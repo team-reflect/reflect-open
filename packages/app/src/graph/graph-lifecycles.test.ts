@@ -19,7 +19,7 @@ const ICLOUD_ROOT = '/Users/me/Library/Mobile Documents/iCloud~reflect/Documents
 function graphDeps(core: TestCoreServices): GraphServicesDeps {
   const { icloudNative, fileChanges, indexLifecycle, activity, clock, logger } = core
   return {
-    backup: {
+    gitSync: {
       git: core.gitRepository,
       syncEngines: core.syncEngines,
       githubAuth: core.githubAuth,
@@ -84,14 +84,14 @@ describe('createAppGraphServices', () => {
   it('runs every lifecycle of a desktop main window', () => {
     const context = setup()
     expect(context.graph).toMatchObject({ session: context.session, role: 'main' })
-    expect(context.graph.backup).not.toBeNull()
+    expect(context.graph.gitSync).not.toBeNull()
     expect(context.core.capture.sessions()).toHaveLength(1)
     expect(context.sessions()).toHaveLength(1)
   })
 
   it('runs only the chat session and the catalog watch in a note window', () => {
     const context = setup({ role: 'note-window', root: ICLOUD_ROOT })
-    expect(context.graph.backup).toBeNull()
+    expect(context.graph.gitSync).toBeNull()
     expect(context.core.capture.sessions()).toEqual([])
     expect(context.sessions()).toEqual([])
     expect(context.core.attachments.watchers()).toBe(1)

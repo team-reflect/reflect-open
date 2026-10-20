@@ -65,7 +65,7 @@ export interface SyncEngineOptions {
    * side): every git command this engine issues is pinned to it, so a
    * command that lands after the user switches graphs fails instead of
    * touching the wrong repository. The engine never refreshes it — the
-   * owner (the backup service) builds a new engine per graph session.
+   * owner (the git sync service) builds a new engine per graph session.
    */
   generation: number
   /**

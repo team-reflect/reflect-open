@@ -54,7 +54,7 @@ import { useAppServices } from '@/services/services-provider.tsx'
 import { formatFullDate } from '@/lib/dates.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
-import { useSyncContext } from '@/providers/sync-provider.tsx'
+import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
@@ -156,7 +156,7 @@ export function MobileSettings(): ReactElement {
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
   const environment = useAppStoreEnvironment()
-  const sync = useSyncContext()
+  const sync = useGitSyncContext()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
   const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
@@ -181,14 +181,14 @@ export function MobileSettings(): ReactElement {
     enabled: graph !== null,
   })
 
-  const backup = sync?.backup ?? null
-  const status = getMobileSyncStatus(backup)
-  const repo = backup !== null && backup.phase === 'connected' ? backup.repo : null
+  const gitSync = sync?.state ?? null
+  const status = getMobileSyncStatus(gitSync)
+  const repo = gitSync !== null && gitSync.phase === 'connected' ? gitSync.repo : null
   // The connect entry point is local-graph-only (iCloud sync and a Git remote
   // are mutually exclusive per graph, Plan 21) and waits out the controller's
   // `loading` phase so the row never flashes on a graph that turns out to be
   // connected.
-  const canConnect = mobileStorageKind === 'local' && backup?.phase === 'disconnected'
+  const canConnect = mobileStorageKind === 'local' && gitSync?.phase === 'disconnected'
 
   // Stop backing this graph up and forget the GitHub credential (one graph
   // per device — unlinking is signing out). The local clone stays; the

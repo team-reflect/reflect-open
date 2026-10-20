@@ -90,7 +90,7 @@ import { createGistPublishService, type GistPublishService } from './sync/gist-p
 import { createGithubAuthService, type GithubAuthService } from './sync/github-auth-service.ts'
 import { createGithubRepoService, type GithubRepoService } from './sync/github-repo-service.ts'
 import { createSyncEngineFactory, type SyncEngineFactory } from './sync/engine.ts'
-import type { BackupServiceDeps } from './sync/backup-service.ts'
+import type { GitSyncServiceDeps } from './sync/git-sync-service.ts'
 import type { ICloudDownloadServiceDeps } from './sync/icloud-download-service.ts'
 import {
   createICloudMigrationService,
@@ -1006,7 +1006,7 @@ export function composeCoreServices(
     logger,
     createServices: (session) => {
       return adapters.createGraphServices(session, {
-        backup: backupDeps,
+        gitSync: gitSyncDeps,
         icloudSync: icloudSyncDeps,
         icloudDownload: icloudDownloadDeps,
         capture: services.capture,
@@ -1103,7 +1103,7 @@ export function composeCoreServices(
     privacy,
   })
   const imageCodec = adapters.imageCodec ?? createUnavailableImageCodec()
-  const backupDeps: BackupServiceDeps = {
+  const gitSyncDeps: GitSyncServiceDeps = {
     git: gitRepository,
     syncEngines,
     githubAuth,

@@ -16,7 +16,7 @@ import {
 import { queryKeys } from '@/lib/query-client.ts'
 import { createDuplicateNoteIdsQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSync } from '@/providers/sync-provider.tsx'
+import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const PENDING_NOTES_REFETCH_MS = 5_000
@@ -58,7 +58,7 @@ function forkLine(forkCount: number): string {
  */
 export function IcloudSettingsField(): ReactElement | null {
   const { graph, openRecent } = useGraph()
-  const { backup, disconnectGraph } = useSync()
+  const { state, disconnectGraph } = useGitSync()
   const { icloudMigration: migration, icloudNative, indexQuery, platform } = useCoreServices()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -91,7 +91,7 @@ export function IcloudSettingsField(): ReactElement | null {
   if (!platform.isMacosDesktop || graph === null) {
     return null
   }
-  const backupConnected = backup.phase === 'connected'
+  const gitSyncConnected = state.phase === 'connected'
   const forkCount = duplicateIds.data?.length
 
   async function moveToICloud(): Promise<void> {
@@ -99,7 +99,7 @@ export function IcloudSettingsField(): ReactElement | null {
     setError(null)
     try {
       const failure = await migration.moveGraph({
-        disconnectBackup: backupConnected ? disconnectGraph : null,
+        disconnectGitSync: gitSyncConnected ? disconnectGraph : null,
         openGraph: openRecent,
         onCopied: (failureSoFar) => {
           setError(failureSoFar)
@@ -155,7 +155,7 @@ export function IcloudSettingsField(): ReactElement | null {
                   <DialogDescription>
                     Your notes are copied into iCloud Drive and the graph reopens there. The current
                     folder stays on disk, untouched, as a recovery copy.
-                    {backupConnected
+                    {gitSyncConnected
                       ? ' GitHub sync is disconnected from the recovery copy; you can reconnect GitHub sync after the iCloud graph opens.'
                       : ''}
                   </DialogDescription>

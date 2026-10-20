@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { BackupSettingsField } from './backup-section.tsx'
+import { GitSyncSettingsField } from './git-sync-section.tsx'
 import { IcloudSettingsField } from './icloud-section.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -12,7 +12,7 @@ export function SyncSection(): ReactElement {
   return (
     <SettingsSection id="sync">
       <IcloudSettingsField />
-      <BackupSettingsField />
+      <GitSyncSettingsField />
     </SettingsSection>
   )
 }

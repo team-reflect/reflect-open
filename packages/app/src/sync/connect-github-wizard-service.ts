@@ -3,7 +3,7 @@ import {
   githubAppInstallUrl,
   newRepoUrl,
   parseRepoInput,
-  type BackupService,
+  type GitSyncService,
   type ClockService,
   type GithubRepoRef,
   type GithubAuthService,
@@ -139,7 +139,7 @@ export interface ConnectGithubWizardService {
  * The services a {@link ConnectGithubWizardService} runs on.
  */
 export interface ConnectGithubWizardDeps {
-  readonly backup: Pick<BackupService, 'connectNewRepo' | 'connectExistingRepo'>
+  readonly connect: Pick<GitSyncService, 'connectNewRepo' | 'connectExistingRepo'>
   readonly githubAuth: GithubAuthService
   readonly opener: OpenerService
   readonly lifecycle: AppLifecycleService
@@ -337,7 +337,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
     if (target === null) {
       return 'stop'
     }
-    const result = await this.#deps.backup.connectExistingRepo(target, { allowPublic: false })
+    const result = await this.#deps.connect.connectExistingRepo(target, { allowPublic: false })
     if (result === 'connected') {
       this.#options.onClose()
       return 'stop'
@@ -471,7 +471,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
     forUser: GithubUser,
     finishOptions: { allowPublic?: boolean; kind?: ConnectAuthKind } = {},
   ): Promise<void> {
-    const { backup } = this.#deps
+    const { connect } = this.#deps
     // The choices this attempt was started with: a change made while it is in
     // flight belongs to the next attempt.
     const kind = finishOptions.kind ?? this.#fields.authKind
@@ -494,7 +494,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
         return
       }
       this.#patch({ showCreateGuide: false, showGrantAccess: false })
-      const result = await backup.connectExistingRepo(ref, {
+      const result = await connect.connectExistingRepo(ref, {
         allowPublic: finishOptions.allowPublic ?? false,
       })
       if (result === 'connected') {
@@ -523,7 +523,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
       }
       // A new repo that doesn't exist yet: create it — by API when the token
       // can, by the guided handoff (plus polling) otherwise.
-      const created = await backup.connectNewRepo(ref.name)
+      const created = await connect.connectNewRepo(ref.name)
       if (created === 'connected') {
         this.#options.onClose()
         return

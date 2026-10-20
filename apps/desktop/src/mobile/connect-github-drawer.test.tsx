@@ -6,9 +6,9 @@ import {
   createTestCoreServices,
   createTestHttpService,
   createTestPlatformService,
-  createTestBackupService,
+  createTestGitSyncService,
   createTestSecretStoreService,
-  type TestBackupService,
+  type TestGitSyncService,
 } from '@reflect/core/testing'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
@@ -37,10 +37,10 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
  */
 async function mount(
   ui: ReactNode,
-  script?: (backup: TestBackupService) => void,
-): Promise<InAppRenderResult<CoreServices> & { backup: TestBackupService }> {
-  const backup = createTestBackupService({ state: { phase: 'disconnected' } })
-  script?.(backup)
+  script?: (gitSync: TestGitSyncService) => void,
+): Promise<InAppRenderResult<CoreServices> & { gitSync: TestGitSyncService }> {
+  const gitSync = createTestGitSyncService({ state: { phase: 'disconnected' } })
+  script?.(gitSync)
   const app = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
@@ -56,16 +56,16 @@ async function mount(
         reply: { status: 200, json: { login: 'alex' } },
       },
     ]),
-    backup,
+    gitSync,
   })
   const view = await renderInApp(ui, { app })
-  return Object.assign(view, { backup })
+  return Object.assign(view, { gitSync })
 }
 
 describe('ConnectGithubDrawer', () => {
   it('suggests reflect-backup — never the local graph name — and connects', async () => {
     const onOpenChange = vi.fn()
-    const { backup } = await mount(
+    const { gitSync } = await mount(
       <ConnectGithubDrawer open onOpenChange={onOpenChange} pollIntervalMs={15} />,
       (scripted) => scripted.onConnectExistingRepo(() => Promise.resolve('notFound')),
     )
@@ -76,14 +76,14 @@ describe('ConnectGithubDrawer', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await vi.waitFor(() => {
-      expect(backup.calls()).toContainEqual({
+      expect(gitSync.calls()).toContainEqual({
         method: 'connectExistingRepo',
         ref: { owner: 'alex', name: 'reflect-backup' },
         allowPublic: false,
       })
     })
     await vi.waitFor(() => {
-      expect(backup.calls()).toContainEqual({
+      expect(gitSync.calls()).toContainEqual({
         method: 'connectNewRepo',
         name: 'reflect-backup',
       })
@@ -93,7 +93,7 @@ describe('ConnectGithubDrawer', () => {
 
   it('connects an existing repository and closes the sheet', async () => {
     const onOpenChange = vi.fn()
-    const { backup } = await mount(
+    const { gitSync } = await mount(
       <ConnectGithubDrawer open onOpenChange={onOpenChange} pollIntervalMs={15} />,
     )
 
@@ -104,7 +104,7 @@ describe('ConnectGithubDrawer', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await vi.waitFor(() => {
-      expect(backup.calls()).toContainEqual({
+      expect(gitSync.calls()).toContainEqual({
         method: 'connectExistingRepo',
         ref: { owner: 'alex', name: 'notes' },
         allowPublic: false,

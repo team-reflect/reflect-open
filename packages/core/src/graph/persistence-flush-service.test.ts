@@ -61,7 +61,7 @@ interface Setup {
   log: string[]
   documents: Step
   settings: Step
-  backup: Step
+  gitSync: Step
 }
 
 const disposers: Unlisten[] = []
@@ -70,7 +70,7 @@ function setup(): Setup {
   const log: string[] = []
   const documents = createStep('documents', log)
   const settings = createStep('settings', log)
-  const backup = createStep('backup', log)
+  const gitSync = createStep('git-sync', log)
   const logger = createTestLoggerService()
   const settingsService = createTestSettingsService()
   vi.spyOn(settingsService, 'flush').mockImplementation(settings.fn)
@@ -81,8 +81,8 @@ function setup(): Setup {
     openDocuments,
     logger,
   })
-  disposers.push(service.registerFlusher('backup', backup.fn))
-  return { service, logger, log, documents, settings, backup }
+  disposers.push(service.registerFlusher('git-sync', gitSync.fn))
+  return { service, logger, log, documents, settings, gitSync }
 }
 
 /**
@@ -102,7 +102,7 @@ afterEach(() => {
 
 describe('flushAll', () => {
   it('flushes documents and settings in parallel, then backup', async () => {
-    const { service, log, backup, documents } = setup()
+    const { service, log, gitSync, documents } = setup()
     const release = documents.hold()
 
     const flushed = service.flushAll()
@@ -111,22 +111,22 @@ describe('flushAll', () => {
 
     release()
     await flushed
-    expect(log).toEqual(['documents', 'settings', 'backup'])
-    expect(backup.calls()).toBe(1)
+    expect(log).toEqual(['documents', 'settings', 'git-sync'])
+    expect(gitSync.calls()).toBe(1)
   })
 
   it('never rejects and logs every failed step', async () => {
-    const { service, documents, settings, backup, logger } = setup()
+    const { service, documents, settings, gitSync, logger } = setup()
     documents.failNext('disk full')
     settings.failNext('settings failed')
-    backup.failNext('commit failed')
+    gitSync.failNext('commit failed')
 
     await expect(service.flushAll()).resolves.toBeUndefined()
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(logger.getErrors().map((entry) => entry.message)).toEqual([
       'documents flush failed:',
       'settings flush failed:',
-      'backup flush failed:',
+      'git-sync flush failed:',
     ])
   })
 
@@ -144,8 +144,8 @@ describe('flushAll', () => {
     const { service, log } = setup()
     const first = createStep('first', log)
     const second = createStep('second', log)
-    const removeFirst = service.registerFlusher('backup', first.fn)
-    service.registerFlusher('backup', second.fn)
+    const removeFirst = service.registerFlusher('git-sync', first.fn)
+    service.registerFlusher('git-sync', second.fn)
     removeFirst()
 
     await service.flushAll()
@@ -160,21 +160,21 @@ describe('startFlushAll', () => {
     const release = documents.hold()
 
     service.startFlushAll()
-    expect(log).toEqual(['documents', 'settings', 'backup'])
+    expect(log).toEqual(['documents', 'settings', 'git-sync'])
     release()
     await settle()
   })
 
   it('logs every failed step', async () => {
-    const { service, documents, backup, logger } = setup()
+    const { service, documents, gitSync, logger } = setup()
     documents.failNext('disk full')
-    backup.failNext('commit failed')
+    gitSync.failNext('commit failed')
 
     service.startFlushAll()
     await settle()
     expect(logger.getErrors().map((entry) => entry.message)).toEqual([
       'documents flush failed:',
-      'backup flush failed:',
+      'git-sync flush failed:',
     ])
   })
 })

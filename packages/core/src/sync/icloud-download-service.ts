@@ -7,7 +7,7 @@ import type { Unlisten } from '../unlisten.ts'
 
 /**
  * A resume transition fires `visibilitychange` and `focus` together in
- * WKWebView (same window as the backup service's resume triggers);
+ * WKWebView (same window as the git sync service's resume triggers);
  * triggers inside this window collapse into one refresh.
  */
 const RESUME_REFRESH_DEDUPE_MS = 1500

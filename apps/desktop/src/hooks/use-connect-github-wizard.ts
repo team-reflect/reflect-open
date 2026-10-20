@@ -7,7 +7,7 @@ import {
   type ConnectWizardStep,
 } from '@reflect/app'
 import type { GithubUser } from '@reflect/core'
-import { useSync } from '@/providers/sync-provider.tsx'
+import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export type {
@@ -70,14 +70,14 @@ export interface ConnectGithubWizard {
  * polls and the public-repo consent gate). Desktop's dialog and mobile's
  * drawer drive the identical flow through it.
  *
- * The connect actions are the ones of {@link useSync}.
+ * The connect actions are the ones of {@link useGitSync}.
  */
 export function useConnectGithubWizard({
   suggestedRepoName,
   onClose,
   pollIntervalMs = 3000,
 }: ConnectGithubWizardOptions): ConnectGithubWizard {
-  const sync = useSync()
+  const sync = useGitSync()
   const { githubAuth, clock } = useCoreServices()
   const { opener, lifecycle } = useAppServices()
   // The wizard lives as long as the surface; it always calls the latest
@@ -90,7 +90,7 @@ export function useConnectGithubWizard({
   const [wizard] = useState(() => {
     return createConnectGithubWizardService(
       {
-        backup: {
+        connect: {
           connectNewRepo: (name) => latestRef.current.sync.connectNewRepo(name),
           connectExistingRepo: (ref, options) => {
             return latestRef.current.sync.connectExistingRepo(ref, options)

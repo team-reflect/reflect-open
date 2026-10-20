@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { getMobileSyncStatus } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSyncContext } from '@/providers/sync-provider.tsx'
+import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 
 /**
  * The sync-status pill (Plan 19, step 10): a small chip that appears only
@@ -11,8 +11,8 @@ import { useSyncContext } from '@/providers/sync-provider.tsx'
  * the tab bar belongs to {@link MobileStatusLayer}.
  */
 export function SyncStatusPill(): ReactElement | null {
-  const sync = useSyncContext()
-  const status = getMobileSyncStatus(sync?.backup ?? null)
+  const sync = useGitSyncContext()
+  const status = getMobileSyncStatus(sync?.state ?? null)
 
   if (status === null || status.tone === 'ok') {
     return null

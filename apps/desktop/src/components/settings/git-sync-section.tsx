@@ -12,49 +12,49 @@ import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { createDuplicateNoteIdsQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSync, type BackupState } from '@/providers/sync-provider.tsx'
+import { useGitSync, type GitSyncState } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
-/** A short, plain-language line for each backup state, never Git jargon. */
-function BackupStatusLine({
-  backup,
+/** A short, plain-language line for each git sync state, never Git jargon. */
+function GitSyncStatusLine({
+  state,
 }: {
-  backup: Extract<BackupState, { phase: 'connected' }>
+  state: Extract<GitSyncState, { phase: 'connected' }>
 }): ReactNode {
-  switch (backup.status.state) {
+  switch (state.status.state) {
     case 'idle':
       return 'Backed up'
     case 'waiting':
       return (
         <>
-          Backs up in <CountdownText until={backup.status.until} />
+          Backs up in <CountdownText until={state.status.until} />
         </>
       )
     case 'syncing':
       return 'Backing up…'
     case 'offline':
-      return backup.status.message
+      return state.status.message
     case 'error':
       // "Reconnect GitHub" only helps when GitHub is the remote; a generic
       // remote's auth message already names the fix (ssh-add, known_hosts…).
-      return backup.status.errorKind === 'auth' && backup.repo !== null
+      return state.status.errorKind === 'auth' && state.repo !== null
         ? 'Backup failed — reconnect GitHub'
-        : `Backup failed: ${backup.status.message}`
+        : `Backup failed: ${state.status.message}`
   }
 }
 
 function githubRepoBrowserUrl(
-  repo: NonNullable<Extract<BackupState, { phase: 'connected' }>['repo']>,
+  repo: NonNullable<Extract<GitSyncState, { phase: 'connected' }>['repo']>,
 ): string {
   return `https://github.com/${repo.owner}/${repo.name}`
 }
 
 /**
  * Settings → Sync → GitHub sync: connect a GitHub repository, see the current
- * backup state in product language, back up on demand, and disconnect.
+ * git sync state in product language, back up on demand, and disconnect.
  */
-export function BackupSettingsField(): ReactElement {
-  const { backup, disconnectGraph, signOut, backUpNow } = useSync()
+export function GitSyncSettingsField(): ReactElement {
+  const { state, disconnectGraph, signOut, syncNow } = useGitSync()
   const { graph } = useGraph()
   const { indexQuery } = useCoreServices()
   const { opener } = useAppServices()
@@ -73,20 +73,20 @@ export function BackupSettingsField(): ReactElement {
   const forkGroups = duplicateIds.data ?? []
 
   const repoLabel =
-    backup.phase === 'connected'
-      ? backup.repo !== null
-        ? `${backup.repo.owner}/${backup.repo.name}`
-        : backup.remoteUrl
+    state.phase === 'connected'
+      ? state.repo !== null
+        ? `${state.repo.owner}/${state.repo.name}`
+        : state.remoteUrl
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
-  const genericRemote = backup.phase === 'connected' && backup.repo === null
+  const genericRemote = state.phase === 'connected' && state.repo === null
   const hosted = graph !== null && isICloudRoot(graph.root)
 
   function openGithubRepo(): void {
-    if (backup.phase !== 'connected' || backup.repo === null) {
+    if (state.phase !== 'connected' || state.repo === null) {
       return
     }
-    const url = githubRepoBrowserUrl(backup.repo)
+    const url = githubRepoBrowserUrl(state.repo)
     const attempt = openRepoAttemptRef.current + 1
     openRepoAttemptRef.current = attempt
     action.setError(null)
@@ -109,7 +109,7 @@ export function BackupSettingsField(): ReactElement {
       <SettingsField
         legend={genericRemote ? 'Backup' : 'GitHub sync'}
         description={
-          hosted && backup.phase === 'connected'
+          hosted && state.phase === 'connected'
             ? `${genericRemote ? 'Pushes to the backup' : 'Backs up to GitHub'} five minutes after iCloud and your edits go quiet. Back up now commits locally.`
             : genericRemote
               ? 'This graph backs up to its own git remote. Edits back up automatically a few moments after you stop typing.'
@@ -117,11 +117,11 @@ export function BackupSettingsField(): ReactElement {
         }
       >
         <div className="mt-3 flex flex-col gap-2">
-          {backup.phase === 'loading' ? (
+          {state.phase === 'loading' ? (
             <p className="text-xs text-text-muted">Checking backup status…</p>
           ) : null}
 
-          {backup.phase === 'disconnected' ? (
+          {state.phase === 'disconnected' ? (
             <>
               <div>
                 <Button size="sm" onClick={() => setConnectOpen(true)}>
@@ -143,12 +143,12 @@ export function BackupSettingsField(): ReactElement {
             </>
           ) : null}
 
-          {backup.phase === 'connected' ? (
+          {state.phase === 'connected' ? (
             <>
               <p className="text-sm text-text">
                 <span className="font-medium">{repoLabel}</span>
                 <span className="ml-2 text-xs text-text-muted">
-                  <BackupStatusLine backup={backup} />
+                  <GitSyncStatusLine state={state} />
                 </span>
               </p>
               <SyncForkNotice groups={forkGroups} />
@@ -156,8 +156,8 @@ export function BackupSettingsField(): ReactElement {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={backup.status.state === 'syncing' || action.pending}
-                  onClick={() => void action.run(backUpNow)}
+                  disabled={state.status.state === 'syncing' || action.pending}
+                  onClick={() => void action.run(syncNow)}
                 >
                   Back up now
                 </Button>
@@ -169,14 +169,14 @@ export function BackupSettingsField(): ReactElement {
                 >
                   Stop backing up
                 </Button>
-                {backup.repo !== null ? (
+                {state.repo !== null ? (
                   <Button variant="ghost" size="sm" onClick={openGithubRepo}>
                     <ExternalLink aria-hidden />
                     Open GitHub repo
                   </Button>
                 ) : null}
               </div>
-              {backup.repo !== null ? (
+              {state.repo !== null ? (
                 <GithubSignOutRow
                   signOut={signOut}
                   description="Sign out on this machine; connected graphs stop backing up."

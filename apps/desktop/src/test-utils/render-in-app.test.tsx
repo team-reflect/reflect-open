@@ -4,7 +4,7 @@ import { page } from 'vitest/browser'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { useGraph, useMaybeGraph } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
-import { useSyncContext } from '@/providers/sync-provider.tsx'
+import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -14,7 +14,7 @@ function Probe(): ReactElement {
   const { status, graph, indexGeneration, indexing, recents, mobileStorageKind } = useGraph()
   const { settings, updateSettings } = useSettings()
   const { route, navigate } = useRouter()
-  const sync = useSyncContext()
+  const sync = useGitSyncContext()
   return (
     <div>
       <output data-testid="graph">
@@ -23,7 +23,7 @@ function Probe(): ReactElement {
       </output>
       <output data-testid="settings">{settings.dateFormat}</output>
       <output data-testid="route">{JSON.stringify(route)}</output>
-      <output data-testid="backup">{sync?.backup.phase ?? 'no sync'}</output>
+      <output data-testid="git-sync">{sync?.state.phase ?? 'no sync'}</output>
       <button type="button" onClick={() => updateSettings({ dateFormat: 'iso' })}>
         iso
       </button>
@@ -52,7 +52,7 @@ describe('renderInApp', () => {
       .toHaveTextContent('ready /graphs/test 1 1 idle 0 -')
     await expect.element(page.getByTestId('session')).toHaveTextContent('/graphs/test')
     await expect.element(page.getByTestId('route')).toHaveTextContent('{"kind":"today"}')
-    await expect.element(page.getByTestId('backup')).toHaveTextContent('disconnected')
+    await expect.element(page.getByTestId('git-sync')).toHaveTextContent('disconnected')
   })
 
   it('reports the graph, the graph state and a later graph switch', async () => {
@@ -89,11 +89,11 @@ describe('renderInApp', () => {
   })
 
   it('runs a scripted backup for the open graph', async () => {
-    const { backup } = await renderInApp(<Probe />, { sync: { phase: 'disconnected' } })
-    await expect.element(page.getByTestId('backup')).toHaveTextContent('disconnected')
+    const { gitSync } = await renderInApp(<Probe />, { sync: { phase: 'disconnected' } })
+    await expect.element(page.getByTestId('git-sync')).toHaveTextContent('disconnected')
 
-    backup?.setState({ phase: 'loading' })
-    await expect.element(page.getByTestId('backup')).toHaveTextContent('loading')
+    gitSync?.setState({ phase: 'loading' })
+    await expect.element(page.getByTestId('git-sync')).toHaveTextContent('loading')
   })
 
   it('renders the mobile surface with the mobile onboarding state', async () => {

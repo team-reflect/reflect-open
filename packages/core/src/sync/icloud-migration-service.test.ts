@@ -20,20 +20,22 @@ function setup(options?: { available?: boolean }) {
     steps.push(`open ${root}`)
     return true
   })
-  const disconnectBackup = vi.fn(() => {
+  const disconnectGitSync = vi.fn(() => {
     steps.push('disconnect')
   })
   const onCopied = vi.fn((failure: string | null) => {
     steps.push(`copied ${String(failure)}`)
   })
-  return { icloudNative, graphSession, migration, steps, openGraph, disconnectBackup, onCopied }
+  return { icloudNative, graphSession, migration, steps, openGraph, disconnectGitSync, onCopied }
 }
 
 describe('createICloudMigrationService', () => {
   it('copies, disconnects the backup, then reopens the graph at its new root', async () => {
-    const { icloudNative, migration, steps, openGraph, disconnectBackup, onCopied } = setup()
+    const { icloudNative, migration, steps, openGraph, disconnectGitSync, onCopied } = setup()
 
-    await expect(migration.moveGraph({ disconnectBackup, openGraph, onCopied })).resolves.toBeNull()
+    await expect(
+      migration.moveGraph({ disconnectGitSync, openGraph, onCopied }),
+    ).resolves.toBeNull()
 
     expect(icloudNative.calls()).toEqual([{ method: 'adoptGraph', args: [4] }])
     expect(steps).toEqual(['disconnect', 'copied null', 'open /iCloud/Documents/Notes'])
@@ -43,20 +45,20 @@ describe('createICloudMigrationService', () => {
     const { migration, steps, openGraph, onCopied } = setup()
 
     await expect(
-      migration.moveGraph({ disconnectBackup: null, openGraph, onCopied }),
+      migration.moveGraph({ disconnectGitSync: null, openGraph, onCopied }),
     ).resolves.toBeNull()
 
     expect(steps).toEqual(['copied null', 'open /iCloud/Documents/Notes'])
   })
 
   it('a failed copy changes nothing: the backup stays connected and the graph stays open', async () => {
-    const { migration, openGraph, disconnectBackup, onCopied } = setup({ available: false })
+    const { migration, openGraph, disconnectGitSync, onCopied } = setup({ available: false })
 
-    await expect(migration.moveGraph({ disconnectBackup, openGraph, onCopied })).resolves.toBe(
+    await expect(migration.moveGraph({ disconnectGitSync, openGraph, onCopied })).resolves.toBe(
       'test iCloud: the container is unavailable',
     )
 
-    expect(disconnectBackup).not.toHaveBeenCalled()
+    expect(disconnectGitSync).not.toHaveBeenCalled()
     expect(onCopied).not.toHaveBeenCalled()
     expect(openGraph).not.toHaveBeenCalled()
   })
@@ -66,7 +68,7 @@ describe('createICloudMigrationService', () => {
 
     await expect(
       migration.moveGraph({
-        disconnectBackup: () => Promise.reject(new AppError('io', 'remote locked')),
+        disconnectGitSync: () => Promise.reject(new AppError('io', 'remote locked')),
         openGraph,
         onCopied,
       }),
@@ -81,14 +83,14 @@ describe('createICloudMigrationService', () => {
 
     await expect(
       migration.moveGraph({
-        disconnectBackup: () => Promise.reject(new AppError('io', 'remote locked')),
+        disconnectGitSync: () => Promise.reject(new AppError('io', 'remote locked')),
         openGraph: () => false,
         onCopied,
       }),
     ).resolves.toBe(`${DISCONNECT_FAILURE} ${OPEN_FAILURE}`)
 
     await expect(
-      migration.moveGraph({ disconnectBackup: null, openGraph: () => false }),
+      migration.moveGraph({ disconnectGitSync: null, openGraph: () => false }),
     ).resolves.toBe(OPEN_FAILURE)
   })
 
@@ -96,7 +98,7 @@ describe('createICloudMigrationService', () => {
     const { icloudNative, graphSession, migration, openGraph } = setup()
     graphSession.setGraph(null)
 
-    await expect(migration.moveGraph({ disconnectBackup: null, openGraph })).resolves.toBe(
+    await expect(migration.moveGraph({ disconnectGitSync: null, openGraph })).resolves.toBe(
       'No graph is open.',
     )
     expect(icloudNative.calls()).toEqual([])
@@ -107,7 +109,7 @@ describe('createICloudMigrationService', () => {
 
     await expect(
       migration.moveGraph({
-        disconnectBackup: () => Promise.reject(new AppError('io', 'remote locked')),
+        disconnectGitSync: () => Promise.reject(new AppError('io', 'remote locked')),
         openGraph: () => Promise.reject(new AppError('io', 'graph vanished')),
       }),
     ).resolves.toBe('graph vanished')

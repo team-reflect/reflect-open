@@ -76,7 +76,7 @@ interface Setup {
   log: string[]
   documents: Step
   settings: Step
-  backup: Step
+  gitSync: Step
   /**
    * Run the close-requested handlers without awaiting them.
    */
@@ -98,7 +98,7 @@ function setup(options?: {
   const log: string[] = []
   const documents = createStep('documents', log)
   const settings = createStep('settings', log)
-  const backup = createStep('backup', log)
+  const gitSync = createStep('git-sync', log)
   const lifecycle = createTestLifecycleService({
     hidden: options?.hidden ?? false,
     backgroundTasks: true,
@@ -142,7 +142,7 @@ function setup(options?: {
     openDocuments,
     logger,
   })
-  disposers.push(persistenceFlush.registerFlusher('backup', backup.fn))
+  disposers.push(persistenceFlush.registerFlusher('git-sync', gitSync.fn))
   const service = createQuitPolicyService({
     lifecycle,
     window,
@@ -157,7 +157,7 @@ function setup(options?: {
     log,
     documents,
     settings,
-    backup,
+    gitSync,
     requestClose() {
       let prevented = false
       const event = {
@@ -198,7 +198,7 @@ describe('installDesktopQuitPolicy', () => {
   it.each(['documents', 'settings'] as const)(
     'hides the main window before pending saves and backup finish (%s finish first)',
     async (firstSave) => {
-      const { service, documents, settings, backup, window, requestClose } = setup()
+      const { service, documents, settings, gitSync, window, requestClose } = setup()
       const releaseDocuments = documents.hold()
       const releaseSettings = settings.hold()
       install(service.installDesktopQuitPolicy())
@@ -209,7 +209,7 @@ describe('installDesktopQuitPolicy', () => {
       await settle()
       expect(documents.calls()).toBe(1)
       expect(settings.calls()).toBe(1)
-      expect(backup.calls()).toBe(0)
+      expect(gitSync.calls()).toBe(0)
 
       const [releaseFirst, releaseLast] =
         firstSave === 'documents'
@@ -217,16 +217,16 @@ describe('installDesktopQuitPolicy', () => {
           : [releaseSettings, releaseDocuments]
       releaseFirst()
       await settle()
-      expect(backup.calls()).toBe(0)
+      expect(gitSync.calls()).toBe(0)
       releaseLast()
       await close.completed
-      expect(backup.calls()).toBe(1)
+      expect(gitSync.calls()).toBe(1)
       expect(window.hideCalls()).toBe(1)
     },
   )
 
   it('still flushes if hiding the main window fails', async () => {
-    const { service, documents, settings, backup, requestClose } = setup({ failHide: true })
+    const { service, documents, settings, gitSync, requestClose } = setup({ failHide: true })
     install(service.installDesktopQuitPolicy())
 
     const close = requestClose()
@@ -234,17 +234,17 @@ describe('installDesktopQuitPolicy', () => {
     expect(close.prevented()).toBe(true)
     expect(documents.calls()).toBe(1)
     expect(settings.calls()).toBe(1)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
   })
 
   it('waits for backup before confirming app quit', async () => {
-    const { service, lifecycle, backup, window } = setup()
-    const release = backup.hold()
+    const { service, lifecycle, gitSync, window } = setup()
+    const release = gitSync.hold()
     install(service.installDesktopQuitPolicy())
 
     lifecycle.emitQuitRequested()
     await settle()
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(lifecycle.confirmQuitCalls()).toBe(0)
     expect(window.hideCalls()).toBe(0)
 
@@ -264,7 +264,7 @@ describe('installDesktopQuitPolicy', () => {
   })
 
   it('flushes and hides the macOS main window even when one flush rejects', async () => {
-    const { service, documents, settings, backup, window, logger, requestClose } = setup()
+    const { service, documents, settings, gitSync, window, logger, requestClose } = setup()
     settings.failNext('settings flush failed')
     install(service.installDesktopQuitPolicy())
 
@@ -273,13 +273,13 @@ describe('installDesktopQuitPolicy', () => {
     await close.completed
     expect(documents.calls()).toBe(1)
     expect(settings.calls()).toBe(1)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(window.hideCalls()).toBe(1)
     expect(logger.getErrors()).toHaveLength(1)
   })
 
   it('allows the main window to close normally outside macOS', async () => {
-    const { service, backup, window, requestClose } = setup({
+    const { service, gitSync, window, requestClose } = setup({
       platform: { isMacosDesktop: false },
     })
     install(service.installDesktopQuitPolicy())
@@ -288,11 +288,11 @@ describe('installDesktopQuitPolicy', () => {
     expect(close.prevented()).toBe(false)
     await close.completed
     expect(window.hideCalls()).toBe(0)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
   })
 
   it('allows secondary windows to close normally', async () => {
-    const { service, documents, backup, window, requestClose } = setup({
+    const { service, documents, gitSync, window, requestClose } = setup({
       windowLabel: 'note-1',
     })
     install(service.installDesktopQuitPolicy())
@@ -301,7 +301,7 @@ describe('installDesktopQuitPolicy', () => {
     expect(close.prevented()).toBe(false)
     await close.completed
     expect(documents.calls()).toBe(1)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(window.hideCalls()).toBe(0)
   })
 
@@ -311,7 +311,7 @@ describe('installDesktopQuitPolicy', () => {
     install(service.installDesktopQuitPolicy())
 
     lifecycle.emitBeforeUnload()
-    expect(log).toEqual(['documents', 'settings', 'backup'])
+    expect(log).toEqual(['documents', 'settings', 'git-sync'])
     release()
     await settle()
   })
@@ -363,39 +363,39 @@ describe('installMobileBackgroundPolicy', () => {
     lifecycle.emitHidden()
     await settle()
 
-    expect(log).toEqual(['begin', 'documents', 'settings', 'backup', 'end background-task-1'])
+    expect(log).toEqual(['begin', 'documents', 'settings', 'git-sync', 'end background-task-1'])
     expect(lifecycle.backgroundTasks()).toEqual([{ token: 'background-task-1', ended: true }])
   })
 
   it('commits only after the buffers have landed', async () => {
-    const { service, lifecycle, documents, backup } = setup()
+    const { service, lifecycle, documents, gitSync } = setup()
     const release = documents.hold()
     install(service.installMobileBackgroundPolicy())
 
     lifecycle.emitHidden()
     await settle()
-    expect(backup.calls()).toBe(0)
+    expect(gitSync.calls()).toBe(0)
 
     release()
     await settle()
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
   })
 
   it('still commits when a buffer flush fails', async () => {
-    const { service, lifecycle, documents, backup } = setup()
+    const { service, lifecycle, documents, gitSync } = setup()
     documents.failNext('disk full')
     install(service.installMobileBackgroundPolicy())
 
     lifecycle.emitHidden()
     await settle()
 
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(lifecycle.backgroundTasks()).toEqual([{ token: 'background-task-1', ended: true }])
   })
 
   it('ends the task even when the commit fails', async () => {
-    const { service, lifecycle, backup } = setup()
-    backup.failNext('commit failed')
+    const { service, lifecycle, gitSync } = setup()
+    gitSync.failNext('commit failed')
     install(service.installMobileBackgroundPolicy())
 
     lifecycle.emitHidden()
@@ -406,7 +406,7 @@ describe('installMobileBackgroundPolicy', () => {
 
   it('still flushes when native background time is unavailable', async () => {
     let ends = 0
-    const { service, lifecycle, documents, backup } = setup({
+    const { service, lifecycle, documents, gitSync } = setup({
       lifecycle: () => ({
         beginBackgroundTask: () => Promise.reject(new Error('no native bridge')),
         endBackgroundTask: () => {
@@ -420,13 +420,13 @@ describe('installMobileBackgroundPolicy', () => {
     await settle()
 
     expect(documents.calls()).toBe(1)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(ends).toBe(0)
   })
 
   it('does not end a task when the native shell returns none', async () => {
     let ends = 0
-    const { service, lifecycle, documents, backup } = setup({
+    const { service, lifecycle, documents, gitSync } = setup({
       lifecycle: () => ({
         beginBackgroundTask: () => null,
         endBackgroundTask: () => {
@@ -440,12 +440,12 @@ describe('installMobileBackgroundPolicy', () => {
     await settle()
 
     expect(documents.calls()).toBe(1)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(ends).toBe(0)
   })
 
   it('survives a failure to end the task', async () => {
-    const { service, lifecycle, backup } = setup({
+    const { service, lifecycle, gitSync } = setup({
       lifecycle: () => ({
         endBackgroundTask: () => Promise.reject(new Error('expired')),
       }),
@@ -454,12 +454,12 @@ describe('installMobileBackgroundPolicy', () => {
 
     lifecycle.emitHidden()
     await settle()
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
 
     lifecycle.emitVisible()
     lifecycle.emitHidden()
     await settle()
-    expect(backup.calls()).toBe(2)
+    expect(gitSync.calls()).toBe(2)
   })
 
   it('does nothing on becoming visible', async () => {
@@ -473,14 +473,14 @@ describe('installMobileBackgroundPolicy', () => {
   })
 
   it('also flushes on pagehide', async () => {
-    const { service, lifecycle, documents, backup } = setup()
+    const { service, lifecycle, documents, gitSync } = setup()
     install(service.installMobileBackgroundPolicy())
 
     lifecycle.emitPageHide()
     await settle()
 
     expect(documents.calls()).toBe(1)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
   })
 
   it('does not flush for a page that starts hidden until a new transition', async () => {
@@ -497,7 +497,7 @@ describe('installMobileBackgroundPolicy', () => {
   })
 
   it('coalesces hidden and pagehide from one background transition', async () => {
-    const { service, lifecycle, documents, backup } = setup()
+    const { service, lifecycle, documents, gitSync } = setup()
     const release = documents.hold()
     install(service.installMobileBackgroundPolicy())
 
@@ -506,17 +506,17 @@ describe('installMobileBackgroundPolicy', () => {
     lifecycle.emitPageHide()
     await settle()
     expect(documents.calls()).toBe(1)
-    expect(backup.calls()).toBe(0)
+    expect(gitSync.calls()).toBe(0)
 
     release()
     await settle()
     expect(documents.calls()).toBe(1)
-    expect(backup.calls()).toBe(1)
+    expect(gitSync.calls()).toBe(1)
     expect(lifecycle.backgroundTasks()).toHaveLength(1)
   })
 
   it('queues one rerun for a genuine visible-to-hidden transition in flight', async () => {
-    const { service, lifecycle, documents, backup } = setup()
+    const { service, lifecycle, documents, gitSync } = setup()
     const release = documents.hold()
     install(service.installMobileBackgroundPolicy())
 
@@ -531,7 +531,7 @@ describe('installMobileBackgroundPolicy', () => {
     release()
     await settle()
     expect(documents.calls()).toBe(2)
-    expect(backup.calls()).toBe(2)
+    expect(gitSync.calls()).toBe(2)
     expect(lifecycle.backgroundTasks()).toHaveLength(2)
   })
 

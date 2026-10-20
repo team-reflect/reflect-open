@@ -91,7 +91,7 @@ export interface ICloudSyncServiceDeps {
 
 /**
  * The iCloud sync lifecycle for one (graph, index session) — the Plan 21
- * counterpart of the backup service, and deliberately much smaller:
+ * counterpart of the git sync service, and deliberately much smaller:
  * iCloud moves the files itself, so all that's left to own is *conflict*
  * handling and shadow-base bookkeeping.
  *
@@ -101,7 +101,7 @@ export interface ICloudSyncServiceDeps {
  *   own writes, pulls, or the sweep's own output) as clean ingests,
  *   which advance the notes' shadow merge bases.
  * - Fans a sweep's rewrites to every file-change subscriber and reindexes
- *   them directly, exactly like the backup service's pull path.
+ *   them directly, exactly like the git sync service's pull path.
  * - Sweeps everything again on resume/focus: a conflict version can appear
  *   without the working file changing, which no file watcher can see. The
  *   resume sweep is the backstop for that — on desktop the only one, and
@@ -391,7 +391,7 @@ class ICloudSyncServiceImpl implements ICloudSyncService {
   /**
    * Fan sweep rewrites out to every file-change subscriber (open sessions
    * reconcile from these) *and* reindex them under the open index session,
-   * exactly like the backup service's pull path — the sweep must never
+   * exactly like the git sync service's pull path — the sweep must never
    * wait on the watcher to notice its own writes.
    */
   #applySweepChanges(changes: FileChange[]): void {

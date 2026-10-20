@@ -27,7 +27,7 @@ import {
 } from './github-repo-service.ts'
 
 /**
- * Backup state as the UI sees it. `connected` means the graph has a repo and
+ * Git sync state as the UI sees it. `connected` means the graph has a repo and
  * an `origin` remote, and the engine is running. `repo` is set for GitHub
  * remotes (which additionally require the stored GitHub credential) and
  * `null` for hand-wired generic remotes (Plan 16: GitLab/Gitea/self-hosted
@@ -37,7 +37,7 @@ import {
  * local-history commit loop (see `startLocalHistory`), which the UI never
  * surfaces.
  */
-export type BackupState =
+export type GitSyncState =
   | { phase: 'loading' }
   | { phase: 'disconnected' }
   | { phase: 'connected'; remoteUrl: string; repo: GithubRepoRef | null; status: SyncStatus }
@@ -70,9 +70,9 @@ const COEXIST_QUIET_MS = 5 * 60_000
 const REMOTE_PROBE_MS = 90_000
 
 /**
- * The (graph, index session) pair one {@link BackupService} backs up.
+ * The (graph, index session) pair one {@link GitSyncService} backs up.
  */
-export interface BackupServiceOptions {
+export interface GitSyncServiceOptions {
   /**
    * The open graph's root folder.
    */
@@ -88,9 +88,9 @@ export interface BackupServiceOptions {
 }
 
 /**
- * The services a {@link BackupService} runs on.
+ * The services a {@link GitSyncService} runs on.
  */
-export interface BackupServiceDeps {
+export interface GitSyncServiceDeps {
   readonly git: GitRepositoryService
   readonly syncEngines: SyncEngineFactory
   readonly githubAuth: GithubAuthService
@@ -113,7 +113,7 @@ export interface BackupServiceDeps {
 }
 
 /**
- * The per-graph backup lifecycle, extracted from React on purpose: every
+ * The per-graph git sync lifecycle, extracted from React on purpose: every
  * review finding against this feature landed in the provider's effect/engine
  * seam (zombie engines on partial init, leaked listeners, resurrection after
  * teardown). Here the lifecycle is one object with one `teardown()` that
@@ -126,12 +126,12 @@ export interface BackupServiceDeps {
  * visible for mobile app resume, and back-online pulls), the quit-commit
  * hook, and the connect / disconnect / sign-out / back-up-now actions.
  */
-export interface BackupService {
+export interface GitSyncService {
   /**
    * Probe the graph and start the engine if fully connected. Idempotent.
    */
   start(): MaybePromise<void>
-  getState: () => BackupState
+  getState: () => GitSyncState
   /**
    * Subscribe to state changes; returns the unsubscribe.
    */
@@ -165,26 +165,26 @@ export interface BackupService {
    * Full cycle now: fetch, pull, push. On an iCloud-hosted graph with a remote
    * it commits, and opens a quiet window only when none is open.
    */
-  backUpNow(): MaybePromise<void>
+  syncNow(): MaybePromise<void>
   /**
    * Tear everything down; the service is unusable afterwards.
    */
   dispose(): void
 }
 
-class BackupServiceImpl implements BackupService {
-  readonly #deps: BackupServiceDeps
+class GitSyncServiceImpl implements GitSyncService {
+  readonly #deps: GitSyncServiceDeps
   readonly #generation: number
   readonly #root: string
   readonly #indexGeneration: number | null
   readonly #mobile: boolean
   readonly #listeners = new Set<() => void>()
   readonly #resumeDisposers: Array<() => void> = []
-  #state: BackupState = { phase: 'loading' }
+  #state: GitSyncState = { phase: 'loading' }
   #disposed = false
   #engine: SyncEngine | null = null
   #unlisten: Unlisten | null = null
-  #unregisterBackupFlusher: (() => void) | null = null
+  #unregisterGitSyncFlusher: (() => void) | null = null
   #probeTimer: TimerHandle | null = null
   /**
    * Serializes direct index writes without delaying synchronous file-change fanout.
@@ -195,7 +195,7 @@ class BackupServiceImpl implements BackupService {
    */
   #remoteIndexEpoch = 0
 
-  constructor(deps: BackupServiceDeps, options: BackupServiceOptions) {
+  constructor(deps: GitSyncServiceDeps, options: GitSyncServiceOptions) {
     this.#deps = deps
     this.#generation = options.generation
     this.#root = options.root
@@ -320,7 +320,7 @@ class BackupServiceImpl implements BackupService {
     }
   }
 
-  readonly getState = (): BackupState => this.#state
+  readonly getState = (): GitSyncState => this.#state
 
   readonly subscribe = (listener: () => void): Unlisten => {
     this.#listeners.add(listener)
@@ -375,7 +375,7 @@ class BackupServiceImpl implements BackupService {
     await this.start()
   }
 
-  async backUpNow(): Promise<void> {
+  async syncNow(): Promise<void> {
     await this.#engine?.syncNow()
   }
 
@@ -385,7 +385,7 @@ class BackupServiceImpl implements BackupService {
     this.#listeners.clear()
   }
 
-  #setState(next: BackupState): void {
+  #setState(next: GitSyncState): void {
     if (this.#disposed || sameState(this.#state, next)) {
       return
     }
@@ -408,8 +408,8 @@ class BackupServiceImpl implements BackupService {
     for (const dispose of this.#resumeDisposers.splice(0)) {
       dispose()
     }
-    this.#unregisterBackupFlusher?.()
-    this.#unregisterBackupFlusher = null
+    this.#unregisterGitSyncFlusher?.()
+    this.#unregisterGitSyncFlusher = null
   }
 
   #clearProbe(): void {
@@ -527,7 +527,7 @@ class BackupServiceImpl implements BackupService {
     // Quit-time commit (local only — never a network push on the way out),
     // queued behind any running cycle so it can never land between a pull's
     // ref move and its checkout.
-    this.#unregisterBackupFlusher = persistenceFlush.registerFlusher('backup', () => {
+    this.#unregisterGitSyncFlusher = persistenceFlush.registerFlusher('git-sync', () => {
       return next.commitNow()
     })
   }
@@ -650,11 +650,11 @@ class BackupServiceImpl implements BackupService {
   }
 }
 
-export function createBackupService(
-  deps: BackupServiceDeps,
-  options: BackupServiceOptions,
-): BackupService {
-  return new BackupServiceImpl(deps, options)
+export function createGitSyncService(
+  deps: GitSyncServiceDeps,
+  options: GitSyncServiceOptions,
+): GitSyncService {
+  return new GitSyncServiceImpl(deps, options)
 }
 
 /**
@@ -664,7 +664,7 @@ function isForbidden(status: SyncStatus): boolean {
   return isSyncError(status) && status.errorKind === 'auth' && status.message.includes('403')
 }
 
-function sameState(a: BackupState, b: BackupState): boolean {
+function sameState(a: GitSyncState, b: GitSyncState): boolean {
   if (a.phase !== 'connected' || b.phase !== 'connected') {
     return a.phase === b.phase
   }

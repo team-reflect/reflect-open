@@ -8,10 +8,10 @@ import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
  */
 export interface MoveGraphToICloudOptions {
   /**
-   * `BackupService.disconnectGraph` of the open graph when its backup is
+   * `GitSyncService.disconnectGraph` of the open graph when its backup is
    * connected, else `null`.
    */
-  disconnectBackup: (() => MaybePromise<void>) | null
+  disconnectGitSync: (() => MaybePromise<void>) | null
   /**
    * Reopen the graph at its new root (`GraphSessionService.openRecent`);
    * resolves `false` when it could not be opened.
@@ -57,7 +57,7 @@ class ICloudMigrationServiceImpl implements ICloudMigrationService {
   }
 
   async moveGraph({
-    disconnectBackup,
+    disconnectGitSync,
     openGraph,
     onCopied,
   }: MoveGraphToICloudOptions): Promise<string | null> {
@@ -71,9 +71,9 @@ class ICloudMigrationServiceImpl implements ICloudMigrationService {
       // Copy first: if it fails, nothing changed — the backup is still
       // connected and the graph untouched.
       const newRoot = await icloudNative.adoptGraph(session.generation)
-      if (disconnectBackup !== null) {
+      if (disconnectGitSync !== null) {
         try {
-          await disconnectBackup()
+          await disconnectGitSync()
         } catch (caught) {
           // The iCloud copy has no .git, so exclusivity holds for the new
           // graph regardless; the original folder keeping its backup is the

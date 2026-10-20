@@ -71,7 +71,7 @@ export function createAppGraphServices(
   const main = session.role === 'main'
   const mobile = isMobilePlatform(platform.appPlatform) || platform.surface.mobileApp
   const services = createGraphServices(session, deps, {
-    backup: main,
+    gitSync: main,
     icloudSync: main && isICloudRoot(session.root),
     capture: main,
     assetDescription: false,

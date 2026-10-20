@@ -10,7 +10,7 @@ import {
 } from '@reflect/app/testing'
 import type {
   CoreServices,
-  BackupState,
+  GitSyncState,
   GraphServices,
   GraphSessionState,
   Settings,
@@ -19,10 +19,10 @@ import {
   createTestClockService,
   createTestCoreServices,
   createTestPlatformService,
-  createTestBackupService,
+  createTestGitSyncService,
   type TestCoreServices,
   type TestDatabaseService,
-  type TestBackupService,
+  type TestGitSyncService,
   type TestOpenGraph,
   type TestPlatformOptions,
 } from '@reflect/core/testing'
@@ -71,7 +71,7 @@ export interface RenderInAppOptions {
    * Swap the backup service for a scripted one that starts in this state; the
    * result's `backup` drives it. Needs an open graph.
    */
-  sync?: BackupState
+  sync?: GitSyncState
   /**
    * The facts of the test platform. Only without `app`; see {@link MOBILE_PLATFORM}.
    */
@@ -106,9 +106,9 @@ interface InAppHandles<App extends CoreServices> {
   readonly appServices: TestAppServices
   readonly queryClient: QueryClient
   /**
-   * The scripted backup when `sync` was a `BackupState`, else `null`.
+   * The scripted git sync service when `sync` was a `GitSyncState`, else `null`.
    */
-  readonly backup: TestBackupService | null
+  readonly gitSync: TestGitSyncService | null
 }
 
 export interface InAppRenderResult<App extends CoreServices>
@@ -124,7 +124,7 @@ type AnyOptions = RenderInAppOptions & { app?: CoreServices | undefined }
  */
 function createApp(
   database: TestDatabaseService,
-  backup: TestBackupService | null,
+  gitSync: TestGitSyncService | null,
   platform: TestPlatformOptions | undefined,
 ): TestCoreServices {
   const clock = createTestClockService()
@@ -134,7 +134,7 @@ function createApp(
     // The app layer's operations list is the port the core services report to.
     progress: createTestOperationsService(clock),
     ...(platform === undefined ? {} : { platform: createTestPlatformService(platform) }),
-    ...(backup === null ? {} : { backup }),
+    ...(gitSync === null ? {} : { gitSync }),
   })
 }
 
@@ -147,11 +147,11 @@ async function prepare(options: AnyOptions | undefined): Promise<
     dispose: () => void
   }
 > {
-  const backup =
-    options?.sync === undefined ? null : createTestBackupService({ state: options.sync })
-  if (options?.app !== undefined && (backup !== null || options.platform !== undefined)) {
+  const gitSync =
+    options?.sync === undefined ? null : createTestGitSyncService({ state: options.sync })
+  if (options?.app !== undefined && (gitSync !== null || options.platform !== undefined)) {
     throw new Error(
-      'renderInApp: with your own `app`, give it the platform and the backup service yourself',
+      'renderInApp: with your own `app`, give it the platform and the git sync service yourself',
     )
   }
   const servicesOnly = options?.servicesOnly ?? false
@@ -169,7 +169,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
   let app: CoreServices
   if (options?.app === undefined) {
     database = createWasmTestDatabaseService()
-    app = createApp(database, backup, options?.platform)
+    app = createApp(database, gitSync, options?.platform)
   } else {
     app = options.app
   }
@@ -240,7 +240,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
     app,
     appServices: appLayer,
     queryClient,
-    backup,
+    gitSync,
     wrap,
     dispose: () => {
       queryClient.clear()

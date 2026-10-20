@@ -28,10 +28,10 @@ export {
 export { githubAppInstallUrl, type GithubAuthService } from './sync/github-auth-service.ts'
 export { newRepoUrl, parseRepoInput, type GithubRepoRef } from './sync/github-repo-service.ts'
 export {
-  type BackupService,
-  type BackupState,
+  type GitSyncService,
+  type GitSyncState,
   type ConnectExistingResult,
-} from './sync/backup-service.ts'
+} from './sync/git-sync-service.ts'
 export { isICloudRoot } from './sync/icloud-sync-service.ts'
 export { type GistPublishService } from './sync/gist-publish-service.ts'
 export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'

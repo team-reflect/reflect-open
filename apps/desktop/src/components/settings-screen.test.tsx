@@ -7,7 +7,7 @@ import {
   createTestCoreServices,
   createTestEmbeddingRuntimeService,
   createTestPlatformService,
-  createTestBackupService,
+  createTestGitSyncService,
   type TestEmbeddingRuntimeService,
   type TestOpenGraph,
 } from '@reflect/core/testing'
@@ -40,13 +40,13 @@ function saved(): Settings[] {
 }
 
 // The screen runs off macOS desktop (no Agents, iCloud or Calendar rows), with
-// a graph open and its backup disconnected.
+// a graph open and its git sync disconnected.
 function createApp() {
   return createTestCoreServices({
     database: createWasmTestDatabaseService(),
     embeddingRuntime: embedRuntime,
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
-    backup: createTestBackupService({ state: { phase: 'disconnected' } }),
+    gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),
   })
 }
 

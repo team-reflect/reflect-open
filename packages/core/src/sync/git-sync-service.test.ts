@@ -24,11 +24,11 @@ import {
 import { createSyncEngineFactory } from './engine.ts'
 import { createGithubRepoService } from './github-repo-service.ts'
 import {
-  createBackupService,
-  type BackupService,
-  type BackupServiceDeps,
-  type BackupState,
-} from './backup-service.ts'
+  createGitSyncService,
+  type GitSyncService,
+  type GitSyncServiceDeps,
+  type GitSyncState,
+} from './git-sync-service.ts'
 import type {
   ChangedFile,
   CommitOutcome,
@@ -43,7 +43,7 @@ let activity: TestActivityPort
 let logger: TestLoggerService
 let fileChanges: TestFileChangeService
 let persistenceFlush: TestPersistenceFlushService
-let backupDeps: BackupServiceDeps
+let gitSyncDeps: GitSyncServiceDeps
 let icloudNative: TestICloudNativeService
 
 beforeEach(() => {
@@ -155,7 +155,7 @@ interface FakeOptions {
 }
 
 /**
- * Build the backup factory over fakes with a mutable repo status, recording
+ * Build the git sync factory over fakes with a mutable repo status, recording
  * every git command and direct index write by method name.
  */
 function fakeServices(options: FakeOptions = {}) {
@@ -281,7 +281,7 @@ function fakeServices(options: FakeOptions = {}) {
   )
 
   const progress = createTestProgressPort()
-  backupDeps = {
+  gitSyncDeps = {
     git,
     syncEngines: createSyncEngineFactory({ git, clock }),
     githubAuth: createTestGithubAuthService({ secretStore, http, clock }),
@@ -312,13 +312,13 @@ function fakeServices(options: FakeOptions = {}) {
 }
 
 /**
- * A backup service of the last {@link fakeServices} call, at graph generation 3.
+ * A git sync service of the last {@link fakeServices} call, at graph generation 3.
  */
-function createBackup(options: {
+function createGitSync(options: {
   indexGeneration: number | null
   root?: string | undefined
-}): BackupService {
-  return createBackupService(backupDeps, {
+}): GitSyncService {
+  return createGitSyncService(gitSyncDeps, {
     root: options.root ?? '/graph',
     generation: GENERATION,
     indexGeneration: options.indexGeneration,
@@ -347,23 +347,23 @@ function commitCount(calls: string[]): number {
   return calls.filter((command) => command === 'committed').length
 }
 
-function trackStates(backup: BackupService): BackupState[] {
-  const states: BackupState[] = []
-  backup.subscribe(() => {
-    states.push(backup.getState())
+function trackStates(gitSync: GitSyncService): GitSyncState[] {
+  const states: GitSyncState[] = []
+  gitSync.subscribe(() => {
+    states.push(gitSync.getState())
   })
   return states
 }
 
 const ICLOUD_ROOT = '/Users/a/Library/Mobile Documents/iCloud~app/Documents/Notes'
 
-describe('createBackupService', () => {
+describe('createGitSyncService', () => {
   it('an iCloud graph with a remote waits for quiet before fetching', async () => {
     const { calls } = fakeServices()
-    const backup = createBackup({ indexGeneration: 1, root: ICLOUD_ROOT })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1, root: ICLOUD_ROOT })
+    await gitSync.start()
     await vi.waitFor(() => {
-      expect(backup.getState()).toMatchObject({
+      expect(gitSync.getState()).toMatchObject({
         phase: 'connected',
         status: { state: 'waiting', until: 5 * 60_000 },
       })
@@ -376,37 +376,37 @@ describe('createBackupService', () => {
       expect(calls).toContain('fetch')
     })
     expect(icloudNative.calls()).toEqual([{ method: 'pendingCount', args: [ICLOUD_ROOT, 'notes'] }])
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('an unchanged state does not notify listeners', async () => {
     fakeServices()
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
-      expect(backup.getState()).toMatchObject({ status: { state: 'idle' } })
+      expect(gitSync.getState()).toMatchObject({ status: { state: 'idle' } })
     })
-    const states = trackStates(backup)
-    await backup.backUpNow()
+    const states = trackStates(gitSync)
+    await gitSync.syncNow()
     await flush()
     expect(states.length).toBeGreaterThan(0)
     for (let i = 1; i < states.length; i++) {
       expect(states[i]).not.toEqual(states[i - 1])
     }
     expect(states.at(-1)).toMatchObject({ status: { state: 'idle' } })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('a folder graph never enters quiet mode', async () => {
     const { calls } = fakeServices()
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(calls).toContain('fetch')
     })
-    expect(backup.getState()).toMatchObject({ status: { state: 'idle' } })
+    expect(gitSync.getState()).toMatchObject({ status: { state: 'idle' } })
     expect(icloudNative.calls()).toEqual([])
-    backup.dispose()
+    gitSync.dispose()
   })
 
   describe('remote probe', () => {
@@ -414,18 +414,18 @@ describe('createBackupService', () => {
 
     async function startSettled(options: Parameters<typeof fakeServices>[0], root?: string) {
       const services = fakeServices(options)
-      const backup = createBackup({ indexGeneration: 1, root })
-      await backup.start()
+      const gitSync = createGitSync({ indexGeneration: 1, root })
+      await gitSync.start()
       await vi.waitFor(() => {
-        const state = backup.getState()
+        const state = gitSync.getState()
         expect.assert(state.phase === 'connected')
         expect(state.status.state).toMatch(/idle|waiting/)
       })
-      return { ...services, backup }
+      return { ...services, gitSync }
     }
 
     it('probes the remote while visible and pulls when it moved', async () => {
-      const { git, calls, backup } = await startSettled({})
+      const { git, calls, gitSync } = await startSettled({})
       try {
         const probes: Array<unknown> = []
         let tip: { remoteOid: string | null; trackingOid: string | null } = {
@@ -454,7 +454,7 @@ describe('createBackupService', () => {
           expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches + 1)
         })
       } finally {
-        backup.dispose()
+        gitSync.dispose()
       }
     })
 
@@ -471,13 +471,13 @@ describe('createBackupService', () => {
       const icloud = await startSettled({}, ICLOUD_ROOT)
       watch(icloud.git)
       await advance(5 * 60_000)
-      icloud.backup.dispose()
+      icloud.gitSync.dispose()
       expect(probed()).toBe(0)
 
       const mobile = await startSettled({ mobile: true })
       watch(mobile.git)
       await advance(5 * 60_000)
-      mobile.backup.dispose()
+      mobile.gitSync.dispose()
       expect(probed()).toBe(0)
 
       const hidden = await startSettled({})
@@ -488,7 +488,7 @@ describe('createBackupService', () => {
       activity.setHidden(false)
       await advance(90_000)
       expect(probed()).toBe(1)
-      hidden.backup.dispose()
+      hidden.gitSync.dispose()
 
       const failing = await startSettled({})
       watch(failing.git)
@@ -496,14 +496,14 @@ describe('createBackupService', () => {
         throw new AppError('auth', 'bad token')
       })
       failing.git.onPull(() => ({ ...PULLED, committed: true, ahead: 1 }))
-      void failing.backup.backUpNow()
+      void failing.gitSync.syncNow()
       await vi.waitFor(() => {
-        expect(failing.backup.getState()).toMatchObject({ status: { state: 'error' } })
+        expect(failing.gitSync.getState()).toMatchObject({ status: { state: 'error' } })
       })
       const before = probed()
       await advance(5 * 60_000)
       expect(probed()).toBe(before)
-      failing.backup.dispose()
+      failing.gitSync.dispose()
     })
   })
 
@@ -512,11 +512,11 @@ describe('createBackupService', () => {
       mobile: true,
       pullOutcome: { ...PULLED, committed: false },
     })
-    const backup = createBackup({ indexGeneration: 1 })
+    const gitSync = createGitSync({ indexGeneration: 1 })
     try {
-      await backup.start()
+      await gitSync.start()
       await vi.waitFor(() => {
-        expect(backup.getState()).toMatchObject({ status: { state: 'idle' } })
+        expect(gitSync.getState()).toMatchObject({ status: { state: 'idle' } })
       })
       git.onCommitAll(() => {
         activity.setHidden(true)
@@ -531,7 +531,7 @@ describe('createBackupService', () => {
         expect(calls.filter((command) => command === 'push')).toHaveLength(1)
       })
     } finally {
-      backup.dispose()
+      gitSync.dispose()
     }
   })
 
@@ -541,10 +541,10 @@ describe('createBackupService', () => {
     // takes over. Losing history here is a silent downgrade the user never
     // asked for.
     const { calls } = fakeServices({ auth: null })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
-    expect(backup.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
     await vi.waitFor(() => {
       expect(calls).toContain('commitAll')
     })
@@ -552,13 +552,13 @@ describe('createBackupService', () => {
     expect(calls).not.toContain('setup')
     expect(calls).not.toContain('fetch')
     expect(calls).not.toContain('push')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('keeps committing on edits after the GitHub credential is gone', async () => {
     const { calls } = fakeServices({ auth: null })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(commitCount(calls)).toBe(1)
     })
@@ -570,7 +570,7 @@ describe('createBackupService', () => {
     await advance(30_000)
     expect(commitCount(calls)).toBe(2)
     expect(calls).not.toContain('push')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('adopts a hand-wired generic remote without any stored credential', async () => {
@@ -580,28 +580,28 @@ describe('createBackupService', () => {
       auth: null,
       remoteUrl: 'git@gitlab.com:alex/notes.git',
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(calls).toContain('fetch')
     })
 
-    expect(backup.getState()).toMatchObject({
+    expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
       repo: null,
     })
     const fetch = invocations.find(({ command }) => command === 'fetch')
     expect(fetch?.args).toMatchObject({ credential: null })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('never offers the GitHub token to a generic remote', async () => {
     // A GitHub credential in the keychain + a foreign origin: the token must
     // not ride along as basic auth to a host the user never authorized.
     const { invocations } = fakeServices({ remoteUrl: 'git@gitlab.com:alex/notes.git' })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(invocations.some(({ command }) => command === 'fetch')).toBe(true)
     })
@@ -611,7 +611,7 @@ describe('createBackupService', () => {
         expect(args).toMatchObject({ credential: null })
       }
     }
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('refuses a generic HTTPS remote', async () => {
@@ -619,15 +619,15 @@ describe('createBackupService', () => {
     // on push — edits arriving while the user's own never leave. The guard
     // surfaces the error before the engine ever starts.
     const { calls } = fakeServices({ remoteUrl: 'https://gitlab.com/alex/notes.git' })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
-    expect(backup.getState()).toMatchObject({
+    expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       repo: null,
       status: { state: 'error', errorKind: 'rejected' },
     })
-    const state = backup.getState()
+    const state = gitSync.getState()
     if (state.phase === 'connected' && state.status.state === 'error') {
       expect(state.status.message).toContain('git remote set-url')
     }
@@ -644,17 +644,17 @@ describe('createBackupService', () => {
     expect(commitCount(calls)).toBe(1)
     expect(calls).not.toContain('fetch')
     expect(calls).not.toContain('push')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('keeps the SSH suggestion when local history cannot start', async () => {
     // Local history is best effort: a watcher that won't come up must not cost
     // the user the one instruction they have for fixing the remote.
     fakeServices({ remoteUrl: 'https://gitlab.com/alex/notes.git', failListen: true })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
-    expect(backup.getState()).toMatchObject({
+    expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       repo: null,
       status: { state: 'error', errorKind: 'rejected' },
@@ -663,7 +663,7 @@ describe('createBackupService', () => {
       message: 'local history failed to start:',
       cause: 'watcher unavailable',
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('keeps local history when the keychain itself cannot be read', async () => {
@@ -671,10 +671,10 @@ describe('createBackupService', () => {
     // missing credential, so it must not fail the whole start into the
     // engine-less catch and take the graph's history with it.
     const { calls } = fakeServices({ failSecretGet: true })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
-    expect(backup.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
     await vi.waitFor(() => {
       expect(calls).toContain('commitAll')
     })
@@ -684,14 +684,14 @@ describe('createBackupService', () => {
       message: 'reading the GitHub credential failed:',
       cause: expect.any(String) as string,
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('runs the launch pull when fully connected — and skips the idle push', async () => {
     const { calls } = fakeServices({ pullOutcome: { ...PULLED, committed: false } })
-    const backup = createBackup({ indexGeneration: 1 })
-    const states = trackStates(backup)
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    const states = trackStates(gitSync)
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(calls).toContain('pull')
     })
@@ -699,18 +699,18 @@ describe('createBackupService', () => {
     expect(states.at(-1)).toMatchObject({ phase: 'connected', status: { state: 'idle' } })
     // Both sides in step: the cycle must end without a network push.
     expect(calls).not.toContain('push')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('disposing mid-probe stops before any engine or git work runs', async () => {
     const { calls, releaseStatus } = fakeServices({ gateStatus: true })
-    const backup = createBackup({ indexGeneration: 1 })
-    const started = backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    const started = gitSync.start()
     await vi.waitFor(() => {
       expect(calls).toContain('status')
     })
 
-    backup.dispose() // teardown wins the race against the probe
+    gitSync.dispose() // teardown wins the race against the probe
     releaseStatus()
     await started
     await flush()
@@ -721,11 +721,11 @@ describe('createBackupService', () => {
 
   it('initializes local history on desktop when no backup is configured', async () => {
     const { calls, invocations } = fakeServices({ auth: null, initialized: false, remoteUrl: null })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
     // The UI never learns about local history — the graph reads as disconnected.
-    expect(backup.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
     const setup = invocations.find(({ command }) => command === 'setup')
     expect(setup?.args).toMatchObject({ remoteUrl: null, branch: null, generation: GENERATION })
     await vi.waitFor(() => {
@@ -733,7 +733,7 @@ describe('createBackupService', () => {
     })
     expect(calls).not.toContain('fetch')
     expect(calls).not.toContain('push')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('disposing while local history sets up creates no engine', async () => {
@@ -743,15 +743,15 @@ describe('createBackupService', () => {
       remoteUrl: null,
       gateSetup: true,
     })
-    const create = vi.spyOn(backupDeps.syncEngines, 'create')
+    const create = vi.spyOn(gitSyncDeps.syncEngines, 'create')
     const subscribe = vi.spyOn(fileChanges, 'subscribe')
-    const backup = createBackup({ indexGeneration: 1 })
-    const started = backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    const started = gitSync.start()
     await vi.waitFor(() => {
       expect(calls).toContain('setup')
     })
 
-    backup.dispose()
+    gitSync.dispose()
     releaseSetup()
     await started
     await flush()
@@ -764,8 +764,8 @@ describe('createBackupService', () => {
   it('local history keeps committing on edits — still with no network', async () => {
     // A repo without a remote (e.g. after disconnectGraph) needs no git_setup.
     const { calls } = fakeServices({ auth: null, remoteUrl: null })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(commitCount(calls)).toBe(1)
     })
@@ -779,13 +779,13 @@ describe('createBackupService', () => {
     expect(commitCount(calls)).toBe(2)
     expect(calls).not.toContain('fetch')
     expect(calls).not.toContain('push')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('a pull batch does not tick the commit debounce', async () => {
     const { calls } = fakeServices({ auth: null, remoteUrl: null })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(commitCount(calls)).toBe(1)
     })
@@ -796,13 +796,13 @@ describe('createBackupService', () => {
     })
     await advance(30_000)
     expect(commitCount(calls)).toBe(1)
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('an icloud-sweep batch ticks the commit debounce', async () => {
     const { calls } = fakeServices({ auth: null, remoteUrl: null })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(commitCount(calls)).toBe(1)
     })
@@ -813,7 +813,7 @@ describe('createBackupService', () => {
     })
     await advance(30_000)
     expect(commitCount(calls)).toBe(2)
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('never starts local history on mobile', async () => {
@@ -823,37 +823,37 @@ describe('createBackupService', () => {
       remoteUrl: null,
       mobile: true,
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await flush()
 
-    expect(backup.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
     expect(calls).not.toContain('setup')
     expect(calls).not.toContain('commitAll')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('disconnectGraph drops the remote and lands on disconnected', async () => {
     const { calls } = fakeServices()
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
-    await backup.disconnectGraph()
+    await gitSync.disconnectGraph()
 
     expect(calls).toContain('disconnect')
-    expect(backup.getState()).toEqual({ phase: 'disconnected' })
-    backup.dispose()
+    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+    gitSync.dispose()
   })
 
   it('a failed probe tears down to disconnected instead of leaving a zombie', async () => {
     const { calls } = fakeServices({ failStatus: true })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
-    expect(backup.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
     expect(calls).not.toContain('commitAll')
     expect(logger.getErrors()).toEqual([{ message: 'backup start failed:', cause: 'broken repo' }])
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('connectNewRepo creates a private repo and connects to its default branch', async () => {
@@ -871,9 +871,9 @@ describe('createBackupService', () => {
         201,
       ),
     )
-    const backup = createBackup({ indexGeneration: 1 })
+    const gitSync = createGitSync({ indexGeneration: 1 })
 
-    await backup.connectNewRepo('g-backup')
+    await gitSync.connectNewRepo('g-backup')
 
     expect(JSON.parse(http.requests()[0]?.body ?? '')).toMatchObject({
       name: 'g-backup',
@@ -885,11 +885,11 @@ describe('createBackupService', () => {
       branch: 'main',
       generation: GENERATION,
     })
-    expect(backup.getState()).toMatchObject({
+    expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       repo: { owner: 'alex', name: 'g-backup' },
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('connectExistingRepo reports a missing repo without touching the graph', async () => {
@@ -899,11 +899,11 @@ describe('createBackupService', () => {
       'https://api.github.com/repos/alex/gone',
       jsonResponse({ message: 'Not Found' }, 404),
     )
-    const backup = createBackup({ indexGeneration: 1 })
+    const gitSync = createGitSync({ indexGeneration: 1 })
 
-    expect(await backup.connectExistingRepo({ owner: 'alex', name: 'gone' })).toBe('notFound')
+    expect(await gitSync.connectExistingRepo({ owner: 'alex', name: 'gone' })).toBe('notFound')
     expect(calls).not.toContain('setup')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('connectExistingRepo demands explicit consent before a public repo', async () => {
@@ -918,30 +918,30 @@ describe('createBackupService', () => {
         html_url: 'https://github.com/alex/public-notes',
       }),
     )
-    const backup = createBackup({ indexGeneration: 1 })
+    const gitSync = createGitSync({ indexGeneration: 1 })
     const ref = { owner: 'alex', name: 'public-notes' }
 
-    expect(await backup.connectExistingRepo(ref)).toBe('needsPublicConfirm')
+    expect(await gitSync.connectExistingRepo(ref)).toBe('needsPublicConfirm')
     expect(calls).not.toContain('setup')
 
-    expect(await backup.connectExistingRepo(ref, { allowPublic: true })).toBe('connected')
+    expect(await gitSync.connectExistingRepo(ref, { allowPublic: true })).toBe('connected')
     const setup = invocations.find(({ command }) => command === 'setup')
     // The repo's default branch is where the existing backup history lives.
     expect(setup?.args).toMatchObject({ branch: 'master' })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('signOut clears the machine credential and lands on disconnected', async () => {
     const { secrets } = fakeServices()
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
-    expect(backup.getState()).toMatchObject({ phase: 'connected' })
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    expect(gitSync.getState()).toMatchObject({ phase: 'connected' })
 
-    await backup.signOut()
+    await gitSync.signOut()
 
     expect(secrets.snapshot()).not.toHaveProperty('github-auth')
-    expect(backup.getState()).toEqual({ phase: 'disconnected' })
-    backup.dispose()
+    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+    gitSync.dispose()
   })
 
   // libgit2 reports every 403 as an auth failure, but GitHub also answers
@@ -953,36 +953,36 @@ describe('createBackupService', () => {
   it('a 403 with a valid token reports a refused sync, not a bad credential', async () => {
     fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
     http.on('GET', USER_URL, jsonResponse({ login: 'alex' }))
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
-      expect(backup.getState()).toMatchObject({
+      expect(gitSync.getState()).toMatchObject({
         phase: 'connected',
         status: { state: 'error', errorKind: 'rejected' },
       })
     })
-    const state = backup.getState()
+    const state = gitSync.getState()
     expect(
       state.phase === 'connected' && state.status.state === 'error' && state.status.message,
     ).toContain('alex/notes')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('a 403 with a rejected token stays an auth error', async () => {
     fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
     http.on('GET', USER_URL, jsonResponse({ message: 'Bad credentials' }, 401))
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(http.requests()).not.toHaveLength(0)
     })
     // Let the probe's rejection settle before asserting nothing changed.
     await flush()
-    expect(backup.getState()).toMatchObject({
+    expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       status: { state: 'error', errorKind: 'auth' },
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('a 403 with a token probe that never reaches GitHub reports offline', async () => {
@@ -990,29 +990,29 @@ describe('createBackupService', () => {
     http.on('GET', USER_URL, () => {
       throw new TypeError('Failed to fetch')
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
-      expect(backup.getState()).toMatchObject({
+      expect(gitSync.getState()).toMatchObject({
         phase: 'connected',
         status: { state: 'offline' },
       })
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('a 403 with a rate-limited token probe reports offline, not a bad credential', async () => {
     fakeServices({ pullOutcome: MERGED, pushError: FORBIDDEN })
     http.on('GET', USER_URL, jsonResponse({ message: 'API rate limit exceeded' }, 403))
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
-      expect(backup.getState()).toMatchObject({
+      expect(gitSync.getState()).toMatchObject({
         phase: 'connected',
         status: { state: 'offline' },
       })
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   // Safety invariant S4 (docs/git-backup-safety.md): the quit-time commit
@@ -1023,8 +1023,8 @@ describe('createBackupService', () => {
       gatePull: true,
       gateCommit: true,
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     try {
       await vi.waitFor(() => {
         expect(calls).toContain('pull')
@@ -1049,15 +1049,15 @@ describe('createBackupService', () => {
     } finally {
       releasePull()
       releaseCommit()
-      backup.dispose()
+      gitSync.dispose()
     }
   })
 
   it('the mobile background flush commits while the document is hidden', async () => {
     const { calls } = fakeServices({ mobile: true })
-    const backup = createBackup({ indexGeneration: 1 })
+    const gitSync = createGitSync({ indexGeneration: 1 })
     try {
-      await backup.start()
+      await gitSync.start()
       await vi.waitFor(() => {
         expect(calls).toContain('pull') // the launch cycle ran
       })
@@ -1067,15 +1067,15 @@ describe('createBackupService', () => {
       await persistenceFlush.flushAll()
       expect(commitCount(calls)).toBe(before + 1)
     } finally {
-      backup.dispose()
+      gitSync.dispose()
     }
   })
 
   it('a resume (window focus, network back, visible again) triggers a sync', async () => {
     const { calls } = fakeServices()
-    const backup = createBackup({ indexGeneration: 1 })
+    const gitSync = createGitSync({ indexGeneration: 1 })
     try {
-      await backup.start()
+      await gitSync.start()
       await vi.waitFor(() => {
         expect(commitCount(calls)).toBe(1) // the launch pull's commit
       })
@@ -1085,19 +1085,19 @@ describe('createBackupService', () => {
         expect(commitCount(calls)).toBe(2)
       })
     } finally {
-      backup.dispose()
+      gitSync.dispose()
     }
   })
 
   it('stops listening for resumes once disposed', async () => {
     const { calls } = fakeServices()
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(commitCount(calls)).toBe(1) // the launch pull's commit
     })
 
-    backup.dispose()
+    gitSync.dispose()
     activity.emitResume()
     await flush()
     expect(commitCount(calls)).toBe(1)
@@ -1106,8 +1106,8 @@ describe('createBackupService', () => {
   it('going hidden does not trigger a cycle (backgrounding is the flush path)', async () => {
     const { calls } = fakeServices()
     activity.setHidden(true)
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(commitCount(calls)).toBe(1)
     })
@@ -1116,15 +1116,15 @@ describe('createBackupService', () => {
     await flush()
     expect(commitCount(calls)).toBe(1)
 
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('defers mobile launch, online, and debounce cycles until foreground', async () => {
     const { calls } = fakeServices({ mobile: true })
     activity.setHidden(true)
-    const backup = createBackup({ indexGeneration: 1 })
+    const gitSync = createGitSync({ indexGeneration: 1 })
     try {
-      await backup.start()
+      await gitSync.start()
       await flush()
 
       // Adoption may probe status/auth while hidden, but the launch cycle must
@@ -1160,16 +1160,16 @@ describe('createBackupService', () => {
       // the edit that arrived while hidden.
       expect(calls.filter((command) => command === 'fetch')).toHaveLength(2)
     } finally {
-      backup.dispose()
+      gitSync.dispose()
     }
   })
 
   it('an edit backs up after 30s idle on desktop, 10s on mobile', async () => {
     async function debouncedCommitDelay(mobile: boolean): Promise<number> {
       const { calls } = fakeServices({ mobile })
-      const backup = createBackup({ indexGeneration: 1 })
+      const gitSync = createGitSync({ indexGeneration: 1 })
       try {
-        await backup.start()
+        await gitSync.start()
         await vi.waitFor(() => {
           expect(commitCount(calls)).toBe(1) // the launch pull's commit
         })
@@ -1184,7 +1184,7 @@ describe('createBackupService', () => {
         await advance(20_000)
         return commitCount(calls) > 1 ? 30_000 : Infinity
       } finally {
-        backup.dispose()
+        gitSync.dispose()
       }
     }
 
@@ -1216,8 +1216,8 @@ describe('createBackupService', () => {
     const unlisten = fileChanges.subscribe(({ changes }) => {
       batches.push(changes)
     })
-    const backup = createBackup({ indexGeneration: null })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: null })
+    await gitSync.start()
 
     await vi.waitFor(() => {
       expect(batches).toHaveLength(1)
@@ -1227,7 +1227,7 @@ describe('createBackupService', () => {
       { path: 'daily/2026-06-11.md', kind: 'remove' },
       { path: 'audio-memos/audio-memo-2026-06-11-090000-000.m4a', kind: 'upsert', modifiedMs: 456 },
     ])
-    backup.dispose()
+    gitSync.dispose()
     unlisten()
   })
 
@@ -1244,8 +1244,8 @@ describe('createBackupService', () => {
         changedFiles: [],
       },
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
     await vi.waitFor(() => {
       expect(progress.snapshot()).toEqual([
@@ -1257,7 +1257,7 @@ describe('createBackupService', () => {
         }),
       ])
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('fans retry-merge batches immediately while serializing direct indexing', async () => {
@@ -1286,8 +1286,8 @@ describe('createBackupService', () => {
     const unlisten = fileChanges.subscribe(({ changes }) => {
       batches.push(changes)
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
     try {
       await vi.waitFor(() => {
@@ -1297,7 +1297,7 @@ describe('createBackupService', () => {
       // The second callback already fanned out synchronously, but its direct
       // index write is queued behind the first gated batch.
       expect(calls.filter((command) => command === 'applyChanges')).toHaveLength(1)
-      expect(backup.getState()).toMatchObject({
+      expect(gitSync.getState()).toMatchObject({
         phase: 'connected',
         status: { state: 'syncing' },
       })
@@ -1305,13 +1305,13 @@ describe('createBackupService', () => {
       releaseIndexApply()
       await vi.waitFor(() => {
         expect(calls.filter((command) => command === 'applyChanges')).toHaveLength(2)
-        expect(backup.getState()).toMatchObject({
+        expect(gitSync.getState()).toMatchObject({
           phase: 'connected',
           status: { state: 'idle' },
         })
       })
     } finally {
-      backup.dispose()
+      gitSync.dispose()
       unlisten()
     }
   })
@@ -1338,15 +1338,15 @@ describe('createBackupService', () => {
         { pushed: true, nonFastForward: false, rejectionMessage: null },
       ],
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
     await vi.waitFor(() => {
       expect(calls.filter((command) => command === 'push')).toHaveLength(2)
       expect(calls.filter((command) => command === 'applyChanges')).toHaveLength(1)
     })
 
-    backup.dispose()
+    gitSync.dispose()
     releaseIndexApply()
     // The first, already-running apply can finish. The second task then reaches
     // the backup-owned tail, observes the teardown epoch, and must exit
@@ -1366,25 +1366,25 @@ describe('createBackupService', () => {
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
     await vi.waitFor(() => {
       expect(calls).toContain('applyChanges')
     })
-    expect(backup.getState()).toMatchObject({
+    expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       status: { state: 'syncing' },
     })
 
     releaseIndexApply()
     await vi.waitFor(() => {
-      expect(backup.getState()).toMatchObject({
+      expect(gitSync.getState()).toMatchObject({
         phase: 'connected',
         status: { state: 'idle' },
       })
     })
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('still settles to idle when direct indexing fails — projection health never blocks backup', async () => {
@@ -1397,11 +1397,11 @@ describe('createBackupService', () => {
         changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
       },
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
 
     await vi.waitFor(() => {
-      expect(backup.getState()).toMatchObject({
+      expect(gitSync.getState()).toMatchObject({
         phase: 'connected',
         status: { state: 'idle' },
       })
@@ -1412,7 +1412,7 @@ describe('createBackupService', () => {
     expect(logger.getErrors().map((entry) => entry.message)).toEqual([
       'pulled-note direct index apply failed:',
     ])
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('defers a pulled note direct-index apply while the mobile app is hidden', async () => {
@@ -1426,12 +1426,12 @@ describe('createBackupService', () => {
       },
     })
     activity.setHidden(true)
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await flush()
 
     expect(calls).not.toContain('applyChanges')
-    backup.dispose()
+    gitSync.dispose()
   })
 
   it('skips the direct-index apply when the mobile app went hidden mid-pull', async () => {
@@ -1449,8 +1449,8 @@ describe('createBackupService', () => {
     const unlisten = fileChanges.subscribe(({ changes }) => {
       batches.push(changes)
     })
-    const backup = createBackup({ indexGeneration: 1 })
-    await backup.start()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     await vi.waitFor(() => {
       expect(calls).toContain('pull')
     })
@@ -1463,7 +1463,7 @@ describe('createBackupService', () => {
     await flush()
 
     expect(calls).not.toContain('applyChanges')
-    backup.dispose()
+    gitSync.dispose()
     unlisten()
   })
 })

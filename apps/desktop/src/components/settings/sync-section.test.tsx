@@ -2,8 +2,8 @@ import { page, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
   AppError,
-  type BackupService,
-  type BackupState,
+  type GitSyncService,
+  type GitSyncState,
   type DuplicateIdGroup,
   type GraphSessionService,
   type IcloudStatus,
@@ -12,10 +12,10 @@ import {
   createTestCoreServices,
   createTestICloudNativeService,
   createTestPlatformService,
-  createTestBackupService,
+  createTestGitSyncService,
   type TestOpenGraph,
   type TestPlatformOptions,
-  type TestBackupService,
+  type TestGitSyncService,
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -37,11 +37,11 @@ let icloud: {
 let duplicateIds: DuplicateIdGroup[]
 let graph: TestOpenGraph
 let platform: TestPlatformOptions
-let backupState: BackupState
+let gitSyncState: GitSyncState
 
 // The services of the app under test.
-let backup: TestBackupService
-let disconnectGraph: MockInstance<BackupService['disconnectGraph']>
+let gitSync: TestGitSyncService
+let disconnectGraph: MockInstance<GitSyncService['disconnectGraph']>
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 // What the next `openRecent` of the rendered app resolves.
 let reopens: boolean
@@ -56,11 +56,11 @@ async function renderSection(): Promise<void> {
       new AppError('io', 'test iCloud: the container is unavailable'),
     )
   }
-  backup.setState(backupState)
+  gitSync.setState(gitSyncState)
   const app = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     icloudNative,
-    backup,
+    gitSync,
     platform: createTestPlatformService(platform),
   })
   vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(() => {
@@ -89,10 +89,10 @@ beforeEach(() => {
     copyFails: false,
   }
   duplicateIds = []
-  backupState = { phase: 'disconnected' }
+  gitSyncState = { phase: 'disconnected' }
   reopens = true
-  backup = createTestBackupService()
-  disconnectGraph = vi.spyOn(backup, 'disconnectGraph')
+  gitSync = createTestGitSyncService()
+  disconnectGraph = vi.spyOn(gitSync, 'disconnectGraph')
 })
 
 describe('SyncSection', () => {
@@ -154,7 +154,7 @@ describe('moving a graph to iCloud', () => {
   }
 
   it('copies the graph, disconnects the backup, and reopens it in iCloud', async () => {
-    backupState = {
+    gitSyncState = {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
@@ -176,7 +176,7 @@ describe('moving a graph to iCloud', () => {
   })
 
   it('reports a backup that could not be disconnected and a graph that did not reopen', async () => {
-    backupState = {
+    gitSyncState = {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },

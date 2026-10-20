@@ -2,19 +2,19 @@ import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { createTestOpenerService, type TestOpenerService } from '@reflect/app/testing'
 import type { OpenerService } from '@reflect/app'
-import type { BackupService, BackupState } from '@reflect/core'
+import type { GitSyncService, GitSyncState } from '@reflect/core'
 import {
   type TestOpenGraph,
   createTestCoreServices,
-  createTestBackupService,
-  type TestBackupService,
+  createTestGitSyncService,
+  type TestGitSyncService,
   type TestCoreServices,
 } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { BackupSettingsField } from './backup-section.tsx'
+import { GitSyncSettingsField } from './git-sync-section.tsx'
 
 // The section's GitHub-vs-generic split (Plan 16): a hand-wired remote must
 // render host-neutrally, and its auth errors must surface the engine's
@@ -25,25 +25,28 @@ let githubConnected: boolean
 
 // The services of the app under test; created fresh for each test.
 let opener: TestOpenerService
-let backup: TestBackupService
+let gitSync: TestGitSyncService
 let openUrl: MockInstance<OpenerService['openUrl']>
-let signOut: MockInstance<BackupService['signOut']>
+let signOut: MockInstance<GitSyncService['signOut']>
 
 beforeEach(() => {
   githubConnected = false
   opener = createTestOpenerService()
   openUrl = vi.spyOn(opener, 'openUrl')
-  backup = createTestBackupService()
-  signOut = vi.spyOn(backup, 'signOut')
+  gitSync = createTestGitSyncService()
+  signOut = vi.spyOn(gitSync, 'signOut')
 })
 
-async function renderSection(state: BackupState, graph?: TestOpenGraph): Promise<TestCoreServices> {
-  backup.setState(state)
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService(), backup })
+async function renderSection(
+  state: GitSyncState,
+  graph?: TestOpenGraph,
+): Promise<TestCoreServices> {
+  gitSync.setState(state)
+  const app = createTestCoreServices({ database: createWasmTestDatabaseService(), gitSync })
   if (githubConnected) {
     await app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
   }
-  await renderInApp(<BackupSettingsField />, {
+  await renderInApp(<GitSyncSettingsField />, {
     app,
     appServices: { opener },
     graph,
@@ -62,7 +65,7 @@ const ICLOUD_GRAPH: TestOpenGraph = {
   name: 'Notes',
 }
 
-describe('BackupSettingsField', () => {
+describe('GitSyncSettingsField', () => {
   it('explains the quiet window on an iCloud graph', async () => {
     await renderSection({ phase: 'disconnected' }, ICLOUD_GRAPH)
     await expect

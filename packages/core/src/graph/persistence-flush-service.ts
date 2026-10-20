@@ -6,7 +6,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 /**
  * The dirty state a registered flusher lands. Settings is built in.
  */
-export type PersistenceFlusherKind = 'documents' | 'backup'
+export type PersistenceFlusherKind = 'documents' | 'git-sync'
 
 export type PersistenceFlusher = () => Promise<void>
 
@@ -65,14 +65,14 @@ class PersistenceFlushServiceImpl implements PersistenceFlushService {
       this.#run('documents', this.#flushers.get('documents')),
       this.#run('settings', () => settings.flush()),
     ])
-    await this.#run('backup', this.#flushers.get('backup'))
+    await this.#run('git-sync', this.#flushers.get('git-sync'))
   }
 
   startFlushAll(): void {
     const { settings } = this.#deps
     void this.#run('documents', this.#flushers.get('documents'))
     void this.#run('settings', () => settings.flush())
-    void this.#run('backup', this.#flushers.get('backup'))
+    void this.#run('git-sync', this.#flushers.get('git-sync'))
   }
 
   async #run(what: string, fn: (() => Promise<void>) | undefined): Promise<void> {

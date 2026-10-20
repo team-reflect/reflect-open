@@ -1,59 +1,59 @@
 import { useMemo } from 'react'
-import { AppError, type BackupService, type BackupState } from '@reflect/core'
+import { AppError, type GitSyncService, type GitSyncState } from '@reflect/core'
 import { useMaybeGraphServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 
-export type { BackupState, ConnectExistingResult } from '@reflect/core'
+export type { GitSyncState, ConnectExistingResult } from '@reflect/core'
 
-type SyncContextValue = { backup: BackupState } & Pick<
-  BackupService,
-  'connectNewRepo' | 'connectExistingRepo' | 'disconnectGraph' | 'signOut' | 'backUpNow'
+type GitSyncContextValue = { state: GitSyncState } & Pick<
+  GitSyncService,
+  'connectNewRepo' | 'connectExistingRepo' | 'disconnectGraph' | 'signOut' | 'syncNow'
 >
 
-const LOADING: BackupState = { phase: 'loading' }
+const LOADING: GitSyncState = { phase: 'loading' }
 
 /**
- * What the surface reads where the graph runs no backup service.
+ * What the surface reads where the graph runs no git sync service.
  */
-const NO_BACKUP = {
+const NO_GIT_SYNC = {
   subscribe: () => () => {},
-  getState: (): BackupState => LOADING,
+  getState: (): GitSyncState => LOADING,
 }
 
 /**
- * Backup state + actions of the open graph's `BackupService`. A note window
+ * Git sync state + actions of the open graph's `GitSyncService`. A note window
  * runs none: its state stays 'loading' (the note window edits, main syncs).
  */
-export function useSync(): SyncContextValue {
-  const controller = useMaybeGraphServices()?.backup ?? null
-  const store = controller ?? NO_BACKUP
-  const backup = useServiceState(store, store.getState)
+export function useGitSync(): GitSyncContextValue {
+  const controller = useMaybeGraphServices()?.gitSync ?? null
+  const store = controller ?? NO_GIT_SYNC
+  const state = useServiceState(store, store.getState)
 
-  return useMemo<SyncContextValue>(() => {
-    const require = (): BackupService => {
+  return useMemo<GitSyncContextValue>(() => {
+    const require = (): GitSyncService => {
       if (controller === null) {
         throw new AppError('io', 'backup is still initializing')
       }
       return controller
     }
     return {
-      backup,
+      state,
       connectNewRepo: (name) => require().connectNewRepo(name),
       connectExistingRepo: (ref, options) => require().connectExistingRepo(ref, options),
       disconnectGraph: () => require().disconnectGraph(),
       signOut: () => require().signOut(),
-      backUpNow: () => require().backUpNow(),
+      syncNow: () => require().syncNow(),
     }
-  }, [controller, backup])
+  }, [controller, state])
 }
 
 /**
- * Like {@link useSync}, but `null` where the graph runs no backup service:
+ * Like {@link useGitSync}, but `null` where the graph runs no git sync service:
  * no graph session is open (the mobile settings sheet in the plain-browser
  * dev harness and in screen tests), and those surfaces hide their sync rows.
  */
-export function useSyncContext(): SyncContextValue | null {
-  const sync = useSync()
-  const backup = useMaybeGraphServices()?.backup ?? null
-  return backup === null ? null : sync
+export function useGitSyncContext(): GitSyncContextValue | null {
+  const sync = useGitSync()
+  const gitSync = useMaybeGraphServices()?.gitSync ?? null
+  return gitSync === null ? null : sync
 }

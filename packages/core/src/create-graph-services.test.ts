@@ -5,11 +5,11 @@ import { trackAssetDescriptionSessions } from './testing/assets.ts'
 import { createNodeTestDatabaseService } from './testing/database.ts'
 import { createTestCoreServices, type TestCoreServices } from './testing/services.ts'
 import {
-  createTestBackupService,
+  createTestGitSyncService,
   createTestICloudSyncService,
   type TestICloudSyncService,
 } from './testing/sync.ts'
-import type { BackupServiceOptions } from './sync/backup-service.ts'
+import type { GitSyncServiceOptions } from './sync/git-sync-service.ts'
 import {
   createGraphServices,
   openGraphLifecycle,
@@ -32,7 +32,7 @@ interface SetupOptions {
  * Every lifecycle of a desktop main window, without the iCloud ones.
  */
 const MAIN_LIFECYCLES: GraphLifecycleFlags = {
-  backup: true,
+  gitSync: true,
   icloudSync: false,
   capture: true,
   assetDescription: true,
@@ -44,7 +44,7 @@ const MAIN_LIFECYCLES: GraphLifecycleFlags = {
  * Only the lifecycles every session runs.
  */
 const NO_LIFECYCLES: GraphLifecycleFlags = {
-  backup: false,
+  gitSync: false,
   icloudSync: false,
   capture: false,
   assetDescription: false,
@@ -58,7 +58,7 @@ const NO_LIFECYCLES: GraphLifecycleFlags = {
 function sessionDeps(app: TestCoreServices) {
   const { icloudNative, fileChanges, indexLifecycle, activity, clock, logger } = app
   return {
-    backup: {
+    gitSync: {
       git: app.gitRepository,
       syncEngines: app.syncEngines,
       githubAuth: app.githubAuth,
@@ -104,8 +104,8 @@ function setup(options?: SetupOptions) {
     },
     controller.signal,
   )
-  const backup = createTestBackupService()
-  const backups: BackupServiceOptions[] = []
+  const gitSync = createTestGitSyncService()
+  const gitSyncOptionsLog: GitSyncServiceOptions[] = []
   const chats: { attached: number; detached: number }[] = []
   const icloudSyncs: { options: ICloudSyncServiceOptions; service: TestICloudSyncService }[] = []
   const downloads: { options: ICloudDownloadServiceOptions; calls: string[] }[] = []
@@ -131,9 +131,9 @@ function setup(options?: SetupOptions) {
     graphSession: app.graphSession,
   }
   const factories: Partial<GraphServiceFactories> = {
-    backup: (_deps, backupOptions) => {
-      backups.push(backupOptions)
-      return backup
+    gitSync: (_deps, gitSyncOptions) => {
+      gitSyncOptionsLog.push(gitSyncOptions)
+      return gitSync
     },
     icloudSync: (_deps, syncOptions) => {
       const service = createTestICloudSyncService()
@@ -167,8 +167,8 @@ function setup(options?: SetupOptions) {
     deps,
     factories,
     graph,
-    backup,
-    backups,
+    gitSync,
+    gitSyncOptionsLog,
     chats,
     icloudSyncs,
     downloads,
@@ -185,9 +185,9 @@ describe('createGraphServices', () => {
     const context = setup()
     await context.app.settings.whenLoaded()
 
-    expect(context.graph.backup).toBe(context.backup)
-    expect(context.backups).toEqual([{ root: '/g', generation: 3, indexGeneration: 5 }])
-    expect(context.backup.calls()).toEqual([{ method: 'start' }])
+    expect(context.graph.gitSync).toBe(context.gitSync)
+    expect(context.gitSyncOptionsLog).toEqual([{ root: '/g', generation: 3, indexGeneration: 5 }])
+    expect(context.gitSync.calls()).toEqual([{ method: 'start' }])
     expect(context.chats).toEqual([{ attached: 1, detached: 0 }])
     expect(context.app.attachments.watchers()).toBe(1)
     expect(context.app.capture.sessions()).toEqual([
@@ -207,7 +207,7 @@ describe('createGraphServices', () => {
       lifecycles: { icloudSync: true },
     })
 
-    expect(context.backups).toEqual([
+    expect(context.gitSyncOptionsLog).toEqual([
       {
         root: '/Users/me/Library/Mobile Documents/iCloud~reflect/Documents/notes',
         generation: 3,
@@ -220,7 +220,7 @@ describe('createGraphServices', () => {
     expect(context.chats).toEqual([{ attached: 1, detached: 0 }])
 
     context.controller.abort()
-    expect(context.backup.calls().at(-1)).toEqual({ method: 'dispose' })
+    expect(context.gitSync.calls().at(-1)).toEqual({ method: 'dispose' })
     expect(context.icloudSyncs[0]?.service.calls()).toEqual(['start', 'dispose'])
     expect(context.app.capture.sessions()[0]?.disposed).toBe(true)
     expect(context.app.attachments.watchers()).toBe(0)
@@ -230,8 +230,8 @@ describe('createGraphServices', () => {
   it('runs only the chat session and the catalog watch without lifecycles', () => {
     const context = setup({ root: ICLOUD_ROOT, lifecycles: NO_LIFECYCLES })
 
-    expect(context.graph.backup).toBeNull()
-    expect(context.backups).toEqual([])
+    expect(context.graph.gitSync).toBeNull()
+    expect(context.gitSyncOptionsLog).toEqual([])
     expect(context.chats).toEqual([{ attached: 1, detached: 0 }])
     expect(context.app.attachments.watchers()).toBe(1)
     expect(context.app.capture.sessions()).toEqual([])
@@ -247,7 +247,7 @@ describe('createGraphServices', () => {
     })
     context.controller.abort()
 
-    expect(context.backup.calls().at(-1)).toEqual({ method: 'dispose' })
+    expect(context.gitSync.calls().at(-1)).toEqual({ method: 'dispose' })
     expect(context.chats).toEqual([{ attached: 1, detached: 1 }])
     expect(context.app.attachments.watchers()).toBe(0)
     expect(context.app.capture.sessions()[0]?.disposed).toBe(true)
@@ -286,7 +286,7 @@ describe('createGraphServices', () => {
       { root: '/g', name: 'g', generation: 3, indexGeneration: 5 },
       controller.signal,
     )
-    const backup = createTestBackupService()
+    const gitSync = createTestGitSyncService()
     createGraphServices(
       session,
       {
@@ -298,10 +298,10 @@ describe('createGraphServices', () => {
         graphSession: app.graphSession,
       },
       MAIN_LIFECYCLES,
-      { backup: () => backup },
+      { gitSync: () => gitSync },
     )
 
-    expect(backup.calls()).toEqual([{ method: 'start' }, { method: 'dispose' }])
+    expect(gitSync.calls()).toEqual([{ method: 'start' }, { method: 'dispose' }])
     expect(app.attachments.watchers()).toBe(0)
     expect(app.capture.sessions()[0]?.disposed).toBe(true)
   })

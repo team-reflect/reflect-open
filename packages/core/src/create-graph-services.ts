@@ -4,10 +4,10 @@ import type { CaptureService } from './capture/capture-service.ts'
 import type { AttachmentService } from './documents/attachment-service.ts'
 import type { GraphSessionService } from './graph/graph-session-service.ts'
 import {
-  createBackupService,
-  type BackupService,
-  type BackupServiceDeps,
-} from './sync/backup-service.ts'
+  createGitSyncService,
+  type GitSyncService,
+  type GitSyncServiceDeps,
+} from './sync/git-sync-service.ts'
 import {
   createICloudDownloadService,
   type ICloudDownloadServiceDeps,
@@ -20,9 +20,9 @@ import type { GraphRole, GraphSession } from './graph/graph-session.ts'
  */
 export interface GraphServicesDeps {
   /**
-   * The deps of the backup service.
+   * The deps of the git sync service.
    */
-  readonly backup: BackupServiceDeps
+  readonly gitSync: GitSyncServiceDeps
   /**
    * The deps of the iCloud conflict service.
    */
@@ -58,9 +58,9 @@ export interface GraphServicesDeps {
  */
 export interface GraphLifecycleFlags {
   /**
-   * The Git backup.
+   * The Git sync service.
    */
-  readonly backup: boolean
+  readonly gitSync: boolean
   /**
    * The iCloud conflict sweeps.
    */
@@ -92,7 +92,7 @@ export type GraphLifecycle = 'assetDescription' | 'icloudDownload'
  * The factory of each per-session service that {@link createGraphServices} builds.
  */
 export const graphServiceFactories = {
-  backup: createBackupService,
+  gitSync: createGitSyncService,
   icloudSync: createICloudSyncService,
   icloudDownload: createICloudDownloadService,
 }
@@ -108,8 +108,8 @@ export type GraphServiceFactories = typeof graphServiceFactories
  * and its lifecycles run with a null `indexGeneration`.
  *
  * Every session runs the chat session and the attachment catalog watch; the
- * {@link GraphLifecycleFlags} pick the other lifecycles. `backup` is `null`
- * when the backup does not run. The lifecycles that no surface reads run
+ * {@link GraphLifecycleFlags} pick the other lifecycles. `gitSync` is `null`
+ * when git sync does not run. The lifecycles that no surface reads run
  * inside and have no field.
  */
 export interface GraphServices {
@@ -126,9 +126,9 @@ export interface GraphServices {
    */
   readonly chat: ChatSession
   /**
-   * The backup lifecycle; `null` when it does not run.
+   * The git sync lifecycle; `null` when it does not run.
    */
-  readonly backup: BackupService | null
+  readonly gitSync: GitSyncService | null
 }
 
 /**
@@ -176,18 +176,18 @@ export function createGraphServices(
     }
   }
   let chat: GraphServices['chat']
-  let backup: BackupService | null = null
+  let gitSync: GitSyncService | null = null
   try {
     chat = chatSessions.create({ session })
     disposers.push(chat.attach())
     disposers.push(attachments.watchCatalog(generation))
 
-    if (lifecycles.backup) {
-      const sessionBackup = create.backup(deps.backup, { root, generation, indexGeneration })
-      backup = sessionBackup
-      void sessionBackup.start()
+    if (lifecycles.gitSync) {
+      const sessionGitSync = create.gitSync(deps.gitSync, { root, generation, indexGeneration })
+      gitSync = sessionGitSync
+      void sessionGitSync.start()
       disposers.push(() => {
-        sessionBackup.dispose()
+        sessionGitSync.dispose()
       })
     }
     if (lifecycles.icloudSync) {
@@ -225,5 +225,5 @@ export function createGraphServices(
     signal.addEventListener('abort', dispose, { once: true })
   }
 
-  return { session, role: session.role, chat, backup }
+  return { session, role: session.role, chat, gitSync }
 }

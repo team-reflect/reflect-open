@@ -10,7 +10,11 @@ import type {
 } from '../ipc/icloud-native-service.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
-import type { BackupService, BackupState, ConnectExistingResult } from '../sync/backup-service.ts'
+import type {
+  GitSyncService,
+  GitSyncState,
+  ConnectExistingResult,
+} from '../sync/git-sync-service.ts'
 import type { ICloudSyncService } from '../sync/icloud-sync-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import type {
@@ -455,10 +459,10 @@ export function createTestGithubAuthService(
 }
 
 /**
- * One recorded {@link TestBackupService} action.
+ * One recorded {@link TestGitSyncService} action.
  */
-export type BackupCall =
-  | { readonly method: 'start' | 'disconnectGraph' | 'signOut' | 'backUpNow' | 'dispose' }
+export type GitSyncCall =
+  | { readonly method: 'start' | 'disconnectGraph' | 'signOut' | 'syncNow' | 'dispose' }
   | { readonly method: 'connectNewRepo'; readonly name: string }
   | {
       readonly method: 'connectExistingRepo'
@@ -466,40 +470,40 @@ export type BackupCall =
       readonly allowPublic: boolean
     }
 
-export interface TestBackupService extends BackupService {
+export interface TestGitSyncService extends GitSyncService {
   /**
    * Publish `state` as the backup state and notify subscribers.
    */
-  setState(state: BackupState): void
+  setState(state: GitSyncState): void
   /**
    * Every action called, in order.
    */
-  calls(): readonly BackupCall[]
+  calls(): readonly GitSyncCall[]
   /**
    * Answer `connectNewRepo`; it resolves `connected` by default.
    */
-  onConnectNewRepo(handler: BackupService['connectNewRepo']): void
+  onConnectNewRepo(handler: GitSyncService['connectNewRepo']): void
   /**
    * Answer `connectExistingRepo`; it resolves `connected` by default.
    */
-  onConnectExistingRepo(handler: BackupService['connectExistingRepo']): void
+  onConnectExistingRepo(handler: GitSyncService['connectExistingRepo']): void
 }
 
 /**
- * A scripted {@link BackupService}: it runs no engine and touches no
+ * A scripted {@link GitSyncService}: it runs no engine and touches no
  * repository. The state starts at `state` (`loading` by default) and moves
  * only through `setState`; every action is recorded.
  */
-class TestBackupServiceImpl implements TestBackupService {
-  #state: BackupState
+class TestGitSyncServiceImpl implements TestGitSyncService {
+  #state: GitSyncState
   readonly #listeners = new Set<() => void>()
-  readonly #log: BackupCall[] = []
-  #connectNew: BackupService['connectNewRepo'] = () => Promise.resolve('connected')
-  #connectExisting: BackupService['connectExistingRepo'] = (): Promise<ConnectExistingResult> => {
+  readonly #log: GitSyncCall[] = []
+  #connectNew: GitSyncService['connectNewRepo'] = () => Promise.resolve('connected')
+  #connectExisting: GitSyncService['connectExistingRepo'] = (): Promise<ConnectExistingResult> => {
     return Promise.resolve('connected')
   }
 
-  constructor(options?: { state?: BackupState }) {
+  constructor(options?: { state?: GitSyncState }) {
     this.#state = options?.state ?? { phase: 'loading' }
   }
 
@@ -507,7 +511,7 @@ class TestBackupServiceImpl implements TestBackupService {
     this.#log.push({ method: 'start' })
   }
 
-  readonly getState = (): BackupState => this.#state
+  readonly getState = (): GitSyncState => this.#state
 
   readonly subscribe = (listener: () => void): Unlisten => {
     // Wrapped for identity, so one function added twice detaches independently.
@@ -545,36 +549,36 @@ class TestBackupServiceImpl implements TestBackupService {
     this.#log.push({ method: 'signOut' })
   }
 
-  backUpNow(): void {
-    this.#log.push({ method: 'backUpNow' })
+  syncNow(): void {
+    this.#log.push({ method: 'syncNow' })
   }
 
   dispose(): void {
     this.#log.push({ method: 'dispose' })
   }
 
-  setState(next: BackupState): void {
+  setState(next: GitSyncState): void {
     this.#state = next
     for (const listener of this.#listeners) {
       listener()
     }
   }
 
-  calls(): readonly BackupCall[] {
+  calls(): readonly GitSyncCall[] {
     return [...this.#log]
   }
 
-  onConnectNewRepo(handler: BackupService['connectNewRepo']): void {
+  onConnectNewRepo(handler: GitSyncService['connectNewRepo']): void {
     this.#connectNew = handler
   }
 
-  onConnectExistingRepo(handler: BackupService['connectExistingRepo']): void {
+  onConnectExistingRepo(handler: GitSyncService['connectExistingRepo']): void {
     this.#connectExisting = handler
   }
 }
 
-export function createTestBackupService(options?: { state?: BackupState }): TestBackupService {
-  return new TestBackupServiceImpl(options)
+export function createTestGitSyncService(options?: { state?: GitSyncState }): TestGitSyncService {
+  return new TestGitSyncServiceImpl(options)
 }
 
 export interface TestICloudSyncService extends ICloudSyncService {

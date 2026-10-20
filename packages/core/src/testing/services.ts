@@ -19,7 +19,7 @@ import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isICloudRoot } from '../sync/icloud-sync-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
-import type { BackupService } from '../sync/backup-service.ts'
+import type { GitSyncService } from '../sync/git-sync-service.ts'
 import {
   createTestAiKeyValidationService,
   createTestAssetDescriberService,
@@ -99,7 +99,7 @@ export type TestCoreServiceOverrides = Partial<CoreServices & CoreInternalServic
   /**
    * The backup service of every main-window graph session.
    */
-  readonly backup?: BackupService
+  readonly gitSync?: GitSyncService
   /**
    * The activity signals the services follow.
    */
@@ -133,7 +133,7 @@ function testGraphLifecycles(session: GraphSession, platform: PlatformFacts): Gr
   const main = session.role === 'main'
   const mobile = isMobilePlatform(platform.appPlatform) || platform.surface.mobileApp
   return {
-    backup: main,
+    gitSync: main,
     icloudSync: main && isICloudRoot(session.root),
     capture: main,
     assetDescription: main && !mobile,
@@ -262,7 +262,7 @@ export type TestCoreServices = Override<
 /**
  * The overrides that go to the adapters rather than in place of a service.
  */
-const TEST_ADAPTER_KEYS = new Set(['backup', 'progress', 'role', 'createGraphServices'])
+const TEST_ADAPTER_KEYS = new Set(['gitSync', 'progress', 'role', 'createGraphServices'])
 
 /**
  * {@link createCoreServices} over test adapters, with the test double of each
@@ -274,7 +274,7 @@ export function createTestCoreServices<
   const defaults = createTestEdgeServices()
   const edge = { ...defaults, ...overrides }
   const platform = edge.platform ?? createTestPlatformService()
-  const backup = overrides.backup
+  const gitSync = overrides.gitSync
   const adapters: CoreAdapters = {
     ipc: edge.ipc ?? createTestIpcBridgeService({ logger: edge.logger }),
     platform,
@@ -295,7 +295,7 @@ export function createTestCoreServices<
           session,
           deps,
           testGraphLifecycles(session, platform),
-          backup === undefined ? {} : { backup: () => backup },
+          gitSync === undefined ? {} : { gitSync: () => gitSync },
         )
       }),
   }

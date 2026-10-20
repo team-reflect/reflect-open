@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { BackupState } from '@reflect/core'
+import type { GitSyncState } from '@reflect/core'
 import { getMobileSyncStatus, type MobileSyncStatus } from './mobile-sync-status.ts'
 
 /**
@@ -7,7 +7,7 @@ import { getMobileSyncStatus, type MobileSyncStatus } from './mobile-sync-status
  * become the words mobile shows, never git terms.
  */
 
-function connected(status: Extract<BackupState, { phase: 'connected' }>['status']): BackupState {
+function connected(status: Extract<GitSyncState, { phase: 'connected' }>['status']): GitSyncState {
   return {
     phase: 'connected',
     remoteUrl: 'https://github.com/alex/notes.git',
@@ -16,8 +16,8 @@ function connected(status: Extract<BackupState, { phase: 'connected' }>['status'
   }
 }
 
-function statusFor(backup: BackupState): MobileSyncStatus | null {
-  return getMobileSyncStatus(backup)
+function statusFor(gitSync: GitSyncState): MobileSyncStatus | null {
+  return getMobileSyncStatus(gitSync)
 }
 
 describe('engine state', () => {

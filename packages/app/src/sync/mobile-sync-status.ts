@@ -1,4 +1,4 @@
-import type { BackupState } from '@reflect/core'
+import type { GitSyncState } from '@reflect/core'
 
 /**
  * The plain-language sync status mobile shows (Plan 19, step 10). The phone
@@ -39,11 +39,11 @@ export type MobileSyncDetail =
  *
  * Precedence: an in-flight cycle shows as `Syncing`; errors and offline last.
  */
-export function getMobileSyncStatus(backup: BackupState | null): MobileSyncStatus | null {
-  if (backup === null || backup.phase !== 'connected') {
+export function getMobileSyncStatus(state: GitSyncState | null): MobileSyncStatus | null {
+  if (state === null || state.phase !== 'connected') {
     return null
   }
-  const status = backup.status
+  const status = state.status
   if (status.state === 'syncing') {
     return { label: 'Syncing', tone: 'active', detail: null }
   }
