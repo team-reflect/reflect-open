@@ -1,12 +1,5 @@
 import { parseUrl } from '@reflect/utils'
-
-/**
- * A GitHub repository, as `owner/name`.
- */
-export interface GithubRepoRef {
-  owner: string
-  name: string
-}
+import type { GithubRepoRef } from './types.ts'
 
 /**
  * What a graph's `origin` points at, which decides where its sign-in comes

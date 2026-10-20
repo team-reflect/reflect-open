@@ -19,7 +19,8 @@ import { describeConflictCopies } from './conflict-copies.ts'
 import type { CredentialResolver } from './credential-resolver.ts'
 import type { ChangedFile, GitCredential, GitRepositoryService } from './git-repository-service.ts'
 import type { GithubAuthService } from './github-auth-service.ts'
-import type { GithubRepoRef, GithubRepoService } from './github-repo-service.ts'
+import type { GithubRepoService } from './github-repo-service.ts'
+import type { GithubRepoRef } from './types.ts'
 import { classifyRemote, githubRemoteUrl, type GitRemote } from './remote-url.ts'
 
 /**

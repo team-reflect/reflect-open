@@ -2,9 +2,8 @@ import { z } from 'zod'
 import type { HttpService } from '../ports/http-service.ts'
 import { AppError } from '../errors.ts'
 import { apiHeaders, readJson } from './github-api.ts'
-import { classifyRemote, type GithubRepoRef } from './remote-url.ts'
-
-export type { GithubRepoRef } from './remote-url.ts'
+import { classifyRemote } from './remote-url.ts'
+import type { GithubRepoRef } from './types.ts'
 
 /**
  * The description stamped on backup repos we create or prefill.

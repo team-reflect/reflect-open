@@ -38,7 +38,7 @@ import {
   type GithubUser,
   type RunDeviceFlowOptions,
 } from '../sync/github-auth-service.ts'
-import type { GithubRepoRef } from '../sync/github-repo-service.ts'
+import type { GithubRepoRef } from '../sync/types.ts'
 import { createTestClockService } from './clock.ts'
 import { createTestHttpService } from './http.ts'
 import { createTestSecretStoreService } from './secrets.ts'
