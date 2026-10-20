@@ -55,8 +55,9 @@ export default defineConfig({
     __REFLECT_VERSION__: JSON.stringify(pkg.version),
   },
 
-  // If the target is below Safari 17.5, Lightning CSS downlevels `light-dark()` to a broken polyfill.
-  build: { cssTarget: 'safari17.5', sourcemap: 'hidden' },
+  // The JS target lowers syntax that Safari 16.4 introduced (class static blocks).
+  // If the CSS target is below Safari 17.5, Lightning CSS downlevels `light-dark()` to a broken polyfill.
+  build: { target: 'safari16', cssTarget: 'safari17.5', sourcemap: 'hidden' },
 
   resolve: {
     alias: {

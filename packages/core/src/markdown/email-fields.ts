@@ -28,11 +28,11 @@ const MARKDOWN_TAB_WIDTH = 4
  * so `'ada@example.com'` and `_ada@example.com_` yield the bare address.
  * Each domain label starts and ends with a letter or digit, so trailing
  * punctuation, `?query`, `/path`, and Markdown or CJK marks end the match.
- * The lookbehind starts a match only at a token boundary, which keeps the
- * scan linear.
+ * The leading non-capturing group starts a match only at a token boundary,
+ * which keeps the scan linear.
  */
 const EMAIL_PATTERN =
-  /(?<![\p{L}\p{N}._%+'-])[._%+'-]*([\p{L}\p{N}][\p{L}\p{N}._%+'-]*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)/gu
+  /(?:^|[^\p{L}\p{N}._%+'-])[._%+'-]*([\p{L}\p{N}][\p{L}\p{N}._%+'-]*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)/gu
 
 /**
  * Normalize an email identity for matching. Provider-specific transformations
