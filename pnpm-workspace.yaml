@@ -37,10 +37,10 @@ patchedDependencies:
 #   '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1
 
-# Testing prosekit/meowdown#703 (collisionBoundary). Revert once it is released.
+# Testing prosekit/meowdown#704, #705 and #706 (the last commit of #703). Revert once it is released.
 blockExoticSubdeps: false
 overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@c98b8dfa7119526d33fa1c8d1673c03b3afe623a
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@c98b8dfa7119526d33fa1c8d1673c03b3afe623a
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@c98b8dfa7119526d33fa1c8d1673c03b3afe623a
-  '@meowdown/embed': https://pkg.pr.new/@meowdown/embed@c98b8dfa7119526d33fa1c8d1673c03b3afe623a
+  '@meowdown/core': https://pkg.pr.new/@meowdown/core@f970d26f5b5b7d15015258fdf62f02ecb1449094
+  '@meowdown/react': https://pkg.pr.new/@meowdown/react@f970d26f5b5b7d15015258fdf62f02ecb1449094
+  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@f970d26f5b5b7d15015258fdf62f02ecb1449094
+  '@meowdown/embed': https://pkg.pr.new/@meowdown/embed@f970d26f5b5b7d15015258fdf62f02ecb1449094
