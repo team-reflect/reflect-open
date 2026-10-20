@@ -120,17 +120,15 @@ pub async fn git_fetch(
     .await
 }
 
-/// Read the remote tip of the current branch without fetching. `url` probes
-/// a remote other than `origin`.
+/// Read the remote tip of the current branch without fetching.
 #[tauri::command]
 pub async fn git_remote_head(
-    url: Option<String>,
     credential: Option<GitCredential>,
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<RemoteTip> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || reflect_git::remote_head(&root, url.as_deref(), credential)).await
+    run_blocking(move || reflect_git::remote_head(&root, credential)).await
 }
 
 /// Commit local changes, then merge the fetched remote branch.
