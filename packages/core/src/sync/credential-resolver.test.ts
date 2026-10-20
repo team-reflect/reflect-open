@@ -57,6 +57,14 @@ describe('CredentialResolver', () => {
     })
   })
 
+  it('never offers a host sign-in over plain http', async () => {
+    const { hostCredentials, resolver } = setup()
+    await hostCredentials.save('http://gitea.local', { username: 'alex', secret: 'tok' })
+    expect(await resolver.resolve({ kind: 'https', origin: 'http://gitea.local' })).toEqual({
+      kind: 'missing',
+    })
+  })
+
   it('gives SSH and path remotes no sign-in', async () => {
     const { resolver } = setup()
     for (const remote of [{ kind: 'ssh', host: 'gitlab.com' }, { kind: 'path' }] as const) {

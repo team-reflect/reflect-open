@@ -60,6 +60,10 @@ class CredentialResolverImpl implements CredentialResolver {
         }
       }
       case 'https': {
+        // A sign-in would travel in the clear over plain http: never offered.
+        if (!remote.origin.startsWith('https:')) {
+          return { kind: 'missing' }
+        }
         const stored = await hostCredentials.load(remote.origin)
         if (stored === null) {
           return { kind: 'missing' }
