@@ -1,5 +1,11 @@
 import { useMemo } from 'react'
-import { AppError, type GitSyncService, type GitSyncState } from '@reflect/core'
+import {
+  AppError,
+  type GithubConnector,
+  type GitSyncService,
+  type GitSyncState,
+  type HostConnector,
+} from '@reflect/core'
 import { useMaybeGraphServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 
@@ -7,8 +13,10 @@ export type { GitSyncState, ConnectExistingResult } from '@reflect/core'
 
 type GitSyncContextValue = { state: GitSyncState } & Pick<
   GitSyncService,
-  'connectNewRepo' | 'connectExistingRepo' | 'disconnectGraph' | 'signOut' | 'syncNow'
->
+  'disconnectGraph' | 'syncNow'
+> &
+  Pick<GithubConnector, 'connectNewRepo' | 'connectExistingRepo'> &
+  Pick<HostConnector, 'connectHost'>
 
 const LOADING: GitSyncState = { phase: 'loading' }
 
@@ -21,30 +29,36 @@ const NO_GIT_SYNC = {
 }
 
 /**
- * Git sync state + actions of the open graph's `GitSyncService`. A note window
- * runs none: its state stays 'loading' (the note window edits, main syncs).
+ * Git sync state + actions of the open graph's `GitSyncService` and its
+ * connectors. A note window runs none: its state stays 'loading' (the note
+ * window edits, main syncs).
  */
 export function useGitSync(): GitSyncContextValue {
-  const controller = useMaybeGraphServices()?.gitSync ?? null
+  const graph = useMaybeGraphServices()
+  const controller = graph?.gitSync ?? null
+  const githubConnector = graph?.githubConnector ?? null
+  const hostConnector = graph?.hostConnector ?? null
   const store = controller ?? NO_GIT_SYNC
   const state = useServiceState(store, store.getState)
 
   return useMemo<GitSyncContextValue>(() => {
-    const require = (): GitSyncService => {
-      if (controller === null) {
-        throw new AppError('io', 'backup is still initializing')
+    const require = <Service,>(service: Service | null): Service => {
+      if (service === null) {
+        throw new AppError('io', 'git sync is still initializing')
       }
-      return controller
+      return service
     }
     return {
       state,
-      connectNewRepo: (name) => require().connectNewRepo(name),
-      connectExistingRepo: (ref, options) => require().connectExistingRepo(ref, options),
-      disconnectGraph: () => require().disconnectGraph(),
-      signOut: () => require().signOut(),
-      syncNow: () => require().syncNow(),
+      connectNewRepo: (name) => require(githubConnector).connectNewRepo(name),
+      connectExistingRepo: (ref, options) => {
+        return require(githubConnector).connectExistingRepo(ref, options)
+      },
+      connectHost: (input) => require(hostConnector).connectHost(input),
+      disconnectGraph: () => require(controller).disconnectGraph(),
+      syncNow: () => require(controller).syncNow(),
     }
-  }, [controller, state])
+  }, [controller, githubConnector, hostConnector, state])
 }
 
 /**

@@ -26,7 +26,9 @@ edit the same note while apart.
   backup first, and `.git`/`.reflect` are always marked local-only as a
   belt-and-braces guard. A graph that has both still works: Reflect commits
   locally as you type, and pushes only after five quiet minutes with no
-  pending iCloud downloads.
+  pending iCloud downloads. On an iCloud-hosted graph the Git card in
+  Settings uses backup wording (Backed up, Back up now), because iCloud is the
+  sync channel. On a folder graph it uses sync wording.
 
 ## What happens on a conflict
 

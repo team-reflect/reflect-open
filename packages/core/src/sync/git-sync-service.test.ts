@@ -21,8 +21,9 @@ import {
   type TestGitRepositoryService,
   type TestICloudNativeService,
 } from '../testing/sync.ts'
+import { createCredentialResolver } from './credential-resolver.ts'
 import { createSyncEngineFactory } from './engine.ts'
-import { createGithubRepoService } from './github-repo-service.ts'
+import { createGitHostCredentialService } from './git-host-credential-service.ts'
 import {
   createGitSyncService,
   type GitSyncService,
@@ -32,6 +33,7 @@ import {
 import type {
   ChangedFile,
   CommitOutcome,
+  RemoteTip,
   GitStatus,
   PullOutcome,
   PushOutcome,
@@ -281,11 +283,14 @@ function fakeServices(options: FakeOptions = {}) {
   )
 
   const progress = createTestProgressPort()
+  const githubAuth = createTestGithubAuthService({ secretStore, http, clock })
+  const hostCredentials = createGitHostCredentialService({ secretStore, logger })
   gitSyncDeps = {
     git,
     syncEngines: createSyncEngineFactory({ git, clock }),
-    githubAuth: createTestGithubAuthService({ secretStore, http, clock }),
-    githubRepos: createGithubRepoService({ http }),
+    credentials: createCredentialResolver({ githubAuth, hostCredentials, logger }),
+    githubAuth,
+    hostCredentials,
     fileChanges,
     indexLifecycle,
     progress,
@@ -410,7 +415,7 @@ describe('createGitSyncService', () => {
   })
 
   describe('remote probe', () => {
-    const MOVED = { remoteOid: 'b', trackingOid: 'a' }
+    const MOVED = { remoteOid: 'b', trackingOid: 'a', defaultBranch: 'main' }
 
     async function startSettled(options: Parameters<typeof fakeServices>[0], root?: string) {
       const services = fakeServices(options)
@@ -428,9 +433,10 @@ describe('createGitSyncService', () => {
       const { git, calls, gitSync } = await startSettled({})
       try {
         const probes: Array<unknown> = []
-        let tip: { remoteOid: string | null; trackingOid: string | null } = {
+        let tip: RemoteTip = {
           remoteOid: 'a',
           trackingOid: 'a',
+          defaultBranch: 'main',
         }
         git.onRemoteHead((credential, generation) => {
           probes.push([credential, generation])
@@ -443,7 +449,7 @@ describe('createGitSyncService', () => {
         expect(probes[0]).toEqual([{ username: 'x-access-token', secret: 'ghp_abc' }, GENERATION])
         expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches)
 
-        tip = { remoteOid: null, trackingOid: 'a' } // the remote branch is gone
+        tip = { remoteOid: null, trackingOid: 'a', defaultBranch: 'main' } // the remote branch is gone
         await advance(90_000)
         expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches)
 
@@ -535,16 +541,20 @@ describe('createGitSyncService', () => {
     }
   })
 
-  it('reports disconnected when no credential is stored — but keeps local history', async () => {
-    // Signing out of GitHub (or a lapsed credential) stops the *backup*, not
+  it('needs a credential when no GitHub sign-in is stored — but keeps local history', async () => {
+    // Signing out of GitHub (or a lapsed credential) stops the *sync*, not
     // the note history: the graph already has a repo, so the commit-only loop
     // takes over. Losing history here is a silent downgrade the user never
-    // asked for.
+    // asked for. The remote stays on record, so the UI can name it.
     const { calls } = fakeServices({ auth: null })
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
-    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toEqual({
+      phase: 'needsCredential',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+    })
     await vi.waitFor(() => {
       expect(calls).toContain('commitAll')
     })
@@ -589,10 +599,56 @@ describe('createGitSyncService', () => {
     expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
-      repo: null,
+      remote: { kind: 'ssh', host: 'gitlab.com' },
+      coexisting: false,
     })
     const fetch = invocations.find(({ command }) => command === 'fetch')
     expect(fetch?.args).toMatchObject({ credential: null })
+    gitSync.dispose()
+  })
+
+  it('syncs an HTTPS host with its stored sign-in, re-read every cycle', async () => {
+    const { invocations, secrets } = fakeServices({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+    })
+    await secrets.set(
+      'git-credential:https://gitlab.com',
+      JSON.stringify({ username: 'alex', secret: 'glpat-1' }),
+    )
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    await vi.waitFor(() => {
+      expect(invocations.some(({ command }) => command === 'push')).toBe(true)
+    })
+    expect(gitSync.getState()).toMatchObject({
+      phase: 'connected',
+      remote: { kind: 'https', origin: 'https://gitlab.com' },
+    })
+    for (const { command, args } of invocations) {
+      if (command === 'fetch' || command === 'push') {
+        expect(args).toMatchObject({ credential: { username: 'alex', secret: 'glpat-1' } })
+      }
+    }
+    gitSync.dispose()
+  })
+
+  it('never offers a host sign-in to another origin', async () => {
+    const { calls, secrets } = fakeServices({
+      auth: null,
+      remoteUrl: 'https://gitlab.com:8443/alex/notes.git',
+    })
+    await secrets.set(
+      'git-credential:https://gitlab.com',
+      JSON.stringify({ username: 'alex', secret: 'glpat-1' }),
+    )
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    expect(gitSync.getState()).toMatchObject({
+      phase: 'needsCredential',
+      remote: { kind: 'https', origin: 'https://gitlab.com:8443' },
+    })
+    expect(calls).not.toContain('fetch')
     gitSync.dispose()
   })
 
@@ -614,23 +670,20 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('refuses a generic HTTPS remote', async () => {
+  it('needs a credential for an HTTPS host with no stored sign-in', async () => {
     // A *public* generic HTTPS remote would pull anonymously and only fail
     // on push — edits arriving while the user's own never leave. The guard
-    // surfaces the error before the engine ever starts.
+    // surfaces the state before the engine ever starts, and the GitHub
+    // sign-in in the keychain is never offered to the host.
     const { calls } = fakeServices({ remoteUrl: 'https://gitlab.com/alex/notes.git' })
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
-    expect(gitSync.getState()).toMatchObject({
-      phase: 'connected',
-      repo: null,
-      status: { state: 'error', errorKind: 'rejected' },
+    expect(gitSync.getState()).toEqual({
+      phase: 'needsCredential',
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      remote: { kind: 'https', origin: 'https://gitlab.com' },
     })
-    const state = gitSync.getState()
-    if (state.phase === 'connected' && state.status.state === 'error') {
-      expect(state.status.message).toContain('git remote set-url')
-    }
 
     // No *sync* engine: the launch snapshot is local history's only commit,
     // and focus buys nothing further, because the resume triggers belong to
@@ -647,17 +700,16 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('keeps the SSH suggestion when local history cannot start', async () => {
+  it('keeps the missing-credential state when local history cannot start', async () => {
     // Local history is best effort: a watcher that won't come up must not cost
-    // the user the one instruction they have for fixing the remote.
+    // the user the one hint they have for fixing the remote.
     fakeServices({ remoteUrl: 'https://gitlab.com/alex/notes.git', failListen: true })
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
     expect(gitSync.getState()).toMatchObject({
-      phase: 'connected',
-      repo: null,
-      status: { state: 'error', errorKind: 'rejected' },
+      phase: 'needsCredential',
+      remote: { kind: 'https', origin: 'https://gitlab.com' },
     })
     expect(logger.getErrors()).toContainEqual({
       message: 'local history failed to start:',
@@ -674,7 +726,7 @@ describe('createGitSyncService', () => {
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
-    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toMatchObject({ phase: 'needsCredential' })
     await vi.waitFor(() => {
       expect(calls).toContain('commitAll')
     })
@@ -856,91 +908,58 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('connectNewRepo creates a private repo and connects to its default branch', async () => {
-    const { invocations } = fakeServices()
-    http.on(
-      'POST',
-      'https://api.github.com/user/repos',
-      jsonResponse(
-        {
-          full_name: 'alex/g-backup',
-          private: true,
-          default_branch: 'main',
-          html_url: 'https://github.com/alex/g-backup',
-        },
-        201,
-      ),
-    )
-    const gitSync = createGitSync({ indexGeneration: 1 })
-
-    await gitSync.connectNewRepo('g-backup')
-
-    expect(JSON.parse(http.requests()[0]?.body ?? '')).toMatchObject({
-      name: 'g-backup',
-      private: true,
-    })
-    const setup = invocations.find(({ command }) => command === 'setup')
-    expect(setup?.args).toMatchObject({
-      remoteUrl: 'https://github.com/alex/g-backup.git',
-      branch: 'main',
-      generation: GENERATION,
-    })
-    expect(gitSync.getState()).toMatchObject({
-      phase: 'connected',
-      repo: { owner: 'alex', name: 'g-backup' },
-    })
-    gitSync.dispose()
-  })
-
-  it('connectExistingRepo reports a missing repo without touching the graph', async () => {
-    const { calls } = fakeServices()
-    http.on(
-      'GET',
-      'https://api.github.com/repos/alex/gone',
-      jsonResponse({ message: 'Not Found' }, 404),
-    )
-    const gitSync = createGitSync({ indexGeneration: 1 })
-
-    expect(await gitSync.connectExistingRepo({ owner: 'alex', name: 'gone' })).toBe('notFound')
-    expect(calls).not.toContain('setup')
-    gitSync.dispose()
-  })
-
-  it('connectExistingRepo demands explicit consent before a public repo', async () => {
-    const { calls, invocations } = fakeServices()
-    http.on(
-      'GET',
-      'https://api.github.com/repos/alex/public-notes',
-      jsonResponse({
-        full_name: 'alex/public-notes',
-        private: false,
-        default_branch: 'master',
-        html_url: 'https://github.com/alex/public-notes',
-      }),
-    )
-    const gitSync = createGitSync({ indexGeneration: 1 })
-    const ref = { owner: 'alex', name: 'public-notes' }
-
-    expect(await gitSync.connectExistingRepo(ref)).toBe('needsPublicConfirm')
-    expect(calls).not.toContain('setup')
-
-    expect(await gitSync.connectExistingRepo(ref, { allowPublic: true })).toBe('connected')
-    const setup = invocations.find(({ command }) => command === 'setup')
-    // The repo's default branch is where the existing backup history lives.
-    expect(setup?.args).toMatchObject({ branch: 'master' })
-    gitSync.dispose()
-  })
-
-  it('signOut clears the machine credential and lands on disconnected', async () => {
+  it('clearing the GitHub sign-in restarts into needsCredential', async () => {
     const { secrets } = fakeServices()
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
     expect(gitSync.getState()).toMatchObject({ phase: 'connected' })
 
-    await gitSync.signOut()
+    await gitSyncDeps.githubAuth.clear()
+    await vi.waitFor(() => {
+      expect(gitSync.getState()).toMatchObject({ phase: 'needsCredential' })
+    })
 
     expect(secrets.snapshot()).not.toHaveProperty('github-auth')
+    gitSync.dispose()
+  })
+
+  it('storing a host sign-in restarts a remote that was waiting for it', async () => {
+    const { calls } = fakeServices({ auth: null, remoteUrl: 'https://gitlab.com/alex/notes.git' })
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    expect(gitSync.getState()).toMatchObject({ phase: 'needsCredential' })
+
+    await gitSyncDeps.hostCredentials.save('https://gitlab.com', {
+      username: 'alex',
+      secret: 'glpat-1',
+    })
+    await vi.waitFor(() => {
+      expect(gitSync.getState()).toMatchObject({ phase: 'connected' })
+    })
+    await vi.waitFor(() => {
+      expect(calls).toContain('fetch')
+    })
+    gitSync.dispose()
+  })
+
+  it('connectRemote points origin at the url, aligns the branch, and restarts', async () => {
+    const { invocations } = fakeServices({ remoteUrl: null })
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
     expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+
+    await gitSync.connectRemote('https://github.com/alex/notes.git', 'main')
+
+    const setup = invocations.findLast(({ command }) => command === 'setup')
+    expect(setup?.args).toMatchObject({
+      remoteUrl: 'https://github.com/alex/notes.git',
+      branch: 'main',
+      generation: GENERATION,
+    })
+    expect(gitSync.getState()).toMatchObject({
+      phase: 'connected',
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+    })
     gitSync.dispose()
   })
 

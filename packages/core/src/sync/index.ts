@@ -34,16 +34,14 @@ export {
   type GithubUser,
 } from './github-auth-service.ts'
 export {
-  parseGithubRemote,
-  remoteHost,
   parseRepoInput,
   suggestRepoName,
-  githubRemoteUrl,
   newRepoUrl,
   BACKUP_REPO_DESCRIPTION,
   type GithubRepoRef,
   type GithubRepo,
 } from './github-repo-service.ts'
+export { classifyRemote, githubRemoteUrl, githubRepoOf, type GitRemote } from './remote-url.ts'
 export type { PublishedGist, GistFile } from './gist-service.ts'
 export {
   isSyncError,

@@ -1,4 +1,5 @@
 import type { GitSyncState } from '@reflect/core'
+import { gitSyncWording } from './git-sync-wording.ts'
 
 /**
  * The plain-language sync status mobile shows (Plan 19, step 10). The phone
@@ -44,6 +45,7 @@ export function getMobileSyncStatus(state: GitSyncState | null): MobileSyncStatu
     return null
   }
   const status = state.status
+  const wording = gitSyncWording(state.coexisting)
   if (status.state === 'syncing') {
     return { label: 'Syncing', tone: 'active', detail: null }
   }
@@ -62,7 +64,7 @@ export function getMobileSyncStatus(state: GitSyncState | null): MobileSyncStatu
     }
   }
   if (status.state === 'waiting') {
-    return { label: 'Backed up', tone: 'ok', detail: { kind: 'countdown', until: status.until } }
+    return { label: wording.idle, tone: 'ok', detail: { kind: 'countdown', until: status.until } }
   }
-  return { label: 'Backed up', tone: 'ok', detail: null }
+  return { label: wording.idle, tone: 'ok', detail: null }
 }

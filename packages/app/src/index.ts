@@ -42,6 +42,7 @@ export {
   type MobileSyncDetail,
   type MobileSyncStatus,
 } from './sync/mobile-sync-status.ts'
+export { gitSyncWording, remoteLabel, type GitSyncWording } from './sync/git-sync-wording.ts'
 export {
   createConnectGithubWizardService,
   type ConnectAuthKind,

@@ -18,8 +18,9 @@ and deserves its own wave (and spike) rather than holding V1 hostage.
 story). **Status:** V1 implemented (SSH agent + path remotes; see
 [docs/generic-git-remotes.md](../generic-git-remotes.md) for the user contract).
 Outstanding V1 validation, manual by nature: agent auth from the *packaged* app
-against a real host (the Phase 0 spike items). V2 (HTTPS credential helpers) not
-started.
+against a real host (the Phase 0 spike items). V2 shipped as per-host sign-ins
+stored in the OS keychain and entered in Settings, not as git credential helpers
+(the helper phases below were never built). See [Plan 25](./25-sync-model.md).
 
 **Explicitly not in scope:** host pickers, a "custom remote" wizard, per-host settings
 UI, or per-host REST sugar (repo creation, visibility checks, install links — those
@@ -196,11 +197,10 @@ GCM.
 
 ## Deferred (beyond V2)
 
-- Per-host token entry UI / per-host keychain entries (the moment we want "no
-  terminal ever" for non-GitHub hosts).
+See also [Plan 25](./25-sync-model.md) for the shipped sign-in model and its deferred items.
+
 - Default key-file fallback (`~/.ssh/id_ed25519`, `id_rsa`) if agent-only proves too
   strict in practice; SSH passphrase prompting (agent covers passphrase keys).
-- Writing credentials back to helpers.
 - GitLab/Gitea REST sugar (repo creation, visibility checks) behind the same
   one-module-per-host pattern as `github.ts`.
 - `git://` and proxy edge cases beyond what libgit2 defaults handle.

@@ -115,6 +115,7 @@ export function IcloudSettingsField(): ReactElement | null {
   return (
     <>
       <SettingsField
+        variant="card"
         legend="iCloud Drive"
         description={
           hosted

@@ -121,11 +121,16 @@ export {
 } from './deep-link.ts'
 export {
   createTestGitSyncService,
+  createTestGithubConnector,
+  createTestHostConnector,
   createTestGitRepositoryService,
   createTestGithubAuthService,
   createTestICloudNativeService,
   createTestICloudSyncService,
   type GitSyncCall,
+  type GithubConnectorCall,
+  type TestGithubConnector,
+  type TestHostConnector,
   type GitRepositoryCall,
   type GitRepositoryHandler,
   type ICloudNativeCall,

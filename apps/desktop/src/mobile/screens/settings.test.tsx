@@ -6,6 +6,7 @@ import {
   createTestAppInfoService,
   createTestCoreServices,
   createTestGitSyncService,
+  createTestHostConnector,
   seedNotes,
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
@@ -35,7 +36,8 @@ function connected(status: Extract<GitSyncState, { phase: 'connected' }>['status
   return {
     phase: 'connected',
     remoteUrl: 'https://github.com/alex/notes.git',
-    repo: { owner: 'alex', name: 'notes' },
+    remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+    coexisting: false,
     status,
   }
 }
@@ -62,10 +64,12 @@ async function mount(options?: MountOptions) {
   const gitSync = createTestGitSyncService({
     state: options?.gitSync ?? connected({ state: 'idle' }),
   })
+  const hostConnector = createTestHostConnector()
   const app = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     appInfo: createTestAppInfoService('1.2.3-beta.4'),
     gitSync,
+    hostConnector,
     // A note window's graph runs no backup.
     role: options?.gitSync === null ? 'note-window' : 'main',
   })
@@ -82,7 +86,7 @@ async function mount(options?: MountOptions) {
     route: { kind: 'settings' },
     ...(options?.settings === undefined ? {} : { settings: options.settings }),
   })
-  return Object.assign(view, { gitSync, updateSettings })
+  return Object.assign(view, { gitSync, hostConnector, updateSettings })
 }
 
 type MountedSettings = Awaited<ReturnType<typeof mount>>
@@ -348,47 +352,103 @@ describe('MobileSettings', () => {
     await vi.waitFor(() => expect(view.app.settings.get().aiPrompts).toEqual([]))
   })
 
-  it('shows the connected repo and the live plain-language status', async () => {
+  it('shows the connected remote and the live plain-language status', async () => {
     await mount()
 
-    await expect.element(page.getByText('alex/notes')).toBeVisible()
-    await expect.element(page.getByText('Backed up')).toBeVisible()
+    await expect.element(page.getByText('alex/notes on GitHub')).toBeVisible()
+    await expect.element(page.getByText('Up to date')).toBeVisible()
     // Never git terms.
     await expect.element(page.getByText(/commit|branch|merge|push|pull/i)).not.toBeInTheDocument()
   })
 
-  it('routes Disconnect through the backup controller and signs out', async () => {
+  it('stops syncing through the controller and keeps the GitHub sign-in', async () => {
     const user = userEvent
     const view = await mount()
+    await view.app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
 
-    await user.click(page.getByRole('button', { name: 'Disconnect GitHub' }))
+    await user.click(page.getByRole('button', { name: 'Stop syncing' }))
 
     await vi.waitFor(() => {
       const methods = view.gitSync.calls().map((call) => call.method)
       expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
-      expect(methods.filter((method) => method === 'signOut')).toHaveLength(1)
+    })
+    expect(view.app.githubAuth.getState().connected).toBe(true)
+  })
+
+  it('signs in to and out of GitHub from the account group', async () => {
+    const user = userEvent
+    const view = await mount()
+
+    await user.click(page.getByRole('button', { name: 'Sign in to GitHub' }))
+    await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
+
+    await view.app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
+    await user.click(page.getByRole('button', { name: 'Sign out of GitHub' }))
+    await vi.waitFor(() => {
+      expect(view.app.githubAuth.getState().connected).toBe(false)
     })
   })
 
-  it('offers Connect GitHub for a disconnected local graph and opens the sheet', async () => {
+  it('offers Connect GitHub and another host for a disconnected local graph', async () => {
     const user = userEvent
     await mount({ storageKind: 'local', gitSync: { phase: 'disconnected' } })
 
     await expect
       .element(page.getByText('Sync notes with Reflect on your other devices.'))
       .toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Connect another host' })).toBeVisible()
     await user.click(page.getByRole('button', { name: 'Connect GitHub' }))
 
     await expect.element(page.getByRole('heading', { name: 'Connect GitHub' })).toBeVisible()
   })
 
-  it('hides the connect row once the local graph is connected', async () => {
+  it('connects another host from its sheet', async () => {
+    const user = userEvent
+    const view = await mount({ storageKind: 'local', gitSync: { phase: 'disconnected' } })
+
+    await user.click(page.getByRole('button', { name: 'Connect another host' }))
+    await expect.element(page.getByRole('heading', { name: 'Connect another host' })).toBeVisible()
+    await page.getByLabelText('Repository URL').fill('https://gitlab.com/alex/notes.git')
+    await page.getByLabelText('Username').fill('alex')
+    await page.getByLabelText('Access token').fill('glpat-1')
+    await user.click(page.getByRole('button', { name: 'Connect', exact: true }))
+
+    await vi.waitFor(() => {
+      expect(view.hostConnector.calls()).toEqual([
+        { remoteUrl: 'https://gitlab.com/alex/notes.git', username: 'alex', token: 'glpat-1' },
+      ])
+    })
+  })
+
+  it('offers a sign-in for a host remote that has none', async () => {
+    const user = userEvent
+    await mount({
+      storageKind: 'local',
+      gitSync: {
+        phase: 'needsCredential',
+        remoteUrl: 'https://gitlab.com/alex/notes.git',
+        remote: { kind: 'https', origin: 'https://gitlab.com' },
+      },
+    })
+
+    await expect.element(page.getByText('gitlab.com/alex/notes')).toBeVisible()
+    await expect.element(page.getByText('Sign-in needed')).toBeVisible()
+    await user.click(page.getByRole('button', { name: 'Add sign-in' }))
+    await expect
+      .element(page.getByLabelText('Repository URL'))
+      .toHaveValue('https://gitlab.com/alex/notes.git')
+  })
+
+  it('hides the connect rows once the local graph is connected', async () => {
     await mount({ storageKind: 'local' })
 
-    await expect.element(page.getByText('alex/notes')).toBeVisible()
-    await expect.element(page.getByRole('button', { name: 'Disconnect GitHub' })).toBeVisible()
+    await expect.element(page.getByText('alex/notes on GitHub')).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Stop syncing' })).toBeVisible()
     await expect
       .element(page.getByRole('button', { name: 'Connect GitHub', exact: true }))
+      .not.toBeInTheDocument()
+    await expect
+      .element(page.getByRole('button', { name: 'Connect another host' }))
       .not.toBeInTheDocument()
   })
 
@@ -398,7 +458,9 @@ describe('MobileSettings', () => {
     await expect
       .element(page.getByRole('button', { name: 'Connect GitHub' }))
       .not.toBeInTheDocument()
-    await expect.element(page.getByText('Backup')).not.toBeInTheDocument()
+    await expect.element(page.getByText('Git repository')).not.toBeInTheDocument()
+    // The account belongs to the device, so it stays.
+    await expect.element(page.getByText('GitHub account')).toBeVisible()
   })
 
   it('waits out the loading phase — no connect row that could flash', async () => {
@@ -407,7 +469,7 @@ describe('MobileSettings', () => {
     await expect
       .element(page.getByRole('button', { name: 'Connect GitHub' }))
       .not.toBeInTheDocument()
-    await expect.element(page.getByText('Backup')).not.toBeInTheDocument()
+    await expect.element(page.getByText('Git repository')).not.toBeInTheDocument()
   })
 
   it('degrades to the local groups where no sync lifecycle is mounted', async () => {
@@ -416,9 +478,7 @@ describe('MobileSettings', () => {
     await expect.element(page.getByText('Field Notes')).toBeVisible()
     await expect.element(page.getByText('1.2.3')).toBeVisible()
     await expect.element(page.getByText('2', { exact: true })).toBeVisible() // the note count
-    await expect.element(page.getByText('Backed up')).not.toBeInTheDocument()
-    await expect
-      .element(page.getByRole('button', { name: 'Disconnect GitHub' }))
-      .not.toBeInTheDocument()
+    await expect.element(page.getByText('Up to date')).not.toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: 'Stop syncing' })).not.toBeInTheDocument()
   })
 })

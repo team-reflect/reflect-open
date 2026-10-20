@@ -1,4 +1,3 @@
-import type { MaybePromise } from '@reflect/utils'
 import { useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -12,22 +11,15 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-
-interface GithubSignOutRowProps {
-  /** Remove the machine's GitHub credential (every connected graph stops syncing). */
-  signOut: () => MaybePromise<void>
-  /** The one-line explanation shown beside the button, tuned to the caller. */
-  description: string
-}
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
- * The machine-level "Sign out of GitHub" row: a destructive button behind a
- * confirmation dialog, with a short explanation. GitHub sign-in is per machine,
- * not per graph, so this is reused wherever the stored credential can be
- * reached: beside a connected repo, and (with no connected graph) on its own,
- * so the credential can still be cleared to switch to another account.
+ * The machine-level "Sign out of GitHub" button behind a confirmation
+ * dialog. Clearing the sign-in restarts every graph's git sync by itself, so
+ * this touches no graph.
  */
-export function GithubSignOutRow({ signOut, description }: GithubSignOutRowProps): ReactElement {
+export function GithubSignOutRow(): ReactElement {
+  const { githubAuth } = useCoreServices()
   const [open, setOpen] = useState(false)
   const action = useAsyncAction()
 
@@ -40,59 +32,53 @@ export function GithubSignOutRow({ signOut, description }: GithubSignOutRowProps
 
   async function confirmSignOut(): Promise<void> {
     await action.run(async () => {
-      await signOut()
+      await githubAuth.clear()
       setOpen(false)
     })
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-2 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-xs font-medium text-text">GitHub account</p>
-        <p className="text-xs text-text-muted">{description}</p>
-      </div>
-      <Dialog open={open} onOpenChange={setDialogOpen}>
-        <DialogTrigger
-          render={
-            <Button
-              variant="destructive"
-              size="sm"
-              title="Removes the GitHub token from this machine"
-              disabled={action.pending}
-            >
-              Sign out of GitHub…
-            </Button>
-          }
-        />
-        <DialogContent showCloseButton={!action.pending}>
-          <DialogHeader>
-            <DialogTitle>Sign out of GitHub?</DialogTitle>
-            <DialogDescription>
-              This removes the GitHub token from this machine. Every GitHub-backed graph will stop
-              backing up until you sign in again.
-            </DialogDescription>
-          </DialogHeader>
-          {action.error !== null ? (
-            <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
-          ) : null}
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button variant="outline" disabled={action.pending}>
-                  Cancel
-                </Button>
-              }
-            />
-            <Button
-              variant="destructive"
-              disabled={action.pending}
-              onClick={() => void confirmSignOut()}
-            >
-              Sign out
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+    <Dialog open={open} onOpenChange={setDialogOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            title="Removes the GitHub token from this machine"
+            disabled={action.pending}
+          >
+            Sign out of GitHub…
+          </Button>
+        }
+      />
+      <DialogContent showCloseButton={!action.pending}>
+        <DialogHeader>
+          <DialogTitle>Sign out of GitHub?</DialogTitle>
+          <DialogDescription>
+            This removes the GitHub token from this machine. Every graph that syncs with a GitHub
+            repository stops until you sign in again, and notes can no longer be shared as gists.
+          </DialogDescription>
+        </DialogHeader>
+        {action.error !== null ? (
+          <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
+        ) : null}
+        <DialogFooter>
+          <DialogClose
+            render={
+              <Button variant="outline" disabled={action.pending}>
+                Cancel
+              </Button>
+            }
+          />
+          <Button
+            variant="destructive"
+            disabled={action.pending}
+            onClick={() => void confirmSignOut()}
+          >
+            Sign out
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

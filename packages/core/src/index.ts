@@ -27,11 +27,11 @@ export {
 } from './ipc/mobile-storage-service.ts'
 export { githubAppInstallUrl, type GithubAuthService } from './sync/github-auth-service.ts'
 export { newRepoUrl, parseRepoInput, type GithubRepoRef } from './sync/github-repo-service.ts'
-export {
-  type GitSyncService,
-  type GitSyncState,
-  type ConnectExistingResult,
-} from './sync/git-sync-service.ts'
+export { type GitSyncService, type GitSyncState } from './sync/git-sync-service.ts'
+export { type ConnectExistingResult, type GithubConnector } from './sync/github-connector.ts'
+export { type ConnectHostInput, type HostConnector } from './sync/host-connector.ts'
+export { classifyRemote, githubRemoteUrl, githubRepoOf, type GitRemote } from './sync/remote-url.ts'
+export { type GitHostCredentialService } from './sync/git-host-credential-service.ts'
 export { isICloudRoot } from './sync/icloud-sync-service.ts'
 export { type GistPublishService } from './sync/gist-publish-service.ts'
 export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'

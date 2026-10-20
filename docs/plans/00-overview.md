@@ -6,8 +6,8 @@ AI-native rewrite described in the product docs.
 
 ## Current source status (2026-06-14)
 
-The source tree now implements Plans 01–12 and 14–17, with Plan 16 at its V1 scope
-(SSH agent auth + path remotes; HTTPS credential helpers remain V2). Plan 11 is no
+The source tree now implements Plans 01–12 and 14–17, with Plan 16 at V1 and V2
+(SSH agent auth, path remotes, and per-host HTTPS sign-ins). Plan 11 is no
 longer deferred: the repo contains the WXT extension (`apps/extension`), the native
 messaging sidecar (`apps/native-host`), desktop capture commands
 (`apps/desktop/src-tauri/src/capture.rs`), and the TS drain/enrichment path in
@@ -73,7 +73,7 @@ before the editor, and the editor lands before search/AI.
 | 13 | [Import / export / portability](13-import-export-portability.md) | **Closed by decision.** Markdown files are the portability surface; no JSON/HTML/ZIP export or Obsidian/folder import suite is planned |
 | 14 | [CLI (read/discovery)](14-cli-read-discovery.md) | `reflect today`, `reflect search`, `reflect show`, path lookup |
 | 15 | [Hardening, packaging & OSS release](15-hardening-packaging-release.md) | a11y, perf budgets, signing/notarization, MIT + docs, onboarding, release pipeline |
-| 16 | [Generic git remotes](16-generic-git-remotes.md) | Any git host (GitLab/Gitea/GHES/NAS) via hand-wired `origin`, zero new UI — V1 SSH (agent) + path remotes, V2 HTTPS (credential helpers) |
+| 16 | [Generic git remotes](16-generic-git-remotes.md) | Any git host (GitLab/Gitea/GHES/NAS). **V1 and V2 shipped:** V1 SSH (agent) + path remotes via hand-wired `origin`; V2 HTTPS via per-host sign-ins entered in Settings and kept in the OS keychain |
 | 17 | [Readable filenames](17-readable-filenames.md) | Title-derived note filenames (slug + collision suffix), frontmatter `id` adoption, rename-on-settled-title file moves, id-healed external renames |
 | 18 | [Tasks](18-tasks.md) | **Post-release add-on.** Round-checkbox (`+ [ ]`) tasks as a rebuildable projection: interactive editor checkboxes, Tasks view (Overdue/Today/Upcoming), `[[date]]`/daily scheduling, guarded toggle write-back, square checklists excluded |
 | 19 | [Mobile companion](19-mobile.md) | **In progress.** iOS target of the existing Tauri app: mobile root gate, fixed graph root, onboarding, Daily/All shell, editable notes, keyboard plugin; device validation + store hardening remain |
@@ -81,6 +81,7 @@ before the editor, and the editor lands before search/AI.
 | 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **Shipped (2026-07-04).** iCloud Drive as the primary consumer sync path: graphs in the app's iCloud container, deterministic resolution ladder over per-device shadow bases (markers as the fallback), `.reflect/`/`.git/` sync-exclusion, iCloud-first onboarding on both platforms with multi-graph lists + the mobile switcher; git remotes stay the self-managed path. AI-assisted resolution deferred |
 | 22 | [Mobile GitHub connect](22-mobile-github-connect.md) | **Implemented; device pass pending.** The connect front door for local (non-iCloud) graphs on iOS: shared wizard hook, `ConnectGithubDrawer`, Settings entry point — no new sync mechanism |
 | 23 | [Mobile AI chat](23-mobile-ai-chat.md) | The Plan 10 chat on iOS as a fourth tab: same engine/store/privacy gate, mobile composer + history/model sheets, per-device BYOK provider settings, lexical-only `search_notes`; streaming-on-iOS spike gates the build |
+| 25 | [Sync model](25-sync-model.md) | **Implemented.** Three independent objects (GitHub account, Git repository, iCloud hosting), `GitRemote` classification, the `needsCredential` state, per-origin sign-ins, and the sync/backup naming rule |
 
 ## Milestone map
 
