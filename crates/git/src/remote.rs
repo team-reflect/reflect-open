@@ -128,46 +128,84 @@ struct Tried {
     ssh_agent: bool,
 }
 
-/// The host of an `http(s)://` URL, lowercased, without user info or port;
-/// `None` for every other URL form.
-pub(super) fn http_host(url: &str) -> Option<String> {
-    let rest = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))?;
-    let authority = rest.split('/').next()?;
-    let host = authority.rsplit('@').next()?;
-    let host = host.split(':').next()?;
-    (!host.is_empty()).then(|| host.to_lowercase())
+/// Where an `http(s)://` URL points: scheme, host and effective port, the
+/// three parts a stored sign-in is bound to. `None` for every other URL
+/// form, and for an http(s) URL this parser cannot read.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct HttpOrigin {
+    pub scheme: String,
+    pub host: String,
+    pub port: u16,
+}
+
+pub(super) fn http_origin(url: &str) -> Option<HttpOrigin> {
+    let (scheme, rest) = url.split_once("://")?;
+    let scheme = scheme.to_ascii_lowercase();
+    let default_port = match scheme.as_str() {
+        "https" => 443,
+        "http" => 80,
+        _ => return None,
+    };
+    let authority = rest.split(['/', '?', '#']).next()?;
+    let host_port = authority.rsplit('@').next()?;
+    let (host, port) = match host_port.strip_prefix('[') {
+        // A bracketed IPv6 literal keeps its brackets so it never compares
+        // equal to a host name.
+        Some(bracketed) => {
+            let (address, after) = bracketed.split_once(']')?;
+            let port = match after.strip_prefix(':') {
+                Some(port) => port.parse().ok()?,
+                None if after.is_empty() => default_port,
+                None => return None,
+            };
+            (format!("[{}]", address.to_ascii_lowercase()), port)
+        }
+        None => match host_port.rsplit_once(':') {
+            Some((host, port)) => (host.to_ascii_lowercase(), port.parse().ok()?),
+            None => (host_port.to_ascii_lowercase(), default_port),
+        },
+    };
+    (!host.is_empty()).then_some(HttpOrigin { scheme, host, port })
 }
 
 /// `RemoteCallbacks` with the credential chain, shared by every network call.
 ///
-/// A [`GitCredential`] is only ever presented to the host of `remote_url`:
+/// A [`GitCredential`] is only ever presented to the origin of `remote_url`:
 /// libgit2 follows one redirect and then asks the callback again for the
-/// new host, which would hand it a sign-in stored for another one.
+/// new URL, which would hand it a sign-in stored for another origin, or send
+/// it over plain http after an https-to-http redirect.
 fn callbacks_with_credentials<'cb>(
     credential: Option<GitCredential>,
     remote_url: &str,
 ) -> RemoteCallbacks<'cb> {
     let mut callbacks = RemoteCallbacks::new();
     let mut tried = Tried::default();
-    let expected_host = http_host(remote_url);
+    let expected = http_origin(remote_url);
     callbacks.credentials(move |url, username_from_url, allowed| {
         if credential.is_some() {
-            guard_host(expected_host.as_deref(), url)?;
+            guard_origin(expected.as_ref(), url)?;
         }
         resolve_credential(credential.as_ref(), username_from_url, allowed, &mut tried)
     });
     callbacks
 }
 
-/// Refuse to present a sign-in to any host but the one it was stored for.
-fn guard_host(expected_host: Option<&str>, url: &str) -> Result<(), git2::Error> {
-    if expected_host.is_some() && http_host(url).as_deref() != expected_host {
+/// Refuse to present a sign-in anywhere but the origin it was stored for.
+/// With no readable origin to compare against (a non-http remote, or an
+/// http URL the parser rejects) the sign-in is withheld rather than sent.
+fn guard_origin(expected: Option<&HttpOrigin>, url: &str) -> Result<(), git2::Error> {
+    let Some(expected) = expected else {
         return Err(git2::Error::new(
             git2::ErrorCode::Auth,
             git2::ErrorClass::Http,
-            "the host redirected to another host; the stored sign-in was not sent",
+            "the stored sign-in is only sent to an http(s) remote",
+        ));
+    };
+    if http_origin(url).as_ref() != Some(expected) {
+        return Err(git2::Error::new(
+            git2::ErrorCode::Auth,
+            git2::ErrorClass::Http,
+            "the host redirected elsewhere; the stored sign-in was not sent",
         ));
     }
     Ok(())
@@ -358,7 +396,7 @@ fn classify_rejection(message: String, sideband: &str) -> PushOutcome {
 mod credential_tests {
     use git2::{Cred, CredentialType, ErrorCode};
 
-    use super::{GitCredential, Tried, guard_host, http_host, resolve_credential};
+    use super::{GitCredential, Tried, guard_origin, http_origin, resolve_credential};
 
     fn github() -> GitCredential {
         GitCredential {
@@ -476,22 +514,28 @@ mod credential_tests {
     }
 
     #[test]
-    fn a_sign_in_is_withheld_from_another_host() {
-        let expected = http_host("https://gitlab.com/alex/notes.git");
+    fn a_sign_in_is_withheld_from_another_origin() {
+        let expected = http_origin("https://gitlab.com/alex/notes.git");
         assert!(
-            guard_host(
-                expected.as_deref(),
+            guard_origin(
+                expected.as_ref(),
                 "https://gitlab.com/alex/notes.git/info/refs"
             )
             .is_ok()
         );
-        assert!(guard_host(expected.as_deref(), "https://GITLAB.com:443/alex/notes.git").is_ok());
-        let err = guard_host(expected.as_deref(), "https://evil.example/alex/notes.git")
+        assert!(guard_origin(expected.as_ref(), "https://GITLAB.com:443/alex/notes.git").is_ok());
+        let err = guard_origin(expected.as_ref(), "https://evil.example/alex/notes.git")
             .expect_err("another host must be refused");
         assert_eq!(err.code(), ErrorCode::Auth);
         assert!(err.message().contains("redirected"), "{err}");
-        // SSH and path remotes carry no expected host: nothing to guard.
-        assert!(guard_host(None, "https://anything.example/x").is_ok());
+        let err = guard_origin(expected.as_ref(), "http://gitlab.com/alex/notes.git")
+            .expect_err("plain http must be refused");
+        assert!(err.message().contains("redirected"), "{err}");
+        // A remote with no readable origin never receives the sign-in.
+        let err = guard_origin(None, "https://anything.example/x")
+            .expect_err("an unreadable origin must withhold the sign-in");
+        assert_eq!(err.code(), ErrorCode::Auth);
+        assert!(err.message().contains("only sent"), "{err}");
     }
 
     #[test]

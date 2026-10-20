@@ -1745,22 +1745,66 @@ fn remote_head_reports_no_default_branch_for_an_empty_remote() {
 }
 
 #[test]
-fn http_host_extracts_the_host_only() {
-    use super::remote::http_host;
+fn http_origin_reads_scheme_host_and_effective_port() {
+    use super::remote::{HttpOrigin, http_origin};
+    let origin = |scheme: &str, host: &str, port: u16| {
+        Some(HttpOrigin {
+            scheme: scheme.to_string(),
+            host: host.to_string(),
+            port,
+        })
+    };
     assert_eq!(
-        http_host("https://gitlab.com/a/b.git").as_deref(),
-        Some("gitlab.com")
+        http_origin("https://gitlab.com/a/b.git"),
+        origin("https", "gitlab.com", 443)
     );
     assert_eq!(
-        http_host("https://alex:tok@GitLab.com:8443/a/b.git").as_deref(),
-        Some("gitlab.com")
+        http_origin("https://alex:tok@GitLab.com:8443/a/b.git"),
+        origin("https", "gitlab.com", 8443)
     );
     assert_eq!(
-        http_host("http://gitea.local/a/b").as_deref(),
-        Some("gitea.local")
+        http_origin("HTTPS://gitea.local/a/b?x#y"),
+        origin("https", "gitea.local", 443)
     );
-    assert_eq!(http_host("git@gitlab.com:a/b.git"), None);
-    assert_eq!(http_host("/Volumes/NAS/notes.git"), None);
+    assert_eq!(
+        http_origin("http://gitea.local/a/b"),
+        origin("http", "gitea.local", 80)
+    );
+    assert_eq!(
+        http_origin("https://[2001:DB8::1]/a/b.git"),
+        origin("https", "[2001:db8::1]", 443)
+    );
+    assert_eq!(
+        http_origin("https://[::1]:8443/a/b.git"),
+        origin("https", "[::1]", 8443)
+    );
+    assert_eq!(http_origin("https://[::1"), None);
+    assert_eq!(http_origin("https://[::1]x/a"), None);
+    assert_eq!(http_origin("https://gitlab.com:/a"), None);
+    assert_eq!(http_origin("https://gitlab.com:abc/a"), None);
+    assert_eq!(http_origin("https:///a"), None);
+    assert_eq!(http_origin("git@gitlab.com:a/b.git"), None);
+    assert_eq!(http_origin("ssh://git@nas:2222/notes.git"), None);
+    assert_eq!(http_origin("/Volumes/NAS/notes.git"), None);
+}
+
+#[test]
+fn guard_origin_withholds_a_sign_in_from_any_other_origin() {
+    use super::remote::{guard_origin, http_origin};
+    let stored = http_origin("https://gitlab.com/a/b.git");
+    let stored = stored.as_ref();
+    assert!(guard_origin(stored, "https://GITLAB.com:443/a/b.git/info/refs").is_ok());
+    // Another host, plain http on the same host, another port, and an IPv6
+    // literal that is not the stored one are all refused.
+    assert!(guard_origin(stored, "https://evil.example/a/b.git").is_err());
+    assert!(guard_origin(stored, "http://gitlab.com/a/b.git").is_err());
+    assert!(guard_origin(stored, "https://gitlab.com:8443/a/b.git").is_err());
+    let v6 = http_origin("https://[2001:db8::1]/a.git");
+    assert!(guard_origin(v6.as_ref(), "https://[2001:db8::2]/a.git").is_err());
+    assert!(guard_origin(v6.as_ref(), "https://[2001:DB8::1]/a.git").is_ok());
+    // No readable origin to compare against: withhold rather than send.
+    assert!(guard_origin(None, "https://gitlab.com/a/b.git").is_err());
+    assert!(guard_origin(stored, "not a url").is_err());
 }
 
 #[test]
