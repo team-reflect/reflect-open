@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { errorMessage } from '../errors.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -55,7 +56,14 @@ class GitHostCredentialServiceImpl implements GitHostCredentialService {
 
   async load(origin: string): Promise<GitCredential | null> {
     const { secretStore, logger } = this.#deps
-    const raw = await secretStore.get(hostCredentialSecretName(origin))
+    let raw: string | null
+    try {
+      raw = await secretStore.get(hostCredentialSecretName(origin))
+    } catch (error) {
+      // A keychain the app cannot read is, for syncing, one with no entry.
+      logger.error(`reading the sign-in for ${origin} failed:`, errorMessage(error))
+      return null
+    }
     if (raw === null) {
       return null
     }

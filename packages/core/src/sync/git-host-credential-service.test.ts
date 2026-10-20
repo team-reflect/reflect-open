@@ -33,6 +33,14 @@ describe('GitHostCredentialService', () => {
     ])
   })
 
+  it('treats a keychain read failure as absent and logs it', async () => {
+    const { secretStore, logger, hostCredentials } = setup()
+    vi.spyOn(secretStore, 'get').mockRejectedValueOnce(new Error('keychain locked'))
+
+    expect(await hostCredentials.load(ORIGIN)).toBeNull()
+    expect(logger.getErrors()).toHaveLength(1)
+  })
+
   it('treats an unreadable entry as absent and logs it', async () => {
     const { logger, hostCredentials } = setup({
       [hostCredentialSecretName(ORIGIN)]: 'not json',
