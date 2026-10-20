@@ -154,7 +154,7 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
   async remoteHead(
     credential: GitCredential | null,
     generation: number,
-    url?: string | undefined,
+    url?: string  ,
   ): Promise<RemoteTip> {
     this.#log.push({ method: 'remoteHead', args: [credential, generation, url] })
     return await this.#handlers.remoteHead(credential, generation, url)

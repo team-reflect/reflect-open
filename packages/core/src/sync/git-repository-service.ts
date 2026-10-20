@@ -140,11 +140,7 @@ export interface GitRepositoryService {
    * Ask `origin` (or `url`, a remote that is not configured yet) for the
    * current branch tip without fetching.
    */
-  remoteHead(
-    credential: GitCredential | null,
-    generation: number,
-    url?: string  ,
-  ): Promise<RemoteTip>
+  remoteHead(credential: GitCredential | null, generation: number, url?: string): Promise<RemoteTip>
   /**
    * Push to `origin`; rejections come back as data, not thrown errors.
    */
@@ -195,7 +191,7 @@ class GitRepositoryServiceImpl implements GitRepositoryService {
   remoteHead(
     credential: GitCredential | null,
     generation: number,
-    url?: string  ,
+    url?: string,
   ): Promise<RemoteTip> {
     return this.#deps.ipc.call(
       'git_remote_head',
