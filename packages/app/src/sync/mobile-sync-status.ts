@@ -35,12 +35,29 @@ export type MobileSyncDetail =
 /**
  * Map the engine's product state to the mobile wording. `null` when no sync
  * lifecycle is mounted (dev harness, tests) or the graph has no backup
- * configured: there is no status to speak of.
+ * configured: there is no status to speak of. A remote that waits for its
+ * sign-in wants a look.
  *
  * Precedence: an in-flight cycle shows as `Syncing`; errors and offline last.
  */
 export function getMobileSyncStatus(state: GitSyncState | null): MobileSyncStatus | null {
-  if (state === null || state.phase !== 'connected') {
+  if (state === null) {
+    return null
+  }
+  if (state.phase === 'needsCredential') {
+    return {
+      label: 'Sign-in needed',
+      tone: 'attention',
+      detail: {
+        kind: 'message',
+        text:
+          state.remote.kind === 'github'
+            ? 'Sign in to GitHub to resume backing up.'
+            : 'This host needs a sign-in, which is not available on this device yet. Switch the remote to its SSH form to resume.',
+      },
+    }
+  }
+  if (state.phase !== 'connected') {
     return null
   }
   const status = state.status

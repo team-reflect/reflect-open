@@ -29,6 +29,7 @@ import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
 import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer.tsx'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer.tsx'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer.tsx'
+import { GithubSignInDrawer } from '@/mobile/github-sign-in-drawer.tsx'
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
@@ -160,6 +161,7 @@ export function MobileSettings(): ReactElement {
   const sync = useGitSyncContext()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
+  const [signInOpen, setSignInOpen] = useState(false)
   const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
     useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
@@ -185,7 +187,12 @@ export function MobileSettings(): ReactElement {
   const gitSync = sync?.state ?? null
   const status = getMobileSyncStatus(gitSync)
   const repo =
-    gitSync !== null && gitSync.phase === 'connected' ? githubRepoOf(gitSync.remote) : null
+    gitSync !== null && (gitSync.phase === 'connected' || gitSync.phase === 'needsCredential')
+      ? githubRepoOf(gitSync.remote)
+      : null
+  // A GitHub remote whose sign-in is gone resumes with a sign-in alone.
+  const needsGithubSignIn =
+    gitSync !== null && gitSync.phase === 'needsCredential' && gitSync.remote.kind === 'github'
   // The connect entry point is local-graph-only (iCloud sync and a Git remote
   // are mutually exclusive per graph, Plan 21) and waits out the controller's
   // `loading` phase so the row never flashes on a graph that turns out to be
@@ -394,6 +401,9 @@ export function MobileSettings(): ReactElement {
               {canConnect ? (
                 <SettingsActionRow label="Connect GitHub" onPress={() => setConnectOpen(true)} />
               ) : null}
+              {needsGithubSignIn ? (
+                <SettingsActionRow label="Sign in to GitHub" onPress={() => setSignInOpen(true)} />
+              ) : null}
               {repo !== null ? (
                 <SettingsActionRow
                   label="Disconnect GitHub"
@@ -525,6 +535,7 @@ export function MobileSettings(): ReactElement {
         </div>
       </main>
       <ConnectGithubDrawer open={connectOpen} onOpenChange={setConnectOpen} />
+      <GithubSignInDrawer open={signInOpen} onOpenChange={setSignInOpen} />
       <AddAiProviderDrawer
         open={addProviderOpen}
         onOpenChange={setAddProviderOpen}

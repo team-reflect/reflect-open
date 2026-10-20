@@ -156,6 +156,41 @@ describe('GitSyncSettingsField', () => {
       .not.toBeInTheDocument()
   })
 
+  it('names a GitHub remote that waits for its sign-in and offers to sign in', async () => {
+    await renderSection({
+      phase: 'needsCredential',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+    })
+
+    await expect.element(page.getByText('alex/notes')).toBeVisible()
+    await expect.element(page.getByText('Sign-in needed')).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Stop backing up' })).toBeVisible()
+    // Not the connect wizard: the remote is already there.
+    await expect
+      .element(page.getByRole('button', { name: 'Connect GitHub…' }))
+      .not.toBeInTheDocument()
+
+    await userEvent.click(page.getByRole('button', { name: 'Sign in to GitHub…' }))
+    await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
+  })
+
+  it('explains the SSH form for a host remote that waits for its sign-in', async () => {
+    await renderSection({
+      phase: 'needsCredential',
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      remote: { kind: 'https', origin: 'https://gitlab.com' },
+    })
+
+    await expect.element(page.locate('legend').getByText('Backup')).toBeVisible()
+    await expect.element(page.getByText('https://gitlab.com/alex/notes.git')).toBeVisible()
+    await expect.element(page.getByText(/git@gitlab\.com:owner\/repo\.git/)).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Stop backing up' })).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: 'Sign in to GitHub…' }))
+      .not.toBeInTheDocument()
+  })
+
   it('renders a GitHub remote with the reconnect affordances', async () => {
     await renderSection({
       phase: 'connected',

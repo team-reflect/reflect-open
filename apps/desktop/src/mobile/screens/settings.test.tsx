@@ -371,6 +371,26 @@ describe('MobileSettings', () => {
     })
   })
 
+  it('offers a GitHub sign-in for a remote that waits for it', async () => {
+    await mount({
+      gitSync: {
+        phase: 'needsCredential',
+        remoteUrl: 'https://github.com/alex/notes.git',
+        remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      },
+    })
+
+    await expect.element(page.getByText('alex/notes')).toBeVisible()
+    await expect.element(page.getByText('Sign-in needed')).toBeVisible()
+    await expect.element(page.getByText(/Sign in to GitHub to resume/)).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: 'Connect GitHub', exact: true }))
+      .not.toBeInTheDocument()
+
+    await userEvent.click(page.getByRole('button', { name: 'Sign in to GitHub' }))
+    await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
+  })
+
   it('offers Connect GitHub for a disconnected local graph and opens the sheet', async () => {
     const user = userEvent
     await mount({ storageKind: 'local', gitSync: { phase: 'disconnected' } })

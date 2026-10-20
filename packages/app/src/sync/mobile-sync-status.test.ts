@@ -27,6 +27,20 @@ describe('engine state', () => {
     expect(statusFor({ phase: 'disconnected' })).toBeNull()
   })
 
+  it('asks for a sign-in when the remote waits for one', () => {
+    expect(
+      statusFor({
+        phase: 'needsCredential',
+        remoteUrl: 'https://github.com/alex/notes.git',
+        remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      }),
+    ).toEqual({
+      label: 'Sign-in needed',
+      tone: 'attention',
+      detail: { kind: 'message', text: 'Sign in to GitHub to resume backing up.' },
+    })
+  })
+
   it('rests on Backed up — the quiet tone the pill hides on', () => {
     const status = statusFor(connected({ state: 'idle' }))
     expect(status).toEqual({ label: 'Backed up', tone: 'ok', detail: null })
