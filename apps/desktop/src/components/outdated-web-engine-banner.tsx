@@ -8,9 +8,9 @@ const SUPPORTS_LIGHT_DARK = CSS.supports('color', 'light-dark(#000, #fff)')
 
 /**
  * A dismissible warning, floating at the top of the window, shown when the
- * system WebKit is too old for the app's colors.
+ * system web engine is too old for the app's colors.
  */
-export function OutdatedSafariBanner(): ReactElement | null {
+export function OutdatedWebEngineBanner(): ReactElement | null {
   const [dismissed, setDismissed] = useState(false)
   if (SUPPORTS_LIGHT_DARK || dismissed) {
     return null
@@ -19,8 +19,8 @@ export function OutdatedSafariBanner(): ReactElement | null {
     <div className="fixed inset-x-4 top-[max(env(safe-area-inset-top),2.25rem)] z-50 mx-auto max-w-md rounded-md bg-background shadow-lg">
       <InlineAlert className="flex items-center gap-2">
         <span className="flex-1">
-          Your Safari is out of date, so some colors may look wrong. Update Safari or macOS in
-          Software Update.
+          Your system's web engine is out of date, so some colors may look wrong. Update your
+          operating system.
         </span>
         <Button
           variant="ghost"

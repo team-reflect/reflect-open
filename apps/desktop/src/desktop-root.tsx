@@ -2,7 +2,7 @@ import { useEffect, type ReactElement } from 'react'
 import { App } from '@/app.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { attachOperationToasts } from '@/components/operation-toasts.ts'
-import { OutdatedSafariBanner } from '@/components/outdated-safari-banner.tsx'
+import { OutdatedWebEngineBanner } from '@/components/outdated-web-engine-banner.tsx'
 import { Toaster } from '@/components/ui/toast.tsx'
 import { WindowDragRegion } from '@/components/window-drag-region.tsx'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
@@ -56,7 +56,7 @@ export function DesktopRoot(): ReactElement {
             <SidebarWidthEffect />
             <WindowDragRegion />
             <App />
-            <OutdatedSafariBanner />
+            <OutdatedWebEngineBanner />
             <Toaster />
           </TooltipProvider>
         </GraphProvider>
