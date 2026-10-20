@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
-import { isICloudRoot, suggestRepoName } from '@reflect/core'
+import { githubRepoOf, isICloudRoot, suggestRepoName, type GithubRepoRef } from '@reflect/core'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
@@ -37,15 +37,13 @@ function GitSyncStatusLine({
     case 'error':
       // "Reconnect GitHub" only helps when GitHub is the remote; a generic
       // remote's auth message already names the fix (ssh-add, known_hosts…).
-      return state.status.errorKind === 'auth' && state.repo !== null
+      return state.status.errorKind === 'auth' && state.remote.kind === 'github'
         ? 'Backup failed — reconnect GitHub'
         : `Backup failed: ${state.status.message}`
   }
 }
 
-function githubRepoBrowserUrl(
-  repo: NonNullable<Extract<GitSyncState, { phase: 'connected' }>['repo']>,
-): string {
+function githubRepoBrowserUrl(repo: GithubRepoRef): string {
   return `https://github.com/${repo.owner}/${repo.name}`
 }
 
@@ -72,21 +70,22 @@ export function GitSyncSettingsField(): ReactElement {
   })
   const forkGroups = duplicateIds.data ?? []
 
+  const repo = state.phase === 'connected' ? githubRepoOf(state.remote) : null
   const repoLabel =
     state.phase === 'connected'
-      ? state.repo !== null
-        ? `${state.repo.owner}/${state.repo.name}`
+      ? repo !== null
+        ? `${repo.owner}/${repo.name}`
         : state.remoteUrl
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
-  const genericRemote = state.phase === 'connected' && state.repo === null
+  const genericRemote = state.phase === 'connected' && repo === null
   const hosted = graph !== null && isICloudRoot(graph.root)
 
   function openGithubRepo(): void {
-    if (state.phase !== 'connected' || state.repo === null) {
+    if (repo === null) {
       return
     }
-    const url = githubRepoBrowserUrl(state.repo)
+    const url = githubRepoBrowserUrl(repo)
     const attempt = openRepoAttemptRef.current + 1
     openRepoAttemptRef.current = attempt
     action.setError(null)
@@ -169,14 +168,14 @@ export function GitSyncSettingsField(): ReactElement {
                 >
                   Stop backing up
                 </Button>
-                {state.repo !== null ? (
+                {repo !== null ? (
                   <Button variant="ghost" size="sm" onClick={openGithubRepo}>
                     <ExternalLink aria-hidden />
                     Open GitHub repo
                   </Button>
                 ) : null}
               </div>
-              {state.repo !== null ? (
+              {repo !== null ? (
                 <GithubSignOutRow
                   signOut={signOut}
                   description="Sign out on this machine; connected graphs stop backing up."

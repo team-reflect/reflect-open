@@ -157,7 +157,8 @@ describe('moving a graph to iCloud', () => {
     gitSyncState = {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     }
 
@@ -179,7 +180,8 @@ describe('moving a graph to iCloud', () => {
     gitSyncState = {
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     }
     disconnectGraph.mockRejectedValueOnce(new AppError('io', 'remote locked'))

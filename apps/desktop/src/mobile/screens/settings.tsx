@@ -5,6 +5,7 @@ import {
   aiProvider,
   aiProviderRequiresApiKey,
   errorMessage,
+  githubRepoOf,
   marketingVersion,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
@@ -183,7 +184,8 @@ export function MobileSettings(): ReactElement {
 
   const gitSync = sync?.state ?? null
   const status = getMobileSyncStatus(gitSync)
-  const repo = gitSync !== null && gitSync.phase === 'connected' ? gitSync.repo : null
+  const repo =
+    gitSync !== null && gitSync.phase === 'connected' ? githubRepoOf(gitSync.remote) : null
   // The connect entry point is local-graph-only (iCloud sync and a Git remote
   // are mutually exclusive per graph, Plan 21) and waits out the controller's
   // `loading` phase so the row never flashes on a graph that turns out to be

@@ -78,7 +78,8 @@ describe('GitSyncSettingsField', () => {
       {
         phase: 'connected',
         remoteUrl: 'https://github.com/alex/notes.git',
-        repo: { owner: 'alex', name: 'notes' },
+        remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+        coexisting: false,
         status: { state: 'idle' },
       },
       ICLOUD_GRAPH,
@@ -94,7 +95,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'waiting', until: 2 * 60_000 + 1 },
     })
     await expect.element(page.getByText('Backs up in 2 minutes')).toBeVisible()
@@ -104,7 +106,8 @@ describe('GitSyncSettingsField', () => {
     const app = await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'waiting', until: 3 * 60_000 },
     })
     await expect.element(page.getByText('Backs up in 3 minutes')).toBeVisible()
@@ -117,7 +120,8 @@ describe('GitSyncSettingsField', () => {
       {
         phase: 'connected',
         remoteUrl: 'git@gitlab.com:alex/notes.git',
-        repo: null,
+        remote: { kind: 'ssh', host: 'gitlab.com' },
+        coexisting: false,
         status: { state: 'idle' },
       },
       ICLOUD_GRAPH,
@@ -132,7 +136,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
-      repo: null,
+      remote: { kind: 'ssh', host: 'gitlab.com' },
+      coexisting: false,
       status: AUTH_ERROR,
     })
 
@@ -155,7 +160,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: AUTH_ERROR,
     })
 
@@ -172,7 +178,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     })
 
@@ -186,7 +193,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     })
 
@@ -206,7 +214,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     })
 
@@ -231,7 +240,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     })
 
@@ -249,7 +259,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     })
 
@@ -274,7 +285,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     })
 
@@ -292,7 +304,8 @@ describe('GitSyncSettingsField', () => {
     await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
-      repo: { owner: 'alex', name: 'notes' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+      coexisting: false,
       status: { state: 'idle' },
     })
 

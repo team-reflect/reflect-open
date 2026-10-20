@@ -16,26 +16,38 @@ import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { isICloudRoot } from './icloud-sync-service.ts'
 import { isSyncError, type SyncEngine, type SyncEngineFactory, type SyncStatus } from './engine.ts'
 import { describeConflictCopies } from './conflict-copies.ts'
+import type { CredentialResolver } from './credential-resolver.ts'
 import type { ChangedFile, GitCredential, GitRepositoryService } from './git-repository-service.ts'
-import { githubCredential, type GithubAuthService } from './github-auth-service.ts'
+import type { GithubAuthService } from './github-auth-service.ts'
 import type { GithubRepoRef, GithubRepoService } from './github-repo-service.ts'
-import { classifyRemote, githubRemoteUrl, githubRepoOf } from './remote-url.ts'
+import { classifyRemote, githubRemoteUrl, type GitRemote } from './remote-url.ts'
 
 /**
- * Git sync state as the UI sees it. `connected` means the graph has a repo and
- * an `origin` remote, and the engine is running. `repo` is set for GitHub
- * remotes (which additionally require the stored GitHub credential) and
- * `null` for hand-wired generic remotes (Plan 16: GitLab/Gitea/self-hosted
- * over SSH, or a bare path repo), whose credentials resolve locally in Rust.
+ * Git sync state as the UI sees it. `connected` means the graph has a repo,
+ * an `origin` remote, the sign-in that remote needs, and a running engine.
+ * `needsCredential` means `origin` is set but its sign-in is not stored: the
+ * GitHub account is signed out, or the HTTPS host has no entry. SSH and path
+ * remotes never land there: Rust resolves them locally.
  *
- * `disconnected` means no *backup*: on desktop such graphs still run the
+ * `disconnected` means no remote: on desktop such graphs still run the
  * local-history commit loop (see `startLocalHistory`), which the UI never
- * surfaces.
+ * surfaces. So does `needsCredential`.
  */
 export type GitSyncState =
   | { phase: 'loading' }
   | { phase: 'disconnected' }
-  | { phase: 'connected'; remoteUrl: string; repo: GithubRepoRef | null; status: SyncStatus }
+  | { phase: 'needsCredential'; remoteUrl: string; remote: GitRemote }
+  | {
+      phase: 'connected'
+      remoteUrl: string
+      remote: GitRemote
+      /**
+       * True on an iCloud-hosted graph: iCloud syncs the notes and Git keeps
+       * a history that updates after five quiet minutes.
+       */
+      coexisting: boolean
+      status: SyncStatus
+    }
 
 /**
  * Outcome of connecting to an existing repo (the public case needs consent).
@@ -88,6 +100,10 @@ export interface GitSyncServiceOptions {
 export interface GitSyncServiceDeps {
   readonly git: GitRepositoryService
   readonly syncEngines: SyncEngineFactory
+  /**
+   * Which sign-in the graph's remote gets.
+   */
+  readonly credentials: CredentialResolver
   readonly githubAuth: GithubAuthService
   readonly githubRepos: GithubRepoService
   readonly fileChanges: FileChangeService
@@ -199,7 +215,7 @@ class GitSyncServiceImpl implements GitSyncService {
   }
 
   async start(): Promise<void> {
-    const { git, syncEngines, githubAuth, progress, activity, logger, icloudNative, platform } =
+    const { git, syncEngines, credentials, progress, activity, logger, icloudNative, platform } =
       this.#deps
     this.#teardown()
     if (this.#disposed) {
@@ -207,17 +223,7 @@ class GitSyncServiceImpl implements GitSyncService {
     }
     this.#setState({ phase: 'loading' })
     try {
-      const [status, auth] = await Promise.all([
-        git.status(this.#generation),
-        // A keychain the app can't read is indistinguishable from a signed-out
-        // one as far as backup is concerned, and must not cost the graph its
-        // history: degrade to the signed-out path below rather than failing
-        // the whole start into the engine-less catch.
-        githubAuth.load().catch((error: unknown) => {
-          logger.error('reading the GitHub credential failed:', errorMessage(error))
-          return null
-        }),
-      ])
+      const status = await git.status(this.#generation)
       if (this.#disposed) {
         return
       }
@@ -228,45 +234,19 @@ class GitSyncServiceImpl implements GitSyncService {
       }
       const remoteUrl = status.remoteUrl
       const remote = classifyRemote(remoteUrl)
-      const repo = githubRepoOf(remote)
-      if (repo !== null && auth === null) {
-        // A GitHub remote needs the managed sign-in; the wizard is the fix.
-        // Generic remotes adopt without it — their credentials live with the
-        // user's own git tooling (ssh agent), not in our keychain.
-        this.#setState({ phase: 'disconnected' })
+      // A missing sign-in fails at adoption, not at the first push: a public
+      // HTTPS remote would pull anonymously and only 401 on push, so the other
+      // device's edits arrive while this one's silently never leave.
+      const resolved = await credentials.resolve(remote)
+      if (this.#disposed) {
+        return
+      }
+      if (resolved.kind === 'missing') {
+        this.#setState({ phase: 'needsCredential', remoteUrl, remote })
         await this.#startLocalHistory(status.initialized)
         return
       }
-      // The app has no sign-in for a non-GitHub HTTPS host (SSH and path
-      // remotes need none: the agent or the filesystem answers). Fail at
-      // adoption, not at the first push: a *public* HTTPS remote would pull
-      // anonymously and only 401 on push, so the other device's edits arrive
-      // while this one's silently never leave. `rejected` = acting (not
-      // retrying) is the fix.
-      if (remote.kind === 'https') {
-        const host = remote.origin.replace(/^https?:\/\//, '')
-        this.#setState({
-          phase: 'connected',
-          remoteUrl,
-          repo: null,
-          status: {
-            state: 'error',
-            errorKind: 'rejected',
-            message: `Backup cannot sign in to ${host} over HTTPS. Switch the remote to its SSH form: git remote set-url origin git@${host}:<owner>/<repo>.git`,
-          },
-        })
-        await this.#startLocalHistory(status.initialized)
-        return
-      }
-      // The managed sign-in is for github.com only; SSH and path remotes get
-      // none and Rust resolves them locally.
-      const getCredential =
-        repo !== null
-          ? async () => {
-              const token = await githubAuth.getToken()
-              return token === null ? null : githubCredential(token)
-            }
-          : () => null
+      const getCredential = resolved.get
       const coexisting = isICloudRoot(this.#root)
       const next = syncEngines.create({
         generation: this.#generation,
@@ -283,9 +263,15 @@ class GitSyncServiceImpl implements GitSyncService {
         canStartCycle: () => !this.#mobile || !activity.isHidden(),
         getCredential,
         onStatus: (engineStatus) => {
-          this.#setState({ phase: 'connected', remoteUrl, repo, status: engineStatus })
-          if (repo !== null && isForbidden(engineStatus)) {
-            void this.#classifyForbidden(engineStatus, remoteUrl, repo)
+          this.#setState({
+            phase: 'connected',
+            remoteUrl,
+            remote,
+            coexisting,
+            status: engineStatus,
+          })
+          if (remote.kind === 'github' && isForbidden(engineStatus)) {
+            void this.#classifyForbidden(engineStatus, remoteUrl, remote, coexisting)
           }
         },
         onLargeFilesSkipped: (files) => {
@@ -296,7 +282,13 @@ class GitSyncServiceImpl implements GitSyncService {
         onRemoteChanges: (changes) => this.#onRemoteChanges(changes),
         onReview: (paths) => progress.fail('Syncing', describeConflictCopies(paths)),
       })
-      this.#setState({ phase: 'connected', remoteUrl, repo, status: { state: 'idle' } })
+      this.#setState({
+        phase: 'connected',
+        remoteUrl,
+        remote,
+        coexisting,
+        status: { state: 'idle' },
+      })
       this.#adoptEngine(next)
 
       this.#resumeDisposers.push(activity.subscribeResume(() => void next.syncNow()))
@@ -596,9 +588,11 @@ class GitSyncServiceImpl implements GitSyncService {
   async #classifyForbidden(
     status: SyncStatus,
     remoteUrl: string,
-    repo: GithubRepoRef,
+    remote: Extract<GitRemote, { kind: 'github' }>,
+    coexisting: boolean,
   ): Promise<void> {
     const { githubAuth } = this.#deps
+    const { repo } = remote
     let next: SyncStatus
     try {
       const token = await githubAuth.getToken()
@@ -626,7 +620,7 @@ class GitSyncServiceImpl implements GitSyncService {
     }
     // Only replace the exact status this probe was asked about.
     if (this.#state.phase === 'connected' && this.#state.status === status) {
-      this.#setState({ phase: 'connected', remoteUrl, repo, status: next })
+      this.#setState({ phase: 'connected', remoteUrl, remote, coexisting, status: next })
     }
   }
 
@@ -661,10 +655,15 @@ function isForbidden(status: SyncStatus): boolean {
 }
 
 function sameState(a: GitSyncState, b: GitSyncState): boolean {
+  if (a.phase === 'needsCredential' && b.phase === 'needsCredential') {
+    return a.remoteUrl === b.remoteUrl
+  }
   if (a.phase !== 'connected' || b.phase !== 'connected') {
     return a.phase === b.phase
   }
-  return a.remoteUrl === b.remoteUrl && a.repo === b.repo && sameStatus(a.status, b.status)
+  return (
+    a.remoteUrl === b.remoteUrl && a.coexisting === b.coexisting && sameStatus(a.status, b.status)
+  )
 }
 
 function sameStatus(a: SyncStatus, b: SyncStatus): boolean {

@@ -21,7 +21,9 @@ import {
   type TestGitRepositoryService,
   type TestICloudNativeService,
 } from '../testing/sync.ts'
+import { createCredentialResolver } from './credential-resolver.ts'
 import { createSyncEngineFactory } from './engine.ts'
+import { createGitHostCredentialService } from './git-host-credential-service.ts'
 import { createGithubRepoService } from './github-repo-service.ts'
 import {
   createGitSyncService,
@@ -281,10 +283,13 @@ function fakeServices(options: FakeOptions = {}) {
   )
 
   const progress = createTestProgressPort()
+  const githubAuth = createTestGithubAuthService({ secretStore, http, clock })
+  const hostCredentials = createGitHostCredentialService({ secretStore, logger })
   gitSyncDeps = {
     git,
     syncEngines: createSyncEngineFactory({ git, clock }),
-    githubAuth: createTestGithubAuthService({ secretStore, http, clock }),
+    credentials: createCredentialResolver({ githubAuth, hostCredentials, logger }),
+    githubAuth,
     githubRepos: createGithubRepoService({ http }),
     fileChanges,
     indexLifecycle,
@@ -535,16 +540,20 @@ describe('createGitSyncService', () => {
     }
   })
 
-  it('reports disconnected when no credential is stored — but keeps local history', async () => {
-    // Signing out of GitHub (or a lapsed credential) stops the *backup*, not
+  it('needs a credential when no GitHub sign-in is stored — but keeps local history', async () => {
+    // Signing out of GitHub (or a lapsed credential) stops the *sync*, not
     // the note history: the graph already has a repo, so the commit-only loop
     // takes over. Losing history here is a silent downgrade the user never
-    // asked for.
+    // asked for. The remote stays on record, so the UI can name it.
     const { calls } = fakeServices({ auth: null })
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
-    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toEqual({
+      phase: 'needsCredential',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'notes' } },
+    })
     await vi.waitFor(() => {
       expect(calls).toContain('commitAll')
     })
@@ -589,10 +598,56 @@ describe('createGitSyncService', () => {
     expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
-      repo: null,
+      remote: { kind: 'ssh', host: 'gitlab.com' },
+      coexisting: false,
     })
     const fetch = invocations.find(({ command }) => command === 'fetch')
     expect(fetch?.args).toMatchObject({ credential: null })
+    gitSync.dispose()
+  })
+
+  it('syncs an HTTPS host with its stored sign-in, re-read every cycle', async () => {
+    const { invocations, secrets } = fakeServices({
+      auth: null,
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+    })
+    await secrets.set(
+      'git-credential:https://gitlab.com',
+      JSON.stringify({ username: 'alex', secret: 'glpat-1' }),
+    )
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    await vi.waitFor(() => {
+      expect(invocations.some(({ command }) => command === 'push')).toBe(true)
+    })
+    expect(gitSync.getState()).toMatchObject({
+      phase: 'connected',
+      remote: { kind: 'https', origin: 'https://gitlab.com' },
+    })
+    for (const { command, args } of invocations) {
+      if (command === 'fetch' || command === 'push') {
+        expect(args).toMatchObject({ credential: { username: 'alex', secret: 'glpat-1' } })
+      }
+    }
+    gitSync.dispose()
+  })
+
+  it('never offers a host sign-in to another origin', async () => {
+    const { calls, secrets } = fakeServices({
+      auth: null,
+      remoteUrl: 'https://gitlab.com:8443/alex/notes.git',
+    })
+    await secrets.set(
+      'git-credential:https://gitlab.com',
+      JSON.stringify({ username: 'alex', secret: 'glpat-1' }),
+    )
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    expect(gitSync.getState()).toMatchObject({
+      phase: 'needsCredential',
+      remote: { kind: 'https', origin: 'https://gitlab.com:8443' },
+    })
+    expect(calls).not.toContain('fetch')
     gitSync.dispose()
   })
 
@@ -614,23 +669,20 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('refuses a generic HTTPS remote', async () => {
+  it('needs a credential for an HTTPS host with no stored sign-in', async () => {
     // A *public* generic HTTPS remote would pull anonymously and only fail
     // on push — edits arriving while the user's own never leave. The guard
-    // surfaces the error before the engine ever starts.
+    // surfaces the state before the engine ever starts, and the GitHub
+    // sign-in in the keychain is never offered to the host.
     const { calls } = fakeServices({ remoteUrl: 'https://gitlab.com/alex/notes.git' })
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
-    expect(gitSync.getState()).toMatchObject({
-      phase: 'connected',
-      repo: null,
-      status: { state: 'error', errorKind: 'rejected' },
+    expect(gitSync.getState()).toEqual({
+      phase: 'needsCredential',
+      remoteUrl: 'https://gitlab.com/alex/notes.git',
+      remote: { kind: 'https', origin: 'https://gitlab.com' },
     })
-    const state = gitSync.getState()
-    if (state.phase === 'connected' && state.status.state === 'error') {
-      expect(state.status.message).toContain('git remote set-url')
-    }
 
     // No *sync* engine: the launch snapshot is local history's only commit,
     // and focus buys nothing further, because the resume triggers belong to
@@ -647,17 +699,16 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('keeps the SSH suggestion when local history cannot start', async () => {
+  it('keeps the missing-credential state when local history cannot start', async () => {
     // Local history is best effort: a watcher that won't come up must not cost
-    // the user the one instruction they have for fixing the remote.
+    // the user the one hint they have for fixing the remote.
     fakeServices({ remoteUrl: 'https://gitlab.com/alex/notes.git', failListen: true })
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
     expect(gitSync.getState()).toMatchObject({
-      phase: 'connected',
-      repo: null,
-      status: { state: 'error', errorKind: 'rejected' },
+      phase: 'needsCredential',
+      remote: { kind: 'https', origin: 'https://gitlab.com' },
     })
     expect(logger.getErrors()).toContainEqual({
       message: 'local history failed to start:',
@@ -674,7 +725,7 @@ describe('createGitSyncService', () => {
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
 
-    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toMatchObject({ phase: 'needsCredential' })
     await vi.waitFor(() => {
       expect(calls).toContain('commitAll')
     })
@@ -887,7 +938,7 @@ describe('createGitSyncService', () => {
     })
     expect(gitSync.getState()).toMatchObject({
       phase: 'connected',
-      repo: { owner: 'alex', name: 'g-backup' },
+      remote: { kind: 'github', repo: { owner: 'alex', name: 'g-backup' } },
     })
     gitSync.dispose()
   })
@@ -931,7 +982,7 @@ describe('createGitSyncService', () => {
     gitSync.dispose()
   })
 
-  it('signOut clears the machine credential and lands on disconnected', async () => {
+  it('signOut clears the machine credential and lands on needsCredential', async () => {
     const { secrets } = fakeServices()
     const gitSync = createGitSync({ indexGeneration: 1 })
     await gitSync.start()
@@ -940,7 +991,7 @@ describe('createGitSyncService', () => {
     await gitSync.signOut()
 
     expect(secrets.snapshot()).not.toHaveProperty('github-auth')
-    expect(gitSync.getState()).toEqual({ phase: 'disconnected' })
+    expect(gitSync.getState()).toMatchObject({ phase: 'needsCredential' })
     gitSync.dispose()
   })
 

@@ -88,6 +88,11 @@ import {
 import { createGistService, type GistService } from './sync/gist-service.ts'
 import { createGistPublishService, type GistPublishService } from './sync/gist-publish-service.ts'
 import { createGithubAuthService, type GithubAuthService } from './sync/github-auth-service.ts'
+import {
+  createGitHostCredentialService,
+  type GitHostCredentialService,
+} from './sync/git-host-credential-service.ts'
+import { createCredentialResolver, type CredentialResolver } from './sync/credential-resolver.ts'
 import { createGithubRepoService, type GithubRepoService } from './sync/github-repo-service.ts'
 import { createSyncEngineFactory, type SyncEngineFactory } from './sync/engine.ts'
 import type { GitSyncServiceDeps } from './sync/git-sync-service.ts'
@@ -339,6 +344,10 @@ export interface CoreServices {
    * The one GitHub sign-in of this machine, kept in the keychain.
    */
   readonly githubAuth: GithubAuthService
+  /**
+   * The sign-ins of the other HTTPS git hosts, one per origin.
+   */
+  readonly hostCredentials: GitHostCredentialService
   /**
    * Publishes a note as a secret GitHub gist, and takes it down again.
    */
@@ -641,6 +650,8 @@ export const coreServiceFactories = {
   persistenceFlush: createPersistenceFlushService,
   gitRepository: createGitRepositoryService,
   githubAuth: createGithubAuthService,
+  hostCredentials: createGitHostCredentialService,
+  credentialResolver: createCredentialResolver,
   githubRepos: createGithubRepoService,
   gists: createGistService,
   noteRows: createNoteRowService,
@@ -720,6 +731,10 @@ export interface CoreInternalServices {
    * Builds the sync engine of one graph session.
    */
   readonly syncEngines: SyncEngineFactory
+  /**
+   * Which sign-in a remote gets.
+   */
+  readonly credentials: CredentialResolver
   /**
    * Bounded outbound web fetches that the native side performs.
    */
@@ -1033,6 +1048,8 @@ export function composeCoreServices(
   })
   const gitRepository = create.gitRepository({ ipc })
   const githubAuth = create.githubAuth({ secretStore, http: adapters.http, clock })
+  const hostCredentials = create.hostCredentials({ secretStore, logger })
+  const credentials = create.credentialResolver({ githubAuth, hostCredentials, logger })
   const githubRepos = create.githubRepos({ http: adapters.http })
   const gists = create.gists({ http: adapters.http })
   const syncEngines = create.syncEngines({ git: gitRepository, clock })
@@ -1106,6 +1123,7 @@ export function composeCoreServices(
   const gitSyncDeps: GitSyncServiceDeps = {
     git: gitRepository,
     syncEngines,
+    credentials,
     githubAuth,
     githubRepos,
     fileChanges,
@@ -1179,6 +1197,7 @@ export function composeCoreServices(
     wikiResolver,
     noteLinkResolver,
     githubAuth,
+    hostCredentials,
     gistPublish: create.gistPublish({
       gists,
       githubAuth,
@@ -1359,6 +1378,7 @@ export function composeCoreServices(
     githubRepos,
     gists,
     syncEngines,
+    credentials,
     webFetch,
     xArchive,
     audioRecorder,
