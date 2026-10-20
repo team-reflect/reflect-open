@@ -3,8 +3,8 @@ name: Release
 # Stable and beta Release PRs share master but use separate lifecycle labels
 # and head branches. A merged PR in one channel therefore cannot block the
 # other channel from refreshing its open PR. Beta versions use a prerelease
-# suffix (for example, X.Y.Z-beta or X.Y.Z-beta.N); publish-desktop.yml derives the
-# prerelease/latest flags from that suffix.
+# suffix (X.Y.Z-beta.N); publish-desktop.yml derives the prerelease/latest flags
+# from that suffix.
 #
 # Everything runs on GITHUB_TOKEN. Tags created with that token do not trigger
 # tag-push workflows, so publishing is called directly through job outputs.

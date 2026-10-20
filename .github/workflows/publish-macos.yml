@@ -46,6 +46,7 @@ jobs:
   macos:
     name: Build macOS ${{ matrix.name }}
     if: github.repository == 'team-reflect/reflect-open'
+    environment: release_app
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:

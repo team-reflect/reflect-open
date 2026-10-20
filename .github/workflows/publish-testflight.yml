@@ -30,6 +30,7 @@ jobs:
   testflight:
     name: Build iOS
     if: github.repository == 'team-reflect/reflect-open'
+    environment: release_app
     runs-on: macos-26
     timeout-minutes: 120
     steps:

@@ -44,7 +44,7 @@ workflow runs: build and check, then upload.
 
 3. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local TestFlight builds. Configure them in
-   GitHub as the repository secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight
+   GitHub as the `release_app` environment secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight
    workflow requires both before building. The DSN initializes the WebView SDK; the iOS
    native SDK embeds its DSN as a constant in `NativeDiagnostics.swift`. The token must
    be allowed to upload JavaScript source maps and native debug files to the
@@ -96,7 +96,7 @@ the matching binaries and dSYMs needed to symbolicate an Apple `.ips` report
 that arrives later; the archive is packaged even when the run failed, so the
 evidence survives a release blocker.
 
-Configure these repository secrets:
+Configure these secrets in the `release_app` environment, which only `master` can use:
 
 | Secret | Value |
 | --- | --- |

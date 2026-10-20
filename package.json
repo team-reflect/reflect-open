@@ -39,7 +39,7 @@
     "@ocavue/eslint-config": "^4.21.0",
     "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
-    "eslint": "^10.12.0",
+    "eslint": "^10.13.0",
     "knip": "^6.41.0",
     "nano-staged": "^1.0.2",
     "oxfmt": "^0.73.0",

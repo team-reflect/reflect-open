@@ -46,7 +46,7 @@ assets into the draft release, and the finalize job in `publish-desktop.yml` pub
 
 5. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local release builds. Configure them in
-   GitHub as the repository secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; release CI
+   GitHub as the `release_app` environment secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; release CI
    requires both so packaged builds cannot silently ship without JavaScript diagnostics
    or readable source-mapped stacks. The token needs release/source-map upload scope only
    and must never use the `VITE_` prefix or enter an app bundle.
@@ -187,8 +187,9 @@ hand-edit the changelogs or manifests outside the flows above, and do not use
 `Release-As:` commit footers: human version interventions go through the manifest
 files, and a major
 graduation such as `1.0.0` is a one-time `release-as` in both config files. The first beta of
-a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`, …)
-— a release-please naming quirk, not a bug.
+a new cycle is `-beta.1` (`v0.6.0-beta.1`, then `-beta.2`, `-beta.3`, …). release-please
+uses `prerelease-type` as the whole prerelease part of a cycle's first version, so
+`config.beta.json` sets it to `beta.1` instead of `beta`.
 
 ### Retrying a release
 
@@ -317,8 +318,8 @@ manifest from the tagged release to `updater-beta`. Both run inside
 Release PR merges. Re-run the failed jobs from that run to retry.
 
 The script reads all signing material from environment variables (exporting them
-works for local releases too); the workflow wires them from repository Actions secrets of the same names. Create these
-under **Settings → Secrets and variables → Actions**:
+works for local releases too); the workflow reads them from the secrets of the same names in the `release_app` environment,
+which only `master` can use. Create these under **Settings → Environments → release_app**:
 
 | Secret | Value |
 | --- | --- |

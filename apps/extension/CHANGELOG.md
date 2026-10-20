@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/team-reflect/reflect-open/compare/extension-v0.4.1...extension-v0.4.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* **extension:** trigger a release ([#1662](https://github.com/team-reflect/reflect-open/issues/1662)) ([b99de83](https://github.com/team-reflect/reflect-open/commit/b99de83cc1294265524e14937c32e18dda33a88c))
+
 ## [0.4.1](https://github.com/team-reflect/reflect-open/compare/extension-v0.4.0...extension-v0.4.1) (2026-10-17)
 
 

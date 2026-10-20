@@ -31,6 +31,7 @@ jobs:
   release:
     name: Build browser extension
     if: github.repository == 'team-reflect/reflect-open' && github.ref == 'refs/heads/master'
+    environment: release_extension
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
