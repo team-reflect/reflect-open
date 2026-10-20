@@ -4,6 +4,7 @@ import { useDoubleTap } from '@/hooks/use-double-tap.ts'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import { MobileStack } from '@/mobile/mobile-stack.tsx'
 import { MobileTabBar, tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
+import { SafeAreaBoundary } from '@/mobile/safe-area-boundary.tsx'
 import {
   EMPTY_ALL_NOTES_FILTERS,
   type AllNotesFilters,
@@ -95,36 +96,37 @@ export function MobileShell(): ReactElement {
   }
 
   return (
-    // The shell yields to the software keyboard by height (Plan 19,
-    // decision 8): the root ends at the keyboard's top, so every screen's
-    // layout — and floating-ui's positioning boundary (`body`), which sizes
-    // the editor's autocomplete menus — sees the true visible viewport.
-    // Only `position: fixed` elements need `--keyboard-height` themselves.
-    <div
-      className="flex w-screen flex-col"
-      style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
-    >
-      <div className="min-h-0 flex-1">
-        {/* A stable boundary lets route transitions retain the current screen while lazy code loads. */}
-        <Suspense fallback={<LoadingScreen />}>
-          <MobileStack
-            allQuery={allQuery}
-            onAllQueryChange={setAllQuery}
-            allFilters={allFilters}
-            onAllFiltersChange={setAllFilters}
-          />
-        </Suspense>
-      </div>
-      {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
+    <SafeAreaBoundary>
+      {/* The shell yields to the software keyboard by height (Plan 19,
+          decision 8): the root ends at the keyboard's top, so every screen's
+          layout sees the true visible viewport. Only `position: fixed`
+          elements need `--keyboard-height` themselves. */}
+      <div
+        className="flex w-screen flex-col"
+        style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
+      >
+        <div className="min-h-0 flex-1">
+          {/* A stable boundary lets route transitions retain the current screen while lazy code loads. */}
+          <Suspense fallback={<LoadingScreen />}>
+            <MobileStack
+              allQuery={allQuery}
+              onAllQueryChange={setAllQuery}
+              allFilters={allFilters}
+              onAllFiltersChange={setAllFilters}
+            />
+          </Suspense>
+        </div>
+        {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
           would ride above the keyboard instead, so it hides while typing.
           Its slot goes to the formatting toolbar, which — sitting at the
           bottom of a root that ends at the keyboard's top — lands exactly
           on the keyboard edge with no fixed positioning. */}
-      {keyboardVisible ? (
-        <MobileFormattingToolbar />
-      ) : (
-        <MobileTabBar tab={tab} onSelect={handleTabSelect} />
-      )}
-    </div>
+        {keyboardVisible ? (
+          <MobileFormattingToolbar />
+        ) : (
+          <MobileTabBar tab={tab} onSelect={handleTabSelect} />
+        )}
+      </div>
+    </SafeAreaBoundary>
   )
 }

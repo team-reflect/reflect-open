@@ -2,6 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import { EditorInputTraits } from '@/editor/editor-input-traits.tsx'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge.tsx'
 import { MediaLightbox } from '@/editor/media-lightbox.tsx'
+import { MenuBoundaryContext } from '@/editor/menu-boundary.ts'
 import { useWikilinkResolver } from '@/editor/resolve-wikilink.ts'
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
 import { lightboxItemFromXPostMedia } from '@/editor/x-post-media-lightbox-item.ts'
@@ -38,6 +39,7 @@ import {
 } from '@meowdown/react'
 import { errorMessage, type TimeFormat } from '@reflect/core'
 import {
+  use,
   useCallback,
   useImperativeHandle,
   useLayoutEffect,
@@ -293,6 +295,7 @@ export function NoteEditor({
 }: NoteEditorProps): ReactElement {
   const { platform, logger } = useCoreServices()
   const touchEditor = platform.surface.touchEditor
+  const menuBoundary = use(MenuBoundaryContext)
   const resolveXPost = useXPostResolver()
   const resolveWikilink = useWikilinkResolver()
   const innerRef = useRef<EditorHandle>(null)
@@ -488,6 +491,7 @@ export function NoteEditor({
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}
         onSelectionMenuSearch={onSelectionMenuSearch}
+        collisionBoundary={menuBoundary}
         pendingReplacementActions={pendingReplacementActions}
         onPendingReplacementResolve={onPendingReplacementResolve}
         onSlashMenuSearch={onSlashMenuSearch}
