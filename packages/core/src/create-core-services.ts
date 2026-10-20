@@ -1125,6 +1125,7 @@ export function composeCoreServices(
     syncEngines,
     credentials,
     githubAuth,
+    hostCredentials,
     githubRepos,
     fileChanges,
     indexLifecycle,

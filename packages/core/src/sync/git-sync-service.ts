@@ -17,6 +17,7 @@ import { isICloudRoot } from './icloud-sync-service.ts'
 import { isSyncError, type SyncEngine, type SyncEngineFactory, type SyncStatus } from './engine.ts'
 import { describeConflictCopies } from './conflict-copies.ts'
 import type { CredentialResolver } from './credential-resolver.ts'
+import type { GitHostCredentialService } from './git-host-credential-service.ts'
 import type { ChangedFile, GitCredential, GitRepositoryService } from './git-repository-service.ts'
 import type { GithubAuthService } from './github-auth-service.ts'
 import type { GithubRepoService } from './github-repo-service.ts'
@@ -107,6 +108,7 @@ export interface GitSyncServiceDeps {
    */
   readonly credentials: CredentialResolver
   readonly githubAuth: GithubAuthService
+  readonly hostCredentials: GitHostCredentialService
   readonly githubRepos: GithubRepoService
   readonly fileChanges: FileChangeService
   /**
@@ -193,6 +195,11 @@ class GitSyncServiceImpl implements GitSyncService {
   readonly #mobile: boolean
   readonly #listeners = new Set<() => void>()
   readonly #resumeDisposers: Array<() => void> = []
+  readonly #credentialDisposers: Array<() => void> = []
+  /**
+   * Serializes `start()` calls: two in flight at once would adopt two engines.
+   */
+  #startTail: Promise<void> = Promise.resolve()
   #state: GitSyncState = { phase: 'loading' }
   #disposed = false
   #engine: SyncEngine | null = null
@@ -216,7 +223,13 @@ class GitSyncServiceImpl implements GitSyncService {
     this.#mobile = isMobilePlatform(deps.platform.appPlatform) || deps.platform.surface.mobileApp
   }
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    const run = this.#startTail.then(() => this.#runStart())
+    this.#startTail = run.catch(() => undefined)
+    return run
+  }
+
+  async #runStart(): Promise<void> {
     const { git, syncEngines, credentials, progress, activity, logger, icloudNative, platform } =
       this.#deps
     this.#teardown()
@@ -240,6 +253,9 @@ class GitSyncServiceImpl implements GitSyncService {
       // HTTPS remote would pull anonymously and only 401 on push, so the other
       // device's edits arrive while this one's silently never leave.
       const resolved = await credentials.resolve(remote)
+      // Subscribed only now: the resolver's first keychain read notifies the
+      // GitHub store's own subscribers, and that read is not a change.
+      this.#watchCredentials()
       if (this.#disposed) {
         return
       }
@@ -372,7 +388,35 @@ class GitSyncServiceImpl implements GitSyncService {
   dispose(): void {
     this.#disposed = true
     this.#teardown()
+    for (const dispose of this.#credentialDisposers.splice(0)) {
+      dispose()
+    }
     this.#listeners.clear()
+  }
+
+  /**
+   * Restart when a sign-in store changes: a remote that was waiting for its
+   * sign-in picks it up; a GitHub remote whose account signed out stops. SSH
+   * and path remotes take no sign-in, so nothing restarts them.
+   */
+  #watchCredentials(): void {
+    if (this.#credentialDisposers.length > 0) {
+      return
+    }
+    const onChange = (): void => {
+      const state = this.#state
+      const affected =
+        state.phase === 'needsCredential' ||
+        (state.phase === 'connected' &&
+          (state.remote.kind === 'github' || state.remote.kind === 'https'))
+      if (affected) {
+        void this.start()
+      }
+    }
+    this.#credentialDisposers.push(
+      this.#deps.githubAuth.subscribe(onChange),
+      this.#deps.hostCredentials.subscribe(onChange),
+    )
   }
 
   #setState(next: GitSyncState): void {

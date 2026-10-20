@@ -24,6 +24,7 @@ function graphDeps(core: TestCoreServices): GraphServicesDeps {
       syncEngines: core.syncEngines,
       credentials: core.credentials,
       githubAuth: core.githubAuth,
+      hostCredentials: core.hostCredentials,
       githubRepos: core.githubRepos,
       fileChanges,
       indexLifecycle,

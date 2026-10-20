@@ -290,6 +290,7 @@ function fakeServices(options: FakeOptions = {}) {
     syncEngines: createSyncEngineFactory({ git, clock }),
     credentials: createCredentialResolver({ githubAuth, hostCredentials, logger }),
     githubAuth,
+    hostCredentials,
     githubRepos: createGithubRepoService({ http }),
     fileChanges,
     indexLifecycle,
@@ -538,6 +539,40 @@ describe('createGitSyncService', () => {
     } finally {
       gitSync.dispose()
     }
+  })
+
+  it('clearing the GitHub sign-in restarts into needsCredential', async () => {
+    const { secrets } = fakeServices()
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    expect(gitSync.getState()).toMatchObject({ phase: 'connected' })
+
+    await gitSyncDeps.githubAuth.clear()
+    await vi.waitFor(() => {
+      expect(gitSync.getState()).toMatchObject({ phase: 'needsCredential' })
+    })
+
+    expect(secrets.snapshot()).not.toHaveProperty('github-auth')
+    gitSync.dispose()
+  })
+
+  it('storing a host sign-in restarts a remote that was waiting for it', async () => {
+    const { calls } = fakeServices({ auth: null, remoteUrl: 'https://gitlab.com/alex/notes.git' })
+    const gitSync = createGitSync({ indexGeneration: 1 })
+    await gitSync.start()
+    expect(gitSync.getState()).toMatchObject({ phase: 'needsCredential' })
+
+    await gitSyncDeps.hostCredentials.save('https://gitlab.com', {
+      username: 'alex',
+      secret: 'glpat-1',
+    })
+    await vi.waitFor(() => {
+      expect(gitSync.getState()).toMatchObject({ phase: 'connected' })
+    })
+    await vi.waitFor(() => {
+      expect(calls).toContain('fetch')
+    })
+    gitSync.dispose()
   })
 
   it('needs a credential when no GitHub sign-in is stored — but keeps local history', async () => {
