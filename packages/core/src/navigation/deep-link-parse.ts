@@ -1,4 +1,4 @@
-import { isIsoDate } from '@reflect/utils'
+import { isIsoDate, parseUrl } from '@reflect/utils'
 import type { TextCaptureKind } from '../capture/capture-envelope.ts'
 import { DEEP_LINK_SCHEME, DEEP_LINK_TEXT_MAX_LENGTH, type DeepLink } from './deep-link.ts'
 
@@ -10,7 +10,7 @@ import { DEEP_LINK_SCHEME, DEEP_LINK_TEXT_MAX_LENGTH, type DeepLink } from './de
  * something close". The caller owns telling the user (toast), never crashing.
  */
 export function parseDeepLink(raw: string): DeepLink | null {
-  const url = tryParseUrl(raw)
+  const url = parseUrl(raw)
   if (url === null || url.protocol !== `${DEEP_LINK_SCHEME}:`) {
     return null
   }
@@ -59,15 +59,7 @@ export function parseDeepLink(raw: string): DeepLink | null {
  * so it fails on the status line like any other bad deep link.
  */
 export function isDeepLinkUrl(href: string): boolean {
-  return tryParseUrl(href)?.protocol === `${DEEP_LINK_SCHEME}:`
-}
-
-function tryParseUrl(raw: string): URL | null {
-  try {
-    return new URL(raw)
-  } catch {
-    return null
-  }
+  return parseUrl(href)?.protocol === `${DEEP_LINK_SCHEME}:`
 }
 
 /**

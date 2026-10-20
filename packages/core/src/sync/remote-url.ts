@@ -1,3 +1,4 @@
+import { parseUrl } from '@reflect/utils'
 import type { GithubRepoRef } from './github-repo-service.ts'
 
 /**
@@ -53,10 +54,3 @@ export function githubRepoOf(remote: GitRemote): GithubRepoRef | null {
   return remote.kind === 'github' ? remote.repo : null
 }
 
-function parseUrl(url: string): URL | null {
-  try {
-    return new URL(url)
-  } catch {
-    return null
-  }
-}
