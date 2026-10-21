@@ -1,7 +1,7 @@
 import { isAppError } from '../errors.ts'
 import type { SyncStatus } from './engine.ts'
 import type { GithubAuthService } from './github-auth-service.ts'
-import type { GithubRepoRef } from './remote-url.ts'
+import type { GithubRepoRef } from './types.ts'
 
 /**
  * GitHub answers 403 both for a token without access to the repository
@@ -36,7 +36,7 @@ export async function classifyForbiddenStatus(
     }
     return {
       state: 'offline',
-      message: 'GitHub is rate limiting or unreachable; the sync will retry',
+      message: 'GitHub is rate limiting or unreachable; the backup will retry',
     }
   }
 }

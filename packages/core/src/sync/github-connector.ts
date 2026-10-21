@@ -1,8 +1,9 @@
 import { AppError } from '../errors.ts'
 import type { GitSyncService } from './git-sync-service.ts'
 import type { GithubAuthService } from './github-auth-service.ts'
-import type { GithubRepoRef, GithubRepoService } from './github-repo-service.ts'
+import type { GithubRepoService } from './github-repo-service.ts'
 import { githubRemoteUrl } from './remote-url.ts'
+import type { GithubRepoRef } from './types.ts'
 
 /**
  * Outcome of connecting to an existing repo (the public case needs consent).

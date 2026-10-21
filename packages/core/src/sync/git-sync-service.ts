@@ -396,31 +396,6 @@ class GitSyncServiceImpl implements GitSyncService {
   }
 
   /**
-   * Restart when a sign-in store changes, once per service. A remote waiting
-   * for its sign-in picks it up; a GitHub remote whose account signed out
-   * stops. SSH and path remotes take no sign-in, so nothing restarts them.
-   */
-  #watchCredentials(): void {
-    if (this.#credentialDisposers.length > 0) {
-      return
-    }
-    const onChange = (): void => {
-      const state = this.#state
-      const affected =
-        state.phase === 'needsCredential' ||
-        (state.phase === 'connected' &&
-          (state.remote.kind === 'github' || state.remote.kind === 'https'))
-      if (affected) {
-        void this.start()
-      }
-    }
-    this.#credentialDisposers.push(
-      this.#deps.githubAuth.subscribe(onChange),
-      this.#deps.hostCredentials.subscribe(onChange),
-    )
-  }
-
-  /**
    * The single teardown path — every exit (failure, dispose, restart) takes it.
    */
   #teardown(): void {
