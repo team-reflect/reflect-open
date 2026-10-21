@@ -1778,7 +1778,14 @@ fn http_origin_reads_scheme_host_and_effective_port() {
         http_origin("https://[::1]:8443/a/b.git"),
         origin("https", "[::1]", 8443)
     );
+    assert_eq!(
+        http_origin("https://[0:0:0:0:0:0:0:1]/a.git"),
+        origin("https", "[::1]", 443)
+    );
     assert_eq!(http_origin("https://[::1"), None);
+    assert_eq!(http_origin("https://[not-an-address]/a"), None);
+    assert_eq!(http_origin("https://::1:8443/a"), None);
+    assert_eq!(http_origin("https://2001:db8::1/a"), None);
     assert_eq!(http_origin("https://[::1]x/a"), None);
     assert_eq!(http_origin("https://gitlab.com:/a"), None);
     assert_eq!(http_origin("https://gitlab.com:abc/a"), None);

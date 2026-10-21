@@ -6,6 +6,7 @@
 //! the SSH agent.
 
 use std::cell::RefCell;
+use std::net::Ipv6Addr;
 use std::path::Path;
 
 use git2::{
@@ -149,18 +150,23 @@ pub(super) fn http_origin(url: &str) -> Option<HttpOrigin> {
     let authority = rest.split(['/', '?', '#']).next()?;
     let host_port = authority.rsplit('@').next()?;
     let (host, port) = match host_port.strip_prefix('[') {
-        // A bracketed IPv6 literal keeps its brackets so it never compares
-        // equal to a host name.
+        // A bracketed IPv6 literal is stored in its canonical form, so
+        // `[::1]` and `[0:0:0:0:0:0:0:1]` compare equal, and keeps its
+        // brackets so it never compares equal to a host name.
         Some(bracketed) => {
             let (address, after) = bracketed.split_once(']')?;
+            let address: Ipv6Addr = address.parse().ok()?;
             let port = match after.strip_prefix(':') {
                 Some(port) => port.parse().ok()?,
                 None if after.is_empty() => default_port,
                 None => return None,
             };
-            (format!("[{}]", address.to_ascii_lowercase()), port)
+            (format!("[{address}]"), port)
         }
         None => match host_port.rsplit_once(':') {
+            // An unbracketed IPv6 literal, or any other host with a colon
+            // in it, is not a readable origin.
+            Some((host, _)) if host.contains(':') => return None,
             Some((host, port)) => (host.to_ascii_lowercase(), port.parse().ok()?),
             None => (host_port.to_ascii_lowercase(), default_port),
         },
