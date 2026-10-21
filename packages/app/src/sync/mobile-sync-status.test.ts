@@ -41,6 +41,26 @@ describe('engine state', () => {
     })
   })
 
+  it('points a host remote at its SSH form, and plain HTTP at the reason', () => {
+    const waiting = (origin: string): GitSyncState => ({
+      phase: 'needsCredential',
+      remoteUrl: `${origin}/alex/notes.git`,
+      remote: { kind: 'https', origin },
+    })
+    expect(statusFor(waiting('https://gitlab.com'))).toEqual({
+      label: 'Sign-in needed',
+      tone: 'attention',
+      detail: {
+        kind: 'message',
+        text: 'This host needs a sign-in, which is not available on this device yet. Switch the remote to its SSH form to resume.',
+      },
+    })
+    expect(statusFor(waiting('http://gitea.local'))?.detail).toEqual({
+      kind: 'message',
+      text: 'A sign-in is never sent over plain HTTP. Switch the remote to its SSH form to resume.',
+    })
+  })
+
   it('rests on Backed up — the quiet tone the pill hides on', () => {
     const status = statusFor(connected({ state: 'idle' }))
     expect(status).toEqual({ label: 'Backed up', tone: 'ok', detail: null })

@@ -1,7 +1,13 @@
 import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
-import { githubRepoOf, isICloudRoot, suggestRepoName, type GithubRepoRef } from '@reflect/core'
+import {
+  githubRepoOf,
+  isICloudRoot,
+  redactRemoteUrl,
+  suggestRepoName,
+  type GithubRepoRef,
+} from '@reflect/core'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
@@ -48,10 +54,10 @@ function githubRepoBrowserUrl(repo: GithubRepoRef): string {
   return `https://github.com/${repo.owner}/${repo.name}`
 }
 
-/** `owner/name` for GitHub, the URL itself for any other remote. */
+/** `owner/name` for GitHub, the URL (less any user info) for any other remote. */
 function remoteLabel(state: Extract<GitSyncState, { phase: 'connected' | 'needsCredential' }>) {
   const repo = githubRepoOf(state.remote)
-  return repo !== null ? `${repo.owner}/${repo.name}` : state.remoteUrl
+  return repo !== null ? `${repo.owner}/${repo.name}` : redactRemoteUrl(state.remoteUrl)
 }
 
 /**
@@ -72,6 +78,8 @@ function NeedsCredentialRows({
 }): ReactElement {
   const github = state.remote.kind === 'github'
   const host = state.remote.kind === 'https' ? new URL(state.remote.origin).host : null
+  // The resolver never sends a sign-in in the clear, so there is nothing to wait for.
+  const plainHttp = state.remote.kind === 'https' && state.remote.origin.startsWith('http:')
   return (
     <>
       <p className="text-sm text-text">
@@ -81,7 +89,9 @@ function NeedsCredentialRows({
       <p className="text-xs text-text-muted">
         {github
           ? 'Sign in to GitHub to resume backing up. Your notes keep their local history meanwhile.'
-          : `Backup cannot sign in to ${host ?? 'this host'} over HTTPS yet. Switch the remote to its SSH form: git remote set-url origin git@${host ?? 'host'}:owner/repo.git`}
+          : plainHttp
+            ? `Backup never sends a sign-in to ${host ?? 'this host'} over plain HTTP. Switch the remote to its SSH form to resume.`
+            : `Backup cannot sign in to ${host ?? 'this host'} over HTTPS yet. Switch the remote to its SSH form to resume.`}
       </p>
       <div className="flex flex-wrap gap-2">
         {github ? (

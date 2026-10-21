@@ -184,11 +184,25 @@ describe('GitSyncSettingsField', () => {
 
     await expect.element(page.locate('legend').getByText('Backup')).toBeVisible()
     await expect.element(page.getByText('https://gitlab.com/alex/notes.git')).toBeVisible()
-    await expect.element(page.getByText(/git@gitlab\.com:owner\/repo\.git/)).toBeVisible()
+    await expect
+      .element(page.getByText(/cannot sign in to gitlab\.com over HTTPS yet/))
+      .toBeVisible()
     await expect.element(page.getByRole('button', { name: 'Stop backing up' })).toBeVisible()
     await expect
       .element(page.getByRole('button', { name: 'Sign in to GitHub…' }))
       .not.toBeInTheDocument()
+  })
+
+  it('names a plain-HTTP remote without its user info and says no sign-in is sent', async () => {
+    await renderSection({
+      phase: 'needsCredential',
+      remoteUrl: 'http://alex:token@gitea.local/alex/notes.git',
+      remote: { kind: 'https', origin: 'http://gitea.local' },
+    })
+
+    await expect.element(page.getByText('http://gitea.local/alex/notes.git')).toBeVisible()
+    await expect.element(page.getByText(/token/)).not.toBeInTheDocument()
+    await expect.element(page.getByText(/never sends a sign-in to gitea\.local/)).toBeVisible()
   })
 
   it('renders a GitHub remote with the reconnect affordances', async () => {

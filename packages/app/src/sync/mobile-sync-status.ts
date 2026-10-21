@@ -53,7 +53,9 @@ export function getMobileSyncStatus(state: GitSyncState | null): MobileSyncStatu
         text:
           state.remote.kind === 'github'
             ? 'Sign in to GitHub to resume backing up.'
-            : 'This host needs a sign-in, which is not available on this device yet. Switch the remote to its SSH form to resume.',
+            : state.remote.kind === 'https' && state.remote.origin.startsWith('http:')
+              ? 'A sign-in is never sent over plain HTTP. Switch the remote to its SSH form to resume.'
+              : 'This host needs a sign-in, which is not available on this device yet. Switch the remote to its SSH form to resume.',
       },
     }
   }
