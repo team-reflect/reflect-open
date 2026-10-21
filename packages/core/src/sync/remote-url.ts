@@ -61,6 +61,20 @@ export function githubRemoteUrl(ref: GithubRepoRef): string {
 }
 
 /**
+ * The remote URL as a surface may show it: any user info a URL-form remote
+ * embeds (`https://alex:token@host/...`) is dropped. Other forms carry none.
+ */
+export function redactRemoteUrl(url: string): string {
+  const parsed = parseUrl(url)
+  if (parsed === null) {
+    return url
+  }
+  parsed.username = ''
+  parsed.password = ''
+  return parsed.href
+}
+
+/**
  * The GitHub ref of a remote, for the surfaces that only exist for GitHub.
  */
 export function githubRepoOf(remote: GitRemote): GithubRepoRef | null {

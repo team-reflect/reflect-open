@@ -33,7 +33,13 @@ export {
   type GitSyncState,
   type ConnectExistingResult,
 } from './sync/git-sync-service.ts'
-export { classifyRemote, githubRemoteUrl, githubRepoOf, type GitRemote } from './sync/remote-url.ts'
+export {
+  classifyRemote,
+  githubRemoteUrl,
+  githubRepoOf,
+  redactRemoteUrl,
+  type GitRemote,
+} from './sync/remote-url.ts'
 export { type GitHostCredentialService } from './sync/git-host-credential-service.ts'
 export { isICloudRoot } from './sync/icloud-sync-service.ts'
 export { type GistPublishService } from './sync/gist-publish-service.ts'

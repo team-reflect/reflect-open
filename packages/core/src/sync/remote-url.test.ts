@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { classifyRemote, githubRemoteUrl, githubRepoOf, type GitRemote } from './remote-url.ts'
+import {
+  classifyRemote,
+  githubRemoteUrl,
+  githubRepoOf,
+  redactRemoteUrl,
+  type GitRemote,
+} from './remote-url.ts'
 
 describe('classifyRemote', () => {
   const cases: Array<[string, GitRemote]> = [
@@ -57,5 +63,22 @@ describe('githubRepoOf', () => {
       },
     )
     expect(githubRepoOf({ kind: 'ssh', host: 'gitlab.com' })).toBeNull()
+  })
+})
+
+describe('redactRemoteUrl', () => {
+  it('drops the user info a URL-form remote embeds', () => {
+    expect(redactRemoteUrl('https://alex:token@gitlab.com/alex/notes.git')).toBe(
+      'https://gitlab.com/alex/notes.git',
+    )
+    expect(redactRemoteUrl('ssh://git@nas:2222/notes.git')).toBe('ssh://nas:2222/notes.git')
+  })
+
+  it('leaves every other form alone', () => {
+    expect(redactRemoteUrl('https://gitlab.com/alex/notes.git')).toBe(
+      'https://gitlab.com/alex/notes.git',
+    )
+    expect(redactRemoteUrl('git@gitlab.com:alex/notes.git')).toBe('git@gitlab.com:alex/notes.git')
+    expect(redactRemoteUrl('/srv/git/notes.git')).toBe('/srv/git/notes.git')
   })
 })
