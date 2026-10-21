@@ -48,7 +48,7 @@ const PAGE_TEXT_END = '<!-- reflect-capture-page-text:end -->'
 /** The capture's display title: the page title, else the URL's host. */
 export function displayTitle(envelope: Pick<CaptureEnvelope, 'title' | 'url'>): string {
   const title = wikiLinkSafe(envelope.title)
-  return title !== '' ? title : (parseUrl(envelope.url)?.host ?? envelope.url)
+  return title !== '' ? title : parseUrl(envelope.url)?.host || envelope.url
 }
 
 function captureNoteBody(
