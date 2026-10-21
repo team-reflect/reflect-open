@@ -6,6 +6,7 @@ import {
   aiProviderRequiresApiKey,
   errorMessage,
   githubRepoOf,
+  redactRemoteUrl,
   marketingVersion,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
@@ -186,10 +187,12 @@ export function MobileSettings(): ReactElement {
 
   const gitSync = sync?.state ?? null
   const status = getMobileSyncStatus(gitSync)
-  const repo =
+  // A graph with a remote, connected or waiting for its sign-in.
+  const remote =
     gitSync !== null && (gitSync.phase === 'connected' || gitSync.phase === 'needsCredential')
-      ? githubRepoOf(gitSync.remote)
+      ? gitSync
       : null
+  const repo = remote !== null ? githubRepoOf(remote.remote) : null
   // A GitHub remote whose sign-in is gone resumes with a sign-in alone.
   const needsGithubSignIn =
     gitSync !== null && gitSync.phase === 'needsCredential' && gitSync.remote.kind === 'github'
@@ -199,10 +202,10 @@ export function MobileSettings(): ReactElement {
   // connected.
   const canConnect = mobileStorageKind === 'local' && gitSync?.phase === 'disconnected'
 
-  // Stop backing this graph up and forget the GitHub credential (one graph
-  // per device — unlinking is signing out). The local clone stays; the
-  // controller restarts into its disconnected state, and re-connecting
-  // re-onboards.
+  // Stop backing this graph up and, for a GitHub remote, forget the GitHub
+  // credential (one graph per device — unlinking is signing out). The local
+  // clone stays; the controller restarts into its disconnected state, and
+  // re-connecting re-onboards.
   async function disconnect(): Promise<void> {
     if (sync === null) {
       return
@@ -210,7 +213,9 @@ export function MobileSettings(): ReactElement {
     setDisconnecting(true)
     try {
       await sync.disconnectGraph()
-      await sync.signOut()
+      if (repo !== null) {
+        await sync.signOut()
+      }
     } catch (err) {
       logger.error('GitHub disconnect failed:', errorMessage(err))
     } finally {
@@ -383,7 +388,7 @@ export function MobileSettings(): ReactElement {
             />
           </SettingsGroup>
 
-          {repo !== null || status !== null || canConnect ? (
+          {remote !== null || status !== null || canConnect ? (
             <SettingsGroup
               header="Backup"
               footer={
@@ -396,6 +401,8 @@ export function MobileSettings(): ReactElement {
             >
               {repo !== null ? (
                 <SettingsValueRow label="GitHub" value={`${repo.owner}/${repo.name}`} />
+              ) : remote !== null ? (
+                <SettingsValueRow label="Remote" value={redactRemoteUrl(remote.remoteUrl)} />
               ) : null}
               {status !== null ? <SettingsValueRow label="Status" value={status.label} /> : null}
               {canConnect ? (
@@ -404,9 +411,9 @@ export function MobileSettings(): ReactElement {
               {needsGithubSignIn ? (
                 <SettingsActionRow label="Sign in to GitHub" onPress={() => setSignInOpen(true)} />
               ) : null}
-              {repo !== null ? (
+              {remote !== null ? (
                 <SettingsActionRow
-                  label="Disconnect GitHub"
+                  label={repo !== null ? 'Disconnect GitHub' : 'Stop backing up'}
                   tone="destructive"
                   pending={disconnecting}
                   onPress={() => void disconnect()}

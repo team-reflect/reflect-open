@@ -391,6 +391,31 @@ describe('MobileSettings', () => {
     await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
   })
 
+  it('names a host remote without its user info and stops it without a sign-out', async () => {
+    const user = userEvent
+    const view = await mount({
+      gitSync: {
+        phase: 'needsCredential',
+        remoteUrl: 'https://alex:token@gitlab.com/alex/notes.git',
+        remote: { kind: 'https', origin: 'https://gitlab.com' },
+      },
+    })
+
+    await expect.element(page.getByText('https://gitlab.com/alex/notes.git')).toBeVisible()
+    await expect.element(page.getByText(/token/)).not.toBeInTheDocument()
+    await expect.element(page.getByText('Sign-in needed')).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: 'Sign in to GitHub' }))
+      .not.toBeInTheDocument()
+
+    await user.click(page.getByRole('button', { name: 'Stop backing up' }))
+    await vi.waitFor(() => {
+      const methods = view.gitSync.calls().map((call) => call.method)
+      expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
+      expect(methods).not.toContain('signOut')
+    })
+  })
+
   it('offers Connect GitHub for a disconnected local graph and opens the sheet', async () => {
     const user = userEvent
     await mount({ storageKind: 'local', gitSync: { phase: 'disconnected' } })
