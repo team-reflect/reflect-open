@@ -664,6 +664,15 @@ describe('createGitSyncService', () => {
         expect(args).toMatchObject({ credential: { username: 'alex', secret: 'glpat-1' } })
       }
     }
+
+    // A rotated token reaches the next cycle without a restart.
+    await secrets.set(
+      'git-credential:https://gitlab.com',
+      JSON.stringify({ username: 'alex', secret: 'glpat-2' }),
+    )
+    await gitSync.syncNow()
+    const lastPush = invocations.findLast(({ command }) => command === 'push')
+    expect(lastPush?.args).toMatchObject({ credential: { username: 'alex', secret: 'glpat-2' } })
     gitSync.dispose()
   })
 
