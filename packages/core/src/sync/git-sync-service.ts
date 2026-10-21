@@ -253,12 +253,12 @@ class GitSyncServiceImpl implements GitSyncService {
       // HTTPS remote would pull anonymously and only 401 on push, so the other
       // device's edits arrive while this one's silently never leave.
       const resolved = await credentials.resolve(remote)
-      // Subscribed only now: the resolver's first keychain read notifies the
-      // GitHub store's own subscribers, and that read is not a change.
-      this.#watchCredentials()
       if (this.#disposed) {
         return
       }
+      // Subscribed only now: the resolver's first keychain read notifies the
+      // GitHub store's own subscribers, and that read is not a change.
+      this.#watchCredentials()
       if (resolved.kind === 'missing') {
         this.#setState({ phase: 'needsCredential', remoteUrl, remote })
         await this.#startLocalHistory(status.initialized)
@@ -583,9 +583,9 @@ class GitSyncServiceImpl implements GitSyncService {
    * so `start()` degrades it to the signed-out path above instead.
    *
    * Starting it is best effort. It must never take down the state the caller
-   * just published: the SSH-only `rejected` message is the user's only
-   * instruction for fixing that remote, and losing it to a watcher that
-   * happened not to come up would be the worse trade.
+   * just published: `needsCredential` names the remote the user has to sign
+   * in to, and losing it to a watcher that happened not to come up would be
+   * the worse trade.
    */
   async #startLocalHistory(initialized: boolean): Promise<void> {
     const { git, syncEngines, platform, logger } = this.#deps
