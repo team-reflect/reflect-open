@@ -193,7 +193,7 @@ fn callbacks_with_credentials<'cb>(
 /// Refuse to present a sign-in anywhere but the origin it was stored for.
 /// With no readable origin to compare against (a non-http remote, or an
 /// http URL the parser rejects) the sign-in is withheld rather than sent.
-fn guard_origin(expected: Option<&HttpOrigin>, url: &str) -> Result<(), git2::Error> {
+pub(super) fn guard_origin(expected: Option<&HttpOrigin>, url: &str) -> Result<(), git2::Error> {
     let Some(expected) = expected else {
         return Err(git2::Error::new(
             git2::ErrorCode::Auth,
