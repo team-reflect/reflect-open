@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { ZodError } from 'zod'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestSecretStoreService } from '../testing/secrets.ts'
 import {
@@ -53,8 +54,12 @@ describe('GitHostCredentialService', () => {
 
   it('refuses an empty username or secret', async () => {
     const { secretStore, hostCredentials } = setup()
-    await expect(hostCredentials.save(ORIGIN, { username: '', secret: 'x' })).rejects.toThrow()
-    await expect(hostCredentials.save(ORIGIN, { username: 'alex', secret: '' })).rejects.toThrow()
+    await expect(hostCredentials.save(ORIGIN, { username: '', secret: 'x' })).rejects.toThrow(
+      ZodError,
+    )
+    await expect(hostCredentials.save(ORIGIN, { username: 'alex', secret: '' })).rejects.toThrow(
+      ZodError,
+    )
     expect(secretStore.snapshot()).toEqual({})
   })
 
