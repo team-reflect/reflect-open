@@ -74,6 +74,12 @@ describe('redactRemoteUrl', () => {
     expect(redactRemoteUrl('ssh://git@nas:2222/notes.git')).toBe('ssh://nas:2222/notes.git')
   })
 
+  it('still drops the user info when the URL does not parse', () => {
+    expect(redactRemoteUrl('https://alex:token@bad host/notes.git')).toBe(
+      'https://bad host/notes.git',
+    )
+  })
+
   it('leaves every other form alone', () => {
     expect(redactRemoteUrl('https://gitlab.com/alex/notes.git')).toBe(
       'https://gitlab.com/alex/notes.git',

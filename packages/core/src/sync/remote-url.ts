@@ -17,6 +17,7 @@ const GITHUB_PATH = /^\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/
 /** `host:path`, as `git clone` reads it; a Windows drive (`C:/…`) is a path. */
 const SCP_LIKE = /^(?![a-z]:[\\/])(?:[^@/]+@)?([^:/]+):.+$/i
 const ANY_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i
+const URL_USER_INFO = /^([a-z][a-z0-9+.-]*:\/\/)[^/?#]*@/i
 
 /**
  * Classify a remote URL. `http://github.com/…` is not `github`: the GitHub
@@ -67,7 +68,8 @@ export function githubRemoteUrl(ref: GithubRepoRef): string {
 export function redactRemoteUrl(url: string): string {
   const parsed = parseUrl(url)
   if (parsed === null) {
-    return url
+    // A URL the parser rejects can still carry user info; strip it by shape.
+    return url.replace(URL_USER_INFO, '$1')
   }
   parsed.username = ''
   parsed.password = ''
