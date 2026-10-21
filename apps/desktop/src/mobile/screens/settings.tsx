@@ -203,9 +203,10 @@ export function MobileSettings(): ReactElement {
   const canConnect = mobileStorageKind === 'local' && gitSync?.phase === 'disconnected'
 
   // Stop backing this graph up and, for a GitHub remote, forget the GitHub
-  // credential (one graph per device — unlinking is signing out). The local
-  // clone stays; the controller restarts into its disconnected state, and
-  // re-connecting re-onboards.
+  // credential (one graph per device — unlinking is signing out). A host
+  // sign-in stays in the keychain, as on desktop. The local clone stays; the
+  // controller restarts into its disconnected state, and re-connecting
+  // re-onboards.
   async function disconnect(): Promise<void> {
     if (sync === null) {
       return
@@ -217,7 +218,7 @@ export function MobileSettings(): ReactElement {
         await sync.signOut()
       }
     } catch (err) {
-      logger.error('GitHub disconnect failed:', errorMessage(err))
+      logger.error('Disconnect failed:', errorMessage(err))
     } finally {
       setDisconnecting(false)
     }
