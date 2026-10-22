@@ -74,7 +74,7 @@
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "@rolldown/plugin-babel": "^0.2.4",
-    "@sentry/cli": "3.8.0",
+    "@sentry/cli": "3.8.1",
     "@sentry/vite-plugin": "^5.4.1",
     "@sqlite.org/sqlite-wasm": "3.53.4-build2",
     "@tailwindcss/vite": "^4.3.3",
