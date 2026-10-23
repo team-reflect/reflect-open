@@ -266,8 +266,7 @@ Three flavors ship as distinct, coexisting apps:
 The base `tauri.conf.json` is the stable flavor and uses the shipped gradient icon
 (`icons/`). Beta and dev are config overlays (`src-tauri/tauri.beta.conf.json`,
 `src-tauri/tauri.dev.conf.json`) merged with `--config`; their icons are the same
-artwork recolored via `magick -modulate` (beta `104,100,120`, dev `92,100,231`; see
-`src-tauri/icons/README.md`). `build:macos` picks the flavor from the version
+artwork in another color (`icons-beta/`, `icons-dev/`; see `src-tauri/icons/README.md`). `build:macos` picks the flavor from the version
 (prerelease → beta, else stable), so a release always matches the updater feed compiled
 into it; `publish-macos.yml` needs no flavor knowledge.
 

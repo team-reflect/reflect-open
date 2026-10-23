@@ -1,40 +1,50 @@
 # App icons
 
-Three color sets, one per build flavor. Same gradient gem artwork, different hue.
+One icon in three colors, one per build flavor. iOS and macOS show the same artwork.
 
-| Dir           | Color        | Flavor        | productName  | modulate (B,S,H) |
-| ------------- | ------------ | ------------- | ------------ | ---------------- |
-| `icons/`      | blue/violet  | stable        | Reflect      | none (as shipped) |
-| `icons-beta/` | purple/violet | beta          | Reflect Beta | `104,100,120`    |
-| `icons-dev/`  | green        | dev (local)   | Reflect Dev  | `92,100,231`     |
+| Dir           | Flavor      | productName  | Icon Composer document | Color         |
+| ------------- | ----------- | ------------ | ---------------------- | ------------- |
+| `icons/`      | stable      | Reflect      | `AppIcon.icon`         | blue/violet   |
+| `icons-beta/` | beta        | Reflect Beta | `AppIcon-Beta.icon`    | purple/violet |
+| `icons-dev/`  | dev (local) | Reflect Dev  | `AppIcon-Dev.icon`     | green         |
 
-`icons/` is the shipped app icon and the default set Tauri uses with no `--config`;
-the base `tauri.conf.json` points its `bundle.icon` here. The `tauri.beta.conf.json`
-and `tauri.dev.conf.json` overlays repoint `bundle.icon` at the sibling dirs.
+`icons/` is the default set: the base `tauri.conf.json` points `bundle.icon` here.
+The `tauri.beta.conf.json` and `tauri.dev.conf.json` overlays point it at the
+sibling dirs. All files in a dir come from the same artwork, so replace them as a set.
 
-The beta/dev sets are the stable artwork run through `magick -modulate B,S,H`
-(B=lightness, S=saturation, 100=unchanged).
+## Files
 
-## Dark, Clear, and Tinted appearances
-
-iOS 26+ and macOS 26+ render app icons in Default, Dark, Clear, and Tinted
-appearances. Each dir holds an Icon Composer document for that flavor
-(`AppIcon.icon`, `AppIcon-Beta.icon`, `AppIcon-Dev.icon`): a gradient fill plus
-the gem as one transparent layer. The beta/dev documents are the stable one with
-the gem layer and the gradient colors run through the flavor's modulate.
+| File                                         | Used by                                                    |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| `*.icon`                                     | iOS (all versions) and the source of `Assets.car`          |
+| `Assets.car`                                 | macOS (`CFBundleIconName`)                                 |
+| `icon.icns`                                  | macOS fallback (`CFBundleIconFile`)                        |
+| `icon.ico`                                   | Windows                                                    |
+| `32x32.png`, `128x128.png`, `128x128@2x.png` | Linux, and the window icon that Tauri embeds in the binary |
 
 - **iOS** compiles `icons/AppIcon.icon` (release: TestFlight and App Store) and
   `icons-dev/AppIcon-Dev.icon` (debug: `tauri ios dev`) straight from the Xcode
   project; `ASSETCATALOG_COMPILER_APPICON_NAME` picks one. Xcode also generates
-  the flat icons for iOS 16 to 18. Do not run `tauri icon` for iOS: it writes an
-  `AppIcon.appiconset`, which the `.icon` would shadow.
-- **macOS** reads `Assets.car` from `bundle.icon`. `icon.icns` stays as the
-  fallback for macOS 15 and earlier. After editing a `.icon`, rebuild the three
-  `Assets.car` files with `pnpm --filter @reflect/desktop gen:icons` (Xcode 26+).
-  The script draws the layers 1024/824 times larger, because `icon.icns` crops
-  the iOS art to its center 824 px.
-  The `.car` files are committed because Tauri's Node CLI cannot compile a `.icon`
-  itself ([tauri-apps/tauri#15315](https://github.com/tauri-apps/tauri/issues/15315)).
+  the flat icons for older iOS versions. Do not run `tauri icon`: it writes an
+  `AppIcon.appiconset` and other files that nothing uses.
+- **macOS** reads `Assets.car` from `bundle.icon`. After editing a `.icon`, rebuild
+  the three `Assets.car` files with `pnpm --filter @reflect/desktop gen:icons`
+  (Xcode 26+). The `.car` files are committed because Tauri's Node CLI cannot
+  compile a `.icon` itself ([tauri-apps/tauri#15315](https://github.com/tauri-apps/tauri/issues/15315)).
+
+## Dark, Clear, and Tinted appearances
+
+iOS 26+ and macOS 26+ show app icons in Default, Dark, Clear, and Tinted
+appearances. Each `.icon` has six layers in three groups: `nodes`, `edges`, and
+`body` (the gem); `ring` and `glow` (the halo); and `background`.
+
+- **Default** shows every layer.
+- **Dark** hides `background`, so the gem glows on the system's dark background.
+- **Clear and Tinted** also hide `background`. The system turns the remaining
+  layers into a single glass or tinted image. `body` drops to 50% opacity and
+  `glow` to 25%, so the gem's lines stay readable.
+
+Icon Composer uses one appearance key, `tinted`, for both Clear and Tinted.
 
 Preview any appearance without a simulator:
 
@@ -43,29 +53,3 @@ Preview any appearance without a simulator:
   AppIcon.icon --export-image --output-file out.png --platform macOS \
   --rendition TintedDark --width 512 --height 512 --scale 1
 ```
-
-## Regenerating a flavor set
-
-ImageMagick on macOS has no ICNS writer, so recolor the rasters in place and rebuild
-`icon.icns` from a recolored master with the native tools:
-
-```bash
-mod="104,100,120"           # the flavor's modulate (see table)
-cp -R icons icons-<flavor>
-find icons-<flavor> -type f \( -iname '*.png' -o -iname '*.ico' \) -print0 \
-  | while IFS= read -r -d '' f; do magick "$f" -modulate "$mod" "$f"; done
-
-sips -s format png icons/icon.icns --out /tmp/master.png   # the stable 1024 master
-magick /tmp/master.png -modulate "$mod" /tmp/recolored.png
-mkdir /tmp/set.iconset
-for s in "16 16x16" "32 16x16@2x" "32 32x32" "64 32x32@2x" "128 128x128" \
-         "256 128x128@2x" "256 256x256" "512 256x256@2x" "512 512x512"; do
-  set -- $s; sips -z "$1" "$1" /tmp/recolored.png --out "/tmp/set.iconset/icon_$2.png"
-done
-cp /tmp/recolored.png /tmp/set.iconset/icon_512x512@2x.png
-iconutil -c icns /tmp/set.iconset -o icons-<flavor>/icon.icns
-```
-
-Dev's hue came from the 400-variant contact sheet (id 149, hue ≈ 126°). Beta was
-hand-tuned to a purple-violet (hue ≈ 286°) — distinct from the stable blue/violet but
-no longer the near-red magenta of the original contact-sheet pick. Eyeball any new pick.

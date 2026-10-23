@@ -3,42 +3,12 @@
 //
 // Needs Xcode 26 or later.
 
-import { copyFileSync, cpSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, readdirSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { exec } from 'tinyexec'
-import { z } from 'zod'
 import { runWithTempDir, TAURI_SRC_DIR } from './helpers.ts'
 
 const ICON_DIRS = ['icons', 'icons-beta', 'icons-dev']
-
-// The macOS `icon.icns` art is the iOS art cropped to its center 824 px, so
-// the macOS icon draws every layer 1024 / 824 times larger than iOS does.
-const MAC_LAYER_SCALE = 1024 / 824
-
-const IconDocumentSchema = z.looseObject({
-  groups: z.array(
-    z.looseObject({
-      layers: z.array(
-        z.looseObject({
-          position: z.looseObject({ scale: z.number() }).optional(),
-        }),
-      ),
-    }),
-  ),
-})
-
-function scaleLayers(documentDir: string): void {
-  const path = join(documentDir, 'icon.json')
-  const document = IconDocumentSchema.parse(JSON.parse(readFileSync(path, 'utf8')))
-  for (const layer of document.groups.flatMap((group) => group.layers)) {
-    layer.position = {
-      'translation-in-points': [0, 0],
-      ...layer.position,
-      scale: (layer.position?.scale ?? 1) * MAC_LAYER_SCALE,
-    }
-  }
-  writeFileSync(path, JSON.stringify(document, null, 2))
-}
 
 async function compile(iconDir: string): Promise<void> {
   const document = readdirSync(iconDir).find((name) => name.endsWith('.icon'))
@@ -46,15 +16,12 @@ async function compile(iconDir: string): Promise<void> {
     throw new Error(`No .icon document in ${iconDir}`)
   }
   await runWithTempDir(async (tempDir) => {
-    const input = join(tempDir, document)
-    cpSync(join(iconDir, document), input, { recursive: true })
-    scaleLayers(input)
     // actool fails with "Bad file descriptor" when it inherits a closed stdin.
     await exec(
       'xcrun',
       [
         'actool',
-        input,
+        join(iconDir, document),
         '--compile',
         tempDir,
         '--output-format',
@@ -72,6 +39,9 @@ async function compile(iconDir: string): Promise<void> {
         '26.0',
         '--platform',
         'macosx',
+        // Drops the flat 32 to 1024 px fallback images and keeps one 512 px
+        // image, which cuts each `Assets.car` from about 5 MB to about 2 MB.
+        '--skip-app-store-deployment',
       ],
       { throwOnError: true, nodeOptions: { stdio: ['ignore', 'inherit', 'inherit'] } },
     )
