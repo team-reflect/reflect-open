@@ -25,7 +25,7 @@ and MIT-licensed, so there is no copyleft constraint.
 | Projection/IPC data cache + invalidation (server-state) | `@tanstack/react-query` | 04 |
 | Shared UI / session state (theme, route, palette, sync) | React context + hooks (no external store dependency today) | 06 / 08 |
 | Frontmatter YAML (tolerant, round-trippable) | `yaml` (eemeli) | 03 |
-| Note IDs (ULID) | `ulidx` | 02 |
+| Note IDs (ULID) | `ulid` | 02 |
 | Routing (typed product routes + history) | **custom, no dependency** | 06 |
 | Dates (local "today", ISO keys, DST-safe) | `date-fns` (+ `date-fns-tz` if needed) | 06 |
 | List virtualization | `@tanstack/react-virtual` | 06 / 08 |

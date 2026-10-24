@@ -384,9 +384,9 @@ importers:
       pkce-challenge:
         specifier: ^6.0.0
         version: 6.0.0
-      ulidx:
-        specifier: ^2.4.1
-        version: 2.4.1
+      ulid:
+        specifier: ^3.0.2
+        version: 3.0.2
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -4449,9 +4449,6 @@ packages:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
     engines: {node: '>=20.0.0'}
 
-  layerr@3.0.0:
-    resolution: {integrity: sha512-tv754Ki2dXpPVApOrjTyRo4/QegVb9eVFq4mjqp4+NM5NaX7syQvN5BBNfV/ZpAHCEHV24XdUVrBAoka4jt3pA==}
-
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
@@ -5995,9 +5992,9 @@ packages:
   uhyphen@0.2.0:
     resolution: {integrity: sha512-qz3o9CHXmJJPGBdqzab7qAYuW8kQGKNEuoHFYrBwV6hWIMcpAmxDLXojcHfFr9US1Pe6zUswEIJIbLI610fuqA==}
 
-  ulidx@2.4.1:
-    resolution: {integrity: sha512-xY7c8LPyzvhvew0Fn+Ek3wBC9STZAuDI/Y5andCKi9AX6/jvfaX45PhsDX8oxgPL0YFp0Jhr8qWMbS/p9375Xg==}
-    engines: {node: '>=16'}
+  ulid@3.0.2:
+    resolution: {integrity: sha512-yu26mwteFYzBAot7KVMqFGCVpsF6g8wXfJzQUHvu1no3+rRRSFcSV2nKeYvNPLD2J4b08jYBDhHUjeH0ygIl9w==}
+    hasBin: true
 
   unbash@5.1.0:
     resolution: {integrity: sha512-YVGyy4XqoZ2AVgHjVdL9cchMSurlXFHWviORa8RiU/Bnol4ooW5Lpyur/5XmbgDdyCKxymmgsEQsLGBMIJ/Agg==}
@@ -10768,8 +10765,6 @@ snapshots:
 
   kysely@0.28.17: {}
 
-  layerr@3.0.0: {}
-
   levn@0.4.1:
     dependencies:
       prelude-ls: 1.2.1
@@ -12567,9 +12562,7 @@ snapshots:
 
   uhyphen@0.2.0: {}
 
-  ulidx@2.4.1:
-    dependencies:
-      layerr: 3.0.0
+  ulid@3.0.2: {}
 
   unbash@5.1.0: {}
 

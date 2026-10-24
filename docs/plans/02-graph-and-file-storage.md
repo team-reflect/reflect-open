@@ -12,7 +12,7 @@ primitives; the `notes`/`graph` **setters** that orchestrate writes + reindex li
 `@reflect/core`. See [Architecture & Conventions](architecture-conventions.md).
 
 **Libraries:** `tempfile` (atomic write), `trash` (delete-to-OS-trash), `dirs`
-(OS app-config) — Rust; `ulid` (Rust) / `ulidx` (TS) for note IDs. See
+(OS app-config) — Rust; `ulid` (Rust) / `ulid` (TS) for note IDs. See
 [Libraries](libraries.md).
 
 ## Scope

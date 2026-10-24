@@ -1,4 +1,4 @@
-import { ulid } from 'ulidx'
+import { ulid } from 'ulid'
 
 /**
  * Fresh random identifiers.

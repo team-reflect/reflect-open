@@ -1,4 +1,4 @@
-import { isValid } from 'ulidx'
+import { isValid } from 'ulid'
 import { describe, expect, it } from 'vitest'
 import { createTestIdService } from '../testing/index.ts'
 import { createSystemIdService } from './id-service.ts'
