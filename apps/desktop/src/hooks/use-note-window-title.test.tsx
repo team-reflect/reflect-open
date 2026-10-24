@@ -12,14 +12,14 @@ describe('useNoteWindowTitle', () => {
         initialProps: { title: 'Meeting Notes' },
       },
     )
-    expect(view.appServices.window.title()).toBe('Meeting Notes')
+    expect(view.app.window.title()).toBe('Meeting Notes')
 
     await view.rerender({ title: 'Renamed Notes' })
-    expect(view.appServices.window.title()).toBe('Renamed Notes')
+    expect(view.app.window.title()).toBe('Renamed Notes')
   })
 
   it('falls back to the app name while the title is unknown', async () => {
-    const { appServices } = await renderHookInApp(() => useNoteWindowTitle(null))
-    expect(appServices.window.title()).toBe('Reflect')
+    const { app } = await renderHookInApp(() => useNoteWindowTitle(null))
+    expect(app.window.title()).toBe('Reflect')
   })
 })

@@ -107,14 +107,14 @@ function Harness(): ReactElement {
 }
 
 async function renderHarness() {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
     chatEngine,
   })
   // The index is not open, so the history drawer reads nothing.
   return await renderInApp(<Harness />, {
-    app,
+    core,
     graph: { ...GRAPH, indexGeneration: null },
     settings: { aiProviders: settingsState.models, defaultAiProviderId: settingsState.defaultId },
   })

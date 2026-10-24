@@ -27,8 +27,8 @@ export function NoteGistAction({
   path,
   keybinding = null,
 }: NoteGistActionProps): ReactElement | null {
-  const services = useCoreServices()
-  const { gistPublish } = services
+  const core = useCoreServices()
+  const { gistPublish } = core
   const app = useAppServices()
   const connected = useGithubConnected()
   const row = useNoteRow(path)
@@ -48,7 +48,7 @@ export function NoteGistAction({
   const onPublish = async (): Promise<void> => {
     setIsPublishing(true)
     try {
-      await publishGistAndCopyLink(services, app, path)
+      await publishGistAndCopyLink(core, app, path)
     } finally {
       setIsPublishing(false)
     }

@@ -70,8 +70,8 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 // The platform of the next `shortcutsHook`; each `describe` sets it.
 let platform: TestPlatformOptions
 // The services of the rendered app; set by `shortcutsHook`.
-let app: TestCoreServices
-let appLayer: AppServices
+let core: TestCoreServices
+let app: AppServices
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 let openRouteInNewWindow: MockInstance<LinkNavigationService['openRouteInNewWindow']>
 let isNativeMenuInstalled: MockInstance<NativeMenuService['isInstalled']>
@@ -88,7 +88,7 @@ beforeEach(() => {
 
 async function shortcutsHook() {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
-  const services = createTestCoreServices({
+  core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService(platform),
     noteDocuments: {
@@ -99,15 +99,14 @@ async function shortcutsHook() {
       isOstensiblyEmpty: isOstensiblyEmptyNoteSource,
     },
   })
-  app = services
-  appLayer = createTestAppServices(services)
-  openRecent = vi.spyOn(services.graphSession, 'openRecent').mockResolvedValue(true)
+  app = createTestAppServices(core)
+  openRecent = vi.spyOn(core.graphSession, 'openRecent').mockResolvedValue(true)
   openRouteInNewWindow = vi
-    .spyOn(appLayer.linkNavigation, 'openRouteInNewWindow')
+    .spyOn(app.linkNavigation, 'openRouteInNewWindow')
     .mockResolvedValue(true)
-  isNativeMenuInstalled = vi.spyOn(appLayer.nativeMenu, 'isInstalled').mockReturnValue(false)
-  const createChatSession = services.chatSessions.create.bind(services.chatSessions)
-  vi.spyOn(services.chatSessions, 'create').mockImplementation((options) => {
+  isNativeMenuInstalled = vi.spyOn(app.nativeMenu, 'isInstalled').mockReturnValue(false)
+  const createChatSession = core.chatSessions.create.bind(core.chatSessions)
+  vi.spyOn(core.chatSessions, 'create').mockImplementation((options) => {
     const session = createChatSession(options)
     newChat = vi.spyOn(session, 'newChat')
     return session
@@ -126,8 +125,8 @@ async function shortcutsHook() {
       }
     },
     {
-      app: services,
-      appServices: appLayer,
+      core,
+      app,
       graph: GRAPH,
       graphState: {
         recents: [
@@ -184,7 +183,7 @@ describe('app shortcuts', () => {
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: 1024 }, 1)
     })
-    expect(app.noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 1024 })
+    expect(core.noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 1024 })
     await act(() => press('o'))
     expect(commitNoteFrontmatter).toHaveBeenCalledTimes(1)
     write.resolve()
@@ -199,7 +198,7 @@ describe('app shortcuts', () => {
     await act(() => result.current.setFocusedDailyDate('2026-09-07'))
     await act(() => result.current.context.togglePin())
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-09-07.md', { pinned: 1024 }, 1)
-    expect(app.noteRows.getOverlay('daily/2026-09-07.md')).toMatchObject({ isPinned: true })
+    expect(core.noteRows.getOverlay('daily/2026-09-07.md')).toMatchObject({ isPinned: true })
   })
 
   it('palette privacy updates the focused daily note row before the write resolves', async () => {
@@ -216,7 +215,7 @@ describe('app shortcuts', () => {
         1,
       )
     })
-    expect(app.noteRows.getOverlay('daily/2026-09-07.md')).toEqual({ isPrivate: true })
+    expect(core.noteRows.getOverlay('daily/2026-09-07.md')).toEqual({ isPrivate: true })
     write.resolve()
     await action
   })
@@ -226,7 +225,7 @@ describe('app shortcuts', () => {
     await act(() => result.current.router.navigate({ kind: 'settings' }))
     await act(() => press('o'))
     await act(() => result.current.context.togglePrivate())
-    await act(() => app.graphSession.setGraph(null))
+    await act(() => core.graphSession.setGraph(null))
     await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
     await act(() => press('o'))
     await act(() => result.current.context.togglePrivate())
@@ -576,7 +575,7 @@ describe('app shortcuts on macOS', () => {
     expect(event.defaultPrevented).toBe(false)
     expect(result.current.sidebar.collapsed).toBe(false)
 
-    await act(() => appLayer.nativeMenu.dispatchCommand('sidebar.toggle'))
+    await act(() => app.nativeMenu.dispatchCommand('sidebar.toggle'))
     expect(result.current.sidebar.collapsed).toBe(true)
   })
 })

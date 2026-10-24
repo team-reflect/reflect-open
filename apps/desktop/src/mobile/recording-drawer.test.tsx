@@ -114,7 +114,7 @@ describe('RecordingDrawer', () => {
     expect(view.getByRole('button', { name: 'Stop recording' }).query()).toBeNull()
 
     await userEvent.click(view.getByRole('button', { name: 'Open Settings' }))
-    expect(view.appServices.navigation.navigations()).toEqual([
+    expect(view.app.navigation.navigations()).toEqual([
       { route: { kind: 'settings' }, options: undefined },
     ])
     expect(memo.onDrawerOpenChange).toHaveBeenCalledWith(false)

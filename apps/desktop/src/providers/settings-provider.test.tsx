@@ -9,8 +9,8 @@ import { useSettings } from './settings-provider.tsx'
 describe('useSettings', () => {
   it('renders the settings of the app services and forwards updates', async () => {
     const settings = createTestSettingsService({ editorMarkdownSyntax: 'show' })
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
-    const { result } = await renderHookInApp(() => useSettings(), { app })
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
+    const { result } = await renderHookInApp(() => useSettings(), { core })
 
     await act(async () => {
       await expect(result.current.whenSettingsLoaded()).resolves.toBe('loaded')
@@ -35,9 +35,9 @@ describe('useSettings', () => {
 
   it('loads once in StrictMode', async () => {
     const settings = createTestSettingsService()
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
     const { result } = await renderHookInApp(() => useSettings(), {
-      app,
+      core,
       wrapper: (children: ReactNode) => <StrictMode>{children}</StrictMode>,
     })
     await act(async () => {

@@ -27,20 +27,18 @@ function wrapBacklinkContexts(contexts: BacklinkContext[]): BacklinkContextPage 
   return { contexts, nextCursor: null, indexedLinkCount: contexts.length }
 }
 
-function createApp() {
-  const services = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  vi.spyOn(services.backlinks, 'getBacklinksWithContext').mockImplementation(
-    getBacklinksWithContext,
-  )
-  vi.spyOn(services.noteCreation, 'resolveOrCreateNoteWithTitle').mockImplementation(
+function createCore() {
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  vi.spyOn(core.backlinks, 'getBacklinksWithContext').mockImplementation(getBacklinksWithContext)
+  vi.spyOn(core.noteCreation, 'resolveOrCreateNoteWithTitle').mockImplementation(
     resolveOrCreateNoteWithTitle,
   )
-  vi.spyOn(services.noteLinkResolver, 'resolveMarkdownHref').mockImplementation(resolveMarkdownHref)
-  return services
+  vi.spyOn(core.noteLinkResolver, 'resolveMarkdownHref').mockImplementation(resolveMarkdownHref)
+  return core
 }
 
-// One app per test, so a panel rendered twice shares its session storage.
-let app: ReturnType<typeof createApp>
+// One set of core services per test, so a panel rendered twice shares its session storage.
+let core: ReturnType<typeof createCore>
 
 function RouteProbe(): ReactNode {
   const { route, arrivalFocusEditor } = useRouter()
@@ -53,8 +51,8 @@ function RouteProbe(): ReactNode {
 
 function renderInGraph(ui: ReactNode) {
   return renderInApp(ui, {
-    app,
-    appServices: { window: createTestWindowService({ openNoteWindow }) },
+    core,
+    app: { window: createTestWindowService({ openNoteWindow }) },
     graph: { root: '/g', name: 'g', generation: 1 },
   })
 }
@@ -73,7 +71,7 @@ beforeEach(() => {
   resolveOrCreateNoteWithTitle.mockReset()
   resolveMarkdownHref.mockReset()
   openNoteWindow.mockReset().mockResolvedValue(true)
-  app = createApp()
+  core = createCore()
 })
 
 describe('BacklinksPanel', () => {

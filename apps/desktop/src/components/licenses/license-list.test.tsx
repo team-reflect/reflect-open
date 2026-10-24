@@ -76,6 +76,6 @@ describe('LicenseEntries', () => {
     await userEvent.click(page.getByRole('button', { name: /^alpha/ }))
     await userEvent.click(page.getByRole('button', { name: 'Homepage' }))
 
-    expect(view.appServices.opener.openedUrls()).toEqual(['https://alpha.example'])
+    expect(view.app.opener.openedUrls()).toEqual(['https://alpha.example'])
   })
 })

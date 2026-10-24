@@ -29,18 +29,18 @@ async function mount(options?: {
   resolving?: boolean
 }): Promise<void> {
   const storage = options?.storage ?? STORAGE
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })
-  const appServices = createTestAppServices(app)
+  const app = createTestAppServices(core)
   completeOnboarding = vi
-    .spyOn(appServices.mobileOnboarding, 'completeOnboarding')
+    .spyOn(app.mobileOnboarding, 'completeOnboarding')
     .mockImplementation(async () => {})
   await renderInApp(<MobileOnboardingScreen />, {
+    core,
     app,
-    appServices,
     graph: null,
     mobile: { needsOnboarding: true, storageInfo: storage, resolving: options?.resolving ?? false },
   })

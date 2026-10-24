@@ -19,8 +19,8 @@ afterEach(() => {
 
 describe('useNoteAttachments', () => {
   it('resolves from the note it renders', async () => {
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-    app.attachments.setCatalog([
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    core.attachments.setCatalog([
       { path: 'Projects/attachments/plan.png', size: 1 },
       { path: 'attachments/plan.png', size: 1 },
     ])
@@ -28,7 +28,7 @@ describe('useNoteAttachments', () => {
       () => {
         attachments = useNoteAttachments('Projects/Plan.md')
       },
-      { app, graph: { generation: 3 } },
+      { core, graph: { generation: 3 } },
     )
 
     expect(attachments?.resolveImageUrl('attachments/plan.png')).toBe(
@@ -42,7 +42,7 @@ describe('useNoteAttachments', () => {
 
   it('re-renders when the catalog changes', async () => {
     let renders = 0
-    const { app: services } = await renderHookInApp(
+    const { core: services } = await renderHookInApp(
       () => {
         renders += 1
         attachments = useNoteAttachments('Home.md')
@@ -64,16 +64,16 @@ describe('useNoteAttachments', () => {
   })
 
   it('resolves against the new generation when the graph reopens', async () => {
-    const { app } = await renderHookInApp(
+    const { core } = await renderHookInApp(
       () => {
         attachments = useNoteAttachments('Home.md')
       },
       { graph: { generation: 3 } },
     )
-    app.attachments.setCatalog([{ path: 'assets/cat.png', size: 1 }])
+    core.attachments.setCatalog([{ path: 'assets/cat.png', size: 1 }])
     const before = attachments
 
-    await act(() => app.graphSession.setGraph({ generation: 4 }))
+    await act(() => core.graphSession.setGraph({ generation: 4 }))
 
     // New resolvers, so an editor re-resolves its images.
     expect(attachments).not.toBe(before)

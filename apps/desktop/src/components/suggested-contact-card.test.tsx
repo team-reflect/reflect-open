@@ -30,7 +30,7 @@ let contacts: TestContactsService
  */
 async function renderCard(contactsEnabled = true): Promise<void> {
   await renderInApp(<SuggestedContactCard path={PATH} />, {
-    app: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile, contacts }),
+    core: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile, contacts }),
     // The card writes with the generation of the open graph.
     graph: { root: '/g', generation: 3 },
     settings: { contactsEnabled },

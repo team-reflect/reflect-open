@@ -34,7 +34,7 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
   const { pickerOpen, closeTemplatePicker, openTemplateCreate } = useNoteTemplates()
   const { graph } = useGraph()
   const { data: templates } = useQuery({
-    ...createTemplatesQueryOptions(context.services.indexQuery, graph?.root),
+    ...createTemplatesQueryOptions(context.core.indexQuery, graph?.root),
     enabled: graph !== null && pickerOpen,
   })
 
@@ -46,7 +46,7 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
     }
     // `TemplateService.insertTemplate` owns all feedback — a missing editor (protected or
     // still-loading note) and a failed read both surface as failed operations.
-    void context.services.templates.insertTemplate(path, noteEditorHandleFor(target))
+    void context.core.templates.insertTemplate(path, noteEditorHandleFor(target))
   }
 
   return (

@@ -37,36 +37,36 @@ function iosServices() {
 
 describe('usePaywallGate', () => {
   it('follows the paywall service gate', async () => {
-    const services = iosServices()
-    services.mobile.appStoreEnvironment.setState({ value: 'Production' })
-    const { result } = await renderHookInApp(() => usePaywallGate(), { app: services })
+    const core = iosServices()
+    core.mobile.appStoreEnvironment.setState({ value: 'Production' })
+    const { result } = await renderHookInApp(() => usePaywallGate(), { core })
     expect(result.current).toBe('show')
 
     await act(() => {
-      services.mobile.appStoreEnvironment.setState({ value: 'Sandbox' })
+      core.mobile.appStoreEnvironment.setState({ value: 'Sandbox' })
     })
     expect(result.current).toBe('hide')
   })
 
   it('starts the subscription, Reflect Classic, and install-channel checks', async () => {
-    const services = iosServices()
-    await renderHookInApp(() => usePaywallGate(), { app: services })
+    const core = iosServices()
+    await renderHookInApp(() => usePaywallGate(), { core })
 
     await vi.waitFor(() => {
-      expect(services.mobile.subscription.calls()).toContain('activeSubscription')
-      expect(services.classicAccess.calls()).toContain('start')
-      expect(services.mobile.appStoreEnvironment.calls()).toContain('environment')
+      expect(core.mobile.subscription.calls()).toContain('activeSubscription')
+      expect(core.classicAccess.calls()).toContain('start')
+      expect(core.mobile.appStoreEnvironment.calls()).toContain('environment')
     })
   })
 
   it('looks the subscription up again on window focus', async () => {
-    const services = iosServices()
-    await renderHookInApp(() => usePaywallGate(), { app: services })
+    const core = iosServices()
+    await renderHookInApp(() => usePaywallGate(), { core })
 
     focusManager.setFocused(false)
     focusManager.setFocused(true)
 
-    expect(services.mobile.subscription.calls()).toContain('refetch')
+    expect(core.mobile.subscription.calls()).toContain('refetch')
   })
 
   describe('over the real services', () => {
@@ -107,7 +107,7 @@ describe('usePaywallGate', () => {
       })
       return {
         iap,
-        services: {
+        core: {
           ...base,
           iap,
           appStore,
@@ -118,13 +118,13 @@ describe('usePaywallGate', () => {
     }
 
     it('shows the paywall on request outside the App Store, and lifts it after a purchase', async () => {
-      const { iap, services } = realServices()
+      const { iap, core } = realServices()
       const { result } = await renderHookInApp(
         () => ({ gate: usePaywallGate(), requested: usePaywallRequested() }),
-        { app: services },
+        { core },
       )
       await vi.waitFor(() => {
-        expect(services.mobile.appStoreEnvironment.getState().value).toBe('Sandbox')
+        expect(core.mobile.appStoreEnvironment.getState().value).toBe('Sandbox')
       })
       expect(result.current.gate).toBe('hide')
 
@@ -133,7 +133,7 @@ describe('usePaywallGate', () => {
       })
       await vi.waitFor(() => expect(result.current.gate).toBe('show'))
 
-      await act(() => services.mobile.paywall.purchase(IAP_PRODUCT_IDS.monthly))
+      await act(() => core.mobile.paywall.purchase(IAP_PRODUCT_IDS.monthly))
       await vi.waitFor(() => expect(result.current.gate).toBe('hide'))
       expect(iap.purchases()).toEqual([IAP_PRODUCT_IDS.monthly])
     })

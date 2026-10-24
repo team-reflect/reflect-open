@@ -13,9 +13,9 @@ const AUTH: GithubAuth = { kind: 'pat', token: 'ghp_abc' }
  * Render the hook over an app whose GitHub device flow is `mockFlow`.
  */
 async function mount() {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  app.githubAuth.onRunDeviceFlow(mockFlow)
-  return await renderHookInApp(() => useDeviceFlowAuth(), { app })
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core.githubAuth.onRunDeviceFlow(mockFlow)
+  return await renderHookInApp(() => useDeviceFlowAuth(), { core })
 }
 
 afterEach(() => {

@@ -65,13 +65,13 @@ export function useAppServices(): AppServices {
  * The {@link GraphServices} of the open graph. Throws while no graph session is open; use `useMaybeGraphServices` where that can happen.
  */
 export function useGraphServices(): GraphServices {
-  const services = useMaybeGraphServices()
-  if (services === null) {
+  const graph = useMaybeGraphServices()
+  if (graph === null) {
     throw new Error(
       'useGraphServices() needs an open graph: no graph session is active (or no <GraphServicesProvider> is mounted above)',
     )
   }
-  return services
+  return graph
 }
 
 /**

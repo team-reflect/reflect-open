@@ -15,7 +15,7 @@ export interface CommandContext {
   /**
    * The core services, for the commands that call one directly.
    */
-  services: CoreServices
+  core: CoreServices
   app: AppServices
   navigate: (route: Route, options?: NavigateOptions) => void
   /** The current route, read at run time. */

@@ -26,10 +26,10 @@ let settings: TestSettingsService
 
 // The field renders only on macOS desktop, which is the test platform.
 async function renderSection(): Promise<void> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService(), calendar })
-  settings = app.settings
-  const view = await renderInApp(<CalendarIntegrationField />, { app, settings: stored })
-  opener = view.appServices.opener
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService(), calendar })
+  settings = core.settings
+  const view = await renderInApp(<CalendarIntegrationField />, { core, settings: stored })
+  opener = view.app.opener
 }
 
 function calendarSwitch(): Locator {

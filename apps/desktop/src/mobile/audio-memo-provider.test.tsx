@@ -54,7 +54,7 @@ async function setup(provider: AiProviderConfig = OPENAI) {
   const audioRecorder = createTestAudioRecorderService({ sessionStartedMs: SESSION_STARTED_MS })
   audioRecorder.setStopResult(RECORDING)
   const assetStore = createTestAssetStoreService({ sources: { [STAGED]: 'audio' } })
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     audioRecorder,
     assetStore,
@@ -62,7 +62,7 @@ async function setup(provider: AiProviderConfig = OPENAI) {
   })
 
   const hook = await renderHookInApp(() => useMobileAudioMemo(), {
-    app,
+    core,
     graph: GRAPH,
     settings: { aiProviders: [provider], defaultAiProviderId: provider.id },
     wrapper: (children) => (
@@ -205,7 +205,7 @@ describe('MobileAudioMemoProvider', () => {
   })
 
   it('unmounting closes the session and leaves a live recording running', async () => {
-    const { result, app, audioRecorder, assetStore, unmount } = await setup()
+    const { result, core, audioRecorder, assetStore, unmount } = await setup()
     await act(() => {
       result.current.toggle()
     })
@@ -213,7 +213,7 @@ describe('MobileAudioMemoProvider', () => {
     await unmount()
     audioRecorder.emitStopped({ segment: RECORDING, reason: 'interruption' })
 
-    expect(app.fileChanges.listenerCount().changes).toBe(0)
+    expect(core.fileChanges.listenerCount().changes).toBe(0)
     expect(assetStore.uploads()).toEqual([])
   })
 })

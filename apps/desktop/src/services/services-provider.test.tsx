@@ -21,7 +21,7 @@ describe('services providers', () => {
   it('gives components the app services', async () => {
     const screen = await renderInApp(<AppVersion />, { servicesOnly: true })
     await expect.element(screen.getByText('version 0.0.0-test')).toBeVisible()
-    expect(screen.app.platform.appVersion).toBe('0.0.0-test')
+    expect(screen.core.platform.appVersion).toBe('0.0.0-test')
   })
 
   it('gives components the graph services', async () => {

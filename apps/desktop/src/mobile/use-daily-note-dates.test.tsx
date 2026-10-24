@@ -8,9 +8,9 @@ import { useDailyNoteDates } from './use-daily-note-dates.ts'
 describe('useDailyNoteDates', () => {
   it('keeps previous markers while a new range loads', async () => {
     const pendingNextRange = Promise.withResolvers<string[]>()
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const dailyDatesInRange = vi
-      .spyOn(app.dailyNotes, 'dailyDatesInRange')
+      .spyOn(core.dailyNotes, 'dailyDatesInRange')
       .mockResolvedValueOnce(['2026-07-14'])
       .mockImplementationOnce(() => pendingNextRange.promise)
     const hook = await renderHookInApp(
@@ -21,7 +21,7 @@ describe('useDailyNoteDates', () => {
         },
       ) => useDailyNoteDates(start, end),
       {
-        app,
+        core,
         graph: { root: '/g' },
         initialProps: { start: '2026-01-12', end: '2027-01-17' },
       },

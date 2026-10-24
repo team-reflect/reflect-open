@@ -12,7 +12,7 @@ import { useReorderPinnedNotes } from './use-reorder-pinned-notes.ts'
 
 const GRAPH: TestOpenGraph = { generation: 7, root: '/graphs/personal' }
 
-let app: TestCoreServices
+let core: TestCoreServices
 let reorderPinnedNotes: MockInstance<NoteActionsService['reorderPinned']>
 
 const NOTE_A = { dailyDate: null, path: 'a.md', title: 'A', pinnedOrder: 1024 } satisfies PinnedNote
@@ -27,13 +27,13 @@ function renderReorder(pinned: readonly PinnedNote[] = NOTES) {
         pinned: NOTES,
       },
     ) => useReorderPinnedNotes(pinned),
-    { initialProps: { pinned }, app, graph: GRAPH },
+    { initialProps: { pinned }, core, graph: GRAPH },
   )
 }
 
 beforeEach(() => {
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  reorderPinnedNotes = vi.spyOn(app.noteActions, 'reorderPinned')
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  reorderPinnedNotes = vi.spyOn(core.noteActions, 'reorderPinned')
 })
 
 describe('useReorderPinnedNotes', () => {
@@ -44,17 +44,17 @@ describe('useReorderPinnedNotes', () => {
     await act(() => hook.result.current('a.md', 'a.md'))
 
     expect(reorderPinnedNotes).not.toHaveBeenCalled()
-    expect(app.noteRows.getOverlays().size).toBe(0)
+    expect(core.noteRows.getOverlays().size).toBe(0)
   })
 
   it('writes nothing without a graph', async () => {
     const hook = await renderReorder()
 
-    await act(() => app.graphSession.setGraph(null))
+    await act(() => core.graphSession.setGraph(null))
     await act(() => hook.result.current('a.md', 'b.md'))
 
     await expect(reorderPinnedNotes.mock.results[0]?.value).resolves.toEqual([])
-    expect(app.noteRows.getOverlaysOn(7).size).toBe(0)
+    expect(core.noteRows.getOverlaysOn(7).size).toBe(0)
   })
 
   it('records the moved order in the overlay at once and writes it', async () => {
@@ -63,7 +63,7 @@ describe('useReorderPinnedNotes', () => {
     await act(() => hook.result.current('a.md', 'b.md'))
 
     // A dropped between two neighbours takes the midpoint.
-    expect(app.noteRows.getOverlay('a.md')).toEqual({ pinnedOrder: 2560 })
+    expect(core.noteRows.getOverlay('a.md')).toEqual({ pinnedOrder: 2560 })
     expect(reorderPinnedNotes).toHaveBeenCalledExactlyOnceWith([{ ...NOTE_A, pinnedOrder: 2560 }])
   })
 
@@ -83,11 +83,11 @@ describe('useReorderPinnedNotes', () => {
   })
 
   it('drops the overlay when the write fails, so the shelf shows the index again', async () => {
-    vi.spyOn(app.noteDocuments, 'commitFrontmatter').mockRejectedValue(new Error('write failed'))
+    vi.spyOn(core.noteDocuments, 'commitFrontmatter').mockRejectedValue(new Error('write failed'))
     const hook = await renderReorder()
 
     await act(() => hook.result.current('a.md', 'b.md'))
 
-    await vi.waitFor(() => expect(app.noteRows.getOverlay('a.md')).toBeNull())
+    await vi.waitFor(() => expect(core.noteRows.getOverlay('a.md')).toBeNull())
   })
 })

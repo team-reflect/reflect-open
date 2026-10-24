@@ -64,7 +64,7 @@ function RouteProbe(): ReactNode {
 function renderWithLinkNavigation(ui: ReactNode, graph?: TestOpenGraph | null) {
   const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
   const graphSession = createTestGraphSessionService()
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     progress: operations,
     graphSession,
@@ -85,8 +85,8 @@ function renderWithLinkNavigation(ui: ReactNode, graph?: TestOpenGraph | null) {
     { window: createTestWindowService({ openNoteWindow }) },
   ).linkNavigation
   return renderInApp(ui, {
-    app,
-    appServices: { linkNavigation },
+    core,
+    app: { linkNavigation },
     graph,
   })
 }

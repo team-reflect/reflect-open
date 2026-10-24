@@ -56,36 +56,34 @@ describe('renderInApp', () => {
   })
 
   it('reports the graph, the graph state and a later graph switch', async () => {
-    const { app } = await renderInApp(<Probe />, {
+    const { core } = await renderInApp(<Probe />, {
       graph: { root: '/g', generation: 3, indexGeneration: 7 },
       graphState: { indexing: true, recents: [{ root: '/g', name: 'g', openedMs: 1 }] },
     })
     await expect.element(page.getByTestId('graph')).toHaveTextContent('ready /g 3 7 indexing 1 -')
 
-    app.graphSession.setGraph(null)
+    core.graphSession.setGraph(null)
     await expect.element(page.getByTestId('graph')).toHaveTextContent('choosing none - - idle 1 -')
   })
 
   it('shows the stored settings on the first render and saves updates', async () => {
-    const { app } = await renderInApp(<Probe />, { settings: { dateFormat: 'dmy' } })
+    const { core } = await renderInApp(<Probe />, { settings: { dateFormat: 'dmy' } })
     expect(page.getByTestId('settings').element().textContent).toBe('dmy')
 
     await page.getByRole('button', { name: 'iso' }).click()
 
     await expect.element(page.getByTestId('settings')).toHaveTextContent('iso')
-    await vi.waitFor(() => expect(app.settings.saves().at(-1)?.dateFormat).toBe('iso'))
+    await vi.waitFor(() => expect(core.settings.saves().at(-1)?.dateFormat).toBe('iso'))
   })
 
   it('starts on the given route and records navigation in the navigation service', async () => {
-    const { appServices } = await renderInApp(<Probe />, { route: { kind: 'settings' } })
+    const { app } = await renderInApp(<Probe />, { route: { kind: 'settings' } })
     await expect.element(page.getByTestId('route')).toHaveTextContent('{"kind":"settings"}')
 
     await page.getByRole('button', { name: 'tasks' }).click()
 
     await expect.element(page.getByTestId('route')).toHaveTextContent('{"kind":"tasks"}')
-    expect(appServices.navigation.navigations()).toEqual([
-      { route: { kind: 'tasks' }, options: undefined },
-    ])
+    expect(app.navigation.navigations()).toEqual([{ route: { kind: 'tasks' }, options: undefined }])
   })
 
   it('runs a scripted backup for the open graph', async () => {
@@ -97,7 +95,7 @@ describe('renderInApp', () => {
   })
 
   it('renders the mobile surface with the mobile onboarding state', async () => {
-    const { app } = await renderInApp(<Probe />, {
+    const { core } = await renderInApp(<Probe />, {
       platform: MOBILE_PLATFORM,
       mobile: { kind: 'icloud' },
     })
@@ -105,37 +103,37 @@ describe('renderInApp', () => {
     await expect
       .element(page.getByTestId('graph'))
       .toHaveTextContent('ready /graphs/test 1 1 idle 0 icloud')
-    expect(app.platform.surface.mobileApp).toBe(true)
+    expect(core.platform.surface.mobileApp).toBe(true)
   })
 
-  it('uses the given app, so a test can spy on a service before the first render', async () => {
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-    const view = await renderInApp(<Probe />, { app })
+  it('uses the given core services, so a test can spy on a service before the first render', async () => {
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const view = await renderInApp(<Probe />, { core })
 
-    expect(view.app).toBe(app)
-    await expect(renderInApp(<Probe />, { app, platform: MOBILE_PLATFORM })).rejects.toThrow(
-      /with your own `app`/,
+    expect(view.core).toBe(core)
+    await expect(renderInApp(<Probe />, { core, platform: MOBILE_PLATFORM })).rejects.toThrow(
+      /with your own `core`/,
     )
   })
 
   it('mounts only the services with `servicesOnly`, and registers the app commands', async () => {
-    const { result, appServices: appLayer } = await renderHookInApp(() => useMaybeGraph(), {
+    const { result, app } = await renderHookInApp(() => useMaybeGraph(), {
       servicesOnly: true,
     })
 
     expect(result.current).toBeNull()
-    expect(appLayer.commands.list().map((command) => command.id)).toContain('nav.today')
+    expect(app.commands.list().map((command) => command.id)).toContain('nav.today')
   })
 })
 
 describe('renderHookInApp', () => {
   it('runs the hook inside the same providers', async () => {
-    const { result, app } = await renderHookInApp(() => useGraph().graph?.root ?? null, {
+    const { result, core } = await renderHookInApp(() => useGraph().graph?.root ?? null, {
       graph: { root: '/g' },
     })
     expect(result.current).toBe('/g')
 
-    app.graphSession.setGraph({ root: '/other' })
+    core.graphSession.setGraph({ root: '/other' })
     await vi.waitFor(() => expect(result.current).toBe('/other'))
   })
 })

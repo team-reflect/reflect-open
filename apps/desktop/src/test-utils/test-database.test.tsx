@@ -34,15 +34,15 @@ describe('createWasmTestDatabaseService', () => {
 
 describe('createTestCoreServices in the browser', () => {
   it('reads the index through the wasm database it is given', async () => {
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-    seedNotes(app.database, [{ path: 'notes/hub.md', markdown: '# Hub\n' }])
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    seedNotes(core.database, [{ path: 'notes/hub.md', markdown: '# Hub\n' }])
     try {
-      await expect(app.wikiResolver.resolveWikiTarget('Hub')).resolves.toEqual({
+      await expect(core.wikiResolver.resolveWikiTarget('Hub')).resolves.toEqual({
         kind: 'resolved',
         ref: 'notes/hub.md',
       })
     } finally {
-      app.database.close()
+      core.database.close()
     }
   })
 })

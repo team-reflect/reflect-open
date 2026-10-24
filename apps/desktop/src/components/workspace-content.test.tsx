@@ -33,10 +33,10 @@ function SidebarToggle(): ReactElement {
 }
 
 function renderWorkspace(route: Route) {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  onTestFinished(() => app.database.close())
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  onTestFinished(() => core.database.close())
   // Pinned, so the sidebar of this note (and only this note) offers "Un-pin this note".
-  seedNotes(app.database, [
+  seedNotes(core.database, [
     { path: 'notes/project.md', markdown: '---\npinned: true\n---\n# Project\n' },
   ])
   // The providers of `GraphWorkspace`, inside the router of `renderInApp`.
@@ -62,7 +62,7 @@ function renderWorkspace(route: Route) {
       </ShortcutsProvider>
     </PaletteProvider>,
     {
-      app,
+      core,
       graph: GRAPH,
       route,
       // The AppShell asides mount resize handles, which read the persisted widths.

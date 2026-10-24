@@ -48,11 +48,11 @@ const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
 function doNothing(): void {}
 
 export function useAppShortcuts(): CommandContext {
-  const services = useCoreServices()
-  const appServices = useAppServices()
+  const core = useCoreServices()
+  const app = useAppServices()
   const { route, navigate, back, forward, clearScrollState } = useRouter()
-  const { platform, semanticSearch } = services
-  const { commands, nativeMenu } = appServices
+  const { platform, semanticSearch } = core
+  const { commands, nativeMenu } = app
   const focusedDailyDate = useFocusedDailyDate()
   const { resolvedTheme, setTheme } = useTheme()
   const { graph, recents, openRecent } = useGraph()
@@ -106,8 +106,8 @@ export function useAppShortcuts(): CommandContext {
 
   const context = useMemo<CommandContext>(
     () => ({
-      services,
-      app: appServices,
+      core,
+      app,
       navigate,
       route: () => routeRef.current,
       // Resolve through the focused stream day so a note-scoped command targets
@@ -123,7 +123,7 @@ export function useAppShortcuts(): CommandContext {
           focusedDailyDateRef.current,
         )
         if (path !== null) {
-          await services.noteActions.togglePinned(path)
+          await core.noteActions.togglePinned(path)
         }
       },
       togglePrivate: async () => {
@@ -133,7 +133,7 @@ export function useAppShortcuts(): CommandContext {
           focusedDailyDateRef.current,
         )
         if (path !== null) {
-          await services.noteActions.togglePrivate(path)
+          await core.noteActions.togglePrivate(path)
         }
       },
       back,
@@ -169,8 +169,8 @@ export function useAppShortcuts(): CommandContext {
       },
     }),
     [
-      services,
-      appServices,
+      core,
+      app,
       navigate,
       back,
       forward,

@@ -50,13 +50,13 @@ interface SectionView {
 }
 
 async function renderSection(platform?: TestPlatformOptions): Promise<SectionView> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     agentSkill,
     platform: createTestPlatformService(platform),
   })
-  const { queryClient } = await renderInApp(<AgentsSection />, { app, graph: GRAPH })
-  return { graphSession: app.graphSession, queryClient }
+  const { queryClient } = await renderInApp(<AgentsSection />, { core, graph: GRAPH })
+  return { graphSession: core.graphSession, queryClient }
 }
 
 beforeEach(() => {

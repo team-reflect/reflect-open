@@ -111,7 +111,7 @@ function PaletteProbe(): ReactElement {
 
 async function renderRoute(route: Route, platform?: TestPlatformOptions) {
   noteFile = createTestNoteFileService({ files })
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile,
     // A seeded id service mints note ids that read as ULIDs, not as numbers.
@@ -127,7 +127,7 @@ async function renderRoute(route: Route, platform?: TestPlatformOptions) {
       <PaletteProbe />
     </PaletteProvider>,
     {
-      app,
+      core,
       graph: { root: '/g', name: 'g', generation: 1 },
       settings: { editorMarkdownSyntax: 'hide', allNotesFilterTags: ['book', 'link', 'person'] },
       route,
@@ -179,7 +179,7 @@ describe('RouteContent', () => {
     await expect.element(page.getByLabelText(`Editing ${path}`)).toBeVisible()
 
     await act(() => editorProbe.onChange?.('# New Title\n'))
-    await act(() => view.app.openDocuments.flushAll())
+    await act(() => view.core.openDocuments.flushAll())
 
     expect(noteFile.files().get(path)).toBe(
       upsertFrontmatter('# New Title\n', {
@@ -212,7 +212,7 @@ describe('RouteContent', () => {
     await vi.waitFor(() => expect(editorProbe.focusCalls).toContain('focus'))
 
     // Opening never litters the graph — even a forced flush writes nothing.
-    await act(() => view.app.openDocuments.flushAll())
+    await act(() => view.core.openDocuments.flushAll())
     expect(noteFile.writes()).toEqual([])
     expect(noteFile.files().get(NEW_NOTE_PATH)).toBeUndefined()
     await view.unmount()
@@ -223,7 +223,7 @@ describe('RouteContent', () => {
     await expect.element(page.getByLabelText(`Editing ${NEW_NOTE_PATH}`)).toBeVisible()
 
     await act(() => editorProbe.onChange?.('# Manifesto\n'))
-    await act(() => view.app.openDocuments.flushAll())
+    await act(() => view.core.openDocuments.flushAll())
 
     // The seed's header rides along: the file is born with its identity
     // (`id:` frontmatter, Plan 17) plus exactly what the user typed.
@@ -242,7 +242,7 @@ describe('RouteContent', () => {
       )
       .toBeVisible()
     await expect.element(page.getByTestId('fake-editor')).not.toBeInTheDocument()
-    await act(() => view.app.openDocuments.flushAll())
+    await act(() => view.core.openDocuments.flushAll())
     expect(noteFile.writes()).toEqual([])
     expect(noteFile.files().get('Projects/missing.md')).toBeUndefined()
     await view.unmount()

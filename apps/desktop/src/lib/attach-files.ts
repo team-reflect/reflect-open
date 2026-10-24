@@ -11,7 +11,7 @@ export async function attachFilesToNote(context: CommandContext): Promise<void> 
   if (notePath === null) {
     return
   }
-  const { attachments, graphSession } = context.services
+  const { attachments, graphSession } = context.core
   const { dialog } = context.app
   const findEditor = () => noteEditorHandleFor(notePath)
   const { session } = graphSession.getState()

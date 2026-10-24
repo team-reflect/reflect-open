@@ -50,7 +50,7 @@ export const MOBILE_PLATFORM: TestPlatformOptions = {
 
 export interface RenderInAppOptions {
   /**
-   * The open graph, reported through `app.graphSession.setGraph()`. Left out,
+   * The open graph, reported through `core.graphSession.setGraph()`. Left out,
    * the graph `test` at `/graphs/test` is open with both generations 1. `null`
    * is the graph chooser: no graph, and no graph services.
    */
@@ -77,7 +77,7 @@ export interface RenderInAppOptions {
    */
   sync?: GitSyncState
   /**
-   * The facts of the test platform. Only without `app`; see {@link MOBILE_PLATFORM}.
+   * The facts of the test platform. Only without `core`; see {@link MOBILE_PLATFORM}.
    */
   platform?: TestPlatformOptions
   /**
@@ -85,10 +85,10 @@ export interface RenderInAppOptions {
    */
   queryClient?: QueryClient
   /**
-   * Replaces fields of the app layer built over `app`, e.g. `{ update }` or a whole
-   * `createTestAppServices(app)` a test must share with the render.
+   * Replaces fields of the app layer built over `core`, e.g. `{ update }` or a whole
+   * `createTestAppServices(core)` a test must share with the render.
    */
-  appServices?: Partial<AppServices>
+  app?: Partial<AppServices>
   /**
    * Wraps `ui` inside every provider, for providers this helper does not mount.
    */
@@ -96,18 +96,18 @@ export interface RenderInAppOptions {
   /**
    * Mount only `CoreServicesProvider` and the query client, for a test of a
    * provider this helper otherwise mounts, or of one that needs no graph.
-   * `app` keeps its own graph session, and the settings load is not awaited.
+   * `core` keeps its own graph session, and the settings load is not awaited.
    * Not with `graph`, `graphState`, `route` or `sync`.
    */
   servicesOnly?: boolean
 }
 
-interface InAppHandles<App extends CoreServices> {
-  readonly app: App
+interface InAppHandles<Core extends CoreServices> {
+  readonly core: Core
   /**
-   * The app layer built over `app`.
+   * The app layer built over `core`.
    */
-  readonly appServices: TestAppServices
+  readonly app: TestAppServices
   readonly queryClient: QueryClient
   /**
    * The scripted git sync service when `sync` was a `GitSyncState`, else `null`.
@@ -120,18 +120,18 @@ interface InAppHandles<App extends CoreServices> {
   readonly gitHostConnector: TestGitHostConnector | null
 }
 
-export interface InAppRenderResult<App extends CoreServices>
-  extends RenderResult, InAppHandles<App> {}
+export interface InAppRenderResult<Core extends CoreServices>
+  extends RenderResult, InAppHandles<Core> {}
 
-export interface InAppRenderHookResult<Result, Props, App extends CoreServices>
-  extends RenderHookResult<Result, Props>, InAppHandles<App> {}
+export interface InAppRenderHookResult<Result, Props, Core extends CoreServices>
+  extends RenderHookResult<Result, Props>, InAppHandles<Core> {}
 
-type AnyOptions = RenderInAppOptions & { app?: CoreServices | undefined }
+type AnyOptions = RenderInAppOptions & { core?: CoreServices | undefined }
 
 /**
  * The test core services over `database`, reporting to an app-layer operations list.
  */
-function createApp(
+function createCore(
   database: TestDatabaseService,
   sync: SyncFakes | null,
   platform: TestPlatformOptions | undefined,
@@ -154,7 +154,7 @@ interface SyncFakes {
 }
 
 /**
- * Prepare `app` and the provider tree; the caller renders `wrap(ui)` and calls `dispose` after.
+ * Prepare `core` and the provider tree; the caller renders `wrap(ui)` and calls `dispose` after.
  */
 async function prepare(options: AnyOptions | undefined): Promise<
   InAppHandles<CoreServices> & {
@@ -171,9 +171,9 @@ async function prepare(options: AnyOptions | undefined): Promise<
           gitHostConnector: createTestGitHostConnector(),
         }
   const gitSync = sync?.gitSync ?? null
-  if (options?.app !== undefined && (sync !== null || options.platform !== undefined)) {
+  if (options?.core !== undefined && (sync !== null || options.platform !== undefined)) {
     throw new Error(
-      'renderInApp: with your own `app`, give it the platform, the git sync service, and the connectors yourself',
+      'renderInApp: with your own `core`, give it the platform, the git sync service, and the connectors yourself',
     )
   }
   const servicesOnly = options?.servicesOnly ?? false
@@ -186,17 +186,17 @@ async function prepare(options: AnyOptions | undefined): Promise<
   ) {
     throw new Error('renderInApp: `servicesOnly` mounts no graph, router or sync')
   }
-  // The database of an app this helper builds; `dispose` closes it. A caller's `app` keeps its own.
+  // The database of the core services this helper builds; `dispose` closes it. A caller's `core` keeps its own.
   let database: TestDatabaseService | null = null
-  let app: CoreServices
-  if (options?.app === undefined) {
+  let core: CoreServices
+  if (options?.core === undefined) {
     database = createWasmTestDatabaseService()
-    app = createApp(database, sync, options?.platform)
+    core = createCore(database, sync, options?.platform)
   } else {
-    app = options.app
+    core = options.core
   }
 
-  const { graphSession, settings } = app
+  const { graphSession, settings } = core
   if (options?.settings !== undefined) {
     if (!('seed' in settings)) {
       throw new Error('renderInApp: `settings` needs a test settings service in `app`')
@@ -219,32 +219,32 @@ async function prepare(options: AnyOptions | undefined): Promise<
 
   const queryClient =
     options?.queryClient ?? new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const appLayer = createTestAppServices(app, options?.appServices)
+  const app = createTestAppServices(core, options?.app)
   if (options?.mobile !== undefined) {
-    if (!('setState' in appLayer.mobileOnboarding)) {
+    if (!('setState' in app.mobileOnboarding)) {
       throw new Error('renderInApp: `mobile` needs a test mobile onboarding service')
     }
-    appLayer.mobileOnboarding.setState(options.mobile)
+    app.mobileOnboarding.setState(options.mobile)
   }
-  registerAppCommands(appLayer.commands)
+  registerAppCommands(app.commands)
 
   const route = options?.route
   const wrap = (children: ReactNode): ReactElement => {
     const wrapped = options?.wrapper === undefined ? children : options.wrapper(children)
     if (servicesOnly) {
       return (
-        <CoreServicesProvider services={app}>
-          <AppServicesProvider services={appLayer}>
+        <CoreServicesProvider services={core}>
+          <AppServicesProvider services={app}>
             <QueryClientProvider client={queryClient}>{wrapped}</QueryClientProvider>
           </AppServicesProvider>
         </CoreServicesProvider>
       )
     }
     return (
-      <CoreServicesProvider services={app}>
-        <AppServicesProvider services={appLayer}>
+      <CoreServicesProvider services={core}>
+        <AppServicesProvider services={app}>
           <QueryClientProvider client={queryClient}>
-            <GraphProvider platform={app.platform.appPlatform}>
+            <GraphProvider platform={core.platform.appPlatform}>
               <TooltipProvider>
                 {route === null ? (
                   wrapped
@@ -259,8 +259,8 @@ async function prepare(options: AnyOptions | undefined): Promise<
     )
   }
   return {
+    core,
     app,
-    appServices: appLayer,
     queryClient,
     gitSync,
     githubConnector: sync?.githubConnector ?? null,
@@ -276,17 +276,17 @@ async function prepare(options: AnyOptions | undefined): Promise<
 /**
  * Render `ui` the way the app does: inside `CoreServicesProvider`, a query
  * client, and the real `GraphProvider` (which provides
- * the graph services) and `RouterProvider`. All of them read `app`, which defaults to test doubles. Tests drive and observe
- * the app through the returned `app`: `app.graphSession.setGraph()`,
- * `app.settings.get()`, `appServices.navigation.navigations()`,
- * `app.progress.getAll()`.
+ * the graph services) and `RouterProvider`. All of them read `core`, which defaults to test doubles. Tests drive and observe
+ * the app through the returned `core`: `core.graphSession.setGraph()`,
+ * `core.settings.get()`, `app.navigation.navigations()`,
+ * `core.progress.getAll()`.
  *
- * Pass your own `app` to replace or spy on a service before the first render.
+ * Pass your own `core` to replace or spy on a service before the first render.
  */
-export async function renderInApp<App extends CoreServices = TestCoreServices>(
+export async function renderInApp<Core extends CoreServices = TestCoreServices>(
   ui: ReactNode,
-  options?: RenderInAppOptions & { app?: App },
-): Promise<InAppRenderResult<App>> {
+  options?: RenderInAppOptions & { core?: Core },
+): Promise<InAppRenderResult<Core>> {
   const { wrap, dispose, ...handles } = await prepare(options)
   try {
     const screen = await render(ui, { wrapper: ({ children }) => wrap(children) })
@@ -294,7 +294,7 @@ export async function renderInApp<App extends CoreServices = TestCoreServices>(
       await screen.unmount()
       dispose()
     })
-    return Object.assign(screen, handles as InAppHandles<App>)
+    return Object.assign(screen, handles as InAppHandles<Core>)
   } catch (error) {
     // A render that throws still releases the database.
     dispose()
@@ -308,11 +308,11 @@ export async function renderInApp<App extends CoreServices = TestCoreServices>(
 export async function renderHookInApp<
   Result,
   Props = undefined,
-  App extends CoreServices = TestCoreServices,
+  Core extends CoreServices = TestCoreServices,
 >(
   hook: (props?: Props) => Result,
-  options?: RenderInAppOptions & { app?: App; initialProps?: Props },
-): Promise<InAppRenderHookResult<Result, Props, App>> {
+  options?: RenderInAppOptions & { core?: Core; initialProps?: Props },
+): Promise<InAppRenderHookResult<Result, Props, Core>> {
   const { wrap, dispose, ...handles } = await prepare(options)
   try {
     const rendered = await renderHook<Props, Result>(hook, {
@@ -323,7 +323,7 @@ export async function renderHookInApp<
       await rendered.unmount()
       dispose()
     })
-    return Object.assign(rendered, handles as InAppHandles<App>)
+    return Object.assign(rendered, handles as InAppHandles<Core>)
   } catch (error) {
     // A render that throws still releases the database.
     dispose()

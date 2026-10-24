@@ -7,15 +7,15 @@ import { useSessionFlag } from './use-session-flag.ts'
 
 describe('useSessionFlag', () => {
   it('falls back to the default until set, then persists for the session', async () => {
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-    const first = await renderHookInApp(() => useSessionFlag('reflect.test-flag', true), { app })
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const first = await renderHookInApp(() => useSessionFlag('reflect.test-flag', true), { core })
     expect(first.result.current[0]).toBe(true)
 
     await act(() => first.result.current[1](false))
     expect(first.result.current[0]).toBe(false)
     await first.unmount()
 
-    const second = await renderHookInApp(() => useSessionFlag('reflect.test-flag', true), { app })
+    const second = await renderHookInApp(() => useSessionFlag('reflect.test-flag', true), { core })
     expect(second.result.current[0]).toBe(false)
     await second.unmount()
   })

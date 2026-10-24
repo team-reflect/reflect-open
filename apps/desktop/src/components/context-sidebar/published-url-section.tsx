@@ -23,7 +23,7 @@ const COPY_RESET_MS = 1400
  * plus a compact copy affordance for sharing it again.
  */
 export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactElement | null {
-  const services = useCoreServices()
+  const core = useCoreServices()
   const app = useAppServices()
   const { clipboard, opener, operations } = app
   const row = useNoteRow(path)
@@ -70,7 +70,7 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
   const updateGist = async (): Promise<void> => {
     setIsUpdating(true)
     try {
-      await publishGistAndCopyLink(services, app, path)
+      await publishGistAndCopyLink(core, app, path)
     } finally {
       setIsUpdating(false)
     }

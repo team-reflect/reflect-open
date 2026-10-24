@@ -12,7 +12,7 @@ const PROVIDER = {
 }
 
 async function renderField(settings?: Partial<Settings>) {
-  const { app } = await renderInApp(<DescribeAssetsField />, {
+  const { core } = await renderInApp(<DescribeAssetsField />, {
     graph: { generation: 5 },
     settings: {
       describeAssets: true,
@@ -21,16 +21,16 @@ async function renderField(settings?: Partial<Settings>) {
       ...settings,
     },
   })
-  return { app, backfill: vi.spyOn(app.assetDescription, 'backfillVisibly') }
+  return { core, backfill: vi.spyOn(core.assetDescription, 'backfillVisibly') }
 }
 
 describe('DescribeAssetsField', () => {
   it('reflects and toggles the automatic OCR setting', async () => {
-    const { app } = await renderField()
+    const { core } = await renderField()
     const toggle = page.getByRole('switch', { name: /ocr new assets automatically/i })
     await expect.element(toggle).toHaveAttribute('aria-checked', 'true')
     await toggle.click()
-    await vi.waitFor(() => expect(app.settings.get().describeAssets).toBe(false))
+    await vi.waitFor(() => expect(core.settings.get().describeAssets).toBe(false))
   })
 
   it('disables the backfill until an AI provider is configured', async () => {

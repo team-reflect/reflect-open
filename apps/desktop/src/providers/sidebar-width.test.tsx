@@ -25,11 +25,11 @@ afterEach(async () => {
 describe('SidebarWidthEffect', () => {
   it('mirrors the live settings onto the document root', async () => {
     await page.viewport(1600, 600)
-    const { app } = await render()
+    const { core } = await render()
     expect(rootVariable('--sidebar-width')).toBe('260px')
     expect(rootVariable('--context-sidebar-width')).toBe('320px')
 
-    app.settings.update({ sidebarWidth: 340, contextSidebarWidth: 400 })
+    core.settings.update({ sidebarWidth: 340, contextSidebarWidth: 400 })
 
     await vi.waitFor(() => expect(rootVariable('--sidebar-width')).toBe('340px'))
     expect(rootVariable('--context-sidebar-width')).toBe('400px')
@@ -55,14 +55,14 @@ describe('SidebarWidthEffect', () => {
 
   it('leaves a variable with a live drag alone when settings hydrate', async () => {
     await page.viewport(1600, 600)
-    const { app } = await render()
+    const { core } = await render()
     expect(rootVariable('--sidebar-width')).toBe('260px')
 
     // A drag is in flight on the workspace rail when the async settings load
     // lands: the dragged variable must not be yanked, the other still updates.
     activeSidebarWidthDrags.add('--sidebar-width')
     document.documentElement.style.setProperty('--sidebar-width', '345px')
-    app.settings.update({ sidebarWidth: 300, contextSidebarWidth: 400 })
+    core.settings.update({ sidebarWidth: 300, contextSidebarWidth: 400 })
 
     await vi.waitFor(() => expect(rootVariable('--context-sidebar-width')).toBe('400px'))
     expect(rootVariable('--sidebar-width')).toBe('345px')

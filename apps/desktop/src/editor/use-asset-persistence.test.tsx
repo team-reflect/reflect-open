@@ -18,9 +18,9 @@ import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAssetPersistence, type AssetPersistence } from './use-asset-persistence.ts'
 
 let persistence: AssetPersistence | null = null
-// The app of the latest `renderPersistence`; the attachment services read its graph.
-let app: ReturnType<typeof createTestCoreServices<{ attachments: AttachmentService }>>
-const graphSession = { getState: () => app.graphSession.getState() }
+// The core services of the latest `renderPersistence`; the attachment services read its graph.
+let core: ReturnType<typeof createTestCoreServices<{ attachments: AttachmentService }>>
+const graphSession = { getState: () => core.graphSession.getState() }
 // The attachment service of the next `renderPersistence`.
 let attachmentService: AttachmentService = createTestAttachmentService({ graphSession })
 
@@ -31,7 +31,7 @@ function renderPersistence({
   generation: number | null
   path?: string
 }) {
-  app = createTestCoreServices({
+  core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     attachments: attachmentService,
   })
@@ -41,7 +41,7 @@ function renderPersistence({
     },
     {
       initialProps: { path },
-      app,
+      core,
       graph: generation === null ? null : { generation },
     },
   )

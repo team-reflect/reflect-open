@@ -22,11 +22,11 @@ function connected(status: Extract<GitSyncState, { phase: 'connected' }>['status
 }
 
 async function mount(gitSync: GitSyncState = connected({ state: 'idle' })): Promise<void> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     gitSync: createTestGitSyncService({ state: gitSync }),
   })
-  await renderInApp(<SyncStatusPill />, { app, graph: { root: '/g', name: 'G', generation: 3 } })
+  await renderInApp(<SyncStatusPill />, { core, graph: { root: '/g', name: 'G', generation: 3 } })
 }
 
 describe('SyncStatusPill', () => {

@@ -62,7 +62,7 @@ describe('DailyCaptureMenu', () => {
     const view = await renderMenu()
 
     await view.getByRole('button', { name: 'Show capture actions' }).click()
-    expect(view.app.mobile.haptics.impacts()).toBe(1)
+    expect(view.core.mobile.haptics.impacts()).toBe(1)
 
     await expect
       .element(view.getByRole('button', { name: 'Hide capture actions' }))
@@ -73,7 +73,7 @@ describe('DailyCaptureMenu', () => {
       .toBeInTheDocument()
 
     await view.getByRole('button', { name: 'Hide capture actions' }).click()
-    expect(view.app.mobile.haptics.impacts()).toBe(2)
+    expect(view.core.mobile.haptics.impacts()).toBe(2)
 
     await expect
       .element(view.getByRole('button', { name: 'Show capture actions' }))
@@ -98,7 +98,7 @@ describe('DailyCaptureMenu', () => {
 
     await view.getByRole('button', { name: 'New note' }).click()
 
-    const navigations = view.appServices.navigation.navigations()
+    const navigations = view.app.navigation.navigations()
     expect(navigations).toHaveLength(1)
     expect(navigations[0]?.route).toMatchObject({
       kind: 'note',

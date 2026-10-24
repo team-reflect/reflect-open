@@ -55,14 +55,14 @@ async function setup(provider: AiProviderConfig = OPENAI) {
     defaultAiProviderId: provider.id,
   })
   await settings.whenLoaded()
-  const app: TestCoreServices = createTestCoreServices({
+  const core: TestCoreServices = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     settings,
   })
-  app.audioRecorder.setStopResult(RECORDING)
+  core.audioRecorder.setStopResult(RECORDING)
 
   const hook = await renderHookInApp(() => ({ memo: useAudioMemo(), sidebar: useSidebar() }), {
-    app,
+    core,
     graph: GRAPH,
     wrapper: (children: ReactNode) => (
       <SidebarProvider>
@@ -71,9 +71,9 @@ async function setup(provider: AiProviderConfig = OPENAI) {
     ),
   })
   const cancels = (): number => {
-    return app.audioRecorder.calls().filter((call) => call.method === 'cancel').length
+    return core.audioRecorder.calls().filter((call) => call.method === 'cancel').length
   }
-  return { ...hook, app, cancels }
+  return { ...hook, core, cancels }
 }
 
 describe('AudioMemoProvider', () => {
@@ -91,7 +91,7 @@ describe('AudioMemoProvider', () => {
   })
 
   it('toggle records, then stops and captures the recording into the open graph', async () => {
-    const { result, app } = await setup()
+    const { result, core } = await setup()
 
     await act(() => {
       result.current.memo.toggle()
@@ -103,11 +103,11 @@ describe('AudioMemoProvider', () => {
     })
     await vi.waitFor(() => expect(result.current.memo.phase).toBe('idle'))
 
-    expect(app.assetStore.uploads()).toEqual([{ kind: 'path', path: FINAL_PATH, generation: 3 }])
+    expect(core.assetStore.uploads()).toEqual([{ kind: 'path', path: FINAL_PATH, generation: 3 }])
   })
 
   it('is unavailable without an OpenAI or Gemini model', async () => {
-    const { result, app } = await setup(ANTHROPIC)
+    const { result, core } = await setup(ANTHROPIC)
 
     expect(result.current.memo.available).toBe(false)
     expect(result.current.memo.unavailableReason).toMatch(/OpenAI or Gemini/)
@@ -116,11 +116,11 @@ describe('AudioMemoProvider', () => {
       result.current.memo.toggle()
     })
     expect(result.current.memo.phase).toBe('idle')
-    expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(false)
+    expect(core.audioRecorder.calls().some((call) => call.method === 'start')).toBe(false)
   })
 
   it('collapsing the sidebar mid-recording stops and saves', async () => {
-    const { result, app } = await setup()
+    const { result, core } = await setup()
 
     await act(() => {
       result.current.memo.toggle()
@@ -131,13 +131,13 @@ describe('AudioMemoProvider', () => {
       result.current.sidebar.toggleSidebar()
     })
 
-    await vi.waitFor(() => expect(app.assetStore.uploads()).toHaveLength(1))
+    await vi.waitFor(() => expect(core.assetStore.uploads()).toHaveLength(1))
     expect(result.current.sidebar.collapsed).toBe(true)
   })
 
   it('collapsing the sidebar during the permission prompt abandons the request', async () => {
-    const { result, app, cancels } = await setup()
-    app.audioRecorder.holdNextStart()
+    const { result, core, cancels } = await setup()
+    core.audioRecorder.holdNextStart()
 
     await act(() => {
       result.current.memo.toggle()
@@ -151,7 +151,7 @@ describe('AudioMemoProvider', () => {
 
     expect(cancels()).toBe(before + 1)
     expect(result.current.memo.phase).toBe('idle')
-    expect(app.assetStore.uploads()).toEqual([])
+    expect(core.assetStore.uploads()).toEqual([])
   })
 
   it('starting from a collapsed sidebar expands it first, and the recording stays live', async () => {
@@ -170,8 +170,8 @@ describe('AudioMemoProvider', () => {
   })
 
   it('a capture failure while the sidebar is collapsed surfaces through operations', async () => {
-    const { result, app } = await setup()
-    vi.spyOn(app.assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
+    const { result, core } = await setup()
+    vi.spyOn(core.assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
 
     await act(() => {
       result.current.memo.toggle()
@@ -181,7 +181,7 @@ describe('AudioMemoProvider', () => {
     })
 
     await vi.waitFor(() => {
-      expect(app.progress.findByLabel('Saving audio memo')).toMatchObject({
+      expect(core.progress.findByLabel('Saving audio memo')).toMatchObject({
         status: 'failed',
         message: 'disk full',
       })
@@ -193,12 +193,12 @@ describe('AudioMemoProvider', () => {
   it('shows the still-recording reminder as a toast, and stopping takes it down', async () => {
     const add = vi.spyOn(toast, 'add').mockReturnValue('audio-memo-reminder')
     const close = vi.spyOn(toast, 'close').mockReturnValue(undefined)
-    const { result, app } = await setup()
+    const { result, core } = await setup()
 
     await act(() => {
       result.current.memo.toggle()
     })
-    app.audioRecorder.emitReminder(30 * 60_000)
+    core.audioRecorder.emitReminder(30 * 60_000)
     expect(add).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'audio-memo-reminder', title: 'Still recording' }),
     )
@@ -213,7 +213,7 @@ describe('AudioMemoProvider', () => {
   })
 
   it('cancel discards the recording without saving', async () => {
-    const { result, app } = await setup()
+    const { result, core } = await setup()
 
     await act(() => {
       result.current.memo.toggle()
@@ -223,21 +223,21 @@ describe('AudioMemoProvider', () => {
     })
 
     expect(result.current.memo.phase).toBe('idle')
-    expect(app.assetStore.uploads()).toEqual([])
+    expect(core.assetStore.uploads()).toEqual([])
   })
 
   it('unmounting closes the session and releases the microphone', async () => {
-    const { result, app, unmount } = await setup()
+    const { result, core, unmount } = await setup()
     await act(() => {
       result.current.memo.toggle()
     })
-    expect(app.audioRecorder.state()).toBe('recording')
+    expect(core.audioRecorder.state()).toBe('recording')
 
     await unmount()
 
-    expect(app.audioRecorder.state()).toBe('idle')
+    expect(core.audioRecorder.state()).toBe('idle')
     // The graph's own lifecycles listen until the graph closes.
-    app.graphSession.setGraph(null)
-    expect(app.fileChanges.listenerCount().changes).toBe(0)
+    core.graphSession.setGraph(null)
+    expect(core.fileChanges.listenerCount().changes).toBe(0)
   })
 })

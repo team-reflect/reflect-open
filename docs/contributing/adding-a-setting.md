@@ -125,12 +125,12 @@ the common shapes). Add the test at the narrowest useful level:
 - For a setting whose value should round-trip, render the screen or the
   section with `renderInApp` (the *real* provider over the test services),
   interact with the control, and assert the saved settings
-  (`app.settings.get()` or `app.settings.saves()`). Start from a stored value
+  (`core.settings.get()` or `core.settings.saves()`). Start from a stored value
   with the `settings` option: `renderInApp(ui, { settings: { yourNewSetting } })`.
 - For a section with its own branching behavior, add a focused section test
   next to it (for example `backup-section.test.tsx` or
   `rebuild-index-field.test.tsx`), also with `renderInApp`. Drive the services
-  it reads through `app`; do not mock the providers. See
+  it reads through `core`; do not mock the providers. See
   [testing](testing.md).
 
 ## Checklist
@@ -142,6 +142,6 @@ the common shapes). Add the test at the narrowest useful level:
       wired to `updateSettings`
 - [ ] New section registered in `settings/sections.ts` and rendered from
       `settings-screen.tsx` if it adds a group
-- [ ] `renderInApp` test asserting `app.settings` for persistence, plus focused
+- [ ] `renderInApp` test asserting `core.settings` for persistence, plus focused
       section tests for section-specific behavior where needed
 - [ ] No Rust changes, no migrations, no per-key save logic

@@ -213,7 +213,7 @@ The short version:
   primitives, the host, core, then app. Core's ports (`progress`, `activity` in
   `packages/core/src/ports/activity-port.ts`, `progress-port.ts`, and `role`) are implemented by app services.
 - React reads `useCoreServices()` and `useAppServices()`; commands read
-  `CommandContext.services` and `.app`. Never import from `boot.ts` outside
+  `CommandContext.core` and `.app`. Never import from `boot.ts` outside
   `main.tsx` and the platform roots.
 - Core, app, or desktop? A product rule every client needs goes in core; windows,
   routes, menus and pixels go in app; React goes in desktop. See

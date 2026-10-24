@@ -6,7 +6,7 @@ import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useBacklinkSources } from './use-backlink-sources.ts'
 
-let app: TestCoreServices
+let core: TestCoreServices
 let getBacklinksWithContext: MockInstance<BacklinkService['getBacklinksWithContext']>
 
 function context(sourcePath: string, snippet: string, posFrom: number): BacklinkContext {
@@ -24,14 +24,14 @@ function context(sourcePath: string, snippet: string, posFrom: number): Backlink
  */
 async function mount() {
   return await renderHookInApp(() => useBacklinkSources('notes/target.md'), {
-    app,
+    core,
     graph: { root: '/g', name: 'g', generation: 1 },
   })
 }
 
 beforeEach(() => {
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  getBacklinksWithContext = vi.spyOn(app.backlinks, 'getBacklinksWithContext')
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  getBacklinksWithContext = vi.spyOn(core.backlinks, 'getBacklinksWithContext')
 })
 
 describe('useBacklinkSources', () => {

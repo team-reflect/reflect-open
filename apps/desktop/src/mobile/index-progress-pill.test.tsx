@@ -13,9 +13,9 @@ import { IndexProgressPill } from './index-progress-pill.tsx'
  */
 
 async function mount(progress: IndexFileProgress): Promise<InAppRenderResult<TestCoreServices>> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  app.indexLifecycle.setFileProgress(progress)
-  return await renderInApp(<IndexProgressPill />, { app })
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core.indexLifecycle.setFileProgress(progress)
+  return await renderInApp(<IndexProgressPill />, { core })
 }
 
 describe('IndexProgressPill', () => {

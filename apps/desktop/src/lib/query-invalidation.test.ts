@@ -29,15 +29,16 @@ const post: XPost = {
   body: [{ type: 'text', text: 'Saved tweet' }],
 }
 
-let services: TestCoreServices | null = null
+// The core services of the running test; closed after each.
+let installed: TestCoreServices | null = null
 
 /**
- * Install over `app` in the window `window`; the test ends with `app`.
+ * Install over `core` in the window `window`; the test ends with `core`.
  */
-function installApp(app: TestCoreServices, window: TestWindowService = createTestWindowService()) {
-  services = app
-  const stop = installQueryInvalidation(app, createTestAppServices(app, { window }))
-  return { app, window, stop }
+function installApp(core: TestCoreServices, window: TestWindowService = createTestWindowService()) {
+  installed = core
+  const stop = installQueryInvalidation(core, createTestAppServices(core, { window }))
+  return { core, window, stop }
 }
 
 function install(capture: ReturnType<typeof createTestCaptureService>): () => void {
@@ -52,8 +53,8 @@ function cachePost(): void {
 afterEach(() => {
   vi.useRealTimers()
   queryClient.clear()
-  services?.database.close()
-  services = null
+  installed?.database.close()
+  installed = null
 })
 
 describe('installQueryInvalidation', () => {
@@ -96,16 +97,16 @@ describe('installQueryInvalidation', () => {
 describe('installQueryInvalidation for the index and the graph', () => {
   it('invalidates the index queries once a pass commits and after a rebuild', async () => {
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
-    const { app, stop } = installApp(
+    const { core, stop } = installApp(
       createTestCoreServices({ database: createNodeTestDatabaseService() }),
     )
-    app.graphSession.setGraph({ indexGeneration: 5 })
+    core.graphSession.setGraph({ indexGeneration: 5 })
 
-    app.indexLifecycle.emitApplied(null, 5)
+    core.indexLifecycle.emitApplied(null, 5)
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.index.all })
     invalidate.mockClear()
 
-    await app.indexLifecycle.rebuildVisibly()
+    await core.indexLifecycle.rebuildVisibly()
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.index.all })
     stop()
   })
@@ -131,12 +132,12 @@ describe('installQueryInvalidation for the index and the graph', () => {
   it('refreshes the chat history queries after a saved turn', () => {
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
     const listeners: Array<() => void> = []
-    const app = createTestCoreServices({ database: createNodeTestDatabaseService() })
-    vi.spyOn(app.chatSessions, 'onConversationsChanged').mockImplementation((listener) => {
+    const core = createTestCoreServices({ database: createNodeTestDatabaseService() })
+    vi.spyOn(core.chatSessions, 'onConversationsChanged').mockImplementation((listener) => {
       listeners.push(listener)
       return () => {}
     })
-    const { stop } = installApp(app)
+    const { stop } = installApp(core)
 
     for (const listener of listeners) {
       listener()
@@ -147,39 +148,39 @@ describe('installQueryInvalidation for the index and the graph', () => {
   })
 
   it('drops the similar notes on a graph switch and the iCloud listing on a delete', async () => {
-    const { app, stop } = installApp(
+    const { core, stop } = installApp(
       createTestCoreServices({ database: createNodeTestDatabaseService() }),
     )
-    app.graphSession.setGraph({ root: '/known' })
+    core.graphSession.setGraph({ root: '/known' })
     queryClient.setQueryData([...queryKeys.similar.all, '/known', 'notes/a.md'], [])
     queryClient.setQueryData(queryKeys.icloud.status, { available: true })
 
-    await app.graphSession.openRecent('/other')
+    await core.graphSession.openRecent('/other')
     expect(queryClient.getQueriesData({ queryKey: queryKeys.similar.all })).toEqual([])
     expect(queryClient.getQueryData(queryKeys.icloud.status)).toEqual({ available: true })
 
     queryClient.setQueryData([...queryKeys.similar.all, '/other', 'notes/a.md'], [])
-    await app.graphSession.close()
+    await core.graphSession.close()
     expect(queryClient.getQueriesData({ queryKey: queryKeys.similar.all })).toHaveLength(1)
 
-    await app.graphSession.openRecent('/other')
-    await app.graphSession.deleteGraph()
+    await core.graphSession.openRecent('/other')
+    await core.graphSession.deleteGraph()
     expect(queryClient.getQueryData(queryKeys.icloud.status)).toBeUndefined()
     stop()
   })
 
   it('drops the archived X posts whenever the graph session ends', async () => {
-    const { app, stop } = installApp(
+    const { core, stop } = installApp(
       createTestCoreServices({ database: createNodeTestDatabaseService() }),
     )
-    app.graphSession.setGraph({ root: '/known' })
+    core.graphSession.setGraph({ root: '/known' })
     cachePost()
 
-    await app.graphSession.openRecent('/known')
+    await core.graphSession.openRecent('/known')
     expect(queryClient.getQueriesData({ queryKey: queryKeys.xPost.all })).toEqual([])
 
     cachePost()
-    await app.graphSession.close()
+    await core.graphSession.close()
     expect(queryClient.getQueriesData({ queryKey: queryKeys.xPost.all })).toEqual([])
     stop()
   })
@@ -192,7 +193,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
     main.window.emitIndexWritten()
     expect(invalidate).not.toHaveBeenCalled()
     main.stop()
-    main.app.database.close()
+    main.core.database.close()
 
     const note = installApp(
       createTestCoreServices({ database: createNodeTestDatabaseService(), role: 'note-window' }),

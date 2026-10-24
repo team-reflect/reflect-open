@@ -34,11 +34,11 @@ function Arrival({
 }
 
 async function renderArrival(path: string, options?: NavigateOptions): Promise<void> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile: createTestNoteFileService({ files: { 'notes/target.md': '# Target\n' } }),
   })
-  await renderInApp(<Arrival path={path} options={options} />, { app })
+  await renderInApp(<Arrival path={path} options={options} />, { core })
 }
 
 describe('MobileNote focus contract', () => {

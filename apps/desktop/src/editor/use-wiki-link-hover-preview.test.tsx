@@ -30,13 +30,13 @@ function hoverHit(target: string): WikilinkHoverHit {
   return { target, from: 0, to: 0, element: document.createElement('span') }
 }
 
-let app: TestCoreServices
+let core: TestCoreServices
 
 async function setupRenderer(
   graph: TestOpenGraph | null = { generation: 7 },
 ): Promise<(hit: WikilinkHoverHit) => Promise<ReactNode>> {
   const { result } = await renderHookInApp(() => useWikiLinkHoverPreview({ dateFormat: 'mdy' }), {
-    app,
+    core,
     graph,
   })
   return result.current
@@ -44,57 +44,57 @@ async function setupRenderer(
 
 describe('useWikiLinkHoverPreview', () => {
   beforeEach(() => {
-    app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    core = createTestCoreServices({ database: createWasmTestDatabaseService() })
     markdownPreview.mockReset()
   })
 
   afterEach(() => {
-    app.database.close()
+    core.database.close()
   })
 
   it('resolves null without touching the graph when no graph session is open', async () => {
-    app.noteFile.set('notes/alpha.md', '# Alpha')
+    core.noteFile.set('notes/alpha.md', '# Alpha')
     const renderBody = await setupRenderer(null)
 
     await expect(renderBody(hoverHit('Alpha'))).resolves.toBeNull()
-    expect(app.noteLinkResolver.calls()).toEqual([])
+    expect(core.noteLinkResolver.calls()).toEqual([])
   })
 
   it('resolves null for a target that does not resolve to one note', async () => {
-    app.noteFile.set('notes/alpha.md', '# Alpha')
-    app.noteFile.set('notes/alpha-2.md', '# Alpha')
+    core.noteFile.set('notes/alpha.md', '# Alpha')
+    core.noteFile.set('notes/alpha-2.md', '# Alpha')
     const renderBody = await setupRenderer()
 
     await expect(renderBody(hoverHit('Missing'))).resolves.toBeNull()
     await expect(renderBody(hoverHit('Alpha'))).resolves.toBeNull()
-    expect(app.noteLinkResolver.calls().map((call) => call.result.kind)).toEqual([
+    expect(core.noteLinkResolver.calls().map((call) => call.result.kind)).toEqual([
       'missing',
       'ambiguous',
     ])
   })
 
   it('renders a passive frontmatter-free body for a resolved target', async () => {
-    app.noteFile.set('notes/alpha.md', '---\nprivate: true\n---\n# Alpha\n\nBody')
+    core.noteFile.set('notes/alpha.md', '---\nprivate: true\n---\n# Alpha\n\nBody')
     const renderBody = await setupRenderer()
 
-    const screen = await renderInApp(<>{await renderBody(hoverHit('Alpha'))}</>, { app })
+    const screen = await renderInApp(<>{await renderBody(hoverHit('Alpha'))}</>, { core })
 
     expect(screen.getByTestId('markdown-preview').element().textContent).toBe('# Alpha\n\nBody')
     expect(markdownPreview.mock.calls.at(-1)?.[0]).toMatchObject({
       content: '# Alpha\n\nBody',
       interactive: false,
     })
-    expect(app.noteLinkResolver.calls()).toMatchObject([
+    expect(core.noteLinkResolver.calls()).toMatchObject([
       { kind: 'wiki', target: 'Alpha', generation: 7 },
     ])
   })
 
   it("hands the preview the target note's image and embed resolvers", async () => {
-    app.attachments.setCatalog([{ path: 'attachments/garden-budget.png', size: 1 }])
-    app.noteFile.set('Projects/Garden redesign.md', '# Garden redesign\n\n![[garden-budget.png]]')
+    core.attachments.setCatalog([{ path: 'attachments/garden-budget.png', size: 1 }])
+    core.noteFile.set('Projects/Garden redesign.md', '# Garden redesign\n\n![[garden-budget.png]]')
     const renderBody = await setupRenderer()
 
-    await renderInApp(<>{await renderBody(hoverHit('/Projects/Garden redesign'))}</>, { app })
+    await renderInApp(<>{await renderBody(hoverHit('/Projects/Garden redesign'))}</>, { core })
 
     const props = markdownPreview.mock.calls.at(-1)?.[0] as MarkdownPreviewProps
     expect(await props.resolveImageUrl('../attachments/garden-budget.png')).toBe(
@@ -106,10 +106,10 @@ describe('useWikiLinkHoverPreview', () => {
   })
 
   it('shows a formatted subject and Empty note for an empty daily note', async () => {
-    app.noteFile.set('daily/2026-06-09.md', '---\nid: day\n---\n\n')
+    core.noteFile.set('daily/2026-06-09.md', '---\nid: day\n---\n\n')
     const renderBody = await setupRenderer()
 
-    const screen = await renderInApp(<>{await renderBody(hoverHit('2026-06-09'))}</>, { app })
+    const screen = await renderInApp(<>{await renderBody(hoverHit('2026-06-09'))}</>, { core })
 
     expect(screen.getByText('Tue, June 9th, 2026').query()).not.toBeNull()
     expect(screen.getByText('Empty note').query()).not.toBeNull()

@@ -13,16 +13,16 @@ import { GithubAccountField } from './github-account-field.tsx'
 // keychain (every graph's git sync restarts by itself).
 
 async function renderField(options: { signedIn: boolean }): Promise<{
-  app: TestCoreServices
+  core: TestCoreServices
   clear: MockInstance<GithubAuthService['clear']>
 }> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   if (options.signedIn) {
-    await app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
+    await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
   }
-  const clear = vi.spyOn(app.githubAuth, 'clear')
-  await renderInApp(<GithubAccountField />, { app })
-  return { app, clear }
+  const clear = vi.spyOn(core.githubAuth, 'clear')
+  await renderInApp(<GithubAccountField />, { core })
+  return { core, clear }
 }
 
 describe('GithubAccountField', () => {
