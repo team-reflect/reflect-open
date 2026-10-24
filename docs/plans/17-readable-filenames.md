@@ -100,8 +100,8 @@ later surface), daily notes (untouched in every respect — `daily/YYYY-MM-DD.md
    lazy-create seed gains the same `id:` frontmatter. The parser→indexer→`notes.id`
    pipeline already exists and runs; this step starts feeding it. Add a
    non-unique index on `notes.id`, **duplicate-id detection** (two paths
-   claiming one id = a sync fork; surfaced in the
-   backup section, repair deferred), and — the payoff — **id-based move
+   claiming one id = a sync fork; repair deferred. The Settings UI that
+   listed forks was later removed: the app shows no fork UI), and — the payoff — **id-based move
    healing**: the open-time reconcile and the live watcher pair a vanished
    row with an appeared file carrying the same id and *move* the rows
    (`index_move`) instead of delete+create, so external renames (Finder,
