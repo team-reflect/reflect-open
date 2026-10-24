@@ -12,7 +12,7 @@ const LicenseEntrySchema = z.object({
 
 const LicensesSchema = z.object({
   entries: z.array(LicenseEntrySchema),
-  /** License texts keyed by a hash of their content. */
+  /** License texts keyed by a unique prefix of their content hash. */
   texts: z.record(z.string(), z.string()),
 })
 
