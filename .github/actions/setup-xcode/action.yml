@@ -3,7 +3,8 @@ description: Select a fixed Xcode and fail when the image does not have it.
 inputs:
   version:
     description: Xcode version, e.g. 27.1
-    required: true
+    required: false
+    default: '27.1'
 runs:
   using: composite
   steps:

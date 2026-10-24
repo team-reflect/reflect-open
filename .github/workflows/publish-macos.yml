@@ -98,8 +98,6 @@ jobs:
 
       # Before setup-rust, which keys its cache on `xcrun clang`.
       - uses: ./.github/actions/setup-xcode
-        with:
-          version: '27.1'
 
       - uses: ./.github/actions/setup-rust
         with:
