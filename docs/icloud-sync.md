@@ -26,7 +26,9 @@ edit the same note while apart.
   backup first, and `.git`/`.reflect` are always marked local-only as a
   belt-and-braces guard. A graph that has both still works: Reflect commits
   locally as you type, and pushes only after five quiet minutes with no
-  pending iCloud downloads.
+  pending iCloud downloads. On such a graph the Git repository card says the
+  repository keeps the history, and its manual action is "Save history now";
+  on a folder graph the same card speaks of sync.
 
 ## What happens on a conflict
 

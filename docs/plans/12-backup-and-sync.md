@@ -1,5 +1,7 @@
 # Plan 12 — Backup & Sync (Git, GitHub-first)
 
+The naming rule and the GitHub / Git / iCloud split now live in [Plan 25](./25-sync-model.md).
+
 **Goal:** Continuous, invisible backup and multi-device continuity over **Git**, with
 **GitHub as the only remote in the product UX**. Edits are debounced into commits and
 pushed; pulls merge on launch/focus; merge conflicts are **committed into the note as
