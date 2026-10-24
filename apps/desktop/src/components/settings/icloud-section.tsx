@@ -20,17 +20,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 
 const PENDING_NOTES_REFETCH_MS = 5_000
 
-function graphCountLine(count: number): string {
-  if (count === 0) {
-    return 'No graphs in iCloud Drive yet.'
-  }
-  return count === 1 ? '1 graph in iCloud Drive.' : `${count} graphs in iCloud Drive.`
-}
-
 function pendingNotesLine(count: number): string {
-  if (count === 0) {
-    return 'All note files are downloaded.'
-  }
   return count === 1
     ? '1 note is still downloading from iCloud.'
     : `${count} notes are still downloading from iCloud.`
@@ -111,15 +101,8 @@ export function IcloudSettingsField(): ReactElement | null {
               : 'iCloud Drive isn’t reachable from this app — sign in to iCloud, or use a build with iCloud enabled.'
         }
       >
-        {hosted ? (
-          <div className="mt-3 flex flex-col gap-1 text-xs text-text-muted">
-            {pendingNotes.isPending ? <p>Checking downloaded notes...</p> : null}
-            {pendingNotes.data !== undefined ? <p>{pendingNotesLine(pendingNotes.data)}</p> : null}
-          </div>
-        ) : status?.available === true ? (
-          <p className="mt-3 text-xs text-text-muted">
-            {graphCountLine(status.existingGraphRoots.length)}
-          </p>
+        {hosted && pendingNotes.data !== undefined && pendingNotes.data > 0 ? (
+          <p className="mt-3 text-xs text-text-muted">{pendingNotesLine(pendingNotes.data)}</p>
         ) : null}
         {hosted ? null : (
           <div className="mt-2">

@@ -65,7 +65,7 @@ export function DescribeAssetsField(): ReactElement {
           onClick={() => setConfirming(true)}
           className="text-text-secondary"
         >
-          {running ? 'Backfilling…' : 'Backfill assets'}
+          {running ? 'Scanning…' : 'Scan existing files'}
         </Button>
         {!hasProvider ? (
           <p className="mt-2 text-xs text-text-muted">Add an AI provider to enable this.</p>
@@ -80,7 +80,7 @@ export function DescribeAssetsField(): ReactElement {
         >
           <DialogContent showCloseButton={false} className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Backfill assets?</DialogTitle>
+              <DialogTitle>Scan existing files?</DialogTitle>
               <DialogDescription>
                 Images and PDFs in non-private notes will be sent to your AI provider so their text
                 can appear in search. Assets that already have OCR are skipped.
@@ -91,7 +91,7 @@ export function DescribeAssetsField(): ReactElement {
                 Cancel
               </Button>
               <Button type="button" size="sm" onClick={() => void runBackfill()}>
-                Backfill assets
+                Scan existing files
               </Button>
             </DialogFooter>
           </DialogContent>

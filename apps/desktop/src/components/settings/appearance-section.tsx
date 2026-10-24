@@ -29,10 +29,7 @@ export function AppearanceSection(): ReactElement {
 
   return (
     <SettingsSection id="appearance">
-      <SettingsField
-        legend="Theme"
-        description="System follows your OS appearance. Saved with your settings."
-      >
+      <SettingsField legend="Theme" description="System follows your OS appearance.">
         <div className="mt-3 grid grid-cols-3 gap-2">
           {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
             const selected = settings.theme === value

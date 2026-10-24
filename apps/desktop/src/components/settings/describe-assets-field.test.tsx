@@ -35,25 +35,25 @@ describe('DescribeAssetsField', () => {
 
   it('disables the backfill until an AI provider is configured', async () => {
     await renderField({ aiProviders: [], defaultAiProviderId: null })
-    await expect.element(page.getByRole('button', { name: /backfill assets/i })).toBeDisabled()
+    await expect.element(page.getByRole('button', { name: /scan existing files/i })).toBeDisabled()
     await expect.element(page.getByText(/add an ai provider to enable this/i)).toBeInTheDocument()
   })
 
   it('confirms the cost before running the backfill, then runs it', async () => {
     const { backfill } = await renderField()
-    await page.getByRole('button', { name: /backfill assets/i }).click()
+    await page.getByRole('button', { name: /scan existing files/i }).click()
 
     // The cost warning appears; nothing is sent until the user confirms.
-    await expect.element(page.getByText(/backfill assets\?/i)).toBeInTheDocument()
+    await expect.element(page.getByText(/scan existing files\?/i)).toBeInTheDocument()
     expect(backfill).toHaveBeenCalledTimes(0)
 
-    await page.getByRole('button', { name: /^backfill assets$/i }).click()
+    await page.getByRole('button', { name: /^scan existing files$/i }).click()
     expect(backfill).toHaveBeenCalledTimes(1)
   })
 
   it('cancels without sending anything', async () => {
     const { backfill } = await renderField()
-    await page.getByRole('button', { name: /backfill assets/i }).click()
+    await page.getByRole('button', { name: /scan existing files/i }).click()
     await page.getByRole('button', { name: /cancel/i }).click()
     expect(backfill).toHaveBeenCalledTimes(0)
   })

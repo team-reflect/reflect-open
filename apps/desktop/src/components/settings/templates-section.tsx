@@ -138,7 +138,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
       <DialogContent showCloseButton={false} className="max-w-sm">
         <DialogTitle>Rename template</DialogTitle>
         <DialogDescription className="sr-only">
-          Renames the template — its title and its file's slug.
+          Renames the template and its file.
         </DialogDescription>
         <form
           className="flex flex-col gap-3"

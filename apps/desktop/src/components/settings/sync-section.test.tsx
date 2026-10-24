@@ -95,7 +95,9 @@ describe('SyncSection', () => {
 
     const section = page.getByRole('region', { name: 'Sync' })
     await expect.element(legend(section, 'iCloud Drive')).toBeInTheDocument()
-    await expect.element(section.getByText('1 graph in iCloud Drive.')).toBeInTheDocument()
+    await expect
+      .element(section.getByRole('button', { name: 'Move graph to iCloud…' }))
+      .toBeInTheDocument()
     await expect.element(legend(section, 'Git repository')).toBeInTheDocument()
     await expect
       .element(section.getByRole('button', { name: 'Connect a repository…' }))
@@ -110,7 +112,7 @@ describe('SyncSection', () => {
 
     const section = page.getByRole('region', { name: 'Sync' })
     await expect.element(legend(section, 'iCloud Drive')).toBeInTheDocument()
-    await expect.element(section.getByText('All note files are downloaded.')).toBeInTheDocument()
+    await expect.element(section.getByText(/This graph lives in iCloud Drive/)).toBeInTheDocument()
     await expect.element(legend(section, 'Git repository')).toBeInTheDocument()
     await expect
       .element(section.getByRole('button', { name: 'Connect a repository…' }))
