@@ -58,6 +58,7 @@ runs:
     - name: Scope the cargo cache to Xcode
       if: runner.os == 'macOS'
       shell: bash
+      # Ensure the setup-xcode action has run before setup-rust, so that xcrun clang points to the selected Xcode version.
       run: echo "RUST_CACHE_CLANG_DIR=$(xcrun clang --print-resource-dir)" >> "$GITHUB_ENV"
 
     # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
