@@ -32,7 +32,7 @@ v2 removes the three pillars V1 mobile is built on:
   extension, audio upload, push, OAuth token exchange) worked by POSTing
   to Reflect's API or Firebase with natively-stored tokens. v2 has no
   backend: the phone is a peer device holding real markdown files, and
-  network egress in mobile v1 is GitHub sync only.
+  network egress in mobile v1 is Git sync only (GitHub or another git host).
 - **No E2EE, no encrypted database.** V1 mobile decrypts an encrypted
   Firestore/SQLite graph behind an unlock gate. v2 notes are plain
   markdown in the app's `Documents/` directory (Files-app visible); SQLite

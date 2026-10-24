@@ -35,7 +35,7 @@ A capture-and-recall companion to the desktop app, sharing one product identity:
 - Not a viewer. Editing ships in v1, on the same document machinery as desktop (sessions, debounced atomic saves, title rename, round-trip protection).
 - Not a parity port. No copilot, no semantic search, no ⌘K palette, no CLI sidecar, no map, no publishing. (The container can hold several graphs — the settings sheet switches between them — but only one graph is open at a time; there is no desktop-style chooser.)
 - Not a separate codebase, schema, or design system.
-- Not a cloud client. The phone is a peer device operating on its own copy of the graph; network egress *from the app* is GitHub sync only — iCloud document sync happens OS-side, below the app.
+- Not a cloud client. The phone is a peer device operating on its own copy of the graph; network egress *from the app* is Git sync only (GitHub or another git host) — iCloud document sync happens OS-side, below the app.
 
 ---
 
@@ -52,7 +52,7 @@ Plan 19 defines the binding scope. Summarized, with the product-owner calls of 2
 | Note actions (pin, share, trash) | **In** | Product call 2026-06-12: full V1 parity — pin/unpin (frontmatter flag), share via the Web Share API (`navigator.share`, verified working in the Tauri iOS WKWebView — no native plugin needed), trash to `.reflect/trash/`. |
 | Settings sheet | **In** | V1's avatar spot: graph name, storage (iCloud Drive / This device), **Switch graph** (other container graphs + the on-device root), note count, GitHub connect/disconnect, sync status, version. |
 | iCloud Drive sync (Plan 21) | **In** | The primary transport: the graph lives in the app's iCloud container; the OS moves files; conflicts resolve on-device through the deterministic ladder (see section 6). iCloud and a Git remote are mutually exclusive per graph. |
-| GitHub sync (device flow, HTTPS) | **In** | For self-managed (on-device) graphs. Foreground-only; cycle on resume, after debounced edits, and on network regain. |
+| Git sync (GitHub by device flow, or another host by username and token, over HTTPS) | **In** | For self-managed (on-device) graphs. Foreground-only; cycle on resume, after debounced edits, and on network regain. |
 | Onboarding: iCloud-first | **In** | Lists every graph already in the container (one-tap open) or stores fresh notes there; **Keep notes on this device** and a **Sync with GitHub instead** link behind it. Roots re-derived every launch; the chosen iCloud graph persists by *name*. |
 | Conflict **resolution** UI | **Out of scope** | Conflicts resolve automatically (the ladder for `.md` notes, conflict copies for other files). |
 | Audio memos | **Later wave** | Product owner: first post-release wave, reusing desktop's raw-first + async BYOK transcription pipeline; OS entry points (widget, Siri, Live Activity) come with it. |

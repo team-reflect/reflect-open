@@ -165,7 +165,7 @@ tests in `src-tauri/src/git/tests.rs`):
   under ULID names; accepted as rare and recoverable).
 - **The same note retitled differently on two devices** forks into two files
   sharing one id. Nothing wedges, both files survive, and the fork surfaces
-  in **Settings → Backup** ("renamed differently on two devices…") via
+  in **Settings → Sync** ("renamed differently on two devices…") via
   `getDuplicateNoteIds`. Repair is the user's call — merge by hand, delete
   the copy you don't want.
 

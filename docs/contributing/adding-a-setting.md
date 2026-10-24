@@ -128,7 +128,7 @@ the common shapes). Add the test at the narrowest useful level:
   (`app.settings.get()` or `app.settings.saves()`). Start from a stored value
   with the `settings` option: `renderInApp(ui, { settings: { yourNewSetting } })`.
 - For a section with its own branching behavior, add a focused section test
-  next to it (for example `backup-section.test.tsx` or
+  next to it (for example `git-sync-section.test.tsx` or
   `rebuild-index-field.test.tsx`), also with `renderInApp`. Drive the services
   it reads through `app`; do not mock the providers. See
   [testing](testing.md).

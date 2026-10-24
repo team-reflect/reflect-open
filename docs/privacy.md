@@ -55,7 +55,7 @@ disk at call time), and it is covered by tests.
 - **What:** the whole graph as git commits — including notes marked `private: true`.
   The privacy flag blocks *services that read your content*; backup is your own
   repository, and excluding private notes from it would silently lose them.
-- **When:** after you connect, on the background backup cadence and on "Back up now".
+- **When:** after you connect, on the background sync cadence and on "Sync now".
 - GitHub sign-in uses the OAuth device flow against `github.com`; the token is stored
   in the OS keychain.
 

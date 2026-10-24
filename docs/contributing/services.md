@@ -321,7 +321,7 @@ Keep the adapter thin: every decision stays in the service.
 
 An app-scoped service lives as long as the webview. Make it a factory, or give
 it an `openSession(options)` method, when an instance must start and stop with
-something shorter-lived. Examples: a loop for one open graph (`createBackupService(deps, { generation, indexGeneration })`,
+something shorter-lived. Examples: a loop for one open graph (`createGitSyncService(deps, { root, generation, indexGeneration })`,
 `capture.openSession({ generation })`), state that must not survive a graph
 switch (`chatSessions.create({ session })`), or one instance per note pane
 (`noteSessions.create(options)`).

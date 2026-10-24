@@ -218,6 +218,6 @@ Small, in the copy-simple-sparse register:
 
 - Restore-shaped onboarding ("start from your GitHub backup" as a first-run
   option next to iCloud/This device).
-- Surfacing `backUpNow` on mobile (a "Back up now" row) — trivial once the
+- Surfacing `syncNow` on mobile (a "Sync now" row) — trivial once the
   group is always visible, but not needed for the sync story.
 - Android (no keychain/keyring story validated there yet).

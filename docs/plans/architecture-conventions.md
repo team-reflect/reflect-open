@@ -209,10 +209,10 @@ Its `GraphLifecycleFlags` pick the lifecycles; `createAppGraphServices`
 
 | Created by | Creates | Lifetime |
 |---|---|---|
-| `graphServiceFactories.backup(deps, { generation, indexGeneration })` | `BackupService` | one per graph session, main window only (`GraphServices.backup`) |
+| `graphServiceFactories.gitSync(deps, { root, generation, indexGeneration })` | `GitSyncService` | one per graph session, main window only (`GraphServices.gitSync`), with its `GithubConnector` and `GitHostConnector` |
 | `graphServiceFactories.icloudSync(deps, ...)` | `ICloudSyncService` | one per iCloud graph session, main window only |
 | `graphServiceFactories.icloudDownload(deps, ...)` | `ICloudDownloadService` | while the mobile graph is stored in iCloud |
-| `syncEngines.create(options)` | the git sync engine of one backup | owned by its `BackupService` |
+| `syncEngines.create(options)` | the git sync engine of one remote | owned by its `GitSyncService` |
 | `chatSessions.create({ session })` | `ChatSession` | one per graph session, every window (`GraphServices.chat`) |
 | `capture.openSession({ generation })` | the capture drain and enrich loop | one per graph session, main window only |
 | `assetDescription.openSession({ generation, indexGeneration })` | the asset description loop | same, desktop, while `describeAssets` is on |
