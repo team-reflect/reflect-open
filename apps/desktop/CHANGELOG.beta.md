@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.16.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.11...v0.16.0-beta.12) (2026-10-23)
+
+
+### Features
+
+* classify remotes and resolve a sign-in per remote ([#1690](https://github.com/team-reflect/reflect-open/issues/1690)) ([25f07d3](https://github.com/team-reflect/reflect-open/commit/25f07d37e80f5839bfbe63d5190a01da63206bb6))
+* **desktop:** rebuild app icons as layered artwork ([#1699](https://github.com/team-reflect/reflect-open/issues/1699)) ([eb1e5ea](https://github.com/team-reflect/reflect-open/commit/eb1e5eaac0aa4c7f9aef99dc85a88b274113213f))
+
+
+### Bug Fixes
+
+* bind a stored sign-in to scheme, host and port ([#1691](https://github.com/team-reflect/reflect-open/issues/1691)) ([f28b9ef](https://github.com/team-reflect/reflect-open/commit/f28b9efe71eb02bbe1d762dd054dcaf31ad3c5c0))
+
 ## [0.16.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.10...v0.16.0-beta.11) (2026-10-20)
 
 

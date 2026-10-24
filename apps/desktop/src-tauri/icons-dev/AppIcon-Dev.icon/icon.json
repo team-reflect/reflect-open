@@ -1,8 +1,8 @@
 {
   "fill": {
     "linear-gradient": [
-      "srgb:0.05208,0.77006,0.46939,1.00000",
-      "srgb:0.06993,0.32560,0.00000,1.00000"
+      "srgb:0.05299,0.77238,0.41418,1.00000",
+      "srgb:0.06161,0.34015,0.01514,1.00000"
     ],
     "orientation": {
       "start": {
@@ -17,11 +17,12 @@
   },
   "groups": [
     {
+      "name": "gem",
       "layers": [
         {
           "glass": false,
-          "image-name": "gem.png",
-          "name": "gem",
+          "image-name": "nodes.png",
+          "name": "nodes",
           "position": {
             "scale": 1,
             "translation-in-points": [
@@ -29,15 +30,132 @@
               0
             ]
           }
+        },
+        {
+          "glass": false,
+          "image-name": "edges.png",
+          "name": "edges",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "glass": false,
+          "image-name": "body.png",
+          "name": "body",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "opacity-specializations": [
+            {
+              "value": 1.0
+            },
+            {
+              "appearance": "tinted",
+              "value": 0.5
+            }
+          ]
         }
       ],
       "shadow": {
-        "kind": "neutral",
-        "opacity": 0.5
+        "kind": "none",
+        "opacity": 0
       },
       "translucency": {
         "enabled": false,
-        "value": 0.5
+        "value": 0
+      }
+    },
+    {
+      "name": "halo",
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "ring.png",
+          "name": "ring",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "glass": false,
+          "image-name": "glow.png",
+          "name": "glow",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "opacity-specializations": [
+            {
+              "value": 1.0
+            },
+            {
+              "appearance": "tinted",
+              "value": 0.25
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    },
+    {
+      "name": "background",
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "background.png",
+          "name": "background",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "hidden-specializations": [
+            {
+              "value": false
+            },
+            {
+              "appearance": "dark",
+              "value": true
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
       }
     }
   ],
