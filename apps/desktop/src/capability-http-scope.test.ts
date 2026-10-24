@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { URLPattern } from 'urlpattern-polyfill'
 
 /**
  * Pins the URLPattern semantics of the `http:default` capability scope.
