@@ -119,9 +119,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ./.github/actions/setup-xcode
+
       - uses: ./.github/actions/setup-node
 
-      - uses: ./.github/actions/setup-xcode
 
       - name: Install Playwright
         run: pnpm --filter @reflect/desktop test:install:webkit
