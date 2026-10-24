@@ -20,11 +20,13 @@ story). **Status:** V1 implemented (SSH agent + path remotes; see
 Outstanding V1 validation, manual by nature: agent auth from the *packaged* app
 against a real host (the Phase 0 spike items). V2 shipped as per-host sign-ins
 entered in Settings and stored in the OS keychain, not as git credential helpers
-(the helper phases below were never built). See [Plan 25](./25-sync-model.md).
+(the helper phases below were never built). See [Plan 25](./25-sync-model.md). The
+design and phase sections below that speak of credential helpers are historical.
 
-**Explicitly not in scope:** host pickers, a "custom remote" wizard, per-host settings
-UI, or per-host REST sugar (repo creation, visibility checks, install links — those
-stay GitHub-only conveniences). File-sync providers were unsupported by design when
+**Explicitly not in scope:** host pickers, a "custom remote" wizard, or per-host REST
+sugar (repo creation, visibility checks, install links — those stay GitHub-only
+conveniences). The one Settings form for a host sign-in (address, username, token or
+password) shipped with Plan 25; per-host settings beyond it stay out. File-sync providers were unsupported by design when
 this was written — [Plan 21](./21-icloud-drive-sync.md) has since shipped iCloud Drive
 as the primary sync path (Dropbox et al. remain unsupported); either way, this plan is
 about other *git hosts*, not other *sync mechanisms*.

@@ -39,6 +39,9 @@ loaded in your agent, sync works.** Reflect authenticates SSH remotes
 through your ssh-agent only; `ssh-add -l` must list the key the host
 accepts. It never asks for, stores, or manages SSH credentials.
 
+SSH remotes are desktop only. iOS has no ssh-agent, so on the phone connect
+over HTTPS from Settings.
+
 ```bash
 cd /path/to/your/graph
 git init -b main                                     # skip if it's already a repo

@@ -51,7 +51,9 @@ disk at call time), and it is covered by tests.
 ## Backup & sync (off until you connect)
 
 - **Where:** the git repository you connect — GitHub guided in-app (created **private**
-  by default; a public repo requires explicit confirmation), or any git host over SSH.
+  by default; a public repo requires explicit confirmation), any other git host over
+  HTTPS with a username and an access token or password entered in Settings, or any
+  git host over SSH through your ssh-agent.
 - **What:** the whole graph as git commits — including notes marked `private: true`.
   The privacy flag blocks *services that read your content*; backup is your own
   repository, and excluding private notes from it would silently lose them.
@@ -60,6 +62,9 @@ disk at call time), and it is covered by tests.
   after five quiet minutes).
 - GitHub sign-in uses the OAuth device flow against `github.com`; the token is stored
   in the OS keychain.
+- A sign-in for another host is stored in the OS keychain under that host's origin
+  (scheme, host and port) and is sent only to that origin: never to another host, even
+  after a redirect, and never over plain `http://`.
 
 ## Browser capture (the Chrome extension)
 
