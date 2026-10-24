@@ -56,7 +56,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      # Before setup-rust, which keys its cache on `xcrun clang`.
       - uses: ./.github/actions/setup-xcode
         if: runner.os == 'macOS'
 
