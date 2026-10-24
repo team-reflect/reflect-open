@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.12...v0.16.0-beta.13) (2026-10-24)
+
+
+### Features
+
+* connect a repository on any git host ([#1702](https://github.com/team-reflect/reflect-open/issues/1702)) ([636a2d5](https://github.com/team-reflect/reflect-open/commit/636a2d551179d3ba2016f0edfbef461008bcaeef))
+* **mobile:** support iPhone Duo safe areas ([#1704](https://github.com/team-reflect/reflect-open/issues/1704)) ([727552a](https://github.com/team-reflect/reflect-open/commit/727552a3b6393fa3ff6346cd2f8e6ec368a6f41e))
+
 ## [0.16.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.11...v0.16.0-beta.12) (2026-10-23)
 
 
