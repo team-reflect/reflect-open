@@ -14,7 +14,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog.tsx'
 import { queryKeys } from '@/lib/query-client.ts'
-import { createDuplicateNoteIdsQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -37,13 +36,6 @@ function pendingNotesLine(count: number): string {
     : `${count} notes are still downloading from iCloud.`
 }
 
-function forkLine(forkCount: number): string {
-  if (forkCount === 0) {
-    return 'No sync forks.'
-  }
-  return forkCount === 1 ? '1 sync fork' : `${forkCount} sync forks`
-}
-
 /**
  * Settings → Sync → iCloud Drive (Plan 21 Phase 1, the desktop leg): see
  * whether the graph syncs through iCloud Drive, and move a local graph into the
@@ -59,7 +51,7 @@ function forkLine(forkCount: number): string {
 export function IcloudSettingsField(): ReactElement | null {
   const { graph, openRecent } = useGraph()
   const { state, disconnectGraph } = useGitSync()
-  const { icloudMigration: migration, icloudNative, indexQuery, platform } = useCoreServices()
+  const { icloudMigration: migration, icloudNative, platform } = useCoreServices()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -81,10 +73,6 @@ export function IcloudSettingsField(): ReactElement | null {
       return typeof count === 'number' && count > 0 ? PENDING_NOTES_REFETCH_MS : false
     },
   })
-  const duplicateIds = useQuery({
-    ...createDuplicateNoteIdsQueryOptions(indexQuery, graph?.root),
-    enabled: hosted,
-  })
 
   // The navigator hides the entry off macOS through the same gate — the two
   // must agree (see use-visible-settings-sections).
@@ -92,7 +80,6 @@ export function IcloudSettingsField(): ReactElement | null {
     return null
   }
   const gitSyncConnected = state.phase === 'connected'
-  const forkCount = duplicateIds.data?.length
 
   async function moveToICloud(): Promise<void> {
     setBusy(true)
@@ -128,11 +115,6 @@ export function IcloudSettingsField(): ReactElement | null {
           <div className="mt-3 flex flex-col gap-1 text-xs text-text-muted">
             {pendingNotes.isPending ? <p>Checking downloaded notes...</p> : null}
             {pendingNotes.data !== undefined ? <p>{pendingNotesLine(pendingNotes.data)}</p> : null}
-            {forkCount !== undefined ? (
-              <p className={forkCount > 0 ? 'text-amber-700 dark:text-amber-300' : undefined}>
-                {forkLine(forkCount)}
-              </p>
-            ) : null}
           </div>
         ) : status?.available === true ? (
           <p className="mt-3 text-xs text-text-muted">

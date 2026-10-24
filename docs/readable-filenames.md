@@ -20,7 +20,7 @@ Three rules make the whole system hang together:
 2. **The frontmatter `id` is the durable identity.** Every note Reflect
    creates carries `id: <lowercase ulid>`. Filenames change; the id never
    does. It's what lets the index recognize a file that moved while Reflect
-   wasn't looking, and what exposes sync forks.
+   wasn't looking, and what exposes sync forks (two files claiming one id).
 3. **Wiki links carry titles, not paths.** `[[Meeting Notes]]` resolves at
    query time against the index's title/alias keys, so a file rename breaks
    zero links by construction. This is the keystone: everything below is
@@ -147,7 +147,7 @@ Limits, all deliberate:
 
 - **Ambiguous ids never pair.** Two files claiming one id (or one id claimed
   by two vanished rows) could wire one note's history to another's file —
-  those surface as sync forks instead.
+  those stay sync forks instead.
 - **Files without ids can't heal** — anything created outside Reflect falls
   back to delete+create, which always converges.
 - **Split watcher batches degrade** to delete+create: the orphan row is gone
@@ -164,10 +164,10 @@ tests in `src-tauri/src/git/tests.rs`):
   is merged by the conflict ladder (this was impossible
   under ULID names; accepted as rare and recoverable).
 - **The same note retitled differently on two devices** forks into two files
-  sharing one id. Nothing wedges, both files survive, and the fork surfaces
-  in **Settings → Backup** ("renamed differently on two devices…") via
-  `getDuplicateNoteIds`. Repair is the user's call — merge by hand, delete
-  the copy you don't want.
+  sharing one id. Nothing wedges and both files survive; the user sees two
+  notes and deletes the one they don't want. `getDuplicateNoteIds` detects
+  forks, but the app shows no UI for them: the term means nothing to a user,
+  and the only remedy is the delete they would do anyway.
 
 ## What deliberately doesn't exist
 
@@ -198,7 +198,7 @@ tests in `src-tauri/src/git/tests.rs`):
 | Move announcements → router/panes | `NoteMoveService.onMoved`, `apps/desktop/src/routing/router.tsx` |
 | Row move + fs rename (Rust) | `apps/desktop/src-tauri/src/db/mod.rs` (`note_move_indexed`, `index_move`), `db/write.rs` (`move_note`), `fs/mod.rs` (`move_note_file`) |
 | Id-based healing | `packages/core/src/indexing/move-detection.ts`, `move-healing.ts`, wired in `indexer.ts` + `live.ts` → `IndexLifecycleService.onMoved` → `NoteMoveService.followHealedMove` |
-| Sync fork surface | `apps/desktop/src/components/settings/sync-fork-notice.tsx`, `getDuplicateNoteIds` in `packages/core/src/indexing/index-query-service.ts` |
+| Sync fork detection | `getDuplicateNoteIds` in `packages/core/src/indexing/index-query-service.ts` |
 | Merge-shape tests | `apps/desktop/src-tauri/src/git/tests.rs` (rename matrix) |
 
 Plan and decision history: [docs/plans/17-readable-filenames.md](plans/17-readable-filenames.md).

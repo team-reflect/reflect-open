@@ -2,17 +2,6 @@ import { queryOptions } from '@tanstack/react-query'
 import type { CoreServices, DailyNoteService, IndexQueryService } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 
-/** Duplicate note IDs shared by the Git and iCloud settings surfaces. */
-export function createDuplicateNoteIdsQueryOptions(
-  indexQuery: IndexQueryService,
-  root: string | undefined,
-) {
-  return queryOptions({
-    queryKey: queryKeys.index.duplicateNoteIds(root),
-    queryFn: () => indexQuery.getDuplicateNoteIds(),
-  })
-}
-
 /** Templates shared by the settings list and insertion picker. */
 export function createTemplatesQueryOptions(
   indexQuery: IndexQueryService,

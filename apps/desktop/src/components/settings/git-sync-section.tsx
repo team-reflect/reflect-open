@@ -1,5 +1,4 @@
 import { useRef, useState, type ReactElement, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { remoteLabel, signInNeededText } from '@reflect/app'
 import { githubRepoOf, isICloudRoot, suggestRepoName, type GithubRepoRef } from '@reflect/core'
@@ -8,13 +7,11 @@ import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog
 import { ConnectGitHostDialog } from '@/components/settings/connect-git-host-dialog.tsx'
 import { ConnectRepositoryDialog } from '@/components/settings/connect-repository-dialog.tsx'
 import { SettingsField } from '@/components/settings/field.tsx'
-import { SyncForkNotice } from '@/components/settings/sync-fork-notice.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-import { createDuplicateNoteIdsQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useGitSync, type GitSyncState } from '@/providers/sync-provider.tsx'
-import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 /** Which dialog is open: the host chooser, or one host's own flow. */
 type OpenDialog =
@@ -65,20 +62,10 @@ function githubRepoBrowserUrl(repo: GithubRepoRef): string {
 export function GitSyncSettingsField(): ReactElement {
   const { state, disconnectGraph, syncNow } = useGitSync()
   const { graph } = useGraph()
-  const { indexQuery } = useCoreServices()
   const { opener } = useAppServices()
   const [dialog, setDialog] = useState<OpenDialog | null>(null)
   const openRepoAttemptRef = useRef(0)
   const action = useAsyncAction()
-
-  // A sync fork (Plan 17): two files claiming one frontmatter id — the same
-  // note retitled differently on two devices. Surfaced for review;
-  // repair is the user's call, never automatic.
-  const duplicateIds = useQuery({
-    ...createDuplicateNoteIdsQueryOptions(indexQuery, graph?.root),
-    enabled: graph !== null,
-  })
-  const forkGroups = duplicateIds.data ?? []
 
   const hosted = graph !== null && isICloudRoot(graph.root)
   const repo = state.phase === 'connected' ? githubRepoOf(state.remote) : null
@@ -178,7 +165,6 @@ export function GitSyncSettingsField(): ReactElement {
                   <GitSyncStatusLine state={state} />
                 </span>
               </p>
-              <SyncForkNotice groups={forkGroups} />
               <div className="flex flex-wrap gap-2">
                 {/* Beside iCloud the engine only commits now; the repository
                     updates after the quiet window, so the button says so. */}

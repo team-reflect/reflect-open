@@ -46,9 +46,6 @@ export const queryKeys = {
     dailyDates(root: GraphRoot, start: string, end: string) {
       return [...this.graph(root), 'daily-dates', start, end] as const
     },
-    duplicateNoteIds(root: GraphRoot) {
-      return [...this.graph(root), 'duplicate-note-ids'] as const
-    },
     templates(root: GraphRoot) {
       return [...this.graph(root), 'templates'] as const
     },

@@ -4,7 +4,6 @@ import {
   AppError,
   type GitSyncService,
   type GitSyncState,
-  type DuplicateIdGroup,
   type GraphSessionService,
   type IcloudStatus,
 } from '@reflect/core'
@@ -34,7 +33,6 @@ let icloud: {
    */
   copyFails: boolean
 }
-let duplicateIds: DuplicateIdGroup[]
 let graph: TestOpenGraph
 let platform: TestPlatformOptions
 let gitSyncState: GitSyncState
@@ -63,9 +61,6 @@ async function renderSection(): Promise<void> {
     gitSync,
     platform: createTestPlatformService(platform),
   })
-  vi.spyOn(app.indexQuery, 'getDuplicateNoteIds').mockImplementation(() => {
-    return Promise.resolve(duplicateIds)
-  })
   openRecent = vi
     .spyOn(app.graphSession, 'openRecent')
     .mockImplementation(() => Promise.resolve(reopens))
@@ -88,7 +83,6 @@ beforeEach(() => {
     pendingNotes: 0,
     copyFails: false,
   }
-  duplicateIds = []
   gitSyncState = { phase: 'disconnected' }
   reopens = true
   gitSync = createTestGitSyncService()
@@ -117,17 +111,15 @@ describe('SyncSection', () => {
     const section = page.getByRole('region', { name: 'Sync' })
     await expect.element(legend(section, 'iCloud Drive')).toBeInTheDocument()
     await expect.element(section.getByText('All note files are downloaded.')).toBeInTheDocument()
-    await expect.element(section.getByText('No sync forks.')).toBeInTheDocument()
     await expect.element(legend(section, 'Git repository')).toBeInTheDocument()
     await expect
       .element(section.getByRole('button', { name: 'Connect a repository…' }))
       .toBeInTheDocument()
   })
 
-  it('surfaces iCloud download and fork counts', async () => {
+  it('surfaces the iCloud download count', async () => {
     graph = ICLOUD_GRAPH
     icloud.pendingNotes = 2
-    duplicateIds = [{ id: 'note-1', paths: ['notes/a.md', 'notes/a 2.md'] }]
 
     await renderSection()
 
@@ -135,7 +127,6 @@ describe('SyncSection', () => {
     await expect
       .element(section.getByText('2 notes are still downloading from iCloud.'))
       .toBeInTheDocument()
-    await expect.element(section.getByText('1 sync fork')).toBeInTheDocument()
   })
 })
 
