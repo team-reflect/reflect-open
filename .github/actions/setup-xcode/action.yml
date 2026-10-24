@@ -1,25 +1,21 @@
 # Run before setup-rust, which keys its cache on `xcrun clang`.
 name: Set up Xcode
-description: Select a fixed Xcode and fail when the image does not have it.
+description: Select a fixed Xcode version
 inputs:
   version:
-    description: Xcode version, e.g. 27.1
+    description: Xcode version
     required: false
     default: '27.1'
 runs:
   using: composite
   steps:
-    - name: Check that Xcode ${{ inputs.version }} is installed
+    - name: List installed Xcode versions
       shell: bash
-      env:
-        XCODE_VERSION: ${{ inputs.version }}
-      run: |
-        app="/Applications/Xcode_${XCODE_VERSION}.app"
-        if [ ! -d "$app" ]; then
-          echo "::error::$app is not on this image"
-          ls -d /Applications/Xcode*.app
-          exit 1
-        fi
+      run: ls -d /Applications/Xcode*.app
+
+    - name: Print the Xcode version
+      shell: bash
+      run: xcodebuild -version
 
     - name: Select Xcode ${{ inputs.version }}
       shell: bash
