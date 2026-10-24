@@ -105,7 +105,7 @@ jobs:
   test-webkit:
     needs: classify
     if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
-    runs-on: macos-26
+    runs-on: xcode-27
     env:
       REFLECT_TEST_BROWSER: webkit
       # Suspected workaround, root cause unknown: WebContent sometimes

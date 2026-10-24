@@ -89,8 +89,8 @@ App Store Connect has processed the build.
 The TestFlight workflow runs as part of every release, called from
 `.github/workflows/publish-desktop.yml`. To retry it, re-run its failed job in
 the Release run. The workflow builds on
-`macos-26`, uploads the IPA to App Store Connect, and serializes runs so two
-uploads do not race each other. It keeps the exported IPA for 30 days and a
+`xcode-27` with Xcode 27.1, uploads the IPA to App Store Connect, and
+serializes runs so two uploads do not race each other. It keeps the exported IPA for 30 days and a
 metadata-preserving ZIP of the exact `.xcarchive` for 90 days. The archive holds
 the matching binaries and dSYMs needed to symbolicate an Apple `.ips` report
 that arrives later; the archive is packaged even when the run failed, so the

@@ -303,8 +303,8 @@ Stable installs are unaffected (same identifier and the shipped icon).
 `.github/workflows/publish-macos.yml` builds two signed/notarized macOS artifacts in
 parallel:
 
-- Apple Silicon: `macos-26`, `--target=aarch64-apple-darwin`
-- Universal (Intel and Apple Silicon): `macos-26`, `--target=universal-apple-darwin`
+- Apple Silicon: `xcode-27` (Xcode 27.1), `--target=aarch64-apple-darwin`
+- Universal (Intel and Apple Silicon): `xcode-27` (Xcode 27.1), `--target=universal-apple-darwin`
 
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
 signing as a local release, then uploads its assets into the draft release.

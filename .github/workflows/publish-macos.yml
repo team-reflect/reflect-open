@@ -54,10 +54,10 @@ jobs:
       matrix:
         include:
           - name: arm64
-            runner: macos-26
+            runner: xcode-27
             target: aarch64-apple-darwin
           - name: universal
-            runner: macos-26
+            runner: xcode-27
             target: universal-apple-darwin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,6 +95,11 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           cache: false
+
+      # Before setup-rust, which keys its cache on `xcrun clang`.
+      - uses: ./.github/actions/setup-xcode
+        with:
+          version: '27.1'
 
       - uses: ./.github/actions/setup-rust
         with:

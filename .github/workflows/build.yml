@@ -28,10 +28,10 @@ jobs:
       matrix:
         include:
           - name: macos
-            os: macos-26
+            os: xcode-27
             command: pnpm build:macos --target=universal-apple-darwin --no-sign
           - name: ios
-            os: macos-26
+            os: xcode-27
             command: pnpm build:ios --build-number=1 --no-sign
           - name: windows
             os: windows-2025
@@ -55,6 +55,12 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
+
+      # Before setup-rust, which keys its cache on `xcrun clang`.
+      - uses: ./.github/actions/setup-xcode
+        if: runner.os == 'macOS'
+        with:
+          version: '27.1'
 
       - uses: ./.github/actions/setup-rust
         with:
