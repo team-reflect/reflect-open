@@ -83,7 +83,7 @@ runs:
         env-vars: ORT_CACHE_DIR
         cache-directories: ${{ env.ORT_CACHE_DIR }}
 
-    # Fails if Cargo.lock is out of date, like `pnpm install --frozen-lockfile`.
+    # Fails if Cargo.lock is out of date.
     - name: Check Cargo.lock
       shell: bash
       run: cargo update --workspace --locked
