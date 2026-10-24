@@ -185,6 +185,42 @@ describe('GithubAuthService.getToken', () => {
     expect(auth.getState().connected).toBe(false)
   })
 
+  it('lets a sign-out queued behind the refresh’s store win', async () => {
+    const { auth, http, secretStore } = setup({
+      now: 2_000,
+      secrets: {
+        'github-auth': JSON.stringify({
+          kind: 'app',
+          accessToken: 'ghu_old',
+          refreshToken: 'ghr_old',
+          expiresAt: 1_000,
+        }),
+      },
+    })
+    http.on(
+      'POST',
+      TOKEN_URL,
+      jsonResponse({ access_token: 'ghu_new', refresh_token: 'ghr_new', expires_in: 28800 }),
+    )
+    // The keychain write of the refreshed pair is slow; the sign-out arrives meanwhile.
+    const storing = Promise.withResolvers<void>()
+    const set = secretStore.set.bind(secretStore)
+    vi.spyOn(secretStore, 'set').mockImplementationOnce(async (name, value) => {
+      await storing.promise
+      await set(name, value)
+    })
+
+    const token = auth.getToken()
+    await vi.waitFor(() => expect(http.requests()).toHaveLength(1))
+    const cleared = auth.clear()
+    storing.resolve()
+
+    expect(await token).toBe('ghu_new')
+    await cleared
+    expect(secretStore.snapshot()).toEqual({})
+    expect(auth.getState().connected).toBe(false)
+  })
+
   it('returns null when the refresh token has lapsed (re-auth required)', async () => {
     const { auth, http } = setup({
       now: 2_000,

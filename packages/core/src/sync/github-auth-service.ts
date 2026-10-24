@@ -247,6 +247,9 @@ class GithubAuthServiceImpl implements GithubAuthService {
   // Bumped by every save and clear, so a read that started before one does not
   // overwrite its answer.
   #writes = 0
+  // Keychain writes run one after the other, so a sign-out never races a
+  // refreshed pair being stored: whichever is queued later has the last word.
+  #writeQueue: Promise<unknown> = Promise.resolve()
 
   constructor(deps: GithubAuthServiceDeps) {
     this.#deps = deps
@@ -265,13 +268,13 @@ class GithubAuthServiceImpl implements GithubAuthService {
 
   async save(auth: GithubAuth): Promise<void> {
     this.#writes += 1
-    await this.#store(auth)
+    await this.#serialized(() => this.#store(auth))
     this.#setConnected(true)
   }
 
   async clear(): Promise<void> {
     this.#writes += 1
-    await this.#deps.secretStore.delete(GITHUB_AUTH_SECRET)
+    await this.#serialized(() => this.#deps.secretStore.delete(GITHUB_AUTH_SECRET))
     this.#setConnected(false)
   }
 
@@ -304,12 +307,20 @@ class GithubAuthServiceImpl implements GithubAuthService {
       return null
     }
     // A sign-out or sign-in that landed during the refresh has the last word:
-    // storing the refreshed pair would bring a cleared credential back.
-    if (this.#writes !== before) {
+    // storing the refreshed pair would bring a cleared credential back. The
+    // check runs inside the write queue, so nothing lands between it and
+    // the store; a sign-out queued later deletes what was stored.
+    const stored = await this.#serialized(async () => {
+      if (this.#writes !== before) {
+        return false
+      }
+      // A refresh keeps the machine connected, so subscribers are not notified.
+      await this.#store(refreshed)
+      return true
+    })
+    if (!stored) {
       return null
     }
-    // A refresh keeps the machine connected, so subscribers are not notified.
-    await this.#store(refreshed)
     return refreshed.kind === 'pat' ? refreshed.token : refreshed.accessToken
   }
 
@@ -473,6 +484,13 @@ class GithubAuthServiceImpl implements GithubAuthService {
     }
     this.#state = { connected }
     this.#notify()
+  }
+
+  /** Run one keychain write after every write queued before it. */
+  #serialized<T>(write: () => Promise<T>): Promise<T> {
+    const run = this.#writeQueue.then(write, write)
+    this.#writeQueue = run.catch(() => undefined)
+    return run
   }
 
   async #store(auth: GithubAuth): Promise<void> {
