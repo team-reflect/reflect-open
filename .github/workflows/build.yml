@@ -54,7 +54,6 @@ jobs:
         with:
           persist-credentials: false
 
-
       - uses: ./.github/actions/setup-xcode
         if: runner.os == 'macOS'
 

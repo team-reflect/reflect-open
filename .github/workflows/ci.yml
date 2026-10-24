@@ -123,7 +123,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-
       - name: Install Playwright
         run: pnpm --filter @reflect/desktop test:install:webkit
 
