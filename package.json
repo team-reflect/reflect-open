@@ -50,7 +50,7 @@
     "vitest": "^5.0.5"
   },
   "simple-git-hooks": {
-    "pre-commit": "./node_modules/.bin/nano-staged --allow-empty -u"
+    "pre-commit": "./node_modules/.bin/nano-staged --allow-empty"
   },
   "nano-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern"
