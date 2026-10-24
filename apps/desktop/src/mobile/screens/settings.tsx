@@ -167,6 +167,7 @@ export function MobileSettings(): ReactElement {
   // Development and TestFlight installs show the prerelease tag; anything else hides it.
   const showPrerelease =
     platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
+  const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
   const sync = useGitSyncContext()
   const githubConnected = useGithubConnected()
   const [disconnecting, setDisconnecting] = useState(false)
@@ -563,11 +564,7 @@ export function MobileSettings(): ReactElement {
               label="Notes"
               value={notes === undefined ? '…' : String(notes.length)}
             />
-            <SettingsValueRow
-              label="Version"
-              value={version === null ? '…' : showPrerelease ? version : marketingVersion(version)}
-              onPress={versionTap}
-            />
+            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsNavRow
               label="Open Source Licenses"
               onPress={() => navigate({ kind: 'licenses' })}
