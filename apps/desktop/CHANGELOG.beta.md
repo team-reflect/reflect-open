@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.16.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.13...v0.16.0-beta.14) (2026-10-24)
+
+
+### Features
+
+* **mobile:** show the prerelease version on TestFlight builds ([#1711](https://github.com/team-reflect/reflect-open/issues/1711)) ([f55c692](https://github.com/team-reflect/reflect-open/commit/f55c692cf7d93baded86eb5c5218734e3d2eda68))
+
+
+### Bug Fixes
+
+* align leftover copy with the sync wording ([#1709](https://github.com/team-reflect/reflect-open/issues/1709)) ([cd3a093](https://github.com/team-reflect/reflect-open/commit/cd3a0936583494a80e723e366f0027ac6412fe43))
+* **desktop:** drop unhelpful Settings text ([#1713](https://github.com/team-reflect/reflect-open/issues/1713)) ([9877ae1](https://github.com/team-reflect/reflect-open/commit/9877ae1358afaf5044a279b07ea27f92bb49245a))
+
 ## [0.16.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.12...v0.16.0-beta.13) (2026-10-24)
 
 
