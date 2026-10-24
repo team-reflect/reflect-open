@@ -34,9 +34,10 @@ repository card, with "Add sign-in…". A sign-in the host refused shows
 
 ## SSH: use your ssh-agent
 
-The contract: **if `ssh -T git@host` works in your terminal, sync works.**
-Reflect authenticates SSH remotes through your ssh-agent. It never asks for,
-stores, or manages SSH credentials.
+The contract: **if `ssh -T git@host` works in your terminal with the key
+loaded in your agent, sync works.** Reflect authenticates SSH remotes
+through your ssh-agent only; `ssh-add -l` must list the key the host
+accepts. It never asks for, stores, or manages SSH credentials.
 
 ```bash
 cd /path/to/your/graph

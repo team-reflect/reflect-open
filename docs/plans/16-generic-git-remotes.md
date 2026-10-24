@@ -168,6 +168,10 @@ external volume, GHES over SSH if reachable.
 
 ## V2 phases (HTTPS via credential helpers)
 
+> **Historical.** V2 shipped as per-host sign-ins entered in Settings and kept
+> in the OS keychain ([Plan 25](./25-sync-model.md)). The helper design below
+> was never built; it stays as the record of the option that was rejected.
+
 **Phase 0 — Spike.** `Cred::credential_helper` from inside the GUI app on macOS:
 helpers resolve via `git` on a GUI-app `PATH` (`/usr/bin` has Apple git, but CLT
 presence and helper discovery need proving — same class of gotcha as the CLI

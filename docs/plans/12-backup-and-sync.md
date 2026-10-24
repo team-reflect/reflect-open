@@ -1,6 +1,9 @@
 # Plan 12 — Backup & Sync (Git, GitHub-first)
 
-The naming rule and the GitHub / Git / iCloud split now live in [Plan 25](./25-sync-model.md).
+This is the original design. Where it says GitHub is the only remote, that
+iCloud is unsupported, or "backup", later plans supersede it: [Plan 16](./16-generic-git-remotes.md)
+(any git host), [Plan 21](./21-icloud-drive-sync.md) (iCloud Drive), and
+[Plan 25](./25-sync-model.md) (the sync model and the naming rule).
 
 **Goal:** Continuous, invisible backup and multi-device continuity over **Git**, with
 **GitHub as the only remote in the product UX**. Edits are debounced into commits and

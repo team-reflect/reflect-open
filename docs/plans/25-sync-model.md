@@ -12,7 +12,7 @@ sign-in may go, and one vocabulary for the UI.
 
 | Object | Level | What it is |
 | --- | --- | --- |
-| GitHub account | Machine | A sign-in with a refresh token. It serves GitHub repositories and gist publishing. It does not depend on any graph. |
+| GitHub account | Machine | One sign-in: a GitHub App token from the device flow (with a refresh token) or a personal access token. It serves GitHub repositories and gist publishing. It does not depend on any graph. |
 | Git repository | Graph | `origin` plus where its sign-in comes from. |
 | iCloud hosting | Graph | A fact of the graph path. The user cannot configure it. |
 
@@ -26,7 +26,10 @@ The GitHub account can exist with no graph connected.
 one of four kinds:
 
 - `github`: `https://github.com/owner/repo`. The GitHub account serves it.
-- `https`: any other `http(s)://` host. A per-host sign-in serves it.
+- `https`: any other `http(s)://` host. A per-host sign-in serves an
+  `https://` host. A plain `http://` host lands here too, but gets no
+  sign-in: Reflect never sends one in the clear, so such a remote stays in
+  `needsCredential` until its address is `https://`.
 - `ssh`: `git@host:…` or `ssh://`, github.com included. The ssh-agent serves
   it; Reflect stores nothing.
 - `path`: a local or mounted path. It needs no credential.
@@ -76,8 +79,9 @@ and the sync loop does not run (desktop keeps the local history commits).
   card description says the repository keeps the history, and the manual
   action is "Save history now", because the engine only commits there; the
   repository updates after the quiet window.
-- The UI names no git host other than GitHub. Every other host is "Other
-  host".
+- The UI names no git host other than GitHub. The chooser's second option
+  is "Other host"; a connected remote is still shown by its own host and
+  path, such as `gitlab.com/alex/notes`.
 - The word `backup` stays only for history and restore.
 
 ## UI shape
