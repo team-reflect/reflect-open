@@ -47,9 +47,11 @@ runs:
 
     - name: Install Rust toolchain
       shell: bash
-      run: |
-        rustup toolchain install --no-self-update
-        rustc --version --verbose
+      run: rustup toolchain install --no-self-update
+
+    - name: Print rustc version
+      shell: bash
+      run: rustc --version --verbose
 
     # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
     # into their cached output, and cargo does not rerun them when Xcode
