@@ -165,9 +165,9 @@ tests in `src-tauri/src/git/tests.rs`):
   under ULID names; accepted as rare and recoverable).
 - **The same note retitled differently on two devices** forks into two files
   sharing one id. Nothing wedges and both files survive; the user sees two
-  notes and deletes the one they don't want. `getDuplicateNoteIds` detects
-  forks, but the app shows no UI for them: the term means nothing to a user,
-  and the only remedy is the delete they would do anyway.
+  notes, copies any edits that differ into one, and deletes the other.
+  `getDuplicateNoteIds` detects forks, but the app shows no UI for them: the
+  term means nothing to a user, and the remedy is what they would do anyway.
 
 ## What deliberately doesn't exist
 

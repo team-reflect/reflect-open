@@ -100,7 +100,7 @@ export interface IndexQueryService {
   /**
    * Frontmatter `id`s claimed by more than one note. Two files claiming one
    * identity means a sync fork (e.g. rename/rename divergence). No UI shows
-   * forks; the user sees two notes and deletes one.
+   * forks; the user sees two notes, merges any differing edits, and deletes one.
    */
   getDuplicateNoteIds(): Promise<DuplicateIdGroup[]>
   /**
