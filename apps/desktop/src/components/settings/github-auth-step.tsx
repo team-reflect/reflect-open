@@ -17,7 +17,7 @@ interface GithubAuthStepProps {
   /**
    * The backup repository the token should be scoped to, when the wizard
    * already knows it — the instructions name it instead of speaking
-   * abstractly about "your backup repository".
+   * abstractly about "your repository".
    */
   repoName?: string | undefined
 }
@@ -169,7 +169,7 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
                   the <strong>{repoName}</strong> repository
                 </>
               ) : (
-                'your backup repository'
+                'your repository'
               )}{' '}
               (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored in your
               OS keychain, never in your graph.
