@@ -273,22 +273,7 @@ class GitSyncServiceImpl implements GitSyncService {
             status: engineStatus,
           })
           if (remote.kind === 'github' && isForbidden(engineStatus)) {
-            void classifyForbiddenStatus(this.#deps.githubAuth, remote.repo).then((next) => {
-              // Only replace the exact status the probe was asked about.
-              if (
-                next !== null &&
-                this.#state.phase === 'connected' &&
-                this.#state.status === engineStatus
-              ) {
-                this.#setState({
-                  phase: 'connected',
-                  remoteUrl,
-                  remote,
-                  isPrimaryChannel,
-                  status: next,
-                })
-              }
-            })
+            void this.#classifyForbidden(engineStatus, remoteUrl, remote, isPrimaryChannel)
           }
         },
         onLargeFilesSkipped: (files) => {
@@ -584,6 +569,19 @@ class GitSyncServiceImpl implements GitSyncService {
       // No zombie engine keeps timers alive behind the caller's state.
       this.#teardown()
       logger.error('local history failed to start:', errorMessage(error))
+    }
+  }
+
+  async #classifyForbidden(
+    status: SyncStatus,
+    remoteUrl: string,
+    remote: Extract<GitRemote, { kind: 'github' }>,
+    isPrimaryChannel: boolean,
+  ): Promise<void> {
+    const next = await classifyForbiddenStatus(this.#deps.githubAuth, remote.repo)
+    // Only replace the exact status this probe was asked about.
+    if (next !== null && this.#state.phase === 'connected' && this.#state.status === status) {
+      this.#setState({ phase: 'connected', remoteUrl, remote, isPrimaryChannel, status: next })
     }
   }
 }

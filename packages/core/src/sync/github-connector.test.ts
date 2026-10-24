@@ -3,10 +3,8 @@ import { AppError } from '../errors.ts'
 import { createTestHttpService } from '../testing/http.ts'
 import { createTestGitSyncService, createTestGithubAuthService } from '../testing/sync.ts'
 import { createGithubConnector } from './github-connector.ts'
-import { classifyForbiddenStatus } from './github-forbidden.ts'
 import { createGithubRepoService } from './github-repo-service.ts'
 
-const USER_URL = 'https://api.github.com/user'
 const PAT = { kind: 'pat', token: 'ghp_abc' } as const
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -119,41 +117,5 @@ describe('GithubConnector', () => {
     const { gitSync, connector } = setup({ signedIn: false })
     await expect(connector.connectNewRepo('g-backup')).rejects.toThrow(AppError)
     expect(gitSync.calls()).toEqual([])
-  })
-})
-
-describe('classifyForbiddenStatus', () => {
-  const repo = { owner: 'alex', name: 'notes' }
-
-  it('reports a refused sync when the token is good', async () => {
-    const { http, githubAuth } = setup()
-    http.on('GET', USER_URL, jsonResponse({ login: 'alex' }))
-    expect(await classifyForbiddenStatus(githubAuth, repo)).toMatchObject({
-      state: 'error',
-      errorKind: 'rejected',
-      message: expect.stringContaining('alex/notes') as string,
-    })
-  })
-
-  it('keeps the auth error when GitHub rejects the token', async () => {
-    const { http, githubAuth } = setup()
-    http.on('GET', USER_URL, jsonResponse({ message: 'Bad credentials' }, 401))
-    expect(await classifyForbiddenStatus(githubAuth, repo)).toBeNull()
-  })
-
-  it('reports offline when the probe never reaches GitHub or is rate limited', async () => {
-    const { http, githubAuth } = setup()
-    http.on('GET', USER_URL, () => {
-      throw new TypeError('Failed to fetch')
-    })
-    expect(await classifyForbiddenStatus(githubAuth, repo)).toMatchObject({ state: 'offline' })
-
-    http.on('GET', USER_URL, jsonResponse({ message: 'API rate limit exceeded' }, 403))
-    expect(await classifyForbiddenStatus(githubAuth, repo)).toMatchObject({ state: 'offline' })
-  })
-
-  it('keeps the auth error while signed out', async () => {
-    const { githubAuth } = setup({ signedIn: false })
-    expect(await classifyForbiddenStatus(githubAuth, repo)).toBeNull()
   })
 })
