@@ -209,7 +209,7 @@ describe('ConnectGithubDialog', () => {
     await expect.element(page.getByText(/alex\/public-notes is public/i)).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
 
-    await page.getByRole('button', { name: 'Back up to a public repo' }).click()
+    await page.getByRole('button', { name: 'Sync with a public repo' }).click()
 
     await vi.waitFor(() => {
       expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(

@@ -153,29 +153,53 @@ function compareEntries(a: Entry, b: Entry): number {
   )
 }
 
-/** The key a license text is stored under: the first 16 hex digits of its SHA-256. */
-function hashText(text: string): string {
-  return createHash('sha256').update(text).digest('hex').slice(0, 16)
+/** The shortest key length. 4 base64url characters hold 24 bits. */
+const MIN_KEY_LENGTH = 4
+
+/**
+ * Maps each text to its key: the shortest prefix of its base64url SHA-256,
+ * at least `MIN_KEY_LENGTH` characters, that no other hash starts with. A new
+ * text changes only the keys that share such a prefix with it. The map is
+ * sorted by key.
+ */
+function keyTexts(texts: string[]): Map<string, string> {
+  const hashed = texts
+    .map((text) => ({ text, hash: createHash('sha256').update(text).digest('base64url') }))
+    .toSorted((a, b) => (a.hash < b.hash ? -1 : 1))
+  // In sorted order, the longest prefix a hash shares with any other hash is
+  // the one it shares with a neighbor.
+  return new Map(
+    hashed.map(({ text, hash }, i) => {
+      const length = Math.max(
+        MIN_KEY_LENGTH,
+        countCommonPrefix(hash, hashed[i - 1]?.hash ?? '') + 1,
+        countCommonPrefix(hash, hashed[i + 1]?.hash ?? '') + 1,
+      )
+      return [text, hash.slice(0, length)]
+    }),
+  )
+}
+
+function countCommonPrefix(a: string, b: string): number {
+  let i = 0
+  while (i < a.length && a[i] === b[i]) i++
+  return i
 }
 
 async function main(): Promise<void> {
   const collected = [...(await collectNpm()), ...(await collectCargo()), collectInter()]
   const entries = mergeEntries(collected).toSorted(compareEntries)
 
-  // Each distinct text is stored once under its hash, and entries refer to
-  // texts by hash. Adding or removing a text changes no other key.
-  const texts = Object.fromEntries(
-    [...new Set(entries.flatMap((entry) => entry.texts))]
-      .map((text) => [hashText(text), text] as const)
-      .toSorted(([a], [b]) => a.localeCompare(b)),
-  )
+  // Each distinct text is stored once under its key, and entries refer to
+  // texts by key.
+  const keys = keyTexts([...new Set(entries.flatMap((entry) => entry.texts))])
 
   const data = {
     entries: entries.map((entry) => ({
       ...entry,
-      texts: entry.texts.map(hashText).toSorted(),
+      texts: entry.texts.map((text) => keys.get(text)!).toSorted(),
     })),
-    texts,
+    texts: Object.fromEntries([...keys].map(([text, key]) => [key, text] as const)),
   }
   writeFileSync(OUTPUT, JSON.stringify(data, null, 2))
   console.log(`[licenses] ${entries.length} entries → ${OUTPUT}`)

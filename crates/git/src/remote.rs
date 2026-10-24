@@ -112,7 +112,7 @@ fn resolve_credential(
         return Err(git2::Error::new(
             ErrorCode::Auth,
             ErrorClass::Http,
-            "no sign-in is stored for this host — add one in Settings → Sync, or use the SSH form of the remote URL",
+            "no sign-in is stored for this host; add one in Settings → Sync for the repository’s https address",
         ));
     }
     Err(git2::Error::new(

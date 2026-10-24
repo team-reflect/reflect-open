@@ -19,8 +19,8 @@ interface ConnectGithubDrawerProps {
 }
 
 const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
-  repo: 'Back up this graph to a private GitHub repository and sync it with Reflect on your other devices.',
-  auth: 'Sign in so Reflect can push your backups.',
+  repo: 'Sync this graph with Reflect on your other devices through a private GitHub repository.',
+  auth: 'Sign in so Reflect can sync with it.',
   finish: 'Connecting your repository…',
 }
 
