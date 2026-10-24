@@ -1,3 +1,4 @@
+import { parseUrl } from '@reflect/utils'
 import { AppError } from '../errors.ts'
 import type { GitHostCredentialService } from './git-host-credential-service.ts'
 import type { GitRepositoryService } from './git-repository-service.ts'
@@ -55,7 +56,14 @@ class HostConnectorImpl implements HostConnector {
     }
     // The token travels encrypted and lives in the keychain only: plain
     // http, and a sign-in written into the URL, are refused.
-    if (remote.kind !== 'https' || !url.startsWith('https://') || /^[^/]*@/.test(url.slice(8))) {
+    const parsed = parseUrl(url)
+    if (
+      remote.kind !== 'https' ||
+      parsed === null ||
+      parsed.protocol !== 'https:' ||
+      parsed.username !== '' ||
+      parsed.password !== ''
+    ) {
       throw new AppError(
         'parse',
         'Enter the repository’s https:// URL, without a username or token in it.',

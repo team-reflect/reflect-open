@@ -138,7 +138,8 @@ export interface GitRepositoryService {
   fetch(credential: GitCredential | null, generation: number): Promise<RemoteDelta>
   /**
    * Ask `origin` (or `url`, a remote that is not configured yet) for the
-   * current branch tip without fetching.
+   * current branch tip without fetching. `trackingOid` always describes
+   * `origin`'s tracking ref, so it is `null` for a probe from a fresh repo.
    */
   remoteHead(credential: GitCredential | null, generation: number, url?: string): Promise<RemoteTip>
   /**

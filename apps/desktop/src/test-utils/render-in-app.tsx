@@ -173,7 +173,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
   const gitSync = sync?.gitSync ?? null
   if (options?.app !== undefined && (sync !== null || options.platform !== undefined)) {
     throw new Error(
-      'renderInApp: with your own `app`, give it the platform and the git sync service yourself',
+      'renderInApp: with your own `app`, give it the platform, the git sync service, and the connectors yourself',
     )
   }
   const servicesOnly = options?.servicesOnly ?? false

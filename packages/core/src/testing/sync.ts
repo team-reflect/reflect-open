@@ -156,7 +156,10 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     generation: number,
     url?: string,
   ): Promise<RemoteTip> {
-    this.#log.push({ method: 'remoteHead', args: [credential, generation, url] })
+    this.#log.push({
+      method: 'remoteHead',
+      args: url === undefined ? [credential, generation] : [credential, generation, url],
+    })
     return await this.#handlers.remoteHead(credential, generation, url)
   }
 

@@ -215,6 +215,9 @@ export function createGraphServices(
     if (lifecycles.gitSync) {
       const sessionGitSync = create.gitSync(deps.gitSync, { root, generation, indexGeneration })
       gitSync = sessionGitSync
+      disposers.push(() => {
+        sessionGitSync.dispose()
+      })
       githubConnector = create.githubConnector({ ...deps.githubConnector, gitSync: sessionGitSync })
       hostConnector = create.hostConnector({
         ...deps.hostConnector,
@@ -222,9 +225,6 @@ export function createGraphServices(
         generation,
       })
       void sessionGitSync.start()
-      disposers.push(() => {
-        sessionGitSync.dispose()
-      })
     }
     if (lifecycles.icloudSync) {
       const icloud = create.icloudSync(deps.icloudSync, {

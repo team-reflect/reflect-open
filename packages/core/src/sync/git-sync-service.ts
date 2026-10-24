@@ -237,9 +237,6 @@ class GitSyncServiceImpl implements GitSyncService {
       // HTTPS remote would pull anonymously and only 401 on push, so the other
       // device's edits arrive while this one's silently never leave.
       const resolved = await credentials.resolve(remote)
-      // Subscribed only now: the resolver's first keychain read notifies the
-      // GitHub store's own subscribers, and that read is not a change.
-      this.#watchCredentials()
       if (this.#disposed) {
         return
       }
