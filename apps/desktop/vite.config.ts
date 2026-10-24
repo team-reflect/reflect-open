@@ -2,8 +2,7 @@ import { sentryVitePlugin } from '@sentry/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
-import babel from '@rolldown/plugin-babel'
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import react from '@vitejs/plugin-react'
 // The single version source; tauri.conf.json's `version` also points here.
 import pkg from './package.json' with { type: 'json' }
 
@@ -31,10 +30,7 @@ const platform: 'mobile' | 'desktop' | '' = (() => {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
-    babel({
-      presets: [reactCompilerPreset()],
-    }),
+    react({ compiler: true }),
 
     tailwindcss(),
     sentryVitePlugin({
