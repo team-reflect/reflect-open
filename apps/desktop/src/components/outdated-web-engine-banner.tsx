@@ -16,7 +16,7 @@ export function OutdatedWebEngineBanner(): ReactElement | null {
     return null
   }
   return (
-    <div className="fixed inset-x-4 top-[max(env(safe-area-inset-top),2.25rem)] z-50 mx-auto max-w-md rounded-md bg-background shadow-lg">
+    <div className="fixed inset-x-safe-offset-4 top-safe-or-9 z-50 mx-auto max-w-md rounded-md bg-background shadow-lg">
       <InlineAlert className="flex items-center gap-2">
         <span className="flex-1">
           Your system's web engine is out of date, so some colors may look wrong. Update your

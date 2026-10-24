@@ -14,11 +14,7 @@ export function SafeAreaBoundary({ children }: { children: ReactNode }): ReactEl
       <div
         ref={setBoundary}
         aria-hidden
-        className="pointer-events-none invisible fixed"
-        style={{
-          inset:
-            'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)',
-        }}
+        className="pointer-events-none invisible fixed inset-safe"
       />
       {children}
     </MenuBoundaryContext>

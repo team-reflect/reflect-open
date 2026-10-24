@@ -31,7 +31,7 @@ export function AppErrorBoundary({ children }: { children: ReactNode }): ReactEl
 function CrashFallback({ error }: FallbackProps): ReactElement {
   const message = error instanceof Error ? error.message : String(error)
   return (
-    <div className="flex h-dvh w-screen items-center justify-center bg-black/20 px-6">
+    <div className="flex h-dvh w-screen items-center justify-center bg-black/20 px-safe-offset-6">
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-xl bg-popover p-4 text-sm ring-1 ring-foreground/10">
         <p className="font-heading text-base font-medium">Something went wrong</p>
         <p className="text-text-muted">{message}</p>

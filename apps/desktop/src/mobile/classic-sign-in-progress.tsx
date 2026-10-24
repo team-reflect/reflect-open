@@ -112,11 +112,7 @@ export function ClassicSignInProgress({ signIn }: { signIn: ClassicSignIn }): Re
       role="dialog"
       aria-modal
       aria-labelledby="classic-sign-in-title"
-      className="fixed inset-0 z-40 flex bg-surface-app px-5 text-text"
-      style={{
-        paddingTop: 'max(env(safe-area-inset-top), 1.5rem)',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)',
-      }}
+      className="fixed inset-0 z-40 flex bg-surface-app px-safe-offset-5 pt-safe-or-6 pb-safe-or-4 text-text"
     >
       <div className="mx-auto flex w-full max-w-md flex-col gap-6 py-6">
         <div className="mt-[20vh] flex flex-col gap-5">

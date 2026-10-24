@@ -102,10 +102,9 @@ export function DaySlide({
   return (
     <div
       ref={containerRef}
-      className="h-full overflow-y-auto"
       // Keyboard avoidance is the shell root's job (it ends at the keyboard's
-      // top); this only clears the home indicator when the keyboard is down.
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      // top); `pb-safe` only clears the home indicator when the keyboard is down.
+      className="h-full overflow-y-auto pb-safe"
       onScroll={handleScroll}
     >
       {/* A column at least as tall as the slide, with the editor taking the

@@ -152,7 +152,7 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
               // Pad past the home indicator, or past the software keyboard while
               // it is up; max() keeps the two from stacking (the keyboard covers
               // the indicator).
-              'pb-[max(env(safe-area-inset-bottom),var(--keyboard-height,0px))]',
+              'pb-above-keyboard px-safe',
             )}
           >
             {children}

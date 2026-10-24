@@ -69,8 +69,7 @@ export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement
     <nav
       ref={navRef}
       aria-label="Sections"
-      className="flex shrink-0 border-t border-border"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="flex shrink-0 border-t border-border px-safe pb-safe"
     >
       <TabButton
         label="Daily"

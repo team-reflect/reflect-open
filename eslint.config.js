@@ -221,6 +221,18 @@ const MODULE_LET_SELECTORS = [
 const ACCESSOR_MESSAGE = 'No accessors. Write getX() / setX().'
 const ACCESSIBILITY_MESSAGE = 'Use # for private members; no accessibility modifiers.'
 
+const SAFE_AREA_MESSAGE =
+  'Use the `tailwindcss-safe-area` utilities (`pt-safe`, `px-safe-offset-4`, …), not `env(safe-area-inset-*)`.'
+
+/** `env(safe-area-inset-*)` written in a string or a template literal. */
+const SAFE_AREA_SELECTORS = [
+  { selector: String.raw`Literal[value=/env\(safe-area-inset/]`, message: SAFE_AREA_MESSAGE },
+  {
+    selector: String.raw`TemplateElement[value.raw=/env\(safe-area-inset/]`,
+    message: SAFE_AREA_MESSAGE,
+  },
+]
+
 const CODE_SHAPE_SELECTORS = [
   {
     selector: 'TSDeclareFunction',
@@ -309,6 +321,7 @@ export default defineESLintConfig(
         'error',
         REACT_ACT_SELECTOR,
         dynamicImportSelector(String.raw`^@tauri-apps\/`, TAURI_IMPORT_MESSAGE),
+        ...SAFE_AREA_SELECTORS,
         ...CODE_SHAPE_SELECTORS,
       ],
     },

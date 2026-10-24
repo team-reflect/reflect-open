@@ -55,12 +55,7 @@ export function DailyCaptureMenu(): ReactElement {
   }
 
   return (
-    <div
-      className="fixed right-4 z-40 size-12"
-      style={{
-        bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)',
-      }}
-    >
+    <div className="fixed right-safe-offset-4 bottom-above-keyboard-offset-17 z-40 size-12">
       <Button
         size="icon"
         aria-label={expanded ? 'Hide capture actions' : 'Show capture actions'}

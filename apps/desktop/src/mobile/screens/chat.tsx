@@ -24,10 +24,7 @@ export function MobileChat(): ReactElement {
   const hasProvider = providers.length > 0
 
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <div className="flex h-full w-screen flex-col pt-safe">
       <MobileTopBar>
         <MobileTopBarRow>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>

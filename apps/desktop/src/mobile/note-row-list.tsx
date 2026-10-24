@@ -30,10 +30,9 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   return (
     <>
       <div
-        className="min-h-0 flex-1 overflow-y-auto"
         // Keyboard avoidance is the shell root's job (it ends at the keyboard's
-        // top); this only clears the home indicator when the keyboard is down.
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        // top); `pb-safe` only clears the home indicator when the keyboard is down.
+        className="min-h-0 flex-1 overflow-y-auto px-safe pb-safe"
         onScroll={() => setRevealedPath(null)}
       >
         <Virtualizer as="ul" item="li" data={rows} itemSize={NOTE_ROW_HEIGHT} bufferSize={640}>

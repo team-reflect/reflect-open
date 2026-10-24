@@ -17,10 +17,8 @@ export function LightboxChromeButton({
   return (
     <div
       className={cn(
-        'absolute top-[max(env(safe-area-inset-top),1rem)] z-10',
-        side === 'left'
-          ? 'left-[max(env(safe-area-inset-left),1rem)]'
-          : 'right-[max(env(safe-area-inset-right),1rem)]',
+        'absolute top-safe-or-4 z-10',
+        side === 'left' ? 'left-safe-or-4' : 'right-safe-or-4',
       )}
       style={wrapperStyle}
     >

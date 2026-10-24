@@ -73,18 +73,12 @@ export function MobileGraphs(): ReactElement {
   }
 
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <div className="flex h-full w-screen flex-col pt-safe">
       <MobileScreenHeader
         title="Graphs"
         onBack={() => (canBack ? back() : navigate({ kind: 'settings' }))}
       />
-      <main
-        className="min-h-0 flex-1 overflow-y-auto"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
+      <main className="min-h-0 flex-1 overflow-y-auto px-safe pb-safe">
         <div className="flex flex-col gap-6 px-4 py-4">
           <SettingsGroup
             header="iCloud Drive"

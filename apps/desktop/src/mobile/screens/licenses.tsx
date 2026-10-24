@@ -7,15 +7,12 @@ import { useRouter } from '@/routing/router.tsx'
 export function MobileLicenses(): ReactElement {
   const { back, canBack, navigate } = useRouter()
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <div className="flex h-full w-screen flex-col pt-safe">
       <MobileScreenHeader
         title="Licenses"
         onBack={() => (canBack ? back() : navigate({ kind: 'settings' }))}
       />
-      <LicenseList className="flex-1 px-4 py-3" />
+      <LicenseList className="flex-1 px-safe-offset-4 py-3" />
     </div>
   )
 }

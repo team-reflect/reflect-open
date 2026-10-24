@@ -46,7 +46,7 @@ export function MobileFormattingToolbar(): ReactElement | null {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex shrink-0 items-center border-t border-border"
+      className="flex shrink-0 items-center border-t border-border px-safe"
     >
       <div className="flex min-w-0 flex-1 items-center overflow-x-auto px-1">
         <ToolbarButton

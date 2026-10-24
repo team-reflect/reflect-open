@@ -110,10 +110,7 @@ export function CalendarStrip({
   }, [resetSeq, date, showWeekOf])
 
   return (
-    <header
-      className="shrink-0 border-b border-border px-2 pb-1"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <header className="shrink-0 border-b border-border px-safe-offset-2 pt-safe pb-1">
       {/* Three equal-flanked columns so the month sits at the screen's center
           regardless of the gear (left) and the fading Today button (right). */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1">

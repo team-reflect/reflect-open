@@ -10,6 +10,7 @@ Cascade layer order, low to high priority.
 @layer theme, base, components, utilities, design, meowdown;
 
 @import 'tailwindcss';
+@import 'tailwindcss-safe-area';
 @import '@reflect/design-system/styles.css' layer(design);
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
@@ -19,6 +20,26 @@ Cascade layer order, low to high priority.
 /* Tailwind v4 dark variant keyed to the design-system `.dark` scope set by the
    ThemeEffect on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* `tailwindcss-safe-area` knows neither the software keyboard nor the tab bar.
+   These clear the home indicator, or the keyboard while it is up
+   (`--keyboard-height`, mobile/use-keyboard.ts), or the tab bar
+   (`--mobile-tab-bar-height`, mobile/mobile-tab-bar.tsx). */
+@utility pb-above-keyboard {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px));
+}
+@utility bottom-above-keyboard-offset-* {
+  bottom: calc(
+    max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px)) + var(--spacing) *
+      --value(integer)
+  );
+}
+@utility bottom-above-tab-bar-offset-* {
+  bottom: calc(
+    var(--mobile-tab-bar-height, env(safe-area-inset-bottom, 0px)) + var(--spacing) *
+      --value(integer)
+  );
+}
 
 /* Controls that sit inside the overlaid macOS title-bar drag strip must share
    the strip's z-index so they win by tree order without jumping above overlays. */
@@ -332,7 +353,7 @@ html:root {
    role with a fixed phone-sized inset: the class must be un-layered so it beats
    `.reflect-editor { padding: 0; }` on the contenteditable itself. */
 .reflect-mobile-content-gutter {
-  padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
+  @apply px-safe-or-4;
 }
 
 /* Block spacing comes from the element margins below, not the theme's

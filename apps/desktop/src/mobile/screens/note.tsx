@@ -24,10 +24,7 @@ export function MobileNote({ path }: { path: string }): ReactElement {
   const untitled = isUntitledNotePath(path)
 
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <div className="flex h-full w-screen flex-col pt-safe">
       <MobileScreenHeader
         title={untitled ? 'New note' : 'Edit note'}
         onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
@@ -39,11 +36,10 @@ export function MobileNote({ path }: { path: string }): ReactElement {
         }
       />
       <main
-        className="min-h-0 flex-1 overflow-y-auto"
         // Keyboard avoidance is the shell root's job (it ends at the
-        // keyboard's top); this only clears the home indicator when the
+        // keyboard's top); `pb-safe` only clears the home indicator when the
         // keyboard is down.
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="min-h-0 flex-1 overflow-y-auto pb-safe"
       >
         {/* A column at least as tall as the scroll area, with the editor
             taking the slack: the backlinks sit right below the note's own

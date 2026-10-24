@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { cn } from '@/lib/utils.ts'
 
 export function MobileTopBar({ children }: { children: ReactNode }): ReactElement {
-  return <header className="shrink-0 border-b border-border">{children}</header>
+  return <header className="shrink-0 border-b border-border px-safe">{children}</header>
 }
 
 export function MobileTopBarRow({

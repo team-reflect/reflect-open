@@ -84,7 +84,7 @@ export function MobileApp(): ReactElement {
 
   if (status === 'choosing') {
     return (
-      <div className="flex h-dvh w-screen flex-col items-center justify-center gap-2 px-8 text-center">
+      <div className="flex h-dvh w-screen flex-col items-center justify-center gap-2 px-safe-offset-8 text-center">
         <p className="text-sm font-medium">Couldn’t open your notes</p>
         <p className="text-sm text-text-muted">{error ?? 'Unknown error'}</p>
       </div>
@@ -96,7 +96,7 @@ export function MobileApp(): ReactElement {
 
 function LoadingScreen(): ReactElement {
   return (
-    <div className="flex h-dvh w-screen items-center justify-center text-sm text-text-muted">
+    <div className="flex h-dvh w-screen items-center justify-center px-safe text-sm text-text-muted">
       Loading…
     </div>
   )

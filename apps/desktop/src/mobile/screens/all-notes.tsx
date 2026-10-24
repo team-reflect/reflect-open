@@ -144,10 +144,7 @@ export function MobileAllNotes({
   }
 
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <div className="flex h-full w-screen flex-col pt-safe">
       <MobileTopBar>
         <MobileTopBarRow>
           {tag !== null && (

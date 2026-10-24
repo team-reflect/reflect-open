@@ -21,12 +21,7 @@ export function MobileStatusLayer(): ReactElement | null {
   }
 
   return (
-    <div
-      className="pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2"
-      style={{
-        bottom: 'calc(var(--mobile-tab-bar-height, env(safe-area-inset-bottom, 0px)) + 0.75rem)',
-      }}
-    >
+    <div className="pointer-events-none fixed inset-x-safe bottom-above-tab-bar-offset-3 z-50 flex flex-col items-center gap-2">
       <MobileOperationsPills />
       <IndexProgressPill />
       <SyncStatusPill />

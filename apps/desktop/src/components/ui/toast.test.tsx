@@ -45,8 +45,8 @@ describe('Toaster', () => {
     await render(<Toaster position="top-center" />)
     addSampleToasts()
 
-    // `env(safe-area-inset-top)` is 0 outside iOS, so `max()` falls back to
-    // 1rem; on a camera-pill iPhone the inset wins and clears the pill.
+    // The top safe-area inset is 0 outside iOS, so `top-safe-or-4` falls back
+    // to 1rem; on a camera-pill iPhone the inset wins and clears the pill.
     expect(getComputedStyle(viewport()).top).toBe('16px')
     expect(getComputedStyle(viewport()).position).toBe('fixed')
 
