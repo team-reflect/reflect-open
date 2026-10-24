@@ -126,7 +126,7 @@ export function MobileSettings(): ReactElement {
   const classicSignOut = useClassicSignOut()
   const { paywall, noteList, logger } = useMobileAppServices()
   const { opener } = useAppServices()
-  const { githubAuth } = useCoreServices()
+  const { githubAuth, platform: platformService } = useCoreServices()
   const [, setPaywallRequested] = usePaywallRequested()
   const [restorePending, setRestorePending] = useState(false)
   const [redeemPending, setRedeemPending] = useState(false)
@@ -164,6 +164,9 @@ export function MobileSettings(): ReactElement {
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
   const environment = useAppStoreEnvironment()
+  // Development and TestFlight installs show the prerelease tag; anything else hides it.
+  const showPrerelease =
+    platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
   const sync = useGitSyncContext()
   const githubConnected = useGithubConnected()
   const [disconnecting, setDisconnecting] = useState(false)
@@ -562,7 +565,7 @@ export function MobileSettings(): ReactElement {
             />
             <SettingsValueRow
               label="Version"
-              value={version === null ? '…' : marketingVersion(version)}
+              value={version === null ? '…' : showPrerelease ? version : marketingVersion(version)}
               onPress={versionTap}
             />
             <SettingsNavRow

@@ -7,6 +7,7 @@ import {
   createTestCoreServices,
   createTestGitSyncService,
   createTestGitHostConnector,
+  createTestPlatformService,
   seedNotes,
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
@@ -60,6 +61,10 @@ interface MountOptions {
    * Whether the device is signed in to GitHub. Signed in by default.
    */
   githubSignedIn?: boolean
+  /**
+   * Whether this is a development build.
+   */
+  isDev?: boolean
 }
 
 /**
@@ -75,6 +80,7 @@ async function mount(options?: MountOptions) {
     appInfo: createTestAppInfoService('1.2.3-beta.4'),
     gitSync,
     gitHostConnector,
+    platform: createTestPlatformService({ isDev: options?.isDev ?? false }),
     // A note window's graph runs no sync lifecycle.
     role: options?.gitSync === null ? 'note-window' : 'main',
   })
@@ -147,6 +153,33 @@ describe('MobileSettings', () => {
     await vi.waitFor(() => {
       expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy'])
     })
+  })
+
+  it('shows the version without the prerelease tag on an App Store install', async () => {
+    const view = await mount()
+    await act(() => {
+      view.app.mobile.appStoreEnvironment.setState({ value: 'Production' })
+    })
+
+    await expect.element(page.getByText('1.2.3', { exact: true })).toBeVisible()
+  })
+
+  it('shows the full version on a TestFlight install', async () => {
+    const view = await mount()
+    await act(() => {
+      view.app.mobile.appStoreEnvironment.setState({ value: 'Sandbox' })
+    })
+
+    await expect.element(page.getByText('1.2.3-beta.4', { exact: true })).toBeVisible()
+  })
+
+  it('shows the full version on a development build', async () => {
+    const view = await mount({ isDev: true })
+    await act(() => {
+      view.app.mobile.appStoreEnvironment.setState({ value: 'Production' })
+    })
+
+    await expect.element(page.getByText('1.2.3-beta.4', { exact: true })).toBeVisible()
   })
 
   it('writes appearance choices to the settings document', async () => {
