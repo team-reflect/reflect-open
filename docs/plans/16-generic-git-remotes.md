@@ -23,7 +23,8 @@ entered in Settings and stored in the OS keychain, not as git credential helpers
 (the helper phases below were never built). See [Plan 25](./25-sync-model.md). The
 design and phase sections below that speak of credential helpers are historical.
 
-**Explicitly not in scope:** host pickers, a "custom remote" wizard, or per-host REST
+**Explicitly not in scope:** host-specific pickers beyond the GitHub / Other host
+choice, a "custom remote" wizard, or per-host REST
 sugar (repo creation, visibility checks, install links — those stay GitHub-only
 conveniences). The one Settings form for a host sign-in (address, username, token or
 password) shipped with Plan 25; per-host settings beyond it stay out. File-sync providers were unsupported by design when

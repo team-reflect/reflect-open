@@ -21,7 +21,8 @@ Create the token on the host first:
   scope. GitLab refuses account passwords for git over HTTPS.
 - **Gitea, Forgejo, Codeberg:** an access token with the `write:repository`
   permission.
-- **A server with plain HTTP Basic auth:** your password works as is.
+- **A server with HTTP Basic auth over HTTPS:** your account password works as
+  is. Plain `http://` never gets a sign-in.
 
 The sign-in lives only in the OS keychain, under the host's origin (scheme,
 host, and port). Reflect sends it only to that origin: never to another
