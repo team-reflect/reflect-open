@@ -26,7 +26,3 @@ runs:
     - name: Print the Xcode version after
       shell: bash
       run: xcodebuild -version
-
-    - name: Print the iOS SDK version
-      shell: bash
-      run: xcrun --sdk iphoneos --show-sdk-version
