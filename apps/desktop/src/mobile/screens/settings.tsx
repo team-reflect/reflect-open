@@ -53,7 +53,7 @@ import {
   useClassicSignOut,
 } from '@/mobile/use-classic-access.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { formatFullDate } from '@/lib/dates.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
@@ -124,9 +124,9 @@ export function MobileSettings(): ReactElement {
   const subscription = useActiveSubscription()
   const classicAccess = useClassicAccess()
   const classicSignOut = useClassicSignOut()
-  const { paywall, noteList, logger } = useMobileAppServices()
+  const { paywall } = useMobileServices()
   const { opener } = useAppServices()
-  const { githubAuth, platform: platformService } = useCoreServices()
+  const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
   const [, setPaywallRequested] = usePaywallRequested()
   const [restorePending, setRestorePending] = useState(false)
   const [redeemPending, setRedeemPending] = useState(false)

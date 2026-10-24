@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { AppStoreEnvironment } from '@reflect/core'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useServiceState } from '@/services/use-service-state.ts'
 
 export type { AppStoreEnvironment } from '@reflect/core'
@@ -14,7 +14,7 @@ export function useAppStoreEnvironment(): {
   isError: boolean
   invalidate: VoidFunction
 } {
-  const { appStoreEnvironment: environment } = useMobileAppServices()
+  const { appStoreEnvironment: environment } = useMobileServices()
   const state = useServiceState(environment, environment.getState)
 
   useEffect(() => {

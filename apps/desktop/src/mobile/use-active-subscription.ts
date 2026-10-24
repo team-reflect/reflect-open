@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { focusManager } from '@tanstack/react-query'
 import type { ActiveSubscription } from '@reflect/core'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
@@ -15,7 +15,7 @@ export function useActiveSubscription(): {
   invalidate: VoidFunction
   refetch: () => Promise<ActiveSubscription>
 } {
-  const { subscription } = useMobileAppServices()
+  const { subscription } = useMobileServices()
   const state = useServiceState(subscription, subscription.getState)
 
   useEffect(() => {

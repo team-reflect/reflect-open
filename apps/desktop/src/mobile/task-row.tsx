@@ -6,7 +6,7 @@ import { TaskText } from '@/components/tasks/task-text.tsx'
 import { formatShortDate } from '@/lib/dates.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { useRowSwipe } from '@/mobile/use-row-swipe.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
@@ -71,7 +71,7 @@ export function MobileTaskRow({
   onOpenNote,
   onDelete,
 }: MobileTaskRowProps): ReactElement {
-  const { haptics } = useMobileAppServices()
+  const { haptics } = useMobileServices()
   const { settings } = useSettings()
   const label = task.text || 'Empty task'
   const edit = (): void => onEdit(task)

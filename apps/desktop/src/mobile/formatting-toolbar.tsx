@@ -15,7 +15,7 @@ import {
 import { useFormattingToolbar } from '@/editor/formatting-toolbar-store.ts'
 import { pickFiles } from '@/lib/pick-files.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 
 /**
  * The webview-drawn formatting toolbar (Plan 19, decision 8 — V1's native
@@ -133,7 +133,7 @@ function ToolbarButton({
   disabled?: boolean
   onPress: () => void
 }): ReactElement {
-  const { haptics } = useMobileAppServices()
+  const { haptics } = useMobileServices()
   return (
     <button
       type="button"

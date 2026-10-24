@@ -169,8 +169,9 @@ The services only a mobile platform builds (`haptics`, `subscription`, `paywall`
   ```
 
   Both hooks throw outside their provider. Do not add per-service hooks. The
-  mobile tree uses `useMobileAppServices()` (`mobile/mobile-services.ts`), which adds
-  `app.mobile` and throws when it is `null`.
+  mobile tree reads the mobile-only services with `useMobileServices()`
+  (`mobile/mobile-services.ts`), which returns `CoreServices.mobile` and throws when it
+  is `null`. Core services still come from `useCoreServices()`.
 - **Non-React desktop modules** (`lib/`, `providers/*.ts`): the leading parameters
   are the services the function uses, or the `CoreServices` container (and a second
   `AppServices` one) when it uses three or more. The React caller passes the

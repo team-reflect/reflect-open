@@ -11,7 +11,7 @@ import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
 import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation.tsx'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileTaskRow } from '@/mobile/task-row.tsx'
 
 interface MobileTaskGroupProps {
@@ -71,7 +71,7 @@ export function MobileTaskGroup({
   revealedTaskKey,
   setRevealedTaskKey,
 }: MobileTaskGroupProps): ReactElement {
-  const { haptics } = useMobileAppServices()
+  const { haptics } = useMobileServices()
   const showSource = group.kind !== 'note'
   const { notePath } = group
   const { icon, colorClass } = taskGroupHeaderStyle(group)

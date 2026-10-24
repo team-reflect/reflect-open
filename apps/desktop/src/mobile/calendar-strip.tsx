@@ -6,7 +6,7 @@ import { monthOf } from '@/lib/month-grid.ts'
 import { cn } from '@/lib/utils.ts'
 import { monthPickTarget, weekAtIndex, weekStartOf } from '@/mobile/calendar.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MonthPickerDrawer } from '@/mobile/month-picker-drawer.tsx'
 import { MonthTitle } from '@/mobile/month-title.tsx'
 import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
@@ -52,7 +52,7 @@ export function CalendarStrip({
   resetSeq,
   onSelect,
 }: CalendarStripProps): ReactElement {
-  const { haptics } = useMobileAppServices()
+  const { haptics } = useMobileServices()
   const { settings } = useSettings()
   const { navigate } = useRouter()
   const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(

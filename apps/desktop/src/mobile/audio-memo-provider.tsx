@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { GraphInfo, MobileAudioMemoSession, MobileAudioMemoSessionState } from '@reflect/core'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
@@ -61,7 +61,7 @@ export function MobileAudioMemoProvider({
   graph,
   children,
 }: MobileAudioMemoProviderProps): ReactElement {
-  const { mobileAudioMemo } = useMobileAppServices()
+  const { mobileAudioMemo } = useMobileServices()
 
   // Opened before paint, so the mic action never shows the closed state.
   const [session, setSession] = useState<MobileAudioMemoSession | null>(null)

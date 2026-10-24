@@ -15,7 +15,7 @@ import { addDaysIso, formatDayLabel } from '@/lib/dates.ts'
 import type { TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
-import { useMobileAppServices } from '@/mobile/mobile-services.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { withDraftDueDate } from '@/mobile/task-draft.ts'
 import { TaskScheduleGrid } from '@/mobile/task-schedule-grid.tsx'
 import { useTaskSheetFinalizer } from '@/mobile/use-task-sheet-finalizer.ts'
@@ -63,7 +63,7 @@ export function MobileTaskEditSheet({
   onOpenNote,
   autoFocusEditor = false,
 }: MobileTaskEditSheetProps): ReactElement {
-  const { haptics } = useMobileAppServices()
+  const { haptics } = useMobileServices()
   const { settings } = useSettings()
   const navigateWikiLink = useWikiLinkNavigation()
   const onLinkClick = useMarkdownLinkClick(null)
