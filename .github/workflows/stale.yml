@@ -7,6 +7,7 @@ name: Stale
 
 on:
   schedule:
+    # Every day at 03:17 UTC (minute 17, hour 3).
     - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
