@@ -1077,6 +1077,41 @@ mod tests {
     }
 
     #[test]
+    fn a_self_conflict_keeps_both_drafts_of_the_last_line() {
+        // One device saves twice while the first save is still uploading, and
+        // iCloud splits the two saves into a conflict. Both sides are this
+        // device's own writes, so the shadow base is still the last synced
+        // content.
+        let root = graph();
+        let rel = "daily/2026-07-11.md";
+        let synced = "# 2026-07-11\n\n- repot the basil\n";
+        let earlier = "# 2026-07-11\n\n- repot the basil\n- water the ferns\n";
+        let latest = "# 2026-07-11\n\n- repot the basil\n- water the ferns on the balcony\n";
+        let shadow = ShadowStore::new(root.path());
+        shadow.record(rel, synced).unwrap();
+        crate::fs::own_writes::record(root.path(), rel, earlier.as_bytes());
+        write(root.path(), rel, latest);
+        crate::fs::own_writes::record(root.path(), rel, latest.as_bytes());
+
+        let resolution = resolve_file(
+            root.path(),
+            rel,
+            2_000,
+            vec![fake_version(root.path(), "earlier.md", earlier, 1_000)],
+            &shadow,
+        )
+        .unwrap();
+
+        // Pins the current behavior: append-union reads the extended line as a
+        // second append and keeps the draft above it. The latest save alone
+        // is the expected result.
+        assert_eq!(
+            resolution.final_content,
+            "# 2026-07-11\n\n- repot the basil\n- water the ferns\n- water the ferns on the balcony\n"
+        );
+    }
+
+    #[test]
     fn multi_version_clean_folds_keep_every_side() {
         let root = graph();
         write(root.path(), "daily/2026-07-04.md", "- seed\n- mac line\n");
