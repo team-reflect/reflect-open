@@ -7,8 +7,8 @@ name: Stale
 
 on:
   schedule:
-    # Every day at 03:17 UTC (minute 17, hour 3).
-    - cron: '17 3 * * *'
+    # Every day at 02:45 UTC (minute 45, hour 2).
+    - cron: '45 2 * * *'
   workflow_dispatch:
     inputs:
       dry-run:
@@ -38,6 +38,6 @@ jobs:
           stale-issue-message: Thanks for the report! We believe this has been fixed, so we will close this issue in 7 days. If you still see the problem, please leave a comment and we will keep it open.
           stale-pr-message: Thank you for this PR! We believe this has been resolved, so we will close it in 7 days. If it is still needed, please leave a comment and we will keep it open.
           close-issue-reason: completed
-          close-issue-message: Closing this issue for now. Thank you! If you still see the problem, please leave a comment and we will reopen it.
-          close-pr-message: Closing this PR for now. Thank you for your contribution! If it is still needed, please leave a comment and we will reopen it.
+          close-issue-message: Closing this issue. If you still see the problem, please leave a comment and we will reopen it.
+          close-pr-message: Closing this PR. If it is still needed, please leave a comment and we will reopen it.
           debug-only: ${{ inputs.dry-run == true }}
