@@ -1,137 +1,29 @@
 # iOS TestFlight Builds
 
-How to build Reflect's Tauri iOS target and upload it to TestFlight.
-
 ```bash
-pnpm build:ios --build-number=<digits>
-pnpm upload:testflight
+pnpm build:ios --build-number=<digits>   # apps/desktop/scripts/build-ios.ts
+pnpm upload:testflight                   # apps/desktop/scripts/upload-testflight.ts
 ```
 
-The helpers live at `apps/desktop/scripts/build-ios.ts` and
-`apps/desktop/scripts/upload-testflight.ts`, and are exposed as `pnpm build:ios`
-and `pnpm upload:testflight` from the repo root. They do what the TestFlight
-workflow runs: build and check, then upload.
+Every release runs both in `.github/workflows/publish-testflight.yml`. To retry, re-run its
+failed job in the Release run.
 
-## What You Need
+## Credentials
 
-1. **An App Store Connect app for `app.reflect.ios`.** The iOS template already
-   sets `PRODUCT_BUNDLE_IDENTIFIER` to `app.reflect.ios` and `DEVELOPMENT_TEAM`
-   to `789ULN5MZB`. This is intentionally separate from the old Capacitor mobile
-   app (`app.reflect.ReflectMobile`), so TestFlight uploads from this repo do not
-   replace the existing mobile app record. The release helper verifies the IPA
-   bundle identifier before upload.
+Local builds read these environment variables. CI sets them from the `release_app`
+environment secrets.
 
-   The same iOS template sets `ITSAppUsesNonExemptEncryption` to `false`.
-   Reflect iOS currently uses only exempt encryption (standard HTTPS/Git
-   transport and OS keychain storage), so App Store Connect can skip the
-   repeated export-compliance questionnaire on later builds. If the mobile app
-   grows non-exempt cryptography, update the Info.plist value and the App Store
-   Connect encryption answers before uploading.
-
-2. **An App Store Connect API key** with permission to manage signing and upload
-   builds. The release helper exposes it to Tauri/xcodebuild through environment
-   variables and uses it for the altool upload:
-
-   ```bash
-   export APPLE_API_KEY=ABC123DEFG
-   export APPLE_API_ISSUER=00000000-0000-0000-0000-000000000000
-   export APPLE_API_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_ABC123DEFG.p8"
-   ```
-
-   In CI, use `APPLE_API_KEY_CONTENT` instead of a path; the script writes it to
-   a temporary file outside the workspace. `APPLE_API_KEY_CONTENT` may be the raw
-   `.p8` file contents or base64-wrapped text.
-
-3. **Sentry exception telemetry credentials.** Set the public DSN as both `VITE_SENTRY_DSN`
-   and `REFLECT_SENTRY_DSN`, and the private, build-only `SENTRY_AUTH_TOKEN`, for local
-   TestFlight builds. Configure them in GitHub as the `release_app` environment secrets
-   `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight workflow requires both before
-   building. `VITE_SENTRY_DSN` initializes the WebView SDK. `REFLECT_SENTRY_DSN` is
-   expanded into the app's `Info.plist` as `ReflectSentryDSN`, which the iOS native SDK
-   reads; the build helper fails when the two differ. The token must
-   be allowed to upload JavaScript source maps and native debug files to the
-   `reflect-open` project; it must never use the `VITE_` prefix or enter the app bundle.
-
-4. **A monotonically increasing build number.** TestFlight rejects duplicate
-   `CFBundleVersion` values for the same marketing version. The GitHub Action
-   always generates a UTC timestamp in `YYYYMMDDHHmm` format and passes it as
-   `--build-number`, which the helper requires. Do not use `github.run_number` for TestFlight
-   builds: a lower `CFBundleVersion` can upload successfully while TestFlight
-   still appears to show the previous timestamp build as the latest.
-
-5. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
-   iOS build command, and `xcrun altool`.
-
-## Commands
-
-```bash
-pnpm build:ios --build-number=<digits>
-```
-
-Runs `tauri ios build --export-method app-store-connect --ci` with the App Store
-Connect API key. The build number is merged into the Tauri config as
-`bundle.iOS.bundleVersion`. The IPA lands at
-`apps/desktop/src-tauri/gen/apple/build/arm64/Reflect.ipa`. Release builds retain Rust line
-tables so Xcode can produce a dSYM that symbolicates native frames. The helper
-requires the current archive's main dSYM, verifies its UUID against the archived
-executable, and asserts the native diagnostics entry point is linked into the
-executable. A `VITE_SENTRY_DSN` that is not the production project is a
-release error.
-
-```bash
-pnpm upload:testflight
-```
-
-Uploads that archive's native symbols to Sentry, without source bundles, then
-uploads the IPA with `xcrun altool --upload-package --wait`, which returns after
-App Store Connect has processed the build.
-
-## GitHub Action
-
-The TestFlight workflow runs as part of every release, called from
-`.github/workflows/publish-desktop.yml`. To retry it, re-run its failed job in
-the Release run. The workflow builds on
-`xcode-27` with Xcode 27.1, uploads the IPA to App Store Connect, and
-serializes runs so two uploads do not race each other. It keeps the exported IPA for 30 days and a
-metadata-preserving ZIP of the exact `.xcarchive` for 90 days. The archive holds
-the matching binaries and dSYMs needed to symbolicate an Apple `.ips` report
-that arrives later; the archive is packaged even when the run failed, so the
-evidence survives a release blocker.
-
-Configure these secrets in the `release_app` environment, which only `master` can use:
-
-| Secret | Value |
-| --- | --- |
-| `APPLE_API_KEY` | App Store Connect API key ID |
-| `APPLE_API_ISSUER` | App Store Connect issuer UUID |
-| `APPLE_API_KEY_CONTENT` | Contents of `AuthKey_<KEY>.p8` |
-| `SENTRY_DSN` | Public DSN for the production Reflect Sentry project |
-| `SENTRY_AUTH_TOKEN` | Build-only token allowed to upload releases, source maps, and debug files |
-
-The workflow does not accept a build-number input. Each run resolves one UTC
-timestamp build number, logs it, and passes it to the helper. If you need a one-off custom value while debugging, run the
-local package command with `--build-number=<number>` instead of changing the
-workflow.
+- App Store Connect API key: `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_KEY_PATH` (CI:
+  `APPLE_API_KEY_CONTENT`).
+- Sentry DSN: `VITE_SENTRY_DSN` for the WebView SDK and `REFLECT_SENTRY_DSN` for the native SDK
+  (CI: both from `SENTRY_DSN`).
+- `SENTRY_AUTH_TOKEN`: dSYM and source map upload. Never give it a `VITE_` prefix.
 
 ## Troubleshooting
 
-- **`exportArchive No Accounts`** or **`No profiles for 'app.reflect.ios' were
-  found`**: xcodebuild could not provision the App Store build. Sign into Xcode
-  with a team account that can create an App Store provisioning profile for
-  `app.reflect.ios`, or set the App Store Connect API key env vars.
-- **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`**: the
-  bundle id exists for signing, but no App Store Connect app record exists yet.
-  Create a new iOS app in App Store Connect for `app.reflect.ios`; do not reuse
-  the old Capacitor app record (`app.reflect.ReflectMobile`).
-- **`Automatic signing cannot register bundle identifier "app.reflect.ios.<ext>"`**
-  (with **`No profiles for 'app.reflect.ios.<ext>' were found`**): a NEW app
-  extension target (ShareExtension, RecordingWidget, …) is shipping for the
-  first time and its bundle identifier does not exist on the developer portal
-  yet. The CI App Store Connect key can create provisioning profiles for
-  *existing* identifiers but cannot *register* new ones. Register it once from
-  a machine whose Xcode is signed into the team — a signed build of just that
-  target auto-registers the identifier and its capabilities (App Group
-  included):
+- **`Automatic signing cannot register bundle identifier "app.reflect.ios.<ext>"`**: a new app
+  extension ships for the first time, and the CI key cannot register identifiers. Register it
+  once from a Mac signed into the team, then rerun the workflow:
 
   ```bash
   cd apps/desktop/src-tauri/gen/apple
@@ -139,41 +31,12 @@ workflow.
     -sdk iphoneos -configuration release -allowProvisioningUpdates build
   ```
 
-  Then rerun the TestFlight workflow. (Registering the identifier by hand in
-  the developer portal — with its App Groups capability — works too.)
-- **Duplicate build number**: rerun the GitHub Action so it stamps a fresh
-  timestamp. For local debugging commands, pass a larger `--build-number`.
-  TestFlight build numbers are per marketing version; `0.4.0` build `123` can
-  only be uploaded once.
-- **TestFlight still shows an older build as latest**: inspect the GitHub Action
-  log for `bundle-version`. If the uploaded value is lower than the latest
-  TestFlight build (for example a small GitHub run number), rerun the workflow
-  so it stamps a fresh timestamp.
-- **Missing `.p8` file**: set `APPLE_API_KEY_CONTENT`, set `APPLE_API_KEY_PATH`,
-  or place `AuthKey_<KEY>.p8` in `~/.appstoreconnect/private_keys/`.
-- **Multiple providers**: if using the Apple ID fallback for upload-only
-  commands, set `APPLE_PROVIDER_PUBLIC_ID`.
-- **Export-compliance prompt appears again**: rebuild from an Xcode project that
-  includes `ITSAppUsesNonExemptEncryption=false` in the iOS Info.plist. The
-  release helper refuses to upload IPAs that are missing this key.
-- **A TestFlight feedback ZIP has no stack**: expected. Tester feedback carries a
-  screenshot and device metadata, not a crash report, and many `WKWebView`
-  content-process deaths, jetsam kills, and watchdog terminations never produce
-  one. Read the native crash/hang/watchdog events in Sentry instead, or ask for
-  the Apple `.ips` report.
-- **An Apple `.ips` report is unsymbolicated**: download the
-  `reflect-ios-xcarchive-<build>` artifact for that exact TestFlight build,
-  confirm its executable UUID appears in the report, and symbolicate against the
-  archive's dSYM. An IPA alone does not contain one.
-- **`Invalid Signature … Reflect.app/Frameworks/Sentry.framework/Sentry is not
-  properly signed` (ITMS-90035)**: the Sentry SPM dependency is pointing at the
-  default `Sentry` product again. That product is a prebuilt *static*
-  xcframework; Xcode 26 links it into the app binary correctly but then embeds
-  a synthesized stub `Sentry.framework` (a tiny symbol-less dylib with a
-  `swbuild` temp-path install name) that App Store Connect rejects. Keep the
-  dependency on `Sentry-Dynamic` in `ios.project.yml` and
-  `gen/apple/project.yml`, and regenerate the Xcode project with `xcodegen`.
-- **Sentry reports "missing debug information"**: check the release helper's
-  `sentry-cli debug-files upload` output. Publication fails when the upload token
-  is configured but no dSYM exists or the upload is rejected; JavaScript
-  source-map upload does not cover Rust or Swift frames.
+- **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`**: create the App Store
+  Connect app record for `app.reflect.ios`. Do not reuse the old Capacitor app
+  (`app.reflect.ReflectMobile`).
+- **Duplicate build number, or TestFlight shows an older build as latest**: build numbers must
+  increase per marketing version. CI uses a UTC `YYYYMMDDHHmm` timestamp; rerun the workflow.
+- **A TestFlight feedback ZIP has no stack**: expected. Read the native events in Sentry, or ask
+  for the Apple `.ips` report.
+- **An `.ips` report is unsymbolicated**: symbolicate it against the dSYM in the
+  `reflect-ios-xcarchive-<build>` artifact of that build. The IPA has no dSYM.

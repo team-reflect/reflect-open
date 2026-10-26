@@ -246,30 +246,9 @@ pnpm tauri:ios:dev "iPhone 17 Pro"  # Run the Tauri iOS target in the simulator 
 pnpm build:ios --build-number=123   # Build and check the iOS app; `pnpm upload:testflight` uploads it
 ```
 
-**iOS simulator**
-
-The mobile app is the Tauri iOS target of `apps/desktop`, not a separate
-package. Use `pnpm tauri:ios:dev "iPhone 17 Pro"` from the repo root (or
-`pnpm tauri:ios:dev --host` for a physical device); debug builds are the dev
-flavor (`app.reflect.ios.dev`, shown as `Reflect Dev`) and need that script's
-config overlay, so do not run plain `tauri ios dev`. List
-available simulator names with `xcrun simctl list devices available`. The first
-run can be quiet while Xcode compiles Rust, Swift plugin code, and native
-dependencies. See `docs/contributing/mobile-simulator.md` before committing
-changes under `apps/desktop/src-tauri/gen/apple/`, because Tauri/Xcode may
-normalize generated project and plist files.
-
-**iOS TestFlight**
-
-Use `pnpm build:ios` and `pnpm upload:testflight` for TestFlight work; do not
-hand-roll `tauri ios build` and `altool` unless debugging the helpers
-themselves. Start with `pnpm build:ios --build-number=<number>`.
-
-The iOS bundle identifier is `app.reflect.ios`, intentionally separate from the
-old Capacitor TestFlight app (`app.reflect.ReflectMobile`). The release helper
-verifies the IPA bundle identifier and `ITSAppUsesNonExemptEncryption=false`
-before upload. See `docs/ios-testflight.md` for App Store Connect setup, API key
-CI secrets, and troubleshooting.
+The mobile app is the Tauri iOS target of `apps/desktop`. Read
+`docs/contributing/mobile-simulator.md` before committing changes under
+`apps/desktop/src-tauri/gen/apple/`, and `docs/ios-testflight.md` for TestFlight.
 
 # Code Conventions
 
