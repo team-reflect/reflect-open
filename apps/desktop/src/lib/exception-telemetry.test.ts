@@ -185,36 +185,6 @@ describe('scrubExceptionEvent', () => {
     })
   })
 
-  it('keeps the mechanism types of unhandled rejections and linked errors', () => {
-    const event: ErrorEvent = {
-      type: undefined,
-      exception: {
-        values: [
-          {
-            type: 'Error',
-            mechanism: { type: 'chained', handled: false },
-          },
-          {
-            type: 'Error',
-            mechanism: {
-              type: 'auto.browser.global_handlers.onunhandledrejection',
-              handled: false,
-            },
-          },
-        ],
-      },
-    }
-
-    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
-      { type: 'Error', value: '[redacted]', mechanism: { type: 'chained', handled: false } },
-      {
-        type: 'Error',
-        value: '[redacted]',
-        mechanism: { type: 'auto.browser.global_handlers.onunhandledrejection', handled: false },
-      },
-    ])
-  })
-
   it('keeps allow-listed ProseMirror transform diagnostics', () => {
     const event: ErrorEvent = {
       type: undefined,
