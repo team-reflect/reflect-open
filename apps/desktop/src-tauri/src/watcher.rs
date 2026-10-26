@@ -23,7 +23,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use file_id::{FileId, get_file_id};
-use notify::{RecommendedWatcher, RecursiveMode};
+use notify::{EventKindMask, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, new_debouncer_opt,
 };
@@ -265,13 +265,16 @@ fn lock_watcher<'a>(
 }
 
 /// Watch `root` recursively and hand each debounced batch to `handler`.
+///
+/// Only changes are subscribed. On Linux the default also reports opens, and
+/// the reconcile pass opens every directory: each pass would trigger the next.
 fn watch_graph(root: &Path, handler: impl DebounceEventHandler) -> notify::Result<GraphDebouncer> {
     let mut debouncer = new_debouncer_opt(
         Duration::from_millis(400),
         None,
         handler,
         PrunedFileIdMap::new(root.to_path_buf()),
-        notify::Config::default(),
+        notify::Config::default().with_event_kinds(EventKindMask::CORE),
     )?;
     debouncer.watch(root, RecursiveMode::Recursive)?;
     Ok(debouncer)
