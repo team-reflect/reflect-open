@@ -22,7 +22,7 @@ import type { CommandContext } from './types.ts'
 
 const TODAY = '2026-06-09'
 
-function createApp() {
+function createCore() {
   const embeddingRuntime: TestEmbeddingRuntimeService = createTestEmbeddingRuntimeService({
     status: { status: 'uninitialized' },
   })
@@ -36,11 +36,11 @@ function createApp() {
   })
 }
 
-let core: ReturnType<typeof createApp>
+let core: ReturnType<typeof createCore>
 let windows: TestWindowService
 
 beforeEach(() => {
-  core = createApp()
+  core = createCore()
   windows = createTestWindowService()
 })
 

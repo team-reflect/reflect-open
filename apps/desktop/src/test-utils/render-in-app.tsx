@@ -199,13 +199,13 @@ async function prepare(options: AnyOptions | undefined): Promise<
   const { graphSession, settings } = core
   if (options?.settings !== undefined) {
     if (!('seed' in settings)) {
-      throw new Error('renderInApp: `settings` needs a test settings service in `app`')
+      throw new Error('renderInApp: `settings` needs a test settings service in `core`')
     }
     ;(settings as TestCoreServices['settings']).seed(options.settings)
   }
   if (!servicesOnly) {
     if (!('setGraph' in graphSession) || !('setState' in graphSession)) {
-      throw new Error('renderInApp: `app.graphSession` must be a test graph session')
+      throw new Error('renderInApp: `core.graphSession` must be a test graph session')
     }
     // The first render already shows the stored settings, not the defaults,
     // and the graph services start over them.

@@ -27,7 +27,7 @@ let logger: TestLoggerService
  * The files of the graph, with a log of every write.
  */
 let noteFile: TestNoteFileService
-let core: ReturnType<typeof createApp>
+let core: ReturnType<typeof createCore>
 
 /**
  * Run every pending timer, and the timers those arm.
@@ -67,7 +67,7 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
 /**
  * The app of one test: the real document services over `noteFile`, `clock` and `logger`.
  */
-function createApp(database: TestDatabaseService) {
+function createCore(database: TestDatabaseService) {
   const indexStore = createTestIndexStoreService()
   const moveIndexed = indexStore.moveIndexed.bind(indexStore)
   // Mirrors the Rust command for the paths these tests exercise: a free
@@ -93,7 +93,7 @@ beforeEach(() => {
   clock = createTestClockService()
   logger = createTestLoggerService()
   noteFile = createTestNoteFileService({ files: { 'notes/a.md': '# Hello\n' } })
-  core = createApp(createWasmTestDatabaseService())
+  core = createCore(createWasmTestDatabaseService())
 })
 
 /**
