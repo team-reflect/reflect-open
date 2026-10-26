@@ -13,5 +13,5 @@ With "Connect Hardware Keyboard" on (I/O → Keyboard, ⇧⌘K), the simulator s
 keyboard and `--keyboard-height` stays 0. Turn it off to test keyboard avoidance.
 
 `tauri ios dev` rewrites files under `apps/desktop/src-tauri/gen/apple/` (`project.pbxproj`
-build settings, the merged `Info.plist`). Do not commit those changes. Change
-`ios.project.yml` and `gen/apple/project.yml` instead.
+build settings, the merged `Info.plist`). Do not commit those changes. To change the project,
+edit `ios.project.yml` and `gen/apple/project.yml` and follow their header comment.

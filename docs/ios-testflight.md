@@ -1,12 +1,12 @@
 # iOS TestFlight Builds
 
 ```bash
-pnpm build:ios --build-number=<digits>   # apps/desktop/scripts/build-ios.ts
-pnpm upload:testflight                   # apps/desktop/scripts/upload-testflight.ts
+pnpm build:ios --build-number=123   # apps/desktop/scripts/build-ios.ts
+pnpm upload:testflight              # apps/desktop/scripts/upload-testflight.ts
 ```
 
-Every release runs both in `.github/workflows/publish-testflight.yml`. To retry, re-run its
-failed job in the Release run.
+`.github/workflows/publish-testflight.yml` runs both on every release (called from
+`publish-desktop.yml`). To retry, re-run its failed job in the Release run.
 
 ## Credentials
 
