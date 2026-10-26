@@ -1,5 +1,4 @@
 import type { MaybePromise } from '@reflect/utils'
-import { EditorInputTraits } from '@/editor/editor-input-traits.tsx'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge.tsx'
 import { MediaLightbox } from '@/editor/media-lightbox.tsx'
 import { MenuBoundaryContext } from '@/editor/menu-boundary.ts'
@@ -462,8 +461,12 @@ export function NoteEditor({
         // setting: iOS derives the keyboard's smart-quotes/smart-dashes traits
         // from it at focus time, and smart punctuation corrupts markdown
         // syntax ([[ wiki links, code spans, --- fences) — Plan 19 gate.
-        // Autocorrect is independent and stays on (EditorInputTraits).
+        // Autocorrect is independent and stays on.
         spellCheck={touchEditor ? false : spellCheck}
+        autoCorrect={touchEditor ? true : undefined}
+        autoCapitalize={touchEditor ? 'sentences' : undefined}
+        // Hides system writing suggestions such as the macOS "Write with Siri" prompt.
+        writingSuggestions={false}
         searchQuery={searchQuery ?? ''}
         onSearchChange={onSearchChange}
         // Reflect's implementation-neutral `12h`/`24h` maps to meowdown's
@@ -503,7 +506,6 @@ export function NoteEditor({
         resolveFileInfo={handleResolveFileInfo}
         onExitBoundary={handleExitBoundary}
       >
-        <EditorInputTraits />
         {/* Only a pane that persists files gets the toolbar's attach button;
             `handleFilePaste` is the same handler meowdown pastes through. */}
         <FormattingToolbarBridge saveFile={saveFile !== undefined ? handleFilePaste : undefined} />

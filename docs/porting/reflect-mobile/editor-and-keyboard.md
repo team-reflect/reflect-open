@@ -14,7 +14,7 @@ toolbar — and the hard-won keyboard/focus lessons.
 > Input hygiene: `spellcheck` is pinned off on the touch surface — WebKit
 > derives the keyboard's smart-quotes/smart-dashes traits from it at focus
 > time (not from `autocorrect`, which stays on for typo fixing) — and
-> `autocapitalize`/`autocorrect` are set explicitly (`EditorInputTraits`).
+> `autocapitalize`/`autocorrect` are set explicitly (`NoteEditor`).
 > Focus contract (revised 2026-07-06): navigation never focuses the
 > destination editor — a focus at arrival time raises the keyboard through
 > the stack push/pop animation. Wiki-link taps, backlink rows, plain

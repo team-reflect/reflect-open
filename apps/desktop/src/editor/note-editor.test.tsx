@@ -283,7 +283,7 @@ describe('NoteEditor touch-surface input hygiene', () => {
     await expect.element(pmRoot).toHaveAttribute('autocorrect', 'on')
   })
 
-  it('leaves the contenteditable untouched on desktop', async () => {
+  it('leaves the input traits unset on desktop', async () => {
     await render(<NoteEditor initialContent="Hello" />)
     await expect.element(pmRoot).toBeVisible()
     await expect.element(pmRoot).not.toHaveAttribute('autocapitalize')
