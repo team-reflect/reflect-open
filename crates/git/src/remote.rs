@@ -86,7 +86,7 @@ fn resolve_credential(
             return Err(git2::Error::new(
                 ErrorCode::Auth,
                 ErrorClass::Http,
-                "the host rejected the stored sign-in",
+                "the Git host rejected the username and access token",
             ));
         }
         tried.credential = true;
@@ -453,7 +453,11 @@ mod credential_tests {
             &mut tried,
         ));
         assert_eq!(err.code(), ErrorCode::Auth);
-        assert!(err.message().contains("rejected"), "{err}");
+        assert!(
+            err.message()
+                .contains("rejected the username and access token"),
+            "{err}"
+        );
     }
 
     #[test]
