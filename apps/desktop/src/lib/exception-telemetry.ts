@@ -222,15 +222,18 @@ export function createExceptionTelemetryOptions(dsn: string, release: string): B
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
     sendClientReports: false,
-    enableLogs: false,
-    sendDefaultPii: false,
+    attachStacktrace: false,
     dataCollection: {
       userInfo: false,
       cookies: false,
       httpHeaders: { request: false, response: false },
       httpBodies: [],
-      queryParams: false,
+      urlQueryParams: false,
+      graphQL: { document: false, variables: false },
       genAI: { inputs: false, outputs: false },
+      mcp: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
       stackFrameVariables: false,
       frameContextLines: 0,
     },
@@ -241,7 +244,6 @@ export function createExceptionTelemetryOptions(dsn: string, release: string): B
     maxValueLength: 200,
     enhanceFetchErrorMessages: false,
     beforeSend: scrubExceptionEvent,
-    beforeSendTransaction: () => null,
   }
 }
 

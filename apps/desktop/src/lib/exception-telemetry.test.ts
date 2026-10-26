@@ -260,14 +260,18 @@ describe('createExceptionTelemetryOptions', () => {
     expect(options.replaysSessionSampleRate).toBe(0)
     expect(options.replaysOnErrorSampleRate).toBe(0)
     expect(options.sendClientReports).toBe(false)
-    expect(options.sendDefaultPii).toBe(false)
+    expect(options.attachStacktrace).toBe(false)
     expect(options.dataCollection).toEqual({
       userInfo: false,
       cookies: false,
       httpHeaders: { request: false, response: false },
       httpBodies: [],
-      queryParams: false,
+      urlQueryParams: false,
+      graphQL: { document: false, variables: false },
       genAI: { inputs: false, outputs: false },
+      mcp: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
       stackFrameVariables: false,
       frameContextLines: 0,
     })
