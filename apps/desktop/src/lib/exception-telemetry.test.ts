@@ -72,7 +72,7 @@ describe('scrubExceptionEvent', () => {
             type: 'TypeError',
             value: 'Customer “Acme” failed at /Users/alex/Notes/Customers/Acme.md',
             mechanism: {
-              type: 'onerror',
+              type: 'auto.browser.global_handlers.onerror',
               handled: false,
               data: { target: 'person@example.com' },
             },
@@ -111,7 +111,7 @@ describe('scrubExceptionEvent', () => {
           {
             type: 'TypeError',
             value: '[redacted]',
-            mechanism: { type: 'onerror', handled: false },
+            mechanism: { type: 'auto.browser.global_handlers.onerror', handled: false },
             stacktrace: {
               frames: [
                 {
@@ -184,6 +184,36 @@ describe('scrubExceptionEvent', () => {
         ],
       },
     })
+  })
+
+  it('keeps the mechanism types of unhandled rejections and linked errors', () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            mechanism: { type: 'chained', handled: false },
+          },
+          {
+            type: 'Error',
+            mechanism: {
+              type: 'auto.browser.global_handlers.onunhandledrejection',
+              handled: false,
+            },
+          },
+        ],
+      },
+    }
+
+    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
+      { type: 'Error', value: '[redacted]', mechanism: { type: 'chained', handled: false } },
+      {
+        type: 'Error',
+        value: '[redacted]',
+        mechanism: { type: 'auto.browser.global_handlers.onunhandledrejection', handled: false },
+      },
+    ])
   })
 
   it('keeps allow-listed ProseMirror transform diagnostics', () => {

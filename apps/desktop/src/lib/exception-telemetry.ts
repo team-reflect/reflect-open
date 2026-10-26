@@ -34,10 +34,11 @@ const SAFE_EXCEPTION_TYPES = new Set([
 ])
 
 const SAFE_MECHANISM_TYPES = new Set([
+  'auto.browser.global_handlers.onerror',
+  'auto.browser.global_handlers.onunhandledrejection',
   'auto.function.react.error_handler',
+  'chained',
   'generic',
-  'onerror',
-  'onunhandledrejection',
 ])
 
 const SAFE_SCRIPT_BASENAME = /^[\w.-]+\.(?:js|jsx|mjs|ts|tsx)$/
