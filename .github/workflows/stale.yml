@@ -34,9 +34,9 @@ jobs:
           any-of-labels: 'likely resolved'
           days-before-stale: 1
           days-before-close: 7
-          stale-issue-message: This looks fixed. We will close it in 7 days unless someone comments.
-          stale-pr-message: This looks resolved. We will close it in 7 days unless someone comments.
+          stale-issue-message: Thanks for the report! We believe this has been fixed, so we will close this issue in 7 days. If you still see the problem, please leave a comment and we will keep it open.
+          stale-pr-message: Thank you for this PR! We believe this has been resolved, so we will close it in 7 days. If it is still needed, please leave a comment and we will keep it open.
           close-issue-reason: completed
-          close-issue-message: Closing due to no activity. Comment here if you still see the problem.
-          close-pr-message: Closing due to no activity.
+          close-issue-message: Closing this issue for now. Thank you! If you still see the problem, please leave a comment and we will reopen it.
+          close-pr-message: Closing this PR for now. Thank you for your contribution! If it is still needed, please leave a comment and we will reopen it.
           debug-only: ${{ inputs.dry-run == true }}
