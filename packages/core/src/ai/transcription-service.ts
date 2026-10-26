@@ -24,13 +24,15 @@ import {
  * (stale gate, timeouts, error ladder) is `ai/transcribe-http`.
  */
 
-export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
+export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-transcribe'
 
 /**
- * Retried once when the primary model is missing on the key — project-scoped
- * OpenAI keys can expose `whisper-1` but not the 4o transcription models.
+ * Retried in order while the model is missing on the key — project-scoped
+ * OpenAI keys may expose only the models this app used before
+ * `gpt-transcribe`, and some expose `whisper-1` but not the 4o transcription
+ * models. Both shut down on 2027-02-26.
  */
-export const OPENAI_TRANSCRIPTION_FALLBACK_MODEL = 'whisper-1'
+export const OPENAI_TRANSCRIPTION_FALLBACK_MODELS = ['gpt-4o-mini-transcribe', 'whisper-1'] as const
 
 export const GOOGLE_TRANSCRIPTION_MODEL = 'gemini-3.6-flash'
 
@@ -178,8 +180,11 @@ async function transcribeWithOpenAi(
 
   let response = await attempt(OPENAI_TRANSCRIPTION_MODEL)
   let body = await response.text()
-  if (!response.ok && isModelNotFound(body)) {
-    response = await attempt(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
+  for (const model of OPENAI_TRANSCRIPTION_FALLBACK_MODELS) {
+    if (response.ok || !isModelNotFound(body)) {
+      break
+    }
+    response = await attempt(model)
     body = await response.text()
   }
   if (!response.ok) {

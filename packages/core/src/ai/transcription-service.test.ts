@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   GOOGLE_TRANSCRIPTION_FALLBACK_MODEL,
   GOOGLE_TRANSCRIPTION_MODEL,
-  OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
+  OPENAI_TRANSCRIPTION_FALLBACK_MODELS,
   OPENAI_TRANSCRIPTION_MODEL,
   createTranscriptionService,
   type TranscriptionRequest,
@@ -99,7 +99,7 @@ describe('TranscriptionService (openai)', () => {
     expect(file.name).toBe('memo.webm')
   })
 
-  it('falls back to whisper-1 only when the primary model is missing on the key', async () => {
+  it('falls back only when the primary model is missing on the key', async () => {
     const calls: RecordedCall[] = []
     const fetchFn = recordingFetch(calls, (_call, index) => {
       return index === 0
@@ -111,7 +111,24 @@ describe('TranscriptionService (openai)', () => {
 
     expect(text).toBe('fallback worked')
     expect(calls).toHaveLength(2)
-    expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
+    expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODELS[0])
+  })
+
+  it('tries each fallback in order while the model is missing on the key', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, (_call, index) => {
+      return index < 2
+        ? jsonResponse(404, { error: { message: 'no such model', code: 'model_not_found' } })
+        : jsonResponse(200, { text: 'last fallback worked' })
+    })
+
+    const text = await transcribe(fetchFn, request())
+
+    expect(text).toBe('last fallback worked')
+    expect(calls.map((call) => (call.body as FormData).get('model'))).toEqual([
+      OPENAI_TRANSCRIPTION_MODEL,
+      ...OPENAI_TRANSCRIPTION_FALLBACK_MODELS,
+    ])
   })
 
   it('marks a refused recording as a rejection — retrying the same bytes cannot help', async () => {
