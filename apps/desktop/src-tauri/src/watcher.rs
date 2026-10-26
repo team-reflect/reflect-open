@@ -41,10 +41,10 @@ use reflect_types::{ChangeKind, FileChange};
 
 type GraphDebouncer = Debouncer<RecommendedWatcher, PrunedFileIdMap>;
 
-/// Holds the active debouncer and the file ID of the graph root it watches;
-/// dropping the debouncer stops the background watch thread.
+/// Holds the active debouncer with the graph root it watches and that root's
+/// file ID; dropping the debouncer stops the background watch thread.
 #[derive(Default)]
-pub struct WatcherState(pub Mutex<Option<(FileId, GraphDebouncer)>>);
+pub struct WatcherState(pub Mutex<Option<(PathBuf, FileId, GraphDebouncer)>>);
 
 /// The debouncer's file-ID cache, pruned to the trees that can carry tracked
 /// files.
@@ -258,7 +258,7 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
 
 fn lock_watcher<'a>(
     watcher: &'a State<WatcherState>,
-) -> AppResult<std::sync::MutexGuard<'a, Option<(FileId, GraphDebouncer)>>> {
+) -> AppResult<std::sync::MutexGuard<'a, Option<(PathBuf, FileId, GraphDebouncer)>>> {
     watcher.0.lock().map_err(|err| {
         tracing::error!(?err, "watcher state lock poisoned by an earlier panic");
         AppError::io("watcher state lock poisoned")
@@ -301,19 +301,25 @@ pub fn watch_start(
     })?;
     let root = graph_guard.root.clone().ok_or_else(AppError::no_graph)?;
 
-    let root_id = get_file_id(&root).map_err(|err| AppError::io(err.to_string()))?;
     let mut active = lock_watcher(&watcher)?;
-    // Every index pass ends here. Keep a watcher on this very directory: the
-    // file ID differs for another graph and for a folder replaced at the same
-    // path. On Linux, a dropped watcher keeps its thread and inotify fd while
-    // events keep arriving, so replacing it on every pass leaks.
-    if active.as_ref().is_some_and(|(id, _)| *id == root_id) {
+    let root_id = get_file_id(&root);
+    // Every index pass ends here. Keep a watcher on this very directory at this
+    // path: the file ID differs for a folder replaced at the same path. On
+    // Linux, a dropped watcher keeps its thread and inotify fd while events
+    // keep arriving, so replacing it on every pass leaks.
+    let unchanged = root_id.as_ref().is_ok_and(|root_id| {
+        active
+            .as_ref()
+            .is_some_and(|(path, id, _)| *path == root && id == root_id)
+    });
+    if unchanged {
         return Ok(());
     }
     // Drop any previous watcher first: if installing the new one fails we're then
     // left with no watcher, rather than the previous graph's still driving
     // index:changed against the now-current graph.
     *active = None;
+    let root_id = root_id.map_err(|err| AppError::io(err.to_string()))?;
 
     let started = std::time::Instant::now();
     let handler_root = root.clone();
@@ -342,7 +348,7 @@ pub fn watch_start(
     })
     .map_err(|err| AppError::io(err.to_string()))?;
 
-    *active = Some((root_id, debouncer));
+    *active = Some((root, root_id, debouncer));
     drop(graph_guard);
     tracing::info!(
         elapsed_ms = started.elapsed().as_millis() as u64,
@@ -575,8 +581,13 @@ mod tests {
         assert!(batch.is_err(), "a read-only walk reported {batch:?}");
 
         // The watcher still reports a real change.
-        std::fs::write(root.join("notes/b.md"), "# b").unwrap();
-        assert!(receiver.recv_timeout(Duration::from_secs(2)).is_ok());
+        let written = root.join("notes/b.md");
+        std::fs::write(&written, "# b").unwrap();
+        let batch = receiver
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap()
+            .unwrap();
+        assert!(batch.iter().any(|event| event.paths.contains(&written)));
     }
 
     #[test]
