@@ -29,13 +29,13 @@ async function renderSection(): Promise<void> {
   if (failLoad) {
     settings.failLoad()
   }
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     settings,
     secretStore: secrets,
   })
-  keyValidation = app.aiKeyValidation
-  await renderInApp(<AiProvidersSection />, { app, servicesOnly: true })
+  keyValidation = core.aiKeyValidation
+  await renderInApp(<AiProvidersSection />, { core, servicesOnly: true })
 }
 
 /**

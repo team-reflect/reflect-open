@@ -50,14 +50,14 @@ beforeEach(() => {
  * Render the step in an app over the test's keychain, HTTP, clipboard and opener.
  */
 async function renderStep(step: ReactNode): Promise<void> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     http,
     secretStore: keychain,
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
   })
-  app.githubAuth.onRunDeviceFlow(mockFlow)
-  await renderInApp(step, { app, appServices: { clipboard, opener } })
+  core.githubAuth.onRunDeviceFlow(mockFlow)
+  await renderInApp(step, { core, appServices: { clipboard, opener } })
 }
 
 /** Switch the step from the device-flow lead to PAT entry. */

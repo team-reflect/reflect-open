@@ -172,7 +172,7 @@ function renderScreen() {
       <RouteProbe />
     </>,
     {
-      app,
+      core,
       appServices: { window: noteWindows },
       graph: { root: '/g', name: 'g', generation: 1 },
       settings: { dateFormat: 'mdy' },
@@ -220,17 +220,17 @@ let storage: TestCoreServices['storage']
 
 let operations: TestCoreServices['progress']
 
-let app: TestCoreServices
+let core: TestCoreServices
 let noteWindows: TestWindowService
 
 beforeEach(() => {
   // A fresh app per test, so its task service's recently-completed set starts empty.
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   noteWindows = createTestWindowService()
-  operations = app.progress
-  storage = app.storage
-  app.clock.setToday('2026-06-14')
-  const tasks = app.tasks
+  operations = core.progress
+  storage = core.storage
+  core.clock.setToday('2026-06-14')
+  const tasks = core.tasks
   getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])
   getCompletedTasks = vi.spyOn(tasks, 'getCompletedTasks').mockResolvedValue([])
   writeTask = vi.spyOn(tasks, 'writeTask').mockResolvedValue(WRITTEN)
@@ -1529,7 +1529,7 @@ describe('TasksScreen', () => {
         updatedAt: 200,
       }),
     ])
-    await app.tasks.refresh()
+    await core.tasks.refresh()
 
     await view.findByRole('button', { name: 'Complete: project task' })
     expect(view.queryByRole('button', { name: 'Reopen: project task' })).toBeNull()
@@ -1554,7 +1554,7 @@ describe('TasksScreen', () => {
     // An unrelated invalidation refetches before the completion's reindex lands:
     // the index still returns the pre-completion row (same updatedAt). The row
     // must stay struck rather than flicker back to open.
-    await app.tasks.refresh()
+    await core.tasks.refresh()
 
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.queryByRole('button', { name: 'Complete: project task' })).toBeNull()

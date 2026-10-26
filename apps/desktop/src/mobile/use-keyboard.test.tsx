@@ -39,11 +39,11 @@ describe('keyboard height', () => {
   })
 
   it('keeps notifying after an unrelated subscriber unmounts', async () => {
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-    const appServices = createTestAppServices(app)
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const appServices = createTestAppServices(core)
     const { keyboard } = appServices
-    const first = await renderHookInApp(() => useKeyboardVisible(), { app, appServices })
-    const second = await renderHookInApp(() => useKeyboardVisible(), { app, appServices })
+    const first = await renderHookInApp(() => useKeyboardVisible(), { core, appServices })
+    const second = await renderHookInApp(() => useKeyboardVisible(), { core, appServices })
     await first.unmount()
     await act(() => keyboard.publish(280))
     expect(second.result.current).toBe(true)

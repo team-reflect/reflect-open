@@ -27,7 +27,7 @@ let logger: TestLoggerService
  * The files of the graph, with a log of every write.
  */
 let noteFile: TestNoteFileService
-let app: ReturnType<typeof createApp>
+let core: ReturnType<typeof createCore>
 
 /**
  * Run every pending timer, and the timers those arm.
@@ -67,7 +67,7 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
 /**
  * The app of one test: the real document services over `noteFile`, `clock` and `logger`.
  */
-function createApp(database: TestDatabaseService) {
+function createCore(database: TestDatabaseService) {
   const indexStore = createTestIndexStoreService()
   const moveIndexed = indexStore.moveIndexed.bind(indexStore)
   // Mirrors the Rust command for the paths these tests exercise: a free
@@ -93,7 +93,7 @@ beforeEach(() => {
   clock = createTestClockService()
   logger = createTestLoggerService()
   noteFile = createTestNoteFileService({ files: { 'notes/a.md': '# Hello\n' } })
-  app = createApp(createWasmTestDatabaseService())
+  core = createCore(createWasmTestDatabaseService())
 })
 
 /**
@@ -103,7 +103,7 @@ function mount<Result, Props = undefined>(
   hook: (props?: Props) => Result,
   options?: { initialProps: Props },
 ) {
-  return renderHookInApp(hook, { app, ...options })
+  return renderHookInApp(hook, { core, ...options })
 }
 
 /**
@@ -124,7 +124,7 @@ function file(path: string): string | undefined {
  * Deliver watcher changes to the open documents, and let the reads they start settle.
  */
 async function emitChange(changes: FileChange[]): Promise<void> {
-  app.fileChanges.emit({ changes, source: 'external' })
+  core.fileChanges.emit({ changes, source: 'external' })
   // The test doubles answer in microtasks, so one task later nothing is pending.
   await new Promise((resolve) => setTimeout(resolve))
 }
@@ -146,7 +146,7 @@ function seedGraph(files: Record<string, string>, indexed: readonly string[] = [
     noteFile.set(path, contents)
   }
   seedNotes(
-    app.database,
+    core.database,
     indexed.map((path) => ({ path, markdown: files[path] ?? '' })),
   )
 }
@@ -182,7 +182,7 @@ describe('useNoteDocument', () => {
 
     // The quit path: the registry flush settles only once the write has
     // landed — no timer advance, the way a ⌘Q teardown would run it.
-    await act(() => app.openDocuments.flushAll())
+    await act(() => core.openDocuments.flushAll())
     expect(writes()).toEqual(['# Quitting\n'])
     expect(hook.result.current.dirty).toBe(false)
   })
@@ -198,7 +198,7 @@ describe('useNoteDocument', () => {
 
     await act(() => hook.result.current.bindEditor(editor))
     await act(() => hook.result.current.bindEditor(null))
-    await act(() => app.openDocuments.flushAll())
+    await act(() => core.openDocuments.flushAll())
 
     expect(getMarkdown).toHaveBeenCalledOnce()
     expect(writes()).toEqual(['# 🧠 Business ideas\n'])
@@ -212,7 +212,7 @@ describe('useNoteDocument', () => {
     await act(async () => {})
     const writesAfterUnmount = writes().length
 
-    await app.openDocuments.flushAll() // the unmounted buffer must no longer be registered
+    await core.openDocuments.flushAll() // the unmounted buffer must no longer be registered
     expect(writes().length).toBe(writesAfterUnmount)
   })
 
@@ -264,7 +264,7 @@ describe('useNoteDocument', () => {
     await act(() => clock.advance(1000)) // save lands
     await act(() => runAllTimers()) // quiet period → rename + move
 
-    expect(app.noteMove.moved()).toEqual([['notes/a.md', 'notes/new-title.md']])
+    expect(core.noteMove.moved()).toEqual([['notes/a.md', 'notes/new-title.md']])
     // Alias frontmatter (the rename's breadcrumb) + content, at the slug path.
     expect(file('notes/new-title.md')).toContain('Old Title')
     expect(file('notes/new-title.md')).toContain('# New Title\n')
@@ -358,7 +358,7 @@ describe('useNoteDocument', () => {
     // the pending save must carry the NEW generation — a stale one would be
     // rejected by Rust and the edit silently lost.
     await act(() => hook.result.current.onEditorChange('# Unsaved\n'))
-    await act(() => app.graphSession.setGraph({ generation: 2 }))
+    await act(() => core.graphSession.setGraph({ generation: 2 }))
     expect(hook.result.current.dirty).toBe(true)
 
     await act(() => clock.advance(1000))

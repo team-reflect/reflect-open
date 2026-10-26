@@ -13,22 +13,22 @@ import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { attachFilesToNote } from './attach-files.ts'
 
-let app: TestCoreServices
+let core: TestCoreServices
 let appLayer: TestAppServices
 
 beforeEach(() => {
-  app = createTestCoreServices({ database: createNodeTestDatabaseService() })
-  appLayer = createTestAppServices(app)
-  app.graphSession.setGraph({ generation: 4 })
+  core = createTestCoreServices({ database: createNodeTestDatabaseService() })
+  appLayer = createTestAppServices(core)
+  core.graphSession.setGraph({ generation: 4 })
 })
 
 afterEach(() => {
-  app.database.close()
+  core.database.close()
 })
 
 function contextFor(notePath: string | null): CommandContext {
   return {
-    services: app,
+    services: core,
     app: appLayer,
     navigate: vi.fn(),
     route: () => ({ kind: 'today' }),
@@ -83,7 +83,7 @@ describe('attachFilesToNote', () => {
     expect(appLayer.dialog.calls()).toEqual([
       { kind: 'files', options: { multiple: true, title: 'Attach files' } },
     ])
-    const [request] = app.attachments.attachRequests()
+    const [request] = core.attachments.attachRequests()
     expect(request?.sources).toEqual(['/tmp/a.pdf'])
     expect(request?.findEditor()).toBe(handle)
     unregisterNoteEditorHandle('notes/plan.md', handle)
@@ -96,14 +96,14 @@ describe('attachFilesToNote', () => {
     await attachFilesToNote(contextFor('notes/plan.md'))
     const handle = editorHandle()
     registerNoteEditorHandle('notes/plan.md', handle)
-    app.graphSession.setGraph(null)
+    core.graphSession.setGraph(null)
     await attachFilesToNote(contextFor('notes/plan.md'))
-    app.graphSession.setGraph({ generation: 4 })
+    core.graphSession.setGraph({ generation: 4 })
     appLayer.dialog.setFiles(null)
     await attachFilesToNote(contextFor('notes/plan.md'))
     unregisterNoteEditorHandle('notes/plan.md', handle)
 
-    expect(app.attachments.attachRequests()).toEqual([])
+    expect(core.attachments.attachRequests()).toEqual([])
     expect(appLayer.dialog.calls()).toHaveLength(1)
   })
 })

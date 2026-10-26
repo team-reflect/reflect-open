@@ -18,12 +18,12 @@ function Opener(): ReactElement {
   )
 }
 
-async function renderDialog(): Promise<{ context: CommandContext; app: TestCoreServices }> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  app.graphSession.setGraph({ generation: 1 })
+async function renderDialog(): Promise<{ context: CommandContext; core: TestCoreServices }> {
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core.graphSession.setGraph({ generation: 1 })
   const context: CommandContext = {
-    services: app,
-    app: createTestAppServices(app),
+    services: core,
+    app: createTestAppServices(core),
     navigate: vi.fn(),
     route: () => ({ kind: 'today' }),
     notePath: () => null,
@@ -51,9 +51,9 @@ async function renderDialog(): Promise<{ context: CommandContext; app: TestCoreS
       <Opener />
       <TemplateCreateDialog context={context} />
     </NoteTemplatesProvider>,
-    { app, servicesOnly: true },
+    { core, servicesOnly: true },
   )
-  return { context, app }
+  return { context, core }
 }
 
 async function openDialog(): Promise<void> {
@@ -88,8 +88,8 @@ it('drops the validation error between opens', async () => {
 })
 
 it('starts empty after a successful create, and drops a stale submit error', async () => {
-  const { context, app } = await renderDialog()
-  vi.spyOn(app.noteFile, 'write').mockRejectedValueOnce(new Error('disk full'))
+  const { context, core } = await renderDialog()
+  vi.spyOn(core.noteFile, 'write').mockRejectedValueOnce(new Error('disk full'))
   await openDialog()
 
   // First attempt fails and surfaces the submit error inline.
@@ -104,7 +104,7 @@ it('starts empty after a successful create, and drops a stale submit error', asy
     kind: 'note',
     path: 'templates/meeting-notes.md',
   })
-  expect(app.noteFile.writes()).toEqual([
+  expect(core.noteFile.writes()).toEqual([
     {
       path: 'templates/meeting-notes.md',
       contents: '---\ntitle: Meeting notes\n---\n\n',

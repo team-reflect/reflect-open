@@ -43,7 +43,7 @@ async function mount(
   const gitSync = createTestGitSyncService({ state: { phase: 'disconnected' } })
   const connector = createTestGithubConnector()
   script?.(connector)
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
     // A stored PAT + GitHub accepting it ("alex") makes the auth step skip
@@ -61,7 +61,7 @@ async function mount(
     gitSync,
     githubConnector: connector,
   })
-  const view = await renderInApp(ui, { app })
+  const view = await renderInApp(ui, { core })
   return Object.assign(view, { connector })
 }
 

@@ -85,12 +85,12 @@ describe('AiProviderActionsDrawer', () => {
 
   it('a failed removal keeps the sheet open for a retry', async () => {
     onRemove.mockRejectedValue(new Error('keychain unavailable'))
-    const { app } = await renderSheet()
+    const { core } = await renderSheet()
 
     await page.getByRole('button', { name: 'Remove provider' }).click()
 
     await vi.waitFor(() => {
-      expect(app.logger.getErrors()).toEqual([
+      expect(core.logger.getErrors()).toEqual([
         { message: 'AI provider removal failed:', cause: 'keychain unavailable' },
       ])
     })

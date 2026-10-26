@@ -48,11 +48,11 @@ function Stream({ children }: { children: ReactNode }): ReactElement {
  * Render `children` in a stream-sized box; the app runs on `clock` (the system clock by default).
  */
 async function renderStream(children: ReactNode, clock: ClockService = createSystemClock()) {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
   // Reads never resolve: every day stays a loading placeholder.
-  vi.spyOn(app.noteFile, 'read').mockReturnValue(new Promise(() => {}))
+  vi.spyOn(core.noteFile, 'read').mockReturnValue(new Promise(() => {}))
   return await renderInApp(<Stream>{children}</Stream>, {
-    app,
+    core,
     graph: { root: '/g', name: 'g', generation: 1 },
     settings: { dateFormat: 'mdy', editorMarkdownSyntax: 'hide', editorSpellCheck: true },
     route: { kind: 'today' },

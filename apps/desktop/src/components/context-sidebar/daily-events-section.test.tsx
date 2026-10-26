@@ -48,12 +48,12 @@ let stored: Partial<Settings>
 let calendar: TestCalendarService
 let contacts: TestContactsService
 let database: TestDatabaseService
-let app: TestCoreServices
+let core: TestCoreServices
 
 // The meeting service writes into the open graph.
 async function renderSection(): Promise<HTMLElement> {
   const { container } = await renderInApp(<DailyEventsSection date={DATE} />, {
-    app,
+    core,
     graph: { root: '/graph', generation: 3 },
     settings: stored,
   })
@@ -65,8 +65,8 @@ beforeEach(() => {
   calendar = createTestCalendarService()
   contacts = createTestContactsService({ status: 'unavailable' })
   database = createWasmTestDatabaseService()
-  app = createTestCoreServices({ calendar, contacts, database })
-  addMeetingToDaily = vi.spyOn(app.meetings, 'addMeetingToDaily')
+  core = createTestCoreServices({ calendar, contacts, database })
+  addMeetingToDaily = vi.spyOn(core.meetings, 'addMeetingToDaily')
   return () => database.close()
 })
 

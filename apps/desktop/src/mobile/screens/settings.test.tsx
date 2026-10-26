@@ -70,7 +70,7 @@ async function mount(options?: MountOptions) {
     state: options?.gitSync ?? connected({ state: 'idle' }),
   })
   const gitHostConnector = createTestGitHostConnector()
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     appInfo: createTestAppInfoService('1.2.3-beta.4'),
     gitSync,
@@ -79,16 +79,16 @@ async function mount(options?: MountOptions) {
     role: options?.gitSync === null ? 'note-window' : 'main',
   })
   if (options?.githubSignedIn !== false) {
-    await app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
+    await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
   }
-  seedNotes(app.database, [
+  seedNotes(core.database, [
     { path: 'notes/a.md', markdown: '# A\n' },
     { path: 'notes/b.md', markdown: '# B\n' },
   ])
   // Spied before the render: the provider hands this function to the screen.
-  const updateSettings = vi.spyOn(app.settings, 'update')
+  const updateSettings = vi.spyOn(core.settings, 'update')
   const view = await renderInApp(<MobileSettings />, {
-    app,
+    core,
     graph: { root: '/g', name: 'Field Notes', generation: 1 },
     mobile: { kind: options?.storageKind ?? 'icloud' },
     route: { kind: 'settings' },
@@ -103,7 +103,7 @@ type MountedSettings = Awaited<ReturnType<typeof mount>>
  * Wait until the settings document holds `patch`.
  */
 async function expectSettings(view: MountedSettings, patch: Partial<Settings>): Promise<void> {
-  await vi.waitFor(() => expect(view.app.settings.get()).toMatchObject(patch))
+  await vi.waitFor(() => expect(view.core.settings.get()).toMatchObject(patch))
 }
 
 beforeEach(async () => {
@@ -278,7 +278,7 @@ describe('MobileSettings', () => {
     await user.click(page.getByRole('button', { name: /System prompt.*Default/ }))
 
     await act(() => {
-      view.app.settings.update({ chatSystemPrompt: 'Persisted instructions loaded from disk.' })
+      view.core.settings.update({ chatSystemPrompt: 'Persisted instructions loaded from disk.' })
     })
     view.updateSettings.mockClear()
 
@@ -314,7 +314,7 @@ describe('MobileSettings', () => {
     await user.click(sheet.getByRole('button', { name: 'Add prompt' }))
 
     await vi.waitFor(() => {
-      expect(view.app.settings.get().aiPrompts).toEqual([
+      expect(view.core.settings.get().aiPrompts).toEqual([
         expect.objectContaining({
           label: 'Shorten',
           body: 'Shorten: {{selectedText}}',
@@ -340,7 +340,7 @@ describe('MobileSettings', () => {
     await user.click(sheet.getByRole('button', { name: 'Save' }))
 
     await vi.waitFor(() => {
-      expect(view.app.settings.get().aiPrompts).toEqual([
+      expect(view.core.settings.get().aiPrompts).toEqual([
         { ...saved, label: 'Translate to German' },
       ])
     })
@@ -357,7 +357,7 @@ describe('MobileSettings', () => {
     await user.click(page.getByRole('button', { name: 'Shorten' }))
     await user.click(page.getByTestId('drawer').getByRole('button', { name: 'Remove' }))
 
-    await vi.waitFor(() => expect(view.app.settings.get().aiPrompts).toEqual([]))
+    await vi.waitFor(() => expect(view.core.settings.get().aiPrompts).toEqual([]))
   })
 
   it('shows the connected remote and the live plain-language status', async () => {
@@ -378,7 +378,7 @@ describe('MobileSettings', () => {
       const methods = view.gitSync.calls().map((call) => call.method)
       expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
     })
-    expect(view.app.githubAuth.getState().connected).toBe(true)
+    expect(view.core.githubAuth.getState().connected).toBe(true)
   })
 
   it('signs in to and out of GitHub from the account group, on any graph', async () => {
@@ -388,10 +388,10 @@ describe('MobileSettings', () => {
     await userEvent.click(page.getByRole('button', { name: 'Sign in to GitHub' }))
     await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
 
-    await act(() => view.app.githubAuth.save({ kind: 'pat', token: 'ghp_test' }))
+    await act(() => view.core.githubAuth.save({ kind: 'pat', token: 'ghp_test' }))
     await userEvent.click(page.getByRole('button', { name: 'Sign out of GitHub' }))
 
-    await vi.waitFor(() => expect(view.app.githubAuth.getState().connected).toBe(false))
+    await vi.waitFor(() => expect(view.core.githubAuth.getState().connected).toBe(false))
     await expect.element(page.getByRole('button', { name: 'Sign in to GitHub' })).toBeVisible()
   })
 
@@ -462,7 +462,7 @@ describe('MobileSettings', () => {
         status: { state: 'idle' },
       },
     })
-    await view.app.gitHostCredentials.save('https://gitlab.com', {
+    await view.core.gitHostCredentials.save('https://gitlab.com', {
       username: 'alex',
       secret: 'glpat-1',
     })
@@ -473,12 +473,12 @@ describe('MobileSettings', () => {
       const methods = view.gitSync.calls().map((call) => call.method)
       expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
     })
-    expect(await view.app.gitHostCredentials.load('https://gitlab.com')).toEqual({
+    expect(await view.core.gitHostCredentials.load('https://gitlab.com')).toEqual({
       origin: 'https://gitlab.com',
       username: 'alex',
       secret: 'glpat-1',
     })
-    expect(view.app.githubAuth.getState().connected).toBe(true)
+    expect(view.core.githubAuth.getState().connected).toBe(true)
   })
 
   it('offers to update the sign-in of a host remote the host refused', async () => {
@@ -501,7 +501,7 @@ describe('MobileSettings', () => {
 
   it('shows a GitHub sign-out that failed under Accounts', async () => {
     const view = await mount({ gitSync: { phase: 'disconnected' } })
-    vi.spyOn(view.app.githubAuth, 'clear').mockRejectedValueOnce(new Error('Keychain denied'))
+    vi.spyOn(view.core.githubAuth, 'clear').mockRejectedValueOnce(new Error('Keychain denied'))
 
     await userEvent.click(page.getByRole('button', { name: 'Sign out of GitHub' }))
 

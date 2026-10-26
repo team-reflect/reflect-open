@@ -27,7 +27,7 @@ async function renderChooser(options?: {
   settings?: Partial<Settings>
   buildPlatform?: BuildPlatform
 }): Promise<void> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ buildPlatform: options?.buildPlatform ?? 'darwin' }),
     graphSession: createTestGraphSessionService({ recents: RECENTS }),
@@ -35,12 +35,12 @@ async function renderChooser(options?: {
       options?.icloud === undefined ? undefined : { status: options.icloud },
     ),
   })
-  openRecent = vi.spyOn(app.graphSession, 'openRecent').mockResolvedValue(true)
-  createGraphAt = vi.spyOn(app.graphSession, 'createGraphAt').mockResolvedValue(true)
+  openRecent = vi.spyOn(core.graphSession, 'openRecent').mockResolvedValue(true)
+  createGraphAt = vi.spyOn(core.graphSession, 'createGraphAt').mockResolvedValue(true)
   // Calls through: the real service forgets the graph and refreshes the list.
-  forgetRecent = vi.spyOn(app.graphSession, 'forgetRecent')
+  forgetRecent = vi.spyOn(core.graphSession, 'forgetRecent')
   await renderInApp(<GraphChooser />, {
-    app,
+    core,
     graph: null,
     route: null,
     ...(options?.settings === undefined ? {} : { settings: options.settings }),

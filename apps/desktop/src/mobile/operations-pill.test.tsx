@@ -66,11 +66,11 @@ describe('MobileOperationsPills', () => {
   })
 
   it('expires with the store’s linger window', async () => {
-    const { app, appServices } = await renderInApp(<MobileOperationsPills />)
+    const { core, appServices } = await renderInApp(<MobileOperationsPills />)
     const handle = await operate(() => appServices.operations.start('Completing task'))
     await act(() => handle.fail('The note is busy.'))
 
-    await act(() => app.clock.advance(LINGER_MS + MIN_VISIBLE_MS))
+    await act(() => core.clock.advance(LINGER_MS + MIN_VISIBLE_MS))
 
     expect(page.getByRole('alert').query()).toBeNull()
   })

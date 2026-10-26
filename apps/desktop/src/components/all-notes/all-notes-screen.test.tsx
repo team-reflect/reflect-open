@@ -105,7 +105,7 @@ interface RenderScreenOptions {
 
 async function renderScreen(options: RenderScreenOptions = {}) {
   const notes = options.notes ?? [...noteRows, taggedDailyRow]
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile: createTestNoteFileService({
       files: Object.fromEntries(notes.map((note) => [note.path, noteMarkdown(note)])),
@@ -115,7 +115,7 @@ async function renderScreen(options: RenderScreenOptions = {}) {
   })
   for (const note of notes) {
     const source = noteMarkdown(note)
-    app.database.applyProjection({
+    core.database.applyProjection({
       ...buildIndexedNote(parseNote({ path: note.path, source }), {
         fileHash: `hash-${note.path}`,
         mtime: note.mtime,
@@ -126,8 +126,8 @@ async function renderScreen(options: RenderScreenOptions = {}) {
   }
   // The facet counts are scripted: the fixture pins `book` although no listed
   // note carries it, so the Custom menu has a pinned facet to leave out.
-  vi.spyOn(app.noteList, 'listNoteTags').mockResolvedValue(facetRows)
-  deleteNote = vi.spyOn(app.noteFile, 'delete')
+  vi.spyOn(core.noteList, 'listNoteTags').mockResolvedValue(facetRows)
+  deleteNote = vi.spyOn(core.noteFile, 'delete')
   return await renderInApp(
     <>
       {/* The screen fills its container (`h-full`); hand it the viewport
@@ -138,7 +138,7 @@ async function renderScreen(options: RenderScreenOptions = {}) {
       <ReArrive />
     </>,
     {
-      app,
+      core,
       graph: { root: '/g', name: 'g', generation: 1 },
       route: { kind: 'allNotes', tag: null },
       settings: {
@@ -497,7 +497,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
       expect(deleteNote).toHaveBeenCalledWith('notes/health.md', 1)
       expect(deleteNote).toHaveBeenCalledWith('notes/tokyo.md', 1)
     })
-    expect(view.app.noteFile.trashed()).toEqual(['notes/health.md', 'notes/tokyo.md'])
+    expect(view.core.noteFile.trashed()).toEqual(['notes/health.md', 'notes/tokyo.md'])
     // Optimistic removal: the rows leave at once — the test harness has no file
     // watcher to drive the reindex that would otherwise refresh the list.
     await expectLocatorToHaveCount(view.getByText('Health Stacked'), 0)
@@ -565,7 +565,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await expectLocatorToHaveCount(page.getByText('Trash 1 note?'), 0)
     await vi.waitFor(() => {
       expect(
-        view.app.progress
+        view.core.progress
           .getAll()
           .map((operation) => `${operation.status}:${operation.message ?? ''}`),
       ).toContain('failed:disk on fire')

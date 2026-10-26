@@ -51,7 +51,7 @@ let queryClient: QueryClient
  * Render the paywall over the services of the running test.
  */
 async function mount(): Promise<InAppRenderResult<CoreServices>> {
-  const view = await renderInApp(<PaywallScreen />, { app: services })
+  const view = await renderInApp(<PaywallScreen />, { core: services })
   queryClient = view.queryClient
   return view
 }

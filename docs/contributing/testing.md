@@ -61,14 +61,14 @@ the service plus members that seed, drive or observe it.
 `createTestCoreServices({ database, ...overrides })` (`packages/core/src/testing/services.ts`)
 builds `CoreServices` through the production root, `composeCoreServices`, over
 test adapters. Services with a double get the double, every other service is
-real. The result also holds `CoreInternalServices` (e.g. `app.database`), the
+real. The result also holds `CoreInternalServices` (e.g. `core.database`), the
 mobile services, and the `progress`, `activity` and `role` ports. Each
 override replaces the factory of its key, so every service built after it
 receives the override:
 
 ```ts
 const noteFile = createTestNoteFileService({ files: { 'notes/a.md': '# A\n' } })
-const app = createTestCoreServices({ noteFile })
+const core = createTestCoreServices({ noteFile })
 ```
 
 `createTestAppServices(core, overrides)` (`packages/app/src/testing/services.ts`)
@@ -87,32 +87,32 @@ register the app commands, as `main.tsx` does. The options are documented on
 
 The result holds two containers:
 
-- `app`: the core container (default: `createTestCoreServices()` over a wasm
+- `core`: the core container (default: `createTestCoreServices()` over a wasm
   database). Drive and
-  observe the graph, settings and progress here: `app.graphSession.setGraph()`,
-  `app.settings.saves()`, `app.progress.getAll()`.
-- `appServices`: the app layer, built with `createTestAppServices(app, options.appServices)`.
+  observe the graph, settings and progress here: `core.graphSession.setGraph()`,
+  `core.settings.saves()`, `core.progress.getAll()`.
+- `appServices`: the app layer, built with `createTestAppServices(core, options.appServices)`.
   Assert navigation with `appServices.navigation.navigations()`.
 
 ```tsx
-const { app } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: 7 } })
+const { core } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: 7 } })
 await page.getByRole('button', { name: /rebuild/i }).click()
-await vi.waitFor(() => expect(app.indexLifecycle.rebuilds()).toEqual([7]))
+await vi.waitFor(() => expect(core.indexLifecycle.rebuilds()).toEqual([7]))
 ```
 
 **Spy before the render.** The providers read `service.method` during the
 render and put that function in their context. A spy installed later is not
-the function the component calls. So build your own `app`, spy on it, and pass
+the function the component calls. So build your own `core`, spy on it, and pass
 it in:
 
 ```tsx
-const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
 const rebuild = Promise.withResolvers<void>()
-vi.spyOn(app.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
-await renderInApp(<RebuildIndexField />, { app, graph: { indexGeneration: 7 } })
+vi.spyOn(core.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
+await renderInApp(<RebuildIndexField />, { core, graph: { indexGeneration: 7 } })
 ```
 
-With your own `app`, put the platform and the backup in it yourself. The
+With your own `core`, put the platform and the backup in it yourself. The
 helper throws if you also pass `platform` or `sync`.
 
 `database` is required: a Node.js test passes
@@ -126,7 +126,7 @@ builds the app itself.
 `DESKTOP_VI_MOCK_ALLOW` and `DESKTOP_VI_MOCK_ALLOW_BY_FILE`: pure UI children,
 heavy children, and `@tauri-apps/*` in adapter tests. `packages/` allows none.
 Never mock `@reflect/core`, `@reflect/app`, a service, or a provider that
-reads a service. Seed or spy on `app` instead. A new entry needs a reason next
+reads a service. Seed or spy on `core` instead. A new entry needs a reason next
 to it.
 
 ## Timing pitfall

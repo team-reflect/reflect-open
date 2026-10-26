@@ -17,18 +17,18 @@ function snapshot(astPath: number[], markdown: string, checked = true): TaskSnap
   return { astPath, markdown, breadcrumbs: [], checked }
 }
 
-let app: TestCoreServices
+let core: TestCoreServices
 let tasks: TaskService
 
 // A fresh service per test, so its recently-completed set starts empty.
 beforeEach(() => {
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  tasks = app.tasks
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  tasks = core.tasks
 })
 
 describe('recently-completed', () => {
   it('keeps session completions showing, as checked', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     expect(result.current).toEqual([])
 
     await act(() => tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2] })]))
@@ -39,7 +39,7 @@ describe('recently-completed', () => {
   })
 
   it('dedupes by task key', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     const taskRow = task({ notePath: 'a.md', astPath: [2] })
     await act(() => tasks.markRecentlyCompleted('/g', [taskRow]))
     await act(() => tasks.markRecentlyCompleted('/g', [taskRow]))
@@ -47,7 +47,7 @@ describe('recently-completed', () => {
   })
 
   it('forgets dropped keys and clears on archive', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => {
       tasks.markRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [2] }),
@@ -62,7 +62,7 @@ describe('recently-completed', () => {
   })
 
   it('relocates struck rows a note write moved', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => {
       tasks.markRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [4], markdown: 'done' }),
@@ -81,7 +81,7 @@ describe('recently-completed', () => {
   })
 
   it('drops a struck row whose task the write removed', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [1] })]))
 
     await act(() => {
@@ -92,7 +92,7 @@ describe('recently-completed', () => {
   })
 
   it('refreshes an edited struck row from its persisted Markdown', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => {
       tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], markdown: 'old' })])
     })
@@ -111,7 +111,7 @@ describe('recently-completed', () => {
   })
 
   it('leaves a struck row alone when the write did not know its task', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => {
       tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [1], markdown: 'dup' })])
     })
@@ -126,7 +126,7 @@ describe('recently-completed', () => {
   })
 
   it('drops a struck copy when the index reports the task open again with a newer updatedAt', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => {
       tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
     })
@@ -143,7 +143,7 @@ describe('recently-completed', () => {
   })
 
   it('keeps the struck copy when the open row is the pre-completion index state', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => {
       tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
     })
@@ -159,7 +159,7 @@ describe('recently-completed', () => {
   })
 
   it('reconciles only the active graph root, and leaves unrelated struck tasks alone', async () => {
-    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { app })
+    const { result } = await renderHookInApp(() => useRecentlyCompleted('/g', undefined), { core })
     await act(() => {
       tasks.markRecentlyCompleted('/g', [
         task({ notePath: 'a.md', astPath: [2], updatedAt: 100 }),
@@ -189,7 +189,7 @@ describe('recently-completed', () => {
           open: undefined,
         },
       ) => useRecentlyCompleted('/g', open),
-      { app, initialProps: { open: undefined as readonly OpenTask[] | undefined } },
+      { core, initialProps: { open: undefined as readonly OpenTask[] | undefined } },
     )
     await act(() => {
       tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
@@ -221,7 +221,7 @@ describe('recently-completed', () => {
         lengths.push(rows.length)
         return rows
       },
-      { app, initialProps: { open: undefined as readonly OpenTask[] | undefined } },
+      { core, initialProps: { open: undefined as readonly OpenTask[] | undefined } },
     )
     await act(() => {
       tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2], updatedAt: 100 })])
@@ -238,7 +238,7 @@ describe('recently-completed', () => {
   it('is scoped to a graph root — switching graphs yields an empty set', async () => {
     const { result, rerender } = await renderHookInApp(
       ({ root }: { root: string } = { root: '/g' }) => useRecentlyCompleted(root, undefined),
-      { app, initialProps: { root: '/g' } },
+      { core, initialProps: { root: '/g' } },
     )
     await act(() => tasks.markRecentlyCompleted('/g', [task({ notePath: 'a.md', astPath: [2] })]))
     expect(result.current).toHaveLength(1)

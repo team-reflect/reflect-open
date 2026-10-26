@@ -42,14 +42,14 @@ async function mount(path: string, client: QueryClient) {
   const embeddingRuntime = createTestEmbeddingRuntimeService({ status: embedStatus })
   // The runtime has reported before the mount, as on a second visit to a note.
   await embeddingRuntime.status()
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile,
     retrieval: createTestRetrievalService({ relatedNotes }),
     embeddingRuntime,
   })
   return await renderHookInApp(() => useSimilarNotes(path), {
-    app,
+    core,
     graph: { root: '/g', name: 'g' },
     settings: { semanticSearchEnabled },
     queryClient: client,

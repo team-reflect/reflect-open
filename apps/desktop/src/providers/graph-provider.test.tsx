@@ -33,10 +33,10 @@ function tree(children: ReactNode, platform?: AppPlatform): ReactElement {
 }
 
 /**
- * Mount the provider over `app` and read its context.
+ * Mount the provider over `core` and read its context.
  */
-async function renderGraph<App extends CoreServices>(
-  app: App,
+async function renderGraph<Core extends CoreServices>(
+  core: Core,
   platform?: AppPlatform,
   appServices?: Partial<AppServices>,
 ) {
@@ -46,12 +46,12 @@ async function renderGraph<App extends CoreServices>(
     return null
   }
   const view = await renderInApp(tree(<Probe />, platform), {
-    app,
+    core,
     servicesOnly: true,
     ...(appServices === undefined ? {} : { appServices }),
   })
   return {
-    app,
+    core,
     appServices: view.appServices,
     result,
   }
@@ -92,7 +92,7 @@ describe('GraphProvider', () => {
   })
 
   it('opens a picked folder and seeds the empty graph', async () => {
-    const { app, appServices, result } = await renderGraph(
+    const { core, appServices, result } = await renderGraph(
       createTestCoreServices({ database: createWasmTestDatabaseService() }),
     )
     appServices.dialog.setFolder('/fresh')
@@ -105,12 +105,12 @@ describe('GraphProvider', () => {
     expect(result.current.status).toBe('ready')
     expect(result.current.graph?.root).toBe('/fresh')
     // The welcome note is written, and the graph is marked as seeded.
-    expect(app.noteFile.writes()).toHaveLength(1)
-    await expect(app.indexStore.getMeta('welcomeSeeded')).resolves.toBe('true')
+    expect(core.noteFile.writes()).toHaveLength(1)
+    await expect(core.indexStore.getMeta('welcomeSeeded')).resolves.toBe('true')
   })
 
   it('boots the app’s graph session and passes its actions through', async () => {
-    const { app, result } = await renderGraph(
+    const { core, result } = await renderGraph(
       createTestCoreServices({ database: createWasmTestDatabaseService() }),
     )
     await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
@@ -122,7 +122,7 @@ describe('GraphProvider', () => {
     expect(result.current.status).toBe('ready')
     expect(result.current.graph).toEqual({ root: '/a', name: 'a', generation: 1 })
     expect(result.current.indexGeneration).toBe(1)
-    expect(app.graphSession.getState().graph?.root).toBe('/a')
+    expect(core.graphSession.getState().graph?.root).toBe('/a')
   })
 
   it('provides the open session’s graph services', async () => {
@@ -149,13 +149,13 @@ describe('GraphProvider', () => {
         </button>
       )
     }
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-    const screen = await renderInApp(tree(<Probe />), { app, servicesOnly: true })
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const screen = await renderInApp(tree(<Probe />), { core, servicesOnly: true })
 
     await screen.getByRole('button', { name: 'Open' }).click()
 
     await expect.element(screen.getByText('main /a')).toBeVisible()
-    expect(app.graphSession.getState().session?.signal.aborted).toBe(false)
+    expect(core.graphSession.getState().session?.signal.aborted).toBe(false)
   })
 })
 
@@ -166,7 +166,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
       icloudDocumentsRoot: ICLOUD_ROOT,
       icloudGraphRoots: [],
     }
-    const { app, result } = await renderGraph(
+    const { core, result } = await renderGraph(
       createTestCoreServices({
         database: createWasmTestDatabaseService(),
         platform: createTestPlatformService({ appPlatform: 'ios' }),
@@ -180,11 +180,11 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(result.current.graph).toBeNull()
     await vi.waitFor(() => expect(result.current.mobileStorageInfo).toEqual(storage))
     expect(result.current.mobileStorageResolving).toBe(false)
-    expect(app.graphSession.getState().graph).toBeNull()
+    expect(core.graphSession.getState().graph).toBeNull()
   })
 
   it('publishes the app’s mobile onboarding and passes completeOnboarding through', async () => {
-    const { app, appServices, result } = await renderGraph(
+    const { core, appServices, result } = await renderGraph(
       createTestCoreServices({
         database: createWasmTestDatabaseService(),
         platform: createTestPlatformService({ appPlatform: 'ios' }),
@@ -203,6 +203,6 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(result.current.graph?.root).toBe('/local/Documents')
     expect(result.current.mobileStorageKind).toBe('local')
     expect(appServices.mobileOnboarding.getState().kind).toBe('local')
-    await vi.waitFor(() => expect(app.settings.saves().at(-1)?.mobileOnboarded).toBe(true))
+    await vi.waitFor(() => expect(core.settings.saves().at(-1)?.mobileOnboarded).toBe(true))
   })
 })

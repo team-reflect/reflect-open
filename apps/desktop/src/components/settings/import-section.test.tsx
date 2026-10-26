@@ -19,19 +19,19 @@ beforeEach(() => {
  * The section under the workspace's real V1 import, whose native import never finishes.
  */
 async function renderSection(): Promise<TestCoreServices> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  app.ipc.onCommand(IMPORT_COMMAND, () => new Promise<never>(() => {}))
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core.ipc.onCommand(IMPORT_COMMAND, () => new Promise<never>(() => {}))
   await renderInApp(<ImportSection />, {
-    app,
+    core,
     appServices: { dialog },
     graph: { generation: 4 },
     wrapper: (children) => <V1ImportProvider>{children}</V1ImportProvider>,
   })
-  return app
+  return core
 }
 
-function importCalls(app: TestCoreServices): Record<string, unknown>[] {
-  return app.ipc
+function importCalls(core: TestCoreServices): Record<string, unknown>[] {
+  return core.ipc
     .calls()
     .filter((call) => call.command === IMPORT_COMMAND)
     .map((call) => call.args)
@@ -43,7 +43,7 @@ function importButton(): Locator {
 
 describe('ImportSection', () => {
   it('hands the picked Reflect V1 zip to the import controller', async () => {
-    const app = await renderSection()
+    const core = await renderSection()
 
     await importButton().click()
 
@@ -60,7 +60,7 @@ describe('ImportSection', () => {
       ])
     })
     await vi.waitFor(() => {
-      expect(importCalls(app)).toEqual([
+      expect(importCalls(core)).toEqual([
         { path: '/Users/alex/Downloads/reflect-v1.zip', generation: 4 },
       ])
     })
@@ -68,12 +68,12 @@ describe('ImportSection', () => {
 
   it('does nothing when the picker is cancelled', async () => {
     dialog.setFiles(null)
-    const app = await renderSection()
+    const core = await renderSection()
 
     await importButton().click()
 
     await vi.waitFor(() => expect(dialog.calls()).toHaveLength(1))
-    expect(importCalls(app)).toEqual([])
+    expect(importCalls(core)).toEqual([])
   })
 
   it('is disabled while an import runs', async () => {

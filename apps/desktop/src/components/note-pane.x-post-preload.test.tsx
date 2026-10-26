@@ -32,11 +32,11 @@ async function renderNote(
   source: string,
   resolveArchive: (postId: string) => Promise<ResolvedArchive>,
 ) {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile: createTestNoteFileService({ files: { [path]: source } }),
   })
-  vi.spyOn(app.xArchive, 'resolve').mockImplementation(
+  vi.spyOn(core.xArchive, 'resolve').mockImplementation(
     async (_generation, postId) => await resolveArchive(postId),
   )
   // The X post resolver and its preload read the app's shared query client.
@@ -45,7 +45,7 @@ async function renderNote(
       <RouteContent />
     </PaletteProvider>,
     {
-      app,
+      core,
       queryClient,
       graph: { root: '/g', name: 'g', generation: 1 },
       settings: { editorMarkdownSyntax: 'hide' },

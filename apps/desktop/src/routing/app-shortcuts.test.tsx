@@ -70,7 +70,7 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 // The platform of the next `shortcutsHook`; each `describe` sets it.
 let platform: TestPlatformOptions
 // The services of the rendered app; set by `shortcutsHook`.
-let app: TestCoreServices
+let core: TestCoreServices
 let appLayer: AppServices
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 let openRouteInNewWindow: MockInstance<LinkNavigationService['openRouteInNewWindow']>
@@ -99,7 +99,7 @@ async function shortcutsHook() {
       isOstensiblyEmpty: isOstensiblyEmptyNoteSource,
     },
   })
-  app = services
+  core = services
   appLayer = createTestAppServices(services)
   openRecent = vi.spyOn(services.graphSession, 'openRecent').mockResolvedValue(true)
   openRouteInNewWindow = vi
@@ -126,7 +126,7 @@ async function shortcutsHook() {
       }
     },
     {
-      app: services,
+      core: services,
       appServices: appLayer,
       graph: GRAPH,
       graphState: {
@@ -184,7 +184,7 @@ describe('app shortcuts', () => {
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/a.md', { pinned: 1024 }, 1)
     })
-    expect(app.noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 1024 })
+    expect(core.noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 1024 })
     await act(() => press('o'))
     expect(commitNoteFrontmatter).toHaveBeenCalledTimes(1)
     write.resolve()
@@ -199,7 +199,7 @@ describe('app shortcuts', () => {
     await act(() => result.current.setFocusedDailyDate('2026-09-07'))
     await act(() => result.current.context.togglePin())
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('daily/2026-09-07.md', { pinned: 1024 }, 1)
-    expect(app.noteRows.getOverlay('daily/2026-09-07.md')).toMatchObject({ isPinned: true })
+    expect(core.noteRows.getOverlay('daily/2026-09-07.md')).toMatchObject({ isPinned: true })
   })
 
   it('palette privacy updates the focused daily note row before the write resolves', async () => {
@@ -216,7 +216,7 @@ describe('app shortcuts', () => {
         1,
       )
     })
-    expect(app.noteRows.getOverlay('daily/2026-09-07.md')).toEqual({ isPrivate: true })
+    expect(core.noteRows.getOverlay('daily/2026-09-07.md')).toEqual({ isPrivate: true })
     write.resolve()
     await action
   })
@@ -226,7 +226,7 @@ describe('app shortcuts', () => {
     await act(() => result.current.router.navigate({ kind: 'settings' }))
     await act(() => press('o'))
     await act(() => result.current.context.togglePrivate())
-    await act(() => app.graphSession.setGraph(null))
+    await act(() => core.graphSession.setGraph(null))
     await act(() => result.current.router.navigate({ kind: 'note', path: 'notes/a.md' }))
     await act(() => press('o'))
     await act(() => result.current.context.togglePrivate())

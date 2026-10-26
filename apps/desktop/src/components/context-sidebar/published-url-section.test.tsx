@@ -40,21 +40,21 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 
 async function renderSection(path = 'notes/a.md') {
   operations = createTestOperationsService()
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     progress: operations,
   })
-  vi.spyOn(app.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
+  vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
   publish = vi
-    .spyOn(app.gistPublish, 'publish')
+    .spyOn(core.gistPublish, 'publish')
     .mockResolvedValue({ url: 'https://gist.github.com/alex/g1', stale: false })
-  const appLayer = createTestAppServices(app)
+  const appLayer = createTestAppServices(core)
   ;({ clipboard, opener } = appLayer)
   if (clipboardFailure !== null) {
     clipboard.failWith(clipboardFailure)
   }
   return await renderInApp(<PublishedUrlSection path={path} />, {
-    app,
+    core,
     appServices: appLayer,
     graph: { root: '/g', name: 'g', generation: 7 },
   })

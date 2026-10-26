@@ -137,7 +137,7 @@ function RouteProbe(): ReactElement | null {
 async function renderChat() {
   probedSendRef.current = null
   probedRouteRef.current = null
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     secretStore: createTestSecretStoreService(
       settingsState.apiKey === null ? {} : { [aiKeySecretName(MODEL.id)]: settingsState.apiKey },
@@ -146,7 +146,7 @@ async function renderChat() {
     chatGraphContext,
   })
   // The cited `[[Atlas]]` links resolve through the index.
-  seedNotes(app.database, [{ path: 'notes/atlas.md', markdown: '# Atlas\n' }])
+  seedNotes(core.database, [{ path: 'notes/atlas.md', markdown: '# Atlas\n' }])
   noteWindows = createTestWindowService()
   return await renderInApp(
     <>
@@ -155,7 +155,7 @@ async function renderChat() {
       <RouteProbe />
     </>,
     {
-      app,
+      core,
       appServices: { window: noteWindows },
       graph: GRAPH,
       settings: {
@@ -619,7 +619,7 @@ describe('ChatScreen', () => {
     expect(signal?.aborted).toBe(false)
 
     // The dead conversation must not keep reading whichever graph is open now.
-    view.app.graphSession.setGraph({ root: '/graphs/other' })
+    view.core.graphSession.setGraph({ root: '/graphs/other' })
     expect(signal?.aborted).toBe(true)
   })
 

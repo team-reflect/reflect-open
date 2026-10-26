@@ -39,17 +39,17 @@ async function renderSection(
   graph?: TestOpenGraph,
 ): Promise<TestCoreServices> {
   gitSync.setState(state)
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     gitSync,
     gitHostConnector,
   })
   await renderInApp(<GitSyncSettingsField />, {
-    app,
+    core,
     appServices: { opener },
     graph,
   })
-  return app
+  return core
 }
 
 const GITHUB = {
@@ -147,14 +147,14 @@ describe('GitSyncSettingsField', () => {
   })
 
   it('counts the waiting countdown down as time passes', async () => {
-    const app = await renderSection({
+    const core = await renderSection({
       phase: 'connected',
       ...GITHUB,
       isPrimaryChannel: true,
       status: { state: 'waiting', until: 3 * 60_000 },
     })
     await expect.element(page.getByText('Syncs in 3 minutes')).toBeVisible()
-    await app.clock.advance(60_000)
+    await core.clock.advance(60_000)
     await expect.element(page.getByText('Syncs in 2 minutes')).toBeVisible()
   })
 

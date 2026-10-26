@@ -35,7 +35,7 @@ function sectionTop(index: number): number {
 }
 
 async function renderNavigatorPage(): Promise<HTMLElement> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ isMacosDesktop: false }),
     contacts: createTestContactsService({ status: 'unavailable' }),
@@ -55,7 +55,7 @@ async function renderNavigatorPage(): Promise<HTMLElement> {
         ))}
       </div>
     </div>,
-    { app },
+    { core },
   )
   return view.getByTestId('scroller').element() as HTMLElement
 }

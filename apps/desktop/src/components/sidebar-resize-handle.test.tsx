@@ -18,9 +18,9 @@ const DEFAULT_WIDTHS: SidebarWidths = { sidebarWidth: 260, contextSidebarWidth: 
 let updateSettings: MockInstance<SettingsService['update']>
 
 async function renderWithWidths(ui: ReactNode, widths: SidebarWidths): Promise<void> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  updateSettings = vi.spyOn(app.settings, 'update').mockImplementation(() => {})
-  await renderInApp(ui, { app, settings: widths })
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  updateSettings = vi.spyOn(core.settings, 'update').mockImplementation(() => {})
+  await renderInApp(ui, { core, settings: widths })
 }
 
 function rootVariable(name: string): string {

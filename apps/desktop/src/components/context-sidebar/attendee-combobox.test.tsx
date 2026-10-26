@@ -32,7 +32,7 @@ const onAdd = vi.fn<(attendee: MeetingAttendee) => void>()
 
 async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locator> {
   const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     contacts,
     meetings: createTestCoreServices({
@@ -42,7 +42,7 @@ async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locato
     }).meetings,
   })
   await renderInApp(<AttendeeCombobox attendees={attendees} onAdd={onAdd} />, {
-    app,
+    core,
     graph: { root: '/g', name: 'g' },
     settings: { contactsEnabled: true },
   })

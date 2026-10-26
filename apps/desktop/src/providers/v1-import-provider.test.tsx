@@ -55,7 +55,7 @@ async function renderProvider(result?: GraphImportSummary | Error) {
   })
   const session = createTestGraphSessionService({ state: { status: 'ready', graph: GRAPH } })
   const refreshIndex = vi.spyOn(session, 'refreshIndex').mockImplementation(() => {})
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     ipc,
     graphSession: session,
@@ -64,7 +64,7 @@ async function renderProvider(result?: GraphImportSummary | Error) {
     <V1ImportProvider>
       <Probe />
     </V1ImportProvider>,
-    { app, servicesOnly: true },
+    { core, servicesOnly: true },
   )
   return {
     view,
@@ -72,7 +72,7 @@ async function renderProvider(result?: GraphImportSummary | Error) {
     session,
     refreshIndex,
     pendingImport,
-    ownWrites: () => app.fileChanges.ownWrites(),
+    ownWrites: () => core.fileChanges.ownWrites(),
     commands: () => ipc.calls().map((call) => call.command),
     emitProgress: (progress: GraphImportProgress) => ipc.emit('import:progress', progress),
   }

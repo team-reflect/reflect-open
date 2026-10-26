@@ -19,7 +19,7 @@ describe('DeepLinkProvider navigation intent integration', () => {
       .mockImplementation(() => pendingResolution.promise)
     const captureInbox = createTestCaptureInboxService()
     const graphSession = createTestGraphSessionService()
-    const app = createTestCoreServices({
+    const core = createTestCoreServices({
       database: createWasmTestDatabaseService(),
       captureInbox,
       graphSession,
@@ -29,14 +29,14 @@ describe('DeepLinkProvider navigation intent integration', () => {
         graphSession,
       }),
     })
-    const appServices = createTestAppServices(app)
-    await renderInApp(<DeepLinkProvider>{null}</DeepLinkProvider>, { app, appServices })
+    const appServices = createTestAppServices(core)
+    await renderInApp(<DeepLinkProvider>{null}</DeepLinkProvider>, { core, appServices })
 
     appServices.deepLinkRouter.dispatch('reflect://note/Project%20X')
     expect(resolveNoteTarget).toHaveBeenCalledWith('Project X')
 
     appServices.deepLinkRouter.dispatch('reflect://append?text=captured%20while%20resolving')
-    await vi.waitFor(() => expect(app.captureInbox.spooled()).toHaveLength(1))
+    await vi.waitFor(() => expect(core.captureInbox.spooled()).toHaveLength(1))
 
     pendingResolution.resolve('notes/project-x.md')
 

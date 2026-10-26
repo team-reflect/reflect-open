@@ -33,7 +33,7 @@ describe('useTaskCheckboxHaptics', () => {
     const checkbox = installList('task')
     const view = await renderHookInApp(() => useTaskCheckboxHaptics())
     press(checkbox)
-    expect(view.app.mobile.haptics.impacts()).toBe(1)
+    expect(view.core.mobile.haptics.impacts()).toBe(1)
     await view.unmount()
   })
 
@@ -41,7 +41,7 @@ describe('useTaskCheckboxHaptics', () => {
     const checkbox = installList('toggle')
     const view = await renderHookInApp(() => useTaskCheckboxHaptics())
     press(checkbox)
-    expect(view.app.mobile.haptics.impacts()).toBe(0)
+    expect(view.core.mobile.haptics.impacts()).toBe(0)
     await view.unmount()
   })
 
@@ -49,14 +49,14 @@ describe('useTaskCheckboxHaptics', () => {
     const checkbox = installList('task', false)
     const view = await renderHookInApp(() => useTaskCheckboxHaptics())
     press(checkbox)
-    expect(view.app.mobile.haptics.impacts()).toBe(0)
+    expect(view.core.mobile.haptics.impacts()).toBe(0)
     await view.unmount()
   })
 
   it('stays silent for presses outside any list marker', async () => {
     const view = await renderHookInApp(() => useTaskCheckboxHaptics())
     press(document.body)
-    expect(view.app.mobile.haptics.impacts()).toBe(0)
+    expect(view.core.mobile.haptics.impacts()).toBe(0)
     await view.unmount()
   })
 
@@ -65,6 +65,6 @@ describe('useTaskCheckboxHaptics', () => {
     const view = await renderHookInApp(() => useTaskCheckboxHaptics())
     await view.unmount()
     press(checkbox)
-    expect(view.app.mobile.haptics.impacts()).toBe(0)
+    expect(view.core.mobile.haptics.impacts()).toBe(0)
   })
 })

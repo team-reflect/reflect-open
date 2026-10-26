@@ -66,7 +66,7 @@ async function renderWizard(onClose = vi.fn()): Promise<ReturnType<typeof vi.fn>
   const githubConnector = createTestGithubConnector()
   githubConnector.onConnectNewRepo(sync.connectNewRepo)
   githubConnector.onConnectExistingRepo(sync.connectExistingRepo)
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     gitSync,
     githubConnector,
@@ -84,7 +84,7 @@ async function renderWizard(onClose = vi.fn()): Promise<ReturnType<typeof vi.fn>
   })
   await renderInApp(
     <ConnectGithubDialog suggestedRepoName="g-backup" onClose={onClose} pollIntervalMs={15} />,
-    { app, appServices: { opener } },
+    { core, appServices: { opener } },
   )
   return onClose
 }

@@ -15,7 +15,7 @@ let connected: boolean
 let row: NoteRow | null
 
 // The services of the app under test; created fresh for each test.
-let app: TestCoreServices
+let core: TestCoreServices
 let publish: MockInstance<GistPublishService['publish']>
 let unpublish: MockInstance<GistPublishService['unpublish']>
 
@@ -33,10 +33,10 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 
 async function renderAction() {
   if (connected) {
-    await app.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
+    await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
   }
   return await renderInApp(<NoteGistAction path="notes/a.md" />, {
-    app,
+    core,
     graph: { root: '/g', name: 'g', generation: 7 },
   })
 }
@@ -46,7 +46,7 @@ async function renderAction() {
  */
 async function waitForReads(queryClient: QueryClient): Promise<void> {
   await vi.waitFor(() => {
-    expect(app.githubAuth.getState().connected).toBe(connected)
+    expect(core.githubAuth.getState().connected).toBe(connected)
     expect(queryClient.getQueryData(queryKeys.index.note('/g', 'notes/a.md'))).toEqual(row)
   })
 }
@@ -54,10 +54,10 @@ async function waitForReads(queryClient: QueryClient): Promise<void> {
 beforeEach(() => {
   connected = true
   row = null
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  vi.spyOn(app.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
-  publish = vi.spyOn(app.gistPublish, 'publish').mockResolvedValue({ url: GIST_URL, stale: false })
-  unpublish = vi.spyOn(app.gistPublish, 'unpublish').mockResolvedValue({ url: null, stale: false })
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
+  publish = vi.spyOn(core.gistPublish, 'publish').mockResolvedValue({ url: GIST_URL, stale: false })
+  unpublish = vi.spyOn(core.gistPublish, 'unpublish').mockResolvedValue({ url: null, stale: false })
 })
 
 describe('NoteGistAction', () => {
@@ -99,7 +99,9 @@ describe('NoteGistAction', () => {
     await userEvent.click(view.getByRole('button', { name: /Share with private link/ }))
 
     await vi.waitFor(() => expect(view.appServices.clipboard.writes()).toEqual([GIST_URL]))
-    expect(app.progress.started().map((operation) => operation.label)).toContain('Gist link copied')
+    expect(core.progress.started().map((operation) => operation.label)).toContain(
+      'Gist link copied',
+    )
   })
 
   it('reports a failed copy and keeps the publish', async () => {
@@ -108,7 +110,7 @@ describe('NoteGistAction', () => {
     await userEvent.click(view.getByRole('button', { name: /Share with private link/ }))
 
     await vi.waitFor(() => {
-      expect(app.progress.findByLabel('Copying the gist link')).toMatchObject({
+      expect(core.progress.findByLabel('Copying the gist link')).toMatchObject({
         status: 'failed',
         message: 'denied',
       })
@@ -126,7 +128,7 @@ describe('NoteGistAction', () => {
     // The overlay is what the publish writes on success (its contract is
     // covered in note-gist.test.ts); given one, the label flips without waiting
     // on the index.
-    app.noteRows.setOverlay('notes/a.md', 7, { gistUrl: 'https://gist.github.com/alex/g1' })
+    core.noteRows.setOverlay('notes/a.md', 7, { gistUrl: 'https://gist.github.com/alex/g1' })
     const view = await renderAction()
     await expect.element(view.getByRole('button', { name: /Unpublish link/ })).toBeInTheDocument()
   })

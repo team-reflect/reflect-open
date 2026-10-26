@@ -35,10 +35,10 @@ beforeEach(() => {
 })
 
 async function renderSheet(): Promise<void> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  keyValidation = app.aiKeyValidation
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  keyValidation = core.aiKeyValidation
   await renderInApp(<AddAiProviderDrawer open onOpenChange={onOpenChange} onAdd={onAdd} />, {
-    app,
+    core,
     servicesOnly: true,
   })
 }

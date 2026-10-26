@@ -8,12 +8,12 @@ afterEach(() => {
 
 describe('EditorFullWidthEffect', () => {
   it('mirrors the live setting onto the document root', async () => {
-    const { app } = await renderInApp(<EditorFullWidthEffect />, {
+    const { core } = await renderInApp(<EditorFullWidthEffect />, {
       settings: { editorFullWidth: false },
     })
     expect(document.documentElement.dataset['editorFullWidth']).toBe('false')
 
-    app.settings.update({ editorFullWidth: true })
+    core.settings.update({ editorFullWidth: true })
 
     await vi.waitFor(() => expect(document.documentElement.dataset['editorFullWidth']).toBe('true'))
   })

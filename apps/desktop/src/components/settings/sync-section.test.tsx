@@ -55,16 +55,16 @@ async function renderSection(): Promise<void> {
     )
   }
   gitSync.setState(gitSyncState)
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     icloudNative,
     gitSync,
     platform: createTestPlatformService(platform),
   })
   openRecent = vi
-    .spyOn(app.graphSession, 'openRecent')
+    .spyOn(core.graphSession, 'openRecent')
     .mockImplementation(() => Promise.resolve(reopens))
-  await renderInApp(<SyncSection />, { app, graph, route: { kind: 'settings' } })
+  await renderInApp(<SyncSection />, { core, graph, route: { kind: 'settings' } })
 }
 
 function legend(section: Locator, text: string): Locator {

@@ -7,7 +7,7 @@ import { WeekRow } from './week-row.tsx'
 describe('WeekRow', () => {
   it('keeps a daily note marked when the date is both selected and today', async () => {
     const onSelect = vi.fn()
-    const { app } = await renderInApp(
+    const { core } = await renderInApp(
       <WeekRow
         weekStart="2026-07-13"
         selectedDay="2026-07-16"
@@ -26,7 +26,7 @@ describe('WeekRow', () => {
     await expect.element(page.getByTestId('note-dot-2026-07-14')).not.toBeInTheDocument()
 
     await userEvent.click(selected)
-    expect(app.mobile.haptics.impacts()).toBe(1)
+    expect(core.mobile.haptics.impacts()).toBe(1)
     expect(onSelect).toHaveBeenCalledWith('2026-07-16')
   })
 })

@@ -28,7 +28,7 @@ let openGraph: TestOpenGraph
 let embedRuntime: TestEmbeddingRuntimeService
 
 // The services of the rendered app; set by `renderScreen`.
-let app: ReturnType<typeof createApp>
+let core: ReturnType<typeof createCore>
 let forget: MockInstance<GraphSessionService['forgetRecent']>
 let deleteGraph: MockInstance<GraphSessionService['deleteGraph']>
 
@@ -36,12 +36,12 @@ let deleteGraph: MockInstance<GraphSessionService['deleteGraph']>
  * Every settings document the app persisted, oldest first.
  */
 function saved(): Settings[] {
-  return app.settings.saves()
+  return core.settings.saves()
 }
 
 // The screen runs off macOS desktop (no Agents, iCloud or Calendar rows), with
 // a graph open and its git sync disconnected.
-function createApp() {
+function createCore() {
   return createTestCoreServices({
     database: createWasmTestDatabaseService(),
     embeddingRuntime: embedRuntime,
@@ -51,16 +51,16 @@ function createApp() {
 }
 
 async function renderScreen(): Promise<void> {
-  app = createApp()
-  forget = vi.spyOn(app.graphSession, 'forgetRecent').mockResolvedValue()
-  deleteGraph = vi.spyOn(app.graphSession, 'deleteGraph').mockResolvedValue()
+  core = createCore()
+  forget = vi.spyOn(core.graphSession, 'forgetRecent').mockResolvedValue()
+  deleteGraph = vi.spyOn(core.graphSession, 'deleteGraph').mockResolvedValue()
   await renderInApp(
     <>
       <SettingsScreen />
       <ShortcutsDialog />
     </>,
     {
-      app,
+      core,
       graph: openGraph,
       settings: stored,
       queryClient: new QueryClient({
@@ -710,7 +710,7 @@ describe('SettingsScreen', () => {
     // The whole chain: button → the index lifecycle's visible rebuild → wipe,
     // then the projection-version stamp that marks a completed rebuild. (The
     // graph is empty here, so there is no apply batch in between.)
-    const indexCalls = (): string[] => app.indexStore.calls().map((call) => call.method)
+    const indexCalls = (): string[] => core.indexStore.calls().map((call) => call.method)
     await vi.waitFor(() => expect(indexCalls()).toContain('clear'))
     await vi.waitFor(() => expect(indexCalls()).toContain('setMeta'))
   })

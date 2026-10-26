@@ -8,7 +8,7 @@ import { useNoteRow } from './use-note-row.ts'
 
 const GENERATION = 5
 
-let app: TestCoreServices
+let core: TestCoreServices
 let getNote: MockInstance<IndexQueryService['getNote']>
 
 function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
@@ -28,14 +28,14 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
  */
 async function mount() {
   return await renderHookInApp(() => useNoteRow('notes/a.md'), {
-    app,
+    core,
     graph: { root: '/g', name: 'g', generation: GENERATION },
   })
 }
 
 beforeEach(() => {
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  getNote = vi.spyOn(app.indexQuery, 'getNote')
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  getNote = vi.spyOn(core.indexQuery, 'getNote')
 })
 
 describe('useNoteRow', () => {
@@ -51,16 +51,16 @@ describe('useNoteRow', () => {
     await vi.waitFor(() => expect(result.current).not.toBeNull())
     expect(result.current?.gistUrl).toBeNull()
 
-    await act(() => app.noteRows.setOverlay('notes/a.md', GENERATION, { gistUrl: 'pending' }))
+    await act(() => core.noteRows.setOverlay('notes/a.md', GENERATION, { gistUrl: 'pending' }))
     await vi.waitFor(() => expect(result.current?.gistUrl).toBe('pending'))
   })
 
   it('retires the overlay once the index row catches up to it', async () => {
-    app.noteRows.setOverlay('notes/a.md', GENERATION, { gistUrl: 'u' })
+    core.noteRows.setOverlay('notes/a.md', GENERATION, { gistUrl: 'u' })
     getNote.mockResolvedValue(noteRow({ gistUrl: 'u' })) // index already agrees
     const { result } = await mount()
 
     await vi.waitFor(() => expect(result.current?.gistUrl).toBe('u'))
-    await vi.waitFor(() => expect(app.noteRows.getOverlay('notes/a.md')).toBeNull())
+    await vi.waitFor(() => expect(core.noteRows.getOverlay('notes/a.md')).toBeNull())
   })
 })

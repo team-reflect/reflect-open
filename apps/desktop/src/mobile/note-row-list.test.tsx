@@ -23,7 +23,7 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
  */
 function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ reducedMotion: true }),
     noteDocuments: {
@@ -35,7 +35,7 @@ function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
     },
   })
   return renderInApp(ui, {
-    app,
+    core,
     graph: { root: '/g', name: 'g', generation: 1 },
     settings: { dateFormat: 'mdy', timeFormat: '12h' },
   })
@@ -128,7 +128,7 @@ describe('NoteRowList', () => {
     )
     await view.getByRole('button', { name: 'Pin Alpha', exact: true }).click()
     await vi.waitFor(() => {
-      expect(view.app.noteRows.getOverlay('notes/alpha.md')).toMatchObject({
+      expect(view.core.noteRows.getOverlay('notes/alpha.md')).toMatchObject({
         isPinned: true,
       })
     })

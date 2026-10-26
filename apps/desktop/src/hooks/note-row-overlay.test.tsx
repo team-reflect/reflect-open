@@ -21,17 +21,17 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 const URL = 'https://gist.github.com/alex/g1'
 const GEN = 1
 
-let app: TestCoreServices
+let core: TestCoreServices
 
 /**
- * Render the overlay hook for `path` over the shared `app`.
+ * Render the overlay hook for `path` over the shared `core`.
  */
 async function mount(path: string) {
-  return await renderHookInApp(() => useNoteRowOverlay(path), { app })
+  return await renderHookInApp(() => useNoteRowOverlay(path), { core })
 }
 
 beforeEach(() => {
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
 })
 
 describe('useNoteRowOverlay', () => {
@@ -40,22 +40,22 @@ describe('useNoteRowOverlay', () => {
     const other = await mount('notes/b.md')
     expect(result.current).toBeNull()
 
-    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => core.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
     expect(result.current?.gistUrl).toBe(URL)
     expect(other.result.current).toBeNull()
   })
 
   it('retires overlay fields independently as the index catches up', async () => {
     const { result } = await mount('notes/a.md')
-    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL, gistStale: false }))
+    await act(() => core.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL, gistStale: false }))
 
     await act(() => {
-      app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: true }))
+      core.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: true }))
     })
     expect(result.current).toEqual({ gistStale: false })
 
     await act(() => {
-      app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: false }))
+      core.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: false }))
     })
     expect(result.current).toBeNull()
   })
@@ -64,19 +64,19 @@ describe('useNoteRowOverlay', () => {
 describe('reconcileNoteRowOverlay', () => {
   it('holds the overlay while the index still lags, retires it once they agree', async () => {
     const { result } = await mount('notes/a.md')
-    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => core.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
 
-    await act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: null })))
+    await act(() => core.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: null })))
     expect(result.current?.gistUrl).toBe(URL) // index hasn't caught up
 
-    await act(() => app.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL })))
+    await act(() => core.noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL })))
     expect(result.current).toBeNull() // index agrees → retired
   })
 
   it('holds the overlay against a null row (nothing to compare yet)', async () => {
     const { result } = await mount('notes/a.md')
-    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
-    await act(() => app.noteRows.reconcile('notes/a.md', null))
+    await act(() => core.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => core.noteRows.reconcile('notes/a.md', null))
     expect(result.current?.gistUrl).toBe(URL)
   })
 })
@@ -84,18 +84,18 @@ describe('reconcileNoteRowOverlay', () => {
 describe('resetNoteRowOverlays', () => {
   it('drops every overlay (e.g. on a graph switch)', async () => {
     const { result } = await mount('notes/a.md')
-    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => core.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
     expect(result.current?.gistUrl).toBe(URL)
 
-    await act(() => app.noteRows.reset())
+    await act(() => core.noteRows.reset())
     expect(result.current).toBeNull()
   })
 
   it('hides the overlays of a graph once another graph opens', async () => {
     const { result } = await mount('notes/a.md')
-    await act(() => app.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
+    await act(() => core.noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL }))
 
-    await act(() => app.graphSession.setGraph({ root: '/graphs/other', generation: GEN + 1 }))
+    await act(() => core.graphSession.setGraph({ root: '/graphs/other', generation: GEN + 1 }))
     expect(result.current).toBeNull()
   })
 })

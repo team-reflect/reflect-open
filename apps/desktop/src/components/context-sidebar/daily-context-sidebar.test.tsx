@@ -30,7 +30,7 @@ const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 let noteRowAnswer: NoteRow | null
 let dailySource: string
 
-// The note files of the rendered app; set by `createApp`.
+// The note files of the rendered app; set by `createCore`.
 let noteFile: TestNoteFileService
 
 function RouteProbe(): ReactNode {
@@ -47,24 +47,24 @@ function sidebar(date: string): ReactNode {
   )
 }
 
-function createApp(storage: TestStorageService = createTestStorageService()) {
+function createCore(storage: TestStorageService = createTestStorageService()) {
   noteFile = createTestNoteFileService({ files: { 'daily/2026-06-09.md': dailySource } })
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile,
     storage,
     retrieval: createTestRetrievalService({ relatedNotes }),
   })
-  vi.spyOn(app.dailyNotes, 'dailyDatesInRange').mockImplementation(dailyDatesInRange)
-  vi.spyOn(app.indexQuery, 'getNote').mockImplementation(() => {
+  vi.spyOn(core.dailyNotes, 'dailyDatesInRange').mockImplementation(dailyDatesInRange)
+  vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => {
     return Promise.resolve(noteRowAnswer ?? undefined)
   })
-  return app
+  return core
 }
 
-async function renderSidebar(date: string, app = createApp()) {
+async function renderSidebar(date: string, core = createCore()) {
   return await renderInApp(sidebar(date), {
-    app,
+    core,
     appServices: { window: createTestWindowService({ openNoteWindow }) },
     graph: { root: '/g', name: 'g' },
     settings: { semanticSearchEnabled: true, dateFormat: 'mdy', weekStartDay: 'monday' },
@@ -212,7 +212,7 @@ describe('DailyContextSidebar sections', () => {
   it('collapses a section and persists the state for the session', async () => {
     // One session: both mounts read the same storage.
     const storage = createTestStorageService()
-    const view = await renderSidebar('2026-06-09', createApp(storage))
+    const view = await renderSidebar('2026-06-09', createCore(storage))
     const header = page.getByRole('button', { name: /Note actions/ })
     await expect.element(header).toHaveAttribute('aria-expanded', 'true')
     await expect.element(page.getByText('Pin this note')).toBeVisible()
@@ -222,7 +222,7 @@ describe('DailyContextSidebar sections', () => {
     await expect.element(page.getByText('Pin this note')).not.toBeInTheDocument()
     await view.unmount()
 
-    await renderSidebar('2026-06-09', createApp(storage))
+    await renderSidebar('2026-06-09', createCore(storage))
     await expect
       .element(page.getByRole('button', { name: /Note actions/ }))
       .toHaveAttribute('aria-expanded', 'false')

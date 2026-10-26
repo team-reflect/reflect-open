@@ -53,17 +53,17 @@ let completeOnboarding: MockInstance<CompleteOnboarding>
  * Render the screen on the mobile platform, with the switch flow observed and answered by the spy.
  */
 async function mount(storage: MobileStorageInfo = STORAGE): Promise<void> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })
-  const appServices = createTestAppServices(app)
+  const appServices = createTestAppServices(core)
   completeOnboarding = vi
     .spyOn(appServices.mobileOnboarding, 'completeOnboarding')
     .mockImplementation(completeOnboardingResult)
   await renderInApp(<MobileGraphs />, {
-    app,
+    core,
     appServices,
     graph: { root: '/iCloud/Documents/Notes', name: 'Notes' },
     route: { kind: 'graphs' },

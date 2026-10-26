@@ -124,20 +124,20 @@ vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
   }),
 }))
 
-// The services of the running test: the graph's files live in `app.noteFile`.
-let app: TestCoreServices
+// The services of the running test: the graph's files live in `core.noteFile`.
+let core: TestCoreServices
 let appServices: AppServices
 let dailyDatesInRange: MockInstance<DailyNoteService['dailyDatesInRange']>
 
 beforeEach(async () => {
   await page.viewport(375, 700)
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  appServices = createTestAppServices(app)
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  appServices = createTestAppServices(core)
   // The tests compute dates from the real clock.
-  app.clock.setNow(Date.now())
+  core.clock.setNow(Date.now())
   // The browser context prefers reduced motion; the test platform says the same.
-  app.platform.setReducedMotion(true)
-  dailyDatesInRange = vi.spyOn(app.dailyNotes, 'dailyDatesInRange').mockResolvedValue([])
+  core.platform.setReducedMotion(true)
+  dailyDatesInRange = vi.spyOn(core.dailyNotes, 'dailyDatesInRange').mockResolvedValue([])
   editorProbe.focusCalls = 0
   editorProbe.selectionCalls = []
 })
@@ -152,7 +152,7 @@ function mount(initialRoute: Route, probeRoute?: Route, options?: { strict?: boo
   // The app runs under StrictMode (main.tsx); opt in where a test guards
   // against impure updaters (dev double-invocation caught a double-pop once).
   return renderInApp(options?.strict ? <StrictMode>{tree}</StrictMode> : tree, {
-    app,
+    core,
     appServices,
     graph: { root: '/g', name: 'g', generation: 1 },
     route: initialRoute,
@@ -238,7 +238,7 @@ function otherDayInWeek(date: string): string {
 describe('MobileShell', () => {
   it('renders today as the daily spine with its note content', async () => {
     const today = todayIso()
-    app.noteFile.set(`daily/${today}.md`, 'captured on the go')
+    core.noteFile.set(`daily/${today}.md`, 'captured on the go')
     const view = await mount({ kind: 'today' })
 
     // The header is the month; the carousel mounts today's slide (±1
@@ -382,13 +382,13 @@ describe('MobileShell', () => {
     const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
-    app.mobile.haptics.reset()
+    core.mobile.haptics.reset()
 
     await user.click(view.getByRole('button', { name: 'Today' }))
-    expect(app.mobile.haptics.impacts()).toBe(1)
+    expect(core.mobile.haptics.impacts()).toBe(1)
 
     await user.click(view.getByRole('button', { name: 'Settings' }))
-    expect(app.mobile.haptics.impacts()).toBe(2)
+    expect(core.mobile.haptics.impacts()).toBe(2)
     await expect.element(view.getByRole('heading', { name: 'Settings' })).toBeVisible()
   })
 
@@ -397,7 +397,7 @@ describe('MobileShell', () => {
     // Beyond the ±366-day window — only reachable as a date-link navigation,
     // which forces the carousel to rebuild its window around the day.
     const farDay = addDaysIso(todayIso(), 400)
-    app.noteFile.set(`daily/${farDay}.md`, 'far future plans')
+    core.noteFile.set(`daily/${farDay}.md`, 'far future plans')
     const view = await mount({ kind: 'today' }, { kind: 'daily', date: farDay })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
@@ -410,7 +410,7 @@ describe('MobileShell', () => {
 
   it('opens a note from in-screen navigation and pops back through history', async () => {
     const user = userEvent
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
@@ -422,7 +422,7 @@ describe('MobileShell', () => {
 
   it('never focuses the destination editor on navigation (keyboard stays down)', async () => {
     const user = userEvent
-    app.noteFile.set('notes/source.md', 'see [[Target Note]]')
+    core.noteFile.set('notes/source.md', 'see [[Target Note]]')
     const view = await mount({ kind: 'note', path: 'notes/source.md' })
 
     // A plain arrival (cold entry, All list, back-nav) must not focus — on
@@ -527,7 +527,7 @@ describe('MobileShell', () => {
 
   it('double-tapping Daily while already on today focuses the editor at its end', async () => {
     const today = todayIso()
-    app.noteFile.set(`daily/${today}.md`, 'first thought')
+    core.noteFile.set(`daily/${today}.md`, 'first thought')
     const view = await mount({ kind: 'today' })
     await waitFor(() => {
       const editors = view.getByTestId('fake-editor').elements()
@@ -689,7 +689,7 @@ describe('MobileShell', () => {
 
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'note', path: 'notes/meeting-notes.md' })
 
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
@@ -717,7 +717,7 @@ describe('MobileStack transitions & back-swipe', () => {
   // so they report the animating preference; the reduced-motion test below
   // sets the other answer for itself.
   beforeEach(() => {
-    app.platform.setReducedMotion(false)
+    core.platform.setReducedMotion(false)
   })
 
   /** Navigate to the probe note and complete the push animation. */
@@ -729,7 +729,7 @@ describe('MobileStack transitions & back-swipe', () => {
 
   it('pushes a note as a sliding card over its origin, which stays mounted but inert', async () => {
     const user = userEvent
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
@@ -752,7 +752,7 @@ describe('MobileStack transitions & back-swipe', () => {
 
   it('pops the note with a slide-out and unmounts it when the animation ends', async () => {
     const user = userEvent
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
@@ -782,7 +782,7 @@ describe('MobileStack transitions & back-swipe', () => {
 
   it('follows history direction within a note chain: wiki-link pushes, back pops', async () => {
     const user = userEvent
-    app.noteFile.set('notes/source.md', 'see [[Target Note]]')
+    core.noteFile.set('notes/source.md', 'see [[Target Note]]')
     const view = await mount({ kind: 'note', path: 'notes/source.md' })
     await waitFor(() => {
       expect(
@@ -811,9 +811,9 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('cuts instantly under prefers-reduced-motion', async () => {
-    app.platform.setReducedMotion(true)
+    core.platform.setReducedMotion(true)
     const user = userEvent
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
@@ -827,7 +827,7 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('pops the note when an edge swipe crosses the release threshold', async () => {
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
@@ -863,7 +863,7 @@ describe('MobileStack transitions & back-swipe', () => {
     // once), and the card's transform + the scrim's opacity settling in the
     // same frame, so `transitionend` arrives twice before React re-renders.
     const user = userEvent
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount(
       { kind: 'today' },
       { kind: 'note', path: 'notes/meeting-notes.md' },
@@ -895,7 +895,7 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('snaps back when the swipe releases short of the threshold', async () => {
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
@@ -929,7 +929,7 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('ignores mid-screen touches, mouse pointers, and vertical scrolls', async () => {
-    app.noteFile.set('notes/meeting-notes.md', 'agenda')
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 

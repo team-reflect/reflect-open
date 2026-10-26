@@ -85,7 +85,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
   const openPalette = vi.fn()
   const readSource = (): Promise<string> => Promise.resolve('# Rust\n')
   operations = createTestOperationsService()
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     progress: operations,
     noteDocuments: {
@@ -97,11 +97,11 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     },
     gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),
   })
-  const appLayer = createTestAppServices(app, {
+  const appLayer = createTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
   })
   const context: CommandContext = {
-    services: app,
+    services: core,
     app: appLayer,
     navigate,
     route: () => ({ kind: 'today' }),
@@ -126,17 +126,17 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     enableSemanticSearch: vi.fn(),
     ...overrides,
   }
-  vi.spyOn(app.indexQuery, 'getPinnedNotes').mockImplementation(getPinnedNotes)
+  vi.spyOn(core.indexQuery, 'getPinnedNotes').mockImplementation(getPinnedNotes)
   vi.spyOn(appLayer.nativeMenu, 'openContextMenu').mockImplementation(openNativeContextMenu)
-  openRecent = vi.spyOn(app.graphSession, 'openRecent').mockResolvedValue(true)
+  openRecent = vi.spyOn(core.graphSession, 'openRecent').mockResolvedValue(true)
   pickAndOpen = vi.spyOn(appLayer.graphBoot, 'pickAndOpen').mockResolvedValue()
   chooseGraph = vi.spyOn(appLayer.graphBoot, 'chooseGraph').mockResolvedValue()
-  updateSettingsWith = vi.spyOn(app.settings, 'updateWith')
+  updateSettingsWith = vi.spyOn(core.settings, 'updateWith')
   opener = appLayer.opener
   // The app constrains the sidebar to its rail width; without it the graph
   // menu's anchor spans the viewport and popper pushes the submenu off-screen.
   const view = await renderInApp(<Sidebar graph={GRAPH} context={context} />, {
-    app,
+    core,
     appServices: appLayer,
     graph: GRAPH,
     graphState: {
@@ -162,7 +162,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
       </div>
     ),
   })
-  return { view, navigate, openPalette, context, app }
+  return { view, navigate, openPalette, context, core }
 }
 
 describe('Sidebar', () => {
@@ -240,22 +240,22 @@ describe('Sidebar', () => {
   })
 
   it('the mic button starts an audio memo', async () => {
-    const { view, app } = await renderSidebar()
+    const { view, core } = await renderSidebar()
     await view.getByRole('button', { name: /record audio memo/i }).click()
     await vi.waitFor(() => {
-      expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(true)
+      expect(core.audioRecorder.calls().some((call) => call.method === 'start')).toBe(true)
     })
   })
 
   it('the mic button disables (without vanishing) when no provider can transcribe', async () => {
     aiProviders = []
-    const { view, app } = await renderSidebar()
+    const { view, core } = await renderSidebar()
     const micButton = view.getByRole('button', { name: /record audio memo/i })
     await expect.element(micButton).toHaveAttribute('aria-disabled', 'true')
     // `aria-disabled` fails Playwright's enabled actionability check, but the
     // element still receives real clicks — force past the check.
     await micButton.click({ force: true })
-    expect(app.audioRecorder.calls().some((call) => call.method === 'start')).toBe(false)
+    expect(core.audioRecorder.calls().some((call) => call.method === 'start')).toBe(false)
   })
 
   it('pinned notes render their own section', async () => {

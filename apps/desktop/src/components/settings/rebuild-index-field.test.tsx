@@ -11,18 +11,18 @@ function rebuildButton(): Locator {
 
 describe('RebuildIndexField', () => {
   it('rebuilds at the open index generation', async () => {
-    const { app } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: 7 } })
+    const { core } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: 7 } })
 
     await rebuildButton().click()
 
-    await vi.waitFor(() => expect(app.indexLifecycle.rebuilds()).toEqual([7]))
+    await vi.waitFor(() => expect(core.indexLifecycle.rebuilds()).toEqual([7]))
   })
 
   it('disables the button while a rebuild is in flight, then re-enables it', async () => {
-    const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
     const rebuild = Promise.withResolvers<void>()
-    vi.spyOn(app.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
-    await renderInApp(<RebuildIndexField />, { app, graph: { indexGeneration: 7 } })
+    vi.spyOn(core.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
+    await renderInApp(<RebuildIndexField />, { core, graph: { indexGeneration: 7 } })
 
     await rebuildButton().click()
 
@@ -33,10 +33,10 @@ describe('RebuildIndexField', () => {
   })
 
   it('is disabled when no graph index is open', async () => {
-    const { app } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: null } })
+    const { core } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: null } })
 
     await expect.element(rebuildButton()).toBeDisabled()
     await rebuildButton().click({ force: true })
-    expect(app.indexLifecycle.rebuilds()).toEqual([])
+    expect(core.indexLifecycle.rebuilds()).toEqual([])
   })
 })

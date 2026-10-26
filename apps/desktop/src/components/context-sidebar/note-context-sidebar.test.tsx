@@ -22,7 +22,7 @@ async function renderSidebar(path: string) {
       <RouteProbe />
     </>,
     {
-      app: createTestCoreServices({
+      core: createTestCoreServices({
         database: createWasmTestDatabaseService(),
         retrieval: createTestRetrievalService({ relatedNotes }),
       }),

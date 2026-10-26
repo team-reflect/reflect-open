@@ -118,7 +118,7 @@ async function renderStream() {
     </div>,
     {
       // The tests name days by the real date, so the app runs on the system clock.
-      app: createTestCoreServices({
+      core: createTestCoreServices({
         database: createWasmTestDatabaseService(),
         clock: createSystemClock(),
       }),

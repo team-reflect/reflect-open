@@ -17,7 +17,7 @@ async function renderSection() {
     <SidebarSection storageKey="probe" title="Probe">
       <p>section body</p>
     </SidebarSection>,
-    { app: createTestCoreServices({ database: createWasmTestDatabaseService(), storage }) },
+    { core: createTestCoreServices({ database: createWasmTestDatabaseService(), storage }) },
   )
 }
 

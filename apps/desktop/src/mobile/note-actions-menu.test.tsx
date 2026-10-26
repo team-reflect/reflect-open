@@ -27,7 +27,7 @@ const SHARED = { title: 'meeting', text: '# Meeting\n' }
 const noteSource = { value: '# A\n' }
 
 // The services of the rendered app; set by `mount`.
-let app: TestCoreServices
+let core: TestCoreServices
 let trash: MockInstance<NoteActionsService['trashOne']>
 let noteContent: MockInstance<ShareService['noteContent']>
 
@@ -152,10 +152,10 @@ async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
   vi.spyOn(created.indexQuery, 'getPinnedNotes').mockResolvedValue([])
   trash = vi.spyOn(created.noteActions, 'trashOne').mockResolvedValue()
   const view = await renderInApp(<NoteActionsMenu path={path} onDeleted={onDeleted} />, {
-    app: created,
+    core: created,
     graph: { root: '/g', name: 'g', generation: 7 },
   })
-  app = view.app
+  core = view.core
   noteContent = vi.spyOn(view.appServices.share, 'noteContent').mockReturnValue(SHARED)
   return { view, onDeleted, client: view.queryClient }
 }
@@ -236,7 +236,7 @@ describe('NoteActionsMenu', () => {
     await view.getByRole('button', { name: 'Lock note' }).click()
 
     await vi.waitFor(() => {
-      expect(app.progress.findByLabel('Updating privacy')).toMatchObject({
+      expect(core.progress.findByLabel('Updating privacy')).toMatchObject({
         status: 'failed',
         message: 'disk on fire',
       })
@@ -276,7 +276,7 @@ describe('NoteActionsMenu', () => {
     await openActions()
     await view.getByRole('button', { name: 'Pin', exact: true }).click()
     await vi.waitFor(() => {
-      expect(view.app.noteRows.getOverlay('notes/meeting.md')).toMatchObject({
+      expect(view.core.noteRows.getOverlay('notes/meeting.md')).toMatchObject({
         isPinned: true,
       })
     })
@@ -334,7 +334,7 @@ describe('NoteActionsMenu', () => {
     const dialog = page.getByRole('dialog')
     // The real trash reports the missing graph.
     trash.mockRestore()
-    await act(() => app.graphSession.setGraph(null))
+    await act(() => core.graphSession.setGraph(null))
     await dialog.getByRole('button', { name: 'Delete' }).click()
 
     await expect.element(dialog.getByText('No graph is open.')).toBeInTheDocument()

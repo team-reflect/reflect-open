@@ -22,7 +22,7 @@ beforeEach(() => {
 
 async function mount(graph: TestOpenGraph | null = GRAPH) {
   return await renderHookInApp(() => useNoteTrash(), {
-    app: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile }),
+    core: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile }),
     graph,
   })
 }

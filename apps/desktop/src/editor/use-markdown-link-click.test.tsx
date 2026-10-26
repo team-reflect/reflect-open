@@ -37,7 +37,7 @@ let onLinkClick: LinkClickHandler
 
 async function mount(sourcePath: string | null): Promise<void> {
   const graphSession = createTestGraphSessionService()
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     attachments,
     graphSession,
@@ -62,7 +62,7 @@ async function mount(sourcePath: string | null): Promise<void> {
     },
   ).linkNavigation
   const { result } = await renderHookInApp(() => useMarkdownLinkClick(sourcePath), {
-    app,
+    core,
     appServices: { linkNavigation },
     graph: { generation: 7 },
     wrapper: (children) => (

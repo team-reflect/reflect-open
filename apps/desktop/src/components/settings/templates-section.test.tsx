@@ -23,8 +23,8 @@ function RouteProbe(): ReactElement {
 }
 
 async function renderSection(): Promise<void> {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  vi.spyOn(app.indexQuery, 'listTemplates').mockResolvedValue([
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  vi.spyOn(core.indexQuery, 'listTemplates').mockResolvedValue([
     { path: 'templates/weekly-review.md', title: 'Weekly review', mtime: 1 },
   ])
   await renderInApp(
@@ -33,7 +33,7 @@ async function renderSection(): Promise<void> {
       <RouteProbe />
     </>,
     {
-      app,
+      core,
       appServices: { window: createTestWindowService({ openNoteWindow }) },
       graph: { root: '/g', name: 'g' },
       route: { kind: 'settings' },

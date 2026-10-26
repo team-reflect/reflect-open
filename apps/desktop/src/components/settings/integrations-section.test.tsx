@@ -26,13 +26,13 @@ let settings: TestSettingsService
  * Render the section over a settings document that starts as `stored`.
  */
 async function renderSection(stored: Partial<Settings> = {}): Promise<void> {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     contacts,
     platform: createTestPlatformService(platform),
   })
-  ;({ settings } = app)
-  const view = await renderInApp(<IntegrationsSection />, { app, settings: stored })
+  ;({ settings } = core)
+  const view = await renderInApp(<IntegrationsSection />, { core, settings: stored })
   opener = view.appServices.opener
 }
 

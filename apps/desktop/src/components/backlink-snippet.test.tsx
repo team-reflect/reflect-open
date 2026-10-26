@@ -43,10 +43,10 @@ async function renderSnippet(
   text: string = SNIPPET,
   onWikilinkClick: () => void = () => {},
 ) {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  operations = app.progress
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  operations = core.progress
   writeTask = vi
-    .spyOn(app.tasks, 'writeTask')
+    .spyOn(core.tasks, 'writeTask')
     .mockResolvedValue({ source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 })
   return await renderInApp(
     <BacklinkSnippet
@@ -55,7 +55,7 @@ async function renderSnippet(
       tasks={tasks}
       onWikilinkClick={onWikilinkClick}
     />,
-    { app, graph: { root: '/g', name: 'g', generation: 7 } },
+    { core, graph: { root: '/g', name: 'g', generation: 7 } },
   )
 }
 

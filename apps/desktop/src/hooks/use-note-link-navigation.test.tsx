@@ -81,9 +81,9 @@ function Harness({ scopeKey, visible = true }: HarnessProps): ReactElement {
  * Render `ui` on the All Notes route of an app whose note windows go to `openNoteWindow`.
  */
 async function mount(ui: ReactElement) {
-  const app = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   return await renderInApp(ui, {
-    app,
+    core,
     appServices: { window: createTestWindowService({ openNoteWindow }) },
     route: { kind: 'allNotes', tag: null },
   })

@@ -23,7 +23,7 @@ import { ThemeEffect, useTheme } from './theme-provider.tsx'
 let settings: TestSettingsService
 let storage: TestStorageService
 let theme: ThemeService
-let app: CoreServices
+let core: CoreServices
 let releaseLoad: () => void
 let originalClassName: string
 let originalColorScheme: string
@@ -41,7 +41,7 @@ function install(stored: Partial<Settings>, options: { gateLoad?: boolean } = {}
   storage = createTestStorageService()
   const platform = createTestPlatformService({ colorScheme: 'light' })
   theme = createThemeService({ settings, storage, platform })
-  app = createTestCoreServices({
+  core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     settings,
     storage,
@@ -63,7 +63,7 @@ async function renderTheme() {
       <ThemeEffect />
       <Probe />
     </>,
-    { app, appServices: { theme }, servicesOnly: true },
+    { core, appServices: { theme }, servicesOnly: true },
   )
   return { result }
 }

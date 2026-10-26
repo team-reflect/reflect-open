@@ -15,14 +15,14 @@ import { createXPostResolver, getXPostResolver } from './use-x-post-resolver.ts'
 const platform = createTestPlatformService()
 const ROOT = '/graph'
 let xArchive: TestXArchiveService
-let app: TestCoreServices
+let core: TestCoreServices
 let ctx: EmbedMediaService
 
 beforeEach(() => {
   xArchive = createTestXArchiveService()
-  app = createTestCoreServices({ database: createNodeTestDatabaseService(), xArchive, platform })
-  app.graphSession.setGraph({ root: ROOT, generation: 7 })
-  ctx = app.embedMedia
+  core = createTestCoreServices({ database: createNodeTestDatabaseService(), xArchive, platform })
+  core.graphSession.setGraph({ root: ROOT, generation: 7 })
+  ctx = core.embedMedia
 })
 
 afterEach(() => {
@@ -107,7 +107,7 @@ it('keeps archives of different graphs apart', async () => {
 
 it('ignores non-X URLs and resolves nothing with no graph open', async () => {
   expect(await createXPostResolver(ctx, ROOT)('https://example.com')).toBeUndefined()
-  app.graphSession.setGraph(null)
+  core.graphSession.setGraph(null)
   expect(await createXPostResolver(ctx, '/other')(URL)).toBeUndefined()
   expect(xArchive.resolves()).toEqual([])
 })

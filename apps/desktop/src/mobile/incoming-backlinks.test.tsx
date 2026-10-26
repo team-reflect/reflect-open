@@ -10,7 +10,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { IncomingBacklinks } from './incoming-backlinks.tsx'
 
-let app: TestCoreServices
+let core: TestCoreServices
 let getBacklinksWithContext: MockInstance<BacklinkService['getBacklinksWithContext']>
 
 /**
@@ -37,7 +37,7 @@ function RouteProbe(): ReactNode {
  * Render `ui` over the app of the running test, so a second render shares its session storage.
  */
 function renderInGraph(ui: ReactNode) {
-  return renderInApp(ui, { app, graph: { root: '/g', name: 'g', generation: 1 } })
+  return renderInApp(ui, { core, graph: { root: '/g', name: 'g', generation: 1 } })
 }
 
 function renderSection(path: string) {
@@ -51,8 +51,8 @@ function renderSection(path: string) {
 
 beforeEach(async () => {
   await page.viewport(375, 700)
-  app = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  getBacklinksWithContext = vi.spyOn(app.backlinks, 'getBacklinksWithContext')
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  getBacklinksWithContext = vi.spyOn(core.backlinks, 'getBacklinksWithContext')
 })
 
 describe('IncomingBacklinks', () => {

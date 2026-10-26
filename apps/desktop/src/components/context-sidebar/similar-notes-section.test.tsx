@@ -25,7 +25,7 @@ function RouteProbe(): ReactNode {
 }
 
 async function renderSimilar(path: string, probe: boolean = true) {
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile: createTestNoteFileService({ files: { 'daily/2026-06-09.md': '- daily entry\n' } }),
     retrieval: createTestRetrievalService({ relatedNotes }),
@@ -36,7 +36,7 @@ async function renderSimilar(path: string, probe: boolean = true) {
       {probe ? <RouteProbe /> : null}
     </>,
     {
-      app,
+      core,
       appServices: { window: createTestWindowService({ openNoteWindow }) },
       graph: { root: '/g', name: 'g' },
       settings: { semanticSearchEnabled },

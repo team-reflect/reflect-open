@@ -67,15 +67,15 @@ async function renderProvider(options?: {
     { type: 'text-delta', text: 'Hi.' },
     { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
   ])
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     settings,
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
     chatHistory,
     chatEngine,
   })
-  const view = await renderInApp(<SessionProbe />, { app, graph: GRAPH, route: null })
-  return { view, app, chatHistory, chatEngine }
+  const view = await renderInApp(<SessionProbe />, { core, graph: GRAPH, route: null })
+  return { view, core, chatHistory, chatEngine }
 }
 
 describe('useChatSession', () => {
@@ -129,7 +129,7 @@ describe('useChatSession', () => {
   })
 
   it('persists a picked model and applies it to the session', async () => {
-    const { app } = await renderProvider()
+    const { core } = await renderProvider()
     expect(sessionRef.current?.activeModel).toEqual(MODEL)
 
     sessionRef.current?.selectModel({ configId: 'm1', modelId: 'gpt-5.5' })
@@ -137,11 +137,11 @@ describe('useChatSession', () => {
     await vi.waitFor(() => {
       expect(sessionRef.current?.activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
     })
-    expect(app.settings.get().chatModelSelection).toEqual({ configId: 'm1', modelId: 'gpt-5.5' })
+    expect(core.settings.get().chatModelSelection).toEqual({ configId: 'm1', modelId: 'gpt-5.5' })
   })
 
   it('aborts the in-flight turn when the graph session ends', async () => {
-    const { app, chatEngine } = await renderProvider()
+    const { core, chatEngine } = await renderProvider()
     let signal: AbortSignal | undefined
     chatEngine.setScript(async function* (request) {
       signal = request.signal
@@ -154,7 +154,7 @@ describe('useChatSession', () => {
     await vi.waitFor(() => expect(signal).toBeDefined())
     expect(signal?.aborted).toBe(false)
 
-    app.graphSession.setGraph({ root: '/other' })
+    core.graphSession.setGraph({ root: '/other' })
     expect(signal?.aborted).toBe(true)
   })
 })

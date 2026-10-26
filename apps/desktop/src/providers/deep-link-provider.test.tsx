@@ -30,14 +30,14 @@ function setup() {
     progress: operations,
     graphSession,
   })
-  const app = createTestCoreServices({
+  const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     captureInbox,
     progress: operations,
     graphSession,
     deepLinkIntake,
   })
-  const appServices = createTestAppServices(app)
+  const appServices = createTestAppServices(core)
 
   function tree(): ReactElement {
     return <DeepLinkProvider>{null}</DeepLinkProvider>
@@ -47,7 +47,7 @@ function setup() {
    * Render under the app's router with `GRAPH` open, as the workspace mounts the provider.
    */
   async function render(ui: ReactNode) {
-    return await renderInApp(ui, { app, appServices, graph: GRAPH })
+    return await renderInApp(ui, { core, appServices, graph: GRAPH })
   }
 
   /**
@@ -72,7 +72,7 @@ function setup() {
   }
 
   return {
-    app,
+    core,
     appServices,
     deepLinkIntake,
     captureInbox,
@@ -111,21 +111,21 @@ describe('DeepLinkProvider', () => {
   })
 
   it('drops an in-flight resolve when the graph session changes', async () => {
-    const { app, tree, navigated, dispatchPendingNote, render } = setup()
+    const { core, tree, navigated, dispatchPendingNote, render } = setup()
     await render(tree())
     const pending = dispatchPendingNote('x')
 
-    await act(() => app.graphSession.setGraph({ ...GRAPH, generation: 8 }))
+    await act(() => core.graphSession.setGraph({ ...GRAPH, generation: 8 }))
     await pending.resolve()
 
     expect(navigated()).toEqual([])
   })
 
   it('serves the next graph session once the graph changes', async () => {
-    const { app, deepLinkIntake, captureInbox, tree, render } = setup()
+    const { core, deepLinkIntake, captureInbox, tree, render } = setup()
     await render(tree())
 
-    await act(() => app.graphSession.setGraph({ ...GRAPH, generation: 8 }))
+    await act(() => core.graphSession.setGraph({ ...GRAPH, generation: 8 }))
     deepLinkIntake.dispatch('reflect://append?text=x')
 
     await vi.waitFor(() => expect(captureInbox.spooled()).toHaveLength(1))
