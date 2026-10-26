@@ -92,12 +92,9 @@ private enum NativeDiagnostics {
 
       // The stack-bearing terminations this integration exists for.
       options.enableCrashHandler = true
-      options.enableAppHangTracking = true
-      options.enableAppHangTrackingV2 = true
-      options.enableReportNonFullyBlockingAppHangs = false
-      options.appHangTimeoutInterval = 2
       options.enableWatchdogTerminationTracking = true
-      options.enableSigtermReporting = false
+      // Hangs come from MetricKit's hang diagnostics, not the in-process tracker.
+      options.enableAppHangTracking = false
 
       // Everything else the SDK would collect by default.
       options.attachScreenshot = false
@@ -147,7 +144,6 @@ private enum NativeDiagnostics {
     // matches the uploaded dSYMs against — but not their build-machine paths.
     event.debugMeta?.forEach { image in
       image.codeFile = image.codeFile.map(basename)
-      image.name = image.name.map(basename)
     }
 
     event.exceptions?.forEach { exception in
