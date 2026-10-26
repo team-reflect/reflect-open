@@ -36,11 +36,11 @@
     "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
-    "@ocavue/eslint-config": "^4.21.0",
+    "@ocavue/eslint-config": "^4.22.0",
     "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
     "eslint": "^10.13.0",
-    "knip": "^6.41.0",
+    "knip": "^6.43.0",
     "nano-staged": "^1.0.2",
     "oxfmt": "^0.74.0",
     "oxlint": "^1.88.0",
@@ -55,5 +55,5 @@
   "nano-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern"
   },
-  "packageManager": "pnpm@11.28.6"
+  "packageManager": "pnpm@11.28.8"
 }

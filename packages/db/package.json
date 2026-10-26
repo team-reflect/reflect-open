@@ -12,7 +12,7 @@
     "db:codegen": "node scripts/generate-schema.mjs"
   },
   "dependencies": {
-    "kysely": "^0.28.17"
+    "kysely": "^0.28.18"
   },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
