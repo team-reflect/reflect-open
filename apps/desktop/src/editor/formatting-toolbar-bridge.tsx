@@ -16,7 +16,7 @@ import {
  * Publishes this editor's formatting-toolbar surface while it holds focus
  * (Plan 19, decision 8: the toolbar is webview-drawn, and V1's item set with
  * selection-aware enablement is the spec). Mounted inside the editor's
- * ProseKit context like `EditorInputTraits`; a no-op off the touch surface.
+ * ProseKit context; a no-op off the touch surface.
  *
  * Deliberately not `useEditor({ update: true })` — that option is
  * incompatible with the React Compiler — nor a widening of
@@ -60,8 +60,7 @@ export function FormattingToolbarBridge({
     const owner = Symbol('formatting-toolbar')
     let teardown: (() => void) | null = null
 
-    // Same mount dance as EditorInputTraits — see `whenEditorMounted` for
-    // why the wait is bounded.
+    // See `whenEditorMounted` for why the wait is bounded.
     const cancel = whenEditorMounted(logger, editor, () => {
       const dom = editor.view.dom
 
