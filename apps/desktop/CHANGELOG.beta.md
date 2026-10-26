@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.17.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.16.0...v0.17.0-beta.1) (2026-10-26)
+
+
+### Features
+
+* update AI model ids ([#1737](https://github.com/team-reflect/reflect-open/issues/1737)) ([7c43a47](https://github.com/team-reflect/reflect-open/commit/7c43a47f7bcac089d1e1c6b04e92b19414f5adbb))
+
+
+### Bug Fixes
+
+* **desktop:** hide system writing suggestions in the editor ([#1733](https://github.com/team-reflect/reflect-open/issues/1733)) ([34b1cbc](https://github.com/team-reflect/reflect-open/commit/34b1cbce1c72f19064d6de0c78c3f875c3415d8f))
+* **desktop:** stop the Linux file watcher looping and leaking ([#1742](https://github.com/team-reflect/reflect-open/issues/1742)) ([d7bef90](https://github.com/team-reflect/reflect-open/commit/d7bef90aeaf4b0b65e2ba3a56668df147ff0756c))
+* name the username and access token in the sign-in error ([#1730](https://github.com/team-reflect/reflect-open/issues/1730)) ([6d2bac0](https://github.com/team-reflect/reflect-open/commit/6d2bac0099a7f17a7c214429aa559d13aa0b2f13))
+* send a stored sign-in only to the origin it belongs to ([#1728](https://github.com/team-reflect/reflect-open/issues/1728)) ([5b7c006](https://github.com/team-reflect/reflect-open/commit/5b7c006a5e769097692bfef0acb906c0e3fc6483))
+* stop iCloud conflicts duplicating an extended line ([#1736](https://github.com/team-reflect/reflect-open/issues/1736)) ([a5cbe48](https://github.com/team-reflect/reflect-open/commit/a5cbe48392ef8aab65cbafe1c419c741891c60f8))
+
 ## [0.16.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.14...v0.16.0-beta.15) (2026-10-24)
 
 
