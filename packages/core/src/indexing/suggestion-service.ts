@@ -108,7 +108,7 @@ class SuggestionServiceImpl implements SuggestionService {
       candidates = candidates.where(sql<boolean>`tag_key LIKE ${likeContains(key)} ESCAPE '\\'`)
     }
     const rows = await candidates.execute()
-    return rows.map((row) => ({ tag: row.tag, count: Number(row.count) }))
+    return rows.map((row) => ({ tag: row.tag, count: row.count }))
   }
 
   async suggestWikiTargets(
