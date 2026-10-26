@@ -55,7 +55,12 @@ core-foundation = "0.10.1"
 dbus-secret-service-keyring-store = "1.0.1"
 dirs = "7.0.0"
 dispatch2 = "0.3.1"
-fastembed = "7.1.1"
+# Text embeddings only. The default `image-models` feature turns on every
+# `image` format (AVIF encoder, EXR, TIFF, ...) through feature unification.
+fastembed = { version = "7.1.1", default-features = false, features = [
+  "hf-hub-native-tls",
+  "ort-download-binaries-native-tls",
+] }
 file-id = "0.2.3"
 # Everything is vendored/static: libssh2 and openssl must never link against
 # homebrew dylibs the distributed app won't have (libssh2-sys only consults

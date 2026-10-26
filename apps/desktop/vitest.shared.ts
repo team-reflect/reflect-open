@@ -1,20 +1,13 @@
 import { fileURLToPath } from 'node:url'
 import { defineProject, type ViteUserConfig } from 'vitest/config'
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
-import babel from '@rolldown/plugin-babel'
+import react from '@vitejs/plugin-react'
 
 export function defineDesktopProject(project: {
   plugins?: ViteUserConfig['plugins']
   test: NonNullable<ViteUserConfig['test']>
 }): ViteUserConfig {
   return defineProject({
-    plugins: [
-      react(),
-      babel({
-        presets: [reactCompilerPreset()],
-      }),
-      ...(project.plugins ?? []),
-    ],
+    plugins: [react({ compiler: true }), ...(project.plugins ?? [])],
     define: {
       __REFLECT_VERSION__: JSON.stringify('0.0.0-test'),
     },
