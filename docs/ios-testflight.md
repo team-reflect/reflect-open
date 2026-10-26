@@ -13,8 +13,8 @@ pnpm upload:testflight                                   # apps/desktop/scripts/
 Local builds read these environment variables. CI sets them from the `release_app`
 environment secrets.
 
-- App Store Connect API key: `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_KEY_PATH` (CI:
-  `APPLE_API_KEY_CONTENT`).
+- App Store Connect API key: `APPLE_API_KEY`, `APPLE_API_ISSUER`, and either `APPLE_API_KEY_PATH`
+  or `APPLE_API_KEY_CONTENT` (CI uses the latter).
 - Sentry DSN: `VITE_SENTRY_DSN` for the WebView SDK and `REFLECT_SENTRY_DSN` for the native SDK
   (CI: both from `SENTRY_DSN`).
 - `SENTRY_AUTH_TOKEN`: dSYM and source map upload. Never give it a `VITE_` prefix.
