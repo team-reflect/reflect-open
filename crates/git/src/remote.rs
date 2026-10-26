@@ -212,7 +212,7 @@ pub(super) fn guard_origin(expected: Option<&HttpOrigin>, url: &str) -> Result<(
         return Err(git2::Error::new(
             git2::ErrorCode::Auth,
             git2::ErrorClass::Http,
-            "the remote is not on the host the stored sign-in belongs to, so it was not sent",
+            "the remote’s scheme, host or port differs from the stored sign-in’s, so it was not sent",
         ));
     }
     Ok(())
@@ -536,16 +536,25 @@ mod credential_tests {
         let err = guard_origin(expected.as_ref(), "https://evil.example/alex/notes.git")
             .expect_err("another host must be refused");
         assert_eq!(err.code(), ErrorCode::Auth);
-        assert!(err.message().contains("not on the host"), "{err}");
+        assert!(
+            err.message().contains("differs from the stored sign-in"),
+            "{err}"
+        );
         let err = guard_origin(
             http_origin(&github().origin).as_ref(),
             "https://gitlab.com/alex/notes.git",
         )
         .expect_err("the GitHub sign-in must never reach another host");
-        assert!(err.message().contains("not on the host"), "{err}");
+        assert!(
+            err.message().contains("differs from the stored sign-in"),
+            "{err}"
+        );
         let err = guard_origin(expected.as_ref(), "http://gitlab.com/alex/notes.git")
             .expect_err("plain http must be refused");
-        assert!(err.message().contains("not on the host"), "{err}");
+        assert!(
+            err.message().contains("differs from the stored sign-in"),
+            "{err}"
+        );
         // A sign-in with no readable origin is never sent.
         let err = guard_origin(None, "https://anything.example/x")
             .expect_err("an unreadable origin must withhold the sign-in");
