@@ -32,14 +32,15 @@ export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
  */
 export const OPENAI_TRANSCRIPTION_FALLBACK_MODEL = 'whisper-1'
 
-export const GOOGLE_TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
+export const GOOGLE_TRANSCRIPTION_MODEL = 'gemini-3.6-flash'
 
 /**
  * Retried once when the primary model 404s. Google retires models on a short
  * clock (the spike caught `gemini-3-pro-preview` dying within months of
  * release), and a retired transcription model must degrade, not hard-fail.
+ * An alias rather than a pinned id, so the fallback itself never retires.
  */
-export const GOOGLE_TRANSCRIPTION_FALLBACK_MODEL = 'gemini-2.5-flash'
+export const GOOGLE_TRANSCRIPTION_FALLBACK_MODEL = 'gemini-flash-latest'
 
 export interface TranscriptionRequest {
   provider: TranscriptionProvider
