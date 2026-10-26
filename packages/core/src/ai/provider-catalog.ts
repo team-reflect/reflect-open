@@ -51,7 +51,7 @@ type GoogleModelId = KnownId<Parameters<GoogleProvider>[0]>
 type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 
 // https://developers.openai.com/api/docs/models/all
-// https://github.com/vercel/ai/blob/ai@7.0.123/packages/openai/src/responses/openai-responses-language-model-options.ts#L92
+// https://github.com/vercel/ai/blob/ai@7.0.153/packages/openai/src/responses/openai-responses-language-model-options.ts#L92
 const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
   { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', contextWindow: 1_000_000 },
@@ -62,11 +62,10 @@ const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-5.5', label: 'GPT-5.5', contextWindow: 1_000_000 },
   { id: 'gpt-5.4', label: 'GPT-5.4', contextWindow: 1_000_000 },
   { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', contextWindow: 400_000 },
-  { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
 ]
 
 // https://platform.claude.com/docs/en/models/overview
-// https://github.com/vercel/ai/blob/ai@7.0.123/packages/anthropic/src/anthropic-language-model-options.ts#L4
+// https://github.com/vercel/ai/blob/ai@7.0.153/packages/anthropic/src/anthropic-language-model-options.ts#L9
 const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', contextWindow: 1_000_000 },
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', contextWindow: 1_000_000 },
@@ -75,20 +74,19 @@ const ANTHROPIC_MODELS: NonEmptyArray<AiModelOption<AnthropicModelId>> = [
   { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
   { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', contextWindow: 1_000_000 },
   { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', contextWindow: 1_000_000 },
+  { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', contextWindow: 1_000_000 },
   { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
 ]
 
-// https://github.com/vercel/ai/blob/ai@7.0.123/packages/google/src/google-language-model-options.ts#L8
+// https://github.com/vercel/ai/blob/ai@7.0.153/packages/google/src/google-language-model-options.ts#L8
 const GOOGLE_MODELS: NonEmptyArray<AiModelOption<GoogleModelId>> = [
   { id: 'gemini-pro-latest', label: 'Gemini Pro Latest', contextWindow: 1_000_000 },
-  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
+  { id: 'gemini-4-argon', label: 'Gemini 4 Argon', contextWindow: 1_000_000 },
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro Preview', contextWindow: 1_000_000 },
   { id: 'gemini-flash-latest', label: 'Gemini Flash Latest', contextWindow: 1_000_000 },
   { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', contextWindow: 1_000_000 },
-  { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', contextWindow: 1_000_000 },
   { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },
-  { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
   { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', contextWindow: 1_000_000 },
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },
 ]
 
 export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
@@ -120,14 +118,14 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
     keyPlaceholder: 'sk-or-v1-…',
     models: [
       { id: 'openrouter/auto', label: 'Auto Router', contextWindow: 2_000_000 },
-      { id: '~openai/gpt-latest', label: 'OpenAI GPT Latest', contextWindow: 1_000_000 },
+      { id: '~openai/gpt-sol-latest', label: 'OpenAI GPT Sol Latest', contextWindow: 1_000_000 },
       {
         id: '~anthropic/claude-sonnet-latest',
         label: 'Claude Sonnet Latest',
         contextWindow: 1_000_000,
       },
       { id: 'openai/gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
-      { id: 'openai/gpt-6-sol', label: 'GPT-6 Sol', contextWindow: 1_000_000 },
+      { id: 'openai/gpt-6.1-sol', label: 'GPT-6.1 Sol', contextWindow: 1_000_000 },
       { id: 'openai/gpt-6-luna', label: 'GPT-6 Luna', contextWindow: 1_000_000 },
       { id: 'openai/gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
     ],
