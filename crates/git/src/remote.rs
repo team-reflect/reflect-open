@@ -21,7 +21,9 @@ use super::repo::{current_branch, open_existing};
 /// An HTTPS sign-in supplied per call. Which username and secret a host
 /// wants is `@reflect/core`'s business (GitHub: `x-access-token` plus the
 /// managed token); this layer only presents it, once, as basic auth.
-#[derive(Debug, Clone, Deserialize)]
+///
+/// No `Debug`: a derived one would print `secret`.
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitCredential {
     pub username: String,
