@@ -185,9 +185,6 @@ The services only a mobile platform builds (`haptics`, `subscription`, `paywall`
   )
   ```
 
-- **Names:** `core` and `app` never mix. A name that holds `CoreServices`
-  never says `app`, and a name that holds `AppServices` never says `core`. For
-  example, the core container is `core` or `coreServices`, never `app`.
 - **Commands:** `CommandContext` (`apps/desktop/src/lib/commands/types.ts`) has
   `services: CoreServices` and `app: AppServices`. A command that calls a service reads it from the
   context it runs with, never from an import.
