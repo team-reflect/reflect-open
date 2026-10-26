@@ -80,8 +80,8 @@ infer = "0.22.0"
 jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
 log = "0.4.34"
-notify = "8.2.0"
-notify-debouncer-full = "0.7.0"
+notify = "9.0.0-rc.6"
+notify-debouncer-full = "0.8.0-rc.2"
 objc2 = "0.6.5"
 objc2-app-kit = { version = "0.3.2", default-features = false }
 objc2-contacts = "0.3.2"
