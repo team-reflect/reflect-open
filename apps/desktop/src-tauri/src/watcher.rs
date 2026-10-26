@@ -23,8 +23,11 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use file_id::{FileId, get_file_id};
+use notify::event::{AccessKind, AccessMode, EventKind};
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{DebounceEventResult, Debouncer, FileIdCache, new_debouncer_opt};
+use notify_debouncer_full::{
+    DebounceEventResult, DebouncedEvent, Debouncer, FileIdCache, new_debouncer_opt,
+};
 use reflect_graph_paths::{
     GraphPathKind, classify, evicted_logical_path, eviction_placeholder, has_pruned_component,
     is_pruned_dir_name, to_slash_lossy, wire_path,
@@ -99,6 +102,13 @@ impl FileIdCache for PrunedFileIdMap {
     }
 
     fn add_path(&mut self, path: &Path, recursive_mode: RecursiveMode) {
+        // `filter_entry` only rejects an entry after `WalkDir` has opened it.
+        // The debouncer offers every uncached path here, hidden ones on every
+        // event, and on inotify each open is itself an event on that path —
+        // walking an excluded root would feed itself forever.
+        if !cache_keeps(&self.root, path) {
+            return;
+        }
         let depth = if recursive_mode == RecursiveMode::Recursive {
             usize::MAX
         } else {
@@ -251,6 +261,28 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
     }
 }
 
+/// Whether an event only observed a read. inotify reports `IN_OPEN` (and
+/// notify forwards it as `Access(Open)`): every directory the reconcile pass
+/// lists and every note the indexer reads would otherwise come back as a
+/// structural change or an upsert, feeding the next pass forever. Only a
+/// close-after-write says the bytes changed.
+fn is_read_only_access(kind: &EventKind) -> bool {
+    matches!(kind, EventKind::Access(access) if *access != AccessKind::Close(AccessMode::Write))
+}
+
+/// Reduce one debounced batch to its effects: reads are dropped before the
+/// paths are collected, and a backend rescan demand forces a reconcile.
+fn batch_effects(events: &[DebouncedEvent], root: &Path) -> BatchEffects {
+    let paths: Vec<PathBuf> = events
+        .iter()
+        .filter(|event| !is_read_only_access(&event.kind))
+        .flat_map(|event| event.paths.clone())
+        .collect();
+    let mut effects = collect_changes(&paths, root);
+    effects.reconcile |= events.iter().any(|event| event.need_rescan());
+    effects
+}
+
 fn lock_watcher<'a>(
     watcher: &'a State<WatcherState>,
 ) -> AppResult<std::sync::MutexGuard<'a, Option<Debouncer<RecommendedWatcher, PrunedFileIdMap>>>> {
@@ -294,13 +326,7 @@ pub fn watch_start(
             let Ok(events) = result else {
                 return; // watch errors are transient; the next batch recovers
             };
-            let rescan_demanded = events.iter().any(|event| event.need_rescan());
-            let paths: Vec<PathBuf> = events
-                .iter()
-                .flat_map(|event| event.paths.clone())
-                .collect();
-            let mut effects = collect_changes(&paths, &handler_root);
-            effects.reconcile |= rescan_demanded;
+            let effects = batch_effects(&events, &handler_root);
             if effects.reconcile || !effects.changes.is_empty() {
                 // Drop the cached catalog before telling the frontend: its
                 // follow-up `list_files` must re-walk, not replay the cache.
@@ -637,6 +663,175 @@ mod tests {
         assert_eq!(effects.changes.len(), 1);
         assert_eq!(effects.changes[0].path, "notes/a.md");
         assert_eq!(effects.changes[0].kind, ChangeKind::Upsert);
+    }
+
+    fn debounced(kind: EventKind, path: PathBuf) -> DebouncedEvent {
+        DebouncedEvent::new(
+            notify::Event::new(kind).add_path(path),
+            std::time::Instant::now(),
+        )
+    }
+
+    #[test]
+    fn reads_never_reach_the_index_or_demand_a_reconcile() {
+        // The reconcile pass lists every folder and the indexer reads every
+        // note; on inotify both surface as `Access` events. Answering them
+        // would start the next pass, which reads again — forever.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("daily")).unwrap();
+        std::fs::write(root.join("daily/2026-06-09.md"), "# day").unwrap();
+
+        let effects = batch_effects(
+            &[
+                debounced(
+                    EventKind::Access(AccessKind::Open(AccessMode::Any)),
+                    root.join("daily"),
+                ),
+                debounced(
+                    EventKind::Access(AccessKind::Open(AccessMode::Any)),
+                    root.join("daily/2026-06-09.md"),
+                ),
+                debounced(
+                    EventKind::Access(AccessKind::Close(AccessMode::Read)),
+                    root.join("daily/2026-06-09.md"),
+                ),
+            ],
+            root,
+        );
+        assert_eq!(effects, BatchEffects::default());
+    }
+
+    #[test]
+    fn a_close_after_write_still_upserts() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        std::fs::write(root.join("notes/a.md"), "# a").unwrap();
+
+        let effects = batch_effects(
+            &[debounced(
+                EventKind::Access(AccessKind::Close(AccessMode::Write)),
+                root.join("notes/a.md"),
+            )],
+            root,
+        );
+        assert_eq!(effects.changes.len(), 1);
+        assert_eq!(effects.changes[0].kind, ChangeKind::Upsert);
+    }
+
+    #[test]
+    fn a_rescan_demand_reconciles_without_paths() {
+        let root = Path::new("/g");
+        let rescan = DebouncedEvent::new(
+            notify::Event::new(EventKind::Other).set_flag(notify::event::Flag::Rescan),
+            std::time::Instant::now(),
+        );
+        let effects = batch_effects(&[rescan], root);
+        assert!(effects.reconcile);
+        assert!(effects.changes.is_empty());
+    }
+
+    /// End to end over the real backend: on inotify, listing a folder and
+    /// reading a note must produce no batch effects at all.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn inotify_reads_produce_no_effects() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        std::fs::create_dir_all(root.join("daily")).unwrap();
+        std::fs::write(root.join("daily/2026-06-09.md"), "# day").unwrap();
+
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let handler_root = root.clone();
+        let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, PrunedFileIdMap>(
+            Duration::from_millis(50),
+            None,
+            move |result: DebounceEventResult| {
+                if let Ok(events) = result {
+                    let _ = sender.send(batch_effects(&events, &handler_root));
+                }
+            },
+            PrunedFileIdMap::new(root.clone()),
+            notify::Config::default(),
+        )
+        .unwrap();
+        debouncer.watch(&root, RecursiveMode::Recursive).unwrap();
+
+        for entry in std::fs::read_dir(root.join("daily")).unwrap() {
+            let _ = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        }
+        let effects: Vec<BatchEffects> = receiver
+            .recv_timeout(Duration::from_millis(500))
+            .into_iter()
+            .collect();
+        assert!(
+            effects
+                .iter()
+                .all(|batch| *batch == BatchEffects::default()),
+            "reads must not look like changes: {effects:?}"
+        );
+
+        // The same watcher still reports a real write.
+        std::fs::write(root.join("daily/2026-06-09.md"), "# edited").unwrap();
+        let written = loop {
+            let batch = receiver
+                .recv_timeout(Duration::from_secs(2))
+                .expect("the write was never reported");
+            if !batch.changes.is_empty() {
+                break batch;
+            }
+        };
+        assert_eq!(written.changes[0].path, "daily/2026-06-09.md");
+        assert_eq!(written.changes[0].kind, ChangeKind::Upsert);
+    }
+
+    /// The debouncer offers every uncached path to the cache, and hidden
+    /// paths are never cached. If offering one opened it, the open's own
+    /// `IN_OPEN` would offer it again — the watcher thread pinned forever by
+    /// a single loose-object directory git created.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_hidden_directory_event_is_not_reopened_forever() {
+        use notify::Watcher as _;
+
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        std::fs::create_dir_all(root.join(".git/objects")).unwrap();
+
+        let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, PrunedFileIdMap>(
+            Duration::from_millis(50),
+            None,
+            |_: DebounceEventResult| {},
+            PrunedFileIdMap::new(root.clone()),
+            notify::Config::default(),
+        )
+        .unwrap();
+        debouncer.watch(&root, RecursiveMode::Recursive).unwrap();
+
+        // An independent raw watcher counts the opens; debounced batches
+        // cannot show them, since a path that never goes quiet never flushes.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut observer =
+            notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
+                if let Ok(event) = result {
+                    let _ = sender.send(event.kind);
+                }
+            })
+            .unwrap();
+        observer
+            .watch(&root.join(".git/objects"), RecursiveMode::NonRecursive)
+            .unwrap();
+
+        std::fs::create_dir(root.join(".git/objects/ab")).unwrap();
+        std::thread::sleep(Duration::from_millis(500));
+        while receiver.try_recv().is_ok() {}
+        std::thread::sleep(Duration::from_millis(500));
+        let opens = receiver
+            .try_iter()
+            .filter(|kind| matches!(kind, EventKind::Access(AccessKind::Open(_))))
+            .count();
+        assert_eq!(opens, 0, "the watcher kept reopening a hidden directory");
     }
 
     #[test]
