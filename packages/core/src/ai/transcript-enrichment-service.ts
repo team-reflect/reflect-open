@@ -10,9 +10,9 @@ const FORMAT_TIMEOUT_MS = 60_000
 const MAX_TRANSCRIPT_CHARS = 4_000
 const MAX_TITLE_CHARS = 80
 const MAX_FALLBACK_WORDS = 8
-const OPENAI_AUDIO_MEMO_ENRICHMENT_MODEL = 'gpt-5.4-nano'
-const ANTHROPIC_AUDIO_MEMO_ENRICHMENT_MODEL = 'claude-haiku-4-5'
-const GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL = 'gemini-3.1-flash-lite'
+const OPENAI_AUDIO_MEMO_ENRICHMENT_MODEL = 'gpt-6-luna'
+const ANTHROPIC_AUDIO_MEMO_ENRICHMENT_MODEL = 'claude-haiku-5-5'
+const GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL = 'gemini-3.5-flash-lite'
 
 const audioMemoTitleSchema = z.object({
   title: z.string(),

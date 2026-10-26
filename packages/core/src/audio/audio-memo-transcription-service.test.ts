@@ -24,7 +24,7 @@ const WITH_ANTHROPIC_DEFAULT = {
 }
 
 const OPENAI_ENRICHMENT = {
-  config: { ...OPENAI_CONFIG, model: 'gpt-5.4-nano' },
+  config: { ...OPENAI_CONFIG, model: 'gpt-6-luna' },
   apiKey: 'sk-live-key',
 }
 
@@ -154,7 +154,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
     expect(kit.enrichMock).toHaveBeenCalledWith(
       expect.objectContaining({
         enrichmentCredentials: {
-          config: { ...ANTHROPIC_CONFIG, model: 'claude-haiku-4-5' },
+          config: { ...ANTHROPIC_CONFIG, model: 'claude-haiku-5-5' },
           apiKey: 'sk-ant-live-key',
         },
       }),

@@ -95,9 +95,9 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
   })
 
   it.each([
-    [CONFIG, 'gpt-5.5', 'gpt-5.4-nano'],
-    [ANTHROPIC_CONFIG, 'claude-sonnet-4-6', 'claude-haiku-4-5'],
-    [GOOGLE_CONFIG, 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'],
+    [CONFIG, 'gpt-5.5', 'gpt-6-luna'],
+    [ANTHROPIC_CONFIG, 'claude-sonnet-4-6', 'claude-haiku-5-5'],
+    [GOOGLE_CONFIG, 'gemini-3.1-pro-preview', 'gemini-3.5-flash-lite'],
   ])('uses the fixed small model for %s', async (config, originalModel, titleModel) => {
     modelAnswering('Planning notes')
 
@@ -164,7 +164,7 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
     ).toMatchObject({
       id: ANTHROPIC_CONFIG.id,
       provider: 'anthropic',
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
     })
   })
 
@@ -177,7 +177,7 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
     ).toMatchObject({
       id: GOOGLE_CONFIG.id,
       provider: 'google',
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-3.5-flash-lite',
     })
   })
 })

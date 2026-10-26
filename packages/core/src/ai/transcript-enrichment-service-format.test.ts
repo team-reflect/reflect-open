@@ -66,7 +66,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
     })
     const calls = languageModelService.calls()
     expect(calls.map(({ config, apiKey }) => ({ model: config.model, apiKey }))).toContainEqual({
-      model: 'gpt-5.4-nano',
+      model: 'gpt-6-luna',
       apiKey: 'sk-live-key',
     })
   })
