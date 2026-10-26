@@ -42,11 +42,13 @@ workflow runs: build and check, then upload.
    a temporary file outside the workspace. `APPLE_API_KEY_CONTENT` may be the raw
    `.p8` file contents or base64-wrapped text.
 
-3. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
-   private, build-only `SENTRY_AUTH_TOKEN` for local TestFlight builds. Configure them in
-   GitHub as the `release_app` environment secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight
-   workflow requires both before building. The DSN initializes the WebView SDK; the iOS
-   native SDK embeds its DSN as a constant in `NativeDiagnostics.swift`. The token must
+3. **Sentry exception telemetry credentials.** Set the public DSN as both `VITE_SENTRY_DSN`
+   and `REFLECT_SENTRY_DSN`, and the private, build-only `SENTRY_AUTH_TOKEN`, for local
+   TestFlight builds. Configure them in GitHub as the `release_app` environment secrets
+   `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight workflow requires both before
+   building. `VITE_SENTRY_DSN` initializes the WebView SDK. `REFLECT_SENTRY_DSN` is
+   expanded into the app's `Info.plist` as `ReflectSentryDSN`, which the iOS native SDK
+   reads; the build helper fails when the two differ. The token must
    be allowed to upload JavaScript source maps and native debug files to the
    `reflect-open` project; it must never use the `VITE_` prefix or enter the app bundle.
 

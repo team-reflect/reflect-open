@@ -12,11 +12,13 @@ import Sentry
 /// file paths, source context, PII — is disabled or scrubbed here; see
 /// `docs/privacy.md`.
 private enum NativeDiagnostics {
-  /// The production Reflect project. Sentry DSNs authorize event submission
-  /// only and are safe to embed in the binary; leaving this empty (as forks
-  /// do) disables the reporter entirely.
+  /// The production Reflect project, expanded into Info.plist from the
+  /// `REFLECT_SENTRY_DSN` build environment. Sentry DSNs authorize event
+  /// submission only; builds without one (local and fork builds) leave the
+  /// reporter off.
   /// https://docs.sentry.io/concepts/key-terms/dsn-explainer/
-  private static let dsn = ""
+  private static let dsn = (Bundle.main.object(forInfoDictionaryKey: "ReflectSentryDSN") as? String ?? "")
+    .trimmingCharacters(in: .whitespacesAndNewlines)
 
   /// Forks build under their own bundle identifier and stay silent even if
   /// they carry a DSN.

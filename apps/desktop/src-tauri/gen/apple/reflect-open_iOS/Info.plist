@@ -61,6 +61,8 @@
 			<string>Any</string>
 		</dict>
 	</dict>
+	<key>ReflectSentryDSN</key>
+	<string>$(REFLECT_SENTRY_DSN)</string>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

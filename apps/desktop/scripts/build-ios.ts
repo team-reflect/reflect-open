@@ -67,6 +67,12 @@ async function assertIpa(): Promise<void> {
     if ((await readInfoValue(app, 'ITSAppUsesNonExemptEncryption')) !== 'false') {
       throw new Error('ITSAppUsesNonExemptEncryption must be false')
     }
+    // The native SDK reads its DSN from `REFLECT_SENTRY_DSN`, the WebView SDK from
+    // `VITE_SENTRY_DSN`. Both come from the same secret.
+    const dsn = (process.env.VITE_SENTRY_DSN ?? '').trim()
+    if (dsn && (await readInfoValue(app, 'ReflectSentryDSN')) !== dsn) {
+      throw new Error('ReflectSentryDSN does not match VITE_SENTRY_DSN; set REFLECT_SENTRY_DSN')
+    }
     await assertAppexEntitlements(app)
   })
 }

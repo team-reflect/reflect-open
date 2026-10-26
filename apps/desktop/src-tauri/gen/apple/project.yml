@@ -135,6 +135,8 @@ targets:
             UIApplicationShortcutItemTitle: Record audio
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAudio
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
+        # Native Sentry DSN from the build environment; empty disables it.
+        ReflectSentryDSN: $(REFLECT_SENTRY_DSN)
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
