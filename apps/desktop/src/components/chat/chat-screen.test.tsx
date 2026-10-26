@@ -156,7 +156,7 @@ async function renderChat() {
     </>,
     {
       core,
-      app: { window: noteWindows },
+      appServices: { window: noteWindows },
       graph: GRAPH,
       settings: {
         aiProviders: settingsState.models,

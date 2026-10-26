@@ -86,7 +86,7 @@ function renderWithLinkNavigation(ui: ReactNode, graph?: TestOpenGraph | null) {
   ).linkNavigation
   return renderInApp(ui, {
     core,
-    app: { linkNavigation },
+    appServices: { linkNavigation },
     graph,
   })
 }

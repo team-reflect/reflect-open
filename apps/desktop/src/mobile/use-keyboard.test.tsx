@@ -27,7 +27,7 @@ describe('keyboard height', () => {
 
   it('exposes visibility as reactive state', async () => {
     const view = await renderHookInApp(() => useKeyboardVisible())
-    const { keyboard } = view.app
+    const { keyboard } = view.appServices
     expect(view.result.current).toBe(false)
 
     await act(() => keyboard.publish(316))
@@ -40,10 +40,10 @@ describe('keyboard height', () => {
 
   it('keeps notifying after an unrelated subscriber unmounts', async () => {
     const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
-    const app = createTestAppServices(core)
-    const { keyboard } = app
-    const first = await renderHookInApp(() => useKeyboardVisible(), { core, app })
-    const second = await renderHookInApp(() => useKeyboardVisible(), { core, app })
+    const appServices = createTestAppServices(core)
+    const { keyboard } = appServices
+    const first = await renderHookInApp(() => useKeyboardVisible(), { core, appServices })
+    const second = await renderHookInApp(() => useKeyboardVisible(), { core, appServices })
     await first.unmount()
     await act(() => keyboard.publish(280))
     expect(second.result.current).toBe(true)
@@ -82,7 +82,7 @@ describe('useKeyboardHeightVar', () => {
   it('mirrors the viewport shortfall into the service and the CSS variable', async () => {
     const viewport = installViewport()
     const view = await renderHookInApp(() => useKeyboardHeightVar())
-    const { keyboard } = view.app
+    const { keyboard } = view.appServices
 
     viewport.height = 464
     await act(() => {
@@ -102,7 +102,7 @@ describe('useKeyboardHeightVar', () => {
   it('ignores a shrink at or under the keyboard threshold', async () => {
     const viewport = installViewport()
     const view = await renderHookInApp(() => useKeyboardHeightVar())
-    const { keyboard } = view.app
+    const { keyboard } = view.appServices
 
     viewport.height = 745
     await act(() => {
@@ -115,7 +115,7 @@ describe('useKeyboardHeightVar', () => {
   it('clears a stale overlap once focus has left every editable element', async () => {
     const viewport = installViewport()
     const view = await renderHookInApp(() => useKeyboardHeightVar())
-    const { keyboard } = view.app
+    const { keyboard } = view.appServices
 
     viewport.height = 464
     await act(() => {

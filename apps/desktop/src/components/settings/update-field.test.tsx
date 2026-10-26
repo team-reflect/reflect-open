@@ -9,7 +9,7 @@ import { UpdateField } from './update-field.tsx'
 async function renderField(state: UpdateState): Promise<TestUpdateService> {
   const update = createTestUpdateService(state)
   await renderInApp(<UpdateField />, {
-    app: { update },
+    appServices: { update },
     wrapper: (children) => <UpdateProvider autoCheck={false}>{children}</UpdateProvider>,
   })
   return update

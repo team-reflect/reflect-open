@@ -44,14 +44,14 @@ let redeems: number
 let subscription: TestSubscriptionService
 let classicAccess: TestClassicAccessService
 let logger: TestLoggerService
-let core: CoreServices
+let services: CoreServices
 let queryClient: QueryClient
 
 /**
  * Render the paywall over the services of the running test.
  */
 async function mount(): Promise<InAppRenderResult<CoreServices>> {
-  const view = await renderInApp(<PaywallScreen />, { core })
+  const view = await renderInApp(<PaywallScreen />, { core: services })
   queryClient = view.queryClient
   return view
 }
@@ -94,7 +94,7 @@ beforeEach(() => {
     redeems += 1
     return redeem()
   })
-  core = {
+  services = {
     ...base,
     classicAccess,
     mobile: {

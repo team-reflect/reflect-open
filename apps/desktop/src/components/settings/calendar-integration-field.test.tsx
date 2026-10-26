@@ -29,7 +29,7 @@ async function renderSection(): Promise<void> {
   const core = createTestCoreServices({ database: createWasmTestDatabaseService(), calendar })
   settings = core.settings
   const view = await renderInApp(<CalendarIntegrationField />, { core, settings: stored })
-  opener = view.app.opener
+  opener = view.appServices.opener
 }
 
 function calendarSwitch(): Locator {

@@ -71,7 +71,7 @@ const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 let platform: TestPlatformOptions
 // The services of the rendered app; set by `shortcutsHook`.
 let core: TestCoreServices
-let app: AppServices
+let appLayer: AppServices
 let openRecent: MockInstance<GraphSessionService['openRecent']>
 let openRouteInNewWindow: MockInstance<LinkNavigationService['openRouteInNewWindow']>
 let isNativeMenuInstalled: MockInstance<NativeMenuService['isInstalled']>
@@ -88,7 +88,7 @@ beforeEach(() => {
 
 async function shortcutsHook() {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
-  core = createTestCoreServices({
+  const services = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService(platform),
     noteDocuments: {
@@ -99,14 +99,15 @@ async function shortcutsHook() {
       isOstensiblyEmpty: isOstensiblyEmptyNoteSource,
     },
   })
-  app = createTestAppServices(core)
-  openRecent = vi.spyOn(core.graphSession, 'openRecent').mockResolvedValue(true)
+  core = services
+  appLayer = createTestAppServices(services)
+  openRecent = vi.spyOn(services.graphSession, 'openRecent').mockResolvedValue(true)
   openRouteInNewWindow = vi
-    .spyOn(app.linkNavigation, 'openRouteInNewWindow')
+    .spyOn(appLayer.linkNavigation, 'openRouteInNewWindow')
     .mockResolvedValue(true)
-  isNativeMenuInstalled = vi.spyOn(app.nativeMenu, 'isInstalled').mockReturnValue(false)
-  const createChatSession = core.chatSessions.create.bind(core.chatSessions)
-  vi.spyOn(core.chatSessions, 'create').mockImplementation((options) => {
+  isNativeMenuInstalled = vi.spyOn(appLayer.nativeMenu, 'isInstalled').mockReturnValue(false)
+  const createChatSession = services.chatSessions.create.bind(services.chatSessions)
+  vi.spyOn(services.chatSessions, 'create').mockImplementation((options) => {
     const session = createChatSession(options)
     newChat = vi.spyOn(session, 'newChat')
     return session
@@ -125,8 +126,8 @@ async function shortcutsHook() {
       }
     },
     {
-      core,
-      app,
+      core: services,
+      appServices: appLayer,
       graph: GRAPH,
       graphState: {
         recents: [
@@ -575,7 +576,7 @@ describe('app shortcuts on macOS', () => {
     expect(event.defaultPrevented).toBe(false)
     expect(result.current.sidebar.collapsed).toBe(false)
 
-    await act(() => app.nativeMenu.dispatchCommand('sidebar.toggle'))
+    await act(() => appLayer.nativeMenu.dispatchCommand('sidebar.toggle'))
     expect(result.current.sidebar.collapsed).toBe(true)
   })
 })

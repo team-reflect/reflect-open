@@ -123,7 +123,7 @@ describe('MobileSettings', () => {
     await expect.element(graphRow).toMatchTextContent('iCloud Drive')
     await user.click(graphRow)
 
-    expect(view.app.navigation.navigations()).toEqual([
+    expect(view.appServices.navigation.navigations()).toEqual([
       { route: { kind: 'graphs' }, options: undefined },
     ])
   })
@@ -133,7 +133,7 @@ describe('MobileSettings', () => {
 
     await userEvent.click(page.getByRole('button', { name: 'Open Source Licenses' }))
 
-    expect(view.app.navigation.navigations()).toEqual([
+    expect(view.appServices.navigation.navigations()).toEqual([
       { route: { kind: 'licenses' }, options: undefined },
     ])
   })
@@ -145,7 +145,7 @@ describe('MobileSettings', () => {
     await user.click(page.getByRole('button', { name: 'Privacy Policy' }))
 
     await vi.waitFor(() => {
-      expect(view.app.opener.openedUrls()).toEqual(['https://reflect.app/privacy'])
+      expect(view.appServices.opener.openedUrls()).toEqual(['https://reflect.app/privacy'])
     })
   })
 

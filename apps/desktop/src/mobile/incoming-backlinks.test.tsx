@@ -34,7 +34,7 @@ function RouteProbe(): ReactNode {
 }
 
 /**
- * Render `ui` over the core services of the running test, so a second render shares its session storage.
+ * Render `ui` over the app of the running test, so a second render shares its session storage.
  */
 function renderInGraph(ui: ReactNode) {
   return renderInApp(ui, { core, graph: { root: '/g', name: 'g', generation: 1 } })

@@ -57,7 +57,7 @@ async function renderStep(step: ReactNode): Promise<void> {
     platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
   })
   core.githubAuth.onRunDeviceFlow(mockFlow)
-  await renderInApp(step, { core, app: { clipboard, opener } })
+  await renderInApp(step, { core, appServices: { clipboard, opener } })
 }
 
 /** Switch the step from the device-flow lead to PAT entry. */

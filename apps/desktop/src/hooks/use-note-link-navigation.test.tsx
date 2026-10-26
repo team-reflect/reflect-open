@@ -84,7 +84,7 @@ async function mount(ui: ReactElement) {
   const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   return await renderInApp(ui, {
     core,
-    app: { window: createTestWindowService({ openNoteWindow }) },
+    appServices: { window: createTestWindowService({ openNoteWindow }) },
     route: { kind: 'allNotes', tag: null },
   })
 }

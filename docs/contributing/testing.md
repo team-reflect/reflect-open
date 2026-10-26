@@ -91,8 +91,8 @@ The result holds two containers:
   database). Drive and
   observe the graph, settings and progress here: `core.graphSession.setGraph()`,
   `core.settings.saves()`, `core.progress.getAll()`.
-- `app`: the app layer, built with `createTestAppServices(core, options.app)`.
-  Assert navigation with `app.navigation.navigations()`.
+- `appServices`: the app layer, built with `createTestAppServices(core, options.appServices)`.
+  Assert navigation with `appServices.navigation.navigations()`.
 
 ```tsx
 const { core } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: 7 } })

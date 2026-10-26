@@ -34,13 +34,13 @@ async function mount(options?: {
     platform: createTestPlatformService(MOBILE_PLATFORM),
     mobileStorage: createTestMobileStorageService({ storage }),
   })
-  const app = createTestAppServices(core)
+  const appServices = createTestAppServices(core)
   completeOnboarding = vi
-    .spyOn(app.mobileOnboarding, 'completeOnboarding')
+    .spyOn(appServices.mobileOnboarding, 'completeOnboarding')
     .mockImplementation(async () => {})
   await renderInApp(<MobileOnboardingScreen />, {
     core,
-    app,
+    appServices,
     graph: null,
     mobile: { needsOnboarding: true, storageInfo: storage, resolving: options?.resolving ?? false },
   })

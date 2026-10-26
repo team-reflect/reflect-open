@@ -23,7 +23,7 @@ async function renderSection(): Promise<TestCoreServices> {
   core.ipc.onCommand(IMPORT_COMMAND, () => new Promise<never>(() => {}))
   await renderInApp(<ImportSection />, {
     core,
-    app: { dialog },
+    appServices: { dialog },
     graph: { generation: 4 },
     wrapper: (children) => <V1ImportProvider>{children}</V1ImportProvider>,
   })

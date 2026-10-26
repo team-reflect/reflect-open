@@ -22,7 +22,7 @@ async function renderDialog(): Promise<{ context: CommandContext; core: TestCore
   const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   core.graphSession.setGraph({ generation: 1 })
   const context: CommandContext = {
-    core,
+    services: core,
     app: createTestAppServices(core),
     navigate: vi.fn(),
     route: () => ({ kind: 'today' }),

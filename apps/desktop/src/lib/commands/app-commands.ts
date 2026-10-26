@@ -32,7 +32,7 @@ function openNewNote(context: CommandContext): void {
   if (route.kind === 'today' || route.kind === 'daily') {
     context.clearScrollState()
   }
-  context.navigate(newNoteRoute(context.core.noteCreation))
+  context.navigate(newNoteRoute(context.services.noteCreation))
 }
 
 const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
@@ -190,7 +190,7 @@ const APP_COMMANDS: AppCommand[] = [
       if (path === null) {
         return
       }
-      await publishGistAndCopyLink(context.core, context.app, path)
+      await publishGistAndCopyLink(context.services, context.app, path)
     },
   },
   {
@@ -217,7 +217,7 @@ const APP_COMMANDS: AppCommand[] = [
       if (path === null) {
         return
       }
-      await copyNoteDeepLink(context.core, context.app, path)
+      await copyNoteDeepLink(context.services, context.app, path)
     },
   },
   {
@@ -234,7 +234,7 @@ const APP_COMMANDS: AppCommand[] = [
       if (path === null) {
         return
       }
-      await copyNotePath(context.core, context.app, path)
+      await copyNotePath(context.services, context.app, path)
     },
   },
   {
@@ -242,7 +242,7 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'Open random note',
     keywords: ['shuffle', 'serendipity'],
     run: async (context) => {
-      const path = await context.core.indexQuery.randomNotePath()
+      const path = await context.services.indexQuery.randomNotePath()
       if (path !== null) {
         context.navigate({ kind: 'note', path })
       }
@@ -319,7 +319,7 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'Rebuild search index',
     keywords: ['reindex', 'refresh'],
     run: async (context) => {
-      await context.core.indexLifecycle.rebuildVisibly()
+      await context.services.indexLifecycle.rebuildVisibly()
     },
   },
   {
@@ -332,7 +332,7 @@ const APP_COMMANDS: AppCommand[] = [
     // bridge. Errors are swallowed: a debug affordance never interrupts the user.
     keybinding: 'Mod-Shift-i',
     run: async (context) => {
-      if (!context.core.platform.isNativeShell) {
+      if (!context.services.platform.isNativeShell) {
         return
       }
       try {

@@ -37,7 +37,7 @@ async function renderSimilar(path: string, probe: boolean = true) {
     </>,
     {
       core,
-      app: { window: createTestWindowService({ openNoteWindow }) },
+      appServices: { window: createTestWindowService({ openNoteWindow }) },
       graph: { root: '/g', name: 'g' },
       settings: { semanticSearchEnabled },
     },

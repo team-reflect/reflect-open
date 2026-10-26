@@ -29,19 +29,19 @@ describe('DeepLinkProvider navigation intent integration', () => {
         graphSession,
       }),
     })
-    const app = createTestAppServices(core)
-    await renderInApp(<DeepLinkProvider>{null}</DeepLinkProvider>, { core, app })
+    const appServices = createTestAppServices(core)
+    await renderInApp(<DeepLinkProvider>{null}</DeepLinkProvider>, { core, appServices })
 
-    app.deepLinkRouter.dispatch('reflect://note/Project%20X')
+    appServices.deepLinkRouter.dispatch('reflect://note/Project%20X')
     expect(resolveNoteTarget).toHaveBeenCalledWith('Project X')
 
-    app.deepLinkRouter.dispatch('reflect://append?text=captured%20while%20resolving')
+    appServices.deepLinkRouter.dispatch('reflect://append?text=captured%20while%20resolving')
     await vi.waitFor(() => expect(core.captureInbox.spooled()).toHaveLength(1))
 
     pendingResolution.resolve('notes/project-x.md')
 
     await vi.waitFor(() => {
-      expect(app.navigation.navigations().map((call) => call.route)).toEqual([
+      expect(appServices.navigation.navigations().map((call) => call.route)).toEqual([
         { kind: 'note', path: 'notes/project-x.md' },
       ])
     })

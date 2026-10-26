@@ -18,7 +18,7 @@ import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAssetPersistence, type AssetPersistence } from './use-asset-persistence.ts'
 
 let persistence: AssetPersistence | null = null
-// The core services of the latest `renderPersistence`; the attachment services read its graph.
+// The app of the latest `renderPersistence`; the attachment services read its graph.
 let core: ReturnType<typeof createTestCoreServices<{ attachments: AttachmentService }>>
 const graphSession = { getState: () => core.graphSession.getState() }
 // The attachment service of the next `renderPersistence`.

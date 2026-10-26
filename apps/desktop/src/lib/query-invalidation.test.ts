@@ -29,14 +29,13 @@ const post: XPost = {
   body: [{ type: 'text', text: 'Saved tweet' }],
 }
 
-// The core services of the running test; closed after each.
-let installed: TestCoreServices | null = null
+let services: TestCoreServices | null = null
 
 /**
  * Install over `core` in the window `window`; the test ends with `core`.
  */
 function installApp(core: TestCoreServices, window: TestWindowService = createTestWindowService()) {
-  installed = core
+  services = core
   const stop = installQueryInvalidation(core, createTestAppServices(core, { window }))
   return { core, window, stop }
 }
@@ -53,8 +52,8 @@ function cachePost(): void {
 afterEach(() => {
   vi.useRealTimers()
   queryClient.clear()
-  installed?.database.close()
-  installed = null
+  services?.database.close()
+  services = null
 })
 
 describe('installQueryInvalidation', () => {

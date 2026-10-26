@@ -63,7 +63,7 @@ async function mount(sourcePath: string | null): Promise<void> {
   ).linkNavigation
   const { result } = await renderHookInApp(() => useMarkdownLinkClick(sourcePath), {
     core,
-    app: { linkNavigation },
+    appServices: { linkNavigation },
     graph: { generation: 7 },
     wrapper: (children) => (
       <>

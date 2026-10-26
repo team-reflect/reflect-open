@@ -156,7 +156,7 @@ async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
     graph: { root: '/g', name: 'g', generation: 7 },
   })
   core = view.core
-  noteContent = vi.spyOn(view.app.share, 'noteContent').mockReturnValue(SHARED)
+  noteContent = vi.spyOn(view.appServices.share, 'noteContent').mockReturnValue(SHARED)
   return { view, onDeleted, client: view.queryClient }
 }
 

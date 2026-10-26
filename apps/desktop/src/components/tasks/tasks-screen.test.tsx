@@ -173,7 +173,7 @@ function renderScreen() {
     </>,
     {
       core,
-      app: { window: noteWindows },
+      appServices: { window: noteWindows },
       graph: { root: '/g', name: 'g', generation: 1 },
       settings: { dateFormat: 'mdy' },
     },
@@ -224,7 +224,7 @@ let core: TestCoreServices
 let noteWindows: TestWindowService
 
 beforeEach(() => {
-  // Fresh core services per test, so its task service's recently-completed set starts empty.
+  // A fresh app per test, so its task service's recently-completed set starts empty.
   core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   noteWindows = createTestWindowService()
   operations = core.progress

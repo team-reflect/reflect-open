@@ -98,7 +98,7 @@ describe('NoteGistAction', () => {
     const view = await renderAction()
     await userEvent.click(view.getByRole('button', { name: /Share with private link/ }))
 
-    await vi.waitFor(() => expect(view.app.clipboard.writes()).toEqual([GIST_URL]))
+    await vi.waitFor(() => expect(view.appServices.clipboard.writes()).toEqual([GIST_URL]))
     expect(core.progress.started().map((operation) => operation.label)).toContain(
       'Gist link copied',
     )
@@ -106,7 +106,7 @@ describe('NoteGistAction', () => {
 
   it('reports a failed copy and keeps the publish', async () => {
     const view = await renderAction()
-    view.app.clipboard.failWith(new Error('denied'))
+    view.appServices.clipboard.failWith(new Error('denied'))
     await userEvent.click(view.getByRole('button', { name: /Share with private link/ }))
 
     await vi.waitFor(() => {
