@@ -22,7 +22,9 @@ use super::repo::{current_branch, open_existing};
 /// wants is `@reflect/core`'s business (GitHub: `x-access-token` plus the
 /// managed token); this layer only presents it, once, as basic auth, and
 /// only to `origin`, the scheme, host and port it was stored for.
-#[derive(Debug, Clone, Deserialize)]
+///
+/// No `Debug`: a derived one would print `secret`.
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitCredential {
     pub origin: String,
@@ -88,7 +90,7 @@ fn resolve_credential(
             return Err(git2::Error::new(
                 ErrorCode::Auth,
                 ErrorClass::Http,
-                "the host rejected the stored sign-in",
+                "the Git host rejected the username and access token or password",
             ));
         }
         tried.credential = true;
@@ -451,7 +453,11 @@ mod credential_tests {
             &mut tried,
         ));
         assert_eq!(err.code(), ErrorCode::Auth);
-        assert!(err.message().contains("rejected"), "{err}");
+        assert!(
+            err.message()
+                .contains("rejected the username and access token"),
+            "{err}"
+        );
     }
 
     #[test]
