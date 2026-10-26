@@ -7,6 +7,10 @@
 //! line-disjoint. A mid-note edit puts the note's own following lines in both
 //! tails (they overlap), which refuses the union and falls through to the
 //! word-level merge, never a silently duplicated half-note.
+//!
+//! Before any line comparison, a side that is the other typed further (a
+//! character prefix of it, ignoring trailing whitespace) yields the longer
+//! side: an extended last line is one line, not two appends.
 
 /// Union `first` and `second` when they diverge append-only. `None` when the
 /// shape doesn't qualify (overlapping tails — a real edit, not an append).
@@ -19,6 +23,17 @@ pub fn append_union(base: Option<&str>, first: &str, second: &str) -> Option<Str
     {
         return None;
     }
+
+    // One side is a character prefix of the other: the longer side already
+    // holds every character of the shorter one.
+    let (first_trimmed, second_trimmed) = (first.trim_end(), second.trim_end());
+    if second_trimmed.starts_with(first_trimmed) {
+        return Some(second.to_string());
+    }
+    if first_trimmed.starts_with(second_trimmed) {
+        return Some(first.to_string());
+    }
+
     let first_lines: Vec<&str> = first.split('\n').collect();
     let second_lines: Vec<&str> = second.split('\n').collect();
 
@@ -29,15 +44,6 @@ pub fn append_union(base: Option<&str>, first: &str, second: &str) -> Option<Str
         .count();
     let first_tail = trim_trailing_blank(&first_lines[shared..]);
     let second_tail = trim_trailing_blank(&second_lines[shared..]);
-
-    // One side is a pure prefix of the other: the longer side already holds
-    // everything.
-    if first_tail.is_empty() {
-        return Some(second.to_string());
-    }
-    if second_tail.is_empty() {
-        return Some(first.to_string());
-    }
 
     // Overlapping non-blank lines mean the divergence isn't append-shaped.
     let first_set: std::collections::BTreeSet<&str> = first_tail
@@ -107,6 +113,14 @@ mod tests {
     }
 
     #[test]
+    fn an_extended_last_line_keeps_the_longer_side() {
+        let first = "# Note\n\n- a\n- water the ferns\n";
+        let second = "# Note\n\n- a\n- water the ferns on the balcony\n";
+        assert_eq!(append_union(None, first, second), Some(second.to_string()));
+        assert_eq!(append_union(None, second, first), Some(second.to_string()));
+    }
+
+    #[test]
     fn creation_collision_with_no_shared_content_unions_both() {
         // Two devices created today's note offline with different content and
         // no template seed: nothing shared, keep both bodies.
@@ -128,9 +142,10 @@ mod tests {
 
     #[test]
     fn identical_up_to_trailing_blank_lines_keeps_one_side() {
-        // Both tails are blank after trimming; the first-tail-empty arm wins,
-        // so the second side comes back. Which side is irrelevant (the ladder
-        // catches whitespace-equality earlier) — determinism is what matters.
+        // Both sides are equal after trimming; the second-extends-first arm
+        // wins, so the second side comes back. Which side is irrelevant (the
+        // ladder catches whitespace-equality earlier) — determinism is what
+        // matters.
         let first = "- a\n";
         let second = "- a\n\n";
         assert_eq!(append_union(None, first, second), Some(second.to_string()));

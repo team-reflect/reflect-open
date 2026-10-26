@@ -1077,38 +1077,50 @@ mod tests {
     }
 
     #[test]
-    fn a_self_conflict_keeps_both_drafts_of_the_last_line() {
+    fn a_self_conflict_keeps_only_the_latest_draft_of_the_last_line() {
         // One device saves twice while the first save is still uploading, and
-        // iCloud splits the two saves into a conflict. Both sides are this
-        // device's own writes, so the shadow base is still the last synced
-        // content.
+        // iCloud splits the two saves into a conflict. Between the saves the
+        // user kept typing on the last line. Own writes never advance the
+        // shadow base, so the base is still the last synced content and the
+        // three-way merge sees two inserts at the same place.
+        //
+        // Append-union compared whole lines, so it read the extended line as
+        // a second append and kept the draft above the finished line. It now
+        // keeps the longer side when one side is a character prefix of the
+        // other.
+
+        // A temporary graph folder with `daily/`, `notes/` and `.reflect/`.
         let root = graph();
-        let rel = "daily/2026-07-11.md";
-        let synced = "# 2026-07-11\n\n- repot the basil\n";
-        let earlier = "# 2026-07-11\n\n- repot the basil\n- water the ferns\n";
-        let latest = "# 2026-07-11\n\n- repot the basil\n- water the ferns on the balcony\n";
+        // The conflicted note: a daily note.
+        let rel = "daily/2026-01-01.md";
+        // The note as last synced: the shadow base both saves start from.
+        let synced = "# 2026-01-01\n\n- repot the basil\n";
+        // The first save: the user started a new line and is still typing.
+        let earlier = "# 2026-01-01\n\n- repot the basil\n- water the ferns\n";
+        // The second save: the same line, typed further.
+        let latest = "# 2026-01-01\n\n- repot the basil\n- water the ferns on the balcony\n";
+        // Record the last synced content as the note's base.
         let shadow = ShadowStore::new(root.path());
         shadow.record(rel, synced).unwrap();
-        crate::fs::own_writes::record(root.path(), rel, earlier.as_bytes());
+        // The second save is the file on disk.
         write(root.path(), rel, latest);
-        crate::fs::own_writes::record(root.path(), rel, latest.as_bytes());
 
         let resolution = resolve_file(
             root.path(),
             rel,
+            // Modification time of the file on disk (the second save).
             2_000,
+            // The first save is the conflict version iCloud kept. It is older
+            // than the file on disk.
             vec![fake_version(root.path(), "earlier.md", earlier, 1_000)],
             &shadow,
         )
         .unwrap();
 
-        // Pins the current behavior: append-union reads the extended line as a
-        // second append and keeps the draft above it. The latest save alone
-        // is the expected result.
-        assert_eq!(
-            resolution.final_content,
-            "# 2026-07-11\n\n- repot the basil\n- water the ferns\n- water the ferns on the balcony\n"
-        );
+        // The second save already holds everything: nothing to write back.
+        assert!(!resolution.changed);
+        // Only the finished line remains, with no half-typed copy above it.
+        assert_eq!(resolution.final_content, latest);
     }
 
     #[test]
