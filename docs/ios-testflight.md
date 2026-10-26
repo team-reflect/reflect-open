@@ -1,8 +1,8 @@
 # iOS TestFlight Builds
 
 ```bash
-pnpm build:ios --build-number=123   # apps/desktop/scripts/build-ios.ts
-pnpm upload:testflight              # apps/desktop/scripts/upload-testflight.ts
+pnpm build:ios --build-number="$(date -u +%Y%m%d%H%M)"   # apps/desktop/scripts/build-ios.ts
+pnpm upload:testflight                                   # apps/desktop/scripts/upload-testflight.ts
 ```
 
 `.github/workflows/publish-testflight.yml` runs both on every release (called from
