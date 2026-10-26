@@ -207,7 +207,7 @@ export function scrubExceptionEvent(event: ErrorEvent): ErrorEvent | null {
 /**
  * Build the exception-only Sentry configuration shared by desktop and iOS WebViews.
  */
-export function createExceptionTelemetryOptions(dsn: string, release: string): BrowserOptions {
+function createExceptionTelemetryOptions(dsn: string, release: string): BrowserOptions {
   return {
     dsn,
     release,

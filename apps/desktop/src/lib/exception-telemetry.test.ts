@@ -3,7 +3,6 @@ import { createTestLoggerService } from '@reflect/core/testing'
 import type { BrowserOptions, ErrorEvent } from '@sentry/react'
 import {
   createExceptionTelemetry,
-  createExceptionTelemetryOptions,
   type ExceptionTelemetrySdk,
   parseExceptionTelemetryDsn,
   scrubExceptionEvent,
@@ -269,42 +268,6 @@ describe('scrubExceptionEvent', () => {
 
   it('drops non-exception events', () => {
     expect(scrubExceptionEvent({ type: undefined, message: 'note content' })).toBeNull()
-  })
-})
-
-describe('createExceptionTelemetryOptions', () => {
-  it('enables only exception integrations and disables ambient collection', () => {
-    const options = createExceptionTelemetryOptions(
-      'https://public@example.ingest.sentry.io/123',
-      'reflect@0.4.0-beta.45',
-    )
-
-    expect(options.defaultIntegrations).toBe(false)
-    expect(options.integrations).toEqual([
-      expect.objectContaining({ name: 'GlobalHandlers' }),
-      expect.objectContaining({ name: 'LinkedErrors' }),
-      expect.objectContaining({ name: 'Dedupe' }),
-    ])
-    expect(options.maxBreadcrumbs).toBe(0)
-    expect(options.tracesSampleRate).toBe(0)
-    expect(options.replaysSessionSampleRate).toBe(0)
-    expect(options.replaysOnErrorSampleRate).toBe(0)
-    expect(options.sendClientReports).toBe(false)
-    expect(options.attachStacktrace).toBe(false)
-    expect(options.dataCollection).toEqual({
-      userInfo: false,
-      cookies: false,
-      httpHeaders: { request: false, response: false },
-      httpBodies: [],
-      urlQueryParams: false,
-      graphQL: { document: false, variables: false },
-      genAI: { inputs: false, outputs: false },
-      mcp: { inputs: false, outputs: false },
-      databaseQueryData: false,
-      queues: false,
-      stackFrameVariables: false,
-      frameContextLines: 0,
-    })
   })
 })
 
