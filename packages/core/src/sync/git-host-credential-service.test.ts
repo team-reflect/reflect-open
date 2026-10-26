@@ -25,8 +25,13 @@ describe('GitHostCredentialService', () => {
       secret: 'glpat-2',
     })
 
-    expect(await gitHostCredentials.load(ORIGIN)).toEqual({ username: 'alex', secret: 'glpat-1' })
+    expect(await gitHostCredentials.load(ORIGIN)).toEqual({
+      origin: ORIGIN,
+      username: 'alex',
+      secret: 'glpat-1',
+    })
     expect(await gitHostCredentials.load('https://gitlab.com:8443')).toEqual({
+      origin: 'https://gitlab.com:8443',
       username: 'alex',
       secret: 'glpat-2',
     })

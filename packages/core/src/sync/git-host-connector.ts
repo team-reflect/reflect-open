@@ -61,16 +61,16 @@ class GitHostConnectorImpl implements GitHostConnector {
 
   async connectGitHost(input: ConnectGitHostInput): Promise<void> {
     const { git, gitHostCredentials, gitSync, generation } = this.#deps
-    const { url, origin, credential } = checkInput(input)
+    const { url, credential } = checkInput(input)
     await git.setup(null, null, generation) // the repository the probe runs from
     const tip = await git.remoteHead(credential, generation, url)
-    await gitHostCredentials.save(origin, credential)
+    await gitHostCredentials.save(credential.origin, credential)
     await gitSync.connectRemote(url, tip.defaultBranch)
   }
 
   async updateGitHostSignIn(signIn: GitHostSignIn): Promise<void> {
     const { git, gitHostCredentials, generation } = this.#deps
-    const credential = checkSignIn(signIn)
+    const checked = checkSignIn(signIn)
     // The configured remote is the one the sign-in is for, whatever a form
     // showed: the probe asks `origin`, and the store is keyed by its origin.
     const { remoteUrl } = await git.status(generation)
@@ -81,6 +81,7 @@ class GitHostConnectorImpl implements GitHostConnector {
     if (remote.kind !== 'https' || !remote.origin.startsWith('https:')) {
       throw new AppError('parse', 'This repository takes no username and password sign-in.')
     }
+    const credential = { origin: remote.origin, ...checked }
     await git.remoteHead(credential, generation)
     await gitHostCredentials.save(remote.origin, credential)
   }
@@ -92,7 +93,6 @@ class GitHostConnectorImpl implements GitHostConnector {
  */
 function checkInput({ remoteUrl, username, token }: ConnectGitHostInput): {
   url: string
-  origin: string
   credential: GitCredential
 } {
   const url = remoteUrl.trim()
@@ -115,13 +115,13 @@ function checkInput({ remoteUrl, username, token }: ConnectGitHostInput): {
       'Enter the repository’s https:// URL, without a username or token in it.',
     )
   }
-  return { url, origin: remote.origin, credential: checkSignIn({ username, token }) }
+  return { url, credential: { origin: remote.origin, ...checkSignIn({ username, token }) } }
 }
 
 /**
  * The sign-in a form submitted, trimmed, or the `AppError` for an empty field.
  */
-function checkSignIn({ username, token }: GitHostSignIn): GitCredential {
+function checkSignIn({ username, token }: GitHostSignIn): Omit<GitCredential, 'origin'> {
   const credential = { username: username.trim(), secret: token.trim() }
   if (credential.username.length === 0 || credential.secret.length === 0) {
     throw new AppError('parse', 'Enter the username and the access token or password.')

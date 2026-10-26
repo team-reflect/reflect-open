@@ -60,7 +60,7 @@ async function runAllTimers(): Promise<void> {
   }
 }
 
-const CRED = { username: 'x-access-token', secret: 'tok' }
+const CRED = { origin: 'https://github.com', username: 'x-access-token', secret: 'tok' }
 const CLEAN_COMMIT: CommitOutcome = {
   committed: false,
   sha: null,

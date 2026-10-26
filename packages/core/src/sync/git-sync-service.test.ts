@@ -446,7 +446,10 @@ describe('createGitSyncService', () => {
 
         await advance(90_000)
         expect(probes).toHaveLength(1)
-        expect(probes[0]).toEqual([{ username: 'x-access-token', secret: 'ghp_abc' }, GENERATION])
+        expect(probes[0]).toEqual([
+          { origin: 'https://github.com', username: 'x-access-token', secret: 'ghp_abc' },
+          GENERATION,
+        ])
         expect(calls.filter((command) => command === 'fetch')).toHaveLength(fetches)
 
         tip = { remoteOid: null, trackingOid: 'a', defaultBranch: 'main' } // the remote branch is gone

@@ -126,7 +126,7 @@ const userResponseSchema = z.object({
  * GitHub accepts any token as the password of the `x-access-token` user.
  */
 export function githubCredential(token: string): GitCredential {
-  return { username: 'x-access-token', secret: token }
+  return { origin: 'https://github.com', username: 'x-access-token', secret: token }
 }
 
 /**

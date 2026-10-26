@@ -474,6 +474,7 @@ describe('MobileSettings', () => {
       expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
     })
     expect(await view.app.gitHostCredentials.load('https://gitlab.com')).toEqual({
+      origin: 'https://gitlab.com',
       username: 'alex',
       secret: 'glpat-1',
     })

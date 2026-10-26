@@ -8,7 +8,7 @@ const STATUS = {
   ahead: 0,
   behind: 0,
 }
-const CRED = { username: 'x-access-token', secret: 'tok' }
+const CRED = { origin: 'https://github.com', username: 'x-access-token', secret: 'tok' }
 
 describe('createGitRepositoryService', () => {
   it('sends each method to its command with the generation', async () => {

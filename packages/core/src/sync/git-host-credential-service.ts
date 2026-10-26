@@ -7,6 +7,8 @@ import type { GitCredential } from './git-repository-service.ts'
 
 const credentialSchema = z.object({ username: z.string().min(1), secret: z.string().min(1) })
 
+type StoredCredential = Pick<GitCredential, 'username' | 'secret'>
+
 /**
  * The keychain entry holding the sign-in of one origin, e.g.
  * `git-credential:https://gitlab.com`.
@@ -30,7 +32,7 @@ export interface GitHostCredentialService {
   /**
    * Stores the sign-in of `origin`, replacing any prior one, and notifies subscribers.
    */
-  save(origin: string, credential: GitCredential): Promise<void>
+  save(origin: string, credential: StoredCredential): Promise<void>
   /**
    * Removes the sign-in of `origin` and notifies subscribers; a missing entry is not an error.
    */
@@ -72,10 +74,10 @@ class GitHostCredentialServiceImpl implements GitHostCredentialService {
       logger.error(`the stored sign-in for ${origin} is unreadable; treating it as absent`)
       return null
     }
-    return parsed.data
+    return { origin, ...parsed.data }
   }
 
-  async save(origin: string, credential: GitCredential): Promise<void> {
+  async save(origin: string, credential: StoredCredential): Promise<void> {
     const validated = credentialSchema.parse(credential)
     await this.#deps.secretStore.set(gitHostCredentialSecretName(origin), JSON.stringify(validated))
     this.#notify()

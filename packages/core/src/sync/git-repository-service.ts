@@ -3,10 +3,12 @@ import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 
 /**
  * An HTTPS sign-in for one remote operation: basic auth, presented once by
- * the Rust layer and never written anywhere. GitHub's shape is
+ * the Rust layer and never written anywhere, and only to `origin` (scheme,
+ * host and port, as `URL.origin` writes them). GitHub's shape is
  * `githubCredential(token)` in `./github-auth`.
  */
 export interface GitCredential {
+  origin: string
   username: string
   secret: string
 }

@@ -28,10 +28,18 @@ describe('CredentialResolver', () => {
     const resolved = await resolver.resolve(GITHUB)
     expect(resolved.kind).toBe('ready')
     if (resolved.kind === 'ready') {
-      expect(await resolved.get()).toEqual({ username: 'x-access-token', secret: 'ghp_1' })
+      expect(await resolved.get()).toEqual({
+        origin: 'https://github.com',
+        username: 'x-access-token',
+        secret: 'ghp_1',
+      })
       // The lookup follows the stored token, so a rotation reaches the engine.
       await githubAuth.save({ kind: 'pat', token: 'ghp_2' })
-      expect(await resolved.get()).toEqual({ username: 'x-access-token', secret: 'ghp_2' })
+      expect(await resolved.get()).toEqual({
+        origin: 'https://github.com',
+        username: 'x-access-token',
+        secret: 'ghp_2',
+      })
     }
   })
 
@@ -48,9 +56,17 @@ describe('CredentialResolver', () => {
     const resolved = await resolver.resolve(GITLAB)
     expect(resolved.kind).toBe('ready')
     if (resolved.kind === 'ready') {
-      expect(await resolved.get()).toEqual({ username: 'alex', secret: 'glpat-1' })
+      expect(await resolved.get()).toEqual({
+        origin: 'https://gitlab.com',
+        username: 'alex',
+        secret: 'glpat-1',
+      })
       await gitHostCredentials.save('https://gitlab.com', { username: 'alex', secret: 'glpat-2' })
-      expect(await resolved.get()).toEqual({ username: 'alex', secret: 'glpat-2' })
+      expect(await resolved.get()).toEqual({
+        origin: 'https://gitlab.com',
+        username: 'alex',
+        secret: 'glpat-2',
+      })
     }
     expect(await resolver.resolve({ kind: 'https', origin: 'https://gitlab.com:8443' })).toEqual({
       kind: 'missing',

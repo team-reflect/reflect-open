@@ -44,7 +44,11 @@ describe('GitHostConnector', () => {
     await connector.connectGitHost({ ...INPUT, remoteUrl: `  ${URL}  `, token: ' glpat-1 ' })
 
     expect(git.calls().map((call) => call.method)).toEqual(['setup', 'remoteHead'])
-    expect(git.calls()[1]?.args).toEqual([{ username: 'alex', secret: 'glpat-1' }, GENERATION, URL])
+    expect(git.calls()[1]?.args).toEqual([
+      { origin: 'https://gitlab.com', username: 'alex', secret: 'glpat-1' },
+      GENERATION,
+      URL,
+    ])
     expect(secretStore.snapshot()).toEqual({
       'git-credential:https://gitlab.com': JSON.stringify({ username: 'alex', secret: 'glpat-1' }),
     })
@@ -105,7 +109,10 @@ describe('GitHostConnector', () => {
 
     // The probe asks `origin`, not an address a form may have changed.
     expect(git.calls().map((call) => call.method)).toEqual(['status', 'remoteHead'])
-    expect(git.calls()[1]?.args).toEqual([{ username: 'alex', secret: 'glpat-2' }, GENERATION])
+    expect(git.calls()[1]?.args).toEqual([
+      { origin: 'https://gitlab.com', username: 'alex', secret: 'glpat-2' },
+      GENERATION,
+    ])
     expect(secretStore.snapshot()).toEqual({
       'git-credential:https://gitlab.com': JSON.stringify({ username: 'alex', secret: 'glpat-2' }),
     })
