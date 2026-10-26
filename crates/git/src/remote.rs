@@ -86,7 +86,7 @@ fn resolve_credential(
             return Err(git2::Error::new(
                 ErrorCode::Auth,
                 ErrorClass::Http,
-                "the Git host rejected the username and access token",
+                "the Git host rejected the username and access token or password",
             ));
         }
         tried.credential = true;
