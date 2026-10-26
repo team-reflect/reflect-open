@@ -690,6 +690,22 @@ mod tests {
         fs::write(root.join(rel), content).unwrap();
     }
 
+    /// A conflict version as the version store holds it: `contents` written
+    /// under `.reflect/` and stamped `modified_ms`.
+    fn fake_version(
+        root: &Path,
+        name: &str,
+        contents: impl AsRef<[u8]>,
+        modified_ms: u64,
+    ) -> VersionRef {
+        let store_path = root.join(".reflect").join(name);
+        fs::write(&store_path, contents).unwrap();
+        VersionRef {
+            store_path,
+            modified_ms,
+        }
+    }
+
     #[test]
     fn collision_names_parse_strictly() {
         assert_eq!(
@@ -1016,8 +1032,6 @@ mod tests {
         // the version store would hold it and run the real fold.
         let root = graph();
         write(root.path(), "daily/2026-07-04.md", "- seed\n- mac line\n");
-        let store = root.path().join(".reflect/fake-version-store.md");
-        fs::write(&store, "- seed\n- phone line\n").unwrap();
         let shadow = ShadowStore::new(root.path());
         shadow.record("daily/2026-07-04.md", "- seed\n").unwrap();
 
@@ -1025,10 +1039,12 @@ mod tests {
             root.path(),
             "daily/2026-07-04.md",
             2_000,
-            vec![VersionRef {
-                store_path: store,
-                modified_ms: 1_000,
-            }],
+            vec![fake_version(
+                root.path(),
+                "fake-version-store.md",
+                "- seed\n- phone line\n",
+                1_000,
+            )],
             &shadow,
         )
         .unwrap();
@@ -1046,8 +1062,6 @@ mod tests {
     fn resolve_file_reconciles_overlapping_edits_without_markers() {
         let root = graph();
         write(root.path(), "notes/a.md", "shared line mac\n");
-        let store = root.path().join(".reflect/fake-store.md");
-        fs::write(&store, "shared line phone\n").unwrap();
         let shadow = ShadowStore::new(root.path());
         shadow.record("notes/a.md", "shared line\n").unwrap();
 
@@ -1055,25 +1069,18 @@ mod tests {
             root.path(),
             "notes/a.md",
             1_000,
-            vec![VersionRef {
-                store_path: store,
-                modified_ms: 2_000,
-            }],
+            vec![fake_version(
+                root.path(),
+                "fake-store.md",
+                "shared line phone\n",
+                2_000,
+            )],
             &shadow,
         )
         .unwrap();
 
         assert!(resolution.final_content.contains("mac"));
         assert!(resolution.final_content.contains("phone"));
-    }
-
-    fn fake_version(root: &Path, name: &str, content: &str, modified_ms: u64) -> VersionRef {
-        let store = root.join(".reflect").join(name);
-        fs::write(&store, content).unwrap();
-        VersionRef {
-            store_path: store,
-            modified_ms,
-        }
     }
 
     #[test]
@@ -1248,15 +1255,6 @@ mod tests {
 
     const VERSION_MS: u64 = 1_792_119_845_000;
 
-    fn version(root: &Path, name: &str, bytes: &[u8], modified_ms: u64) -> VersionRef {
-        let store_path = root.join(".reflect").join(name);
-        fs::write(&store_path, bytes).unwrap();
-        VersionRef {
-            store_path,
-            modified_ms,
-        }
-    }
-
     fn json_graph() -> tempfile::TempDir {
         let root = graph();
         fs::create_dir_all(root.path().join("assets")).unwrap();
@@ -1267,7 +1265,7 @@ mod tests {
     #[test]
     fn a_json_conflict_version_becomes_a_sibling_copy() {
         let root = json_graph();
-        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let v = fake_version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
         let hash8 = blob_hash8_of_file(&v.store_path).unwrap();
         let mut outcome = SweepOutcome::default();
 
@@ -1297,7 +1295,7 @@ mod tests {
     fn a_binary_conflict_version_is_marked_resolved_after_the_copy() {
         let root = graph();
         fs::write(root.path().join("notes/clip.bin"), [0u8, 1, 2]).unwrap();
-        let first = version(root.path(), "v1", &[0u8, 9, 9], VERSION_MS);
+        let first = fake_version(root.path(), "v1", [0u8, 9, 9], VERSION_MS);
         let missing = VersionRef {
             store_path: root.path().join(".reflect/missing"),
             modified_ms: VERSION_MS + 1000,
@@ -1318,7 +1316,7 @@ mod tests {
             [0u8, 9, 9]
         );
 
-        let ok = version(root.path(), "v2", &[0u8, 9, 9], VERSION_MS);
+        let ok = fake_version(root.path(), "v2", [0u8, 9, 9], VERSION_MS);
         let mut again = SweepOutcome::default();
         assert!(copy_conflict_versions(
             root.path(),
@@ -1334,7 +1332,7 @@ mod tests {
         let names: Vec<String> = (0..2)
             .map(|_| {
                 let root = json_graph();
-                let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+                let v = fake_version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
                 let mut outcome = SweepOutcome::default();
                 copy_conflict_versions(root.path(), "assets/data.json", vec![v], &mut outcome);
                 outcome.copies[0].clone()
@@ -1346,7 +1344,7 @@ mod tests {
     #[test]
     fn a_version_equal_to_the_current_file_writes_no_copy() {
         let root = json_graph();
-        let v = version(root.path(), "v1", b"{\"a\":1}", VERSION_MS);
+        let v = fake_version(root.path(), "v1", b"{\"a\":1}", VERSION_MS);
         let mut outcome = SweepOutcome::default();
 
         assert!(copy_conflict_versions(
@@ -1365,7 +1363,7 @@ mod tests {
         let root = json_graph();
         let mut total = 0;
         for _ in 0..2 {
-            let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+            let v = fake_version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
             let mut outcome = SweepOutcome::default();
             assert!(copy_conflict_versions(
                 root.path(),
@@ -1383,7 +1381,7 @@ mod tests {
     #[test]
     fn an_edited_conflict_copy_is_not_mistaken_for_the_version() {
         let root = json_graph();
-        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let v = fake_version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
         let hash8 = blob_hash8_of_file(&v.store_path).unwrap();
         let first = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8}).json");
         let second = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8} 2).json");
@@ -1408,7 +1406,7 @@ mod tests {
     #[test]
     fn a_conflict_copy_stages_outside_the_synced_folder() {
         let root = json_graph();
-        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let v = fake_version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
         let target = root.path().join("assets/copy.json");
 
         write_copy(root.path(), &v.store_path, &target).unwrap();
@@ -1423,7 +1421,7 @@ mod tests {
     #[test]
     fn an_identical_conflict_copy_counts_as_done() {
         let root = json_graph();
-        let v = version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
+        let v = fake_version(root.path(), "v1", b"{\"a\":2}", VERSION_MS);
         let hash8 = blob_hash8_of_file(&v.store_path).unwrap();
         let first = format!("assets/data (conflict 2026-10-16 03-04-05 {hash8}).json");
         write(root.path(), &first, "{\"a\":2}");
