@@ -155,6 +155,30 @@ function isModelNotFound(body: string): boolean {
   return parsed.success && parsed.data.error.code === 'model_not_found'
 }
 
+interface ModelReply {
+  readonly response: Response
+  readonly body: string
+}
+
+/**
+ * Send to each model in turn, moving on only while `isMissing` says the model
+ * is not available on the key. The last model's reply is final.
+ */
+async function attemptInOrder(
+  models: readonly [string, ...string[]],
+  attempt: (model: string) => Promise<Response>,
+  isMissing: (reply: ModelReply) => boolean,
+): Promise<ModelReply> {
+  const [model, ...fallbacks] = models
+  const response = await attempt(model)
+  const reply = { response, body: await response.text() }
+  const [next, ...rest] = fallbacks
+  if (next !== undefined && isMissing(reply)) {
+    return await attemptInOrder([next, ...rest], attempt, isMissing)
+  }
+  return reply
+}
+
 async function transcribeWithOpenAi(
   fetchFn: typeof fetch,
   request: TranscriptionRequest,
@@ -178,15 +202,11 @@ async function transcribeWithOpenAi(
     )
   }
 
-  let response = await attempt(OPENAI_TRANSCRIPTION_MODEL)
-  let body = await response.text()
-  for (const model of OPENAI_TRANSCRIPTION_FALLBACK_MODELS) {
-    if (response.ok || !isModelNotFound(body)) {
-      break
-    }
-    response = await attempt(model)
-    body = await response.text()
-  }
+  const { response, body } = await attemptInOrder(
+    [OPENAI_TRANSCRIPTION_MODEL, ...OPENAI_TRANSCRIPTION_FALLBACK_MODELS],
+    attempt,
+    (reply) => !reply.response.ok && isModelNotFound(reply.body),
+  )
   if (!response.ok) {
     throw httpError('openai', response.status, body)
   }
@@ -260,13 +280,12 @@ async function transcribeWithGemini(
     )
   }
 
-  let response = await attempt(GOOGLE_TRANSCRIPTION_MODEL)
-  let body = await response.text()
-  // A 404 on the model path means Google retired the model.
-  if (response.status === 404) {
-    response = await attempt(GOOGLE_TRANSCRIPTION_FALLBACK_MODEL)
-    body = await response.text()
-  }
+  const { response, body } = await attemptInOrder(
+    [GOOGLE_TRANSCRIPTION_MODEL, GOOGLE_TRANSCRIPTION_FALLBACK_MODEL],
+    attempt,
+    // A 404 on the model path means Google retired the model.
+    (reply) => reply.response.status === 404,
+  )
   if (!response.ok) {
     throw httpError('google', response.status, body)
   }
