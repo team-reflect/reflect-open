@@ -41,9 +41,10 @@ use reflect_types::{ChangeKind, FileChange};
 
 type GraphDebouncer = Debouncer<RecommendedWatcher, PrunedFileIdMap>;
 
-/// Holds the active debouncer; dropping it stops the background watch thread.
+/// Holds the active debouncer and the file ID of the graph root it watches;
+/// dropping the debouncer stops the background watch thread.
 #[derive(Default)]
-pub struct WatcherState(pub Mutex<Option<GraphDebouncer>>);
+pub struct WatcherState(pub Mutex<Option<(FileId, GraphDebouncer)>>);
 
 /// The debouncer's file-ID cache, pruned to the trees that can carry tracked
 /// files.
@@ -257,7 +258,7 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
 
 fn lock_watcher<'a>(
     watcher: &'a State<WatcherState>,
-) -> AppResult<std::sync::MutexGuard<'a, Option<GraphDebouncer>>> {
+) -> AppResult<std::sync::MutexGuard<'a, Option<(FileId, GraphDebouncer)>>> {
     watcher.0.lock().map_err(|err| {
         tracing::error!(?err, "watcher state lock poisoned by an earlier panic");
         AppError::io("watcher state lock poisoned")
@@ -300,10 +301,19 @@ pub fn watch_start(
     })?;
     let root = graph_guard.root.clone().ok_or_else(AppError::no_graph)?;
 
+    let root_id = get_file_id(&root).map_err(|err| AppError::io(err.to_string()))?;
+    let mut active = lock_watcher(&watcher)?;
+    // Every index pass ends here. Keep a watcher on this very directory: the
+    // file ID differs for another graph and for a folder replaced at the same
+    // path. On Linux, a dropped watcher keeps its thread and inotify fd while
+    // events keep arriving, so replacing it on every pass leaks.
+    if active.as_ref().is_some_and(|(id, _)| *id == root_id) {
+        return Ok(());
+    }
     // Drop any previous watcher first: if installing the new one fails we're then
     // left with no watcher, rather than the previous graph's still driving
     // index:changed against the now-current graph.
-    *lock_watcher(&watcher)? = None;
+    *active = None;
 
     let started = std::time::Instant::now();
     let handler_root = root.clone();
@@ -332,8 +342,7 @@ pub fn watch_start(
     })
     .map_err(|err| AppError::io(err.to_string()))?;
 
-    // Dropping any previous debouncer here stops its thread.
-    *lock_watcher(&watcher)? = Some(debouncer);
+    *active = Some((root_id, debouncer));
     drop(graph_guard);
     tracing::info!(
         elapsed_ms = started.elapsed().as_millis() as u64,
