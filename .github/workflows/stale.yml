@@ -33,7 +33,7 @@ jobs:
       - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
         with:
           any-of-labels: 'likely resolved'
-          days-before-stale: 1
+          days-before-stale: 4
           days-before-close: 7
           stale-issue-message: Thanks for the report! We believe this has been fixed, so we will close this issue in 7 days. If you still see the problem, please leave a comment and we will keep it open.
           stale-pr-message: Thank you for this PR! We believe this has been resolved, so we will close it in 7 days. If it is still needed, please leave a comment and we will keep it open.
