@@ -14,7 +14,7 @@
     "test": "vitest run --config ../../vitest.config.ts --project core"
   },
   "dependencies": {
-    "@meowdown/markdown": "^0.77.0",
+    "@meowdown/markdown": "^0.78.0",
     "@ocavue/utils": "^1.9.0",
     "@post-embed/exporter": "^0.5.0",
     "@post-embed/schema": "^0.5.2",
