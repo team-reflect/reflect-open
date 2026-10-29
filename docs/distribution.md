@@ -114,8 +114,7 @@ iPhone or iPad. The minimum iOS version is `deploymentTarget` in
 - **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`**: create the App Store
   Connect app record. Do not reuse the old Capacitor app (`app.reflect.ReflectMobile`).
 - **Duplicate build number, or an older build shows as latest**: build numbers must be unique,
-  and should increase, within one marketing version. CI uses the release commit's commit count,
-  so a duplicate on a rerun means that build is already on TestFlight.
+  and should increase, within one marketing version.
 - **A TestFlight feedback ZIP has no stack**: expected. Read Sentry, or ask for the `.ips`
   report.
 - **A crash report is unsymbolicated**: the dSYM is in the build's
