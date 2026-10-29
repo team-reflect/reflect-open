@@ -54,7 +54,7 @@ Development happens on `master` (the only long-lived branch); branch from it and
 target it with PRs. release-please keeps a beta and a stable Release PR open side by
 side; merging one publishes that channel. Between stable releases the version carries
 a prerelease suffix (`0.7.0-beta.3`), which the release pipeline publishes as GitHub
-pre-releases. See [docs/macos-distribution.md](docs/macos-distribution.md).
+pre-releases. See [docs/distribution.md](docs/distribution.md).
 
 PR titles must be conventional commits (`feat:` / `fix:` / `chore:` …, enforced by
 CI). The title becomes the squash-commit message, drives the release-please version
@@ -241,14 +241,14 @@ pnpm tauri dev        # Full Tauri app with hot reload (stages the CLI sidecar f
 pnpm tauri:dev        # `pnpm tauri dev` with the dev overlay → the "Reflect Dev" flavor (green icon, own identifier; coexists with Reflect / Reflect Beta)
 pnpm build            # turbo build pipeline → apps/desktop/dist/
 pnpm tauri build      # Native app bundle, incl. the reflect CLI sidecar
-pnpm build:macos      # Signed + notarized macOS build for distribution (docs/macos-distribution.md)
+pnpm build:macos      # Signed + notarized macOS build for distribution (docs/distribution.md)
 pnpm tauri:ios:dev "iPhone 17 Pro"  # Run the Tauri iOS target in the simulator (docs/contributing/mobile-simulator.md)
 pnpm build:ios --build-number=123   # Build and check the iOS app; `pnpm upload:testflight` uploads it
 ```
 
 The mobile app is the Tauri iOS target of `apps/desktop`. Read
 `docs/contributing/mobile-simulator.md` before committing changes under
-`apps/desktop/src-tauri/gen/apple/`, and `docs/ios-testflight.md` for TestFlight.
+`apps/desktop/src-tauri/gen/apple/`, and `docs/distribution.md` for TestFlight.
 
 # Code Conventions
 

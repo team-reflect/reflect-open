@@ -92,7 +92,7 @@ is added to [docs/privacy.md](../privacy.md)'s inventory.
   (`com.apple.security.personal-information.calendars`) and an
   `NSCalendarsFullAccessUsageDescription` string join the bundle config;
   notarization is already in place
-  ([docs/macos-distribution.md](../macos-distribution.md)).
+  ([docs/distribution.md](../distribution.md)).
 - **iOS.** EventKit is the same API on iOS, so the mobile companion
   ([plans/19-mobile.md](../plans/19-mobile.md)) inherits this integration
   rather than needing a separate "mobile sync" story like v1's Capacitor

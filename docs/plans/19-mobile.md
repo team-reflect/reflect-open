@@ -33,7 +33,7 @@ fallback with explicit triggers.
 > iCloud containers" no longer holds (one graph *open* at a time still does). The
 > formatting toolbar shipped **webview-drawn** (decision 8), spike B passed with
 > meowdown on device, and
-> the TestFlight flow exists ([docs/ios-testflight.md](../ios-testflight.md)).
+> the TestFlight flow exists ([docs/distribution.md](../distribution.md)).
 
 **Depends on:** Plans 02–05 (graph/storage, document model, index, **editor**),
 06 (daily notes/route model), 07 (backlinks/autocomplete), 08 (lexical
@@ -397,7 +397,7 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
 11. **Harden + ship.** Memory pass on a large graph (webview process limits;
     editing a very large note), resume-after-process-death recovery check,
     a11y labels, TestFlight build (`pnpm release:ios testflight`; see
-    `docs/ios-testflight.md`), then App Store submission with the review story.
+    `docs/distribution.md`), then App Store submission with the review story.
 12. **Android (fast follow, same shape).** `tauri android init`, Kotlin half
     of the keyboard plugin, keystore signing, the same frontend gate already
     matching `'android'`, Play submission. No new product surface.

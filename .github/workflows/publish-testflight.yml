@@ -54,7 +54,7 @@ jobs:
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::missing TestFlight secret(s): ${missing[*]} — see docs/ios-testflight.md"
+            echo "::error::missing TestFlight secret(s): ${missing[*]} — see docs/distribution.md"
             exit 1
           fi
 

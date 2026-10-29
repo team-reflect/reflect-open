@@ -157,7 +157,7 @@ Push notifications (no server), OAuth token exchange, Firebase everything, App-S
 | Note history UI | Git history exists; history UI deferred product-wide |
 | Push notifications | Dropped — no server |
 | Deep links (`reflect://`) | Tauri's deep-link plugin exists; not a v1 surface — revisit with the command registry |
-| TestFlight automation, timestamp build numbers | **Done** — `pnpm release:ios` + the TestFlight workflow ([docs/ios-testflight.md](./ios-testflight.md)), timestamp `CFBundleVersion`s carried over |
+| TestFlight automation, timestamp build numbers | **Done** — `pnpm release:ios` + the TestFlight workflow ([docs/distribution.md](./distribution.md)), timestamp `CFBundleVersion`s carried over |
 
 ---
 

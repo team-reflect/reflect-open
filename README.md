@@ -50,8 +50,7 @@ another git remote are connected directly by the user.
    [TestFlight](https://testflight.apple.com/join/j2eEz43d). The iOS app uses
    the same plain-file graph and sync options as the Mac app.
 3. **Windows and Linux (experimental).** Unsigned builds are attached to a
-   release when their builds succeed. See [docs/windows-builds.md](docs/windows-builds.md) and
-   [docs/linux-builds.md](docs/linux-builds.md).
+   release when their builds succeed. See [docs/distribution.md](docs/distribution.md#windows-experimental).
 4. **Install the Chrome extension.** Add
    [Reflect Capture from the Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
    to save the current page, selected text, screenshots, and optional page text
