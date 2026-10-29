@@ -22,7 +22,6 @@ import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { useAppVersion } from '@/hooks/use-app-version.ts'
-import { usePaywallRequested } from '@/hooks/use-paywall-requested.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
@@ -32,7 +31,7 @@ import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer.tsx'
 import { ConnectGitHostDrawer } from '@/mobile/connect-git-host-drawer.tsx'
 import { ConnectRepositoryDrawer } from '@/mobile/connect-repository-drawer.tsx'
 import { GithubSignInDrawer } from '@/mobile/github-sign-in-drawer.tsx'
-import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
+import { PRIVACY_POLICY_URL } from '@/mobile/legal-urls.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
 import {
@@ -45,15 +44,9 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list.tsx'
-import { useActiveSubscription } from '@/mobile/use-active-subscription.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
-import {
-  classicAccessMessage,
-  useClassicAccess,
-  useClassicSignOut,
-} from '@/mobile/use-classic-access.ts'
+import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { formatFullDate } from '@/lib/dates.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
@@ -121,43 +114,9 @@ export function MobileSettings(): ReactElement {
   const { back, canBack, navigate } = useRouter()
   const { graph, mobileStorageKind, platform } = useGraph()
   const isIos = platform === 'ios'
-  const subscription = useActiveSubscription()
-  const classicAccess = useClassicAccess()
-  const classicSignOut = useClassicSignOut()
-  const { paywall } = useMobileServices()
+  const subscriptionControls = useSubscriptionControls()
   const { opener } = useAppServices()
   const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
-  const [, setPaywallRequested] = usePaywallRequested()
-  const [restorePending, setRestorePending] = useState(false)
-  const [redeemPending, setRedeemPending] = useState(false)
-  const [subscriptionMessage, setSubscriptionMessage] = useState<string | null>(null)
-
-  const handleRestore = async (): Promise<void> => {
-    setRestorePending(true)
-    setSubscriptionMessage(null)
-    try {
-      const found = await paywall.restore()
-      if (found === null) {
-        setSubscriptionMessage('No previous purchase found for this Apple account.')
-      }
-    } catch {
-      setSubscriptionMessage('Restore failed. Check your connection and try again.')
-    } finally {
-      setRestorePending(false)
-    }
-  }
-
-  const handleRedeem = async (): Promise<void> => {
-    setRedeemPending(true)
-    setSubscriptionMessage(null)
-    try {
-      await paywall.redeemCode()
-    } catch {
-      setSubscriptionMessage('Could not open the redemption sheet. Try again.')
-    } finally {
-      setRedeemPending(false)
-    }
-  }
   const { settings, updateSettings } = useSettings()
   const [today] = useState(() => new Date())
   const version = useAppVersion()
@@ -483,79 +442,45 @@ export function MobileSettings(): ReactElement {
           </SettingsGroup>
 
           {isIos ? (
-            <SettingsGroup
-              header="Subscription"
-              footer={subscriptionMessage ?? classicAccessMessage(classicAccess)}
-            >
-              <SettingsValueRow
-                label="Plan"
-                value={
-                  subscription.value === 'monthly'
-                    ? 'Monthly'
-                    : subscription.value === 'yearly'
-                      ? 'Yearly'
-                      : classicAccess.active && classicAccess.value !== null
-                        ? `Reflect Classic, until ${formatFullDate(new Date(classicAccess.value.expiresAt), settings.dateFormat)}`
-                        : subscription.isLoading || classicAccess.isLoading
-                          ? 'Checking…'
-                          : 'Not subscribed'
-                }
-              />
-              {subscription.value === null && !classicAccess.active ? (
-                // The request flips usePaywallGate to 'show', so the gate in
-                // mobile-app.tsx replaces the app with the paywall immediately.
-                // It is what makes that work outside the App Store, where the
-                // gate otherwise never shows the paywall at all.
-                <SettingsActionRow
-                  label="Subscribe"
-                  onPress={() => {
-                    setPaywallRequested(true)
-                  }}
-                />
-              ) : subscription.value !== null ? (
+            <SettingsGroup header="Subscription" footer={subscriptionControls.message}>
+              <SettingsValueRow label="Plan" value={subscriptionControls.planLabel} />
+              {subscriptionControls.canSubscribe ? (
+                <SettingsActionRow label="Subscribe" onPress={subscriptionControls.subscribe} />
+              ) : subscriptionControls.canManage ? (
                 <SettingsActionRow
                   label="Manage Subscription"
-                  onPress={() => {
-                    opener.openUrlSync('https://apps.apple.com/account/subscriptions')
-                  }}
+                  onPress={subscriptionControls.manage}
                 />
               ) : null}
-              {classicAccess.value !== null ? (
+              {subscriptionControls.classicAccount !== null ? (
                 <>
                   <SettingsValueRow
                     label="Verified Account"
-                    value={classicAccess.value.email ?? 'Unknown'}
+                    value={subscriptionControls.classicAccount}
                   />
                   <SettingsActionRow
                     label="Remove Reflect Classic Verification"
                     tone="destructive"
-                    pending={classicSignOut.isPending}
-                    onPress={() => {
-                      classicSignOut.mutate()
-                    }}
+                    pending={subscriptionControls.removeClassicVerificationPending}
+                    onPress={subscriptionControls.removeClassicVerification}
                   />
                 </>
               ) : null}
               <SettingsActionRow
                 label="Redeem Code"
-                pending={redeemPending}
+                pending={subscriptionControls.redeemPending}
                 onPress={() => {
-                  void handleRedeem()
+                  void subscriptionControls.redeem()
                 }}
               />
               <SettingsActionRow
                 label="Restore Purchases"
-                pending={restorePending}
+                pending={subscriptionControls.restorePending}
                 onPress={() => {
-                  void handleRestore()
+                  void subscriptionControls.restore()
                 }}
               />
-              <SettingsActionRow
-                label="Terms of Use"
-                onPress={() => {
-                  opener.openUrlSync(TERMS_OF_USE_URL)
-                }}
-              />
+              <SettingsActionRow label="Terms of Use" onPress={subscriptionControls.openTerms} />
             </SettingsGroup>
           ) : null}
 

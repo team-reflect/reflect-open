@@ -45,8 +45,8 @@ Reflect presents two distinct visual worlds that share a brand color:
 
 ## Sources
 
-This system was reverse-engineered from materials the user supplied. The reader may
-not have access, but they are recorded here for provenance and deeper study:
+This system was reverse-engineered from these sources (recorded for provenance; the
+reader may not have access):
 
 - **GitHub — `team-reflect/reflect`** (private): https://github.com/team-reflect/reflect
   - `styles/tailwind.css` — the shadcn/HSL design-token root (brand, background, muted,
@@ -59,9 +59,8 @@ not have access, but they are recorded here for provenance and deeper study:
 - **Live site** — https://reflect.app (marketing copy, feature list, pricing, testimonials).
 - **Academy / docs** — https://reflect.academy
 
-> Explore the `team-reflect/reflect` repository further to build with higher fidelity —
-> the editor (`@team-reflect/reflect-editor`), preferences, and AI surfaces are deeper
-> than what is reproduced here.
+> For higher fidelity, explore `team-reflect/reflect`: its editor
+> (`@team-reflect/reflect-editor`), preferences, and AI surfaces go deeper than this kit.
 
 ---
 
@@ -176,34 +175,25 @@ circular testimonial avatars).
 
 ## ADDENDUM — V1 visual parity (June 2026)
 
-The desktop app's chrome was restyled to match Reflect V1 exactly. That pass added
-tokens and pinned down conventions that earlier drafts of this guide left implicit.
-Everything below lives in `tokens/colors.css` / `tokens/typography.css` and is mapped
-to Tailwind utilities in the desktop app's `@theme inline` block.
+The desktop app's chrome was restyled to match Reflect V1 exactly. The new tokens live
+in `tokens/colors.css` / `tokens/typography.css` (values and comments there) and map to
+Tailwind utilities in the desktop app's `@theme inline` block.
 
-**New color tokens.**
-- `--surface-inverse` — V1's near-black-blue selection fill (`hsl(222.2 47.4% 11.2%)`;
-  dark mode: indigo-500). Used for the calendar's **selected-day square**: a 32×32px
-  `radius-md` block behind the day number.
-- `--text-on-inverse` — the near-white number on that square (`hsl(210 40% 98%)`,
-  both modes), set **bold** when selected.
-- `--surface-active` — *today's* calendar square when not selected: the same grey wash
-  as hover (`rgba(229,231,235,.5)`; dark `rgba(55,65,81,.5)`).
-- Light `--border` moved from `coolgray-200` → **`coolgray-100`** (V1's hairline).
-  This is deliberate and global: V1 sets every divider at gray-100.
-- Dark `--surface-hover` tightened to `rgba(255,255,255,.03)` and dark
-  `--border-strong` to `rgba(255,255,255,.05)` — V1's exact dark-mode opacities.
+**Color tokens.**
+- `--surface-inverse` / `--text-on-inverse`: the calendar's **selected-day square**
+  (a 32×32px `radius-md` block) and its **bold** day number.
+- `--surface-active`: *today's* calendar square when not selected (the hover wash).
+- Light `--border` moved from `coolgray-200` → **`coolgray-100`**. This is deliberate
+  and global: V1 sets every divider at gray-100.
+- Dark `--surface-hover` and `--border-strong` match V1's exact dark-mode opacities.
 
-**New shadow token.** `--shadow-app-input` — V1's signature five-layer stacked shadow
-for the search field (`0 1px 0 -1px` … `0 3px 6px -3px`, each `rgba(0,0,0,.05)`;
-`.10` in dark). It reads as one soft, crisp lift; pair it with the field's `7px`
-radius and `--border-strong` outline.
+**Shadow token.** `--shadow-app-input`: V1's five-layer search-field shadow. Pair it with
+the field's `7px` radius and `--border-strong` outline.
 
-**New type tokens.** `--font-shortcut` — `system-ui`-first stack so keyboard glyphs
+**Type tokens.** `--font-shortcut` is a `system-ui`-first stack so keyboard glyphs
 (⌘ ⌥ ⇧) render cleanly. Shortcut hints come in two styles: **keycaps** (bordered
 `<kbd>` chips, revealed on row hover) and **ghost** (borderless 12px uppercase text in
-`--font-shortcut`, always visible — the search field's `⌘K`). The desktop app also
-exposes `text-2xs` (12px) as a Tailwind utility; note the scale's intent — **13px
+`--font-shortcut`, always visible, like the search field's `⌘K`). Use **13px
 (`--text-xs`) for sidebar note rows and labels, 12px (`--text-2xs`) for section
 headers, ghost hints, and meta**.
 
@@ -252,37 +242,15 @@ that matches Reflect's weight and style almost exactly (`search`, `pencil`, `lis
 need pixel-exact brand icons. Set `stroke-width: 1.75` to match.
 
 > **Update (V1 parity pass):** the desktop app now vendors the real V1 SVGs in
-> `apps/desktop/src/components/icons/` — `pencil`, `list`, `search`, `help`, `pin`,
-> `calendar`, `chevron-left/right`, plus a heroicons-traced `arrow-uturn-left` (the
-> similar-notes return arrow, rendered flipped via `-scale-x-100`). All are 24×24
-> `currentColor` fills (the magnifier is a 1.5px stroke). Prefer these over Lucide in
-> product chrome; Lucide remains the stand-in for glyphs without a V1 equivalent
-> (e.g. `square-pen` for New note, `settings`), sized 16px inside a 24px box.
+> `apps/desktop/src/components/icons/`. Prefer these over Lucide in product chrome;
+> Lucide remains the stand-in for glyphs without a V1 equivalent (e.g. `square-pen`
+> for New note, `settings`), sized 16px inside a 24px box.
 
 ---
 
-## Index / manifest
+## Index
 
-**Root**
-- `styles.css` — global entry point (link this); `@import`s every token + font file.
-- `readme.md` — this guide.
-- `SKILL.md` — Agent-Skill manifest for using this system in Claude Code.
-
-**`tokens/`** — CSS custom properties (all reachable from `styles.css`)
-- `fonts.css` — Inter Variable `@font-face`.
-- `colors.css` — indigo & cool-grey ramps, marketing purples, semantic aliases;
-  `.dark` and `.reflect-space` theme scopes.
-- `typography.css` — families, type scale, weights, line-heights, tracking.
-- `spacing.css` — 4px spacing scale, radii, shadows, layout widths, motion.
-
-**`assets/`**
-- `fonts/InterVariable.woff2`, `fonts/InterVariable-Italic.woff2`
-- `reflect-app-icon.png` (rounded graph sphere), `reflect-app-icon-square.png`,
-  `reflect-graph-hero.png` (graph-on-grid hero), `reflect-logo-mark.png`.
-
-**`components/core/`** — reusable React primitives (see each `.prompt.md`):
-Button, IconButton, Input, SearchField, Checkbox, Badge, Card, Avatar, MenuItem,
-ShortcutKey, Toggle. *(populated below)*
+The file map is in `SKILL.md`.
 
 > **Consuming this package:** `@reflect/design-system` exports **only**
 > `styles.css`, `tokens/*`, and `assets/*` (see `package.json`). The `.jsx`
@@ -292,11 +260,3 @@ ShortcutKey, Toggle. *(populated below)*
 > Tailwind theme keys (`@theme inline` in its `styles/index.css`), so product
 > code writes `text-text-muted` / `bg-surface-hover` instead of raw `var(--…)`
 > escapes.
-
-**`guidelines/`** — foundation specimen cards (Design System tab).
-
-**`ui_kits/`**
-- `app/` — the Reflect notes app (sidebar + daily notes + editor + ⌘K search).
-- `marketing/` — the deep-space marketing homepage.
-
-See `SKILL.md` for how to use this as a downloadable Agent Skill.

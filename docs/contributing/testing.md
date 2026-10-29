@@ -72,25 +72,23 @@ const core = createTestCoreServices({ noteFile })
 ```
 
 `createTestAppServices(core, overrides)` (`packages/app/src/testing/services.ts`)
-builds `AppServices` over `core`.
-It shares the core's test platform, activity port and `progress` port, and
-picks a note-window test window when `core.role` is `'note-window'`.
+builds `AppServices` over `core`, sharing its platform and ports.
 
 ## Testing React code
 
 Components read `useCoreServices()` and `useAppServices()`, which throw
-outside their providers. Every desktop test that renders goes through `renderInApp(ui, options)` or `renderHookInApp(hook, options)` in
-`apps/desktop/src/test-utils/render-in-app.tsx`. They mount both service
-providers, a query client, the real `GraphProvider` and `RouterProvider`, and
-register the app commands, as `main.tsx` does. The options are documented on
+outside their providers. Every desktop test that renders goes through
+`renderInApp(ui, options)` or `renderHookInApp(hook, options)`
+(`apps/desktop/src/test-utils/render-in-app.tsx`), which mount the app's
+providers as `main.tsx` does. The options are documented on
 `RenderInAppOptions`.
 
 The result holds two containers:
 
 - `core`: the core container (default: `createTestCoreServices()` over a wasm
-  database). Drive and
-  observe the graph, settings and progress here: `core.graphSession.setGraph()`,
-  `core.settings.saves()`, `core.progress.getAll()`.
+  database). Drive and observe the graph, settings and progress here:
+  `core.graphSession.setGraph()`, `core.settings.saves()`,
+  `core.progress.getAll()`.
 - `appServices`: the app layer, built with `createTestAppServices(core, options.appServices)`.
   Assert navigation with `appServices.navigation.navigations()`.
 
@@ -112,8 +110,9 @@ vi.spyOn(core.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.prom
 await renderInApp(<RebuildIndexField />, { core, graph: { indexGeneration: 7 } })
 ```
 
-With your own `core`, put the platform and the backup in it yourself. The
-helper throws if you also pass `platform` or `sync`.
+With your own `core`, put the platform, the git sync service and the
+connectors in it yourself. The helper throws if you also pass `platform` or
+`sync`.
 
 `database` is required: a Node.js test passes
 `createNodeTestDatabaseService()`, a desktop browser test passes

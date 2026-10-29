@@ -1,5 +1,5 @@
 // Builds a signed, notarized macOS app and DMG. The shipped executables are
-// stripped; their symbols stay in dSYMs. See docs/macos-distribution.md.
+// stripped; their symbols stay in dSYMs. See docs/distribution.md.
 //
 //   pnpm build:macos [flags]
 //

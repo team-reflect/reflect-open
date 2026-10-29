@@ -4,13 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitSyncState, Settings } from '@reflect/core'
 import {
   createTestAppInfoService,
+  createTestAppStoreService,
+  createTestClassicAccessService,
   createTestCoreServices,
   createTestGitSyncService,
   createTestGitHostConnector,
+  createTestPlatformService,
+  createTestSubscriptionService,
   seedNotes,
+  type TestClassicAccessService,
+  type TestSubscriptionService,
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
-import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
+import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileSettings } from './settings.tsx'
 
@@ -60,6 +67,18 @@ interface MountOptions {
    * Whether the device is signed in to GitHub. Signed in by default.
    */
   githubSignedIn?: boolean
+  /**
+   * Run as the iOS app, which adds the Subscription group.
+   */
+  ios?: boolean
+  /**
+   * The App Store subscription StoreKit reports; none by default.
+   */
+  subscription?: TestSubscriptionService
+  /**
+   * The Reflect Classic grant; none by default.
+   */
+  classicAccess?: TestClassicAccessService
 }
 
 /**
@@ -70,13 +89,18 @@ async function mount(options?: MountOptions) {
     state: options?.gitSync ?? connected({ state: 'idle' }),
   })
   const gitHostConnector = createTestGitHostConnector()
+  const appStore = createTestAppStoreService()
   const core = createTestCoreServices({
+    appStore,
     database: createWasmTestDatabaseService(),
     appInfo: createTestAppInfoService('1.2.3-beta.4'),
     gitSync,
     gitHostConnector,
     // A note window's graph runs no sync lifecycle.
     role: options?.gitSync === null ? 'note-window' : 'main',
+    ...(options?.ios ? { platform: createTestPlatformService(MOBILE_PLATFORM) } : {}),
+    ...(options?.subscription === undefined ? {} : { subscription: options.subscription }),
+    ...(options?.classicAccess === undefined ? {} : { classicAccess: options.classicAccess }),
   })
   if (options?.githubSignedIn !== false) {
     await core.githubAuth.save({ kind: 'pat', token: 'ghp_test' })
@@ -94,7 +118,7 @@ async function mount(options?: MountOptions) {
     route: { kind: 'settings' },
     ...(options?.settings === undefined ? {} : { settings: options.settings }),
   })
-  return Object.assign(view, { gitSync, gitHostConnector, updateSettings })
+  return Object.assign(view, { gitSync, gitHostConnector, updateSettings, appStore })
 }
 
 type MountedSettings = Awaited<ReturnType<typeof mount>>
@@ -597,5 +621,88 @@ describe('MobileSettings', () => {
     await expect.element(page.getByText('2', { exact: true })).toBeVisible() // the note count
     await expect.element(page.getByText('Up to date')).not.toBeInTheDocument()
     await expect.element(page.getByRole('button', { name: 'Stop syncing' })).not.toBeInTheDocument()
+  })
+})
+
+describe('MobileSettings subscription', () => {
+  it('offers Subscribe until a plan is active', async () => {
+    await mount({ ios: true })
+
+    await expect.element(page.getByText('Not subscribed')).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Subscribe' })).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: 'Manage Subscription' }))
+      .not.toBeInTheDocument()
+  })
+
+  it('names an App Store plan and opens its management page', async () => {
+    const view = await mount({
+      ios: true,
+      subscription: createTestSubscriptionService({ value: 'yearly' }),
+    })
+
+    await expect.element(page.getByText('Yearly')).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Subscribe' })).not.toBeInTheDocument()
+    await userEvent.click(page.getByRole('button', { name: 'Manage Subscription' }))
+    expect(view.appServices.opener.openedUrls()).toContain(
+      'https://apps.apple.com/account/subscriptions',
+    )
+  })
+
+  it('restores through the App Store and says when nothing was found', async () => {
+    const view = await mount({ ios: true })
+
+    await userEvent.click(page.getByRole('button', { name: 'Restore Purchases' }))
+
+    await expect
+      .element(page.getByText('No previous purchase found for this Apple account.'))
+      .toBeVisible()
+    expect(view.appStore.calls()).toContain('sync')
+  })
+
+  it('redeems a code through the App Store’s offer code sheet', async () => {
+    const view = await mount({ ios: true })
+
+    await userEvent.click(page.getByRole('button', { name: 'Redeem Code' }))
+
+    await vi.waitFor(() => {
+      expect(view.appStore.calls()).toContain('presentOfferCodeRedeemSheet')
+    })
+  })
+
+  it('opens the terms of use', async () => {
+    const view = await mount({ ios: true })
+
+    await userEvent.click(page.getByRole('button', { name: 'Terms of Use' }))
+
+    expect(view.appServices.opener.openedUrls()).toContain(TERMS_OF_USE_URL)
+  })
+
+  it('names a Reflect Classic grant and removes its verification', async () => {
+    const classicAccess = createTestClassicAccessService({
+      access: {
+        token: 'classic-token',
+        email: 'alex@example.com',
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        checkedAt: Date.now(),
+      },
+      active: true,
+      isLoading: false,
+    })
+    await mount({ ios: true, classicAccess })
+
+    await expect.element(page.getByText(/Reflect Classic, until /)).toBeVisible()
+    await expect.element(page.getByText('alex@example.com')).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Subscribe' })).not.toBeInTheDocument()
+    await userEvent.click(page.getByRole('button', { name: 'Remove Reflect Classic Verification' }))
+
+    await vi.waitFor(() => expect(classicAccess.calls()).toContain('signOut'))
+    // The grant is gone, so the group offers the paywall again.
+    await expect.element(page.getByText('Not subscribed')).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Subscribe' })).toBeVisible()
+    await expect.element(page.getByText('alex@example.com')).not.toBeInTheDocument()
+    await expect
+      .element(page.getByRole('button', { name: 'Remove Reflect Classic Verification' }))
+      .not.toBeInTheDocument()
   })
 })

@@ -10,14 +10,6 @@ Mobile-only: `apps/desktop/src-tauri` depends on this crate for iOS/Android
 targets only and registers it under `#[cfg(mobile)]`. Android has no
 implementation yet and fails the build on purpose (`src/mobile.rs`).
 
-## Layers
-
-| Layer | Path |
-| --- | --- |
-| Rust crate (command routing, desktop stub) | `src/` |
-| Swift implementation | `ios/Sources/MobileHapticsPlugin.swift` |
-| TypeScript bindings | `packages/core/src/ipc/haptics-service.ts` |
-
 ## Changing the command surface
 
 Adding, renaming, or removing a command must update, in the same PR:

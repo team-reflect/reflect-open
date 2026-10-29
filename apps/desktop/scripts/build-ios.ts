@@ -1,5 +1,5 @@
 // Builds the iOS app and checks the IPA and its dSYM. `pnpm upload:testflight`
-// uploads the result. See docs/ios-testflight.md.
+// uploads the result. See docs/distribution.md.
 //
 //   pnpm build:ios --build-number=<digits>
 //

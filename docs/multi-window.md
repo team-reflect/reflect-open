@@ -1,38 +1,31 @@
 # Multiple windows & cross-window communication
 
-Modifier-click a note reference anywhere it appears in the app — editor
-`[[wiki links]]`, backlinks, pinned notes, calendar days, search/palette
-results, and other note lists — or run the selected-note command, and the note
-opens in its own chrome-free window: just the editor with its backlinks, no
-sidebar, palette, or context panel. In-note `reflect://` links follow the same
-convention. This document describes how those windows relate to the main
-window and to each other.
+Modifier-click a note reference anywhere in the app (editor `[[wiki links]]`,
+backlinks, pinned notes, calendar days, search/palette results, other note
+lists), or run the selected-note command, and the note opens in its own
+chrome-free window: the editor with its backlinks, no sidebar, palette, or
+context panel. In-note `reflect://` links follow the same convention.
 
-Two ideas carry the whole design:
+Two ideas carry the design:
 
 1. **Adoption, never re-open.** Rust's session states (`GraphState`,
    `IndexState`) are app-wide singletons whose generations bump on every
-   open, invalidating everything pinned to the previous session. A secondary
-   window therefore never runs `graph_open`/`index_open`; it *adopts* the
-   main window's live sessions through a pure read (`window_bootstrap`).
+   open, invalidating everything pinned to the previous session. So a
+   secondary window never runs `graph_open`/`index_open`; it *adopts* the main
+   window's live sessions through a pure read (`window_bootstrap`).
 2. **User actions work in any window; app-wide singletons run only in
-   main.** Editing, recording an audio memo, chatting — all fine anywhere.
-   Background machinery that must exist exactly once — sync, the capture
-   drain, the indexer, AI reconcilers — belongs to the main window, and a
-   note-window edit reaches that machinery the same way an external edit
-   does: through the file watcher.
+   main.** Editing, audio memos, and chat work anywhere. Machinery that must
+   exist once (sync, the capture drain, the indexer, AI reconcilers) belongs to
+   main, and a note-window edit reaches it the way an external edit does:
+   through the file watcher.
 
 ## Window roles
 
-The webview's Tauri label decides the role: `main` is the config-declared
-window; note windows normally get content-addressed `note-<hash(deep link)>`
-labels, with a numeric suffix when opening the target requires a distinct
-destination. An app-wide registry remembers the preferred window for each
-target. The frontend reads the role via `WindowService.isMainWindow()`
-(`packages/app/src/app/window-service.ts`, `useAppServices().window`).
-Environments without native windows — browser dev, tests, the `?platform=ios`
-harness — get the single-window host (`createSingleWindowHost`), whose label is
-`main`: they are all single-window.
+The Tauri label decides the role: `main` is the config-declared window; note
+windows get content-addressed `note-<hash(deep link)>` labels, with a numeric
+suffix when a distinct destination is needed. Environments without native
+windows (browser dev, tests, the `?platform=ios` harness) are single-window and
+labelled `main`.
 
 | Runs where?          | main window | note window |
 | -------------------- | ----------- | ----------- |
@@ -44,162 +37,109 @@ harness — get the single-window host (`createSingleWindowHost`), whose label i
 | Update checks, OS deep-link intake                | ✓ | — |
 | Graph management (open / switch / delete)         | ✓ | refused |
 
-The gate is structural: `createAppGraphServices` (`@reflect/app`) turns on the
-per-graph background lifecycles only for the main window's role, so a new one
-declares its ownership rather than remembering a guard. A note window's deep
-link intake has no OS source, and `UpdateService.start` does nothing there. Graph-mutating
-actions are refused off-main in `GraphSessionService` (`role !== 'main'`) —
-opening a graph from a note window would re-root the shared `GraphState`
-under every window at once.
+The gate is structural: `createAppGraphServices` (`@reflect/app`) starts the
+per-graph background lifecycles only for main, so a new lifecycle declares its
+ownership instead of remembering a guard. Graph-mutating actions are refused
+off-main because opening a graph from a note window would re-root the shared
+`GraphState` under every window at once.
 
 ## Opening a window
 
-The main workspace also exposes `note.openInNewWindow` at Cmd/Ctrl+Shift+O.
-It targets `CommandContext.notePath()`, so the focused day in the daily stream
-and an ordinary routed note both open through the same mechanism described
-below. The command is also exposed in the native Window menu.
+Triggers: a mod-click (Cmd on Apple, Ctrl elsewhere), Mod+Enter on a selected
+link or a highlighted palette result, or `note.openInNewWindow`
+(Cmd/Ctrl+Shift+O, also in the native Window menu). Each UI boundary turns its
+gesture into an explicit `openInNewWindow` flag, and meowdown's `isModEvent`
+backs them all. Navigation goes through `LinkNavigationService`
+(`packages/app/src/navigation/link-navigation-service.ts`).
 
-1. A mod-click (the platform's mod key: Cmd on Apple, Ctrl elsewhere), or a
-   Mod+Enter press on a selected link unit or on the highlighted note in the
-   command palette, asks for a new window. Each UI
-   boundary turns its own gesture into the explicit `openInNewWindow` flag
-   the navigation chain carries, and one definition backs them all:
-   meowdown's `isModEvent` reads plain DOM row clicks, and the editor's own
-   `mod` follow flag comes from the same helper (a caret follow, which since
-   meowdown 0.65 fires only with the caret strictly inside a tag or
-   Markdown link, consumed its mod key as the trigger and reports false).
-   The flag then resolves the target as usual. Resolved note
-   references share `useNoteLinkNavigation`, which applies the convention and
-   delegates to `openRouteInNewWindow`; raw in-note links use
-   `openDeepLinkInNewWindow` (both on `LinkNavigationService`,
-   `packages/app/src/navigation/link-navigation-service.ts`). Routes
-   serialize through the existing deep-link grammar (`deepLinkForRoute`);
-   capture links (`append`, `task`) are writes, not places, and never
-   window-ify. A declined or failed open falls back to in-window navigation
-   while its originating link intent remains current; a newer navigation drops
-   the late fallback instead of pulling the source window somewhere stale.
-2. `open_note_window` (`src-tauri/src/windows.rs`) refuses without an open
-   graph, after a graph switch, or while a quit is in flight. An app-wide
-   creation gate serializes target selection and Tauri's non-atomic native
-   build, then the registry selects the target's preferred destination, stores
-   the deep link in `WindowInit`'s label-keyed one-shot bootstrap map, and
-   builds the window — cascade offset by the live note-window count, main-window
-   chrome (overlay titlebar, native drag-drop off), excluded from window-state
-   tracking. The invoking window is never a valid destination. If it was
-   preferred for that target, a distinct suffixed `note-*` window is created
-   and becomes preferred instead.
-3. The new webview boots the ordinary desktop tree. `GraphProvider` sees a
-   non-main label and takes the adoption leg (`GraphBootService.boot`):
-   `window_bootstrap` returns the graph info + index generation (unbumped —
-   pinned by the `session_adoption_reads_never_bump_generations` test) and
-   drains the pending deep link. Because ⌘-click builds **path-shaped**
-   links, the route usually derives synchronously
-   (`initialRouteForDeepLink`) and seeds the router directly — the window's
-   first workspace render is already the clicked note, no flash of today's
-   daily note. Only a target that needs the index (an id/title-shaped link)
-   rides the normal deep-link intake, buffering until the workspace's
-   `DeepLinkProvider` attaches — the same path an OS-delivered `reflect://`
-   URL takes, including `openNote` resolution and error surfacing.
-4. The window renders `NoteWindowContent`: the routed view only, with daily
-   targets shown as a single lazy `NotePane` (a daily is treated like any
-   other note here, day label standing in for the title). The OS window
-   title follows the shown note (`useNoteWindowTitle`).
-
-A bootstrap failure (racing a graph switch) parks the window on an error
-screen — never the chooser, which could re-root every other window.
+- Routes serialize through the deep-link grammar. Capture links (`append`,
+  `task`) are writes, not places, and never open a window.
+- A declined or failed open falls back to in-window navigation, unless a newer
+  navigation has happened, so a late fallback never pulls the source window
+  somewhere stale.
+- `open_note_window` (`src-tauri/src/windows.rs`) refuses without an open
+  graph, after a graph switch, or during a quit. An app-wide gate serializes
+  target selection and Tauri's non-atomic window build.
+- Reopening a target focuses its preferred window. The invoking window is never
+  a destination: if it was preferred, a new suffixed window is created and
+  becomes preferred, so modifier-open never redirects its source.
+- ⌘-click builds **path-shaped** links, so the route usually derives
+  synchronously and the window's first render is already the clicked note, with
+  no flash of today's daily. Only id/title-shaped links wait for the normal
+  deep-link intake.
+- A bootstrap failure (racing a graph switch) parks the window on an error
+  screen, never the chooser, which could re-root every other window.
 
 ## How windows communicate
 
-All cross-window signals are **Tauri events emitted from Rust**; the
-frontends never talk to each other directly. In-process signals
-(`IndexLifecycleService.onApplied`, `NoteMoveService.onMoved`) do not cross webviews — that
-asymmetry is what each broadcast below exists to bridge.
+All cross-window signals are **Tauri events emitted from Rust**; frontends never
+talk directly. In-process signals (`IndexLifecycleService.onApplied`,
+`NoteMoveService.onMoved`) do not cross webviews, and each broadcast below
+bridges that gap.
 
-| Event | Emitted by | Consumed by | Purpose |
-| ----- | ---------- | ----------- | ------- |
-| `index:changed` | file watcher (`watcher.rs`) | every window | Open editors reconcile external changes; the main window's indexer applies the batch. Pre-dates multi-window; note windows get editor freshness from it for free. |
-| `index:written` | index write commands after a **committed** write (`db/mod.rs`) | note windows only | Refetch index-backed queries (backlinks, lists). The main window invalidates in-process via its indexer and must not subscribe — it would refetch twice. |
-| `note:moved` | `note_move_indexed` / `index_move` after rows commit | **every** window (`desktop-root.tsx`) | Retarget open sessions + router history after a rename. Renames can originate in any window (a title edit), and a window left behind would resurrect the dead path on its next save. The origin window's in-process handling makes the echo idempotent. |
-| `window:navigate` | `open_note_window` on a preferred-destination hit (targeted `emit_to`) | that note window | Reopening a target focuses its window *and* re-navigates it there — it may have browsed elsewhere since opening. The invoking window is excluded, so modifier-open never redirects its source. |
-| `app:quit-requested` | the run loop on a deferred ⌘Q (`lib.rs`) | every window | Each window flushes its own dirty buffers, then confirms. |
+| Event | Consumed by | Purpose |
+| ----- | ----------- | ------- |
+| `index:changed` | every window | Open editors reconcile external changes; main's indexer applies the batch. Note windows get editor freshness from it for free. |
+| `index:written` | note windows only | Refetch index-backed queries after a **committed** write. Main invalidates in-process and must not subscribe, or it would refetch twice. |
+| `note:moved` | **every** window | Retarget sessions and router history after a rename. A rename can start in any window, and a window left behind would resurrect the dead path on its next save. |
+| `window:navigate` | the target note window | Reopening a target re-navigates its window, which may have browsed elsewhere. |
+| `app:quit-requested` | every window | Each window flushes its own dirty buffers, then confirms. |
 
-The write path that ties it together: a note window saves via the ordinary
-generation-pinned `note_write` → the watcher reports the file → the main
-window indexes it → `index:written` broadcasts → other note windows refetch.
-A note-window edit is indistinguishable from an external edit by design; no
-new sync or indexing paths exist.
+A note window saves via the ordinary `note_write`, the watcher reports the file,
+main indexes it, and `index:written` tells other note windows to refetch. A
+note-window edit is indistinguishable from an external edit by design; no new
+sync or indexing paths exist.
 
-### Deep-link intake scoping
-
-The intake (`DeepLinkIntakeService` in `packages/core/src/navigation/deep-link-intake-service.ts`) is per-webview state.
-Every window attaches a handler (in-note `reflect://` clicks must work
-everywhere), but only the main window starts the **OS** listener — the
-plugin's event stream reaches every webview, and N windows must not all
-navigate on one OS-delivered URL. Handler staleness is scoped to the *graph
-session* (generation), not the effect lifetime: StrictMode's probe cycle
-detaches/reattaches around in-flight resolutions, and an effect-scoped flag
-silently dropped the note window's initial link.
+Deep-link intake is per-webview. Every window handles in-note `reflect://`
+clicks, but only main starts the **OS** listener: the plugin's stream reaches
+every webview, and N windows must not all navigate on one URL. Handler
+staleness is scoped to the graph session, not the effect lifetime: StrictMode's
+detach/reattach cycle made an effect-scoped flag drop the note window's initial
+link.
 
 ## Quit & close
 
-- **Window close (⌘W / red button):** each webview's `onCloseRequested`
-  flushes its own note buffers and settings; the backup commit hook is only
-  registered in main. On macOS the main window prevents destruction and hides
-  after flushing, so closing the last window leaves Reflect running like a
-  native Mac app. Note windows still close normally. Per-window JS state makes
-  both paths correct with no coordination.
-- **Destroying the main window closes every note window.** This is a fallback
-  for shell-driven teardown rather than the macOS user-close path (which hides
-  main). Note windows adopt main's graph session and would degrade silently
-  without it — edits still land on disk, but nothing indexes, syncs, or
-  propagates renames. Rather than run in that half-alive state, they close with
-  their owner (via `close()`, so each child's flush runs exactly like ⌘W — no
-  data loss).
-- **Switching or deleting the graph closes note windows first.** They
-  adopted the outgoing session, so `GraphBootService` awaits
-  `close_note_windows` **before** anything bumps the generations: each
-  child's flush runs against the still-valid session, and a destroyed
-  webview implies its flush landed (close-requested defers destruction until
-  the handler resolves). Bump-first ordering would reject their final saves
-  as stale. The wait is bounded — a wedged child can't block the switch.
-- **App quit (⌘Q):** the run loop defers the exit, arms `QuitState` with the
-  **labels** of every live webview, and emits `app:quit-requested`. Every
-  window flushes and calls `quit_confirm`; settling the *last owed label*
-  exits. Labels, not a counter: a window that confirms and is then
-  destroyed — or re-confirms after a second ⌘Q — must count once, never
-  spending another window's obligation while it is still mid-flush. A window
-  destroyed mid-handshake settles its own label so survivors can't hang, and
-  `open_note_window` refuses while armed so no webview is born outside the
-  pending set.
+- **Window close (⌘W / red button):** each webview flushes its own buffers and
+  settings; the backup commit hook lives only in main. On macOS, main hides
+  instead of closing, so closing the last window leaves Reflect running like a
+  native Mac app.
+- **Destroying main closes every note window** (a fallback for shell-driven
+  teardown). Without main, note windows would degrade silently: edits land on
+  disk, but nothing indexes, syncs, or propagates renames. They close via
+  `close()`, so each flush runs as on ⌘W.
+- **Switching or deleting the graph closes note windows first**, before
+  anything bumps the generations, so their final saves run against the
+  still-valid session. Bump-first ordering would reject them as stale. The wait
+  is bounded, so a wedged child can't block the switch.
+- **App quit (⌘Q):** the run loop defers the exit, records the **labels** of
+  every live webview, and emits `app:quit-requested`. The app exits when the
+  last owed label confirms. Labels, not a counter: a window that confirms and
+  is then destroyed, or confirms twice after a second ⌘Q, must count once. A
+  window destroyed mid-handshake settles its own label so survivors can't
+  hang, and `open_note_window` refuses during the handshake so no webview is
+  born outside the pending set.
 
 ## SQLite & contention
 
-All windows in one process share the single Rust index connection — there is
-no per-window database state, so multi-window adds no lock contention. A
-*second process* on the same graph (another app flavor, the `reflect` CLI)
-can contend; the writer connection carries a 5s `busy_timeout`
-(`crates/index-schema`) so cross-process locks wait instead of failing with
-`database is locked`.
+All windows share the single Rust index connection, so multi-window adds no lock
+contention. A *second process* on the same graph (the `reflect` CLI) can contend;
+the writer's 5s `busy_timeout` (`crates/index-schema`) makes it wait instead of
+failing with `database is locked`.
 
 ## Deliberate v1 limits
 
-- Note windows are **same-graph only**; switching graphs lives in main.
-- Note windows close if the main window is destroyed (above) — "promote a note
-  window to session owner", which would let one survive as a focus surface,
-  is the eventual alternative if that usage ever matters.
-- The same note open in two windows converges through the existing
-  external-change reconciliation, the same path an iCloud edit takes.
-- The native macOS application menu is installed by the main window only.
-  Menu action channels belong to the webview that creates them; letting a
-  chrome-free note window replace the app-wide menu would leave command items
-  with no `useAppShortcuts` dispatcher.
-- A note window's settings screen shows sync as loading (it creates no
-  backup service, on purpose).
-- **Settings are effectively main-window-owned.** Note windows mount no
-  settings-writing surface (no sidebar/palette/shortcuts/settings route),
-  so their quit-time `settings.flush()` is a no-op — `SettingsService`
-  only writes when the window's own doc diverged from its confirmed
-  baseline. Constraint for future work: settings saves are full-document,
-  so before any surface lets a note window call `updateSettings`, add a
-  `settings:changed` broadcast (à la `index:written`) or a stale-base save
-  would revert other windows' changes.
+- Note windows are **same-graph only**.
+- Note windows close with main. "Promote a note window to session owner" is the
+  alternative if a surviving focus window ever matters.
+- The same note in two windows converges through external-change
+  reconciliation, the same path an iCloud edit takes.
+- Only main installs the native macOS menu. Menu action channels belong to the
+  webview that creates them, so a note window's menu would have no
+  `useAppShortcuts` dispatcher.
+- A note window's settings screen shows sync as loading (it creates no backup
+  service, on purpose).
+- **Settings are main-window-owned.** Note windows mount no settings-writing
+  surface, so their quit-time flush writes nothing. Settings saves are
+  full-document: before any surface lets a note window call `updateSettings`,
+  add a `settings:changed` broadcast, or a stale-base save would revert other
+  windows' changes.
