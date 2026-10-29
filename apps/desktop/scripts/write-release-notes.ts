@@ -113,7 +113,7 @@ for (const { heading, icon, badges } of PLATFORMS) {
   const markdown = badges
     .filter((badge) => badge.file === undefined || assetNames.includes(badge.file))
     .map((badge) => {
-      const image = `https://badgen.net/badge/${encodeURIComponent(badge.variant)}/${encodeURIComponent(tag)}/${badge.color}?icon=${icon}`
+      const image = `https://badgen.net/badge/${encodeURIComponent(tag)}/${encodeURIComponent(badge.variant)}/${badge.color}?icon=${icon}`
       const url = badge.url ?? `https://github.com/${repo}/releases/download/${tag}/${badge.file}`
       return `[![${heading} ${badge.variant}](${image})](${url})`
     })
