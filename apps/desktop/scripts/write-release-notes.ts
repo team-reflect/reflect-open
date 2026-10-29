@@ -49,7 +49,10 @@ const assetNames = release.assets.map((item) => item.name)
  * A badge links either to an installer `file` on the release, shown only when
  * the release has it, or to an outside `url`.
  */
-type Badge = { variant: string; color: string } & ({ file: string } | { url: string })
+type Badge = { variant: string; color: string } & (
+  | { file: string; url?: undefined }
+  | { url: string; file?: undefined }
+)
 
 const PLATFORMS: { heading: string; icon: string; badges: Badge[] }[] = [
   {
@@ -98,7 +101,7 @@ const PLATFORMS: { heading: string; icon: string; badges: Badge[] }[] = [
 ]
 
 const files = PLATFORMS.flatMap((platform) => {
-  return platform.badges.flatMap((badge) => ('file' in badge ? badge.file : []))
+  return platform.badges.flatMap((badge) => badge.file ?? [])
 })
 if (!files.some((file) => assetNames.includes(file))) {
   fail(`no installer among the asset names. Expected: ${files.join(', ')}`)
@@ -108,13 +111,10 @@ let section =
   '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n\n| Platform | Download |\n| --- | --- |\n'
 for (const { heading, icon, badges } of PLATFORMS) {
   const markdown = badges
-    .filter((badge) => !('file' in badge) || assetNames.includes(badge.file))
+    .filter((badge) => badge.file === undefined || assetNames.includes(badge.file))
     .map((badge) => {
       const image = `https://badgen.net/badge/${encodeURIComponent(badge.variant)}/${encodeURIComponent(tag)}/${badge.color}?icon=${icon}`
-      const url =
-        'file' in badge
-          ? `https://github.com/${repo}/releases/download/${tag}/${badge.file}`
-          : badge.url
+      const url = badge.url ?? `https://github.com/${repo}/releases/download/${tag}/${badge.file}`
       return `[![${heading} ${badge.variant}](${image})](${url})`
     })
   if (markdown.length > 0) {
