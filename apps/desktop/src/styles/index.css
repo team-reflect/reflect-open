@@ -328,9 +328,10 @@ html:root {
   --meowdown-h1-size: var(--text-note-subject);
   --meowdown-h2-size: var(--text-lg);
   --meowdown-h3-size: var(--text-base);
-  --meowdown-h4-size: var(--text-base);
-  --meowdown-h5-size: var(--text-base);
-  --meowdown-h6-size: var(--text-base);
+  /* TODO: replace the hard-coded 15px with a design-system token. */
+  --meowdown-h4-size: 0.9375rem;
+  --meowdown-h5-size: var(--text-sm);
+  --meowdown-h6-size: var(--text-xs);
   --meowdown-code-block-margin-block: 0.5rem;
   --meowdown-code-block-padding-block: 0.75rem;
   --reflect-list-marker-width: 1.15lh;
@@ -375,8 +376,8 @@ html:root {
    variables above: the leading H1 is the document title (the regular-note
    subject, matching the daily date subject), H2 and H3 step down the type scale
    so a section heading reads as subordinate to the title. Auto-appended
-   sections (`## [[Links]]`, `## [[Audio memos]]`) land at H2; H3 to H6 sit at
-   body size, carried by weight rather than scale. */
+   sections (`## [[Links]]`, `## [[Audio memos]]`) land at H2; H3 to H6 keep
+   stepping down one pixel at a time. */
 .reflect-editor :is(h1, h2, h3, h4, h5, h6) {
   font-weight: 650;
   letter-spacing: var(--tracking-snug, -0.01em);
