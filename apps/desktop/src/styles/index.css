@@ -597,7 +597,9 @@ html:root {
 
 /* meowdown's list marker column is 1lh wide, which leaves a centered checkbox
    too close to its label. A wider column keeps bullets, checkboxes, and numbers
-   centered on one axis with room before the text. */
+   centered on one axis with room before the text.
+   TODO: replace these three rules with one variable once meowdown exposes the
+   marker column width (it hard-codes `1lh` in all three places). */
 .reflect-editor .prosemirror-flat-list > .list-marker {
   width: var(--reflect-list-marker-width);
 }
