@@ -1,143 +1,103 @@
 # Plan 07 — Backlinks
 
 **Goal:** Make `[[Wiki Links]]` the organizing primitive: fast autocomplete,
-create-from-unresolved, ambient incoming backlinks while writing, and rename that
-rewrites links + preserves the old title as an alias.
+create-from-unresolved, ambient incoming backlinks, and rename that rewrites links and
+keeps the old title as an alias.
 
-**Depends on:** Plan 03 (link parsing/resolution), Plan 04 (links/backlinks/aliases
-tables), Plan 05 (editor `[[` hook), Plan 06 (date links).
-**Unlocks:** richer AI context (Plan 10), and the associative recall the product is built
-on.
+**Depends on:** Plans 03 (parsing/resolution), 04 (links/backlinks/aliases tables), 05
+(editor `[[` hook), 06 (date links).
+**Unlocks:** richer AI context (Plan 10) and the associative recall the product is built on.
 
-**Libraries:** ProseKit `defineAutocomplete` (the `[[` trigger, installed) + shadcn/ui
-popover for the suggestion menu. See [Libraries](libraries.md).
+**Libraries:** ProseKit `defineAutocomplete` + shadcn/ui popover. See [Libraries](libraries.md).
 
 ## Scope
 
-**In:** `[[` autocomplete, create-note-from-unresolved-link, incoming-backlinks panel,
-rename + link rewrite + alias preservation, alias frontmatter, case-insensitive
-resolution.
-**Out:** typed entities/people/companies (deferred — backlinks stay plain `[[Alice]]`),
-graph-map view (deferred), suggested backlinks (nice-to-have; can follow once retrieval
-exists in Plan 09).
+**In:** `[[` autocomplete, create-from-unresolved, incoming-backlinks panel, rename + link
+rewrite + alias preservation, alias frontmatter, case-insensitive resolution.
+**Out:** typed entities/people (backlinks stay plain `[[Alice]]`), graph-map view,
+suggested backlinks (can follow Plan 09 retrieval).
 
-**Carried in from Plan 06 review:** clicking a wiki link that fails to resolve currently
-logs to the console only — surface it to the user (toast/inline) as part of this plan's
-link UX (create-from-unresolved largely subsumes the failure case).
+**Carried in from Plan 06 review:** a click on an unresolved wiki link only logged to the
+console. Surface it to the user (create-from-unresolved largely covers it).
 
 ## Delivery split (decided 2026-06-09)
 
-- **07a — linking while writing** *(delivered 2026-06-09, PR #13)* (steps 1–3 + the TanStack Query adoption):
-  `[[` autocomplete (ProseKit autocomplete popover; suggestions ranked in
-  `@reflect/core` over titles + aliases + dailies, exact < prefix < substring,
-  recency tie-break; a full `YYYY-MM-DD` query always offers that daily — files
-  are created lazily); insertion is **literal text** (wiki links are literal
-  syntax + decorations in the meowdown model — no node, no serializer surface);
-  create-from-unresolved in the popover *and* on click (decided: clicking an
-  unresolved non-date `[[link]]` creates the note and opens it immediately —
-  this also retires the carried-in failure-feedback item); the incoming-
-  backlinks panel under **both regular notes and stream days** (decided), with
-  source title + line snippet, reads via TanStack Query invalidated by the
-  index lifecycle's post-apply hook (initial reconcile + each watcher batch).
-- **07b — rename with automatic rewrite** (steps 4–5; includes the
-  session-owns-frontmatter editor fix — meowdown mangles `---` blocks, so the
-  session splits every disk read, the editor sees body only, and saves rejoin
-  the exact header bytes; this is what makes frontmatter notes editable and
-  gives alias writes a channel that never disturbs the editor view): title changes on
-  non-daily notes **auto-update** inbound `[[links]]` (decided — no
-  confirmation prompt), triggered on *settled* titles (navigate-away / blur /
-  quiet period), never per keystroke — intermediate typing states must not
-  rewrite the graph; old title preserved as a frontmatter alias, same-session
-  intermediate aliases pruned; daily notes excluded (their date labels are
-  stream chrome, not content). Filenames stay put in the first wave — the
-  title lives in content, and `note_move` filename-sync joins later in
-  [Plan 17](17-readable-filenames.md).
-  Two recorded edges: a note with an explicit frontmatter `title:` cannot be
-  renamed from the editor yet (the heading isn't its title — `title:` is
-  authoritative and the editor doesn't edit frontmatter; a title field editor
-  is a later surface), and a merged write that changes the title cancels a
-  pending rename (`#adoptMergedWrite` in `note-session-service.ts`).
+- **07a — linking while writing** *(delivered 2026-06-09, PR #13)*, steps 1–3 + TanStack
+  Query adoption:
+  - Suggestions ranked in `@reflect/core` over titles + aliases + dailies (exact < prefix <
+    substring, recency tie-break). A full `YYYY-MM-DD` query always offers that daily.
+  - Insertion is **literal text**: wiki links are literal syntax + decorations in
+    meowdown, so there is no node or serializer surface.
+  - Create-from-unresolved in the popover *and* on click (decided: clicking an unresolved
+    non-date link creates and opens the note; this retires the carried-in item).
+  - Backlinks panel under **both regular notes and stream days** (decided), with source
+    title + line snippet. Reads invalidate on the index lifecycle's post-apply hook.
+- **07b — rename with automatic rewrite** (steps 4–5):
+  - Includes the session-owns-frontmatter fix: meowdown mangles `---` blocks, so the
+    session splits every disk read, the editor sees body only, and saves rejoin the exact
+    header bytes. This makes frontmatter notes editable and gives alias writes a channel
+    that never disturbs the editor.
+  - Title changes on non-daily notes **auto-update** inbound links (decided, no prompt),
+    triggered on *settled* titles (navigate-away / blur / quiet period), never per
+    keystroke, so intermediate states never rewrite the graph.
+  - Old title kept as a frontmatter alias; same-session intermediate aliases pruned.
+    Daily notes are excluded (their date labels are stream chrome, not content).
+  - Filenames stay put in the first wave; filename sync joins in
+    [Plan 17](17-readable-filenames.md).
+  - Recorded edges: a note with an explicit frontmatter `title:` cannot be renamed from
+    the editor yet (`title:` is authoritative and the editor does not edit frontmatter).
+    A merged write that changes the title cancels a pending rename (`#adoptMergedWrite`
+    in `note-session-service.ts`).
 
 ## Steps
 
-1. **`[[` autocomplete.** Builds on the meowdown wiki-link extension added in Plan 05
-   (step 6) — meowdown has no `[[ ]]` support out of the box, so that node/Lezer rule is a
-   prerequisite. Wire a ProseKit autocomplete/predict trigger on `[[` to a popover that
-   queries the index (Plan 04) over titles + aliases (and `YYYY-MM-DD` dailies), ranked by
-   recency/match. Keyboard-driven: type to filter, ↑/↓ to move, Enter to insert, Esc to
-   dismiss. Supports `[[Note|display alias]]` syntax.
-
-2. **Create from unresolved.** If the typed target has no match, the top option is
-   "Create '<name>'" → makes a new note (Plan 02 ULID + readable filename), inserts the
-   link, resolves it. Following an unresolved `[[link]]` already in text offers the same.
-
-3. **Incoming backlinks (ambient).** Below the note (and available while writing, not only
-   in search), render incoming backlinks from the `backlinks` table (Plan 04): source
-   note title + the surrounding line/snippet, click to open. This is core context, per
-   the Obsidian lesson — keep it always-available and cheap.
-
-4. **Aliases.** Support `aliases:` in frontmatter (Plan 03 schema). Aliases participate in
-   resolution + autocomplete so links survive renames and external edits. The `//`-style
-   V1 alias-in-title convention is *not* required; frontmatter aliases are the contract.
-
-5. **Rename with rewrite.** Renaming a note (title and/or file):
-   - rewrites known incoming `[[links]]` across the graph to the new title (minimal-diff
-     edits via Plan 03), in a single batched, undoable operation;
-   - preserves the previous title as an alias so any links Reflect couldn't rewrite (or
-     external ones) still resolve;
-   - updates the file path (Plan 02 `note_move` → OS-aware) and reindexes affected notes.
-   Show progress for large rewrites; never partially-apply without recording a checkpoint
-   (ties into Plan 12 checkpoints once available).
-
-6. **Resolution everywhere.** Centralize link resolution (Plan 03 rules) so the editor,
-   backlinks panel, search, and AI context all agree on what `[[X]]` points to.
-   Case-insensitive title/alias match; ambiguous matches surface a disambiguation choice.
-   *(First wave: collisions resolve deterministically — same note every time, by path
-   order — and the autocomplete lists all candidates; the click-side disambiguation
-   picker is deferred to Plan 08, whose command-palette UI makes it nearly free.)*
-
-7. **Tests.** Autocomplete ranking; create-from-unresolved; backlink rows after edits;
-   rename rewrites N referencing notes and adds the alias; case-insensitive + alias
-   resolution; ambiguity handling.
+1. **`[[` autocomplete.** Needs the meowdown wiki-link rule from Plan 05 (meowdown has no
+   `[[ ]]` support built in). Popover queries the index over titles + aliases + dailies.
+   Keyboard-driven; supports `[[Note|display alias]]`.
+2. **Create from unresolved.** No match → top option "Create '<name>'" (ULID + readable
+   filename, Plan 02), inserts and resolves the link.
+3. **Incoming backlinks (ambient).** Below the note, available while writing: source
+   title + snippet, click to open. Core context (the Obsidian lesson), so keep it
+   always-available and cheap.
+4. **Aliases.** `aliases:` frontmatter participates in resolution + autocomplete so links
+   survive renames and external edits. The V1 `//` alias-in-title convention is not
+   required.
+5. **Rename with rewrite.** Rewrite incoming links (minimal-diff, Plan 03) in one batched,
+   undoable operation; keep the old title as an alias for links Reflect could not rewrite;
+   reindex. Show progress for large rewrites; never partially apply without a checkpoint
+   (ties into Plan 12).
+6. **Resolution everywhere.** One resolver so editor, backlinks, search, and AI agree on
+   `[[X]]`. *(First wave: collisions resolve deterministically by path order and
+   autocomplete lists all candidates; the click-side picker is deferred to Plan 08.)*
+7. **Tests.** Ranking, create-from-unresolved, backlinks after edits, rename rewrite +
+   alias, case-insensitive + alias resolution, ambiguity.
 
 ## Key decisions / contracts
 
-- **Adopt TanStack Query here.** This plan is where projection reads multiply
-  (backlinks panel, `[[` autocomplete), so it's the agreed point to introduce
-  `@tanstack/react-query` per [architecture-conventions §5](architecture-conventions.md):
-  `queryFn`s are `@reflect/core` getters (`getBacklinks`, `searchNotes`), the
-  watcher's `index:changed` events drive targeted `queryClient.invalidateQueries`,
-  and markdown setters invalidate after writing. Decided during the post-Plan-05
-  refactor (June 2026) rather than retrofitting earlier file-only screens.
-- **Backlinks stay plain.** No typed-entity layer in first wave; entities can later be
-  projections over notes + aliases.
-- **Frontmatter `aliases` is the alias contract** (not title `//`).
+- **Adopt TanStack Query here**, because projection reads multiply (backlinks,
+  autocomplete). `queryFn`s are `@reflect/core` getters, watcher `index:changed` events
+  drive targeted invalidation, and markdown setters invalidate after writing (see
+  [architecture-conventions](architecture-conventions.md) §5). Decided in the post-Plan-05
+  refactor (June 2026) instead of retrofitting earlier screens.
+- **Backlinks stay plain.** Entities can later be projections over notes + aliases.
+- **Frontmatter `aliases` is the alias contract.**
 - **Rename = rewrite links + keep old title as alias**, batched and recoverable.
-- **One shared resolver** used by editor, backlinks, search, and AI.
+- **One shared resolver.**
 
 ## Acceptance criteria
 
-- Typing `[[` autocompletes existing notes/dailies; Enter inserts; unresolved offers
-  "Create".
-- Incoming backlinks render under a note with snippets and update as links change.
-- Renaming a note rewrites referencing links and the old name still resolves via alias.
-- Case-insensitive + alias resolution covered by tests.
-- `pnpm typecheck` + tests pass.
+- `[[` autocompletes notes/dailies; Enter inserts; unresolved offers "Create".
+- Backlinks render with snippets and update as links change.
+- Rename rewrites referencing links; the old name still resolves via alias.
 
 ## Risks
 
-- **Rename rewrite correctness** (links in code blocks, partial matches, ambiguous
-  titles). Mitigate: AST-based edits only (Plan 03), skip code contexts, and the
-  07b **collision guard**: when the old title already belongs to a different
-  note, the rewrite *and* the alias are skipped — existing links keep resolving
-  to their deliberate target (deterministic first wave; the interactive picker
-  is deferred to Plan 08, see step 6). Batch + checkpoint ties into Plan 12.
-  *(Accepted edge: the guard reads the index, which lags the watcher debounce —
-  a note created with the old title inside that sub-second window can be
-  missed. Resolution stays deterministic; the late-created note wins future
-  resolutions.)*
-- **Autocomplete latency** on large graphs. Mitigate with an indexed prefix query +
-  in-memory recent-notes cache.
-- **External renames** (file moved in Finder/Obsidian). The watcher (Plan 04) must treat
-  it as delete+create and reconcile by `id`; links may dangle until reindex — resolve
-  gracefully.
+- **Rename rewrite correctness** (code blocks, partial matches, ambiguous titles). Use
+  AST-based edits, skip code contexts, and the 07b **collision guard**: when the old title
+  already belongs to another note, skip both the rewrite and the alias, so existing links
+  keep their target. *(Accepted edge: the guard reads the index, which lags the watcher
+  debounce; a note created with the old title in that sub-second window can be missed.
+  The late-created note wins future resolutions.)*
+- **Autocomplete latency.** Indexed prefix query + in-memory recent-notes cache.
+- **External renames** (Finder/Obsidian) arrive as delete+create; links may dangle until
+  reindex and must resolve gracefully.

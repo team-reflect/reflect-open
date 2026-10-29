@@ -1,204 +1,137 @@
 # Readable filenames & note identity
 
 Regular notes Reflect creates live at `notes/<slug>.md`, where the slug derives
-from the note's title: a Reflect-created note titled "Meeting Notes" is
-`notes/meeting-notes.md`, and when the title changes, the file follows. An
-opened Markdown vault can also contain adopted notes at the root or in visible
-nested folders. Reflect edits those files in place: in-app title changes keep
-known wiki links and title-mirroring displays current, but never move the file
-or opt its filename into title projection (Plan 17).
+from the title: "Meeting Notes" is `notes/meeting-notes.md`, and when the title
+changes, the file follows. An opened Markdown vault can also contain adopted
+notes at the root or in visible nested folders. Reflect edits those in place:
+retitles keep known wiki links and title-mirroring displays current, but never
+move the file (Plan 17).
 
-Three rules make the whole system hang together:
+Three rules make the system hang together:
 
-1. **A managed filename is a projection of the title.** The title lives in content
-   (the first H1, or frontmatter `title:`); the slug is derived from it, never
-   edited directly. There is no "rename file" UI — retitle the note and the
-   filename follows. This applies only to a direct `notes/*.md` file carrying a
-   valid Reflect ULID `id`. Adopted notes keep their path: a retitle maintains
-   their known wiki links and records the old title as an alias, but never moves
-   the file.
-2. **The frontmatter `id` is the durable identity.** Every note Reflect
-   creates carries `id: <lowercase ulid>`. Filenames change; the id never
-   does. It's what lets the index recognize a file that moved while Reflect
-   wasn't looking, and what exposes sync forks (two files claiming one id).
-3. **Wiki links carry titles, not paths.** `[[Meeting Notes]]` resolves at
-   query time against the index's title/alias keys, so a file rename breaks
-   zero links by construction. This is the keystone: everything below is
-   cheap *because* links never reference filenames.
+1. **A managed filename is a projection of the title.** The title lives in
+   content (the first H1, or frontmatter `title:`). There is no "rename file"
+   UI: retitle the note and the filename follows. This applies only to a
+   direct `notes/*.md` file with a valid Reflect ULID `id`.
+2. **The frontmatter `id` is the durable identity.** Every note Reflect creates
+   carries `id: <lowercase ulid>`. Filenames change; the id never does. It lets
+   the index recognize a file that moved while Reflect wasn't looking, and it
+   exposes sync forks (two files claiming one id).
+3. **Wiki links carry titles, not paths.** `[[Meeting Notes]]` resolves at query
+   time against title/alias keys, so a file rename breaks zero links by
+   construction. Everything below is cheap *because* links never reference
+   filenames.
 
-Daily notes are untouched by all of this — `daily/YYYY-MM-DD.md` is already
-the readable contract, and their date labels never rename.
+Daily notes are untouched: `daily/YYYY-MM-DD.md` is already the readable
+contract.
 
 ## The slug
 
-`slugForTitle` (`packages/core/src/markdown/slug.ts`): NFC-normalize,
-lowercase, keep letters/numbers, collapse whitespace/`_`/`-` runs to a single
-`-`, drop everything else, trim edge dashes, cap at 60 code points. Never
-empty (`untitled`), never a Windows reserved device name (`con` → `con-note`).
-CJK and other scripts pass through untransliterated: `日本語ノート` keeps its
-characters.
-
-Two properties are load-bearing:
+`slugForTitle` (`packages/core/src/markdown/slug.ts`) defines the rules. Two
+properties are load-bearing:
 
 - **Lowercase-only output** makes APFS/NTFS case-insensitivity and git
-  case-sensitivity agree by construction — `Meeting.md` vs `meeting.md` can
-  never fight across platforms because Reflect only ever writes the latter.
-- **The 60-point cap** serves readability and the filesystem at once: 60
-  worst-case 4-byte letters stays inside the 255-byte basename limit with
-  room for `notes/`, `.md`, and a collision suffix.
+  case-sensitivity agree: `Meeting.md` vs `meeting.md` can never fight because
+  Reflect only writes the latter.
+- **The 60-code-point cap** keeps worst-case 4-byte letters inside the
+  255-byte basename limit, with room for `notes/`, `.md`, and a suffix.
 
 The rules are **frozen** by a golden corpus in `slug.test.ts`. Changing any
-output is a rename storm across every graph — a failure there is a deliberate
+output is a rename storm across every graph, so a failure there is a
 breaking-change gate, not a test to update casually.
 
-Collisions take a numeric suffix: `meeting.md`, then `meeting-2.md`, `-3`, ….
-The probe (`NotePathService`, `packages/core/src/indexing/note-path-service.ts`)
-checks the index *and* the disk (`note_exists`), so a file the watcher hasn't indexed yet can't be
-clobbered. A note's own path always counts as available — a note never
-collides with itself, and a note already at `meeting-2.md` doesn't "tighten"
-to `meeting.md` when it frees up.
+Collisions take a numeric suffix (`meeting-2.md`, `-3`, …). The probe
+(`packages/core/src/indexing/note-path-service.ts`) checks the index *and* the
+disk, so a file the watcher hasn't indexed yet can't be clobbered. A note never
+collides with itself, and `meeting-2.md` doesn't "tighten" to `meeting.md` when
+it frees up.
 
-## Birth: how notes get their names
+## Birth
 
-- **Created with a title** (the `[[` autocomplete's create row, clicking an
-  unresolved link): the file is born at its slug path with `id:` frontmatter
-  and the title as H1 (`NoteCreationService`,
-  `packages/core/src/graph/note-creation-service.ts`).
-- **Created untitled** (⌘N): no title exists yet, so the file gets a ULID
-  placeholder name (`untitledNotePath`). The lazy-create seed — an empty H1
-  the caret lands in (ghosted "Untitled" by the `titlePlaceholder` prop of
-  `apps/desktop/src/editor/note-editor.tsx`) plus a fresh `id:` —
-  reaches disk only when the user actually types. When the first title
-  settles, a **birth** fires (a rename with `from: null`): no links to
-  rewrite, no alias to record, the file just sheds its placeholder for the
-  slug.
+- **Created with a title** (`[[` create row, clicking an unresolved link): the
+  file is born at its slug path.
+- **Created untitled** (⌘N): the file gets a ULID placeholder name and reaches
+  disk only when the user types. When the first title settles, a **birth**
+  fires (a rename with `from: null`): no links to rewrite, no alias, the file
+  just takes its slug.
 
 ## Rename: filenames follow settled titles
 
 Only settled, in-app title changes to Reflect-managed notes move files. Sync
 pulls, external edits, reconciles, rebuilds, and edits to adopted notes never
-rename a file — that rule makes move loops with external tools impossible and
-keeps existing vault layouts intact. Settled in-app retitles of any editable
-regular note still maintain known wiki links and preserve the old title as an
-alias; link consistency does not imply filename ownership.
+rename a file. That makes move loops with external tools impossible and keeps
+vault layouts intact. Link maintenance and filename ownership are separate:
+any editable regular note gets its links rewritten and its old title kept as
+an alias.
 
-The settled-title tracker (`packages/core/src/documents/title-rename-tracker.ts`, Plan
-07b) watches saves and fires after 5 seconds of quiet, or immediately on
-blur/pane teardown/quit. The rename coordinator
-(`packages/core/src/documents/title-rename-service.ts`) then runs three phases, each
-failing independently with an honest report (`rename-failure.ts`):
+A title settles after 5 seconds of quiet, or at once on blur, pane teardown,
+or quit (`packages/core/src/documents/title-rename-tracker.ts`, Plan 07b).
+The rename (`title-rename-service.ts`) then rewrites inbound links, aliases
+the old title (so anything the rewrite missed still resolves), and moves the
+file. Each phase fails independently with an honest report.
 
-1. **Rewrite** inbound `[[old title]]` targets and pipe displays that still
-   mirror the old title on links resolving to this note.
-2. **Alias** the old title onto the note (`alias-placement.ts`), so anything
-   the rewrite missed still resolves.
-3. **Move** the file onto the new title's slug (`note-move-service.ts`), only when the
-   note is Reflect-managed. Adopted and stable-path notes stop after phase 2.
+The move (`packages/core/src/documents/note-move-service.ts`) moves the index
+rows in one transaction before it renames the file. `embedding_chunks` ride
+along, so **a rename never re-embeds** (BYOK re-embeds cost the user money). A
+failed file rename reverses the row move. Because the rows moved first, the
+watcher's echo of the move is a no-op.
 
-The move itself (`NoteMoveService.moveNote`) is ordering-as-mechanism: flush
-the session, retarget it to the new path (so any later save writes the new
-home), re-key the open-documents registry (identity-guarded — it can never
-grab another pane's document), then call `note_move_indexed`. On the Rust
-side (`db/mod.rs`, `db/write.rs`) the projection rows move in one
-transaction — pinned state, conflict flags, FTS, and crucially
-`embedding_chunks` all ride along, so **a rename never re-embeds** (BYOK
-re-embeds cost the user money) — the transaction commits, and only then does
-the file rename (`fs::move_note_file`). A failed rename compensates with a
-reverse row-move; every failure path converges.
+**An occupied destination always refuses**, db row or disk file. Nothing is
+deleted or overwritten; the filename drifts until the next settled rename
+retries. (Deliberate simplification, 2026-06-11: the race window is one IPC
+round-trip behind a 5-second quiet gate.) Drift is cosmetic: resolution never
+reads filenames.
 
-**An occupied destination always refuses** — db row or disk file, one rule at
-both layers. Nothing is deleted or overwritten; the rename reports failed and
-the filename drifts until the next settled rename retries. (Deliberate
-simplification, 2026-06-11: the only way a destination gets occupied mid-move
-is a race whose window is one IPC round-trip behind a 5-second save-quiet
-gate.) Drift is cosmetic by design: resolution never reads filenames.
-
-After a successful move, the app follows the file:
-
-- `NoteMoveService` announces it to its `onMoved` subscribers
-  (`packages/core/src/documents/note-move-service.ts`).
-- The router rewrites every history entry pointing at the old path — the
-  current route follows without an arrival, and back/forward can never land
-  on a dead path (`apps/desktop/src/routing/router.tsx`).
-- The pane **adopts** its retargeted session instead of recreating it: the
-  editor is keyed on `sessionEpoch`, not the path, so the cursor, selection,
-  and undo history survive the rename
-  (`packages/core/src/documents/document-binding.ts` owns the
-  create/adopt/teardown/hand-off protocol;
-  `apps/desktop/src/editor/use-note-document.ts` is a thin React adapter over
-  it).
-
-The watcher's echo of the move (`remove(old)` + `upsert(new)`) is benign by
-construction: the rows moved before the file did, so the remove finds nothing
-and the upsert re-applies an identical projection.
+After a move, the router rewrites history entries for the old path, so
+back/forward never lands on a dead path. The pane adopts its retargeted
+session (the editor is keyed on `sessionEpoch`, not the path), so cursor,
+selection, and undo history survive (`packages/core/src/documents/document-binding.ts`).
 
 ## External renames heal by id
 
-Rename a file in Finder, Obsidian, or via a sync pull, and Reflect's index
-recognizes it: an indexed row whose file vanished plus an unindexed file
-carrying the same frontmatter `id` is a *move*, not a delete+create
-(`packages/core/src/indexing/move-detection.ts`, `move-healing.ts`). The rows
-migrate (`index_move`), embeddings survive, and `followHealedMove` carries any
-open session and the route to the new path — exactly as if the rename
-happened in-app. Both observation points heal: the open-time reconcile
-(orphans ↔ arrivals) and the live watcher (same-batch remove+upsert pairs).
+A rename in Finder, Obsidian, or a sync pull is recognized: a vanished indexed
+row plus an unindexed file with the same `id` is a *move*, not a delete+create
+(`packages/core/src/indexing/move-detection.ts`). Rows migrate, embeddings
+survive, and any open session and route follow, as for an in-app rename. Both
+the open-time reconcile and the live watcher heal.
 
 Limits, all deliberate:
 
-- **Ambiguous ids never pair.** Two files claiming one id (or one id claimed
-  by two vanished rows) could wire one note's history to another's file —
-  those stay sync forks instead.
-- **Files without ids can't heal** — anything created outside Reflect falls
-  back to delete+create, which always converges.
-- **Split watcher batches degrade** to delete+create: the orphan row is gone
-  before the arrival shows. In practice the debouncer groups rename halves.
+- **Ambiguous ids never pair.** Pairing could wire one note's history to
+  another's file, so those stay sync forks.
+- **Files without ids can't heal.** They fall back to delete+create, which
+  always converges.
+- **Split watcher batches degrade** to delete+create. In practice the debouncer
+  groups rename halves.
 
 ## Sync
 
-A rename reaches git as delete+add. The merge semantics (pinned by two-device
-tests in `src-tauri/src/git/tests.rs`):
+A rename reaches git as delete+add. Two-device tests in
+`crates/git/src/tests.rs` pin the merge semantics:
 
-- **Rename on one device + edit on another** converges cleanly — libgit2's
-  default rename detection lands the edit in the moved file.
-- **Same title created on two devices offline** collides on one path and
-  is merged by the conflict ladder (this was impossible
-  under ULID names; accepted as rare and recoverable).
-- **The same note retitled differently on two devices** forks into two files
-  sharing one id. Nothing wedges and both files survive; the user sees two
-  notes, copies any edits that differ into one, and deletes the other.
-  `getDuplicateNoteIds` detects forks, but the app shows no UI for them: the
-  term means nothing to a user, and the remedy is what they would do anyway.
+- **Rename on one device + edit on another** converges: libgit2's rename
+  detection lands the edit in the moved file.
+- **Same title created on two devices offline** collides on one path and the
+  conflict ladder merges it (impossible under ULID names; accepted as rare and
+  recoverable).
+- **One note retitled differently on two devices** forks into two files sharing
+  one id. Both survive; the user copies any differing edits into one and
+  deletes the other. `getDuplicateNoteIds` detects forks, but the app shows no
+  UI for them: the term means nothing to a user, and the remedy is what they
+  would do anyway.
 
 ## What deliberately doesn't exist
 
 - **No ULID→slug migration.** Pre-launch there are no legacy graphs; a
-  ULID-named note converts through the birth/rename path the next time it's
-  titled.
-- **No "rename file" UI** — the filename is derived, full stop.
-- **No id-based routes** — routes and the index stay path-keyed; the id is
-  for reconciliation and fork detection.
-- **No md-style link rewriting** — `[text](notes/foo.md)` links (an
-  external-tool shape; Reflect writes wiki links) dangle after a rename. The
-  `links` table records `kind = 'md'`, so a later pass can find them.
-- A note with explicit frontmatter `title:` can't be retitled from the editor
-  (the H1 isn't its title), so its filename only changes via external renames
-  — which heal by id like any other.
-
-## Code map
-
-| Concern | Where |
-|---|---|
-| Slug rules (frozen) | `packages/core/src/markdown/slug.ts` + golden corpus in `slug.test.ts` |
-| Collision probe / rename target | `packages/core/src/indexing/note-path-service.ts` |
-| Creation (titled + ⌘N seed/path) | `packages/core/src/graph/note-creation-service.ts` |
-| Settled-title detection, births | `packages/core/src/documents/title-rename-tracker.ts` |
-| Rename orchestration | `packages/core/src/documents/title-rename-service.ts` (+ `alias-placement.ts`, `rename-failure.ts`) |
-| The move (session-carrying + healed) | `packages/core/src/documents/note-move-service.ts` |
-| Pane lifecycle (create/adopt/hand-off) | `packages/core/src/documents/document-binding.ts` |
-| Move announcements → router/panes | `NoteMoveService.onMoved`, `apps/desktop/src/routing/router.tsx` |
-| Row move + fs rename (Rust) | `apps/desktop/src-tauri/src/db/mod.rs` (`note_move_indexed`, `index_move`), `db/write.rs` (`move_note`), `fs/mod.rs` (`move_note_file`) |
-| Id-based healing | `packages/core/src/indexing/move-detection.ts`, `move-healing.ts`, wired in `indexer.ts` + `live.ts` → `IndexLifecycleService.onMoved` → `NoteMoveService.followHealedMove` |
-| Sync fork detection | `getDuplicateNoteIds` in `packages/core/src/indexing/index-query-service.ts` |
-| Merge-shape tests | `apps/desktop/src-tauri/src/git/tests.rs` (rename matrix) |
+  ULID-named note converts through birth/rename the next time it's titled.
+- **No "rename file" UI.** The filename is derived.
+- **No id-based routes.** Routes and the index stay path-keyed; the id is for
+  reconciliation and fork detection.
+- **No md-style link rewriting.** `[text](notes/foo.md)` links dangle after a
+  rename. The `links` table records `kind = 'md'`, so a later pass can find
+  them.
+- A note with frontmatter `title:` can't be retitled from the editor (the H1
+  isn't its title), so its filename only changes via external renames, which
+  heal by id.
 
 Plan and decision history: [docs/plans/17-readable-filenames.md](plans/17-readable-filenames.md).

@@ -1,13 +1,12 @@
 # Adding a native command
 
-How a value travels from Rust to a React component, and every file you touch
-to add a new command. **Adding a command is two things: the Rust command, and
-a method on the core service that owns the domain.** The canonical in-tree
-example is `app_version`: a real `#[tauri::command]` (`lib.rs`), bound as
-`AppInfoService.version()` (`packages/core/src/ports/app-info-service.ts`) with a
-zod-validated response, and read in React by `useAppVersion()`
-(`apps/desktop/src/hooks/use-app-version.ts`) through `useCoreServices()`. This
-guide walks the same path with a hypothetical `note_stat` command.
+How a value travels from Rust to a React component. **Adding a command is two
+things: the Rust command, and a method on the core service that owns the
+domain.** The in-tree example is `app_version`: a `#[tauri::command]` in
+`lib.rs`, bound as `AppInfoService.version()`
+(`packages/core/src/ports/app-info-service.ts`), and read in React by
+`useAppVersion()` (`apps/desktop/src/hooks/use-app-version.ts`). This guide
+walks the same path with a hypothetical `note_stat` command.
 
 ```text
 React component / hook        useCoreServices()
@@ -18,24 +17,19 @@ React component / hook        useCoreServices()
                       └─ #[tauri::command]  apps/desktop/src-tauri/src/<module>.rs
 ```
 
-Before writing any Rust, check whether you actually need a new command. Per
+First check whether you need a new command. Per
 [architecture-conventions](../plans/architecture-conventions.md), Rust owns
 **capabilities** (file IO, SQLite, watching, OS stores) and TypeScript owns
-**policy**. If your feature is a new *rule* over existing primitives — a new
-query shape, a different orchestration — it belongs in `@reflect/core`, built
-on the commands that already exist.
+**policy**. A new *rule* over existing primitives belongs in `@reflect/core`.
 
 ## 1. The Rust command
 
-Pick the module that owns the capability (`fs/` for graph file IO, `db/` for
-the index, `settings.rs`, `recents.rs`, `secrets.rs`, `git/`, `capture.rs`,
-`embed.rs`, …) or add a new one for a genuinely new capability. Commands are
-snake_case, return `AppResult<T>`, and serialize camelCase:
+Put it in the module that owns the capability (`fs/`, `db/`, `settings.rs`,
+`recents.rs`, `secrets.rs`, `git.rs`, `capture.rs`, `embed.rs`, …) or a new one.
+Commands are snake_case, return `AppResult<T>`, and serialize camelCase:
 
 ```rust
 // apps/desktop/src-tauri/src/fs/mod.rs
-use crate::error::AppResult;
-
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteStat {
@@ -52,39 +46,33 @@ pub fn note_stat(path: String, state: tauri::State<GraphState>) -> AppResult<Not
 }
 ```
 
-Conventions that matter here:
+- **Errors are the shared contract.** Return `AppError` (from `reflect-types`,
+  `crates/types/src/error.rs`). It serializes as `{ kind, message }`, and the
+  frontend gets the `AppError` class (`packages/core/src/errors.ts`) and
+  branches on `kind` with `isAppError`. Never return bare strings.
+  `std::io::Error` and `rusqlite::Error` convert via `From`, so `?` works.
+- **Paths must not escape the graph.** Resolve graph-relative paths with
+  `resolve()` (`crates/graph-io/src/resolve.rs`), which rejects traversal and
+  symlink escapes. Do not build paths by hand.
+- **Writes are generation-pinned.** A mutating command takes the `generation`
+  from `graph_open`/`graph_create` and gets the root via `root_for_generation`,
+  which rejects stale ones. A write racing a graph switch then fails loudly
+  instead of landing in the wrong graph.
+- **Background reads may also pin.** UI reads of the open graph can use
+  `current_root`. A read in a background pass that can span a graph switch
+  takes `generation` (optional or required) and uses `root_for`, like
+  `fs::note_read`/`asset_read`.
+- **No product policy.** A command exposes a primitive. "What to do when X"
+  belongs in `@reflect/core`.
 
-- **Errors are the shared contract.** Return `AppError` (`error.rs`); it
-  serializes as `{ kind, message }`, `IpcBridgeService` turns it into the
-  `AppError` class in `packages/core/src/errors.ts`, and the frontend branches
-  on `kind` with `isAppError`. Never
-  return bare strings. `std::io::Error` and `rusqlite::Error` already convert
-  via `From` (`?` just works); NotFound is mapped for you.
-- **Paths must not escape the graph.** Anything taking a graph-relative path
-  resolves it via `resolve()` (`fs/resolve.rs`), which rejects traversal and
-  symlink escapes. Don't build paths by hand.
-- **Writes are generation-pinned.** Mutating commands take a `generation`
-  argument (from `graph_open`/`graph_create`) and get the root via
-  `root_for_generation`, which rejects stale ones — a write racing a graph
-  switch fails loudly instead of landing in the wrong graph. A new mutating
-  command must follow this pattern.
-- **Background reads may also pin.** UI reads for the currently open graph can
-  use `current_root`, but a read that belongs to a background pass that can
-  span a graph switch should accept `generation: Option<u64>` (or a required
-  `generation`, if the pass always has one) and use the `root_for` pattern
-  from `fs::note_read`/`asset_read`.
-- **No product policy.** A command exposes a primitive. If you find yourself
-  encoding "what to do when X", that decision belongs in `@reflect/core`.
+Register it in `tauri::generate_handler![...]` in
+`apps/desktop/src-tauri/src/lib.rs`. A missing registration compiles fine and
+fails at runtime with "command not found".
 
-Register it in `apps/desktop/src-tauri/src/lib.rs` inside
-`tauri::generate_handler![...]` — forgetting this compiles fine and fails at
-runtime with a "command not found" rejection.
-
-Test the logic with `#[cfg(test)]` against the pure helper, not the command
-wrapper: `settings.rs` is a good model — `settings_load`/`settings_save` are
-two-liners over `load_from`/`save_to`, and the tests exercise those with
-`tempfile`. From the repo root, stage the sidecars once before compiling the
-desktop crate, then run the crate tests:
+Test the pure helper with `#[cfg(test)]`, not the command wrapper.
+`settings.rs` is the model: `settings_load`/`settings_save` wrap
+`load_from`/`save_to`, which the tests exercise with `tempfile`. Stage the
+sidecars once before compiling the desktop crate:
 
 ```bash
 pnpm --filter @reflect/desktop sidecar
@@ -93,72 +81,52 @@ cargo test -p reflect-open
 
 ## 2. The service method
 
-Every command is bound in `packages/core` as a **method of the service that
-owns the domain**. Components never call `invoke` or touch the transport. The
-service already has the `IpcBridgeService` in its `deps`.
-
-`note_stat` is graph file IO, so it belongs to `NoteFileService`
-(`packages/core/src/graph/note-file-service.ts`), next to `read`, `write` and
-`exists`:
+Bind every command as a **method of the core service that owns the domain**.
+Components never call `invoke`. `note_stat` is graph file IO, so it belongs to
+`NoteFileService` (`packages/core/src/graph/note-file-service.ts`), next to
+`read` and `write`:
 
 ```ts
-// packages/core/src/graph/note-file-service.ts
-const noteStatSchema = z.object({
-  sizeBytes: z.number(),
-  modifiedMs: z.number(),
-})
+const noteStatSchema = z.object({ sizeBytes: z.number(), modifiedMs: z.number() })
 
 export type NoteStat = z.infer<typeof noteStatSchema>
 
 export interface NoteFileService {
   // ...
-  /** File metadata for one note (graph-relative path). */
+  /**
+   * File metadata for one note (graph-relative path).
+   */
   stat(path: string): Promise<NoteStat>
 }
 
-export function createNoteFileService(deps: {
-  ipc: IpcBridgeService
-  clock: ClockService
-  fileChanges: FileChangeService
-}): NoteFileService {
-  const { ipc, clock, fileChanges } = deps
-  return {
-    // ...
-    async stat(path) {
-      return await ipc.call('note_stat', { path }, noteStatSchema)
-    },
+class NoteFileServiceImpl implements NoteFileService {
+  // ...
+  async stat(path: string): Promise<NoteStat> {
+    return await this.#deps.ipc.call('note_stat', { path }, noteStatSchema)
   }
 }
 ```
 
-- `IpcBridgeService.call` (`ipc/ipc-service.ts`) is the single boundary where
-  the untyped IPC response becomes a typed value: it validates with your
-  schema (a mismatch throws a `parse` `AppError` naming the command) and
-  coerces any rejection into an `AppError` instance. Your method adds no error
-  handling of its own.
-- Commands returning `()` from Rust serialize as `null`: validate with
-  `z.null()` (see the `voidSchema` convention in `settings/settings-service.ts`).
-- Schemas live next to the service (or in the domain's `schemas.ts` when
-  shared) — zod at the boundary, plain types inside.
-- A mutating method takes `generation: number` and passes it to the command
+- `IpcBridgeService.call` is the one place an IPC response becomes typed: a
+  schema mismatch throws a `parse` `AppError` naming the command, and any
+  rejection becomes an `AppError`. Your method adds no error handling.
+- A command returning `()` serializes as `null`: validate with `z.null()`
+  (`voidSchema` in `settings/settings-service.ts`).
+- Schemas live next to the service, or in the domain's `schemas.ts` when
+  shared.
+- A mutating method takes `generation: number` and passes it on
   (`write(path, contents, generation)`).
-- Export the new types that the app imports from
-  `packages/core/src/index.ts`; the apps only import from the package root.
+- Export new types the apps import from `packages/core/src/index.ts`.
 - **Update the service's test double.** `createTestNoteFileService`
-  (`packages/core/src/testing/graph.ts`) is an in-memory implementation of the
-  interface, so it needs a `stat` too, or `pnpm typecheck` fails. A double that
-  is the real service over `createTestIpcBridgeService()` needs nothing.
+  (`packages/core/src/testing/graph.ts`) implements the interface in memory, so
+  it needs `stat` too, or `pnpm typecheck` fails.
 
-Plain-browser dev (`pnpm dev` without the shell) has no Rust. Its in-memory
-backend, `apps/desktop/src/dev/dev-bridge.ts`, answers commands by name and
-rejects the ones it does not know. Add a `case` there if the feature must work
-in that mode.
+Plain-browser dev (`pnpm dev` without the shell) answers commands from
+`apps/desktop/src/dev/dev-bridge.ts` and throws on unknown ones. Add a `case`
+there if the feature must work in that mode.
 
-If no existing service owns the capability, add one: a small
-`createXxxService({ ipc })` like `AppInfoService`, a field on `CoreServices`,
-and a test double. [Adding a service](services.md) is the guide.
-
-React then reaches the method through the service, as `useAppVersion()` does:
+If no service owns the capability, add one: see [services.md](services.md).
+React reaches the method through the service:
 
 ```ts
 const { noteFile } = useCoreServices()
@@ -167,17 +135,10 @@ const stat = await noteFile.stat(path)
 
 ## 3. Tests on the TS side
 
-`@reflect/core` never imports Tauri, so the test constructs the service over
-an in-memory transport instead of module-mocking
+Construct the service over an in-memory IPC instead of module mocks
 (`packages/core/src/graph/note-file-service.test.ts` is the model):
 
 ```ts
-import {
-  createTestClockService,
-  createTestFileChangeService,
-  createTestIpcBridgeService,
-} from '@reflect/core/testing'
-
 const ipc = createTestIpcBridgeService({
   commands: { note_stat: () => ({ sizeBytes: 12, modifiedMs: 99 }) },
 })
@@ -191,28 +152,18 @@ await expect(noteFile.stat('notes/a.md')).resolves.toEqual({ sizeBytes: 12, modi
 expect(ipc.calls()).toEqual([{ command: 'note_stat', args: { path: 'notes/a.md' } }])
 ```
 
-`createTestIpcBridgeService()` is an in-memory `IpcBridgeService` with
-`onCommand`, `emit`, and `calls()`.
-`packages/core/src/ipc/ipc-service.test.ts` shows the error paths
-(well-formed `AppError` pass-through, foreign rejection coercion,
-schema-mismatch → `parse`). A method that is a one-line `ipc.call()` needs
-little: cover the schema if it normalizes, and the behavior in whatever
-core/UI module consumes it. [Testing](testing.md) covers the test doubles and
-the desktop render helpers.
+`packages/core/src/ipc/ipc-service.test.ts` covers the error paths. A one-line
+`ipc.call()` method needs little: cover the schema if it normalizes, and the
+behavior in the module that consumes it. See [testing.md](testing.md).
 
 ## Checklist
 
-- [ ] Rust: command in the owning capability module, returns `AppResult<T>`,
-      camelCase serde, traversal-guarded paths, generation-pinned if mutating
-      (and pinned for background reads that can span a graph switch)
+- [ ] Rust: command in the owning module, `AppResult<T>`, camelCase serde,
+      `resolve()`d paths, generation-pinned if mutating or a background read
 - [ ] Rust: registered in `lib.rs` `generate_handler!`
 - [ ] Rust: `#[cfg(test)]` tests on the pure helper; `cargo test -p reflect-open`
-      passes after staging sidecars when the desktop crate compiles
-- [ ] TS: zod schema + typed method through `ipc.call()` on the service that
-      owns the domain; `generation` parameter if mutating
-- [ ] TS: the service's test double in `packages/core/src/testing/` updated;
-      new types the app imports exported from `packages/core/src/index.ts`
-- [ ] TS: a new service only if no existing one owns the capability
-      ([services.md](services.md))
+- [ ] TS: zod schema + method through `ipc.call()` on the owning service;
+      `generation` parameter if mutating
+- [ ] TS: test double updated; new types exported from `packages/core/src/index.ts`
 - [ ] TS: behavior covered over `createTestIpcBridgeService()` where it matters
 - [ ] `pnpm typecheck && pnpm lint && pnpm test --run <touched paths>`

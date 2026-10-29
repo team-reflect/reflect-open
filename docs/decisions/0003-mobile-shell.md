@@ -2,15 +2,13 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-12
-- **Scope:** The shell technology for the Reflect mobile companion app (iOS
-  first, Android shortly after). The v1 product scope is deliberately small
-  but **includes editing as a hard requirement** — browse daily notes, edit
-  notes in place, create notes, lexical search, GitHub sync compatible with
-  desktop (see [Plan 19](../plans/19-mobile.md)).
-- **Decision driver:** Which shell maximizes reuse of the existing stack
-  (React + Vite frontend, `@reflect/core` actions, Rust primitives: git2 sync,
-  rusqlite FTS5 index, keychain) while staying App-Store-viable and
-  Android-portable?
+- **Scope:** The shell for the Reflect mobile companion app (iOS first, Android
+  shortly after). The v1 scope is small but **editing is a hard requirement**:
+  browse daily notes, edit in place, create notes, lexical search, GitHub sync
+  compatible with desktop ([Plan 19](../plans/19-mobile.md)).
+- **Decision driver:** Which shell reuses the most of the existing stack (React
+  + Vite, `@reflect/core`, Rust git2 sync, rusqlite FTS5 index, keychain) while
+  staying App-Store-viable and Android-portable?
 - **Alternatives evaluated:** React Native (bare), Expo, Capacitor, Ionic
   Framework.
 
@@ -19,19 +17,16 @@
 ## TL;DR
 
 **Build mobile with Tauri 2's mobile targets, inside the existing app crate.**
-One repo, one Rust core, one IPC layer, one frontend codebase with a mobile
-entry surface.
+One repo, one Rust core, one IPC layer, one frontend with a mobile entry
+surface.
 
-The deciding asset is the Rust core. Reflect's hardest-won, most
-correctness-critical code — the git sync engine over libgit2, the SQLite/FTS5
-index, keychain secrets — lives in the Tauri crate and compiles to
-`aarch64-apple-ios` as-is. Every alternative shell forfeits that and forces a
-reimplementation (JS git does not credibly exist for real merge workflows) or a
-hand-rolled Rust-to-native bridge that recreates what Tauri already gives us.
+The deciding asset is the Rust core: the libgit2 sync engine, the SQLite/FTS5
+index and keychain secrets compile to `aarch64-apple-ios` as-is. Every other
+shell forces a reimplementation (JS git cannot do real merges) or a hand-rolled
+Rust-to-native bridge that recreates what Tauri gives us.
 
-We accept that we are early adopters of Tauri mobile and will write a small
-amount of Swift (keyboard handling). **Capacitor is the documented fallback** if
-Tauri's mobile gaps prove fatal — see [Fallback triggers](#fallback-triggers).
+We accept being early adopters and writing a little Swift (keyboard handling).
+**Capacitor is the documented fallback** (see Fallback triggers).
 
 ---
 
@@ -40,115 +35,92 @@ Tauri's mobile gaps prove fatal — see [Fallback triggers](#fallback-triggers).
 ### Tauri 2 mobile (chosen)
 
 Tauri 2 (stable since Oct 2024; 2.11.x as of mid-2026) builds iOS and Android
-targets from the same crate as desktop: a thin Swift/Kotlin shell embeds the
-system webview, the Rust crate compiles to a static library, and the existing
-`@tauri-apps/api` IPC bridge carries the same commands. The repo is already
-half-way there: `lib.rs` declares `#[cfg_attr(mobile, tauri::mobile_entry_point)]`,
-the updater is `cfg(desktop)`-gated, `tauri ios init` has been run
-(`gen/apple/`, `ios.project.yml` with a development team), and the CLI sidecar
-is bundled only by the desktop platform overlays.
+from the desktop crate: a thin Swift/Kotlin shell embeds the system webview,
+the crate compiles to a static library, and the same IPC carries the same
+commands. The repo was already half-way there (`mobile_entry_point` in
+`lib.rs`, the updater `cfg(desktop)`-gated, `tauri ios init` run, the CLI
+sidecar bundled only on desktop).
 
-**What we keep:** the entire Rust primitive surface (git2 with vendored
-libgit2/OpenSSL — the GitHub HTTPS + device-flow token path is exactly the
-mobile-viable transport; rusqlite with FTS5; keyring's `apple-native` backend,
-which covers the iOS keychain), the Kysely-over-IPC read layer, all of
-`@reflect/core`, the design system, and the Vite toolchain.
+**What we keep:** the whole Rust surface (git2 with vendored libgit2/OpenSSL,
+whose GitHub HTTPS + device-flow path is the mobile-viable transport; rusqlite
+with FTS5; keyring's `apple-native` backend for the iOS keychain), the
+Kysely-over-IPC reads, all of `@reflect/core`, the design system, and Vite.
 
 **What we pay (verified, mid-2026):**
 
-- **Keyboard:** the webview is pushed off-screen instead of resized when the
-  iOS keyboard opens ([tauri#9907](https://github.com/tauri-apps/tauri/issues/9907),
-  open since 2024). There is no official keyboard plugin (Capacitor has a
-  mature one), so we ship a small first-party Swift plugin that pins the
+- **Keyboard:** iOS pushes the webview off-screen instead of resizing it
+  ([tauri#9907](https://github.com/tauri-apps/tauri/issues/9907)). There is no
+  official keyboard plugin, so we ship a small Swift plugin that pins the
   webview (inset adjustment off, scroll offset held at zero). With the page
   pinned, `visualViewport` reflects the keyboard exactly (verified on iOS
-  18.4/26.5, iPhone and iPad; an earlier note here claimed otherwise): its
-  `resize` fires at the end of the keyboard animation, ~240ms after the
-  native notification, and carries no duration. `--keyboard-height` is
-  derived from it in `use-keyboard.ts`; the plugin's original native event
-  bridge was removed. Known OS bug: iOS 26.0 leaves the viewport stale after
+  18.4/26.5, iPhone and iPad): its `resize` fires at the end of the animation,
+  ~240ms after the native notification, with no duration.
+  `--keyboard-height` derives from it in `use-keyboard.ts`; the plugin's
+  native event bridge was removed. iOS 26.0 leaves the viewport stale after
   dismissal ([forums 800125](https://developer.apple.com/forums/thread/800125),
   fixed in 26.1); a focusout watchdog resets the variable.
-- **Lifecycle:** iOS kills the WebContent process in the background; apps must
-  handle resume-with-dead-webview ([tauri#14371](https://github.com/tauri-apps/tauri/issues/14371),
-  fixed upstream — verify the fix is in our pinned version). iOS suspends the
-  process shortly after backgrounding; no background sync without
-  BGTaskScheduler work (out of v1 scope).
-- **Plugin gaps vs Capacitor:** no official share-sheet, push, or keyboard
-  plugins (community ones exist, early-stage). Official mobile coverage is
-  good for what v1 needs: fs, sql, http, dialog, opener, deep-link, biometric,
-  haptics, notification (local).
-- **Thin precedent:** no marquee consumer iOS app ships Tauri mobile today.
-  App Store submissions exist and the `tauri ios build --export-method
-  app-store-connect` path is documented, but we'd be early. Apple's
-  guideline 4.2 (minimum functionality) is a low risk for an offline-capable
-  local-first app, but it is nonzero for any webview shell.
+- **Lifecycle:** iOS kills the WebContent process in the background
+  ([tauri#14371](https://github.com/tauri-apps/tauri/issues/14371), fixed
+  upstream; verify it is in our pinned version). iOS suspends the app soon
+  after backgrounding, so no background sync without BGTaskScheduler (out of
+  v1 scope).
+- **Plugin gaps:** no official share-sheet, push or keyboard plugins
+  (community ones are early). Official coverage fits v1: fs, sql, http, dialog,
+  opener, deep-link, biometric, haptics, local notification.
+- **Thin precedent:** no marquee consumer iOS app ships Tauri mobile. The
+  `tauri ios build --export-method app-store-connect` path is documented, but
+  we are early. Guideline 4.2 (minimum functionality) risk is low for an
+  offline-capable app, but nonzero for any webview shell.
 
 ### Capacitor (strongest alternative; the fallback)
 
-Capacitor 8 (SPM-based on iOS, actively maintained, ~1M weekly downloads) wraps
-the same WKWebView around the same Vite `dist/` — frontend reuse is near-total,
-and its first-party plugins cover exactly Tauri's gap list: `@capacitor/keyboard`
-(resize modes), share, push, app lifecycle events. **Obsidian ships its mobile
-apps on Capacitor** — the existence proof that a webview markdown editor at
-scale is App-Store-viable and fast.
+Capacitor 8 (SPM on iOS, actively maintained, ~1M weekly downloads) wraps the
+same WKWebView around the same Vite `dist/`, and its first-party plugins cover
+Tauri's gaps (`@capacitor/keyboard`, share, push, lifecycle). **Obsidian ships
+mobile on Capacitor**, proof that a webview markdown editor is App-Store-viable.
 
-What disqualifies it as the first choice: **no Rust.** The sync engine would
-need libgit2 compiled and bridged through a hand-written Swift/Kotlin plugin
-(at which point we are doing Tauri's job without Tauri's tooling), or a JS git
-implementation (isomorphic-git cannot do real merges), or — worst — a separate
-sync implementation that must stay byte-compatible with desktop's commit/merge
-behavior. The index would move to `@capacitor-community/sqlite`, a second
-SQLite stack with its own dialect quirks. Our IPC layer (zod-validated
-commands, the Kysely-over-IPC dialect) is Tauri-shaped and would need a
-parallel Capacitor bridge. Two shells, two native plugin surfaces, two
-permission models — for the same webview with the same editor problem.
+What disqualifies it: **no Rust.** Sync would need libgit2 bridged through a
+hand-written Swift/Kotlin plugin (Tauri's job without Tauri's tooling), a JS
+git (isomorphic-git cannot do real merges), or a separate implementation kept
+byte-compatible with desktop. The index would move to
+`@capacitor-community/sqlite`, a second SQLite stack. Our Tauri-shaped IPC
+(zod-validated commands, Kysely dialect) would need a parallel bridge.
 
-Worth weighing honestly: the defunct V1 mobile app (`team-reflect/reflect-mobile`)
-*was* Capacitor (v6 + Next.js + Firestore), and its deepest recurring pain —
-ProseMirror focus/selection/keyboard timing inside WKWebView, webview-crash
-recovery, native class-swizzling for the keyboard accessory bar — was **not**
-solved by Capacitor's maturity. The hard problem for a notes app is
-editor-in-WKWebView, and it is shell-independent. That neutralizes much of
-Capacitor's headline advantage for us.
+The defunct V1 mobile app (`team-reflect/reflect-mobile`) *was* Capacitor (v6 +
+Next.js + Firestore). Its worst pain (ProseMirror focus/selection/keyboard
+timing in WKWebView, webview-crash recovery, swizzling the keyboard accessory
+bar) was **not** solved by Capacitor's maturity. Editor-in-WKWebView is
+shell-independent, which neutralizes much of Capacitor's advantage.
 
-Strategic note: Ionic (the company behind Capacitor) was acquired by
-OutSystems, which discontinued all commercial products in Feb 2025 while
-keeping Capacitor open source and maintained. Healthy today; bus-factor is
-OutSystems' continued interest.
+Strategic note: OutSystems acquired Ionic and discontinued its commercial
+products in Feb 2025, keeping Capacitor open source and maintained. The bus
+factor is OutSystems' continued interest.
 
 ### React Native / Expo
 
-RN 0.85 + Expo SDK 55/56 is the most mature stack with truly native UI — and
-the wrong fit here:
+RN 0.85 + Expo SDK 55/56 is the most mature stack with native UI, and the wrong
+fit:
 
-- **Frontend reuse ≈ zero.** Everything DOM-based (Tailwind, shadcn, the
-  design system, meowdown/ProseKit, TanStack Virtual) is unusable; only hooks
-  and pure logic port. This is a full UI rewrite, permanently maintained in
-  parallel.
-- **The editor problem comes back anyway.** RN's flagship markdown note apps —
-  Joplin, Notesnook — embed their editors (CodeMirror 6 / Tiptap) in a
-  *webview inside React Native*, inheriting the same WKWebView keyboard pain
-  plus an extra RN↔webview bridge. Expensify's `react-native-live-markdown` is
-  the native-input exception, but it's tied to their markdown flavor and parser
-  architecture.
-- **Rust requires uniffi.** `uniffi-bindgen-react-native` works (TurboModules
-  from UniFFI-annotated Rust) but adds a second FFI toolchain and xcframework
-  build complexity that Tauri gives us for free.
-- **The cautionary precedent points the other way.** Standard Notes went
-  native → React Native → publicly abandoned RN in 2022 ("React Native is not
-  the future") for a single web codebase wrapped on mobile, citing exactly our
-  concern: two codebases, mobile permanently lagging.
+- **Frontend reuse ≈ zero.** Tailwind, shadcn, the design system,
+  meowdown/ProseKit and TanStack Virtual are DOM-based. Only hooks and pure
+  logic port: a full UI rewrite, maintained in parallel.
+- **The editor problem returns anyway.** Joplin and Notesnook embed their
+  editors (CodeMirror 6 / Tiptap) in a webview inside RN, adding an RN↔webview
+  bridge to the same keyboard pain. Expensify's `react-native-live-markdown` is
+  the exception, tied to their markdown flavor.
+- **Rust requires uniffi.** `uniffi-bindgen-react-native` works but adds a
+  second FFI toolchain and xcframework complexity.
+- **Precedent points the other way.** Standard Notes went native → React
+  Native → abandoned RN in 2022 for one web codebase wrapped on mobile, citing
+  two codebases and mobile always lagging.
 
-Expo specifically adds excellent tooling (EAS builds/updates) but none of it
-addresses the reuse problem; it optimizes a path we don't want to be on.
+Expo's tooling (EAS) does not address reuse.
 
 ### Ionic Framework
 
-A web-component UI kit (iOS/Material adaptive widgets, transitions) layered on
-Capacitor. We have our own design system and component library; Obsidian ships
-Capacitor without Ionic. Nothing it offers is load-bearing for us. Ruled out
-without much ceremony — the real Capacitor question is answered above.
+A web-component UI kit on Capacitor. We have our own design system, and
+Obsidian ships Capacitor without Ionic. Ruled out; the Capacitor question is
+answered above.
 
 ## Comparison at a glance
 
@@ -165,37 +137,32 @@ without much ceremony — the real Capacitor question is answered above.
 
 ## Fallback triggers
 
-Capacitor remains the credible plan B precisely because it wraps the same Vite
-frontend. We switch (or re-evaluate) if, during Plan 19's gate spikes:
+Capacitor stays plan B because it wraps the same frontend. We re-evaluate if,
+during Plan 19's gate spikes:
 
-1. The crate cannot be made to build and run acceptably on iOS (git2/vendored
-   OpenSSL cross-compile, keyring-on-iOS, rusqlite/FTS5) within the spike
-   budget — this would gut the "keep the Rust core" rationale.
-2. Keyboard/viewport behavior cannot reach acceptable quality with a
-   first-party Swift plugin (tauri#9907 workaround) — **shell-attributable
-   failures only**. Editing quality *inside* the webview (ProseMirror/
-   CodeMirror focus, selection, IME) is shell-independent: Capacitor wraps
-   the same WKWebView and would inherit the identical problem, so editor
-   viability never justifies a shell switch. Plan 19 handles it with an
-   editor ladder (meowdown → CodeMirror 6, Obsidian-proven on iOS); if both
-   rungs fail, the escalation is native-editor territory (a much bigger
-   decision than the shell), taken with the spike data in hand.
-3. App Store review rejects the Tauri shell on grounds Capacitor demonstrably
-   passes (4.2 / process model), after one appeal cycle.
+1. The crate cannot build and run acceptably on iOS (git2/vendored OpenSSL,
+   keyring, rusqlite/FTS5) within the spike budget.
+2. Keyboard/viewport behavior cannot reach acceptable quality with a Swift
+   plugin. **Shell-attributable failures only:** editing quality inside the
+   webview (focus, selection, IME) is shell-independent, so it never justifies
+   a shell switch. Plan 19 handles it with an editor ladder (meowdown →
+   CodeMirror 6, Obsidian-proven on iOS); if both fail, the next step is a
+   native editor, a bigger decision than the shell.
+3. App Store review rejects the Tauri shell on grounds Capacitor passes (4.2 /
+   process model), after one appeal.
 
-A fallback would keep `@reflect/core` and the frontend, and would require a
-Capacitor bridge implementing the same command surface plus a native sync
-plugin — significant, bounded work; not a rewrite.
+A fallback keeps `@reflect/core` and the frontend and needs a Capacitor bridge
+for the same command surface plus a native sync plugin: significant, bounded,
+not a rewrite.
 
 ## Consequences
 
-- Mobile is a **target of the existing app**, not a new app: see
-  [Plan 19](../plans/19-mobile.md) for the cfg-gating, capability split,
-  mobile frontend entry, and the keyboard plugin.
-- We own a small Swift (later Kotlin) surface: keyboard insets now; share
-  sheet / share-target later.
-- Desktop-only crates get target-gated (`fastembed`, `notify`, `trash`,
-  `tauri-plugin-window-state`) — semantic search and file watching are
-  desktop-only by design in mobile v1.
-- We track Tauri mobile releases closely and pin deliberately; upstream
-  keyboard/lifecycle fixes may let us delete our workarounds.
+- Mobile is a **target of the existing app**, not a new app
+  ([Plan 19](../plans/19-mobile.md)).
+- We own a small Swift (later Kotlin) surface: keyboard insets now, share
+  sheet / share target later.
+- Desktop-only crates are target-gated (`fastembed`, `notify`, `trash`,
+  `tauri-plugin-window-state`): semantic search and file watching are
+  desktop-only in mobile v1.
+- We track Tauri mobile releases and pin deliberately; upstream fixes may let
+  us delete our workarounds.

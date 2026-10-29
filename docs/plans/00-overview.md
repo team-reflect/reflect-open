@@ -1,109 +1,84 @@
 # Reflect V2 — First-Version Implementation Roadmap
 
-This directory holds the numbered, dependency-ordered plans for building the **first
-version (first wave)** of Reflect V2: the open-source, local-first, markdown-native,
-AI-native rewrite described in the product docs.
+The numbered, dependency-ordered plans for the **first wave** of Reflect V2: the
+open-source, local-first, markdown-native, AI-native rewrite described in the product docs.
 
 ## Current source status (2026-06-14)
 
-The source tree now implements Plans 01–12 and 14–17, with Plan 16 at its V1 scope
-(SSH agent auth + path remotes; HTTPS credential helpers remain V2). Plan 11 is no
-longer deferred: the repo contains the WXT extension (`apps/extension`), the native
-messaging sidecar (`apps/native-host`), desktop capture commands
-(`apps/desktop/src-tauri/src/capture.rs`), and the TS drain/enrichment path in
-`@reflect/core`.
+The source implements Plans 01–12 and 14–17. Plan 16 is at its V1 scope (SSH agent auth +
+path remotes; HTTPS credential helpers remain V2). Plan 11 is no longer deferred: the WXT
+extension (`apps/extension`), native-messaging sidecar (`apps/native-host`), desktop
+capture commands, and the TS drain/enrichment path all exist.
 
-Plan 13 is **closed by product decision**: the graph folder itself is the portability
-surface, so no dedicated import/export suite is planned. Reflect V1 exports now use a
-V2-compatible markdown graph shape, so there is no separate V1 import surface. Plan 18
-remains an unbuilt add-on. Plan 19 is active implementation work, not just a future
-track: the existing Tauri app has a platform root gate, mobile UI tree, fixed-root
-onboarding, target-gated Rust capabilities, and the first-party iOS keyboard plugin;
-physical-device validation and App Store/TestFlight hardening are still open.
+Plan 13 is **closed by product decision**: the graph folder is the portability surface.
+Reflect V1 exports already use a V2-compatible markdown shape, so there is no V1 import
+surface. Plan 18 is an unbuilt add-on. Plan 19 is active: platform root gate, mobile UI
+tree, fixed-root onboarding, target-gated Rust capabilities, and the iOS keyboard plugin
+exist; device validation and App Store/TestFlight hardening are open.
 
-Two features landed beyond the original written plans: **audio memos** (raw-first
-capture with async BYOK cloud transcription via `audio/audio-memo`) and **durable AI
-chat persistence** (the `chat_*` tables in `index.sqlite` are the one sanctioned
-non-rebuildable exception to the projection-only rule). The AI copilot (Plan 10) ships
-as a dedicated, read-only chat view over local tools; patchsets/edits remain a later
-wave, per the plan's revision note.
+Two features landed beyond the written plans: **audio memos** (raw-first capture, async
+BYOK transcription) and **durable AI chat persistence** (the `chat_*` tables are the one
+sanctioned non-rebuildable exception to the projection-only rule). The copilot (Plan 10)
+ships as a read-only chat view over local tools; patchsets remain a later wave.
 
-Read these alongside the source docs they implement:
-
-- [V2 Product Vision](../reflect-v2-product-vision.md)
-- [V2 Indexing Strategy](../reflect-v2-indexing-strategy.md)
-- [V2 Sync Strategy](../reflect-v2-sync-strategy.md)
-- [V2 Grounding Brief](../reflect-v2-grounding-brief.md)
-- [V1 Overview](../reflect-v1-overview.md)
-- Repo conventions: [AGENTS.md](../../AGENTS.md)
+Source docs: [V2 Product Vision](../reflect-v2-product-vision.md),
+[V2 Indexing Strategy](../reflect-v2-indexing-strategy.md),
+[V2 Sync Strategy](../reflect-v2-sync-strategy.md),
+[V2 Grounding Brief](../reflect-v2-grounding-brief.md),
+[V1 Overview](../reflect-v1-overview.md), repo conventions in [AGENTS.md](../../AGENTS.md).
 
 ## How to read this set
 
-Each plan is one phase. A phase has a **goal**, **depends on / unlocks**, **scope**
-(explicit in/out), **steps**, **key decisions/contracts** (with code sketches),
-**acceptance criteria**, and **risks**. Build them roughly in order — later phases
-assume the contracts defined in earlier ones.
+Each plan is one phase with goal, depends on / unlocks, scope, steps, key decisions,
+acceptance criteria, and risks. Later phases assume earlier contracts.
 
-The product vision is explicit: **do not start with screens.** Start by defining
-contracts (document model, workspace model, projection model, sync model, assistant
-model, route model). The plan ordering reflects that — storage and the index land
-before the editor, and the editor lands before search/AI.
+The product vision says **do not start with screens**: define contracts first (document,
+workspace, projection, sync, assistant, route). So storage and the index land before the
+editor, and the editor before search/AI.
 
-> **Read first:** [Architecture & Conventions](architecture-conventions.md) — the
-> cross-cutting decisions (Turborepo monorepo, **TS `core` / Rust primitives**, the
-> per-domain **actions** pattern, full Kysely discipline) that every plan below assumes.
-> Chosen libraries (TS + Rust) per step are recorded in [Libraries](libraries.md).
+> **Read first:** [Architecture & Conventions](architecture-conventions.md) (Turborepo,
+> **TS `core` / Rust primitives**, per-domain **actions**, Kysely discipline). Libraries
+> per step: [Libraries](libraries.md).
 
 ## The plans
 
 | # | Plan | Delivers |
 |---|------|----------|
-| 01 | [Foundation & toolchain](01-foundation-and-toolchain.md) | Tauri/React/TS app shell, Tailwind + shadcn + Lucide, zod, Kysely wiring, test/lint, design-system, IPC conventions |
-| 02 | [Graph & file storage](02-graph-and-file-storage.md) | Graph folder (`daily/`, `notes/`, `assets/`, `.reflect/`), Rust file IO, frontmatter + note identity, graph open/create |
-| 03 | [Markdown document model](03-markdown-document-model.md) | Canonical AST, frontmatter + wiki-link parsing, lossless serialization, zod schemas, external-edit tolerance |
-| 04 | [Local index (SQLite)](04-local-index-sqlite.md) | SQLite-in-Rust + Kysely query builder, projections, FTS, file watching, incremental indexing, rebuild/repair |
-| 05 | [Markdown editor](05-markdown-editor.md) | Integrate **meowdown** (ProseKit/ProseMirror over `@lezer/markdown`), keyboard-native; add wiki-link/image/checkbox extensions |
-| 06 | [Daily notes & routing](06-daily-notes-and-routing.md) | Opens to today, chronological navigation, `[[YYYY-MM-DD]]` date links, stable route model |
-| 07 | [Backlinks](07-backlinks.md) | `[[` autocomplete, create-from-unresolved, incoming backlinks, rename-rewrite + aliases |
-| 08 | [Lexical search & command palette](08-lexical-search-and-command-palette.md) | `⌘K` search/command surface, FTS over titles/body, filters, navigation commands |
-| 09 | [Semantic search & local embeddings](09-semantic-search-and-embeddings.md) | Local embedding runtime (Rust), chunking, `sqlite-vec`, incremental re-embed, retrieval layer |
-| 10 | [AI copilot sidebar](10-ai-copilot-sidebar.md) | BYOK providers, keychain secrets, read-only chat route over `search_notes`/`read_note`, durable chat history, `private: true` hard-block; patchsets deferred |
-| 11 | [Link capture](11-link-capture.md) | Chrome extension → native-messaging sidecar → desktop capture inbox, screenshots, meta/BYOK enrichment, dedicated capture notes + daily-note `[[Links]]` |
-| 12 | [Backup & sync (GitHub-only)](12-backup-and-sync.md) | GitHub/Git backup + restore, Git-native conflict surface, manual review, checkpoints. Written when file-sync providers were unsupported — Plan 21 later shipped iCloud Drive as the primary sync path; Git remains the self-managed alternative (never both on one graph) |
-| 13 | [Import / export / portability](13-import-export-portability.md) | **Closed by decision.** Markdown files are the portability surface; no JSON/HTML/ZIP export or Obsidian/folder import suite is planned |
+| 01 | [Foundation & toolchain](01-foundation-and-toolchain.md) | Tauri/React/TS shell, Tailwind + shadcn + Lucide, zod, Kysely, test/lint, IPC conventions |
+| 02 | [Graph & file storage](02-graph-and-file-storage.md) | Graph folder (`daily/`, `notes/`, `assets/`, `.reflect/`), Rust file IO, note identity, graph open/create |
+| 03 | [Markdown document model](03-markdown-document-model.md) | Canonical AST, frontmatter + wiki-link parsing, lossless serialization, external-edit tolerance |
+| 04 | [Local index (SQLite)](04-local-index-sqlite.md) | SQLite-in-Rust + Kysely builder, projections, FTS, watching, incremental indexing, rebuild |
+| 05 | [Markdown editor](05-markdown-editor.md) | **meowdown** (ProseKit over `@lezer/markdown`), keyboard-native; wiki-link/image/checkbox extensions |
+| 06 | [Daily notes & routing](06-daily-notes-and-routing.md) | Opens to today, chronological navigation, date links, route model |
+| 07 | [Backlinks](07-backlinks.md) | `[[` autocomplete, create-from-unresolved, backlinks, rename-rewrite + aliases |
+| 08 | [Lexical search & command palette](08-lexical-search-and-command-palette.md) | `⌘K` search/command surface, FTS, filters, navigation commands |
+| 09 | [Semantic search & local embeddings](09-semantic-search-and-embeddings.md) | Local embeddings (Rust), chunking, `sqlite-vec`, incremental re-embed, retrieval |
+| 10 | [AI copilot sidebar](10-ai-copilot-sidebar.md) | BYOK, keychain secrets, read-only chat over `search_notes`/`read_note`, durable history, `private: true` block; patchsets deferred |
+| 11 | [Link capture](11-link-capture.md) | Chrome extension → native-messaging sidecar → capture inbox, screenshots, enrichment, capture notes + daily `[[Links]]` |
+| 12 | [Backup & sync (GitHub-only)](12-backup-and-sync.md) | Git backup + restore, conflict surface, checkpoints. Written when file-sync was unsupported; Plan 21 later made iCloud the primary path, Git the self-managed alternative (never both) |
+| 13 | [Import / export / portability](13-import-export-portability.md) | **Closed by decision.** Markdown files are the portability surface |
 | 14 | [CLI (read/discovery)](14-cli-read-discovery.md) | `reflect today`, `reflect search`, `reflect show`, path lookup |
-| 15 | [Hardening, packaging & OSS release](15-hardening-packaging-release.md) | a11y, perf budgets, signing/notarization, MIT + docs, onboarding, release pipeline |
-| 16 | [Generic git remotes](16-generic-git-remotes.md) | Any git host (GitLab/Gitea/GHES/NAS) via hand-wired `origin`, zero new UI — V1 SSH (agent) + path remotes, V2 HTTPS (credential helpers) |
-| 17 | [Readable filenames](17-readable-filenames.md) | Title-derived note filenames (slug + collision suffix), frontmatter `id` adoption, rename-on-settled-title file moves, id-healed external renames |
-| 18 | [Tasks](18-tasks.md) | **Post-release add-on.** Round-checkbox (`+ [ ]`) tasks as a rebuildable projection: interactive editor checkboxes, Tasks view (Overdue/Today/Upcoming), `[[date]]`/daily scheduling, guarded toggle write-back, square checklists excluded |
-| 19 | [Mobile companion](19-mobile.md) | **In progress.** iOS target of the existing Tauri app: mobile root gate, fixed graph root, onboarding, Daily/All shell, editable notes, keyboard plugin; device validation + store hardening remain |
-| 20 | [Asset descriptions](20-asset-descriptions.md) | **Post-release add-on.** AI-generated `.reflect.md` description files for referenced, non-private images/PDFs under `assets/`; BYOK, privacy-gated, manual backfill |
-| 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **Shipped (2026-07-04).** iCloud Drive as the primary consumer sync path: graphs in the app's iCloud container, deterministic resolution ladder over per-device shadow bases (markers as the fallback), `.reflect/`/`.git/` sync-exclusion, iCloud-first onboarding on both platforms with multi-graph lists + the mobile switcher; git remotes stay the self-managed path. AI-assisted resolution deferred |
-| 22 | [Mobile GitHub connect](22-mobile-github-connect.md) | **Implemented; device pass pending.** The connect front door for local (non-iCloud) graphs on iOS: shared wizard hook, `ConnectGithubDrawer`, Settings entry point — no new sync mechanism |
-| 23 | [Mobile AI chat](23-mobile-ai-chat.md) | The Plan 10 chat on iOS as a fourth tab: same engine/store/privacy gate, mobile composer + history/model sheets, per-device BYOK provider settings, lexical-only `search_notes`; streaming-on-iOS spike gates the build |
+| 15 | [Hardening, packaging & OSS release](15-hardening-packaging-release.md) | a11y, perf, signing/notarization, MIT + docs, onboarding, release pipeline |
+| 16 | [Generic git remotes](16-generic-git-remotes.md) | Any git host via hand-wired `origin`, no new UI. V1: SSH agent + path; V2: HTTPS credential helpers |
+| 17 | [Readable filenames](17-readable-filenames.md) | Title-derived filenames, frontmatter `id` adoption, rename-on-settled-title moves, id-healed external renames |
+| 18 | [Tasks](18-tasks.md) | **Post-release add-on.** `+ [ ]` tasks as a projection: editor checkboxes, Tasks view, date scheduling, guarded write-back |
+| 19 | [Mobile companion](19-mobile.md) | **In progress.** iOS target of the Tauri app; device validation + store hardening remain |
+| 20 | [Asset descriptions](20-asset-descriptions.md) | **Post-release add-on.** AI `.reflect.md` descriptions for non-private assets; BYOK, manual backfill |
+| 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **Shipped (2026-07-04).** Primary consumer sync: iCloud container graphs, resolution ladder over per-device shadow bases, `.reflect/`/`.git/` exclusion, iCloud-first onboarding; AI-assisted resolution deferred |
+| 22 | [Mobile GitHub connect](22-mobile-github-connect.md) | **Implemented; device pass pending.** Connect flow for local iOS graphs; no new sync mechanism |
+| 23 | [Mobile AI chat](23-mobile-ai-chat.md) | Plan 10 chat on iOS as a fourth tab, per-device BYOK, lexical-only `search_notes`; streaming spike gates the build |
 
 ## Milestone map
 
-The phases group into shippable milestones. Each milestone is independently
-demonstrable.
-
-- **M0 — Walking skeleton** (Plans 01–02): app boots, user picks a graph folder, Rust
-  reads/writes a markdown file round-trip.
-- **M1 — Notes you can write** (Plans 03, 05, 06; index **04 can lag**): parser + editor +
-  daily notes. *First genuinely usable build:* open today's note, write markdown, files
-  land on disk, reopen. **Sequencing insight (review):** the editor and daily notes read/
-  write files directly and **don't need the SQLite index** — only search/backlinks do. So
-  ship M1 file-only with a no-op indexer, and land Plan 04 (the index) **with M2**, where
-  it's actually needed. This shrinks M1 (which was overloaded) and de-risks the bespoke
-  Kysely-over-IPC layer by not blocking "usable" on it.
-- **M2 — A connected graph you can find** (Plans 07–09): backlinks, `⌘K` lexical
-  search, then local semantic search.
-- **M3 — AI-native** (Plan 10): the right-sidebar copilot over local context.
-- **M4 — Capture & durability** (Plans 11–13): link capture, backup/sync, and the
-  markdown-folder portability contract. *(Shipped substantially: backup/sync, link
-  capture, and audio memos landed; Plan 13 is closed because the graph itself is the
-  export.)*
-- **M5 — Reach & release** (Plans 14–15): CLI, hardening, packaging, open-source launch.
+- **M0 — Walking skeleton** (01–02): app boots, picks a graph, round-trips a file.
+- **M1 — Notes you can write** (03, 05, 06): *first usable build.* **Sequencing (review):**
+  editor and dailies read/write files directly and **do not need the index**; only
+  search/backlinks do. So M1 ships file-only with a no-op indexer and Plan 04 lands
+  **with M2**. This shrinks M1 and keeps the Kysely-over-IPC layer off the critical path.
+- **M2 — A connected graph you can find** (07–09).
+- **M3 — AI-native** (10).
+- **M4 — Capture & durability** (11–13). *(Shipped substantially; Plan 13 closed.)*
+- **M5 — Reach & release** (14–15).
 
 ## Dependency graph (abridged)
 
@@ -119,65 +94,50 @@ demonstrable.
 
 ## Top risks (from plan review)
 
-The highest-severity risks surfaced reviewing this plan, with where they're handled:
-
-1. **meowdown is the core bet and is early (v0.2.0, no wiki-links).** The whole product
-   rides a pre-1.0 editor we must extend with `[[ ]]`. **Gate passed:** the Plan 01
-   wiki-link spike confirmed lossless `[[ ]]` round-trips + a clean extension path.
-   Residual: it's pre-1.0 (we own the extension code, pin versions); CodeMirror-6
-   live-preview stays the documented fallback. *Licensing is resolved — meowdown is
-   first-party MIT.*
-2. **A cloud-sync folder can corrupt the index or fight a Git remote.** Originally
-   mitigated by refusing file-sync providers outright; since Plan 21 shipped, iCloud
-   Drive is the *supported primary* path and the risk is managed instead of avoided:
-   `.reflect/` (and `.git/`) are sync-excluded so the SQLite `-wal`/`-shm` never ride
-   the provider, atomic-write temps stage inside `.reflect/tmp/`, and **iCloud and a
-   Git remote are mutually exclusive per graph**. Third-party folder sync (Dropbox et
-   al.) remains unsupported: same hazards, none of Plan 21's machinery.
-3. **Durable macOS folder access** (TCC prompts; security-scoped bookmarks if sandboxed) —
-   the in-graph decision depends on it; spike + handle in Plans 01/02/15.
-4. **Bespoke Kysely-over-IPC dialect** is non-trivial; keep zod to real boundaries and keep
-   a named-query-command fallback (Plan 04).
-5. **Scope creep in sync/AI:** AI-assisted conflict resolution trimmed out of first wave
-   (Plan 12); semantic search kept independently deferrable (Plan 09).
+1. **meowdown is the core bet and was early** (v0.2.0, no wiki links). **Gate passed:**
+   the Plan 01 spike confirmed lossless `[[ ]]` round-trips. Residual: pre-1.0 (we own the
+   extension, pin versions); CodeMirror-6 live preview is the fallback. Licensing is
+   resolved (first-party MIT).
+2. **A cloud-sync folder can corrupt the index or fight a Git remote.** First mitigated by
+   refusing file-sync providers; since Plan 21, iCloud is *supported* and the risk is
+   managed: `.reflect/` and `.git/` are sync-excluded (so SQLite `-wal`/`-shm` never
+   sync), atomic-write temps stage in `.reflect/tmp/`, and **iCloud and a Git remote are
+   mutually exclusive per graph**. Other folder sync (Dropbox etc.) stays unsupported:
+   same hazards, none of Plan 21's machinery.
+3. **Durable macOS folder access** (TCC; bookmarks if sandboxed): Plans 01/02/15.
+4. **Kysely-over-IPC dialect** is non-trivial: zod only at real boundaries, named-query
+   fallback (Plan 04).
+5. **Scope creep in sync/AI:** AI conflict resolution cut from the first wave (Plan 12);
+   semantic search independently deferrable (Plan 09).
 
 ## First-wave scope guardrails
 
-These are the product's hard principles. Every plan must hold them. Restated here so
-they are not re-litigated per phase:
+The product's hard principles, restated so they are not re-litigated per phase:
 
-- **Markdown is the source of truth.** SQLite under `.reflect/` is a rebuildable
-  projection, never durable storage. Any non-rebuildable local state must be justified.
-- **No Reflect-hosted APIs.** LLM/transcription/sync calls go directly from the app to
-  user-approved providers (BYOK AI providers, GitHub). No proxy through Reflect infra.
-- **`private: true` is a hard block.** Such notes' content must never be sent to any
-  external service — AI, capture enrichment, conflict resolution, or otherwise.
-- **Secrets live in the OS keychain.** Never in markdown, Git, or `.reflect/`.
-- **Keyboard-native.** Every core workflow reachable from the keyboard.
-- **Portable data from day one.** The graph folder itself is the export; backup must be
-  free. Sync is iCloud Drive (the primary path since Plan 21) or a Git remote — one per
-  graph, never both; other file-sync providers (Dropbox/Drive) remain unsupported.
-- **No Electron, no web app, Mac-first.** Tauri shell; iOS/Windows later.
-- **MIT open-source core.** Write as if the code is public and will be critiqued. The
-  editor [meowdown](https://github.com/prosekit/meowdown) is **first-party** (owned by the
-  team) and MIT-licensed, so the MIT core holds with no copyleft constraint.
+- **Markdown is the source of truth.** `.reflect/` SQLite is a rebuildable projection; any
+  non-rebuildable state must be justified.
+- **No Reflect-hosted APIs.** LLM/transcription/sync calls go straight to user-approved
+  providers.
+- **`private: true` is a hard block** for every external service.
+- **Secrets live in the OS keychain.**
+- **Keyboard-native.**
+- **Portable data from day one.** The graph folder is the export; backup is free. Sync is
+  iCloud Drive (primary since Plan 21) or a Git remote, one per graph; other file-sync
+  providers stay unsupported.
+- **No Electron, no web app, Mac-first.**
+- **MIT open-source core.** [meowdown](https://github.com/prosekit/meowdown) is first-party
+  MIT, so there is no copyleft constraint.
 
 ## Explicitly deferred (NOT first wave)
 
-Do not build these now; keep the door open in the data model. Tasks (now planned as a
-post-release add-on — [Plan 18](18-tasks.md)), full browser clipper / article
-extraction beyond the implemented Plan 11 link-capture flow, graph-map view, templates,
-contacts/calendar, publishing, any non-GitHub sync (iCloud/Dropbox/Drive are unsupported
-by design, not "deferred"), a public plugin API, typed-entity layer, and full multi-device
-sync conflict automation (incl. AI-assisted resolution). Mobile did not block the Mac
-release, but [Plan 19](19-mobile.md) is now underway: capture/read/**edit**/lexical-search
-on iOS first (Tauri mobile, per [TDR 0003](../decisions/0003-mobile-shell.md)), Android
-shortly after.
+Keep the door open in the data model, but do not build: tasks (now
+[Plan 18](18-tasks.md)), full clipper / article extraction beyond Plan 11, graph map,
+templates, contacts/calendar, publishing, any non-GitHub sync (iCloud/Dropbox/Drive are
+unsupported by design, not "deferred"), a public plugin API, typed entities, and full
+multi-device conflict automation (incl. AI resolution). Mobile did not block the Mac
+release, but [Plan 19](19-mobile.md) is underway: capture/read/**edit**/lexical search on
+iOS first (Tauri mobile, per [TDR 0003](../decisions/0003-mobile-shell.md)), Android after.
 
-## Conventions (apply to every plan)
+## Conventions
 
-From [AGENTS.md](../../AGENTS.md): TypeScript with no `any`; zod at every data
-boundary, normalized to camelCase; kebab-case files; one component per file;
-providers + hooks for state; small single-responsibility modules; Kysely for DB types;
-Tailwind + shadcn (`components/ui`) + Lucide; document all public APIs; run
-`pnpm typecheck` and targeted `pnpm test --run` before declaring a phase done.
+Every plan follows [AGENTS.md](../../AGENTS.md).
