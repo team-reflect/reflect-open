@@ -140,9 +140,9 @@ jobs:
         run: |
           notes="$RUNNER_TEMP/release-notes.md"
           body="$(gh release view "$TAG" --json body --jq .body |
-            awk '/^<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->$/ { skip = 1 }
+            awk '/RELEASE_NOTES_DOWNLOAD_LINKS_START/ { skip = 1 }
               !skip { print }
-              /^<!-- RELEASE_NOTES_DOWNLOAD_LINKS_END -->$/ { skip = 0 }')"
+              /RELEASE_NOTES_DOWNLOAD_LINKS_END/ { skip = 0 }')"
           printf '%s\n\n' "$body" > "$notes"
           mapfile -t assets < <(gh release view "$TAG" --json assets --jq '.assets[].name')
           node apps/desktop/scripts/release-downloads.ts \
