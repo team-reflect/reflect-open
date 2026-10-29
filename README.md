@@ -49,8 +49,9 @@ another git remote are connected directly by the user.
 2. **Install the iOS beta.** Join
    [TestFlight](https://testflight.apple.com/join/j2eEz43d). The iOS app uses
    the same plain-file graph and sync options as the Mac app.
-3. **Windows and Linux (experimental).** Unsigned builds are attached to a
-   release when their builds succeed. See [docs/distribution.md](docs/distribution.md#windows-experimental).
+3. **Windows and Linux (experimental).** Each release includes unsigned builds.
+   See [Windows](docs/distribution.md#windows-experimental) and
+   [Linux](docs/distribution.md#linux-experimental).
 4. **Install the Chrome extension.** Add
    [Reflect Capture from the Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
    to save the current page, selected text, screenshots, and optional page text

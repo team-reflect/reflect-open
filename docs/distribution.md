@@ -6,10 +6,11 @@ source of truth for the steps. This file holds what they cannot say.
 
 ## Cutting a release
 
-release-please keeps two Release PRs open on `master`: beta (`chore: release X.Y.Z-beta.N`) and
-stable (`chore: release X.Y.Z`). **Merging a Release PR is the release.** The Release workflow
+release-please keeps two Release PRs open on `master`: beta (`chore: release X.Y.Z-beta`, then
+`-beta.N`) and stable (`chore: release X.Y.Z`). **Merging a Release PR is the release.** The Release workflow
 builds every platform into a draft GitHub release, uploads to TestFlight, and publishes the
-release after the macOS, Windows, and Linux builds succeed.
+release after the macOS, Windows, and Linux builds succeed. A failed build on any of the three
+keeps the release a draft until a rerun succeeds.
 
 - Release PRs are created with `GITHUB_TOKEN`, so their checks do not start by themselves. Use
   the run-checks button before you merge one.
@@ -139,8 +140,7 @@ pnpm build:windows [--target=aarch64-pc-windows-msvc]
 
 ### Install
 
-Each release can attach `*_x64-setup.exe` and `*_arm64-setup.exe`, not code-signed. A Windows
-build failure does not block a release.
+Each release attaches `*_x64-setup.exe` and `*_arm64-setup.exe`, not code-signed.
 
 - The installer is per-user and needs no admin.
 - The first launch shows "Windows protected your PC": click **More info → Run anyway**.
@@ -167,8 +167,7 @@ pnpm build:linux [--target=aarch64-unknown-linux-gnu]
 
 ### Install
 
-Each release can attach an AppImage and a `.deb` for x64 and arm64, not code-signed. A Linux
-build failure does not block a release.
+Each release attaches an AppImage and a `.deb` for x64 and arm64, not code-signed.
 
 - **AppImage** runs without installation and carries its own WebKitGTK. Make it executable and
   keep it in a writable folder, because updates replace the file.
