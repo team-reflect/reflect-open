@@ -113,12 +113,12 @@ for (const { heading, icon, badges } of PLATFORMS) {
   const markdown = badges
     .filter((badge) => badge.file === undefined || assetNames.includes(badge.file))
     .map((badge) => {
-      const image = `https://badgen.net/badge/${encodeURIComponent(tag)}/${encodeURIComponent(badge.variant)}/${badge.color}?icon=${icon}`
+      const image = `https://badgen.net/badge/${encodeURIComponent(version)}/${encodeURIComponent(badge.variant)}/${badge.color}?icon=${icon}&style=flat`
       const url = badge.url ?? `https://github.com/${repo}/releases/download/${tag}/${badge.file}`
       return `[![${heading} ${badge.variant}](${image})](${url})`
     })
   if (markdown.length > 0) {
-    section += `| ${heading} | ${markdown.join('<br>')} |\n`
+    section += `| **${heading}** | ${markdown.join('<br>')} |\n`
   }
 }
 section += '\n<!-- RELEASE_NOTES_DOWNLOAD_LINKS_END -->\n'
