@@ -123,6 +123,9 @@ for (const { heading, icon, badges } of PLATFORMS) {
 section += '\n<!-- RELEASE_NOTES_DOWNLOAD_LINKS_END -->\n'
 
 const body = release.body
-  .replace(/^.*RELEASE_NOTES_DOWNLOAD_LINKS_START[\s\S]*?RELEASE_NOTES_DOWNLOAD_LINKS_END.*$/m, '')
+  .replace(
+    /^.*RELEASE_NOTES_DOWNLOAD_LINKS_START[\s\S]*?(?:RELEASE_NOTES_DOWNLOAD_LINKS_END.*$|(?![\s\S]))/m,
+    '',
+  )
   .trimEnd()
 process.stdout.write(body ? `${body}\n\n${section}` : section)
