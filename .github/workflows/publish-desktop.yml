@@ -1,9 +1,5 @@
 name: Publish desktop
 
-# Builds, uploads, and publishes one desktop release (macOS, Windows, Linux,
-# and TestFlight) for a tag created by release-please. Called once per channel
-# by release.yml. To retry, re-run the failed jobs of the Release run.
-
 on:
   workflow_call:
     inputs:
@@ -74,10 +70,6 @@ jobs:
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-  # Every release also ships to TestFlight. iOS needs no version bump of its
-  # own: the marketing version follows apps/desktop/package.json with the
-  # prerelease suffix stripped, so beta and stable builds stack under the same
-  # version, told apart by the UTC-timestamp build number.
   testflight:
     name: Upload the release to TestFlight
     uses: ./.github/workflows/publish-testflight.yml
@@ -90,13 +82,6 @@ jobs:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
-  # The builds only fill the draft release. Publishing waits for the macOS,
-  # Windows, and Linux builds to succeed.
-  #
-  # This job writes latest.json, completes the release notes, and publishes
-  # the release. Nothing is visible to users, and releases/latest does not
-  # move, until it undrafts the release as its last step on the tagged
-  # release. To retry, re-run this job from the workflow run.
   finalize:
     name: Finalize the release
     needs: [macos, windows, linux]
@@ -144,12 +129,9 @@ jobs:
             echo "asset=${product// /.}"
           } >> "$GITHUB_OUTPUT"
 
-      # Installed apps find a new version through latest.json: stable apps read
-      # it from releases/latest, beta apps from the updater-beta release.
       - name: Write the updater manifest
         run: pnpm release:manifest --tag="$TAG"
 
-      # Keep the changelog release-please wrote and add the download badges.
       # A rerun replaces the download section, so it lists the assets that a
       # retried build uploaded since the last run.
       - name: Write the release notes
@@ -182,9 +164,8 @@ jobs:
           fi
           gh release edit "$TAG" "${flags[@]}"
 
-      # Beta apps and the README download links read from the moving
-      # updater-beta release. A failed sync can be retried by re-running this
-      # job: every step above gives the same result on a rerun.
+      # Every step above gives the same result on a rerun, so a failed sync can
+      # be retried by re-running this job.
       - name: Sync beta downloads and updater feed
         if: steps.release.outputs.prerelease == 'true'
         working-directory: ${{ runner.temp }}

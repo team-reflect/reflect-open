@@ -23,7 +23,6 @@ concurrency:
   group: publish-browser-extension
   cancel-in-progress: false
 
-# Uploads the zip into the release-please draft release and undrafts it.
 permissions:
   contents: write
 
