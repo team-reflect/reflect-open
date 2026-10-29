@@ -107,13 +107,12 @@ if (!files.some((file) => assetNames.includes(file))) {
   fail(`no installer among the asset names. Expected: ${files.join(', ')}`)
 }
 
-let section =
-  '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n\n| Platform | Download |\n| --- | --- |\n'
+let section = `<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n\n| Platform | Download (${tag}) |\n| --- | --- |\n`
 for (const { heading, icon, badges } of PLATFORMS) {
   const markdown = badges
     .filter((badge) => badge.file === undefined || assetNames.includes(badge.file))
     .map((badge) => {
-      const image = `https://badgen.net/badge/${encodeURIComponent(version)}/${encodeURIComponent(badge.variant)}/${badge.color}?icon=${icon}&style=flat`
+      const image = `https://badgen.net/badge/icon/${encodeURIComponent(badge.variant)}/${badge.color}?icon=${icon}&label=&style=flat`
       const url = badge.url ?? `https://github.com/${repo}/releases/download/${tag}/${badge.file}`
       return `[![${heading} ${badge.variant}](${image})](${url})`
     })
