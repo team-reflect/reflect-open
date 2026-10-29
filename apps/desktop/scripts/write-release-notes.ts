@@ -7,16 +7,16 @@
 // the assets gets no badge.
 //
 //   gh release view <tag> --json body,assets |
-//     node apps/desktop/scripts/write-release-notes.ts --tag=<tag> --asset=<prefix>
+//     node apps/desktop/scripts/write-release-notes.ts --tag=<tag> --asset-prefix=<prefix>
 //
-//   --tag    release tag, `v` followed by the version
-//   --asset  asset name prefix: the product name with spaces as dots
+//   --tag           release tag, `v` followed by the version
+//   --asset-prefix  asset name prefix: the product name with spaces as dots
 //
 // The repository comes from GITHUB_REPOSITORY. To preview a published release:
 //
 //   gh release view v0.16.0 --repo team-reflect/reflect-open --json body,assets |
 //     GITHUB_REPOSITORY=team-reflect/reflect-open \
-//     node apps/desktop/scripts/write-release-notes.ts --tag=v0.16.0 --asset=Reflect
+//     node apps/desktop/scripts/write-release-notes.ts --tag=v0.16.0 --asset-prefix=Reflect
 
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
@@ -27,12 +27,12 @@ function fail(message: string): never {
 }
 
 const { values } = parseArgs({
-  options: { tag: { type: 'string' }, asset: { type: 'string' } },
+  options: { tag: { type: 'string' }, 'asset-prefix': { type: 'string' } },
 })
-const { tag, asset } = values
+const { tag, 'asset-prefix': prefix } = values
 const repo = process.env.GITHUB_REPOSITORY
-if (!tag || !asset || !repo) {
-  fail('--tag, --asset, and GITHUB_REPOSITORY are required')
+if (!tag || !prefix || !repo) {
+  fail('--tag, --asset-prefix, and GITHUB_REPOSITORY are required')
 }
 if (!/^v\d/.test(tag)) {
   fail(`invalid --tag "${tag}": expected "v" and a version, such as v0.15.0-beta.5`)
@@ -45,61 +45,84 @@ const release = JSON.parse(readFileSync(0, 'utf8')) as {
 }
 const assetNames = release.assets.map((item) => item.name)
 
-const INSTALLERS = [
-  { os: 'macOS', chip: 'Apple Silicon', color: '0969DA', file: `${asset}_aarch64.dmg` },
-  { os: 'macOS', chip: 'Universal', color: '8250DF', file: `${asset}_universal.dmg` },
-  { os: 'Windows', chip: 'x64', color: '1A7F37', file: `${asset}_${version}_x64-setup.exe` },
-  { os: 'Windows', chip: 'ARM64', color: '1B7C83', file: `${asset}_${version}_arm64-setup.exe` },
+/**
+ * A badge links either to an installer `file` on the release, shown only when
+ * the release has it, or to an outside `url`.
+ */
+type Badge = { variant: string; color: string } & ({ file: string } | { url: string })
+
+const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] }[] = [
   {
-    os: 'Linux',
-    chip: 'x64 AppImage',
-    color: '9A6700',
-    file: `${asset}_${version}_amd64.AppImage`,
+    heading: 'Mac',
+    name: 'Mac',
+    icon: 'apple',
+    badges: [
+      { variant: 'Apple Silicon', color: '0969DA', file: `${prefix}_aarch64.dmg` },
+      { variant: 'Universal', color: '8250DF', file: `${prefix}_universal.dmg` },
+    ],
   },
-  { os: 'Linux', chip: 'x64 .deb', color: 'BC4C00', file: `${asset}_${version}_amd64.deb` },
   {
-    os: 'Linux',
-    chip: 'ARM64 AppImage',
-    color: 'CF222E',
-    file: `${asset}_${version}_aarch64.AppImage`,
+    heading: 'Windows',
+    name: 'Windows',
+    icon: 'windows',
+    badges: [
+      { variant: 'x64', color: '1A7F37', file: `${prefix}_${version}_x64-setup.exe` },
+      { variant: 'ARM64', color: '1B7C83', file: `${prefix}_${version}_arm64-setup.exe` },
+    ],
   },
-  { os: 'Linux', chip: 'ARM64 .deb', color: 'BF3989', file: `${asset}_${version}_arm64.deb` },
+  {
+    heading: 'Linux',
+    name: 'Linux',
+    icon: 'linux',
+    badges: [
+      { variant: 'x64 AppImage', color: '9A6700', file: `${prefix}_${version}_amd64.AppImage` },
+      { variant: 'x64 .deb', color: 'BC4C00', file: `${prefix}_${version}_amd64.deb` },
+      { variant: 'ARM64 AppImage', color: 'CF222E', file: `${prefix}_${version}_aarch64.AppImage` },
+      { variant: 'ARM64 .deb', color: 'BF3989', file: `${prefix}_${version}_arm64.deb` },
+    ],
+  },
+  {
+    heading: 'iPhone & iPad',
+    name: 'iPhone',
+    icon: 'apple',
+    badges: [
+      version.includes('-')
+        ? {
+            variant: 'TestFlight',
+            color: '57606A',
+            url: 'https://testflight.apple.com/join/j2eEz43d',
+          }
+        : {
+            variant: 'App Store',
+            color: '57606A',
+            url: 'https://apps.apple.com/us/app/reflect-open/id6787385615',
+          },
+    ],
+  },
 ]
 
-const PLATFORMS = [
-  { os: 'macOS', heading: 'Mac', name: 'Mac', icon: 'apple' },
-  { os: 'Windows', heading: 'Windows', name: 'Windows', icon: 'windows' },
-  { os: 'Linux', heading: 'Linux', name: 'Linux', icon: 'linux' },
-  { os: 'iOS', heading: 'iPhone & iPad', name: 'iPhone', icon: 'apple' },
-]
-
-const links = INSTALLERS.filter((item) => assetNames.includes(item.file)).map(
-  ({ file, ...item }) => ({
-    ...item,
-    url: `https://github.com/${repo}/releases/download/${tag}/${file}`,
-  }),
+const files = PLATFORMS.flatMap((platform) =>
+  platform.badges.flatMap((badge) => ('file' in badge ? [badge.file] : [])),
 )
-if (links.length === 0) {
-  fail(
-    `no installer among the asset names. Expected: ${INSTALLERS.map((item) => item.file).join(', ')}`,
-  )
+if (!files.some((file) => assetNames.includes(file))) {
+  fail(`no installer among the asset names. Expected: ${files.join(', ')}`)
 }
-const ios = version.includes('-')
-  ? { chip: 'TestFlight', url: 'https://testflight.apple.com/join/j2eEz43d' }
-  : { chip: 'App Store', url: 'https://apps.apple.com/us/app/reflect-open/id6787385615' }
-links.push({ os: 'iOS', color: '57606A', ...ios })
 
 let section = '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n'
-for (const { os, heading, name, icon } of PLATFORMS) {
-  const badges = links
-    .filter((item) => item.os === os)
-    .map(({ chip, color, url }) => {
-      const label = `${name} ${chip}`
-      const image = `https://badgen.net/badge/${encodeURIComponent(label)}/${encodeURIComponent(tag)}/${color}?icon=${icon}`
+for (const { heading, name, icon, badges } of PLATFORMS) {
+  const markdown = badges
+    .filter((badge) => !('file' in badge) || assetNames.includes(badge.file))
+    .map((badge) => {
+      const label = `${name} ${badge.variant}`
+      const image = `https://badgen.net/badge/${encodeURIComponent(label)}/${encodeURIComponent(tag)}/${badge.color}?icon=${icon}`
+      const url =
+        'file' in badge
+          ? `https://github.com/${repo}/releases/download/${tag}/${badge.file}`
+          : badge.url
       return `[![${label}](${image})](${url})`
     })
-  if (badges.length > 0) {
-    section += `\n### ${heading}\n\n${badges.join(' ')}\n`
+  if (markdown.length > 0) {
+    section += `\n### ${heading}\n\n${markdown.join(' ')}\n`
   }
 }
 section += '\n<!-- RELEASE_NOTES_DOWNLOAD_LINKS_END -->\n'

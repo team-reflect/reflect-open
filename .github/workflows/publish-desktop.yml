@@ -139,7 +139,7 @@ jobs:
           ASSET: ${{ steps.release.outputs.asset }}
         run: |
           gh release view "$TAG" --json body,assets |
-            node apps/desktop/scripts/write-release-notes.ts --tag="$TAG" --asset="$ASSET" \
+            node apps/desktop/scripts/write-release-notes.ts --tag="$TAG" --asset-prefix="$ASSET" \
             > "$RUNNER_TEMP/release-notes.md"
 
       - name: Publish the release
