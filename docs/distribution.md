@@ -7,9 +7,9 @@ file holds what they cannot say.
 ## Cutting a release
 
 release-please keeps two Release PRs open on `master`, beta and stable. **Merging a Release PR
-is the release.** The Release workflow
-builds every platform into a draft GitHub release and uploads to TestFlight. The release
-publishes only after the macOS, Windows, and Linux builds all succeed.
+is the release.** The Release workflow builds every platform into a draft GitHub release and
+uploads to TestFlight. The release publishes only after the macOS, Windows, and Linux builds
+all succeed.
 
 - Release PRs are created with `GITHUB_TOKEN`, so their checks do not start by themselves. Use
   the run-checks button before you merge.
