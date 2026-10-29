@@ -26,7 +26,6 @@
     "check": "pnpm typecheck && pnpm lint",
     "gen:licenses": "pnpm --filter @reflect/desktop gen:licenses",
     "tauri": "pnpm --filter @reflect/desktop tauri",
-    "release:manifest": "pnpm --filter @reflect/desktop release:manifest",
     "upload:testflight": "pnpm --filter @reflect/desktop upload:testflight",
     "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
     "tauri:ios:dev": "pnpm --filter @reflect/desktop tauri:ios:dev",

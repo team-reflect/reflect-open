@@ -130,7 +130,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Write the updater manifest
-        run: pnpm release:manifest --tag="$TAG"
+        run: node apps/desktop/scripts/write-release-manifest.ts --tag="$TAG"
 
       # A rerun replaces the download section, so it lists the assets that a
       # retried build uploaded since the last run.
@@ -138,16 +138,9 @@ jobs:
         env:
           ASSET: ${{ steps.release.outputs.asset }}
         run: |
-          notes="$RUNNER_TEMP/release-notes.md"
-          body="$(gh release view "$TAG" --json body --jq .body |
-            awk '/RELEASE_NOTES_DOWNLOAD_LINKS_START/ { skip = 1 }
-              !skip { print }
-              /RELEASE_NOTES_DOWNLOAD_LINKS_END/ { skip = 0 }')"
-          printf '%s\n\n' "$body" > "$notes"
-          mapfile -t assets < <(gh release view "$TAG" --json assets --jq '.assets[].name')
-          node apps/desktop/scripts/release-downloads.ts \
-            --repo="$GITHUB_REPOSITORY" --tag="$TAG" --asset="$ASSET" \
-            "${assets[@]}" >> "$notes"
+          gh release view "$TAG" --json body,assets |
+            node apps/desktop/scripts/write-release-notes.ts --tag="$TAG" --asset="$ASSET" \
+            > "$RUNNER_TEMP/release-notes.md"
 
       - name: Publish the release
         env:
