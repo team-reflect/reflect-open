@@ -83,7 +83,7 @@ const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] 
   },
   {
     heading: 'iPhone & iPad',
-    name: 'iPhone',
+    name: '',
     icon: 'apple',
     badges: [
       version.includes('-')
@@ -113,7 +113,7 @@ for (const { heading, name, icon, badges } of PLATFORMS) {
   const markdown = badges
     .filter((badge) => !('file' in badge) || assetNames.includes(badge.file))
     .map((badge) => {
-      const label = `${name} ${badge.variant}`
+      const label = `${name} ${badge.variant}`.trim()
       const image = `https://badgen.net/badge/${encodeURIComponent(label)}/${encodeURIComponent(tag)}/${badge.color}?icon=${icon}`
       const url =
         'file' in badge
