@@ -321,6 +321,15 @@ html:root {
   padding: 0;
   font-size: inherit;
   font-family: var(--font-reading, var(--font-sans));
+  /* meowdown spaces blocks with padding and aligns list markers from these
+     variables, so Reflect sets its spacing and heading sizes here instead of
+     adding block margins. */
+  --meowdown-block-padding: 0.2em;
+  --meowdown-h1-size: var(--text-note-subject);
+  --meowdown-h2-size: var(--text-lg);
+  --meowdown-h3-size: var(--text-base);
+  --meowdown-code-block-margin-block: 0.5rem;
+  --meowdown-code-block-padding-block: 0.75rem;
 }
 
 /* The primary note editor (the note pane and every daily-stream row, both via
@@ -356,39 +365,25 @@ html:root {
   @apply px-safe-or-4;
 }
 
-/* Block spacing comes from the element margins below, not the theme's
-   uniform sibling gap. */
-.reflect-editor > * + * {
-  margin-top: 0;
-}
-
-/* Heading weight and size compete with meowdown's `.ProseMirror h*` theme
+/* Heading weight and spacing override meowdown's `.ProseMirror h*` theme
    rules. meowdown is layered (`@layer meowdown`), so these unlayered rules win
-   without a `.ProseMirror` compound. (Margin and letter-spacing ride along; only
-   the size and weight actually clash with the theme.) */
+   without a `.ProseMirror` compound. The sizes live in the `--meowdown-h*-size`
+   variables above: the leading H1 is the document title (the regular-note
+   subject, matching the daily date subject), H2 and H3 step down the type scale
+   so a section heading reads as subordinate to the title. Auto-appended
+   sections (`## [[Links]]`, `## [[Audio memos]]`) land at H2; H3 sits at body
+   size, carried by weight rather than scale. */
 .reflect-editor h1,
 .reflect-editor h2,
 .reflect-editor h3 {
   font-weight: 650;
   letter-spacing: var(--tracking-snug, -0.01em);
-  margin: 1.25em 0 0.4em;
+  padding: 1.1em 0 0.25em;
 }
-/* The leading H1 is the document title: the regular-note subject, matching
-   the daily date subject. H2 and H3 step down the type scale so a section
-   heading reads as subordinate to the title, not a second one: auto-appended
-   sections (`## [[Links]]`, `## [[Audio memos]]`) land at H2, one size below the
-   subject; H3 sits at body size, carried by weight rather than scale. */
-.reflect-editor h1 {
-  @apply text-note-subject;
-} /* text-xl, 20px */
-.reflect-editor h2 {
-  font-size: var(--text-lg, 1.125rem);
-} /* 18px */
-.reflect-editor h3 {
-  font-size: var(--text-base, 1rem);
-} /* 16px */
-.reflect-editor h1:first-child {
-  margin-top: 0;
+.reflect-editor h1:first-child,
+.reflect-editor h2:first-child,
+.reflect-editor h3:first-child {
+  padding-top: 0;
 }
 .reflect-editor .reflect-note-title {
   @apply text-note-subject;
@@ -420,21 +415,22 @@ html:root {
    re-scales here: the subject one step above body, section headings at body
    size carried by weight — the same hierarchy, compressed. Unlayered, so
    these win over meowdown's `@layer meowdown` theme rules. */
-.reflect-hover-preview .reflect-editor h1,
+.reflect-hover-preview .reflect-editor {
+  --meowdown-h1-size: var(--text-sm, 0.875rem);
+  --meowdown-h2-size: var(--text-xs, 0.75rem);
+  --meowdown-h3-size: var(--text-xs, 0.75rem);
+}
 .reflect-hover-preview .reflect-daily-subject {
   font-size: var(--text-sm, 0.875rem);
 }
-.reflect-hover-preview .reflect-editor h2,
-.reflect-hover-preview .reflect-editor h3 {
-  font-size: var(--text-xs, 0.75rem);
-}
 .reflect-hover-preview .reflect-editor h1,
 .reflect-hover-preview .reflect-editor h2,
 .reflect-hover-preview .reflect-editor h3 {
-  margin: 1em 0 0.35em;
+  padding-top: 0.8em;
+  padding-bottom: 0.15em;
 }
-.reflect-hover-preview .reflect-editor h1:first-child {
-  margin-top: 0;
+.reflect-hover-preview .reflect-editor :is(h1, h2, h3):first-child {
+  padding-top: 0;
 }
 .reflect-hover-preview .reflect-editor input[type='checkbox'] {
   width: 0.75rem;
@@ -469,22 +465,13 @@ html:root {
   }
 }
 
-.reflect-editor p {
-  margin: 0.4em 0;
-}
-
 /* The Tasks inline editor (TaskEditor) shares each row's single-line box with
-   the read-only TaskText, which renders the content in a marginless span. The editor wraps it in a paragraph, so the `.reflect-editor p` block
-   margin above would grow the row the moment it enters edit mode. Zero it (same
-   0-1-1 specificity, later source order wins the tie) so focusing a task never
-   shifts its height. */
-.reflect-task-editor p {
-  margin: 0;
-}
-
-/* Same unitless line-height as `.reflect-task-preview` below. Unlayered, so it
-   wins over meowdown's `.ProseMirror` line-height. */
+   the read-only TaskText. Its paragraph gets no block padding, so focusing a
+   task never shifts its height. The unitless line-height matches
+   `.reflect-task-preview` below. Unlayered, so it wins over meowdown's
+   `.ProseMirror` line-height. */
 .reflect-task-editor {
+  --meowdown-block-padding: 0px;
   line-height: calc(24 / 14);
 }
 
@@ -508,7 +495,7 @@ html:root {
 .reflect-task-preview h6,
 .reflect-task-preview blockquote,
 .reflect-task-preview pre {
-  margin: 0;
+  padding: 0;
 }
 .reflect-task-preview h1,
 .reflect-task-preview h2,
@@ -537,11 +524,12 @@ html:root {
    inline marks share the editor's styling; these rules keep it in the panel's
    compact 12px line box (the wrapper clamps it to two lines). meowdown is
    layered, so these unlayered rules win without a `.ProseMirror` compound. */
-.reflect-backlink-snippet .reflect-editor :is(p, ul, ol, blockquote, pre) {
-  margin: 0;
+.reflect-backlink-snippet .reflect-editor {
+  --meowdown-block-padding: 0px;
+  --meowdown-code-block-margin-block: 0px;
 }
 .reflect-backlink-snippet .reflect-editor :is(h1, h2, h3, h4, h5, h6) {
-  margin: 0;
+  padding: 0;
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit;
@@ -561,13 +549,10 @@ html:root {
   cursor: pointer;
 }
 
-/* meowdown's blockquote is now upright, muted, and themed by default; we only
-   restate the thinner accent border and the block margin (the per-element spacing
-   the `> * + *` reset above relies on). meowdown's muted text already matches
-   `--text-secondary`, so we no longer set the color. */
+/* meowdown's blockquote is upright, muted, and themed by default; Reflect only
+   sets the thinner accent border. */
 .reflect-editor blockquote {
   border-left: 2px solid var(--accent-soft, var(--border));
-  margin: 0.6em 0;
   padding-left: 1em;
 }
 
@@ -580,13 +565,12 @@ html:root {
   border-top-color: var(--coolgray-700);
 }
 
-/* Inline code now inherits meowdown's neutral default (text color + the
-   `--meowdown-code-bg` surface we map below), so it needs no override. The code
-   block keeps Reflect's radius/padding and its block margin. */
+/* Inline code inherits meowdown's neutral default (text color + the
+   `--meowdown-code-bg` surface mapped above). The code block keeps Reflect's
+   radius; its block margin and padding come from the `--meowdown-code-block-*`
+   variables on `.reflect-editor`. */
 .reflect-editor pre {
   border-radius: var(--radius-md, 6px);
-  margin: 0.6em 0;
-  padding: 0.75em 1em;
 }
 
 /* Inline images: meowdown renders `![alt](src)` through a mark view
