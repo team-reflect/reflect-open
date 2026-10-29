@@ -76,7 +76,6 @@ const PLATFORMS = [
 const links = INSTALLERS.filter((item) => assetNames.includes(item.file)).map(
   ({ file, ...item }) => ({
     ...item,
-    alt: `${item.os} ${item.chip}`,
     url: `https://github.com/${repo}/releases/download/${tag}/${file}`,
   }),
 )
@@ -88,19 +87,16 @@ if (links.length === 0) {
 const ios = version.includes('-')
   ? { chip: 'TestFlight', url: 'https://testflight.apple.com/join/j2eEz43d' }
   : { chip: 'App Store', url: 'https://apps.apple.com/us/app/reflect-open/id6787385615' }
-links.push({ os: 'iOS', color: '57606A', alt: ios.chip, ...ios })
+links.push({ os: 'iOS', color: '57606A', ...ios })
 
 let section = '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n'
 for (const { os, heading, icon } of PLATFORMS) {
   const badges = links
     .filter((item) => item.os === os)
-    .map(({ chip, color, alt, url }) => {
-      // Encode the parentheses too, or they would end the Markdown link URL.
-      const label = encodeURIComponent(`${heading} (${chip})`)
-        .replace(/\(/g, '%28')
-        .replace(/\)/g, '%29')
-      const image = `https://badgen.net/badge/${label}/${encodeURIComponent(tag)}/${color}?icon=${icon}`
-      return `[![${alt}](${image})](${url})`
+    .map(({ chip, color, url }) => {
+      const label = `${heading} ${chip}`
+      const image = `https://badgen.net/badge/${encodeURIComponent(label)}/${encodeURIComponent(tag)}/${color}?icon=${icon}`
+      return `[![${label}](${image})](${url})`
     })
   if (badges.length > 0) {
     section += `\n### ${heading}\n\n${badges.join(' ')}\n`
