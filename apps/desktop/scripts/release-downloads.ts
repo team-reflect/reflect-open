@@ -1,7 +1,8 @@
 // Prints the "Download" section of the release notes as Markdown: one badge
 // per installer, each linked to that installer, and one badge for iOS, linked
-// to TestFlight for a beta version or to the App Store for a stable one. It
-// reads nothing from the network. The asset names of the release are
+// to TestFlight for a beta version or to the App Store for a stable one. The
+// section sits between the RELEASE_NOTES_DOWNLOAD_LINKS_START and _END
+// comments, so a rerun can replace it. It reads nothing from the network. The asset names of the release are
 // arguments, and an installer that is not among them gets no badge.
 //
 //   node apps/desktop/scripts/release-downloads.ts \
@@ -101,14 +102,15 @@ const INSTALLERS = [
 
 const PLATFORMS = [
   { os: 'macOS', heading: 'macOS', icon: 'apple' },
-  { os: 'iOS', heading: 'iOS', icon: 'apple' },
   { os: 'Windows', heading: 'Windows', icon: 'windows' },
-  { os: 'Linux', heading: 'Linux (Experimental)', icon: 'linux' },
+  { os: 'Linux', heading: 'Linux', icon: 'linux' },
+  { os: 'iOS', heading: 'iOS / iPadOS', icon: 'apple' },
 ]
 
 const links = INSTALLERS.filter((item) => assetNames.includes(item.file)).map(
   ({ file, ...item }) => ({
     ...item,
+    alt: `${item.os} ${item.chip}`,
     url: `https://github.com/${repo}/releases/download/${tag}/${file}`,
   }),
 )
@@ -120,18 +122,19 @@ if (links.length === 0) {
 const ios = version.includes('-')
   ? { chip: 'TestFlight', url: 'https://testflight.apple.com/join/j2eEz43d' }
   : { chip: 'App Store', url: 'https://apps.apple.com/us/app/reflect-open/id6787385615' }
-links.push({ os: 'iOS', color: '0EA5E9', ...ios })
+links.push({ os: 'iOS', color: '0EA5E9', alt: ios.chip, ...ios })
 
-let markdown = '## Download\n'
+let markdown = '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n'
 for (const { os, heading, icon } of PLATFORMS) {
   const badges = links
     .filter((item) => item.os === os)
-    .map(({ chip, color, url }) => {
+    .map(({ chip, color, alt, url }) => {
       const image = `https://badgen.net/badge/${os}/${encodeURIComponent(chip)}/${color}?icon=${icon}`
-      return `[![${os} ${chip}](${image})](${url})`
+      return `[![${alt}](${image})](${url})`
     })
   if (badges.length > 0) {
     markdown += `\n### ${heading}\n\n${badges.join(' ')}\n`
   }
 }
+markdown += '\n<!-- RELEASE_NOTES_DOWNLOAD_LINKS_END -->\n'
 process.stdout.write(markdown)

@@ -1,8 +1,8 @@
 # Distribution
 
-How Reflect ships: macOS (signed and notarized), iOS (TestFlight), and experimental Windows and
-Linux builds. The steps live in `apps/desktop/scripts/` and the `publish-*.yml` workflows. This
-file holds what they cannot say.
+How Reflect ships: macOS (signed and notarized), iOS (TestFlight), Windows, and Linux. The steps
+live in `apps/desktop/scripts/` and the `publish-*.yml` workflows. This file holds what they
+cannot say.
 
 ## Cutting a release
 
@@ -120,7 +120,7 @@ iPhone or iPad. The minimum iOS version is `deploymentTarget` in
 - **A crash report is unsymbolicated**: the dSYM is in the build's
   `reflect-ios-xcarchive-<build>` workflow artifact, not in the IPA.
 
-## Windows (experimental)
+## Windows
 
 ### Build
 
@@ -146,7 +146,7 @@ Windows 10 22H2 (x64) or Windows 11 (x64, arm64).
 - **The app does not start**: Smart App Control is on and blocks unsigned apps. Defender can
   also flag unsigned Rust binaries.
 
-## Linux (experimental)
+## Linux
 
 ### Build
 
