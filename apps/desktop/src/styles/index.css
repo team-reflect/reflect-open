@@ -328,6 +328,9 @@ html:root {
   --meowdown-h1-size: var(--text-note-subject);
   --meowdown-h2-size: var(--text-lg);
   --meowdown-h3-size: var(--text-base);
+  --meowdown-h4-size: var(--text-base);
+  --meowdown-h5-size: var(--text-base);
+  --meowdown-h6-size: var(--text-base);
   --meowdown-code-block-margin-block: 0.5rem;
   --meowdown-code-block-padding-block: 0.75rem;
   --reflect-list-marker-width: 1.15lh;
@@ -372,18 +375,14 @@ html:root {
    variables above: the leading H1 is the document title (the regular-note
    subject, matching the daily date subject), H2 and H3 step down the type scale
    so a section heading reads as subordinate to the title. Auto-appended
-   sections (`## [[Links]]`, `## [[Audio memos]]`) land at H2; H3 sits at body
-   size, carried by weight rather than scale. */
-.reflect-editor h1,
-.reflect-editor h2,
-.reflect-editor h3 {
+   sections (`## [[Links]]`, `## [[Audio memos]]`) land at H2; H3 to H6 sit at
+   body size, carried by weight rather than scale. */
+.reflect-editor :is(h1, h2, h3, h4, h5, h6) {
   font-weight: 650;
   letter-spacing: var(--tracking-snug, -0.01em);
   padding: 1.1em 0 0.25em;
 }
-.reflect-editor h1:first-child,
-.reflect-editor h2:first-child,
-.reflect-editor h3:first-child {
+.reflect-editor :is(h1, h2, h3, h4, h5, h6):first-child {
   padding-top: 0;
 }
 .reflect-editor .reflect-note-title {
@@ -420,17 +419,18 @@ html:root {
   --meowdown-h1-size: var(--text-sm, 0.875rem);
   --meowdown-h2-size: var(--text-xs, 0.75rem);
   --meowdown-h3-size: var(--text-xs, 0.75rem);
+  --meowdown-h4-size: var(--text-xs, 0.75rem);
+  --meowdown-h5-size: var(--text-xs, 0.75rem);
+  --meowdown-h6-size: var(--text-xs, 0.75rem);
 }
 .reflect-hover-preview .reflect-daily-subject {
   font-size: var(--text-sm, 0.875rem);
 }
-.reflect-hover-preview .reflect-editor h1,
-.reflect-hover-preview .reflect-editor h2,
-.reflect-hover-preview .reflect-editor h3 {
+.reflect-hover-preview .reflect-editor :is(h1, h2, h3, h4, h5, h6) {
   padding-top: 0.8em;
   padding-bottom: 0.15em;
 }
-.reflect-hover-preview .reflect-editor :is(h1, h2, h3):first-child {
+.reflect-hover-preview .reflect-editor :is(h1, h2, h3, h4, h5, h6):first-child {
   padding-top: 0;
 }
 .reflect-hover-preview .reflect-editor input[type='checkbox'] {
