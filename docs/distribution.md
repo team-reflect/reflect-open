@@ -6,8 +6,8 @@ file holds what they cannot say.
 
 ## Cutting a release
 
-release-please keeps two Release PRs open on `master`: beta (`chore: release X.Y.Z-beta.N`) and
-stable (`chore: release X.Y.Z`). **Merging a Release PR is the release.** The Release workflow
+release-please keeps two Release PRs open on `master`, beta and stable. **Merging a Release PR
+is the release.** The Release workflow
 builds every platform into a draft GitHub release and uploads to TestFlight. The release
 publishes only after the macOS, Windows, and Linux builds all succeed.
 
