@@ -77,7 +77,7 @@ const PLATFORMS: { heading: string; icon: string; badges: Badge[] }[] = [
     badges: [
       { variant: 'x64 AppImage', color: '9A6700', file: `${prefix}_${version}_amd64.AppImage` },
       { variant: 'x64 .deb', color: 'BC4C00', file: `${prefix}_${version}_amd64.deb` },
-      { variant: 'ARM64 AppImage', color: 'CF222E', file: `${prefix}_${version}_aarch64.AppImage` },
+      { variant: 'ARM64 AppImage', color: '9E1F63', file: `${prefix}_${version}_aarch64.AppImage` },
       { variant: 'ARM64 .deb', color: 'BF3989', file: `${prefix}_${version}_arm64.deb` },
     ],
   },
