@@ -1,8 +1,8 @@
 # iOS TestFlight Builds
 
 ```bash
-pnpm build:ios --build-number="$(date -u +%Y%m%d%H%M)"   # apps/desktop/scripts/build-ios.ts
-pnpm upload:testflight                                   # apps/desktop/scripts/upload-testflight.ts
+pnpm build:ios --build-number="$(git rev-list --count HEAD)"   # apps/desktop/scripts/build-ios.ts
+pnpm upload:testflight                                         # apps/desktop/scripts/upload-testflight.ts
 ```
 
 `.github/workflows/publish-testflight.yml` runs both on every release (called from
@@ -35,7 +35,8 @@ environment secrets.
   Connect app record for `app.reflect.ios`. Do not reuse the old Capacitor app
   (`app.reflect.ReflectMobile`).
 - **Duplicate build number, or TestFlight shows an older build as latest**: build numbers must
-  increase per marketing version. CI uses a UTC `YYYYMMDDHHmm` timestamp; rerun the workflow.
+  increase per marketing version. CI uses the commit count of the release commit, so a rerun
+  reuses the number: a duplicate means that commit's build is already on TestFlight.
 - **A TestFlight feedback ZIP has no stack**: expected. Read the native events in Sentry, or ask
   for the Apple `.ips` report.
 - **An `.ips` report is unsymbolicated**: symbolicate it against the dSYM in the

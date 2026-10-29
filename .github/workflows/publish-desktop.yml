@@ -77,7 +77,7 @@ jobs:
   # Every release also ships to TestFlight. iOS needs no version bump of its
   # own: the marketing version follows apps/desktop/package.json with the
   # prerelease suffix stripped, so beta and stable builds stack under the same
-  # version, told apart by the UTC-timestamp build number.
+  # version, told apart by the commit-count build number.
   testflight:
     name: Upload the release to TestFlight
     uses: ./.github/workflows/publish-testflight.yml

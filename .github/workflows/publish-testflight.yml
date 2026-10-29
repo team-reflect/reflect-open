@@ -40,6 +40,10 @@ jobs:
           # release snapshot. Always build the verified immutable tag commit.
           ref: ${{ inputs.commit }}
           persist-credentials: false
+          # The build number counts commits. A treeless clone fetches the
+          # whole history without the file contents of older commits.
+          fetch-depth: 0
+          filter: tree:0
 
       - name: Verify TestFlight secrets are configured
         env:
@@ -72,7 +76,7 @@ jobs:
       - name: Resolve build number
         id: build_number
         run: |
-          build_number="$(date -u +%Y%m%d%H%M)"
+          build_number="$(git rev-list --count HEAD)"
           echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
           echo "value=$build_number" >> "$GITHUB_OUTPUT"
           echo "Using TestFlight CFBundleVersion $build_number"
