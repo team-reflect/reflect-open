@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.2...v0.17.0-beta.3) (2026-10-29)
+
+
+### Bug Fixes
+
+* **desktop:** align list markers ([#1765](https://github.com/team-reflect/reflect-open/issues/1765)) ([66e32aa](https://github.com/team-reflect/reflect-open/commit/66e32aa08818784940c84c4422b7b8a538bbd454))
+
 ## [0.17.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.1...v0.17.0-beta.2) (2026-10-29)
 
 
