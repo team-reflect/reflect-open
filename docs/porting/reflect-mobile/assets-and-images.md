@@ -2,53 +2,45 @@
 
 **v2 status: replaced.** V1 mobile's encrypted asset pipeline exists to
 serve encrypted cloud blobs offline; v2 assets are plain files under
-`assets/` in the graph, so nearly all of the machinery dissolves. What
-ports is the **experience contract** — images in notes load instantly and
-work offline — plus the photo-insertion flow, which returns with the
-editor-toolbar work.
+`assets/`, so most of it dissolves. What ports is the **experience
+contract** (images load instantly and work offline) and the photo-insertion
+flow, which returns with the editor-toolbar work.
 
 ## What V1 mobile does
 
-- **Upload**: files are encrypted client-side
-  (`@team-reflect/file-crypto` in a worker) and uploaded to the asset
-  host. Editor insertion is optimistic: a temporary URL renders
-  immediately, the confirmed upload follows (50 MB cap,
+- **Upload**: files are encrypted client-side (`@team-reflect/file-crypto`
+  in a worker) and uploaded. Insertion is optimistic: a temporary URL
+  renders at once, the confirmed upload follows (50 MB cap,
   `helpers/editor/editor-file-upload-handler.ts`).
-- **Native cache**: encrypted blobs are also cached in
-  `Library/Caches/AssetsCache` by the Assets plugin
-  (`ios/App/App/Capacitor Plugins/AssetsPlugin/`). A
-  `reserveUpload → addUpload → getUpload` bridge protocol coordinates the
-  webview's crypto pipeline with the native cache and resolves races
-  between concurrent uploads and downloads (`capacitor/assets.ts`).
-- **Serving**: a custom `reflect-assets://` WKWebView scheme handler
-  fetches the encrypted blob (with retries), **decrypts AES-GCM
-  natively**, and returns the bytes to the webview — images in notes work
-  offline and load fast.
-- **Insertion**: the keyboard-toolbar image button opens the Capacitor
-  Camera image picker (1000 px max width, 80 % quality, popover on iPad);
-  picked photos round-trip through base64 into `editor.uploadImages()`.
-- **Preview**: tapping an image opens a native full-screen viewer
-  (Agrume) via the ImagePreview plugin.
+- **Native cache**: encrypted blobs are cached in `Library/Caches/AssetsCache`
+  by the Assets plugin (`ios/App/App/Capacitor Plugins/AssetsPlugin/`). A
+  `reserveUpload → addUpload → getUpload` bridge protocol
+  (`capacitor/assets.ts`) coordinates the webview crypto pipeline with the
+  cache and resolves upload/download races.
+- **Serving**: a `reflect-assets://` WKWebView scheme handler fetches the
+  blob (with retries), **decrypts AES-GCM natively**, and returns the
+  bytes, so images work offline and load fast.
+- **Insertion**: the toolbar image button opens the Capacitor Camera picker
+  (1000 px max width, 80 % quality, popover on iPad); photos round-trip
+  through base64 into `editor.uploadImages()`.
+- **Preview**: tapping an image opens a native full-screen viewer (Agrume)
+  via the ImagePreview plugin.
 
 ## What changes in v2, and why
 
-- **Assets are normal files** under `assets/` with relative markdown
-  links, synced by git like everything else. No encryption, no asset
-  host, no cache layer, no scheme-handler decryption — the file *is* the
-  offline copy. Plan 19 step 7 already covers rendering: images resolve
-  through the same asset protocol as desktop.
-- **The race-coordination protocol has no equivalent** — there is one
-  writer (the app) and one filesystem.
-- **Photo insertion returns with editor/toolbar work**: an image picker →
-  file in `assets/` → relative link at the caret, through the shared
-  asset-write path (which emits its file-change batch like every local
-  write). Down-scaling before write (V1's 1000 px/80 %) is worth keeping
-  as a default on mobile — camera originals are huge, and graph size is
-  sync cost.
-- **Full-screen preview** becomes a webview-drawn lightbox when needed;
-  no native viewer dependency.
-- V1's 50 MB cap maps to the product-vision guardrail: large binaries get
-  warnings/limits for GitHub-backed graphs.
+- **Assets are normal files** under `assets/` with relative links, synced
+  by git. No encryption, asset host, cache, or scheme decryption: the file
+  *is* the offline copy. Plan 19 step 7 covers rendering through the same
+  asset protocol as desktop.
+- **No race protocol**: one writer (the app), one filesystem.
+- **Photo insertion returns with editor/toolbar work**: picker → file in
+  `assets/` → relative link at the caret, through the shared asset-write
+  path (which emits its file-change batch like every local write). Keep
+  V1's down-scaling (1000 px/80 %) as the mobile default: camera originals
+  are huge, and graph size is sync cost.
+- **Full-screen preview** becomes a webview lightbox when needed.
+- V1's 50 MB cap maps to the product-vision guardrail: warnings/limits for
+  large binaries in GitHub-backed graphs.
 
 ## V1 → v2 mapping
 

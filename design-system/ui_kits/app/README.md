@@ -15,14 +15,6 @@ files and mounts `AppShell`.
 - **Checkboxes** — toggle tasks inline (daily notes + Tasks view).
 - **Backlinks & pinned notes** — click to open the corresponding note in All notes.
 
-## Structure
-- `index.html` — host + mount.
-- `icons.jsx` — thin-stroke line icons (`window.RIcons`).
-- `Sidebar.jsx` — search, nav menu, pinned notes, account/graph footer.
-- `Views.jsx` — `DailyNotes` (the home editor), `AllNotes`, `Tasks`, `MapView`.
-- `SearchModal.jsx` — the ⌘K palette.
-- `AppShell.jsx` — state + composition.
-
 ## Fidelity notes
 This mirrors layout, hierarchy and the real interaction model (daily-notes-first,
 backlinks, ⌘K, the grey hover wash, indigo selected state). The actual product uses a

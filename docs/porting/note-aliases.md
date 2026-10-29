@@ -1,23 +1,21 @@
 # Porting note aliases
 
-**Status: ported.** Frontmatter aliases shipped with the readable-filenames
-work ([docs/readable-filenames.md](../readable-filenames.md)); direct support
-for v1 `//` titles followed in `v0.4.0-beta.31` and stable `v0.4.0`.
+**Status: ported.** Frontmatter aliases shipped with readable filenames
+([docs/readable-filenames.md](../readable-filenames.md)); direct support for
+v1 `//` titles followed in `v0.4.0-beta.31` and stable `v0.4.0`.
 
 ## What v1 did
 
-In v1, aliases were part of the note's title: editing the H1 to
-`Superman // Clark Kent // Kal‑El` made everything after each `//` an alias.
-`[[` autocomplete matched aliases, links through any spelling resolved to the
-canonical note, and backlinks aggregated under the canonical title. A saved
-v1 link carried the target note's stable ID as well as its visible label, so an
-existing link survived a rename even when the old spelling disappeared from
-the title. Its displayed label could remain stale; the ID still identified the
-note.
+Aliases were part of the title: an H1 of `Superman // Clark Kent // Kal‑El`
+made each segment after `//` an alias. `[[` autocomplete matched aliases,
+links through any spelling resolved to the canonical note, and backlinks
+aggregated under the canonical title. A saved v1 link carried the target's
+stable ID as well as its label, so it survived a rename even when the old
+spelling left the title (the label could go stale).
 
 ## How v2 does it
 
-Frontmatter is the native files-first representation for aliases:
+Frontmatter is the native files-first form:
 
 ```yaml
 ---
@@ -30,53 +28,49 @@ aliases:
 # Superman
 ```
 
-- The `aliases` field is a plain YAML string array
+- `aliases` is a plain YAML string array
   (`packages/core/src/markdown/model.ts`); malformed values degrade to an
-  empty list rather than breaking the note.
-- V1 titles also work without conversion. For `# Tim MacCaw // Dad`, the
-  complete H1 remains the canonical title while `Tim MacCaw` and `Dad` are
-  derived into the rebuildable alias projection. The markdown file is not
-  rewritten.
+  empty list.
+- V1 titles work without conversion. For `# Tim MacCaw // Dad`, the full H1
+  stays the canonical title, and `Tim MacCaw` and `Dad` become derived
+  aliases in the rebuildable index. The file is not rewritten.
 - Reader-facing surfaces show a `//` title by its first segment, as v1 did:
-  All Notes, the ⌘K palette, backlink and similar-note lists, task groups, the
-  window title, wiki-link chips, and the `reflect search` listing all read
-  `Tim MacCaw`. The complete H1 stays the canonical title, resolution key,
-  link target, and filename slug; the editor still shows the full H1, which
-  remains the place to edit the segments. A chip for `[[Tim MacCaw // Dad]]`
-  reads `Tim MacCaw`, and `[[Tim MacCaw // Dad|Dad]]` keeps its authored
-  `Dad`. When the ⌘K palette matched through a segment, the row shows
-  `Dad → Tim MacCaw` under the title.
+  All Notes, the ⌘K palette, backlink and similar-note lists, task groups,
+  the window title, wiki-link chips, and `reflect search` all read
+  `Tim MacCaw`. The full H1 stays the canonical title, resolution key, link
+  target, and filename slug; the editor shows the full H1 for editing. A
+  chip for `[[Tim MacCaw // Dad]]` reads `Tim MacCaw`;
+  `[[Tim MacCaw // Dad|Dad]]` keeps `Dad`. When ⌘K matched a segment, the
+  row shows `Dad → Tim MacCaw`.
 - `[[Dad]]` resolves to that note and counts as its backlink. Choosing the
-  `Dad` autocomplete match normally writes `[[Tim MacCaw // Dad|Dad]]`, so the
-  editor displays the alias the user chose. Unlike v1's ID-backed links, this
-  is still a textual address: if another note wins the complete-title key, the
-  alias itself is used when it uniquely resolves to the selected note. A note
-  with no winning textual key is omitted from `[[` autocomplete rather than
-  inserting a link to a different note.
-- Read-only wiki-link resolution and backlinks are deterministic: a
-  calendar-valid daily date wins, then an exact title, then an alias; collisions
-  within one tier choose the first graph-relative path alphabetically. The
-  `note_keys` view contains that winner plus the winning tier's claim count.
-  Writable navigation refuses an ambiguous winning tier, and `[[` autocomplete
-  omits the same ambiguous address (date-shaped or not) unless a unique alias
-  can address the selected note. Clicking a valid ISO date whose key is
-  unclaimed still opens or lazily creates that daily.
+  `Dad` autocomplete match writes `[[Tim MacCaw // Dad|Dad]]`. Unlike v1's
+  ID-backed links, this is a textual address: if another note wins the
+  full-title key, the alias is used when it uniquely resolves to the
+  selected note. A note with no winning textual key is omitted from `[[`
+  autocomplete instead of linking a different note.
+- Read-only resolution and backlinks are deterministic: a calendar-valid
+  daily date wins, then an exact title, then an alias; collisions within a
+  tier choose the first graph-relative path alphabetically. The `note_keys`
+  view holds that winner plus the tier's claim count. Writable navigation
+  refuses an ambiguous winning tier, and `[[` autocomplete omits the same
+  ambiguous address unless a unique alias can address the note. Clicking a
+  valid ISO date with an unclaimed key still opens or lazily creates that
+  daily.
 - Renames are **stronger than v1**: the rename coordinator
   (`packages/core/src/documents/title-rename-service.ts`) rewrites known
-  `[[old title]]` links across the graph, then records the old title as an
-  alias so unindexed or external references keep resolving too.
-- Because the whole `Tim MacCaw // Dad` H1 is v2's canonical title, changing
-  only its `Dad` segment is still a normal title rename. It can rename the
-  markdown file and rewrite graph links; `//` is compatibility syntax, not a
-  separately stored alias field. Use frontmatter `aliases` when that distinction
-  matters. A rename records each old segment as well as the old title, so
-  `[[Dad]]` and `[[Tim MacCaw]]` keep resolving after the H1 becomes
-  `# Timothy MacCaw`; segments the new title still carries are not recorded.
-- Daily notes may carry frontmatter or derived `//` aliases. Their calendar
-  date remains the strongest address for the ISO-date key.
-- Markdown wikilinks additionally support display text via
-  `[[target|shown text]]` — a per-link cosmetic that v1 didn't have, distinct
-  from aliases (which affect resolution).
+  `[[old title]]` links, then records the old title as an alias so
+  unindexed or external references keep resolving.
+- Since the whole `Tim MacCaw // Dad` H1 is the canonical title, changing
+  only `Dad` is a normal title rename (it can rename the file and rewrite
+  links); `//` is compatibility syntax, not a stored alias field. Use
+  frontmatter `aliases` when the distinction matters. A rename records each
+  old segment as well as the old title, so `[[Dad]]` and `[[Tim MacCaw]]`
+  still resolve after the H1 becomes `# Timothy MacCaw`; segments the new
+  title keeps are not recorded.
+- Daily notes may carry frontmatter or `//` aliases; their date stays the
+  strongest address for the ISO-date key.
+- `[[target|shown text]]` display text is a per-link cosmetic v1 lacked,
+  distinct from aliases (which affect resolution).
 
 ## v1 → v2 mapping
 
@@ -90,24 +84,21 @@ aliases:
 
 ## Diagnosing an alias report
 
-1. Check the app version. Direct `//` support begins in
-   `v0.4.0-beta.31` and is included in stable `v0.4.0` and later. Earlier
-   builds treat the whole H1 as one literal title. Upgrading triggers the
-   projection-version rebuild that adds the derived aliases to the index.
-2. Check for a standalone note whose complete title is the reported alias.
-   For example, an older build may have created `# Dad` when `[[Dad]]` looked
-   unresolved. That exact title intentionally wins over the `Dad` alias on
-   `# Tim MacCaw // Dad`, for navigation, backlinks, and autocomplete.
-3. If both notes are intentional, use the canonical target explicitly — for
-   example `[[Tim MacCaw // Dad|Dad]]` when that full title resolves to the
-   intended note. Otherwise rename or remove the accidental standalone note so
-   bare `[[Dad]]` resolves through the alias. Duplicate complete titles are
-   ambiguous for writable navigation; give the intended note a unique alias —
-   `[[` autocomplete then offers it through that alias even when the search
-   matched its title.
+1. Check the version. Direct `//` support starts in `v0.4.0-beta.31` and
+   stable `v0.4.0`; earlier builds treat the H1 as one literal title.
+   Upgrading triggers the projection-version rebuild that adds the aliases.
+2. Look for a standalone note whose full title is the alias, e.g. `# Dad`
+   created by an older build when `[[Dad]]` looked unresolved. That exact
+   title intentionally wins over the `Dad` alias for navigation, backlinks,
+   and autocomplete.
+3. If both notes are intentional, link the canonical target explicitly
+   (`[[Tim MacCaw // Dad|Dad]]`). Otherwise rename or remove the accidental
+   note so `[[Dad]]` resolves through the alias. Duplicate full titles are
+   ambiguous for writable navigation; give the intended note a unique alias
+   and `[[` autocomplete offers it through that alias.
 
 ## Open porting task
 
-- **Collision surfacing.** Writable navigation reports ambiguity, but there is
-  no persistent lint-style indicator showing every title or alias collision.
-  Worth adding eventually, but not a porting blocker.
+- **Collision surfacing.** Writable navigation reports ambiguity, but there
+  is no persistent indicator listing title or alias collisions. Worth
+  adding; not a blocker.

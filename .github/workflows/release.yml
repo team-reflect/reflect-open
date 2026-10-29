@@ -2,9 +2,7 @@ name: Release
 
 # Stable and beta Release PRs share master but use separate lifecycle labels
 # and head branches. A merged PR in one channel therefore cannot block the
-# other channel from refreshing its open PR. Beta versions use a prerelease
-# suffix (X.Y.Z-beta.N); publish-desktop.yml derives the prerelease/latest flags
-# from that suffix.
+# other channel from refreshing its open PR.
 #
 # Everything runs on GITHUB_TOKEN. Tags created with that token do not trigger
 # tag-push workflows, so publishing is called directly through job outputs.
@@ -58,9 +56,6 @@ jobs:
           config-file: .github/release-please/config.stable.json
           manifest-file: .github/release-please/manifest.stable.json
 
-      # After a stable promotion, beta reads the new stable tag and manifest
-      # before the superseded beta PR is closed below. After a beta release,
-      # this pass creates the beta tag and clears beta's pending label.
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: beta
         with:
@@ -90,10 +85,6 @@ jobs:
       CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
       CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
-  # Merging a Release PR makes its channel's pass above create a draft release
-  # and output its tag. Chain straight into the desktop pipeline with the tag
-  # resolved to its immutable commit once; publish-desktop.yml builds every
-  # platform into the draft and then publishes it.
   publish-desktop-stable:
     name: Publish the stable desktop release
     needs: release-please
