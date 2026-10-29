@@ -25,10 +25,8 @@ both installers.
   cannot run unsigned apps at all.
 - **Per-user install, no admin prompt.** The installer uses NSIS in
   `currentUser` mode and installs under `%LOCALAPPDATA%`.
-- **Auto-update.** CI signs each installer with the updater key (minisign,
-  the same key as macOS) and `latest.json` lists it as `windows-x86_64` or
-  `windows-aarch64`. The app verifies that signature before it installs an
-  update. This is separate from code signing.
+- **Auto-update works without code signing.** Updates are verified with the
+  updater key, which is separate from Windows code signing.
 - **No MSI.** Reflect's beta versions carry a prerelease suffix, which the
   MSI toolchain rejects; only the NSIS installer is produced.
 

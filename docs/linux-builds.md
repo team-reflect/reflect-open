@@ -40,12 +40,8 @@ all Linux packages.
 - **Secrets need a keyring.** AI provider keys and the GitHub token are kept in
   the Secret Service (GNOME Keyring or KWallet). Without one, the app cannot
   save them.
-- **Auto-update.** CI signs each package with the updater key (minisign, the
-  same key as macOS and Windows). `latest.json` lists the AppImages as
-  `linux-x86_64-appimage` and `linux-aarch64-appimage`, and the `.deb` packages as
-  `linux-x86_64-deb` and `linux-aarch64-deb`. An AppImage replaces itself, so
-  it must be in a folder you can write to. A `.deb` update asks for your
-  password through `pkexec`.
+- **Auto-update.** An AppImage replaces itself, so it must be in a folder you
+  can write to. A `.deb` update asks for your password through `pkexec`.
 - **Not supported yet:** browser capture (the extension cannot find the native
   host), audio memo recording, iCloud, and the Calendar and Contacts
   integrations.
