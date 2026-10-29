@@ -51,10 +51,9 @@ const assetNames = release.assets.map((item) => item.name)
  */
 type Badge = { variant: string; color: string } & ({ file: string } | { url: string })
 
-const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] }[] = [
+const PLATFORMS: { heading: string; icon: string; badges: Badge[] }[] = [
   {
     heading: 'Mac',
-    name: 'Mac',
     icon: 'apple',
     badges: [
       { variant: 'Apple Silicon', color: '0969DA', file: `${prefix}_aarch64.dmg` },
@@ -63,7 +62,6 @@ const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] 
   },
   {
     heading: 'Windows',
-    name: 'Windows',
     icon: 'windows',
     badges: [
       { variant: 'x64', color: '1A7F37', file: `${prefix}_${version}_x64-setup.exe` },
@@ -72,7 +70,6 @@ const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] 
   },
   {
     heading: 'Linux',
-    name: 'Linux',
     icon: 'linux',
     badges: [
       { variant: 'x64 AppImage', color: '9A6700', file: `${prefix}_${version}_amd64.AppImage` },
@@ -83,7 +80,6 @@ const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] 
   },
   {
     heading: 'iPhone & iPad',
-    name: '',
     icon: 'apple',
     badges: [
       version.includes('-')
@@ -101,33 +97,33 @@ const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] 
   },
 ]
 
-const files = PLATFORMS.flatMap((platform) =>
-  platform.badges.flatMap((badge) => ('file' in badge ? [badge.file] : [])),
-)
+const files = PLATFORMS.flatMap((platform) => {
+  return platform.badges.flatMap((badge) => ('file' in badge ? badge.file : []))
+})
 if (!files.some((file) => assetNames.includes(file))) {
   fail(`no installer among the asset names. Expected: ${files.join(', ')}`)
 }
 
-let section = '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n'
-for (const { heading, name, icon, badges } of PLATFORMS) {
+let section =
+  '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n\n| Platform | Download |\n| --- | --- |\n'
+for (const { heading, icon, badges } of PLATFORMS) {
   const markdown = badges
     .filter((badge) => !('file' in badge) || assetNames.includes(badge.file))
     .map((badge) => {
-      const label = `${name} ${badge.variant}`.trim()
-      const image = `https://badgen.net/badge/${encodeURIComponent(label)}/${encodeURIComponent(tag)}/${badge.color}?icon=${icon}`
+      const image = `https://badgen.net/badge/${encodeURIComponent(badge.variant)}/${encodeURIComponent(tag)}/${badge.color}?icon=${icon}`
       const url =
         'file' in badge
           ? `https://github.com/${repo}/releases/download/${tag}/${badge.file}`
           : badge.url
-      return `[![${label}](${image})](${url})`
+      return `[![${heading} ${badge.variant}](${image})](${url})`
     })
   if (markdown.length > 0) {
-    section += `\n### ${heading}\n\n${markdown.join('\n\n')}\n`
+    section += `| ${heading} | ${markdown.join('<br>')} |\n`
   }
 }
 section += '\n<!-- RELEASE_NOTES_DOWNLOAD_LINKS_END -->\n'
 
 const body = release.body
-  .replace(/^.*RELEASE_NOTES_DOWNLOAD_LINKS_START[^]*?RELEASE_NOTES_DOWNLOAD_LINKS_END.*$/m, '')
+  .replace(/^.*RELEASE_NOTES_DOWNLOAD_LINKS_START[\s\S]*?RELEASE_NOTES_DOWNLOAD_LINKS_END.*$/m, '')
   .trimEnd()
 process.stdout.write(body ? `${body}\n\n${section}` : section)
