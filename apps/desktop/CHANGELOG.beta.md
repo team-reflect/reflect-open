@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.1...v0.17.0-beta.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* **core:** find titles typed without their accents in [[ suggestions ([#1757](https://github.com/team-reflect/reflect-open/issues/1757)) ([40d3580](https://github.com/team-reflect/reflect-open/commit/40d35804223cefdde3ecc7f4f8c60162a537ca0d))
+* **mobile:** pass Sentry DSN for iOS ([#1747](https://github.com/team-reflect/reflect-open/issues/1747)) ([af50d4b](https://github.com/team-reflect/reflect-open/commit/af50d4b7a9be79749ee1929292589bb5c6a3928c))
+
 ## [0.17.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.16.0...v0.17.0-beta.1) (2026-10-26)
 
 
