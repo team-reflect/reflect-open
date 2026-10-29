@@ -40,10 +40,10 @@ jobs:
           # release snapshot. Always build the verified immutable tag commit.
           ref: ${{ inputs.commit }}
           persist-credentials: false
-          # The build number counts commits. A treeless clone fetches the
+          # The build number counts commits. A blobless clone fetches the
           # whole history without the file contents of older commits.
           fetch-depth: 0
-          filter: tree:0
+          filter: blob:none
 
       - name: Verify TestFlight secrets are configured
         env:
