@@ -49,8 +49,8 @@ another git remote are connected directly by the user.
 2. **Install the iOS beta.** Join
    [TestFlight](https://testflight.apple.com/join/j2eEz43d). The iOS app uses
    the same plain-file graph and sync options as the Mac app.
-3. **Windows and Linux (experimental).** Each release includes unsigned builds.
-   See [docs/distribution.md](docs/distribution.md).
+3. **Windows and Linux.** Each release includes unsigned builds. See
+   [docs/distribution.md](docs/distribution.md).
 4. **Install the Chrome extension.** Add
    [Reflect Capture from the Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
    to save the current page, selected text, screenshots, and optional page text
@@ -149,8 +149,7 @@ Release and TestFlight builds are in [docs/distribution.md](docs/distribution.md
 Reflect is in beta and used daily. The current focus is the Mac app, iOS
 companion, browser capture, local-first data model, and sync reliability.
 
-Android and a plugin API are out of scope for now. Windows and Linux builds
-are experimental. See the
+Android and a plugin API are out of scope for now. See the
 [V2 product vision](docs/reflect-v2-product-vision.md) and the implementation
 plans in [docs/plans/](docs/plans/) for the longer-term direction.
 

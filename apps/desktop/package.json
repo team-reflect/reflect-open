@@ -15,7 +15,6 @@
     "postinstall": "node src-tauri/xcode-scripts/generate-xcode-env.mjs",
     "gen:icons": "node scripts/generate-icons.ts",
     "gen:licenses": "node scripts/generate-licenses.ts",
-    "release:manifest": "node scripts/release-manifest.ts",
     "upload:testflight": "node scripts/upload-testflight.ts",
     "test": "vitest run --config ../../vitest.config.ts --project desktop-browser --project desktop-node",
     "test:install": "pnpm run test:install:chromium && pnpm run test:install:webkit",

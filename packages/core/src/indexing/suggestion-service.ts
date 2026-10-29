@@ -6,6 +6,7 @@ import type { DatabaseService } from './database-service.ts'
 import type { DateSuggestionContext } from './date-suggestion-types.ts'
 import { generateDateSuggestions } from './date-suggestions.ts'
 import { likeContains } from './query-utils.ts'
+import { buildFtsTitlePrefixMatch } from './search-query.ts'
 import { verifyWikiSuggestionAddresses, type WikiLinkSuggestionResult } from './queries-shared.ts'
 import {
   mergeDateSuggestions,
@@ -159,19 +160,29 @@ async function queryWikiTargetCandidates(
 
   // The pool is cut by usage before recency: a much-linked note stays in it
   // however long ago its file was last edited. An exact hit is always kept.
+  // The search index also admits titles that differ only in accents (`elisk`
+  // finds `Eliška`); those rank below spelled hits, so spelled hits fill the
+  // pool first.
+  const contains = sql<boolean>`title_key LIKE ${likeContains(key)} ESCAPE '\\'`
+  const ftsMatch = buildFtsTitlePrefixMatch(key)
   let titleQuery = db
     .selectFrom('notes')
     .where('kind', '!=', 'template')
     .select(['path', 'title', 'titleKey', 'dailyDate', 'mtime', selectLinkCount()])
     .orderBy(sql`title_key = ${key}`, 'desc')
+    .orderBy(contains, 'desc')
     .orderBy(sql`link_count`, 'desc')
     .orderBy('mtime', 'desc')
     .limit(WIKI_CANDIDATE_LIMIT)
   if (key === '') {
     // Days come from the date generator; the unqueried list is for notes.
     titleQuery = titleQuery.where('dailyDate', 'is', null)
+  } else if (ftsMatch === null) {
+    titleQuery = titleQuery.where(contains)
   } else {
-    titleQuery = titleQuery.where(sql<boolean>`title_key LIKE ${likeContains(key)} ESCAPE '\\'`)
+    titleQuery = titleQuery.where(
+      sql<boolean>`(${contains} OR path IN (SELECT path FROM search_fts WHERE search_fts MATCH ${ftsMatch}))`,
+    )
   }
   const titles: TitleCandidate[] = await titleQuery.execute()
 
