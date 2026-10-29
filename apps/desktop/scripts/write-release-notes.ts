@@ -67,10 +67,10 @@ const INSTALLERS = [
 ]
 
 const PLATFORMS = [
-  { os: 'macOS', heading: 'macOS', icon: 'apple' },
-  { os: 'Windows', heading: 'Windows', icon: 'windows' },
-  { os: 'Linux', heading: 'Linux', icon: 'linux' },
-  { os: 'iOS', heading: 'iPhone & iPad', icon: 'apple' },
+  { os: 'macOS', heading: 'Mac', name: 'Mac', icon: 'apple' },
+  { os: 'Windows', heading: 'Windows', name: 'Windows', icon: 'windows' },
+  { os: 'Linux', heading: 'Linux', name: 'Linux', icon: 'linux' },
+  { os: 'iOS', heading: 'iPhone & iPad', name: 'iPhone', icon: 'apple' },
 ]
 
 const links = INSTALLERS.filter((item) => assetNames.includes(item.file)).map(
@@ -90,11 +90,11 @@ const ios = version.includes('-')
 links.push({ os: 'iOS', color: '57606A', ...ios })
 
 let section = '<!-- RELEASE_NOTES_DOWNLOAD_LINKS_START -->\n\n## Download\n'
-for (const { os, heading, icon } of PLATFORMS) {
+for (const { os, heading, name, icon } of PLATFORMS) {
   const badges = links
     .filter((item) => item.os === os)
     .map(({ chip, color, url }) => {
-      const label = `${heading} ${chip}`
+      const label = `${name} ${chip}`
       const image = `https://badgen.net/badge/${encodeURIComponent(label)}/${encodeURIComponent(tag)}/${color}?icon=${icon}`
       return `[![${label}](${image})](${url})`
     })
