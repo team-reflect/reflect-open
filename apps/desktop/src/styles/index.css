@@ -330,7 +330,7 @@ html:root {
   --meowdown-h3-size: var(--text-base);
   --meowdown-code-block-margin-block: 0.5rem;
   --meowdown-code-block-padding-block: 0.75rem;
-  --reflect-list-marker-width: 1.25lh;
+  --reflect-list-marker-width: 1.15lh;
 }
 
 /* The primary note editor (the note pane and every daily-stream row, both via
