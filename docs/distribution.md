@@ -154,8 +154,8 @@ Windows 10 22H2 (x64) or Windows 11 (x64, arm64).
 
 ### Troubleshooting
 
-- **The app does not start after install**: Smart App Control is on. It blocks unsigned apps,
-  and an unsigned build cannot run while it is on.
+- **The app does not start after install**: Smart App Control is on, and it blocks unsigned
+  apps.
 
 ## Linux (experimental)
 
