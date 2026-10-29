@@ -1,139 +1,223 @@
 # Plan 22 — Mobile GitHub Connect (iOS)
 
-**Goal:** the "This device" (local) graph on iOS can connect to a GitHub backup repo,
-giving phone ↔ desktop sync without iCloud. The sync machinery already runs on mobile
-(backup controller, background flush, Settings status + Disconnect). Only the front door
-is missing: sign in and pick/create a repo from the phone. **No new sync mechanism, no
-engine changes.**
+**Goal:** the "This device" (local) graph on iOS can connect to a GitHub backup
+repository, giving phone ↔ desktop sync for users without iCloud. The sync
+machinery already runs on mobile — the backup controller mounts, background
+flush fires on app-background, and Settings shows status and Disconnect. What's
+missing is only the front door: sign in to GitHub and pick/create a repo from
+the phone. This plan builds that connect flow and nothing else; **no new sync
+mechanism, no engine changes.**
 
-**Depends on:** Plan 12 (backup controller, merge), Plan 19/PR #483 (`SyncProvider` in the
-mobile tree, mobile quit-flush), Plan 21 contract 5 (iCloud and a Git remote are mutually
-exclusive per graph, so the local graph is the one allowed a remote).
-**Status:** implemented (Phases 0–3): wizard hook extraction (dialog tests pass
-untouched), `ConnectGithubDrawer`, the Settings entry point, copy, and jsdom +
-`?platform=ios` coverage. Remaining: the Phase 0 device spikes and the manual device
-pass; both need a phone/simulator build.
+**Depends on:** Plan 12 (backup controller, merge machinery),
+Plan 19/PR #483 (SyncProvider mounted in the mobile tree, mobile quit-flush),
+Plan 21 (contract 5: iCloud sync and a Git remote are mutually exclusive per
+graph — which makes the local graph precisely the one allowed a remote).
+**Status:** implemented (Phases 0–3): the wizard hook extraction
+(`use-connect-github-wizard.ts`, dialog tests passing untouched), the
+`ConnectGithubDrawer` sheet, the Settings entry point, the copy changes, and
+the jsdom + `?platform=ios` harness coverage. Remaining: the Phase 0
+device spikes (clipboard, background-resume poll, keychain round-trip) and
+the four-item manual device pass — both need a phone/simulator build.
 
-**Not in scope:** GitHub for iCloud graphs; non-Git sync for local graphs; a
-restore-from-repo onboarding (the phone joins an existing repo through the same flow);
-Android; SSH remotes on mobile (Plan 16's agent auth has no phone story).
+**Explicitly not in scope:** GitHub connect for iCloud graphs (contract 5);
+sync for the local graph via any non-Git mechanism; a mobile restore-from-repo
+onboarding path (the phone joins an existing repo through the same connect
+flow — a dedicated "restore" wizard can come later); Android; SSH remotes on
+mobile (Plan 16's agent-auth transport has no phone story).
 
 ## Where we stand
 
-**Reused unchanged:**
+**What already exists (and is reused unchanged):**
 
-- **Engine + lifecycle.** `SyncProvider` is mounted in `mobile-app.tsx`, and
-  `connectNewRepo` / `connectExistingRepo` / `disconnectGraph` / `signOut` are already
-  exposed through `useSync()`.
-- **Rust.** The git2 module already builds for iOS (PR #483). Credentials use `keyring`
-  with `apple-native`, which covers the iOS keychain.
-- **Core auth** (`runDeviceFlow`, auth save/load, repo create/get) is platform-neutral.
-  `GITHUB_APP_CLIENT_ID` is a hardcoded constant, so iOS builds need no injection.
-- **Transport (verified).** GitHub calls go through `providerFetch` →
-  `tauri-plugin-http`, so they leave from Rust and webview CORS never applies. This
-  matters: the device-flow token endpoints send no CORS headers. The plugin registers on
-  all platforms (`src-tauri/src/lib.rs:105`) and `capabilities/default.json` has no
-  `platforms` filter, so the http scope and opener grant already apply on iOS.
-- **Desktop UI.** `GithubAuthStep` is already the shared sign-in step (device flow, PAT
-  fallback, verified via `GET /user`). `ConnectGithubDialog` holds the full wizard
-  (repo → auth → finish, create-handoff poll, grant-access step, public-repo consent).
-- **Mobile substrate.** Inset-grouped settings primitives, the vaul Drawer idiom
-  (`new-graph-drawer.tsx`), and the Backup group in `mobile/screens/settings.tsx`, which
-  renders only when connected.
+- **Engine + lifecycle.** `SyncProvider` is mounted in the mobile tree
+  (`apps/desktop/src/mobile/mobile-app.tsx`), one backup controller per
+  (graph, index session), launch pull, resume/online triggers, and the
+  quit-flush leg. `connectNewRepo` / `connectExistingRepo` /
+  `disconnectGraph` / `signOut` are already exposed through `useSync()`
+  (`apps/desktop/src/providers/sync-provider.tsx`,
+  `apps/desktop/src/lib/backup-controller.ts`).
+- **Rust.** The `git` module (git2, vendored libssh2/openssl) already builds
+  for iOS — PR #483 shipped it. Credentials go through `secrets.rs` on
+  `keyring` with the `apple-native` feature, which backs onto the iOS
+  keychain as well as the macOS one.
+- **Core auth.** `runDeviceFlow` (poll policy included),
+  `saveGithubAuth`/`loadGithubAuth`, `createGithubRepo`/`getGithubRepo` —
+  all platform-neutral TS in `@reflect/core`. The device flow is *always*
+  configured: `GITHUB_APP_CLIENT_ID` is a hardcoded constant in
+  `packages/core/src/sync/github-auth.ts`, not a build-time env var, so iOS
+  builds need no injection.
+- **Transport (verified, not assumed).** GitHub calls ride `providerFetch` →
+  `tauri-plugin-http`, so requests leave from the Rust side and webview CORS
+  never applies — which matters because GitHub's device-flow token endpoints
+  send no CORS headers. The plugin registers unconditionally
+  (`src-tauri/src/lib.rs:105`, outside every `#[cfg(desktop)]` block), and
+  `capabilities/default.json` has no `platforms` filter, so its http scope
+  (`github.com/login/device/code`, `login/oauth/access_token`,
+  `api.github.com/*`) and the opener grant already apply on iOS.
+- **Desktop UI to mine.** `GithubAuthStep`
+  (`apps/desktop/src/components/settings/github-auth-step.tsx`) is already
+  written as the shared sign-in step (device flow leading, PAT fallback,
+  single-shot completion, verified via `GET /user`). `ConnectGithubDialog`
+  (`connect-github-dialog.tsx`) holds the full wizard: repo step → auth →
+  finish, with the create-handoff poll, the grant-access step for App
+  installs, and the public-repo consent gate.
+- **Mobile UI substrate.** The inset-grouped settings primitives
+  (`apps/desktop/src/mobile/settings-list.tsx`), the vaul bottom-sheet Drawer
+  idiom (`apps/desktop/src/mobile/new-graph-drawer.tsx` is the model), and
+  `useMobileSyncStatus` + the Backup group already in
+  `apps/desktop/src/mobile/screens/settings.tsx` (status + Disconnect; it
+  renders only when connected today).
 
-**The gap:** no mobile surface calls `GithubAuthStep` or the connect methods. The Backup
-group is invisible for a disconnected local graph, and the `settings.tsx` docstring still
-says "connecting happens in onboarding" (a leftover from removed onboarding).
+**The gap:** no mobile surface calls `GithubAuthStep` or the connect methods.
+The Backup group is invisible for a disconnected local graph, and the
+`settings.tsx` docstring still claims "connecting happens in onboarding" — a
+leftover from the pre-iCloud mobile onboarding that no longer exists.
 
 ## Contracts
 
-1. **Local graphs only.** The entry point renders only when `mobileStorageKind ===
-   'local'` and the backup phase is `disconnected`. Gate on storage kind, not a root-path
-   sniff.
-2. **One wizard, two shells.** The state machine moves from `ConnectGithubDialog` into a
-   hook; desktop Dialog and mobile Drawer are thin renderings. No forked flow logic.
-3. **Same safety gates as desktop:** destructive-styled public-repo consent;
-   grant-access steers to "Only select repositories"; a failed connect can go back to the
-   repo step.
-4. **The phone joins, it does not fork.** Connect-existing aligns the local branch with
-   the repo's default branch, and the launch pull merges via Plan 12. The near-empty phone
-   graph merges into desktop history, never the reverse.
+1. **Local graphs only.** The connect entry point renders only when
+   `mobileStorageKind === 'local'` and the backup phase is `disconnected`.
+   iCloud graphs never see it (Plan 21 contract 5). The gate is the storage
+   kind, not a root-path sniff.
+2. **One wizard, two shells.** The connect state machine is extracted from
+   `ConnectGithubDialog` into a hook; desktop's Dialog and mobile's Drawer
+   are thin renderings of the same hook. No forked flow logic.
+3. **Same safety gates as desktop.** Public-repo consent stays an explicit
+   destructive-styled confirmation; the grant-access step steers to
+   "Only select repositories"; a failed connect always offers a way back to
+   the repo step.
+4. **The phone joins, it does not fork.** Connecting an existing repo aligns
+   the local branch with the repo's default branch (existing
+   `connectExistingRepo` behavior) and the launch pull merges local content
+   through the Plan 12 machinery — the near-empty phone graph (a seeded daily
+   note at most) merges into desktop history, never the reverse.
 
 ## Phase 0 — extraction + spikes
 
-- **Extract `hooks/use-connect-github-wizard.ts`** (steps, create-vs-existing, target-ref
-  from the verified user, `finish()` branches, existence/access poll).
-  `ConnectGithubDialog` becomes a shell with **zero behavior change**: its existing tests
-  passing untouched is the acceptance test. `GithubAuthStep` has one consumer (its
-  "restore dialog" docstring is aspirational). `useRestoreFocus` stays in the desktop shell.
-- **Device-flow spikes in WKWebView** (simulator + device, before UI work):
-  1. `navigator.clipboard.writeText` in a tap handler. Tauri iOS uses a custom scheme, so
-     the async clipboard may be absent. The manual-copy fallback exists; if needed, pick
-     the smaller of touch-friendlier copy or `tauri-plugin-clipboard-manager`.
-  2. `openUrl` → Safari → return: the `runDeviceFlow` poll must resume on foreground
-     (codes live ~15 min; `slow_down` is handled). Verify, do not assume.
-  3. `keyring` round-trip on iOS; `apple-native` should cover it but has never run there.
+- **Extract `use-connect-github-wizard.ts`** (new,
+  `apps/desktop/src/hooks/`): steps (`repo`/`auth`/`finish`), create-vs-existing
+  mode, target-ref resolution from the verified user, `finish()` with the
+  public-confirm / create-guide / grant-access branches, and the
+  existence/access poll. `ConnectGithubDialog` becomes a shell over the hook
+  with **zero behavior change** — its existing tests
+  (`connect-github-dialog.test.tsx`) must pass untouched, which is the
+  refactor's acceptance test. Scope notes: `GithubAuthStep` has exactly one
+  consumer today (the dialog — its docstring's "restore dialog" is
+  aspirational), so the extraction touches one call site; `useRestoreFocus`
+  is desktop-Dialog furniture and stays in the shell, not the hook.
+- **Spike: device flow in WKWebView.** Three things to prove on a simulator
+  + device before UI work:
+  1. `navigator.clipboard.writeText` inside a tap handler (the copy-before-
+     open step). Tauri iOS serves the app over a custom scheme, and the
+     async clipboard API may be absent outside a browser-blessed secure
+     context. The `copyState === 'failed'` manual-copy fallback already
+     exists; if the API is missing, decide between touch-friendlier
+     fallback copy (long-press-select the code) and adding
+     `tauri-plugin-clipboard-manager` — prefer whichever is smaller.
+  2. `openUrl` → Safari → return-to-app: the JS poll inside `runDeviceFlow`
+     suspends while backgrounded and must simply resume and succeed on
+     foreground (GitHub device codes live ~15 min; `slow_down` handling
+     already exists in core). No code change expected — this is a
+     verify-don't-assume item.
+  3. `keyring`/`secrets.rs` round-trip on iOS (save + load a dummy entry) —
+     `apple-native` should cover it, but it has never run on the phone.
 
-  Whether GitHub requests can leave the app at all was settled in planning (see
-  *Transport*).
+  (A fourth unknown — whether GitHub API/device-flow requests can leave the
+  app at all — was checked during planning and is settled: see *Transport*
+  above.)
 
 ## Phase 1 — the mobile connect surface
 
-- **`mobile/connect-github-drawer.tsx`**, a vaul Drawer driving the hook:
-  - *Repo step:* create-new (name) vs use-existing (`owner/name`). **Do not pass the graph
-    name to `suggestRepoName`:** the local graph's name is the sandbox folder basename,
-    "Documents", which would suggest `documents-backup`. Mobile takes the `reflect-backup`
-    fallback.
-  - *Auth step:* `GithubAuthStep` as-is; tweak styling only if something breaks.
-  - *Finish step:* spinner plus the hook's three parked states (public-confirm,
-    create-guide + poll, grant-access + poll).
-- **Settings entry point:** show the Backup group for disconnected local graphs with a
-  "Connect GitHub" row. Today `mobileSyncStatus` returns `null` for every non-`connected`
-  phase. During `loading`, show the row disabled (or nothing) so it never flashes on a
-  graph that turns out connected. Connected and iCloud behavior stay as today. Fix the
-  stale docstring.
-- **Gating:** `mobileStorageKind` from `useGraph()`, no new plumbing.
-- **Post-connect UX:** `connectRemote` awaits git setup + controller restart, but the
-  launch pull is non-blocking, so the drawer closes once the remote is wired and the
-  status row shows `Syncing`. No progress UI in the drawer.
+- **`apps/desktop/src/mobile/connect-github-drawer.tsx`** (new): a vaul
+  Drawer in the `NewGraphDrawer` idiom driving the wizard hook.
+  - *Repo step:* segmented create-new (name input) vs use-existing
+    (`owner/name` input, `parseRepoInput`). **Do not feed the graph name
+    into `suggestRepoName` here:** the local graph's display name is the
+    sandbox folder's basename — literally "Documents" — so desktop's
+    `suggestRepoName(graph?.name)` would suggest `documents-backup`. Mobile
+    passes no name and takes the `reflect-backup` fallback.
+  - *Auth step:* reuse `GithubAuthStep` as-is — it is deliberately
+    surface-agnostic (device flow + PAT fallback). Touch-specific styling
+    tweaks only if something actually breaks in the sheet.
+  - *Finish step:* connecting spinner, and the three parked states from the
+    hook (public-confirm with destructive confirm, create-guide with
+    "Create on GitHub…" handoff + poll, grant-access with the
+    only-select-repositories steer + poll).
+- **Settings entry point** (`apps/desktop/src/mobile/screens/settings.tsx`):
+  render the Backup group for local graphs even when disconnected, with a
+  `SettingsActionRow` "Connect GitHub" opening the drawer. Today the group
+  is genuinely invisible in that state — `mobileSyncStatus` returns `null`
+  for every non-`connected` phase, so both `repo` and `status` are null.
+  Mind the `loading` phase: show the row disabled (or nothing) until the
+  controller reports `disconnected`, so the row never flashes on a graph
+  that turns out to be connected. Connected state keeps today's rows (repo,
+  status, Disconnect). iCloud graphs keep today's behavior exactly (group
+  appears only with status to show). Fix the stale "connecting happens in
+  onboarding" docstring while there.
+- **Gating:** `mobileStorageKind` comes from `useGraph()` — no new plumbing.
+- **Post-connect UX:** `connectRemote` awaits `gitSetup` + controller
+  restart, but the launch pull is fired non-blocking inside `start()` — so
+  the drawer closes as soon as the remote is wired and the existing status
+  pill/row shows `Syncing` while the first pull runs. No progress UI in the
+  drawer.
 
 ## Phase 2 — copy
 
-- Graphs screen local footer: "Notes stay on this device." → "Notes stay on this device.
-  Sync with GitHub from Settings." (dropping the second sentence when connected is
-  optional).
-- Onboarding "This device" card: add "You can sync with GitHub later from Settings." so
-  it is not a dead end.
+Small, in the copy-simple-sparse register:
+
+- Graphs screen local-group footer (`apps/desktop/src/mobile/screens/graphs.tsx`):
+  "Notes stay on this device." → "Notes stay on this device. Sync with
+  GitHub from Settings." (drop the second sentence when a repo is connected —
+  optional polish, not required).
+- Onboarding "This device" card (`apps/desktop/src/mobile/onboarding-screen.tsx`):
+  append one line to the existing description so the option no longer reads
+  as a dead end: "You can sync with GitHub later from Settings."
 
 ## Phase 3 — tests + verification
 
-- **Hook:** the dialog tests already cover the wizard; add hook tests only for what the
-  shells miss (poll stop conditions, single-shot finish).
-- **Drawer:** screen tests with the drawer mock pattern (vaul portals do not render in
-  jsdom): create-new, existing, public-confirm, and the settings-row visibility matrix.
-- **Dev harness:** smoke under `?platform=ios` so new IPC does not rot the browser bridge
-  (PR #538 lesson). Rendering only: without the shell, `providerFetch` falls back to plain
-  `fetch` and GitHub rejects browser CORS, so the full flow is device-only.
-- **Manual device pass (release gate):**
-  1. Device flow end-to-end (copy → Safari → authorize → return → connected).
-  2. Connect a repo a desktop graph backs up to; seeded content merges without fork or
-     duplicates; edits round-trip.
-  3. Background mid-poll and resume.
-  4. PAT fallback once (paste from clipboard).
+- **Hook:** the dialog's existing tests already exercise the wizard paths
+  through the desktop shell; add hook-level tests only for what the shells
+  don't reach (poll stop conditions, single-shot finish).
+- **Drawer:** screen tests with the drawer mock pattern from the tasks
+  quick-edit sheet work (vaul portals don't render in jsdom): happy path
+  create-new, happy path existing, public-confirm branch, and the
+  local-only/disconnected-only visibility matrix for the settings row.
+- **Dev harness:** smoke the settings screen and drawer under
+  `?platform=ios` — new IPC on the boot/connect path must not rot the
+  browser bridge (PR #538 lesson). Rendering only: without the shell,
+  `providerFetch` falls back to plain `fetch`, and GitHub's device-flow
+  endpoints reject browser CORS — the full flow is device/simulator-only.
+- **Manual device pass (release gate for the feature):**
+  1. iPhone, local graph, device flow end-to-end (copy code → Safari →
+     authorize → return → connected).
+  2. Connect the repo an existing desktop graph backs up to; verify the
+     phone's seeded content merges (no fork, no duplicate notes) and edits
+     round-trip phone ↔ desktop.
+  3. Background the app mid-poll and resume (spike 2's scenario, on the real
+     device).
+  4. PAT fallback path once (paste from clipboard).
 
 ## Risks
 
-- **Poll under iOS suspension** is the biggest unknown. If WKWebView kills the loop, the
-  fix is a resume-time retry in the auth step, not a new flow.
-- **Clipboard availability** has a clunky fallback either way, so it only affects polish.
-- **First-sync merge:** the phone seeds a daily that likely collides with the repo's for
-  the same date. Same shape as desktop connect-existing, same merge ladder; manual item 2
-  is the proof.
-- **PAT stays the escape hatch** (GHES, scoped tokens); manual item 4 checks the paste
-  field in the drawer.
+- **Device-flow poll under iOS suspension** is the biggest remaining unknown
+  (Phase 0 spike 2). If WKWebView kills rather than suspends the fetch loop,
+  the remedy is a resume-time retry inside the auth step, not a new flow.
+- **Clipboard API availability** (spike 1) — has a working-but-clunky
+  fallback either way, so it can't block the feature, only polish.
+- **First-sync merge on a non-empty phone graph:** the local graph seeds a
+  daily note, and the repo likely has one for the same date. This is the same
+  shape as desktop's connect-existing-to-existing-graph path and goes through
+  the same merge ladder; the manual matrix (item 2) is the proof, not new
+  code.
+- **PAT entry stays as the escape hatch** (GHES, users who prefer scoped
+  tokens) — `GithubAuthStep` already renders it; the only mobile question is
+  whether the paste field behaves in the drawer, covered by manual pass
+  item 4.
 
 ## Deferred
 
-- Restore-shaped onboarding ("start from your GitHub backup").
-- A mobile "Back up now" row.
-- Android (no keyring story validated).
+- Restore-shaped onboarding ("start from your GitHub backup" as a first-run
+  option next to iCloud/This device).
+- Surfacing `backUpNow` on mobile (a "Back up now" row) — trivial once the
+  group is always visible, but not needed for the sync story.
+- Android (no keychain/keyring story validated there yet).
