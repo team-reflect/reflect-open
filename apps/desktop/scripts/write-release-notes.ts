@@ -89,12 +89,12 @@ const PLATFORMS: { heading: string; name: string; icon: string; badges: Badge[] 
       version.includes('-')
         ? {
             variant: 'TestFlight',
-            color: '57606A',
+            color: '0369A1',
             url: 'https://testflight.apple.com/join/j2eEz43d',
           }
         : {
             variant: 'App Store',
-            color: '57606A',
+            color: '0369A1',
             url: 'https://apps.apple.com/us/app/reflect-open/id6787385615',
           },
     ],
@@ -122,7 +122,7 @@ for (const { heading, name, icon, badges } of PLATFORMS) {
       return `[![${label}](${image})](${url})`
     })
   if (markdown.length > 0) {
-    section += `\n### ${heading}\n\n${markdown.join(' ')}\n`
+    section += `\n### ${heading}\n\n${markdown.join('\n\n')}\n`
   }
 }
 section += '\n<!-- RELEASE_NOTES_DOWNLOAD_LINKS_END -->\n'
