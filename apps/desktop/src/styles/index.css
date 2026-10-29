@@ -413,19 +413,19 @@ html:root {
 /* The wiki-link hover card's compact body (wiki-link-hover-preview.tsx).
    Meowdown's card is a 20 × 12rem glimpse; the editor's display sizes (20px
    H1, rem-sized checkboxes) overwhelm its 13px body text, so the type ramp
-   re-scales here: the subject one step above body, section headings at body
-   size carried by weight — the same hierarchy, compressed. Unlayered, so
-   these win over meowdown's `@layer meowdown` theme rules. */
+   re-scales here: one pixel per level, with H5 at body size, the same shape as
+   the editor's ramp. The daily date subject matches H1. Unlayered, so these
+   win over meowdown's `@layer meowdown` theme rules. */
 .reflect-hover-preview .reflect-editor {
-  --meowdown-h1-size: var(--text-sm);
-  --meowdown-h2-size: var(--text-xs);
-  --meowdown-h3-size: var(--text-xs);
-  --meowdown-h4-size: var(--text-xs);
-  --meowdown-h5-size: var(--text-xs);
-  --meowdown-h6-size: var(--text-xs);
+  --meowdown-h1-size: 1.0625rem; /* 17px */
+  --meowdown-h2-size: 1rem; /* 16px */
+  --meowdown-h3-size: 0.9375rem; /* 15px */
+  --meowdown-h4-size: 0.875rem; /* 14px */
+  --meowdown-h5-size: 0.8125rem; /* 13px */
+  --meowdown-h6-size: 0.75rem; /* 12px */
 }
 .reflect-hover-preview .reflect-daily-subject {
-  font-size: var(--text-sm, 0.875rem);
+  font-size: 1.0625rem;
 }
 .reflect-hover-preview .reflect-editor :is(h1, h2, h3, h4, h5, h6) {
   padding-top: 0.8em;
