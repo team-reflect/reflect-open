@@ -6,6 +6,8 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type RefCallback,
+  type RefObject,
 } from 'react'
 import { flushSync } from 'react-dom'
 import { clamp } from '@ocavue/utils'
@@ -29,46 +31,71 @@ const DRAG_SHRINK = 0.08
 const SNAP_BACK_EASING = 'cubic-bezier(0.3, 1.35, 0.45, 1)'
 const DISMISS_EASING = 'cubic-bezier(0.3, 0.7, 0.4, 1)'
 
-type DragState =
-  | { phase: 'idle' }
-  | { phase: 'armed' }
-  | {
-      phase: 'dragging'
-      originX: number
-      originY: number
-      width: number
-      height: number
-      deltaX: number
-      deltaY: number
-    }
-  | {
-      phase: 'settling'
-      action: 'close' | 'cancel'
-      deltaX: number
-      deltaY: number
-      width: number
-      height: number
-      durationMs: number
-    }
+interface IdleState {
+  phase: 'idle'
+}
 
-const IDLE: DragState = { phase: 'idle' }
+interface SettlingState {
+  phase: 'settling'
+  action: 'close' | 'cancel'
+  deltaX: number
+  deltaY: number
+  width: number
+  height: number
+  durationMs: number
+}
 
 /**
- * Styles and handlers driving the mobile drag-to-dismiss gesture.
+ * The whole gesture. Only `idle` and `settling` reach React state; the hook
+ * writes the `armed` and `dragging` presentation to the DOM itself.
+ */
+type DragState =
+  | IdleState
+  | { phase: 'armed' }
+  | { phase: 'dragging'; originX: number; originY: number; width: number; height: number }
+  | SettlingState
+
+type RenderedState = IdleState | SettlingState
+
+const IDLE: IdleState = { phase: 'idle' }
+
+/**
+ * The elements a drag moves and fades.
+ */
+interface DragTargets {
+  image: HTMLElement | null
+  backdrop: HTMLElement | null
+  chrome: ReadonlySet<HTMLElement>
+}
+
+/**
+ * Styles, refs, and handlers driving the mobile drag-to-dismiss gesture.
  */
 export interface ImageDismissDrag {
   /**
-   * Transform applied to the dragged image, or undefined at rest.
+   * Settle transition of the dragged image, or undefined outside a settle.
    */
   imageStyle: CSSProperties | undefined
   /**
-   * Fade applied to the lightbox backdrop as the drag progresses.
+   * Settle fade of the lightbox backdrop, or undefined outside a settle.
    */
   backdropStyle: CSSProperties | undefined
   /**
-   * Fade applied to the corner chrome (close/open buttons) during a drag.
+   * Settle fade of the corner chrome (close/open buttons), or undefined outside a settle.
    */
   chromeStyle: CSSProperties | undefined
+  /**
+   * The dragged image. Pointer moves write its `transform` directly, without a React render.
+   */
+  imageRef: RefObject<HTMLImageElement | null>
+  /**
+   * The lightbox backdrop. Pointer moves write its `opacity` directly.
+   */
+  backdropRef: RefObject<HTMLDivElement | null>
+  /**
+   * Attach to every corner chrome wrapper. Pointer moves write its `opacity` directly.
+   */
+  chromeRef: RefCallback<HTMLDivElement>
   handlers: {
     onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
     onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => void
@@ -117,81 +144,117 @@ function dismissDurationMs(distance: number, height: number, velocity: number): 
   return clamp(remaining / Math.max(velocity, floorVelocity), DISMISS_MIN_MS, DISMISS_MS)
 }
 
-function imageStyleForState(state: DragState): CSSProperties | undefined {
-  if (state.phase === 'dragging') {
-    const progress = dragProgress(state.deltaX, state.deltaY, state.height)
+function imageStyleForState(state: RenderedState): CSSProperties | undefined {
+  if (state.phase !== 'settling') {
+    return undefined
+  }
+  if (state.action === 'close') {
+    const offset = projectDismissOffset(state.deltaX, state.deltaY, state.width, state.height)
     return {
-      transform: `translate3d(${state.deltaX}px, ${state.deltaY}px, 0) scale(${1 - progress * DRAG_SHRINK})`,
-      transition: 'none',
+      transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(0.9)`,
+      transition: `transform ${state.durationMs}ms ${DISMISS_EASING}`,
       willChange: 'transform',
     }
   }
-  if (state.phase === 'settling') {
-    const closing = state.action === 'close'
-    if (closing) {
-      const offset = projectDismissOffset(state.deltaX, state.deltaY, state.width, state.height)
-      return {
-        transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(0.9)`,
-        transition: `transform ${state.durationMs}ms ${DISMISS_EASING}`,
-        willChange: 'transform',
-      }
-    }
-    return {
-      transform: 'translate3d(0, 0, 0) scale(1)',
-      transition: `transform ${state.durationMs}ms ${SNAP_BACK_EASING}`,
-      willChange: 'transform',
-    }
+  return {
+    transform: 'translate3d(0, 0, 0) scale(1)',
+    transition: `transform ${state.durationMs}ms ${SNAP_BACK_EASING}`,
+    willChange: 'transform',
   }
-  return undefined
 }
 
-function backdropStyleForState(state: DragState): CSSProperties | undefined {
-  if (state.phase === 'dragging') {
-    return {
-      opacity: 1 - dragProgress(state.deltaX, state.deltaY, state.height) * BACKDROP_FADE,
-      transition: 'none',
-    }
+function backdropStyleForState(state: RenderedState): CSSProperties | undefined {
+  if (state.phase !== 'settling') {
+    return undefined
   }
-  if (state.phase === 'settling') {
-    const closing = state.action === 'close'
-    return {
-      opacity: closing ? 0 : 1,
-      transition: `opacity ${state.durationMs}ms ${closing ? DISMISS_EASING : SNAP_BACK_EASING}`,
-    }
+  const closing = state.action === 'close'
+  return {
+    opacity: closing ? 0 : 1,
+    transition: `opacity ${state.durationMs}ms ${closing ? DISMISS_EASING : SNAP_BACK_EASING}`,
   }
-  return undefined
 }
 
-function chromeStyleForState(state: DragState): CSSProperties | undefined {
-  if (state.phase === 'dragging') {
-    return {
-      opacity: clamp(
-        1 - dragProgress(state.deltaX, state.deltaY, state.height) * CHROME_FADE_RATE,
-        0,
-        1,
-      ),
-      pointerEvents: 'none',
-      transition: 'none',
-    }
+function chromeStyleForState(state: RenderedState): CSSProperties | undefined {
+  if (state.phase !== 'settling') {
+    return undefined
   }
-  if (state.phase === 'settling') {
-    const closing = state.action === 'close'
-    return {
-      opacity: closing ? 0 : 1,
-      pointerEvents: 'none',
-      transition: `opacity ${state.durationMs}ms ${closing ? DISMISS_EASING : SNAP_BACK_EASING}`,
-    }
+  const closing = state.action === 'close'
+  return {
+    opacity: closing ? 0 : 1,
+    pointerEvents: 'none',
+    transition: `opacity ${state.durationMs}ms ${closing ? DISMISS_EASING : SNAP_BACK_EASING}`,
   }
-  return undefined
+}
+
+/**
+ * Freeze transitions and hint the layer for a drag. Every settling style sets
+ * each property written here and in {@link presentDragOffset}, so the settle
+ * commit replaces all of them.
+ */
+function presentDragStart({ image, backdrop, chrome }: DragTargets): void {
+  if (image) {
+    image.style.transition = 'none'
+    image.style.willChange = 'transform'
+  }
+  if (backdrop) {
+    backdrop.style.transition = 'none'
+  }
+  for (const element of chrome) {
+    element.style.transition = 'none'
+    element.style.pointerEvents = 'none'
+  }
+}
+
+/**
+ * Move the image with the finger and fade the backdrop and chrome with distance.
+ */
+function presentDragOffset(
+  { image, backdrop, chrome }: DragTargets,
+  deltaX: number,
+  deltaY: number,
+  height: number,
+): void {
+  const progress = dragProgress(deltaX, deltaY, height)
+  if (image) {
+    image.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${1 - progress * DRAG_SHRINK})`
+  }
+  if (backdrop) {
+    backdrop.style.opacity = String(1 - progress * BACKDROP_FADE)
+  }
+  const chromeOpacity = String(clamp(1 - progress * CHROME_FADE_RATE, 0, 1))
+  for (const element of chrome) {
+    element.style.opacity = chromeOpacity
+  }
+}
+
+/**
+ * Remove every inline style a drag wrote.
+ */
+function clearDragPresentation({ image, backdrop, chrome }: DragTargets): void {
+  if (image) {
+    image.style.transform = ''
+    image.style.transition = ''
+    image.style.willChange = ''
+  }
+  if (backdrop) {
+    backdrop.style.opacity = ''
+    backdrop.style.transition = ''
+  }
+  for (const element of chrome) {
+    element.style.opacity = ''
+    element.style.pointerEvents = ''
+    element.style.transition = ''
+  }
 }
 
 /**
  * Touch drag-to-dismiss for the mobile image lightbox. A touch drag detaches
  * the image so it follows the finger in any direction while the backdrop and
- * chrome fade with distance. Releasing past a distance threshold, or flicking,
- * slides the image out along the drag vector at a velocity-matched speed and
- * then calls `onClose`; shorter drags spring back. A plain tap still closes via
- * `onClick`.
+ * chrome fade with distance. The drag writes these styles to the DOM directly,
+ * so pointer moves never re-render React. Releasing past a distance threshold,
+ * or flicking, slides the image out along the drag vector at a velocity-matched
+ * speed and then calls `onClose`; shorter drags spring back. A plain tap still
+ * closes via `onClick`.
  */
 export function useImageDismissDrag({
   active,
@@ -203,14 +266,37 @@ export function useImageDismissDrag({
   onClose: () => void
 }): ImageDismissDrag {
   const stateRef = useRef<DragState>(IDLE)
-  const [state, setState] = useState<DragState>(IDLE)
+  const [state, setState] = useState<RenderedState>(IDLE)
   const [drag] = useState(() => new PointerDrag())
   const [velocity] = useState(() => new VelocitySampler())
   const suppressClickUntilRef = useRef(0)
+  const imageRef = useRef<HTMLImageElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const chromeElementsRef = useRef(new Set<HTMLElement>())
 
-  const commit = useCallback((next: DragState): void => {
+  const commit = useCallback((next: RenderedState): void => {
     stateRef.current = next
     setState(next)
+  }, [])
+
+  const getDragTargets = useCallback(
+    (): DragTargets => ({
+      image: imageRef.current,
+      backdrop: backdropRef.current,
+      chrome: chromeElementsRef.current,
+    }),
+    [],
+  )
+
+  const chromeRef = useCallback((element: HTMLDivElement | null) => {
+    if (!element) {
+      return
+    }
+    const elements = chromeElementsRef.current
+    elements.add(element)
+    return () => {
+      elements.delete(element)
+    }
   }, [])
 
   const suppressUpcomingClick = useCallback((): void => {
@@ -237,11 +323,15 @@ export function useImageDismissDrag({
   }, [commit, onClose])
 
   useEffect(() => {
-    if ((!active || !enabled) && stateRef.current.phase !== 'idle') {
+    const current = stateRef.current
+    if ((!active || !enabled) && current.phase !== 'idle') {
+      if (current.phase === 'dragging') {
+        clearDragPresentation(getDragTargets())
+      }
       suppressClickUntilRef.current = 0
       commit(IDLE)
     }
-  }, [active, enabled, commit])
+  }, [active, enabled, commit, getDragTargets])
 
   useEffect(() => {
     if (state.phase !== 'settling') {
@@ -256,9 +346,9 @@ export function useImageDismissDrag({
       if (!enabled || stateRef.current.phase !== 'idle' || !drag.arm(event)) {
         return
       }
-      commit({ phase: 'armed' })
+      stateRef.current = { phase: 'armed' }
     },
-    [enabled, commit, drag],
+    [enabled, drag],
   )
 
   const onPointerMove = useCallback(
@@ -278,15 +368,16 @@ export function useImageDismissDrag({
         velocity.reset(0)
         // Rebase on the activation point so the image picks up from rest
         // instead of jumping by the activation distance.
-        commit({
+        stateRef.current = {
           phase: 'dragging',
           originX: event.clientX,
           originY: event.clientY,
           width,
           height,
-          deltaX: 0,
-          deltaY: 0,
-        })
+        }
+        const targets = getDragTargets()
+        presentDragStart(targets)
+        presentDragOffset(targets, 0, 0, height)
         return
       }
 
@@ -294,10 +385,10 @@ export function useImageDismissDrag({
         const deltaX = event.clientX - current.originX
         const deltaY = event.clientY - current.originY
         velocity.sample(dragDistance(deltaX, deltaY))
-        commit({ ...current, deltaX, deltaY })
+        presentDragOffset(getDragTargets(), deltaX, deltaY, current.height)
       }
     },
-    [commit, drag, velocity],
+    [drag, velocity, getDragTargets],
   )
 
   const release = useCallback(
@@ -310,7 +401,7 @@ export function useImageDismissDrag({
         return
       }
       if (current.phase === 'armed') {
-        commit(IDLE)
+        stateRef.current = IDLE
         return
       }
 
@@ -328,7 +419,8 @@ export function useImageDismissDrag({
       suppressUpcomingClick()
 
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        commit(IDLE)
+        clearDragPresentation(getDragTargets())
+        stateRef.current = IDLE
         if (shouldClose) {
           onClose()
         }
@@ -347,7 +439,7 @@ export function useImageDismissDrag({
           : SNAP_BACK_MS,
       })
     },
-    [commit, onClose, suppressUpcomingClick, drag, velocity],
+    [commit, onClose, suppressUpcomingClick, drag, velocity, getDragTargets],
   )
 
   const onPointerUp = useCallback(
@@ -383,6 +475,9 @@ export function useImageDismissDrag({
     imageStyle: imageStyleForState(state),
     backdropStyle: backdropStyleForState(state),
     chromeStyle: chromeStyleForState(state),
+    imageRef,
+    backdropRef,
+    chromeRef,
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onClick },
     finishSettle,
   }
