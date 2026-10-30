@@ -247,6 +247,8 @@ const line = 'a long line that overflows the code block to the right, keep going
       const filler = 'Lorem ipsum dolor sit amet. '.repeat(400)
       document.getElementById('below-text').textContent = filler
       document.getElementById('current-text').textContent = filler
+      const editableLine = document.getElementById('editable')
+      editableLine.textContent = editableLine.textContent.trim()
       const pin = () => {
         pager.scrollLeft = pager.clientWidth
       }
@@ -341,7 +343,10 @@ const line = 'a long line that overflows the code block to the right, keep going
         const control = target.closest('button, a, [role="button"], label')
         if (control) return control.click()
         const editable = target.closest('[contenteditable="true"]')
+        // The strip is on top, so hide it from the hit test.
+        edge.style.pointerEvents = 'none'
         const caret = editable && document.caretRangeFromPoint(event.clientX, event.clientY)
+        edge.style.pointerEvents = ''
         if (caret) {
           editable.focus({ preventScroll: true })
           getSelection().removeAllRanges()
