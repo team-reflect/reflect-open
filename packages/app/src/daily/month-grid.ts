@@ -5,6 +5,7 @@ import {
   getYearMonthStart,
   parseIsoDate,
   getIsoToday,
+  isIsoDate,
 } from '@reflect/utils'
 import { getUserWeekStart, type WeekStartDay } from '@reflect/core'
 
@@ -49,12 +50,21 @@ export interface MonthGrid {
   end: string
 }
 
+/** The first day of a `YYYY-MM` year-month. Throws when `yearMonth` is malformed. */
+function getMonthStart(yearMonth: string): string {
+  const start = getYearMonthStart(yearMonth)
+  if (!isIsoDate(start)) {
+    throw new Error(`expected a YYYY-MM month, got: ${yearMonth}`)
+  }
+  return start
+}
+
 /**
  * Build the full-week grid for a `YYYY-MM` year-month, its weeks starting on `weekStartDay`.
  */
 export function buildMonthGrid(yearMonth: string, weekStartDay: WeekStartDay): MonthGrid {
   const weeks: MonthGridCell[][] = []
-  const start = getUserWeekStart(getYearMonthStart(yearMonth), weekStartDay)
+  const start = getUserWeekStart(getMonthStart(yearMonth), weekStartDay)
   let cursor = start
   while (getYearMonth(cursor) <= yearMonth) {
     const week: MonthGridCell[] = []
@@ -69,12 +79,12 @@ export function buildMonthGrid(yearMonth: string, weekStartDay: WeekStartDay): M
 
 /** Human label for a `YYYY-MM` year-month, e.g. `June 2026`. */
 export function formatMonthLabel(yearMonth: string): string {
-  return formatDate(parseIsoDate(getYearMonthStart(yearMonth)), 'MMMM yyyy')
+  return formatDate(parseIsoDate(getMonthStart(yearMonth)), 'MMMM yyyy')
 }
 
 /** Short label for a `YYYY-MM` year-month, e.g. `Jun` — month-picker grid cells. */
 export function formatMonthShortLabel(yearMonth: string): string {
-  return formatDate(parseIsoDate(getYearMonthStart(yearMonth)), 'MMM')
+  return formatDate(parseIsoDate(getMonthStart(yearMonth)), 'MMM')
 }
 
 /** Two-letter weekday labels for the grid's header row, e.g. `Mo`. */

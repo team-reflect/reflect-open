@@ -134,6 +134,10 @@ function relativeSuggestions(
   if (amount === null) {
     return []
   }
+  // Even in days, a larger amount is past the limit, and it can overflow `Date`.
+  if (amount > MAX_RELATIVE_YEARS * 366) {
+    return []
+  }
   const unitFilter = extractUnit(tokens)
   const directionFilter = extractDirection(tokens)
   // A bare number ("1") offers offsets in every unit; otherwise a unit or

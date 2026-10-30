@@ -8,7 +8,7 @@ describe('file stamps', () => {
     expect(parseFileStamp(stamp)).toEqual({ date: '2026-06-12', time: '15:30:22' })
   })
 
-  it('rejects a stamp that names no real moment', () => {
+  it('rejects a stamp with an out-of-range field', () => {
     expect(parseFileStamp('2026-02-31-153022-845')).toBeNull()
     expect(parseFileStamp('2026-06-12-243022-845')).toBeNull()
     expect(parseFileStamp('2026-06-12-156022-845')).toBeNull()

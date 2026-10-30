@@ -46,7 +46,7 @@ const WEEK_START_OPTIONS: WeekStartOption[] = [
 /**
  * Date & time display preferences. Both formats feed every date and time the
  * app renders (via `formatDayLabel`/`formatTimeOfDay`/`formatRecencyLabel` in
- * `@reflect/utils`) — display-only, so switching them never touches stored
+ * `@reflect/core`) — display-only, so switching them never touches stored
  * timestamps or daily-note keys.
  */
 export function DateTimeSection(): ReactElement {

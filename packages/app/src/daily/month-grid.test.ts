@@ -69,6 +69,11 @@ describe('buildMonthGrid', () => {
   })
 
   it('rejects malformed months', () => {
+    expect(() => buildMonthGrid('2026-13', 'monday')).toThrow(/YYYY-MM/)
+    expect(() => buildMonthGrid('June', 'monday')).toThrow(/YYYY-MM/)
+  })
+
+  it('rejects malformed months', () => {
     expect(() => buildMonthGrid('2026-13', 'monday')).toThrow()
     expect(() => buildMonthGrid('June', 'monday')).toThrow()
   })

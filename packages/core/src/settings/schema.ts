@@ -146,17 +146,20 @@ export const themePreferenceSchema = z.enum(['system', 'light', 'dark']).catch('
 
 export type ThemePreference = z.infer<typeof themePreferenceSchema>
 
+/** The time-format setting's choices. */
+export const TIME_FORMATS = ['12h', '24h'] as const
+
 /**
  * How times of day are displayed throughout the app. `12h` (the default)
  * renders `8:22pm`; `24h` renders `20:22`. Display-only — stored timestamps
  * and daily-note keys are unaffected.
  */
-/** The time-format setting's choices. */
-export const TIME_FORMATS = ['12h', '24h'] as const
-
 export const timeFormatSchema = z.enum(TIME_FORMATS).catch('12h')
 
 export type TimeFormat = z.infer<typeof timeFormatSchema>
+
+/** The date-format setting's choices. */
+export const DATE_FORMATS = ['mdy', 'dmy', 'iso'] as const
 
 /**
  * How calendar dates are displayed throughout the app: `mdy` (the default)
@@ -164,9 +167,6 @@ export type TimeFormat = z.infer<typeof timeFormatSchema>
  * renders `2026-06-10`. Display-only — daily-note filenames and stored dates
  * stay ISO `YYYY-MM-DD` regardless.
  */
-/** The date-format setting's choices. */
-export const DATE_FORMATS = ['mdy', 'dmy', 'iso'] as const
-
 export const dateFormatSchema = z.enum(DATE_FORMATS).catch('mdy')
 
 export type DateFormat = z.infer<typeof dateFormatSchema>
