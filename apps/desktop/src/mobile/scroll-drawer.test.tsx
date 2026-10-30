@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
+import { mouse } from 'vitest-browser-commands/playwright'
 import { describe, expect, it, vi } from 'vitest'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement } from '@/test-utils/scroll.ts'
@@ -98,17 +99,15 @@ describe('ScrollDrawer', () => {
     const onOpenChange = vi.fn()
     await renderInApp(<Harness onOpenChange={onOpenChange} />)
     await openScroller()
-    const title = page.getByRole('heading', { name: 'Test drawer' }).element()
-    const top = title.getBoundingClientRect().top
-    const mouse = (type: string, target: EventTarget, clientY: number): void => {
-      target.dispatchEvent(
-        new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'mouse', clientY }),
-      )
-    }
-    mouse('pointerdown', title, top)
-    mouse('pointermove', window, top + 10)
-    mouse('pointermove', window, innerHeight)
-    mouse('pointerup', window, innerHeight)
+    const title = page
+      .getByRole('heading', { name: 'Test drawer' })
+      .element()
+      .getBoundingClientRect()
+
+    await mouse.move(title.left + 20, title.top + 5)
+    await mouse.down()
+    await mouse.move(title.left + 20, innerHeight - 5, { steps: 10 })
+    await mouse.up()
 
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
