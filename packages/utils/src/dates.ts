@@ -9,10 +9,20 @@
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
+/**
+ * UTC midnight on the given day. `setUTCFullYear` rather than `Date.UTC`: the
+ * latter remaps years 0-99 to 1900-1999.
+ */
+function utcDate(year: number, monthIndex: number, day: number): Date {
+  const date = new Date(0)
+  date.setUTCFullYear(year, monthIndex, day)
+  return date
+}
+
 /** Parse an ISO `YYYY-MM-DD` string as a UTC-midnight {@link Date}. */
 export function parseIsoUtc(iso: string): Date {
   const [year, month, day] = iso.split('-').map(Number) as [number, number, number]
-  return new Date(Date.UTC(year, month - 1, day))
+  return utcDate(year, month - 1, day)
 }
 
 /** Format a {@link Date} as an ISO `YYYY-MM-DD` string from its UTC fields. */
@@ -43,7 +53,7 @@ export function addMonthsIso(iso: string, months: number): string {
   const zeroBased = month - 1 + months
   const targetYear = year + Math.floor(zeroBased / 12)
   const targetMonth = ((zeroBased % 12) + 12) % 12
-  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate()
+  const lastDay = utcDate(targetYear, targetMonth + 1, 0).getUTCDate()
   return isoFromParts(targetYear, targetMonth + 1, Math.min(day, lastDay))
 }
 
@@ -63,7 +73,7 @@ export function isCalendarDate(value: string): boolean {
     return false
   }
   // Day 0 of the next month = the last day of `month` (leap years included).
-  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  const daysInMonth = utcDate(year, month, 0).getUTCDate()
   return day >= 1 && day <= daysInMonth
 }
 

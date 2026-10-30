@@ -16,6 +16,11 @@ describe('addDaysIso', () => {
     expect(addDaysIso('2020-01-01', 0)).toBe('2020-01-01')
   })
 
+  it('keeps years 0-99', () => {
+    expect(addDaysIso('0099-01-01', -1)).toBe('0098-12-31')
+    expect(addDaysIso('0000-02-28', 1)).toBe('0000-02-29')
+  })
+
   it('is DST-safe (a spring-forward day still advances by one calendar day)', () => {
     // 2020-03-08 is the US spring-forward day; UTC math never skips it.
     expect(addDaysIso('2020-03-08', 1)).toBe('2020-03-09')
@@ -56,6 +61,12 @@ describe('isCalendarDate / isIsoDate', () => {
     expect(isCalendarDate('2023-02-29')).toBe(false)
     expect(isCalendarDate('2026-02-31')).toBe(false)
     expect(isCalendarDate('2026-13-01')).toBe(false)
+  })
+
+  it('keeps years 0-99', () => {
+    // Year 0 is a leap year (divisible by 400) even though 1900 is not.
+    expect(isCalendarDate('0099-12-31')).toBe(true)
+    expect(isCalendarDate('0000-02-29')).toBe(true)
   })
 
   it('isIsoDate also enforces the YYYY-MM-DD shape', () => {
