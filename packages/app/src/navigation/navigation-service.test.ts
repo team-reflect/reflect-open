@@ -353,6 +353,31 @@ describe('NavigationService', () => {
     expect(navigation.savedScroll()).toBeNull()
   })
 
+  describe('forgetScrollStates', () => {
+    it('drops every offset, the surface ones included, but keeps the history', () => {
+      const navigation = createNavigationService()
+      navigation.saveScrollState(500)
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.saveScrollState(40)
+      const before = navigation.getState()
+      let notified = 0
+      navigation.subscribe(() => {
+        notified += 1
+      })
+
+      navigation.forgetScrollStates()
+
+      expect(navigation.getState()).toEqual(before)
+      expect(navigation.savedScroll()).toBeNull()
+      expect(notified).toBe(0)
+      navigation.back()
+      expect(navigation.savedScroll()).toBeNull()
+      navigation.navigate({ kind: 'note', path: 'notes/b.md' })
+      navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+      expect(navigation.savedScroll()).toBeNull()
+    })
+  })
+
   describe('reset', () => {
     it('starts a fresh history on the given route', () => {
       const navigation = createNavigationService()

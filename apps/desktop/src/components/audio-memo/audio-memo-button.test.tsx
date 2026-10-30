@@ -19,6 +19,7 @@ const memo = vi.hoisted((): Mutable<AudioMemoContextValue> => ({
   discard: vi.fn(),
   pendingCount: 0,
   recorderState: 'idle',
+  presentation: 'popover',
 }))
 
 vi.mock('@/providers/audio-memo-provider.tsx', () => ({
@@ -39,6 +40,7 @@ beforeEach(() => {
   memo.unavailableReason = null
   memo.error = null
   memo.canRetry = false
+  memo.presentation = 'popover'
 })
 
 describe('AudioMemoButton', () => {
@@ -110,6 +112,42 @@ describe('AudioMemoButton', () => {
     expect(memo.retry).toHaveBeenCalled()
     await userEvent.click(view.getByRole('button', { name: 'Discard', exact: true }))
     expect(memo.discard).toHaveBeenCalled()
+  })
+
+  describe('with the iOS recording sheet', () => {
+    beforeEach(() => {
+      memo.presentation = 'sheet'
+    })
+
+    it('starts from the mic without a popover of its own', async () => {
+      const view = await renderButton()
+
+      await userEvent.click(view.getByRole('button', { name: 'Record audio memo' }))
+      expect(memo.toggle).toHaveBeenCalledTimes(1)
+      expect(view.getByRole('dialog').query()).toBeNull()
+    })
+
+    it('stops from the mic, leaving the recording UI to the sheet', async () => {
+      memo.phase = 'recording'
+      const view = await renderButton()
+
+      await userEvent.click(view.getByRole('button', { name: 'Stop recording' }))
+      expect(memo.toggle).toHaveBeenCalledTimes(1)
+      expect(view.getByRole('dialog').query()).toBeNull()
+    })
+
+    it('keeps the plain mic for every other phase, the sheet presenting errors and progress', async () => {
+      for (const phase of ['transcribing', 'error'] as const) {
+        memo.phase = phase
+        memo.error = phase === 'error' ? 'provider down' : null
+        const view = await renderButton()
+
+        await userEvent.click(view.getByRole('button', { name: 'Record audio memo' }))
+        expect(view.getByText('provider down').query()).toBeNull()
+        await view.unmount()
+      }
+      expect(memo.toggle).toHaveBeenCalledTimes(2)
+    })
   })
 
   it('a non-resumable failure hides Retry', async () => {

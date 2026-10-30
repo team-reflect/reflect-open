@@ -31,19 +31,27 @@ function envPlatform(env: string): AppPlatform {
   }
 }
 
-// Plain-browser dev (no Tauri build target) may pick a UI family with `?platform=`.
-function devPlatformOverride(env: string): AppPlatform | null {
+interface DevPlatformOverride {
+  readonly appPlatform: AppPlatform
+  readonly tablet: boolean
+}
+
+// Plain-browser dev (no Tauri build target) may pick a UI family with `?platform=`;
+// `ipad` is the iOS app on a tablet.
+function devPlatformOverride(env: string): DevPlatformOverride | null {
   if (env || !import.meta.env.DEV || typeof window === 'undefined') {
     return null
   }
   const query = new URLSearchParams(window.location.search).get('platform')
   switch (query) {
     case 'ios':
-      return 'ios'
+      return { appPlatform: 'ios', tablet: false }
+    case 'ipad':
+      return { appPlatform: 'ios', tablet: true }
     case 'android':
-      return 'android'
+      return { appPlatform: 'android', tablet: false }
     case 'desktop':
-      return 'desktop'
+      return { appPlatform: 'desktop', tablet: false }
   }
   if (query) {
     console.warn('[reflect-open] Unknown platform override in query string:', query)
@@ -69,14 +77,21 @@ export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
     navigator.userAgent.includes('Macintosh') &&
     navigator.maxTouchPoints === 0
 
-  const appPlatform = devPlatformOverride(env) ?? envPlatform(env)
+  const override = devPlatformOverride(env)
+  const appPlatform = override?.appPlatform ?? envPlatform(env)
   const mobile = appPlatform !== 'desktop'
+  // iPadOS asks for desktop-class pages, so its webview reports a Mac user
+  // agent; only an iPhone (or iPod) names itself.
+  const tablet =
+    override?.tablet ??
+    (appPlatform === 'ios' && hasNavigator && !/iPhone|iPod/.test(navigator.userAgent))
 
   return {
     appPlatform,
     isNativeShell: nativeShell,
     buildPlatform: buildPlatformFromEnv(env),
     isMacosDesktop: macosDesktop,
+    isTablet: tablet,
     isApplePlatform:
       hasNavigator && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent),
     hasMacosTitleBarOverlay: macosDesktop,

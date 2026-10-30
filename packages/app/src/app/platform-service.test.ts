@@ -7,6 +7,7 @@ const FACTS: PlatformFacts = {
   isNativeShell: true,
   buildPlatform: 'ios',
   isMacosDesktop: false,
+  isTablet: true,
   isApplePlatform: true,
   hasMacosTitleBarOverlay: false,
   surface: { touchEditor: true, mobileApp: true },

@@ -4,6 +4,7 @@ import type {
   NativeMenuPredefinedItem,
   NativeMenuService,
 } from '@reflect/app'
+import type { PlatformFacts } from '@reflect/core'
 
 /**
  * The native macOS application menu (the V1 Electron menu, ported). Command
@@ -29,11 +30,20 @@ function separator(): AppMenuEntry {
   return predefined('Separator')
 }
 
+export interface AppMenuLayoutOptions {
+  /**
+   * The iPadOS menu bar: it has no note window to open a note in (yet) and no
+   * in-app web inspector, so those commands stay off it.
+   */
+  readonly tablet?: boolean
+}
+
 /**
  * The menu structure, as pure data so tests can hold it against the command
- * registry. macOS replaces the first submenu's title with the app name.
+ * registry. macOS replaces the first submenu's title with the app name; the
+ * iPad files each submenu into the system menu of the same title.
  */
-export function appMenuLayout(): AppSubmenuLayout[] {
+export function appMenuLayout({ tablet = false }: AppMenuLayoutOptions = {}): AppSubmenuLayout[] {
   return [
     {
       text: 'Reflect',
@@ -88,16 +98,14 @@ export function appMenuLayout(): AppSubmenuLayout[] {
         command('history.forward'),
         separator(),
         command('sidebar.toggle'),
-        separator(),
-        command('dev.toggleDevtools'),
+        ...(tablet ? [] : [separator(), command('dev.toggleDevtools')]),
       ],
     },
     {
       text: 'Window',
       nsAppRole: 'windows',
       entries: [
-        command('note.openInNewWindow'),
-        separator(),
+        ...(tablet ? [] : [command('note.openInNewWindow'), separator()]),
         predefined('Minimize'),
         predefined('Maximize', 'Zoom'),
         separator(),
@@ -117,14 +125,19 @@ export function appMenuLayout(): AppSubmenuLayout[] {
  * Call once at startup, before React mounts — the menu holds command ids, not
  * state, so it never needs rebuilding.
  *
- * macOS-only for now: other desktop platforms would render an in-window
- * menubar we haven't designed for, and every shortcut already works there
- * through the keydown path. Most keyboard equivalents the webview handles are
- * consumed before the menu sees them (`useAppShortcuts` prevents the default),
- * so a focused webview never double-fires a command. The sidebar toggle is
- * deliberately exempted there so its key equivalent belongs to this native
- * macOS application menu.
+ * The macOS app menu and the iPadOS menu bar only: other desktop platforms
+ * would render an in-window menubar we haven't designed for, and every
+ * shortcut already works there through the keydown path. On macOS most
+ * keyboard equivalents the webview handles are consumed before the menu sees
+ * them (`useAppShortcuts` prevents the default), so a focused webview never
+ * double-fires a command; the sidebar toggle is deliberately exempted there so
+ * its key equivalent belongs to this native menu. On iPadOS the order is the
+ * other way round: the menu bar claims its key equivalents first, and they run
+ * through the same guarded dispatch.
  */
-export async function installNativeMenu(nativeMenu: NativeMenuService): Promise<void> {
-  await nativeMenu.install(appMenuLayout())
+export async function installNativeMenu(
+  nativeMenu: NativeMenuService,
+  platform: Pick<PlatformFacts, 'isTablet'>,
+): Promise<void> {
+  await nativeMenu.install(appMenuLayout({ tablet: platform.isTablet }))
 }

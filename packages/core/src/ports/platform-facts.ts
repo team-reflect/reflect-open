@@ -46,6 +46,12 @@ export interface PlatformFacts {
    */
   readonly isMacosDesktop: boolean
   /**
+   * The iOS build runs on an iPad. Its services stay those of the iOS app
+   * (`appPlatform` is still `ios`), but a regular-width window renders the
+   * desktop workspace, menu bar and shortcuts instead of the phone shell.
+   */
+  readonly isTablet: boolean
+  /**
    * Mod renders as ⌘ rather than Ctrl.
    */
   readonly isApplePlatform: boolean

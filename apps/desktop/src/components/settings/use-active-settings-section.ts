@@ -1,6 +1,7 @@
 import { useEffect, useState, type RefObject } from 'react'
 import { findScrollContainer, SECTION_JUMP_OFFSET_PX } from './section-scrolling.ts'
 import { SETTINGS_SECTIONS, settingsSectionDomId, type SettingsSectionId } from './sections.ts'
+import { useVisibleSettingsSections } from './use-visible-settings-sections.ts'
 
 /**
  * The reading line: a section is active while it is the last one whose top
@@ -16,12 +17,16 @@ const ACTIVATION_LINE_PX = SECTION_JUMP_OFFSET_PX + 16
  * rendered inside it — and recomputes on scroll and resize. The active
  * section is the last one whose top has crossed the reading line; once the
  * container is scrolled to the very bottom the final section wins instead,
- * since a short last card may never reach the line on its own.
+ * since a short last card may never reach the line on its own. First and
+ * final mean among the sections this platform shows.
  */
 export function useActiveSettingsSection(
   anchorRef: RefObject<HTMLElement | null>,
 ): SettingsSectionId {
-  const [activeId, setActiveId] = useState<SettingsSectionId>(SETTINGS_SECTIONS[0].id)
+  const sections = useVisibleSettingsSections()
+  const firstId = sections[0]!.id
+  const lastId = sections[sections.length - 1]!.id
+  const [activeId, setActiveId] = useState<SettingsSectionId>(firstId)
 
   useEffect(() => {
     const anchor = anchorRef.current
@@ -37,7 +42,7 @@ export function useActiveSettingsSection(
     // per frame, and the work is eight getBoundingClientRect calls.
     const compute = (): void => {
       const containerTop = container.getBoundingClientRect().top
-      let current: SettingsSectionId = SETTINGS_SECTIONS[0].id
+      let current: SettingsSectionId = firstId
       for (const section of SETTINGS_SECTIONS) {
         const element = document.getElementById(settingsSectionDomId(section.id))
         if (element && element.getBoundingClientRect().top - containerTop <= ACTIVATION_LINE_PX) {
@@ -47,7 +52,7 @@ export function useActiveSettingsSection(
       const atBottom =
         container.scrollTop > 0 &&
         container.scrollTop + container.clientHeight >= container.scrollHeight - 1
-      setActiveId(atBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1]!.id : current)
+      setActiveId(atBottom ? lastId : current)
     }
     compute()
     // ScrollRestored restores a saved scrollTop in its own effect, which runs
@@ -62,7 +67,7 @@ export function useActiveSettingsSection(
       container.removeEventListener('scroll', compute)
       resizeObserver.disconnect()
     }
-  }, [anchorRef])
+  }, [anchorRef, firstId, lastId])
 
   return activeId
 }

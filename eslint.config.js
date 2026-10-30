@@ -138,6 +138,11 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
   // Heavy children: the pane and the task row mount the editor.
   'apps/desktop/src/components/daily-stream.focus.test.tsx': ['@/components/note-pane.tsx'],
   'apps/desktop/src/components/tasks/tasks-screen.test.tsx': ['./task-editor'],
+  // Each surface mounts a whole shell; the size-class switch between them is under test.
+  'apps/desktop/src/mobile/tablet-shell.test.tsx': [
+    '@/mobile/mobile-shell.tsx',
+    '@/mobile/tablet-workspace.tsx',
+  ],
 
   // The real resolver only lets `reflect-asset:` media through, which no test
   // browser can load; the mock also widens `X_MEDIA_URL_PROTOCOLS`.

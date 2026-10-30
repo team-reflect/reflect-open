@@ -183,6 +183,27 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(core.graphSession.getState().graph).toBeNull()
   })
 
+  it('offers no recents, whose container paths do not survive a restore', async () => {
+    const recents: RecentGraph[] = [{ root: '/old/Documents', name: 'Documents', openedMs: 1 }]
+    const { core, result } = await renderGraph(
+      createTestCoreServices({
+        database: createWasmTestDatabaseService(),
+        platform: createTestPlatformService({ appPlatform: 'ios' }),
+        graphSession: createTestGraphSessionService({ recents }),
+      }),
+      'ios',
+    )
+    await vi.waitFor(() => expect(result.current.mobileStorageResolving).toBe(false))
+
+    // The shell still records every open, so the session lists them.
+    await act(async () => {
+      await core.graphSession.loadRecents()
+    })
+
+    expect(core.graphSession.getState().recents).toEqual(recents)
+    expect(result.current.recents).toEqual([])
+  })
+
   it('publishes the app’s mobile onboarding and passes completeOnboarding through', async () => {
     const { core, appServices, result } = await renderGraph(
       createTestCoreServices({

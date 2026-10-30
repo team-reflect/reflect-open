@@ -31,6 +31,7 @@ class PlatformServiceImpl implements PlatformService {
   readonly isNativeShell: boolean
   readonly buildPlatform: PlatformFacts['buildPlatform']
   readonly isMacosDesktop: boolean
+  readonly isTablet: boolean
   readonly isApplePlatform: boolean
   readonly hasMacosTitleBarOverlay: boolean
   readonly surface: PlatformFacts['surface']
@@ -44,6 +45,7 @@ class PlatformServiceImpl implements PlatformService {
     this.isNativeShell = facts.isNativeShell
     this.buildPlatform = facts.buildPlatform
     this.isMacosDesktop = facts.isMacosDesktop
+    this.isTablet = facts.isTablet
     this.isApplePlatform = facts.isApplePlatform
     this.hasMacosTitleBarOverlay = facts.hasMacosTitleBarOverlay
     this.surface = { touchEditor: facts.surface.touchEditor, mobileApp: facts.surface.mobileApp }

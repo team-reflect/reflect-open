@@ -1,0 +1,8 @@
+[default]
+description = "Install the app's commands in the iPadOS menu bar, receive their activations, and present context menus"
+permissions = [
+  "allow-set-menu",
+  "allow-present-context-menu",
+  "allow-registerListener",
+  "allow-remove-listener",
+]

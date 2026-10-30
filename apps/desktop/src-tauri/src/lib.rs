@@ -246,6 +246,14 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     let builder = builder.plugin(tauri_plugin_web_auth::init());
 
+    // The iPad's desktop-class surface: the window's horizontal size class
+    // picks the desktop workspace or the phone shell, and the iPadOS menu bar
+    // carries the desktop app menu's commands and key equivalents.
+    #[cfg(target_os = "ios")]
+    let builder = builder
+        .plugin(tauri_plugin_scene::init())
+        .plugin(tauri_plugin_native_menu::init());
+
     builder
         // Serves note images (`assets/…`) to the webview. Registered as an
         // *asynchronous* protocol on purpose: WebKit delivers custom-scheme

@@ -24,7 +24,12 @@ import {
   type TestOpenerService,
   type TestOperationsService,
 } from '@reflect/app/testing'
-import { createTestCoreServices, createTestGitSyncService } from '@reflect/core/testing'
+import {
+  createTestCoreServices,
+  createTestGitSyncService,
+  createTestPlatformService,
+  type TestPlatformOptions,
+} from '@reflect/core/testing'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
@@ -83,7 +88,11 @@ beforeEach(() => {
   openNativeContextMenu.mockClear()
 })
 
-async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route) {
+async function renderSidebar(
+  overrides?: Partial<CommandContext>,
+  initialRoute?: Route,
+  platform?: TestPlatformOptions,
+) {
   const navigate = vi.fn()
   const openPalette = vi.fn()
   const readSource = (): Promise<string> => Promise.resolve('# Rust\n')
@@ -99,6 +108,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
       isOstensiblyEmpty: isOstensiblyEmptyNoteSource,
     },
     gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),
+    ...(platform === undefined ? {} : { platform: createTestPlatformService(platform) }),
   })
   const appLayer = createTestAppServices(core, {
     window: createTestWindowService({ openNoteWindow }),
@@ -339,17 +349,24 @@ describe('Sidebar', () => {
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
-    await rust.click({ button: 'right' })
+    // Right-click a known point inside the row: the iPad's menu points at it.
+    const row = rust.element().getBoundingClientRect()
+    await userEvent.click(rust, { button: 'right', position: { x: 12, y: 6 } })
 
     await vi.waitFor(() => {
-      expect(openNativeContextMenu).toHaveBeenCalledWith({
-        items: [
-          expect.objectContaining({
-            text: 'Unpin Note',
-          }),
-        ],
-      })
+      expect(openNativeContextMenu).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              text: 'Unpin Note',
+            }),
+          ],
+        }),
+      )
     })
+    const at = openNativeContextMenu.mock.lastCall?.[0].at
+    expect(at?.x).toBeCloseTo(row.left + 12, 0)
+    expect(at?.y).toBeCloseTo(row.top + 6, 0)
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
     expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
   })
@@ -360,7 +377,7 @@ describe('Sidebar', () => {
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
-    await rust.click({ button: 'right' })
+    await userEvent.click(rust, { button: 'right' })
 
     await vi.waitFor(() => {
       expect(commitNoteFrontmatter).toHaveBeenCalledWith('notes/rust.md', { pinned: false }, 1)
@@ -408,6 +425,24 @@ describe('Sidebar', () => {
     await page.getByRole('menuitem', { name: /open another graph/i }).click()
     expect(chooseGraph).toHaveBeenCalled()
     expect(pickAndOpen).not.toHaveBeenCalled()
+  })
+
+  it('the graph footer switches graphs through the iOS graph list in the iOS app', async () => {
+    const { view } = await renderSidebar(undefined, undefined, {
+      appPlatform: 'ios',
+      isMacosDesktop: false,
+    })
+
+    await view.getByRole('button', { name: /Notes/ }).click()
+    await page.getByRole('menuitem', { name: 'Switch graph…' }).click()
+
+    expect(view.appServices.navigation.navigations()).toEqual([
+      { route: { kind: 'graphs' }, options: undefined },
+    ])
+    await view.getByRole('button', { name: /Notes/ }).click()
+    await expect.element(page.getByRole('menuitem', { name: 'Switch graph…' })).toBeVisible()
+    expect(page.getByRole('menuitem', { name: /open another graph/i }).query()).toBeNull()
+    expect(page.getByRole('menuitem', { name: /reveal graph/i }).query()).toBeNull()
   })
 
   it('the graph footer opens preferences from the graph menu', async () => {

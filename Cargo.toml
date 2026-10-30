@@ -16,8 +16,10 @@ members = [
   "crates/types",
   "plugins/tauri-plugin-app-store",
   "plugins/tauri-plugin-keyboard",
+  "plugins/tauri-plugin-native-menu",
   "plugins/tauri-plugin-mobile-haptics",
   "plugins/tauri-plugin-recording",
+  "plugins/tauri-plugin-scene",
   "plugins/tauri-plugin-web-auth",
 ]
 
@@ -42,8 +44,10 @@ reflect-index-schema = { path = "crates/index-schema", default-features = false 
 reflect-types = { path = "crates/types" }
 tauri-plugin-app-store = { path = "plugins/tauri-plugin-app-store" }
 tauri-plugin-keyboard = { path = "plugins/tauri-plugin-keyboard" }
+tauri-plugin-native-menu = { path = "plugins/tauri-plugin-native-menu" }
 tauri-plugin-mobile-haptics = { path = "plugins/tauri-plugin-mobile-haptics" }
 tauri-plugin-recording = { path = "plugins/tauri-plugin-recording" }
+tauri-plugin-scene = { path = "plugins/tauri-plugin-scene" }
 tauri-plugin-web-auth = { path = "plugins/tauri-plugin-web-auth" }
 
 # Third-party crates

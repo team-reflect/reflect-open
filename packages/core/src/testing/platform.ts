@@ -43,6 +43,7 @@ class TestPlatformServiceImpl implements TestPlatformService {
   readonly isNativeShell: boolean
   readonly buildPlatform: BuildPlatform | null
   readonly isMacosDesktop: boolean
+  readonly isTablet: boolean
   readonly isApplePlatform: boolean
   readonly hasMacosTitleBarOverlay: boolean
   readonly surface: PlatformSurface
@@ -56,6 +57,7 @@ class TestPlatformServiceImpl implements TestPlatformService {
     this.isNativeShell = options.isNativeShell ?? true
     this.buildPlatform = options.buildPlatform ?? 'darwin'
     this.isMacosDesktop = options.isMacosDesktop ?? true
+    this.isTablet = options.isTablet ?? false
     this.isApplePlatform = options.isApplePlatform ?? true
     this.hasMacosTitleBarOverlay = options.hasMacosTitleBarOverlay ?? true
     this.surface = {

@@ -1,0 +1,17 @@
+[package]
+name = "tauri-plugin-scene"
+version = "0.1.0"
+description = "Reports the Reflect iPad window scene's horizontal size class, which picks the desktop workspace or the phone shell."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+links = "tauri-plugin-scene"
+
+[dependencies]
+tauri = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { workspace = true }

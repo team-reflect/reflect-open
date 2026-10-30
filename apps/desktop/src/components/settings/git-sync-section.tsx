@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useGitSync } from '@/providers/sync-provider.tsx'
-import { useAppServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /** Which dialog is open: the host chooser, or one host's own flow. */
 type OpenDialog =
@@ -69,11 +69,18 @@ export function GitSyncSettingsField(): ReactElement {
   const { state, disconnectGraph, syncNow } = useGitSync()
   const { graph } = useGraph()
   const { opener } = useAppServices()
+  const { platform } = useCoreServices()
   const [dialog, setDialog] = useState<OpenDialog | null>(null)
   const openRepoAttemptRef = useRef(0)
   const action = useAsyncAction()
 
   const hosted = graph !== null && isICloudRoot(graph.root)
+  // The iOS app (the iPad's desktop workspace) connects a repository only to
+  // a graph kept on the device, like the phone settings (Plan 21): an iCloud
+  // graph syncs through the container. A remote such a graph already carries
+  // still runs, as the engine's secondary history channel, once its sign-in
+  // resolves; without one it waits and only local history runs.
+  const connectable = !(hosted && platform.appPlatform === 'ios')
   const repo = state.phase === 'connected' ? githubRepoOf(state.remote) : null
   // A remote that waits for its sign-in: a host sign-in is added here, a
   // GitHub one under Accounts, and plain http never gets one.
@@ -124,9 +131,11 @@ export function GitSyncSettingsField(): ReactElement {
             ? 'Syncs this graph’s history to the repository five minutes after iCloud and your edits go quiet.'
             : state.phase === 'connected'
               ? 'Syncs this graph with your other devices and keeps its history.'
-              : hosted
-                ? 'This graph syncs through iCloud Drive. A repository adds a history that updates after five quiet minutes.'
-                : 'Sync this graph with your other devices through a Git repository, and keep its history.'
+              : hosted && !connectable
+                ? 'This graph syncs through iCloud Drive. To sync through a repository instead, use a graph kept on this device.'
+                : hosted
+                  ? 'This graph syncs through iCloud Drive. A repository adds a history that updates after five quiet minutes.'
+                  : 'Sync this graph with your other devices through a Git repository, and keep its history.'
         }
       >
         <div className="mt-3 flex flex-col gap-2">
@@ -134,7 +143,7 @@ export function GitSyncSettingsField(): ReactElement {
             <p className="text-xs text-text-muted">Checking the repository…</p>
           ) : null}
 
-          {state.phase === 'disconnected' ? (
+          {state.phase === 'disconnected' && connectable ? (
             <div>
               <Button size="sm" onClick={() => setDialog({ kind: 'choose' })}>
                 Connect a repository…

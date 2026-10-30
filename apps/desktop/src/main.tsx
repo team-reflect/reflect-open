@@ -20,7 +20,7 @@ import '@/styles/index.css'
 warmPlatformRoot()
 registerAppCommands(appServices.commands)
 registerAppKeymaps(appServices.keymap)
-installNativeMenu(appServices.nativeMenu).catch((cause: unknown) => {
+installNativeMenu(appServices.nativeMenu, coreServices.platform).catch((cause: unknown) => {
   coreServices.logger.error('failed to install the native menu', cause)
 })
 

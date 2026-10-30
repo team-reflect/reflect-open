@@ -4,6 +4,7 @@ import { LoadingScreen } from '@/components/loading-screen.tsx'
 import { SearchRoute } from '@/components/search-route.tsx'
 import { SingleNoteView } from '@/components/single-note-view.tsx'
 import { useRouter } from '@/routing/router.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 const AllNotesScreen = lazy(async () => {
   const { AllNotesScreen } = await import('@/components/all-notes/all-notes-screen.tsx')
@@ -21,6 +22,10 @@ const TasksScreen = lazy(async () => {
   const { TasksScreen } = await import('@/components/tasks/tasks-screen.tsx')
   return { default: TasksScreen }
 })
+const MobileGraphs = lazy(async () => {
+  const { MobileGraphs } = await import('@/mobile/screens/graphs.tsx')
+  return { default: MobileGraphs }
+})
 
 /**
  * The route → view mapping (Plan 06): the single place a {@link Route} kind
@@ -34,6 +39,7 @@ const TasksScreen = lazy(async () => {
  */
 function RouteContentBody(): ReactElement {
   const { route } = useRouter()
+  const { platform } = useCoreServices()
   switch (route.kind) {
     case 'today':
       return <DailyStream target={{ kind: 'today' }} />
@@ -59,8 +65,14 @@ function RouteContentBody(): ReactElement {
       return <ChatScreen />
     // The graph-switcher and licenses routes are mobile settings sub-screens.
     // On desktop, graph switching lives in the sidebar footer and licenses
-    // open in a dialog, so both render as settings.
+    // open in a dialog, so both render as settings. The iPad's graphs live in
+    // the iOS app's fixed roots, so it keeps the iOS graph list.
     case 'graphs':
+      return platform.appPlatform === 'ios' ? (
+        <MobileGraphs safeAreaInsets={false} />
+      ) : (
+        <SettingsRoute />
+      )
     case 'licenses':
     case 'settings':
       return <SettingsRoute />

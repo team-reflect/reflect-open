@@ -5,6 +5,7 @@ import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
 import { PaywallScreen } from '@/mobile/paywall-screen.tsx'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
+import { TabletShell } from '@/mobile/tablet-shell.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
 import {
   useKeyboardCaretReveal,
@@ -15,7 +16,7 @@ import { usePaywallGate } from '@/mobile/use-paywall-gate.ts'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
-import { useAppServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * Mobile root component (Plan 19): the graph provider bootstraps the fixed
@@ -25,12 +26,15 @@ import { useAppServices } from '@/services/services-provider.tsx'
  *
  * The router mounts per graph exactly as on desktop; `MobileScreen` renders
  * the current route (daily spine, note pages), so wiki-link and date-link
- * taps navigate for real. The keyboard-height mirror lives here so every
- * screen inherits `--keyboard-height`; the field/caret reveals and the
- * checkbox-haptic listener mount here so they cover every screen's inputs.
+ * taps navigate for real. An iPad renders {@link TabletShell} instead of the
+ * phone shell: the desktop workspace while its window is regular-width. The
+ * keyboard-height mirror lives here so every screen inherits
+ * `--keyboard-height`; the field/caret reveals and the checkbox-haptic
+ * listener mount here so they cover every screen's inputs.
  */
 export function MobileApp(): ReactElement {
   const { quitPolicy } = useAppServices()
+  const { platform } = useCoreServices()
   const { status, graph, error, needsOnboarding } = useGraph()
   const paywallGate = usePaywallGate()
   useKeyboardHeightVar()
@@ -64,7 +68,7 @@ export function MobileApp(): ReactElement {
               queue, the reconciler, and the orphan scan survive tab
               switches. */}
           <MobileAudioMemoProvider graph={graph}>
-            <MobileShell />
+            {platform.isTablet ? <TabletShell graph={graph} /> : <MobileShell />}
             <MobileStatusLayer />
             {/* Mounted beside the shell (not inside the daily screen)
                 so a live recording's sheet survives tab switches. */}

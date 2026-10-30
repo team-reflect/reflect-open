@@ -134,6 +134,14 @@ export interface NavigationService {
    * renders, so subscribers are not notified; read `getState()` afterwards.
    */
   reset(initialRoute?: Route): void
+  /**
+   * Drop every recorded scroll offset but keep the history. An iPad crossing
+   * size classes swaps the desktop workspace for the phone shell (or back)
+   * over the same history, and one surface's offsets mean nothing to the
+   * other's views. Like {@link reset}, the surface that mounts calls this
+   * while it renders, so nothing is notified.
+   */
+  forgetScrollStates(): void
 }
 
 export interface NavigationServiceDeps {
@@ -311,6 +319,11 @@ class NavigationServiceImpl implements NavigationService {
   reset(initialRoute?: Route): void {
     this.#revision += 1
     this.#state = this.#start(initialRoute ?? { kind: 'today' })
+  }
+
+  forgetScrollStates(): void {
+    this.#scrollById.clear()
+    this.#scrollBySurface.clear()
   }
 
   #snapshot(): NavigationState {

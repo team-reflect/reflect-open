@@ -36,6 +36,7 @@ export {
   type SystemSettingsPane,
 } from './app/opener-service.ts'
 export { type KeyboardService } from './mobile/keyboard-service.ts'
+export { type SizeClassService } from './app/size-class-service.ts'
 export { type ShareService } from './mobile/share-service.ts'
 export {
   getMobileSyncStatus,
@@ -116,11 +117,13 @@ export {
 } from './daily/week-window.ts'
 export { type Command, type CommandService } from './commands/command-service.ts'
 export { formatBinding } from './commands/keybindings.ts'
+export { bindingToKeyEquivalent } from './commands/accelerator.ts'
 export { type KeymapService } from './commands/keymap-service.ts'
 export {
   type AppMenuEntry,
   type AppSubmenuLayout,
   type FocusedNoteMenuCommand,
+  type NativeAppMenu,
   type NativeContextMenuOptions,
   type NativeMenuHost,
   type NativeMenuItem,

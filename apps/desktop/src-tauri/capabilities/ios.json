@@ -1,8 +1,14 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "ios",
-  "description": "iOS-only capabilities: the StoreKit In-App Purchase bridge, the App Store environment probe, and the system web sign-in session",
+  "description": "iOS-only capabilities: the StoreKit In-App Purchase bridge, the App Store environment probe, the system web sign-in session, the window's size class, and the iPadOS menu bar",
   "platforms": ["iOS"],
   "windows": ["main"],
-  "permissions": ["iap:default", "app-store:default", "web-auth:default"]
+  "permissions": [
+    "iap:default",
+    "app-store:default",
+    "web-auth:default",
+    "scene:default",
+    "native-menu:default"
+  ]
 }

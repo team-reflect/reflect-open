@@ -84,7 +84,7 @@ export function ChatHistoryMenu(): ReactElement | null {
                       event.stopPropagation()
                       void deleteConversation(conversation.id)
                     }}
-                    className="invisible shrink-0 text-text-muted hover:text-text group-hover/conversation:visible"
+                    className="invisible shrink-0 text-text-muted hover:text-text group-hover/conversation:visible touch-app:visible"
                   >
                     <X aria-hidden className="size-3.5" />
                   </button>

@@ -321,6 +321,24 @@ export {
 } from './ipc/iap-service.ts'
 export { createAppStoreService, type AppStoreService } from './ipc/app-store-service.ts'
 export {
+  sizeClassChangedEvent,
+  sizeClassCommand,
+  type HorizontalSizeClass,
+  type SizeClassPayload,
+} from './ipc/scene-plugin.ts'
+export {
+  mainMenuCommandEvent,
+  presentContextMenuCommand,
+  setMainMenuCommand,
+  type ContextMenuItem,
+  type MainMenuItem,
+  type MainMenuKeyEquivalent,
+  type MainMenuModifier,
+  type MainMenuNamedKey,
+  type MainMenuPlacement,
+  type MainMenuSection,
+} from './ipc/native-menu-plugin.ts'
+export {
   AI_PROVIDERS,
   aiProvider,
   aiModelLabel,

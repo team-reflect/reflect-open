@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-present-context-menu"
+description = "Enables the present_context_menu command without any pre-configured scope."
+commands.allow = ["present_context_menu"]
+
+[[permission]]
+identifier = "deny-present-context-menu"
+description = "Denies the present_context_menu command without any pre-configured scope."
+commands.deny = ["present_context_menu"]

@@ -76,6 +76,10 @@ export function GraphProvider({
   const value = useMemo<GraphContextValue>(
     () => ({
       ...state,
+      // The shell still records every open, but a mobile recent is a dead
+      // path after a restore or update; the iPad's desktop footer and ⌘1–9
+      // must not offer them (graphs switch through the mobile graph list).
+      recents: platform === 'desktop' ? state.recents : [],
       ...mobile,
       pickAndOpen: () => graphBoot.pickAndOpen(),
       chooseGraph: () => graphBoot.chooseGraph(),

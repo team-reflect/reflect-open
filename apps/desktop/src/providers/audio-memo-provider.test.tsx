@@ -11,12 +11,14 @@ import {
 } from '@reflect/core'
 import {
   createTestCoreServices,
+  createTestPlatformService,
   createTestSettingsService,
   type TestCoreServices,
 } from '@reflect/core/testing'
 import { toast } from '@/components/ui/toast.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
-import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
+import { IPAD_PLATFORM, renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AudioMemoProvider, useAudioMemo } from './audio-memo-provider.tsx'
 
@@ -239,5 +241,42 @@ describe('AudioMemoProvider', () => {
     // The graph's own lifecycles listen until the graph closes.
     core.graphSession.setGraph(null)
     expect(core.fileChanges.listenerCount().changes).toBe(0)
+  })
+})
+
+describe('AudioMemoProvider in the iPad workspace', () => {
+  async function renderBridge(isNativeShell: boolean) {
+    const core = createTestCoreServices({
+      database: createWasmTestDatabaseService(),
+      platform: createTestPlatformService({ ...IPAD_PLATFORM, isNativeShell }),
+    })
+    return await renderHookInApp(() => useAudioMemo(), {
+      core,
+      graph: GRAPH,
+      wrapper: (children: ReactNode) => (
+        <MobileAudioMemoProvider graph={GRAPH}>
+          <AudioMemoProvider graph={GRAPH}>{children}</AudioMemoProvider>
+        </MobileAudioMemoProvider>
+      ),
+    })
+  }
+
+  it('borrows the native recording session, presented in the iOS sheet', async () => {
+    const { result } = await renderBridge(true)
+
+    expect(result.current).toMatchObject({
+      presentation: 'sheet',
+      available: true,
+      unavailableReason: null,
+    })
+  })
+
+  it('turns the mic off where there is no native recorder', async () => {
+    const { result } = await renderBridge(false)
+
+    expect(result.current).toMatchObject({
+      available: false,
+      unavailableReason: 'Audio recording is not supported on this platform',
+    })
   })
 })

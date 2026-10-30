@@ -69,7 +69,7 @@ export const AllNotesRow = memo(function AllNotesRow({
         }}
         className={cn(
           'group absolute inset-y-0 left-0 flex w-12 items-center justify-center opacity-0 transition-opacity duration-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none',
-          selected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
+          selected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100 touch-app:opacity-100',
         )}
       >
         <span

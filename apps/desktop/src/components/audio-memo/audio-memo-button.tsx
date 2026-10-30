@@ -14,7 +14,8 @@ import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
  * beside it. While earlier memos are still transcribing the mic stays live —
  * memos queue, so the next recording can start immediately. Disabled (with
  * the reason as a tooltip) when no OpenAI/Gemini model is configured —
- * `aria-disabled` rather than `disabled` so the tooltip still fires.
+ * `aria-disabled` rather than `disabled` so the tooltip still fires. On the
+ * iPad the iOS recording sheet presents the recording instead of the panel.
  */
 export function AudioMemoButton(): ReactElement {
   const memo = useAudioMemo()
@@ -33,7 +34,25 @@ export function AudioMemoButton(): ReactElement {
     }
   }
 
-  if (memo.phase === 'idle' || memo.phase === 'requesting') {
+  // The iOS recording sheet presents everything but the start and stop taps,
+  // and a recording never stands in the way of queueing the next one.
+  const sheetPresented = memo.presentation === 'sheet'
+
+  if (sheetPresented && memo.phase === 'recording') {
+    return (
+      <Button
+        variant="destructive"
+        size="icon-sm"
+        className="rounded-full"
+        aria-label="Stop recording"
+        onClick={() => memo.toggle()}
+      >
+        <Square aria-hidden fill="currentColor" className="size-3" />
+      </Button>
+    )
+  }
+
+  if (memo.phase === 'idle' || memo.phase === 'requesting' || sheetPresented) {
     return (
       <Tooltip>
         <TooltipTrigger

@@ -5,9 +5,16 @@ import { detectPlatformFacts } from './detect-platform.ts'
 const DESKTOP_SURFACE = { touchEditor: false, mobileApp: false }
 const MOBILE_SURFACE = { touchEditor: true, mobileApp: true }
 
+// WKWebView on iPadOS requests desktop-class pages with a Mac user agent.
+const IPAD_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)'
+const IPHONE_USER_AGENT =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'
+
 const originalUrl = window.location.href
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllEnvs()
   window.history.replaceState(null, '', originalUrl)
 })
@@ -30,6 +37,34 @@ describe('detectPlatformFacts', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', env)
     const facts = detectPlatformFacts(true)
     expect(facts.appPlatform).toBe(env)
+    expect(facts.surface).toEqual(MOBILE_SURFACE)
+  })
+
+  it.each([
+    ['an iPad', IPAD_USER_AGENT, true],
+    ['an iPhone', IPHONE_USER_AGENT, false],
+  ])('in an ios build on %s, reports isTablet=%s', (_device, userAgent, tablet) => {
+    vi.stubEnv('TAURI_ENV_PLATFORM', 'ios')
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent)
+    const facts = detectPlatformFacts(true)
+    expect(facts.isTablet).toBe(tablet)
+    // A tablet keeps the iOS app's services; only the workspace layout differs.
+    expect(facts.appPlatform).toBe('ios')
+    expect(facts.surface).toEqual(MOBILE_SURFACE)
+  })
+
+  it('is never a tablet in a desktop build, even with a Mac user agent', () => {
+    vi.stubEnv('TAURI_ENV_PLATFORM', 'darwin')
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(IPAD_USER_AGENT)
+    expect(detectPlatformFacts(true).isTablet).toBe(false)
+  })
+
+  it('follows the `?platform=ipad` override in plain-browser dev', () => {
+    vi.stubEnv('TAURI_ENV_PLATFORM', '')
+    setQuery('?platform=ipad')
+    const facts = detectPlatformFacts(false)
+    expect(facts.appPlatform).toBe('ios')
+    expect(facts.isTablet).toBe(true)
     expect(facts.surface).toEqual(MOBILE_SURFACE)
   })
 

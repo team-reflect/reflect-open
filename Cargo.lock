@@ -4740,9 +4740,11 @@ dependencies = [
  "tauri-plugin-keyboard",
  "tauri-plugin-log",
  "tauri-plugin-mobile-haptics",
+ "tauri-plugin-native-menu",
  "tauri-plugin-opener",
  "tauri-plugin-process",
  "tauri-plugin-recording",
+ "tauri-plugin-scene",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tauri-plugin-web-auth",
@@ -6160,6 +6162,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-native-menu"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "tauri-plugin-opener"
 version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6193,6 +6206,16 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-recording"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "tauri-plugin-scene"
 version = "0.1.0"
 dependencies = [
  "serde",
