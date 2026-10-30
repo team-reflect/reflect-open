@@ -7,7 +7,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { SearchInput } from '@/mobile/search-input.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import type { NoteFilterRef } from './filter-state.ts'
+import type { NoteFilterRef } from '@reflect/app'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 const PICKER_LIMIT = 20

@@ -7,10 +7,9 @@ import {
   type ReactElement,
 } from 'react'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
-import type { AllNotesFilters } from '@/mobile/search-filters/filter-state.ts'
+import type { AllNotesFilters, Route } from '@reflect/app'
 import { BACK_SWIPE_SETTLE_MS, useBackSwipe, type BackSwipeState } from '@/mobile/use-back-swipe.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
-import type { Route } from '@/routing/route.ts'
 import { RouterFreeze, useRouter } from '@/routing/router.tsx'
 import './mobile-stack.css'
 

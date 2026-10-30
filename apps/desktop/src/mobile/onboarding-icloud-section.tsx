@@ -10,7 +10,7 @@ import {
   graphNameFromRoot,
   graphRootForName,
   isGraphNameTaken,
-} from '@/lib/graph-names.ts'
+} from '@reflect/core'
 import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header.tsx'
 
 interface OnboardingIcloudSectionProps {

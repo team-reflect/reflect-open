@@ -2,7 +2,7 @@ import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { weekStartDow } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates.ts'
-import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid.ts'
+import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 

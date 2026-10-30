@@ -4,7 +4,7 @@ import { isTagName, isToolPending, type AssistantPart, type NoteHitSummary } fro
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
-import { routeForPath } from '@/routing/route.ts'
+import { routeForPath } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
 import { useDateFormat } from '@/hooks/use-date-format.ts'

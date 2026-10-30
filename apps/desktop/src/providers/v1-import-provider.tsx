@@ -7,9 +7,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { createV1ImportService, type V1ImportService } from '@reflect/core'
+import { createV1ImportService, type V1ImportService, type V1ImportState } from '@reflect/core'
 import { V1ImportDialog } from '@/components/v1-import-dialog.tsx'
-import type { V1ImportState } from '@/lib/v1-import-state.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 

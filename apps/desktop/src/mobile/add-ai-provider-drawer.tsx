@@ -7,6 +7,7 @@ import {
   aiProviderRequiresApiKey,
   isPlainHttpRemoteBaseUrl,
   type AiProviderId,
+  type NewAiProvider,
 } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -22,7 +23,6 @@ import {
 } from '@/components/ui/select.tsx'
 import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit.ts'
 import { AiProviderConsent } from '@/mobile/ai-provider-consent.tsx'
-import type { NewAiProvider } from '@/hooks/use-ai-providers.ts'
 
 interface AddAiProviderDrawerProps {
   open: boolean

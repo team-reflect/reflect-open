@@ -6,10 +6,7 @@ import { getIsComposing } from '@meowdown/core'
 import { CommandItem, CommandList } from '@/components/ui/command.tsx'
 import { INPUT_CLASS_NAME } from '@/components/ui/input.tsx'
 import { Popover, PopoverContent } from '@/components/ui/popover.tsx'
-import {
-  buildAutocompleteEntries,
-  type AutocompleteEntry,
-} from '@/editor/wiki-autocomplete-entries.ts'
+import { buildAutocompleteEntries, type AutocompleteEntry } from '@reflect/app'
 import { useContactsState } from '@/hooks/use-contacts-state.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'

@@ -8,8 +8,6 @@
  * downscales oversized images); this module owns only the DOM side.
  */
 
-export type { ChatAttachment } from '@reflect/core'
-
 /** The image files in a drop or paste payload; everything else is ignored. */
 export function imageFilesFrom(data: DataTransfer | null): File[] {
   if (!data) {

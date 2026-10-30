@@ -3,7 +3,14 @@ import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
-import type { AppServices } from '@reflect/app'
+import {
+  type AppServices,
+  type Route,
+  monthLabel,
+  monthOf,
+  createWeekWindow,
+  weekOf,
+} from '@reflect/app'
 import { createTestAppServices } from '@reflect/app/testing'
 import type { DailyNoteService } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
@@ -12,14 +19,11 @@ import {
   publishFormattingToolbar,
 } from '@/editor/formatting-toolbar-store.ts'
 import { useRouter } from '@/routing/router.tsx'
-import type { Route } from '@/routing/route.ts'
 import { addDaysIso, formatDayLabel, todayIso } from '@/lib/dates.ts'
-import { monthLabel, monthOf } from '@/lib/month-grid.ts'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { createWeekWindow, weekOf } from './calendar.ts'
 import { MobileShell } from './mobile-shell.tsx'
 
 const waitFor = vi.waitFor

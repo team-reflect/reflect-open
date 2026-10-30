@@ -1,7 +1,13 @@
 import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { ExternalLink } from 'lucide-react'
 import { remoteLabel, signInNeededText } from '@reflect/app'
-import { githubRepoOf, isICloudRoot, suggestRepoName, type GithubRepoRef } from '@reflect/core'
+import {
+  githubRepoOf,
+  isICloudRoot,
+  suggestRepoName,
+  type GithubRepoRef,
+  type GitSyncState,
+} from '@reflect/core'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog.tsx'
 import { ConnectGitHostDialog } from '@/components/settings/connect-git-host-dialog.tsx'
@@ -10,7 +16,7 @@ import { SettingsField } from '@/components/settings/field.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useGitSync, type GitSyncState } from '@/providers/sync-provider.tsx'
+import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /** Which dialog is open: the host chooser, or one host's own flow. */

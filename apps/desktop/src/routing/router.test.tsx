@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import type { Route } from './route.ts'
+import type { Route } from '@reflect/app'
 import { RouterFreeze, useRouter } from './router.tsx'
 
 /**

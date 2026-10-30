@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { formatDayLabel } from '@/lib/dates.ts'
-import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid.ts'
+import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@reflect/app'
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'

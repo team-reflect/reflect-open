@@ -71,7 +71,7 @@ Invariants the loop maintains:
   bytes aside, and rejoins them on every write. The editor only ever sees the
   body; metadata writes go through `session.updateFrontmatter()` without
   disturbing the view.
-- **Round-trip fidelity gates editability** (`editor/roundtrip.ts`, passed to
+- **Round-trip fidelity gates editability** (meowdown's `checkRoundTrip`, passed to
   the session as its `classify` option). Before the save
   pipeline may rewrite a note, the editor must prove it can reproduce it; a
   converter gap (e.g. task lists today) opens the note as a `protected`
@@ -164,7 +164,6 @@ Desktop, `apps/desktop/src/editor/`:
 |---|---|
 | `use-note-document.ts` | React adapter: session ↔ state/watcher/editor |
 | `note-editor.tsx` | meowdown composition + our extensions; imperative handle |
-| `roundtrip.ts` | fidelity classification (`exact` / `normalizing` / `lossy`), re-exported from meowdown |
 | `use-editor-autocomplete.ts` | `[[` and `#` search handlers over `AutocompleteSuggestionService` |
 | `use-wiki-link-navigation.ts`, `use-tag-navigation.ts` | chip click → resolve → navigate or create |
 | `use-wiki-link-hover-preview.tsx` | desktop chip hover → side-effect-free local preview renderer |

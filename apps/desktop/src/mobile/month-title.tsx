@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { monthLabel } from '@/lib/month-grid.ts'
+import { monthLabel } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './month-title.css'

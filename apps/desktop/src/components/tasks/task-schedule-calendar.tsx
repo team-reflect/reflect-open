@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { weekStartDow } from '@reflect/core'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
 import { formatDayLabel } from '@/lib/dates.ts'
-import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid.ts'
+import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 

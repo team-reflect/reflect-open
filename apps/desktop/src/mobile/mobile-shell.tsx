@@ -8,10 +8,11 @@ import { SafeAreaBoundary } from '@/mobile/safe-area-boundary.tsx'
 import {
   EMPTY_ALL_NOTES_FILTERS,
   type AllNotesFilters,
-} from '@/mobile/search-filters/filter-state.ts'
+  routesEqual,
+  type Route,
+} from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
-import { routesEqual, type Route } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 
 type DailyRoute = Extract<Route, { kind: 'today' }> | Extract<Route, { kind: 'daily' }>

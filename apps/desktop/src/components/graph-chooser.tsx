@@ -13,7 +13,7 @@ import {
   cleanGraphName,
   graphNameFromRoot,
   isGraphNameTaken,
-} from '@/lib/graph-names.ts'
+} from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { graphColorCss } from '@/lib/graph-colors.ts'
 import { cn } from '@/lib/utils.ts'

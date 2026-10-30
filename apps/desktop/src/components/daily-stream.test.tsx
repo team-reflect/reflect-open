@@ -14,7 +14,7 @@ import { createTestCoreServices, createTestClockService } from '@reflect/core/te
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { formatDayLabel, todayIso } from '@/lib/dates.ts'
-import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window.ts'
+import { createDayWindow, dateAtIndex, indexOfDate } from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'

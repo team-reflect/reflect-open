@@ -2,7 +2,7 @@ import { act } from '@/test-utils/act.ts'
 import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WeekStartDay } from '@reflect/core'
-import { createWeekWindow, weekAtIndex, weekIndexOf, weekStartOf } from './calendar.ts'
+import { createWeekWindow, weekAtIndex, weekIndexOf, weekStartOf } from '@reflect/app'
 import { shouldRecenterWeeks, useWeekStrip } from './use-week-strip.ts'
 
 /**

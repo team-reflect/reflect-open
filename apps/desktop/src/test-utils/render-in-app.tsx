@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { onTestFinished } from 'vitest'
 import { render, renderHook, type RenderHookResult, type RenderResult } from 'vitest-browser-react'
-import type { AppServices, MobileOnboardingState } from '@reflect/app'
+import type { AppServices, MobileOnboardingState, Route } from '@reflect/app'
 import {
   createTestAppServices,
   createTestOperationsService,
@@ -33,7 +33,6 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { registerAppCommands } from '@/lib/commands/app-commands.ts'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
-import type { Route } from '@/routing/route.ts'
 import { RouterProvider } from '@/routing/router.tsx'
 import { AppServicesProvider, CoreServicesProvider } from '@/services/services-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
