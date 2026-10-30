@@ -1,7 +1,7 @@
 import { page, userEvent } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, vi } from 'vitest'
-import { ConfirmActionDialog } from './confirm-action-dialog.tsx'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
 
 describe('ConfirmActionDialog', () => {
   it('closes once the action resolves', async () => {

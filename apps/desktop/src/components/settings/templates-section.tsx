@@ -17,7 +17,8 @@ import { createTemplatesQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { ConfirmActionDialog } from './confirm-action-dialog.tsx'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
+import { InlineAlert } from '@/components/inline-alert.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 import { isModEvent } from '@meowdown/core'
@@ -130,7 +131,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
     <Dialog
       open
       onOpenChange={(isOpen) => {
-        if (!isOpen) {
+        if (!isOpen && !pending) {
           onClose()
         }
       }}
@@ -155,13 +156,9 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
             autoComplete="off"
             spellCheck={false}
           />
-          {error !== null ? (
-            <span role="alert" className="text-xs text-red-600 dark:text-red-400">
-              {error}
-            </span>
-          ) : null}
+          {error !== null ? <InlineAlert tone="error">{error}</InlineAlert> : null}
           <DialogFooter>
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={pending || name.trim() === ''}>

@@ -1,14 +1,5 @@
-import { useRef, type ReactElement } from 'react'
-import { Button } from '@/components/ui/button.tsx'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog.tsx'
-import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useCallback, type ReactElement } from 'react'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
 import { useNoteTrash } from '@/lib/notes/use-note-trash.ts'
 
 interface AllNotesTrashDialogProps {
@@ -41,65 +32,33 @@ export function AllNotesTrashDialog({
   onOpenChange,
   paths,
   onTrashed,
-}: AllNotesTrashDialogProps): ReactElement {
+}: AllNotesTrashDialogProps): ReactElement | null {
   const { trash } = useNoteTrash()
-  // Also guards against a double-submit: the button's `disabled` only takes
-  // effect after a re-render, so a fast second click/Return could start a
-  // second trash pass on the same snapshot before it disables. `run` drops a
-  // call made while one is in flight.
-  const confirm = useAsyncAction()
-  const confirmButtonRef = useRef<HTMLButtonElement>(null)
   const count = paths.length
 
-  const onConfirm = async (): Promise<void> => {
-    await confirm.run(async () => {
-      const trashed = await trash(paths)
-      if (trashed) {
-        onTrashed()
-      }
-      onOpenChange(false)
-    })
+  // `trash` never rejects (failures go to the operations toast), so the
+  // dialog always closes when it settles.
+  const confirm = useCallback(async (): Promise<void> => {
+    if (await trash(paths)) {
+      onTrashed()
+    }
+  }, [trash, paths, onTrashed])
+  const close = useCallback(() => onOpenChange(false), [onOpenChange])
+
+  if (!open) {
+    return null
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (confirm.pending) {
-          return // a trash in flight owns the dialog until it settles
-        }
-        onOpenChange(next)
-      }}
-    >
-      <DialogContent
-        // Focus the confirm action so ⌘⌫ → Return completes from the keyboard.
-        initialFocus={confirmButtonRef}
-      >
-        <DialogTitle>
-          Trash {count} {count === 1 ? 'note' : 'notes'}?
-        </DialogTitle>
-        <DialogDescription>
-          {count === 1 ? 'It moves' : 'They move'} to your system Trash, where you can restore{' '}
-          {count === 1 ? 'it' : 'them'}.
-        </DialogDescription>
-        <DialogFooter>
-          <DialogClose
-            render={
-              <Button variant="ghost" disabled={confirm.pending}>
-                Cancel
-              </Button>
-            }
-          />
-          <Button
-            ref={confirmButtonRef}
-            variant="destructive"
-            disabled={confirm.pending}
-            onClick={() => void onConfirm()}
-          >
-            Trash
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmActionDialog
+      title={`Trash ${count} ${count === 1 ? 'note' : 'notes'}?`}
+      description={`${count === 1 ? 'It moves' : 'They move'} to your system Trash, where you can restore ${count === 1 ? 'it' : 'them'}.`}
+      confirmLabel="Trash"
+      pendingLabel="Trashing…"
+      variant="destructive"
+      focusConfirm
+      onConfirm={confirm}
+      onClose={close}
+    />
   )
 }

@@ -1,16 +1,7 @@
-import { useState, type ReactElement } from 'react'
+import { useCallback, useState, type ReactElement } from 'react'
 import { canTrashNote, errorMessage } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button.tsx'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog.tsx'
-import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -29,26 +20,22 @@ export function NoteTrashAction({ path }: NoteTrashActionProps): ReactElement | 
   const { noteActions } = useCoreServices()
   const { operations } = useAppServices()
   const [confirmingTrash, setConfirmingTrash] = useState(false)
-  const trashAction = useAsyncAction()
+
+  const trash = useCallback(async (): Promise<void> => {
+    const operation = operations.start('Trashing note')
+    try {
+      await noteActions.trashOne(path)
+    } catch (cause) {
+      operation.fail(errorMessage(cause))
+      throw cause
+    }
+    operation.done()
+    navigate({ kind: 'today' })
+  }, [operations, noteActions, path, navigate])
+  const closeConfirm = useCallback(() => setConfirmingTrash(false), [])
 
   if (!canTrashNote(path)) {
     return null
-  }
-
-  const onTrash = async (): Promise<void> => {
-    await trashAction.run(async () => {
-      const operation = operations.start('Trashing note')
-      try {
-        await noteActions.trashOne(path)
-        operation.done()
-        setConfirmingTrash(false)
-        navigate({ kind: 'today' })
-      } catch (cause) {
-        operation.fail(errorMessage(cause))
-        // Rethrown so `trashAction.error` shows it in the dialog.
-        throw cause
-      }
-    })
   }
 
   return (
@@ -66,36 +53,17 @@ export function NoteTrashAction({ path }: NoteTrashActionProps): ReactElement | 
         </span>
       </button>
 
-      <Dialog
-        open={confirmingTrash}
-        onOpenChange={(open) => !trashAction.pending && setConfirmingTrash(open)}
-      >
-        <DialogContent>
-          <DialogTitle>Trash this note?</DialogTitle>
-          <DialogDescription>
-            It moves to your system Trash, where you can restore it.
-          </DialogDescription>
-          {trashAction.error !== null ? (
-            <p className="text-sm text-destructive">{trashAction.error}</p>
-          ) : null}
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button variant="ghost" disabled={trashAction.pending}>
-                  Cancel
-                </Button>
-              }
-            />
-            <Button
-              variant="destructive"
-              disabled={trashAction.pending}
-              onClick={() => void onTrash()}
-            >
-              Trash note
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmingTrash ? (
+        <ConfirmActionDialog
+          title="Trash this note?"
+          description="It moves to your system Trash, where you can restore it."
+          confirmLabel="Trash note"
+          pendingLabel="Trashing…"
+          variant="destructive"
+          onConfirm={trash}
+          onClose={closeConfirm}
+        />
+      ) : null}
     </>
   )
 }

@@ -3,7 +3,7 @@ import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { ConfirmActionDialog } from './confirm-action-dialog.tsx'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 

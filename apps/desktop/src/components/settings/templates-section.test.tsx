@@ -105,6 +105,9 @@ describe('TemplatesSection dialogs', () => {
     await userEvent.click(page.getByRole('button', { name: 'Rename', exact: true }))
 
     await expect.element(page.getByRole('button', { name: 'Rename', exact: true })).toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    await userEvent.keyboard('{Escape}')
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument()
     // Enter in the field is an implicit submit; a disabled submit button blocks it.
     await userEvent.type(page.getByRole('textbox', { name: 'Template name' }), '{Enter}')
     expect(renameTemplate).toHaveBeenCalledTimes(1)
