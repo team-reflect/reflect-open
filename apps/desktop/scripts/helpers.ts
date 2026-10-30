@@ -75,18 +75,13 @@ export function assertSentryDsn(): void {
   }
 }
 
-/** The app version from `apps/desktop/package.json`, the single version source. */
-export function readAppVersion(): string {
-  return packageJson.version
-}
-
 /**
  * The Tauri config overlay of the flavor to build, or null for the stable
  * flavor (the base config). A prerelease version builds the beta flavor, so a
  * build always matches its updater feed.
  */
 export function getFlavorOverlay(): string | null {
-  return readAppVersion().includes('-') ? BETA_OVERLAY : null
+  return packageJson.version.includes('-') ? BETA_OVERLAY : null
 }
 
 /** The `--config` arguments that select the flavor. */
