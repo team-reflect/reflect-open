@@ -67,7 +67,8 @@
       body[data-pany] .content * {
         touch-action: pan-y;
       }
-      body[data-pany] .content :is(pre, [data-pager-pan-x]) {
+      body[data-pany] .content :is(pre, [data-pager-pan-x]),
+      body[data-pany] .content :is(pre, [data-pager-pan-x]) * {
         touch-action: auto;
       }
       body[data-contain] .content :is(pre, [data-pager-pan-x]) {
