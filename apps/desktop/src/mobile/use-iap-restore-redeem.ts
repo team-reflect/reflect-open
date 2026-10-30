@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react'
 import { useMutation, type UseMutationResult } from '@tanstack/react-query'
 import type { ActiveSubscription } from '@reflect/core'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
@@ -43,18 +44,19 @@ export function useIapRestoreRedeem(): IapRestoreRedeem {
     ? 'Could not open the redemption sheet. Try again.'
     : null
 
-  return {
-    restoreMutation,
-    redeemMutation,
-    restoreFeedback,
-    redeemFeedback,
-    restore: () => {
-      redeemMutation.reset()
-      restoreMutation.mutate()
-    },
-    redeem: () => {
-      restoreMutation.reset()
-      redeemMutation.mutate()
-    },
-  }
+  const { reset: resetRestore, mutate: startRestore } = restoreMutation
+  const { reset: resetRedeem, mutate: startRedeem } = redeemMutation
+  const restore = useCallback(() => {
+    resetRedeem()
+    startRestore()
+  }, [resetRedeem, startRestore])
+  const redeem = useCallback(() => {
+    resetRestore()
+    startRedeem()
+  }, [resetRestore, startRedeem])
+
+  return useMemo(
+    () => ({ restoreMutation, redeemMutation, restoreFeedback, redeemFeedback, restore, redeem }),
+    [restoreMutation, redeemMutation, restoreFeedback, redeemFeedback, restore, redeem],
+  )
 }
