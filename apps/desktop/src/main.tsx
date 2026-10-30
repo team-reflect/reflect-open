@@ -25,7 +25,7 @@ installNativeMenu(appServices.nativeMenu).catch((cause: unknown) => {
   coreServices.logger.error('failed to install the native menu', cause)
 })
 
-startPerfHud(coreServices)
+startPerfHud()
 
 const rootElement = document.getElementById('root')
 if (!rootElement) {

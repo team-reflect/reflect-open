@@ -20,24 +20,22 @@ const KEEP_GESTURES = 20
  */
 export function mountPerfHud(): () => void {
   const times = new Float64Array(CAPACITY)
-  const state = {
-    next: 0,
-    count: 0,
-    raf: 0,
-    budgetMs: 1000 / 60,
-    activePointers: 0,
-    gestureStart: null as number | null,
-    tail: undefined as ReturnType<typeof setTimeout> | undefined,
-    pendingMoves: [] as number[],
-    lags: [] as number[],
-    results: [] as GestureMetrics[],
-  }
+  let next = 0
+  let count = 0
+  let raf = 0
+  let budgetMs = 1000 / 60
+  let activePointers = 0
+  let gestureStart: number | null = null
+  let tail: ReturnType<typeof setTimeout> | undefined
+  const pendingMoves: number[] = []
+  let lags: number[] = []
+  let results: GestureMetrics[] = []
   const view = createView()
 
   const getTimesSince = (from: number): number[] => {
     const result: number[] = []
-    for (let i = 0; i < state.count; i++) {
-      const time = times[(state.next - state.count + i + CAPACITY) % CAPACITY] ?? 0
+    for (let i = 0; i < count; i++) {
+      const time = times[(next - count + i + CAPACITY) % CAPACITY] ?? 0
       if (time >= from) {
         result.push(time)
       }
@@ -46,49 +44,49 @@ export function mountPerfHud(): () => void {
   }
 
   const tick = (now: number): void => {
-    times[state.next] = now
-    state.next = (state.next + 1) % CAPACITY
-    state.count = Math.min(state.count + 1, CAPACITY)
-    if (state.pendingMoves.length > 0) {
+    times[next] = now
+    next = (next + 1) % CAPACITY
+    count = Math.min(count + 1, CAPACITY)
+    if (pendingMoves.length > 0) {
       // The real start of this callback, after every queued move handler ran.
       const start = performance.now()
-      for (const timeStamp of state.pendingMoves) {
-        state.lags.push(Math.max(0, start - timeStamp))
+      for (const timeStamp of pendingMoves) {
+        lags.push(Math.max(0, start - timeStamp))
       }
-      state.pendingMoves.length = 0
+      pendingMoves.length = 0
     }
-    state.raf = requestAnimationFrame(tick)
+    raf = requestAnimationFrame(tick)
   }
 
   const finishGesture = (startMs: number, endMs: number): void => {
     const frameTimes = getTimesSince(startMs).filter((time) => time <= endMs)
-    const result = measureGesture(frameTimes, state.lags, state.budgetMs)
-    state.lags = []
-    state.results = [...state.results, result].slice(-KEEP_GESTURES)
-    view.root.dataset.gestures = JSON.stringify(state.results)
+    const result = measureGesture(frameTimes, lags, budgetMs)
+    lags = []
+    results = [...results, result].slice(-KEEP_GESTURES)
+    view.root.dataset.gestures = JSON.stringify(results)
   }
 
   const handlePointerUp = (event: PointerEvent): void => {
-    state.activePointers = Math.max(0, state.activePointers - 1)
-    const startMs = state.gestureStart
-    if (state.activePointers > 0 || startMs === null) {
+    activePointers = Math.max(0, activePointers - 1)
+    const startMs = gestureStart
+    if (activePointers > 0 || startMs === null) {
       return
     }
     const endMs = event.timeStamp + SETTLE_TAIL_MS
-    clearTimeout(state.tail)
+    clearTimeout(tail)
     // 50 ms extra so the last frame of the tail is in the buffer.
-    state.tail = setTimeout(() => {
-      state.gestureStart = null
+    tail = setTimeout(() => {
+      gestureStart = null
       finishGesture(startMs, endMs)
     }, SETTLE_TAIL_MS + 50)
   }
 
   const refresh = setInterval(() => {
     const lastSecond = getTimesSince(performance.now() - 1000)
-    if (state.gestureStart === null && lastSecond.length > 1) {
-      state.budgetMs = getPercentile(getFrameIntervals(lastSecond), 0.5)
+    if (gestureStart === null && lastSecond.length > 1) {
+      budgetMs = getPercentile(getFrameIntervals(lastSecond), 0.5)
     }
-    view.render(Math.max(0, lastSecond.length - 1), state.budgetMs, state.results.at(-1))
+    view.render(Math.max(0, lastSecond.length - 1), budgetMs, results.at(-1))
   }, REFRESH_MS)
 
   const controller = new AbortController()
@@ -97,17 +95,17 @@ export function mountPerfHud(): () => void {
   window.addEventListener(
     'pointerdown',
     (event) => {
-      clearTimeout(state.tail)
-      state.activePointers++
-      state.gestureStart ??= event.timeStamp
+      clearTimeout(tail)
+      activePointers++
+      gestureStart ??= event.timeStamp
     },
     options,
   )
   window.addEventListener(
     'pointermove',
     (event) => {
-      if (state.activePointers > 0) {
-        state.pendingMoves.push(event.timeStamp)
+      if (activePointers > 0) {
+        pendingMoves.push(event.timeStamp)
       }
     },
     options,
@@ -115,15 +113,34 @@ export function mountPerfHud(): () => void {
   window.addEventListener('pointerup', handlePointerUp, options)
   window.addEventListener('pointercancel', handlePointerUp, options)
   document.body.append(view.root)
-  state.raf = requestAnimationFrame(tick)
+  raf = requestAnimationFrame(tick)
 
   return () => {
     controller.abort()
-    cancelAnimationFrame(state.raf)
+    cancelAnimationFrame(raf)
     clearInterval(refresh)
-    clearTimeout(state.tail)
+    clearTimeout(tail)
     view.root.remove()
   }
+}
+
+const VALUE_CLASS = 'font-mono text-sm leading-5 font-semibold tabular-nums'
+
+/** Green below `good`, amber up to `bad`, red above. */
+function getToneClass(value: number, good: number, bad: number): string {
+  return value < good ? 'text-green-400' : value <= bad ? 'text-amber-400' : 'text-red-400'
+}
+
+function createStat(label: string): { root: HTMLElement; value: HTMLElement; label: HTMLElement } {
+  const root = document.createElement('div')
+  const valueElement = document.createElement('div')
+  const labelElement = document.createElement('div')
+  valueElement.className = VALUE_CLASS
+  valueElement.textContent = '–'
+  labelElement.className = 'text-xs leading-4 whitespace-nowrap text-neutral-400'
+  labelElement.textContent = label
+  root.append(valueElement, labelElement)
+  return { root, value: valueElement, label: labelElement }
 }
 
 function createView(): {
@@ -134,24 +151,32 @@ function createView(): {
   root.dataset.perfHud = ''
   root.dataset.gestures = '[]'
   root.className =
-    'pointer-events-none fixed top-safe-offset-2 left-safe-offset-2 z-2147483647 h-10 w-60 rounded-lg bg-neutral-900/90 px-2 py-1 font-mono text-xs leading-4 whitespace-pre text-neutral-100 contain-strict will-change-transform'
-  const live = document.createElement('div')
-  const last = document.createElement('div')
-  last.textContent = 'last  –'
-  root.append(live, last)
+    'pointer-events-none fixed top-safe-offset-2 left-safe-offset-2 z-2147483647 flex h-12 w-70 items-center gap-3 rounded-xl bg-neutral-900 px-3 text-neutral-100 shadow-lg ring-1 ring-white/10 contain-strict will-change-transform'
+  const fps = createStat('fps')
+  const divider = document.createElement('div')
+  divider.className = 'h-7 w-px shrink-0 bg-white/20'
+  const hitch = createStat('hitch ms/s')
+  const p95 = createStat('p95 ms')
+  const lag = createStat('lag ms')
+  root.append(fps.root, divider, hitch.root, p95.root, lag.root)
 
   return {
     root,
-    render: (fps, budgetMs, result) => {
-      live.textContent = `MAIN ${String(fps).padStart(3)} fps   ${Math.round(1000 / budgetMs)}Hz`
+    render: (liveFps, budgetMs, result) => {
+      fps.value.textContent = String(liveFps)
+      fps.label.textContent = `fps · ${Math.round(1000 / budgetMs)}Hz`
       if (!result) {
         return
       }
-      const ratio = result.hitchTimeRatio
-      last.className =
-        ratio < 5 ? 'text-green-400' : ratio <= 10 ? 'text-amber-400' : 'text-red-400'
-      const lag = result.p95InputLagMs === null ? '–' : result.p95InputLagMs.toFixed(0)
-      last.textContent = `last ${ratio.toFixed(0).padStart(2)} ms/s · p95 ${result.p95FrameMs.toFixed(0)} · lag ${lag}`
+      hitch.value.textContent = result.hitchTimeRatio.toFixed(0)
+      hitch.value.className = `${VALUE_CLASS} ${getToneClass(result.hitchTimeRatio, 5, 10)}`
+      p95.value.textContent = result.p95FrameMs.toFixed(0)
+      const lagMs = result.p95InputLagMs
+      lag.value.textContent = lagMs === null ? '–' : lagMs.toFixed(0)
+      lag.value.className =
+        lagMs === null
+          ? VALUE_CLASS
+          : `${VALUE_CLASS} ${getToneClass(lagMs, result.frameBudgetMs, 2 * result.frameBudgetMs)}`
     },
   }
 }
