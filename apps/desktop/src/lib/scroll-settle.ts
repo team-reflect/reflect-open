@@ -15,9 +15,9 @@ const DRAG_THRESHOLD_PX = 4
 const NO_DRAG_SELECTOR = 'input, textarea, select, [contenteditable]'
 
 /**
- * The finger id a mouse drag holds. Touch identifiers are never negative.
+ * The finger id a mouse drag holds. A string never equals a touch identifier.
  */
-const MOUSE = -1
+const MOUSE = 'm'
 
 export interface ScrollSettleOptions {
   /**
@@ -76,7 +76,7 @@ export function watchScrollSettle({
   dragHandle = element,
 }: ScrollSettleOptions): ScrollSettleWatch {
   // Fingers that landed on the element and have not lifted, plus `MOUSE`.
-  const fingers = new Set<number>()
+  const fingers = new Set<number | typeof MOUSE>()
   // A finger is down, or lifted after it moved the element, and that scroll has not settled.
   let fingerScroll = false
   let scrolledSinceTouch = false
