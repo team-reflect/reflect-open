@@ -22,7 +22,7 @@ describe('createDeferredIpcTransport', () => {
     const deferred = createDeferredIpcTransport()
     const binary = deferred.transport.invokeBinary?.('upload', new Uint8Array([1]), {})
     deferred.connect(
-      { ...createTestIpcBridgeService().transport, invokeBinary: async () => 'stored' },
+      { ...createTestIpcBridgeService().transport, invokeBinary: () => Promise.resolve('stored') },
       { convertFileSrc: (filePath) => `blob:${filePath}` },
     )
     await expect(binary).resolves.toBe('stored')
