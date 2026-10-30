@@ -14,7 +14,13 @@ import { createTestCoreServices, createTestClockService } from '@reflect/core/te
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { formatDayLabel, todayIso } from '@/lib/dates.ts'
-import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window.ts'
+import {
+  createDayWindow,
+  dateAtIndex,
+  extendDayWindowBack,
+  indexOfDate,
+  PAST_DAYS,
+} from '@/lib/day-window.ts'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -78,6 +84,34 @@ function NavigateTodayProbe({ onReady }: { onReady: (navigateToday: () => void) 
   return null
 }
 
+/**
+ * The stream as the workspace routes it: the today and daily routes share one
+ * mounted instance.
+ */
+function RoutedStream(): ReactElement {
+  const { route } = useRouter()
+  return (
+    <DailyStream
+      target={route.kind === 'daily' ? { kind: 'date', date: route.date } : { kind: 'today' }}
+    />
+  )
+}
+
+/**
+ * Publishes the router so a test can navigate and go back.
+ */
+function RouterProbe({
+  routerRef,
+}: {
+  routerRef: RefObject<ReturnType<typeof useRouter> | null>
+}): null {
+  const router = useRouter()
+  useLayoutEffect(() => {
+    routerRef.current = router
+  })
+  return null
+}
+
 describe('DailyStream', () => {
   it('anchors its first scroll to today, with no top-of-window flicker', async () => {
     const today = todayIso()
@@ -86,6 +120,42 @@ describe('DailyStream', () => {
     const stream = page.getByTestId('daily-stream')
     await vi.waitFor(() => expect(stream.element().scrollTop).toBeGreaterThan(0))
     await expect.element(page.getByText(formatDayLabel(today, 'mdy'))).toBeVisible()
+    await view.unmount()
+  })
+
+  it('extends its window to show a day years before it', async () => {
+    const view = await renderStream(<DailyStream target={{ kind: 'date', date: '2003-05-01' }} />)
+
+    await expect.element(page.getByText(formatDayLabel('2003-05-01', 'mdy'))).toBeVisible()
+    await view.unmount()
+  })
+
+  it('restores an offset saved before its window grew back', async () => {
+    const view = await renderStream(<SaveScrollProbe offset={4321} />)
+    const routerRef: RefObject<ReturnType<typeof useRouter> | null> = createRef()
+    await view.rerender(
+      <Stream>
+        <SaveScrollProbe offset={4321} />
+        <RouterProbe routerRef={routerRef} />
+        <RoutedStream />
+      </Stream>,
+    )
+    const stream = page.getByTestId('daily-stream')
+    await vi.waitFor(() => expect(stream.element().scrollTop).toBeCloseTo(4321, -1))
+
+    await act(() => {
+      routerRef.current?.navigate({ kind: 'daily', date: '2003-05-01' })
+    })
+    await expect.element(page.getByText(formatDayLabel('2003-05-01', 'mdy'))).toBeVisible()
+    await act(() => {
+      routerRef.current?.back()
+    })
+
+    const extended = extendDayWindowBack(createDayWindow(todayIso()), '2003-05-01')
+    const addedPastHeight = (extended.anchorIndex - PAST_DAYS) * ESTIMATED_DAY_HEIGHT
+    await vi.waitFor(() => {
+      expect(stream.element().scrollTop).toBeCloseTo(4321 + addedPastHeight, -1)
+    })
     await view.unmount()
   })
 

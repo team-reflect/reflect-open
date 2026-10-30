@@ -5,6 +5,7 @@
 export {
   createDayWindow,
   dateAtIndex,
+  extendDayWindowBack,
   FUTURE_DAYS,
   indexOfDate,
   indexWithin,

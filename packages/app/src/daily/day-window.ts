@@ -3,18 +3,19 @@ import { addDaysIso } from '@reflect/utils'
 import { parseIsoDate } from '@reflect/core'
 
 /**
- * The daily surfaces' virtual window (Plan 06b / Plan 19): a **fixed**
- * chronological range of days around an anchor, indexed `0 … count-1` from
- * oldest to newest. Virtual rows/slides are free until mounted, so a generous
- * static window sidesteps bidirectional infinite scroll's prepend/scroll-
- * compensation problem entirely. Index↔date is pure offset math.
+ * The daily surfaces' virtual window (Plan 06b / Plan 19): a chronological
+ * range of days around an anchor, indexed `0 … count-1` from oldest to newest.
+ * Virtual rows/slides are free until mounted, so a generous window that changes
+ * only on navigation sidesteps bidirectional infinite scroll's prepend/scroll-
+ * compensation problem while the user scrolls. Index↔date is pure offset math.
  *
  * Two surfaces share this module: the desktop daily stream (a wide, asymmetric
- * window it virtualizes with TanStack Virtual) and the mobile day carousel (a
- * tighter symmetric window Embla pages through). They differ only in radius and
- * in how they treat a date outside the window — see {@link indexOfDate} (clamps
- * to the nearest edge) versus {@link indexWithin} (reports `-1` so the caller
- * can re-anchor around the far date).
+ * window it virtualizes with virtua) and the mobile day carousel (a tighter
+ * symmetric window Embla pages through). They differ in radius and in how they
+ * treat a date outside the window: the stream grows back to an earlier date
+ * ({@link extendDayWindowBack}) and clamps a later one to its end
+ * ({@link indexOfDate}), while the carousel re-anchors around it
+ * ({@link indexWithin} reports `-1`).
  */
 
 /**
@@ -54,8 +55,7 @@ export interface DayWindow {
 
 /**
  * Build the window around `anchor`, reaching `past` days back and `future` days
- * forward (defaulting to the desktop stream's asymmetric reach). Stable for the
- * life of the view.
+ * forward (defaulting to the desktop stream's asymmetric reach).
  */
 export function createDayWindow(
   anchor: string,
@@ -66,6 +66,21 @@ export function createDayWindow(
     count: past + future + 1,
     anchorIndex: past,
   }
+}
+
+/**
+ * `window` grown back to start {@link PAST_DAYS} before `date`, so a far-past
+ * arrival keeps the stream's usual reach behind it; `window` itself when `date`
+ * is not before its start. Days are only ever added before the start: the
+ * anchor keeps its date and its index moves by the number of days added.
+ */
+export function extendDayWindowBack(window: DayWindow, date: string): DayWindow {
+  if (offsetOfDate(window, date) >= 0) {
+    return window
+  }
+  const start = addDaysIso(date, -PAST_DAYS)
+  const added = -offsetOfDate(window, start)
+  return { start, count: window.count + added, anchorIndex: window.anchorIndex + added }
 }
 
 /**
@@ -85,8 +100,8 @@ function offsetOfDate(window: DayWindow, date: string): number {
 /**
  * The index of `date` **clamped** to the window's bounds — a date link outside
  * the window still scrolls to the nearest edge instead of erroring. Used by the
- * desktop stream, whose window is wide enough that the clamp is effectively
- * unreachable in normal use.
+ * desktop stream, which first extends its window back to include an earlier
+ * day, so only a day past its far end clamps.
  */
 export function indexOfDate(window: DayWindow, date: string): number {
   return Math.max(0, Math.min(window.count - 1, offsetOfDate(window, date)))

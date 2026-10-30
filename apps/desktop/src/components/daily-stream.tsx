@@ -7,7 +7,14 @@ import { formatDayLabel } from '@/lib/dates.ts'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useToday } from '@/lib/use-today.ts'
-import { createDayWindow, dateAtIndex, indexOfDate, neighborDate } from '@/lib/day-window.ts'
+import {
+  createDayWindow,
+  dateAtIndex,
+  extendDayWindowBack,
+  indexOfDate,
+  neighborDate,
+  PAST_DAYS,
+} from '@/lib/day-window.ts'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -41,17 +48,24 @@ const CONTENT_GUTTER = 'reflect-content-gutter'
  * above, future below — where **every day is a virtual note**. Each visible row
  * mounts the Plan 05 editor lazily (`createIfMissing`), so a day only becomes a
  * real `daily/*.md` when edited. Offscreen rows unmount and flush through the
- * save pipeline's final-flush path. The window is a fixed ±range around today
- * (virtual rows are free), so there is no bidirectional infinite-scroll
- * bookkeeping; index↔date is pure offset math.
+ * save pipeline's final-flush path. The window is a ±range around today
+ * (virtual rows are free) that grows back only when an arrival lands before it,
+ * so scrolling needs no bidirectional infinite-scroll bookkeeping; index↔date
+ * is pure offset math.
  */
 export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const { arrivalSeq, arrivalFocusEditor, entryId, saveScrollState, savedScroll } = useRouter()
   const virtualizerRef = useRef<VirtualizerHandle>(null)
-  // The window anchors at today-on-mount and stays stable for the view's life.
-  // (`dayWindow`, not `window` — shadowing the DOM global here was a footgun.)
+  // The window anchors at today-on-mount and only grows back, when an arrival
+  // lands before it. (`dayWindow`, not `window` — shadowing the DOM global here was a
+  // footgun.)
   const { dailyNotes } = useCoreServices()
-  const [dayWindow] = useState(() => createDayWindow(dailyNotes.today()))
+  const [dayWindow, setDayWindow] = useState(() => createDayWindow(dailyNotes.today()))
+  // Saved scroll offsets are measured against the default window. Days added
+  // before its start are unmeasured rows, which virtua sizes at exactly
+  // `itemSize` (a fixed `itemSize` turns off its auto-estimation), so
+  // subtracting them keeps offsets saved before the window grew valid after.
+  const addedPastHeight = (dayWindow.anchorIndex - PAST_DAYS) * ESTIMATED_DAY_HEIGHT
   // Per-row data is unused (the date is derived from the index); a stable array
   // of the window's length just tells virtua how many rows exist.
   const data = useMemo(() => Array.from({ length: dayWindow.count }), [dayWindow.count])
@@ -187,6 +201,15 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // top before the first frame is shown, instead of painting the top of the
   // five-year window and then lurching down.
   useLayoutEffect(() => {
+    const target = targetDateRef.current
+    const extended = extendDayWindowBack(dayWindow, target)
+    if (extended !== dayWindow) {
+      // An arrival before the window (a Cmd+K pick or date link years back)
+      // grows it; virtua's `shift` keeps the viewport in place across the
+      // prepend, and the effect re-runs on the new window to anchor there.
+      setDayWindow(extended)
+      return
+    }
     const restored = savedScroll()
     if (restored !== null) {
       // A restored arrival also cancels any focus still pending from a prior
@@ -195,17 +218,16 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       // otherwise steal focus when its row scrolls into view.
       focusPendingRef.current = null
       pendingFocusRef.current = null
-      virtualizerRef.current?.scrollTo(restored)
+      virtualizerRef.current?.scrollTo(restored + addedPastHeight)
       return
     }
-    const target = targetDateRef.current
     pendingFocusRef.current = null
     focusPendingRef.current = {
       date: target,
       selection: arrivalFocusEditorRef.current ? 'end' : 'start',
     }
     virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
-  }, [arrivalSeq, entryId, dayWindow, savedScroll])
+  }, [arrivalSeq, entryId, dayWindow, savedScroll, addedPastHeight])
 
   const onScrollOffset = useCallback((offset: number) => {
     const scrollIndex = virtualizerRef.current?.findItemIndex(offset)
@@ -228,7 +250,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     <div
       data-testid="daily-stream"
       className="h-full overflow-auto"
-      onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
+      onScroll={(event) => saveScrollState(event.currentTarget.scrollTop - addedPastHeight)}
       // An explicit click/touch picks its own focus target — a focus still
       // pending for a day whose editor hasn't mounted yet must not steal the
       // caret later. Typing is deliberately not a cancel: ⌘D-then-type should
