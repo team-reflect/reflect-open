@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Scroll drawer probe</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        font:
+          15px -apple-system,
+          system-ui;
+      }
+      .page {
+        height: 100%;
+        overflow-y: auto;
+        padding: env(safe-area-inset-top) 16px 0;
+        background: #eef1ff;
+      }
+      /* popup > [backdrop > tint, scroller > [spacer, slide > panel]] */
+      .popup {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+      }
+      .popup[hidden] {
+        display: none;
+      }
+      .backdrop {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .tint {
+        position: absolute;
+        inset: 0;
+        background: rgb(0 0 0 / 0.3);
+      }
+      .drawer {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: none;
+        scroll-snap-type: y mandatory;
+        scrollbar-width: none;
+      }
+      .drawer::-webkit-scrollbar {
+        display: none;
+      }
+      body[data-bounce] .drawer {
+        overscroll-behavior: auto;
+      }
+      body[data-scrollbar] .drawer {
+        scrollbar-width: auto;
+      }
+      body[data-scrollbar] .drawer::-webkit-scrollbar {
+        display: initial;
+      }
+      .spacer {
+        flex: none;
+        display: block;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        scroll-snap-align: start;
+      }
+      .slide {
+        position: relative;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100% - 6rem);
+        overflow: clip;
+        scroll-snap-align: end;
+      }
+      .panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 8px 16px calc(env(safe-area-inset-bottom) + 16px);
+        border-radius: 16px 16px 0 0;
+        background: #fff;
+      }
+      .handle {
+        align-self: center;
+        width: 40px;
+        height: 5px;
+        margin-bottom: 8px;
+        border-radius: 3px;
+        background: #ccc;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        font-size: 13px;
+      }
+      .body {
+        min-height: 0;
+        overflow-y: auto;
+      }
+      .list {
+        max-height: 30svh;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+      }
+      body[data-inner-none] .list {
+        overscroll-behavior-y: none;
+      }
+      .list div {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+      }
+      .editable {
+        min-height: 44px;
+        padding: 8px;
+        border: 1px solid #ddd;
+      }
+      body[data-pan-x] .editable {
+        touch-action: pan-x;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px;
+        font-size: 16px;
+      }
+      #log {
+        position: fixed;
+        inset: env(safe-area-inset-top) 0 auto 0;
+        z-index: 100;
+        max-height: 30%;
+        margin: 0;
+        overflow: auto;
+        font:
+          11px ui-monospace,
+          monospace;
+        color: #0f0;
+        background: rgb(0 0 0 / 0.8);
+        pointer-events: none;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h2>Page under the drawer</h2>
+      <p id="page-text"></p>
+    </div>
+    <div class="popup" id="popup" role="dialog" aria-label="Probe drawer">
+      <div class="backdrop"><div class="tint" id="tint"></div></div>
+      <div class="drawer" id="scroller">
+        <button class="spacer" id="spacer" aria-label="Close"></button>
+        <div class="slide" id="slide">
+          <div class="panel">
+            <div class="handle"></div>
+            <div class="controls">
+              <label><input type="checkbox" id="busy" /> busy</label>
+              <label><input type="checkbox" id="lock" /> lock</label>
+              <label><input type="checkbox" id="inner-none" /> list none</label>
+              <label><input type="checkbox" id="bounce" /> bounce</label>
+              <label><input type="checkbox" id="scrollbar" /> scrollbar</label>
+              <label><input type="checkbox" id="pan-x" /> pan-x</label>
+              <button id="grow">Grow</button>
+              <button id="shrink">Shrink</button>
+              <button id="smooth">Smooth open</button>
+              <button id="reveal">scrollIntoView</button>
+            </div>
+            <div class="body">
+              <input id="field" placeholder="Focus for the keyboard" />
+              <div class="list" id="list"></div>
+              <div class="editable" id="editable" contenteditable="true">
+                Long-press a word here to select it.
+              </div>
+              <div id="extra"></div>
+              <input id="bottom-field" placeholder="Bottom field" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <pre id="log"></pre>
+    <script type="module">
+      // The app's own modules, served by the Vite dev server.
+      import { watchScrollSettle } from '/src/lib/scroll-settle.ts'
+      import { linkOpacityToScroll } from '/src/lib/scroll-linked-opacity.ts'
+
+      const $ = (id) => document.getElementById(id)
+      const scroller = $('scroller')
+      const slide = $('slide')
+      const logBox = $('log')
+      const start = performance.now()
+      const log = (text) => {
+        logBox.textContent =
+          `${(performance.now() - start).toFixed(0).padStart(6)} ${text}\n${logBox.textContent}`.slice(
+            0,
+            5000,
+          )
+      }
+      $('page-text').textContent = 'Lorem ipsum dolor sit amet. '.repeat(200)
+      for (let i = 0; i < 30; i++) {
+        const row = document.createElement('div')
+        row.textContent = `List row ${i}`
+        $('list').append(row)
+      }
+
+      log(`ua=${navigator.userAgent}`)
+      log(
+        `scrollend=${'onscrollend' in window} snapchange=${'onscrollsnapchange' in window} ScrollTimeline=${typeof ScrollTimeline === 'function'}`,
+      )
+
+      // Drawer control: a scroll that settles at the closed snap point closes it. Logs where an app would act.
+      const controller = new AbortController()
+      const { signal } = controller
+      const openTop = () => slide.offsetTop + slide.offsetHeight - scroller.clientHeight
+      const scrollOpen = () => scroller.scrollTo({ top: openTop(), behavior: 'smooth' })
+      let slideHidden = false
+      let handled = false
+      scroller.scrollTop = openTop()
+
+      const settle = () => {
+        if (!slideHidden || handled || watch.isTouching()) return
+        handled = true
+        if (!watch.isUserScroll()) {
+          log('REOPEN: not a user scroll')
+          scrollOpen()
+          return
+        }
+        log('CLOSE: swipe')
+        // The app unmounts here; the probe opens again so the next check can run.
+        setTimeout(() => scrollOpen(), 800)
+      }
+      const watch = watchScrollSettle({
+        element: scroller,
+        onSettle: () => {
+          log(`settle top=${scroller.scrollTop.toFixed(1)} user=${watch.isUserScroll()}`)
+          settle()
+        },
+        signal,
+        isSettled: () => scroller.scrollTop <= 1,
+      })
+
+      new IntersectionObserver(
+        (entries) => {
+          const entry = entries.at(-1)
+          if (!entry) return
+          slideHidden = !entry.isIntersecting
+          log(`io hidden=${slideHidden}`)
+          if (slideHidden) settle()
+          else handled = false
+        },
+        { root: scroller, rootMargin: '0px 0px -1px 0px' },
+      ).observe(slide)
+
+      const resize = new ResizeObserver(() => {
+        if (!watch.isTouching() && !slideHidden) {
+          const before = scroller.scrollTop
+          scroller.scrollTop = openTop()
+          log(`resize pin ${before.toFixed(1)} -> ${scroller.scrollTop.toFixed(1)}`)
+        }
+      })
+      resize.observe(slide)
+      resize.observe(scroller)
+
+      linkOpacityToScroll({ target: $('tint'), scroller, axis: 'y', from: 0, to: 1, signal })
+
+      // Raw events, to compare with the settle lines.
+      for (const type of [
+        'touchstart',
+        'touchend',
+        'touchcancel',
+        'scrollend',
+        'scrollsnapchange',
+        'wheel',
+      ]) {
+        let last = 0
+        scroller.addEventListener(
+          type,
+          (event) => {
+            const now = performance.now()
+            if (type === 'wheel' && now - last < 100) return
+            last = now
+            const target = event.snapTargetBlock
+              ? ` target=${event.snapTargetBlock.className || event.snapTargetBlock.id}`
+              : ''
+            log(`${type} top=${scroller.scrollTop.toFixed(1)}${target}`)
+          },
+          { passive: true, signal },
+        )
+      }
+      let lastScroll = 0
+      scroller.addEventListener(
+        'scroll',
+        () => {
+          const now = performance.now()
+          if (now - lastScroll > 100) {
+            lastScroll = now
+            log(
+              `scroll top=${scroller.scrollTop.toFixed(1)} tint=${getComputedStyle($('tint')).opacity.slice(0, 4)}`,
+            )
+          }
+        },
+        { passive: true, signal },
+      )
+      $('spacer').addEventListener('click', () => log('CLOSE: tap above the sheet'))
+      for (const id of ['field', 'bottom-field']) {
+        $(id).addEventListener('focus', () =>
+          log(`${id} focus top=${scroller.scrollTop.toFixed(1)}`),
+        )
+      }
+      document.addEventListener('selectionchange', () => {
+        const selection = getSelection()
+        if ($('editable').contains(selection.anchorNode)) log(`selection "${selection.toString()}"`)
+      })
+
+      // Controls.
+      const toggle = (id, attribute) =>
+        $(id).addEventListener('change', (event) => {
+          document.body.toggleAttribute(attribute, event.target.checked)
+        })
+      toggle('inner-none', 'data-inner-none')
+      toggle('bounce', 'data-bounce')
+      toggle('scrollbar', 'data-scrollbar')
+      toggle('pan-x', 'data-pan-x')
+      let burn = 0
+      $('busy').addEventListener('change', (event) => {
+        clearInterval(burn)
+        if (event.target.checked) {
+          // The main thread is busy 80ms of every 100ms.
+          burn = setInterval(() => {
+            const end = performance.now() + 80
+            while (performance.now() < end) {}
+          }, 100)
+        }
+      })
+      // What Base UI's scroll lock does on iOS (@base-ui/utils useScrollLock.js:55-76).
+      $('lock').addEventListener('change', (event) => {
+        for (const element of [document.documentElement, document.body]) {
+          element.style.overflowX = event.target.checked ? 'hidden' : ''
+          element.style.overflowY = event.target.checked ? 'hidden' : ''
+        }
+      })
+      $('grow').addEventListener('click', () => {
+        const block = document.createElement('p')
+        block.textContent = 'Added content. '.repeat(20)
+        $('extra').append(block)
+        log('grow')
+      })
+      $('shrink').addEventListener('click', () => {
+        $('extra').lastElementChild?.remove()
+        log('shrink')
+      })
+      $('smooth').addEventListener('click', () => {
+        scroller.scrollTop = 0
+        requestAnimationFrame(() => scrollOpen())
+      })
+      $('reveal').addEventListener('click', () => {
+        // Like useKeyboardFieldReveal (use-keyboard.ts:146).
+        $('bottom-field').scrollIntoView({ block: 'nearest' })
+      })
+    </script>
+  </body>
+</html>

@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Back pager probe</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        font:
+          15px -apple-system,
+          system-ui;
+      }
+      .pager {
+        position: relative;
+        display: flex;
+        height: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior: none;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+      .pager::-webkit-scrollbar {
+        display: none;
+      }
+      body[data-overscroll='auto'] .pager {
+        overscroll-behavior: auto;
+      }
+      .page {
+        position: sticky;
+        left: 0;
+        flex: none;
+        width: 100%;
+        height: 100%;
+        background: #fff;
+      }
+      .below {
+        z-index: 0;
+        background: #eef1ff;
+      }
+      .current {
+        z-index: 10;
+        box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
+      }
+      .snap {
+        position: absolute;
+        top: 0;
+        width: 1px;
+        height: 1px;
+        scroll-snap-align: start;
+        pointer-events: none;
+      }
+      .content {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      body[data-pany] .content,
+      body[data-pany] .content * {
+        touch-action: pan-y;
+      }
+      body[data-pany] .content :is(pre, [data-pager-pan-x]),
+      body[data-pany] .content :is(pre, [data-pager-pan-x]) * {
+        touch-action: auto;
+      }
+      body[data-contain] .content :is(pre, [data-pager-pan-x]) {
+        overscroll-behavior-x: contain;
+      }
+      body[data-ob='none'] .content [data-pager-pan-x] {
+        overscroll-behavior-x: none;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        min-height: 52px;
+        padding: env(safe-area-inset-top) 8px 0;
+        border-bottom: 1px solid #ddd;
+      }
+      main {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 16px;
+      }
+      pre {
+        overflow-x: auto;
+        padding: 12px;
+        background: #f4f4f4;
+      }
+      .row {
+        display: flex;
+        height: 56px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+      .row > * {
+        flex: none;
+        width: 100%;
+        scroll-snap-align: start;
+        display: flex;
+        align-items: center;
+      }
+      .row > .actions {
+        width: 160px;
+        justify-content: center;
+        background: #e33;
+        color: #fff;
+      }
+      .edge {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 10;
+        width: 20px;
+        touch-action: pan-x;
+        background: rgb(255 0 0 / 0.08);
+      }
+      body[data-below-header] .edge {
+        top: calc(env(safe-area-inset-top) + 52px);
+      }
+      .scrim {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 100%;
+        width: 100%;
+        background: rgb(0 0 0 / 0.25);
+        pointer-events: none;
+      }
+      @supports (animation-timeline: scroll()) {
+        .scrim {
+          animation: dim linear both;
+          animation-timeline: scroll(nearest inline);
+        }
+      }
+      @keyframes dim {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      body[data-s1] .scrim {
+        animation: none;
+      }
+      .fab {
+        position: fixed;
+        right: 16px;
+        bottom: 140px;
+        z-index: 40;
+        width: 48px;
+        height: 48px;
+        border-radius: 24px;
+        background: #63f;
+      }
+      #log {
+        position: fixed;
+        inset: auto 0 0 0;
+        z-index: 100;
+        max-height: 28%;
+        margin: 0;
+        overflow: auto;
+        font:
+          11px ui-monospace,
+          monospace;
+        color: #0f0;
+        background: rgb(0 0 0 / 0.8);
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body data-pany data-contain>
+    <div class="pager" id="pager">
+      <div class="page below" inert>
+        <div class="content">
+          <main>
+            <h2>Below (daily)</h2>
+            <p id="below-text"></p>
+          </main>
+        </div>
+        <div class="fab"></div>
+      </div>
+      <div class="page current" id="current">
+        <div class="content">
+          <header>
+            <button id="back">Back</button>
+            <label><input type="checkbox" id="burn" /> busy</label>
+            <label><input type="checkbox" id="pany" checked /> pan-y</label>
+            <label><input type="checkbox" id="contain" checked /> contain</label>
+            <label><input type="checkbox" id="bounce" /> bounce</label>
+            <label><input type="checkbox" id="below-header" /> strip below header</label>
+            <button id="reinsert">Reinsert</button>
+          </header>
+          <main>
+            <input id="field" placeholder="Focus for the keyboard" />
+            <div contenteditable="true" id="editable">
+              Tap the left edge of this line to place the caret.
+            </div>
+            <pre>
+const line = 'a long line that overflows the code block to the right, keep going, keep going, end'</pre>
+            <div class="row" data-pager-pan-x>
+              <div>Row: swipe left for actions</div>
+              <div class="actions">Delete</div>
+            </div>
+            <p id="current-text"></p>
+          </main>
+        </div>
+        <div class="scrim" id="scrim"></div>
+        <div class="edge" id="edge" data-pager-edge aria-hidden="true"></div>
+      </div>
+      <div class="snap" style="left: 0"></div>
+      <div class="snap" style="left: 100%"></div>
+    </div>
+    <pre id="log"></pre>
+    <script type="module">
+      const params = new URLSearchParams(location.search)
+      // ?s1: settle detection and the scrim use the app's own modules instead of the inline code below.
+      const s1 = params.has('s1')
+      document.body.toggleAttribute('data-s1', s1)
+      // ?ob=none: rows use overscroll-behavior-x: none.
+      if (params.get('ob') === 'none') document.body.dataset.ob = 'none'
+      const pager = document.getElementById('pager')
+      const scrim = document.getElementById('scrim')
+      const logBox = document.getElementById('log')
+      const hasTimeline = CSS.supports('animation-timeline: scroll()')
+      const start = performance.now()
+      const log = (text) => {
+        logBox.textContent =
+          `${(performance.now() - start).toFixed(0).padStart(6)} ${text}\n${logBox.textContent}`.slice(
+            0,
+            4000,
+          )
+      }
+      const filler = 'Lorem ipsum dolor sit amet. '.repeat(400)
+      document.getElementById('below-text').textContent = filler
+      document.getElementById('current-text').textContent = filler
+      const editableLine = document.getElementById('editable')
+      editableLine.textContent = editableLine.textContent.trim()
+      const pin = () => {
+        pager.scrollLeft = pager.clientWidth
+      }
+      pin()
+      log(`ua=${navigator.userAgent}`)
+      log(
+        `scrollend=${'onscrollend' in window} timeline=${hasTimeline} snapchange=${'onscrollsnapchange' in window}`,
+      )
+      log(
+        `touch-action pre=${getComputedStyle(document.querySelector('pre')).touchAction} p=${getComputedStyle(document.querySelector('main p')).touchAction}`,
+      )
+
+      let touching = false
+      let touchEndAt = 0
+      let lastLogged = 0
+      pager.addEventListener(
+        'touchstart',
+        () => {
+          touching = true
+          log('touchstart')
+        },
+        { passive: true },
+      )
+      const release = (event) => {
+        touching = event.touches.length > 0
+        touchEndAt = performance.now()
+        log(`${event.type} scrollLeft=${pager.scrollLeft.toFixed(1)}`)
+        settle()
+      }
+      pager.addEventListener('touchend', release, { passive: true })
+      pager.addEventListener('touchcancel', release, { passive: true })
+      pager.addEventListener(
+        'scroll',
+        () => {
+          if (!s1 && !hasTimeline)
+            scrim.style.opacity = String(Math.min(1, pager.scrollLeft / pager.clientWidth))
+          const now = performance.now()
+          if (now - lastLogged > 50 || pager.scrollLeft <= 1) {
+            lastLogged = now
+            log(`scroll ${pager.scrollLeft.toFixed(1)}`)
+          }
+          settle()
+        },
+        { passive: true },
+      )
+      pager.addEventListener('scrollend', () => log(`scrollend ${pager.scrollLeft.toFixed(1)}`))
+      function settle() {
+        if (s1) return
+        if (touching || pager.scrollLeft > 1) return
+        log(`POP after touchend +${(performance.now() - touchEndAt).toFixed(0)}ms`)
+        setTimeout(pin, 600)
+      }
+
+      let burn = 0
+      document.getElementById('burn').addEventListener('change', (event) => {
+        clearInterval(burn)
+        if (event.target.checked) {
+          burn = setInterval(() => {
+            const end = performance.now() + 200
+            while (performance.now() < end) {}
+          }, 250)
+        }
+      })
+      const toggle = (id, attribute) =>
+        document.getElementById(id).addEventListener('change', (event) => {
+          document.body.toggleAttribute(attribute, event.target.checked)
+        })
+      toggle('pany', 'data-pany')
+      toggle('contain', 'data-contain')
+      document.getElementById('bounce').addEventListener('change', (event) => {
+        document.body.dataset.overscroll = event.target.checked ? 'auto' : 'none'
+      })
+      toggle('below-header', 'data-below-header')
+      document.getElementById('back').addEventListener('click', () => log('back button click'))
+      document.getElementById('field').addEventListener('focus', () => log('field focus'))
+      document.addEventListener('selectionchange', () => {
+        const selection = getSelection()
+        if (document.getElementById('editable').contains(selection.anchorNode))
+          log(`caret offset=${selection.anchorOffset}`)
+      })
+      // Forwards a tap on the edge strip to the element under it on the current page.
+      const edge = document.getElementById('edge')
+      edge.addEventListener('click', (event) => {
+        const page = edge.parentElement
+        const target = document
+          .elementsFromPoint(event.clientX, event.clientY)
+          .find((element) => element !== edge && page.contains(element))
+        log(`strip tap -> ${target ? target.tagName + (target.id ? '#' + target.id : '') : 'none'}`)
+        if (!(target instanceof HTMLElement)) return
+        const field = target.closest('input, textarea, select')
+        if (field) return field.focus()
+        const control = target.closest('button, a, [role="button"], label')
+        if (control) return control.click()
+        const editable = target.closest('[contenteditable="true"]')
+        // The strip is on top, so hide it from the hit test.
+        edge.style.pointerEvents = 'none'
+        const caret = editable && document.caretRangeFromPoint(event.clientX, event.clientY)
+        edge.style.pointerEvents = ''
+        if (caret) {
+          editable.focus({ preventScroll: true })
+          getSelection().removeAllRanges()
+          getSelection().addRange(caret)
+        }
+      })
+      // Mimics a React commit: drop and re-add the lower page, then pin in the same task.
+      document.getElementById('reinsert').addEventListener('click', () => {
+        const below = pager.querySelector('.below')
+        below.remove()
+        pager.scrollLeft = 0
+        requestAnimationFrame(() => {
+          pager.prepend(below)
+          pin()
+          log(`reinserted, scrollLeft=${pager.scrollLeft}`)
+        })
+      })
+      new ResizeObserver(() => {
+        if (!touching && pager.scrollLeft > 1) pin()
+      }).observe(pager)
+
+      if (s1) {
+        const { watchScrollSettle } = await import('/src/lib/scroll-settle.ts')
+        const { linkOpacityToScroll } = await import('/src/lib/scroll-linked-opacity.ts')
+        const controller = new AbortController()
+        const watch = watchScrollSettle({
+          element: pager,
+          onSettle: () => {
+            log(
+              `settle left=${pager.scrollLeft.toFixed(1)} user=${watch.isUserScroll()} +${(performance.now() - touchEndAt).toFixed(0)}ms`,
+            )
+            if (watch.isUserScroll() && pager.scrollLeft <= 1) setTimeout(pin, 600)
+          },
+          signal: controller.signal,
+          isSettled: () => pager.scrollLeft <= 1,
+        })
+        linkOpacityToScroll({
+          target: scrim,
+          scroller: pager,
+          axis: 'x',
+          from: 0,
+          to: 1,
+          signal: controller.signal,
+        })
+        log('s1 modules loaded')
+      }
+    </script>
+  </body>
+</html>

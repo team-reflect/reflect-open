@@ -1,4 +1,4 @@
-import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { useCallback, useId, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
@@ -15,6 +15,12 @@ import { ConnectGitHostDrawer } from '@/mobile/connect-git-host-drawer.tsx'
 import { ConnectRepositoryDrawer } from '@/mobile/connect-repository-drawer.tsx'
 import { GithubSignInDrawer } from '@/mobile/github-sign-in-drawer.tsx'
 import { PRIVACY_POLICY_URL } from '@/mobile/legal-urls.ts'
+import {
+  listMotionFlags,
+  setMotionFlag,
+  useMotionFlag,
+  type MotionFlag,
+} from '@/mobile/motion-flags.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
 import {
@@ -97,6 +103,18 @@ function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
     </>
   )
 }
+
+/** One motion flag's Debug switch. The choice is kept across launches. */
+function MotionFlagRow({ flag, label }: { flag: MotionFlag; label: string }): ReactElement {
+  const checked = useMotionFlag(flag)
+  const handleCheckedChange = useCallback(
+    (next: boolean) => setMotionFlag(flag, next, { persist: true }),
+    [flag],
+  )
+  return <SettingsSwitchRow label={label} checked={checked} onCheckedChange={handleCheckedChange} />
+}
+
+const motionFlags = /* @__PURE__ */ listMotionFlags()
 
 /**
  * The mobile Settings screen — a pushed card (route kind `settings`) in the
@@ -497,27 +515,39 @@ export function MobileSettings(): ReactElement {
           </SettingsGroup>
 
           {debugUnlocked ? (
-            <SettingsGroup
-              header="Debug"
-              footer="Production is an App Store install; Sandbox is TestFlight or a development install."
-            >
-              {isIos ? (
-                <SettingsValueRow
-                  label="Environment"
-                  value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
+            <>
+              <SettingsGroup
+                header="Debug"
+                footer="Production is an App Store install; Sandbox is TestFlight or a development install."
+              >
+                {isIos ? (
+                  <SettingsValueRow
+                    label="Environment"
+                    value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
+                  />
+                ) : null}
+                <SettingsSwitchRow
+                  label="Performance HUD"
+                  checked={perfHudEnabled}
+                  onCheckedChange={setPerfHudEnabled}
                 />
+                <SettingsActionRow
+                  label="Trigger test error"
+                  tone="destructive"
+                  onPress={crashTest}
+                />
+              </SettingsGroup>
+              {motionFlags.length > 0 ? (
+                <SettingsGroup
+                  header="Motion"
+                  footer="On uses native scrolling. Off brings back the old gesture. A switch here is kept across launches; a ?motion= URL override lasts until reload."
+                >
+                  {motionFlags.map(({ flag, label }) => (
+                    <MotionFlagRow key={flag} flag={flag} label={label} />
+                  ))}
+                </SettingsGroup>
               ) : null}
-              <SettingsSwitchRow
-                label="Performance HUD"
-                checked={perfHudEnabled}
-                onCheckedChange={setPerfHudEnabled}
-              />
-              <SettingsActionRow
-                label="Trigger test error"
-                tone="destructive"
-                onPress={crashTest}
-              />
-            </SettingsGroup>
+            </>
           ) : null}
         </div>
       </main>

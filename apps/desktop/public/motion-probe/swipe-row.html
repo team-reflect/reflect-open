@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Swipe row probe</title>
+    <style>
+      body {
+        margin: 0;
+        font: 15px system-ui;
+        overflow: hidden;
+        height: 100svh;
+      }
+      .page {
+        height: 100%;
+        overflow-y: auto;
+      }
+      .row {
+        display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        border-bottom: 1px solid #ddd;
+      }
+      .row[data-ob='contain'] {
+        overscroll-behavior-x: contain;
+      }
+      .row[data-ob='none'] {
+        overscroll-behavior-x: none;
+      }
+      .content {
+        position: relative;
+        z-index: 1;
+        flex: none;
+        width: 100%;
+        padding: 16px;
+        background: white;
+        scroll-snap-align: start;
+      }
+      .actions {
+        flex: none;
+        display: flex;
+        width: 136px;
+      }
+      .actions.sticky {
+        position: sticky;
+        right: 0;
+      }
+      .actions button {
+        flex: 1;
+        border: 0;
+        color: white;
+      }
+      .anchor {
+        flex: none;
+        width: 0;
+        scroll-snap-align: end;
+      }
+      .offscreen {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 52px;
+      }
+      #log {
+        position: fixed;
+        inset: auto 0 0;
+        max-height: 30svh;
+        overflow: auto;
+        background: #000c;
+        color: #0f0;
+        font: 11px ui-monospace;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page" id="current"></div>
+    <pre id="log"></pre>
+    <script type="module">
+      // The app's own module, served by the Vite dev server.
+      import { watchScrollSettle } from '/src/lib/scroll-settle.ts'
+
+      const params = new URLSearchParams(location.search)
+      const count = Number(params.get('rows') ?? 40)
+      const ob = params.get('ob') ?? 'contain'
+      const sticky = params.has('sticky')
+      const offscreen = params.has('offscreen')
+      const current = document.getElementById('current')
+      const log = (text) => {
+        document.getElementById('log').textContent =
+          `${performance.now().toFixed(0)} ${text}\n` +
+          document.getElementById('log').textContent.slice(0, 4000)
+      }
+      const controller = new AbortController()
+      for (let i = 0; i < count; i++) {
+        const row = document.createElement('div')
+        row.className = `row${offscreen ? ' offscreen' : ''}`
+        row.dataset.ob = ob
+        row.toggleAttribute('data-pager-pan-x', true)
+        row.innerHTML = `<div class="content">Row ${i}</div><div class="actions${sticky ? ' sticky' : ''}"><button style="background:#06c">Note</button><button style="background:#d00">Delete</button></div><span class="anchor"></span>`
+        for (const type of [
+          'pointerdown',
+          'pointercancel',
+          'pointerup',
+          'touchstart',
+          'touchend',
+          'click',
+          'scrollend',
+        ]) {
+          row.addEventListener(type, () => log(`row ${i} ${type} left=${row.scrollLeft}`), {
+            passive: true,
+          })
+        }
+        current.append(row)
+        const watch = watchScrollSettle({
+          element: row,
+          onSettle: () => {
+            log(`row ${i} settle left=${row.scrollLeft} user=${watch.isUserScroll()}`)
+          },
+          signal: controller.signal,
+        })
+      }
+      log(`scrollend=${'onscrollend' in window} scrollsnapchange=${'onscrollsnapchange' in window}`)
+    </script>
+  </body>
+</html>
