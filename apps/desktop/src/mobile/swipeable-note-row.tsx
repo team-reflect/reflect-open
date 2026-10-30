@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { Pin, PinOff, Trash2 } from 'lucide-react'
 import { type HighlightSegment, formatRecencyLabel } from '@reflect/core'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
+import { type RevealedRowStore, useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 
@@ -24,10 +25,10 @@ export interface NoteRowModel {
 
 interface SwipeableNoteRowProps {
   row: NoteRowModel
-  revealed: boolean
-  onReveal: () => void
-  onClose: () => void
-  onBeginInteraction: () => void
+  /**
+   * The list's one revealed row, keyed by note path.
+   */
+  revealedRow: RevealedRowStore
   onOpen: () => void
   onTogglePin: () => void
   onDelete: () => void
@@ -52,20 +53,18 @@ function renderHighlightedSegments(segments: HighlightSegment[]): ReactNode {
  */
 export function SwipeableNoteRow({
   row,
-  revealed,
-  onReveal,
-  onClose,
-  onBeginInteraction,
+  revealedRow,
   onOpen,
   onTogglePin,
   onDelete,
 }: SwipeableNoteRowProps): ReactElement {
   const { settings } = useSettings()
+  const { revealed, reveal, close, beginInteraction } = useRevealedRow(revealedRow, row.path)
   const actionWidth = SWIPE_ACTION_WIDTH * (row.canDelete ? 2 : 1)
   const title = row.titleSegments.map((segment) => segment.text).join('')
   const activate = (): void => {
     if (revealed) {
-      onClose()
+      close()
       return
     }
     onOpen()
@@ -76,9 +75,9 @@ export function SwipeableNoteRow({
       <SwipeRow
         actionWidth={actionWidth}
         revealed={revealed}
-        onReveal={onReveal}
-        onClose={onClose}
-        onBeginInteraction={onBeginInteraction}
+        onReveal={reveal}
+        onClose={close}
+        onBeginInteraction={beginInteraction}
         className="h-full"
         surfaceClassName="bg-background"
         actions={
@@ -90,7 +89,7 @@ export function SwipeableNoteRow({
               revealed={revealed}
               className="bg-accent"
               onClick={() => {
-                onClose()
+                close()
                 onTogglePin()
               }}
             />

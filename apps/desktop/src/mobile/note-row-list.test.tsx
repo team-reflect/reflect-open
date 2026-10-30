@@ -16,6 +16,7 @@ import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteRowList } from './note-row-list.tsx'
+import { RevealedRowStore } from './revealed-row.ts'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row.tsx'
 
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
@@ -69,15 +70,12 @@ function row(overrides: Partial<NoteRowModel> = {}): NoteRowModel {
 }
 
 function SwipeHarness({ note = row() }: { note?: NoteRowModel }): ReactElement {
-  const [revealed, setRevealed] = useState(false)
+  const [revealedRow] = useState(() => new RevealedRowStore())
   return (
     <div style={{ width: 360 }}>
       <SwipeableNoteRow
         row={note}
-        revealed={revealed}
-        onReveal={() => setRevealed(true)}
-        onClose={() => setRevealed(false)}
-        onBeginInteraction={() => {}}
+        revealedRow={revealedRow}
         onOpen={onOpen}
         onTogglePin={onTogglePin}
         onDelete={onDelete}

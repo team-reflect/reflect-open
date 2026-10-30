@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
+import { type RevealedRowStore, useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 
@@ -33,10 +34,10 @@ interface MobileTaskRowProps {
    * Open the quick-edit sheet for this task (V1 mobile: tap edits in place).
    */
   onEdit: (task: OpenTask) => void
-  revealed: boolean
-  onReveal: () => void
-  onClose: () => void
-  onBeginInteraction: () => void
+  /**
+   * The list's one revealed row, keyed by `getTaskKey`.
+   */
+  revealedRow: RevealedRowStore
   /**
    * Navigate to the task's source note (the revealed Note action).
    */
@@ -63,26 +64,25 @@ export function MobileTaskRow({
   onToggle,
   togglePending,
   onEdit,
-  revealed,
-  onReveal,
-  onClose,
-  onBeginInteraction,
+  revealedRow,
   onOpenNote,
   onDelete,
 }: MobileTaskRowProps): ReactElement {
   const { haptics } = useMobileServices()
   const { settings } = useSettings()
+  const key = getTaskKey(task)
+  const { revealed, reveal, close, beginInteraction } = useRevealedRow(revealedRow, key)
   const label = task.text || 'Empty task'
   const edit = (): void => onEdit(task)
 
   return (
-    <li data-task-key={getTaskKey(task)} className="border-b border-border">
+    <li data-task-key={key} className="border-b border-border">
       <SwipeRow
         actionWidth={ACTION_WIDTH}
         revealed={revealed}
-        onReveal={onReveal}
-        onClose={onClose}
-        onBeginInteraction={onBeginInteraction}
+        onReveal={reveal}
+        onClose={close}
+        onBeginInteraction={beginInteraction}
         surfaceClassName="bg-surface"
         actions={
           <>
@@ -94,7 +94,7 @@ export function MobileTaskRow({
               className="bg-accent"
               onClick={() => {
                 hapticImpactLight(haptics)
-                onClose()
+                close()
                 onOpenNote()
               }}
             />
@@ -106,7 +106,7 @@ export function MobileTaskRow({
               className="bg-destructive"
               onClick={() => {
                 hapticImpactLight(haptics)
-                onClose()
+                close()
                 onDelete()
               }}
             />
@@ -120,7 +120,7 @@ export function MobileTaskRow({
             if (revealed) {
               event.preventDefault()
               event.stopPropagation()
-              onClose()
+              close()
             }
           }}
           className="flex min-h-12 items-start"
