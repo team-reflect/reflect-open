@@ -22,7 +22,12 @@ export {
   MIN_VISIBLE_MS,
   type OperationsService,
 } from './app/operations-service.ts'
-export { type UpdaterAdapter, type UpdateService, type UpdateState } from './app/update-service.ts'
+export {
+  type AvailableUpdate,
+  type UpdaterAdapter,
+  type UpdateService,
+  type UpdateState,
+} from './app/update-service.ts'
 export {
   createThemeService,
   THEME_PREFERENCE_CACHE_KEY,

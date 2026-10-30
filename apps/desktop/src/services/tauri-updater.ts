@@ -1,6 +1,6 @@
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check } from '@tauri-apps/plugin-updater'
-import type { UpdaterAdapter } from '@reflect/app'
+import type { AvailableUpdate, UpdaterAdapter } from '@reflect/app'
 
 /**
  * The Tauri updater and process plugins. Both are registered only under
@@ -8,7 +8,7 @@ import type { UpdaterAdapter } from '@reflect/app'
  */
 export function createTauriUpdaterAdapter(): UpdaterAdapter {
   return {
-    check: () => check(),
+    check: (): Promise<AvailableUpdate | null> => check(),
     relaunch: () => relaunch(),
   }
 }

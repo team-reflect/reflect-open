@@ -179,7 +179,7 @@ class UpdateServiceImpl implements UpdateService {
   }
 
   async install(): Promise<void> {
-    const update = this.#pendingUpdate
+    const update: AvailableUpdate | null = this.#pendingUpdate
     if (!update || this.#state.phase === 'downloading' || this.#state.phase === 'ready') {
       return
     }
@@ -258,7 +258,7 @@ class UpdateServiceImpl implements UpdateService {
     // (e.g. an install of a previously found update) transitioned while we awaited".
     const baseline = this.#state
     try {
-      const update = await this.#deps.updater.check()
+      const update: AvailableUpdate | null = await this.#deps.updater.check()
       if (this.#state !== baseline) {
         void this.#close(update)
         return
