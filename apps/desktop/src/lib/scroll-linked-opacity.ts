@@ -32,6 +32,8 @@ export function linkOpacityToScroll(
     return
   }
 
+  // FIXME: just do nothing if ScrollTimeline is not supported? As long as it is OK that we don't have such animation, I think it is acceptable that a small part of users don't see it.
+
   const paint = (): void => {
     const range =
       axis === 'x'
