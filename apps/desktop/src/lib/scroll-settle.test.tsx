@@ -270,6 +270,26 @@ describe('watchScrollSettle', () => {
       expect(element.style.scrollSnapType).toBe('')
     })
 
+    it('lets a new press take over from a release scroll', async () => {
+      const element = mountSnapScroller()
+      const onSettle = vi.fn()
+      const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+
+      mouse('pointerdown', element, 200)
+      mouse('pointermove', window, 150)
+      mouse('pointerup', window, 150)
+      // A second press during the release scroll.
+      mouse('pointerdown', element, 150)
+      mouse('pointermove', window, 100)
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      expect(watch.isTouching()).toBe(true)
+      expect(onSettle).not.toHaveBeenCalled()
+      mouse('pointerup', window, 100)
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(watch.isUserScroll()).toBe(true)
+    })
+
     it('starts a drag only on the drag handle', () => {
       const element = mountSnapScroller()
       const handle = document.createElement('div')

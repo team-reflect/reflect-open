@@ -91,6 +91,8 @@ export function watchScrollSettle({
   // frames belong to the reported scroll.
   let snapTail = false
   let snapTailTimer: ReturnType<typeof setTimeout> | undefined
+  // The current mouse press, from `pointerdown` until its release scroll stops.
+  let press: AbortController | undefined
 
   const isTouching = (): boolean => fingers.size > 0
   const endSnapTail = (): void => {
@@ -203,7 +205,7 @@ export function watchScrollSettle({
   )
 
   // One press, from `pointerdown` until the release scroll stops. Aborting
-  // `press` undoes everything it set.
+  // the press undoes everything it set.
   function dragWithMouse(down: PointerEvent): void {
     const axis = snapAxis(element)
     if (
@@ -223,9 +225,12 @@ export function watchScrollSettle({
     const origin = pointer(down)
     let dragging = false
     let quiet: ReturnType<typeof setTimeout> | undefined
+    // A new press ends the last one, so the two never share `MOUSE`.
+    press?.abort()
     const controller = new AbortController()
-    const press = AbortSignal.any([signal, controller.signal])
-    press.addEventListener(
+    press = controller
+    const pressSignal = AbortSignal.any([signal, controller.signal])
+    pressSignal.addEventListener(
       'abort',
       () => {
         clearTimeout(quiet)
@@ -260,7 +265,7 @@ export function watchScrollSettle({
         }
         element.scrollTo({ [x ? 'left' : 'top']: start - delta, behavior: 'instant' })
       },
-      { signal: press },
+      { signal: pressSignal },
     )
     window.addEventListener(
       'pointerup',
@@ -282,7 +287,7 @@ export function watchScrollSettle({
           clearTimeout(quiet)
           quiet = setTimeout(finish, SETTLE_IDLE_MS)
         }
-        element.addEventListener('scroll', wait, { passive: true, signal: press })
+        element.addEventListener('scroll', wait, { passive: true, signal: pressSignal })
         element.addEventListener(
           'scrollend',
           () => {
@@ -290,12 +295,12 @@ export function watchScrollSettle({
               finish()
             }
           },
-          { signal: press },
+          { signal: pressSignal },
         )
         wait()
         element.scrollTo({ [x ? 'left' : 'top']: end, behavior: 'smooth' })
       },
-      { once: true, signal: press },
+      { once: true, signal: pressSignal },
     )
   }
 
