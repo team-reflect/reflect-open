@@ -16,6 +16,13 @@ describe('date labels', () => {
     expect(formatDayLabel('2026-05-31', 'mdy')).toBe('Sun, May 31st, 2026')
   })
 
+  it('renders the date key itself for iso', () => {
+    // `Pacific/Apia` had no local 2011-12-30.
+    expect(formatDayLabel('2011-12-30', 'iso')).toBe('2011-12-30')
+    expect(formatShortDate('2011-12-30', 'iso')).toBe('2011-12-30')
+    expect(formatMonthDay('2011-12-30', 'iso')).toBe('2011-12-30')
+  })
+
   it('formatFullDate spells the date out per the date format', () => {
     expect(formatFullDate(new Date(2026, 5, 10), 'mdy')).toBe('June 10th, 2026')
     expect(formatFullDate(new Date(2026, 5, 10), 'dmy')).toBe('10th June, 2026')

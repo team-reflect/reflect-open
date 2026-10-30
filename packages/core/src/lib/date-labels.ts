@@ -20,15 +20,19 @@ function formatByDateFormat(date: Date, dateFormat: DateFormat, patterns: DatePa
 }
 
 /**
- * Render an ISO date per the chosen format. A date-shaped string that names no
- * real day (a file called `daily/2026-13-45.md`) renders as itself.
+ * Render an ISO date per the chosen format. `iso`, and a date-shaped string
+ * that names no real day (a file called `daily/2026-13-45.md`), render as the
+ * string itself, so the label always matches the date key.
  */
 function formatIsoByDateFormat(
   date: string,
   dateFormat: DateFormat,
   patterns: DatePatterns,
 ): string {
-  return isIsoDate(date) ? formatByDateFormat(parseIsoDate(date), dateFormat, patterns) : date
+  if (dateFormat === 'iso' || !isIsoDate(date)) {
+    return date
+  }
+  return formatDate(parseIsoDate(date), patterns[dateFormat])
 }
 
 /**
