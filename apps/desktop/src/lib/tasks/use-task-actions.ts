@@ -106,13 +106,19 @@ export function useTaskActions(): TaskActions {
   ): Promise<T | null> {
     count(kind, 1)
     let result: T | null = null
+    let failure: { cause: unknown } | null = null
     try {
       result = await write()
     } catch (cause) {
-      operations.start(label).fail(errorMessage(cause))
+      failure = { cause }
     }
-    // No `finally`: the React Compiler skips any function that has one.
+    // No `finally`: the React Compiler skips any function that has one. The
+    // count drops before the failure is reported, so a throwing listener can't
+    // leave it stuck.
     count(kind, -1)
+    if (failure !== null) {
+      operations.start(label).fail(errorMessage(failure.cause))
+    }
     return result
   }
 

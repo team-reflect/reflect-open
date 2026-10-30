@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -35,6 +36,11 @@ export function RebuildIndexField(): ReactElement {
           {rebuild.pending ? 'Rebuilding…' : 'Rebuild index'}
         </Button>
       </div>
+      {rebuild.error !== null ? (
+        <InlineAlert tone="error" className="mt-2">
+          {rebuild.error}
+        </InlineAlert>
+      ) : null}
     </SettingsField>
   )
 }

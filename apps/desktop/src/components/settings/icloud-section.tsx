@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog.tsx'
+import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -128,6 +129,8 @@ export function IcloudSettingsField(): ReactElement | null {
                       : ''}
                   </DialogDescription>
                 </DialogHeader>
+                {/* A failure before the copy lands keeps the dialog open; show it here too. */}
+                {shownError !== null ? <InlineAlert tone="error">{shownError}</InlineAlert> : null}
                 <DialogFooter>
                   <DialogClose
                     render={
