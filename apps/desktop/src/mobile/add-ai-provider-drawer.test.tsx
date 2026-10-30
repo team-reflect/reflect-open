@@ -16,7 +16,21 @@ import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 // Keep the sheet content inline so this suite exercises its state flow
 // without depending on the drawer's drag and animation behavior.
 vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  // "Dismiss sheet" stands in for a swipe-down or backdrop tap.
+  Drawer: ({
+    children,
+    onOpenChange,
+  }: {
+    children?: ReactNode
+    onOpenChange?: (open: boolean) => void
+  }) => (
+    <>
+      {children}
+      <button type="button" onClick={() => onOpenChange?.(false)}>
+        Dismiss sheet
+      </button>
+    </>
+  ),
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
@@ -72,6 +86,29 @@ describe('AddAiProviderDrawer', () => {
         expect.objectContaining({ provider: 'anthropic', apiKey: 'sk-ant-key' }),
       )
     })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('cannot be dismissed while the submit is pending', async () => {
+    await renderSheet()
+    const pending = Promise.withResolvers<'valid'>()
+    vi.spyOn(keyValidation, 'validate').mockReturnValueOnce(pending.promise)
+
+    await typeKeyAndSubmit('sk-key')
+    await expect.element(page.getByRole('button', { name: 'Add provider' })).toBeDisabled()
+    await page.getByRole('button', { name: 'Dismiss sheet' }).click()
+    expect(onOpenChange).not.toHaveBeenCalled()
+
+    pending.resolve('valid')
+    await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(onAdd).toHaveBeenCalledTimes(1)
+  })
+
+  it('can be dismissed while idle', async () => {
+    await renderSheet()
+
+    await page.getByRole('button', { name: 'Dismiss sheet' }).click()
+
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 

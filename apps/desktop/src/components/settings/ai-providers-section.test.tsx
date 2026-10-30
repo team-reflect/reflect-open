@@ -356,6 +356,25 @@ describe('AiProvidersSection', () => {
     })
   })
 
+  it('locks the dialog while the add is pending', async () => {
+    await renderSection()
+    await expect.element(page.getByText(/No AI providers configured/)).toBeInTheDocument()
+    const pending = Promise.withResolvers<'valid'>()
+    vi.spyOn(keyValidation, 'validate').mockReturnValueOnce(pending.promise)
+
+    const dialog = await openDialog()
+    await dialog.getByLabelText('API key').fill('sk-test-wxyz1')
+    await dialog.getByRole('button', { name: 'Add provider' }).click()
+
+    await expect.element(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    await userEvent.keyboard('{Escape}')
+    await expect.element(dialog).toBeInTheDocument()
+
+    pending.resolve('valid')
+    await vi.waitFor(() => expect(saved()).toHaveLength(1))
+    await expect.element(dialog).not.toBeInTheDocument()
+  })
+
   it('falls back to the first entry when the default id dangles', async () => {
     stored = { ...twoStoredModels(), defaultAiProviderId: 'gone' }
     await renderSection()

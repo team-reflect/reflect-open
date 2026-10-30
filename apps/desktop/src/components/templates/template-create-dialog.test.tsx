@@ -1,6 +1,6 @@
 import { createTestAppServices } from '@reflect/app/testing'
 import type { ReactElement } from 'react'
-import { page } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { expect, it, vi } from 'vitest'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import type { CommandContext } from '@/lib/commands/types.ts'
@@ -115,4 +115,30 @@ it('starts empty after a successful create, and drops a stale submit error', asy
   await openDialog()
   await expect.element(page.getByPlaceholder('Template name')).toHaveValue('')
   await expect.element(page.getByText('disk full')).not.toBeInTheDocument()
+})
+
+it('cannot be cancelled or dismissed while the create is pending', async () => {
+  const { context, core } = await renderDialog()
+  const pending = Promise.withResolvers<void>()
+  const write = core.noteFile.write.bind(core.noteFile)
+  vi.spyOn(core.noteFile, 'write').mockImplementationOnce(async (...args) => {
+    await pending.promise
+    return await write(...args)
+  })
+  await openDialog()
+
+  await page.getByPlaceholder('Template name').fill('Meeting notes')
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+  await userEvent.keyboard('{Escape}')
+  await expect.element(page.getByRole('dialog', { name: 'New template' })).toBeInTheDocument()
+  expect(context.navigate).not.toHaveBeenCalled()
+
+  pending.resolve()
+  await expect.element(page.getByRole('dialog', { name: 'New template' })).not.toBeInTheDocument()
+  expect(context.navigate).toHaveBeenCalledWith({
+    kind: 'note',
+    path: 'templates/meeting-notes.md',
+  })
 })
