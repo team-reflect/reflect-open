@@ -469,16 +469,12 @@ export function MobileSettings(): ReactElement {
               <SettingsActionRow
                 label="Redeem Code"
                 pending={subscriptionControls.redeemPending}
-                onPress={() => {
-                  void subscriptionControls.redeem()
-                }}
+                onPress={subscriptionControls.redeem}
               />
               <SettingsActionRow
                 label="Restore Purchases"
                 pending={subscriptionControls.restorePending}
-                onPress={() => {
-                  void subscriptionControls.restore()
-                }}
+                onPress={subscriptionControls.restore}
               />
               <SettingsActionRow label="Terms of Use" onPress={subscriptionControls.openTerms} />
             </SettingsGroup>
