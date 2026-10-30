@@ -10,13 +10,16 @@ import {
   AppError,
 } from '@reflect/core'
 import {
+  createTestAudioRecorderService,
   createTestCoreServices,
+  createTestPlatformService,
   createTestSettingsService,
   type TestCoreServices,
 } from '@reflect/core/testing'
 import { toast } from '@/components/ui/toast.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
-import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
+import { MOBILE_PLATFORM, renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AudioMemoProvider, useAudioMemo } from './audio-memo-provider.tsx'
 
@@ -239,5 +242,61 @@ describe('AudioMemoProvider', () => {
     // The graph's own lifecycles listen until the graph closes.
     core.graphSession.setGraph(null)
     expect(core.fileChanges.listenerCount().changes).toBe(0)
+  })
+})
+
+describe('AudioMemoProvider under the iOS app', () => {
+  async function renderBridge(isNativeShell: boolean) {
+    const audioRecorder = createTestAudioRecorderService()
+    const core = createTestCoreServices({
+      database: createWasmTestDatabaseService(),
+      platform: createTestPlatformService({ ...MOBILE_PLATFORM, isNativeShell }),
+      audioRecorder,
+    })
+    const hook = await renderHookInApp(() => useAudioMemo(), {
+      core,
+      graph: GRAPH,
+      settings: { aiProviders: [OPENAI], defaultAiProviderId: OPENAI.id },
+      wrapper: (children: ReactNode) => (
+        <MobileAudioMemoProvider graph={GRAPH}>
+          <AudioMemoProvider graph={GRAPH}>{children}</AudioMemoProvider>
+        </MobileAudioMemoProvider>
+      ),
+    })
+    const methods = (): string[] => audioRecorder.calls().map((call) => call.method)
+    return { ...hook, methods }
+  }
+
+  it('borrows the native recording session, presented in the iOS sheet', async () => {
+    const { result, methods } = await renderBridge(true)
+    expect(result.current).toMatchObject({
+      presentation: 'sheet',
+      phase: 'idle',
+      available: true,
+      unavailableReason: null,
+    })
+
+    // The mic starts the native recorder through the bridge…
+    await act(() => {
+      result.current.toggle()
+    })
+    expect(result.current.phase).toBe('recording')
+    expect(methods()).toContain('start')
+
+    // …and cancelling drops that same recording.
+    await act(() => {
+      result.current.cancel()
+    })
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
+    expect(methods()).toContain('cancel')
+  })
+
+  it('turns the mic off where there is no native recorder', async () => {
+    const { result } = await renderBridge(false)
+
+    expect(result.current).toMatchObject({
+      available: false,
+      unavailableReason: 'Audio recording is not supported on this platform',
+    })
   })
 })

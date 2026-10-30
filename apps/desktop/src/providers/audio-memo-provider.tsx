@@ -19,6 +19,7 @@ import {
   dismissRecordingReminder,
   showRecordingReminder,
 } from '@/components/audio-memo/recording-reminder.ts'
+import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
@@ -40,6 +41,12 @@ export type AudioMemoContextValue = AudioMemoSessionState &
      * Idle → start recording (expanding a collapsed sidebar); recording → stop & save.
      */
     toggle: () => void
+    /**
+     * Where a live recording shows. `popover`: the desktop panel anchored to
+     * the mic. `sheet`: the iOS app's recording sheet, which owns the
+     * recording UI while the mic only starts and stops it.
+     */
+    presentation: 'popover' | 'sheet'
   }
 
 const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
@@ -59,6 +66,12 @@ const CLOSED_STATE: AudioMemoSessionState = {
   recorderState: 'idle',
 }
 
+/**
+ * Why the iOS app's mic is off without a native recorder (a plain browser),
+ * in the desktop's words.
+ */
+const NATIVE_RECORDER_MISSING = 'Audio recording is not supported on this platform'
+
 const CLOSED_SESSION = {
   subscribe: () => () => {},
   getState: () => CLOSED_STATE,
@@ -70,6 +83,49 @@ interface AudioMemoProviderProps {
 }
 
 export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): ReactElement {
+  const { platform } = useCoreServices()
+  // The iOS app records natively, so a capture survives the webview; its
+  // session already lives above the workspace (`MobileAudioMemoProvider`),
+  // where the lock-screen widget, Siri and the Live Activity reach it. Under
+  // the iOS app the desktop workspace borrows that session instead of opening
+  // a second recorder.
+  if (platform.surface.mobileApp) {
+    return <NativeAudioMemoBridge>{children}</NativeAudioMemoBridge>
+  }
+  return <WebviewAudioMemoProvider graph={graph}>{children}</WebviewAudioMemoProvider>
+}
+
+function NativeAudioMemoBridge({ children }: { children: ReactNode }): ReactElement {
+  const memo = useMobileAudioMemo()
+  const value = useMemo<AudioMemoContextValue>(
+    () => ({
+      phase: memo.phase,
+      elapsedMs: memo.elapsedMs,
+      stream: null,
+      pendingCount: memo.pendingCount,
+      // The sheet explains a missing transcription model itself, so the mic
+      // opens it rather than going inert; only a missing native recorder (a
+      // plain browser) disables it.
+      available: memo.available,
+      unavailableReason: memo.available ? null : NATIVE_RECORDER_MISSING,
+      error: memo.error,
+      canRetry: memo.canRetry,
+      recorderState:
+        memo.phase === 'recording' || memo.phase === 'requesting' ? memo.phase : 'idle',
+      toggle: memo.toggle,
+      cancel: () => {
+        void memo.cancelRecording()
+      },
+      retry: memo.retry,
+      discard: memo.discard,
+      presentation: 'sheet',
+    }),
+    [memo],
+  )
+  return <AudioMemoContext value={value}>{children}</AudioMemoContext>
+}
+
+function WebviewAudioMemoProvider({ graph, children }: AudioMemoProviderProps): ReactElement {
   const { audioMemo } = useCoreServices()
   const { collapsed, toggleSidebar } = useSidebar()
 
@@ -121,7 +177,10 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     }),
     [session],
   )
-  const value = useMemo<AudioMemoContextValue>(() => ({ ...state, ...controls }), [state, controls])
+  const value = useMemo<AudioMemoContextValue>(
+    () => ({ ...state, ...controls, presentation: 'popover' }),
+    [state, controls],
+  )
 
   return <AudioMemoContext value={value}>{children}</AudioMemoContext>
 }
