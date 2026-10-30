@@ -209,8 +209,12 @@ export function watchScrollSettle({
       return
     }
     // A new press ends the last one first: the last press may still hold the
-    // inline snap type the axis comes from.
+    // inline snap type the axis comes from. A release scroll it cuts short
+    // still settles.
     press?.abort()
+    if (pending) {
+      settleOrWait()
+    }
     const axis = snapAxis(element)
     if (!axis || (down.target instanceof Element && down.target.closest(NO_DRAG_SELECTOR))) {
       return
@@ -225,12 +229,15 @@ export function watchScrollSettle({
     const controller = new AbortController()
     press = controller
     const pressSignal = AbortSignal.any([signal, controller.signal])
-    // Stops text selection, and leaves the press itself to the control under
-    // it: a `preventDefault` on `pointerdown` would cancel its `mousedown`.
-    window.addEventListener('selectstart', (event) => event.preventDefault(), {
-      capture: true,
-      signal: pressSignal,
-    })
+    // Stops text selection and native drag and drop, and leaves the press
+    // itself to the control under it: a `preventDefault` on `pointerdown`
+    // would cancel its `mousedown`.
+    for (const type of ['selectstart', 'dragstart']) {
+      window.addEventListener(type, (event) => event.preventDefault(), {
+        capture: true,
+        signal: pressSignal,
+      })
+    }
     // The button is down: from `pointerdown` until `pointerup` or `pointercancel`.
     const released = new AbortController()
     const held = AbortSignal.any([pressSignal, released.signal])
