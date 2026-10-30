@@ -1,6 +1,6 @@
 import { page } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useEffect } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { createSystemClock } from '@reflect/core'
 import { createTestCoreServices } from '@reflect/core/testing'
@@ -102,13 +102,26 @@ function NavigateProbe({ onReady }: { onReady: (navigate: Navigate) => void }): 
   return null
 }
 
+/**
+ * The stream as the workspace routes it: the today and daily routes share one
+ * mounted instance.
+ */
+function RoutedStream(): ReactElement {
+  const { route } = useRouter()
+  return (
+    <DailyStream
+      target={route.kind === 'daily' ? { kind: 'date', date: route.date } : { kind: 'today' }}
+    />
+  )
+}
+
 async function renderStream() {
   let navigate: Navigate = () => {
     throw new Error('navigate not ready')
   }
   const view = await renderInApp(
     <div style={{ height: 800 }}>
-      <DailyStream target={{ kind: 'today' }} />
+      <RoutedStream />
       <NavigateProbe
         onReady={(run) => {
           navigate = run
@@ -135,6 +148,21 @@ async function renderStream() {
 }
 
 describe('DailyStream arrival focus', () => {
+  it('keeps the focused day mounted when an arrival grows the window back', async () => {
+    const today = getIsoToday()
+    const { view, navigate, anchored, paneFor } = await renderStream()
+    await anchored(today)
+    paneFor(today)
+      .element()
+      .dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+
+    await act(() => navigate({ kind: 'daily', date: '2003-05-01' }))
+    await anchored('2003-05-01')
+
+    await expect.element(paneFor(today)).toBeInTheDocument()
+    await view.unmount()
+  })
+
   it('a capture arrival (focusEditor) focuses today with the caret at the end', async () => {
     const today = getIsoToday()
     const { view, navigate, anchored, paneFor } = await renderStream()

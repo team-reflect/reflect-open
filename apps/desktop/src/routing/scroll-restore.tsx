@@ -27,7 +27,8 @@ export function ScrollRestored({ className, children }: ScrollRestoredProps): Re
   // top for an entry that has none — never carry the previous view's position.
   useEffect(() => {
     if (ref.current) {
-      ref.current.scrollTop = savedScroll() ?? 0
+      const saved = savedScroll()
+      ref.current.scrollTop = typeof saved === 'number' ? saved : 0
     }
   }, [entryId, savedScroll])
 

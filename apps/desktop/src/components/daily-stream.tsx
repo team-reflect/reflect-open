@@ -8,8 +8,8 @@ import {
   dateAtIndex,
   extendDayWindowBack,
   indexOfDate,
+  isDayScrollPosition,
   neighborDate,
-  PAST_DAYS,
 } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
@@ -60,11 +60,6 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // footgun.)
   const { dailyNotes } = useCoreServices()
   const [dayWindow, setDayWindow] = useState(() => createDayWindow(dailyNotes.today()))
-  // Saved scroll offsets are measured against the default window. Days added
-  // before its start are unmeasured rows, which virtua sizes at exactly
-  // `itemSize` (a fixed `itemSize` turns off its auto-estimation), so
-  // subtracting them keeps offsets saved before the window grew valid after.
-  const addedPastHeight = (dayWindow.anchorIndex - PAST_DAYS) * ESTIMATED_DAY_HEIGHT
   // Per-row data is unused (the date is derived from the index); a stable array
   // of the window's length just tells virtua how many rows exist.
   const data = useMemo(() => Array.from({ length: dayWindow.count }), [dayWindow.count])
@@ -193,7 +188,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // pressed while already on today — the router clears the entry's saved
   // offset for that case; `entryId` covers back/forward between entries whose
   // routes resolve to the same day). A back/forward-restored entry carries its
-  // offset; a fresh navigation anchors to the target day.
+  // saved day; a fresh navigation anchors to the target day.
   //
   // A layout effect, not a passive one: virtua applies an imperative scroll in a
   // pre-paint microtask, so anchoring here pins the target day to the viewport
@@ -201,15 +196,18 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // five-year window and then lurching down.
   useLayoutEffect(() => {
     const target = targetDateRef.current
-    const extended = extendDayWindowBack(dayWindow, target)
+    const saved = savedScroll()
+    const restored = isDayScrollPosition(saved) ? saved : null
+    const extended = extendDayWindowBack(dayWindow, restored?.date ?? target)
     if (extended !== dayWindow) {
-      // An arrival before the window (a Cmd+K pick or date link years back)
-      // grows it; virtua's `shift` keeps the viewport in place across the
-      // prepend, and the effect re-runs on the new window to anchor there.
+      // An arrival or restored day before the window grows it; the effect
+      // re-runs on the new window to anchor there. Tracked indices move with it.
+      const added = extended.anchorIndex - dayWindow.anchorIndex
+      setScrollIndex((index) => index + added)
+      setFocusIndex((index) => index + added)
       setDayWindow(extended)
       return
     }
-    const restored = savedScroll()
     if (restored !== null) {
       // A restored arrival also cancels any focus still pending from a prior
       // navigation the user backed out of before that day's editor mounted (both
@@ -217,7 +215,10 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       // otherwise steal focus when its row scrolls into view.
       focusPendingRef.current = null
       pendingFocusRef.current = null
-      virtualizerRef.current?.scrollTo(restored + addedPastHeight)
+      virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, restored.date), {
+        align: 'start',
+        offset: restored.offset,
+      })
       return
     }
     pendingFocusRef.current = null
@@ -226,7 +227,21 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       selection: arrivalFocusEditorRef.current ? 'end' : 'start',
     }
     virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
-  }, [arrivalSeq, entryId, dayWindow, savedScroll, addedPastHeight])
+  }, [arrivalSeq, entryId, dayWindow, savedScroll])
+
+  // Save the top day, not a pixel offset, which goes stale as rows measure.
+  const saveDayScroll = useCallback(
+    (scrollTop: number) => {
+      const virtualizer = virtualizerRef.current
+      if (!virtualizer) return
+      const index = virtualizer.findItemIndex(scrollTop)
+      saveScrollState({
+        date: dateAtIndex(dayWindow, index),
+        offset: scrollTop - virtualizer.getItemOffset(index),
+      })
+    },
+    [dayWindow, saveScrollState],
+  )
 
   const onScrollOffset = useCallback((offset: number) => {
     const scrollIndex = virtualizerRef.current?.findItemIndex(offset)
@@ -249,7 +264,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     <div
       data-testid="daily-stream"
       className="h-full overflow-auto"
-      onScroll={(event) => saveScrollState(event.currentTarget.scrollTop - addedPastHeight)}
+      onScroll={(event) => saveDayScroll(event.currentTarget.scrollTop)}
       // An explicit click/touch picks its own focus target — a focus still
       // pending for a day whose editor hasn't mounted yet must not steal the
       // caret later. Typing is deliberately not a cancel: ⌘D-then-type should
@@ -265,7 +280,11 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
         itemSize={ESTIMATED_DAY_HEIGHT}
         bufferSize={2 * ESTIMATED_DAY_HEIGHT}
         keepMounted={keepMounted}
-        shift={true}
+        // Every growth is followed by a scroll to a day, which virtua's prepend
+        // compensation could land after and undo (seen in Chromium, so Windows'
+        // WebView2). The cost: rows measured before a growth keep their sizes at
+        // their old indices, now earlier days, until those rows remount.
+        shift={false}
         onScroll={onScrollOffset}
       >
         {(_, index) => {

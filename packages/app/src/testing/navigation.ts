@@ -5,6 +5,7 @@ import {
   type NavigationPosition,
   type NavigationService,
   type NavigationState,
+  type ScrollPosition,
 } from '../navigation/navigation-service.ts'
 import type { Route } from '../navigation/route.ts'
 
@@ -65,15 +66,15 @@ class TestNavigationServiceImpl implements TestNavigationService {
     return this.#inner.navigationRevision()
   }
 
-  saveScrollState(offset: number, at?: NavigationPosition): void {
-    this.#inner.saveScrollState(offset, at)
+  saveScrollState(position: ScrollPosition, at?: NavigationPosition): void {
+    this.#inner.saveScrollState(position, at)
   }
 
   clearScrollState(at?: NavigationPosition): void {
     this.#inner.clearScrollState(at)
   }
 
-  savedScroll(at?: NavigationPosition): number | null {
+  savedScroll(at?: NavigationPosition): ScrollPosition | null {
     return this.#inner.savedScroll(at)
   }
 

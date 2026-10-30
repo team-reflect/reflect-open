@@ -144,7 +144,13 @@ export {
   type LinkNavigationHost,
   type LinkNavigationService,
 } from './navigation/link-navigation-service.ts'
-export { type NavigateOptions, type NavigationService } from './navigation/navigation-service.ts'
+export {
+  isDayScrollPosition,
+  type DayScrollPosition,
+  type NavigateOptions,
+  type NavigationService,
+  type ScrollPosition,
+} from './navigation/navigation-service.ts'
 export {
   effectiveDailyDate,
   focusedNotePathForRoute,

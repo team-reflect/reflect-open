@@ -9,18 +9,13 @@ import {
   type RefObject,
 } from 'react'
 import { act } from '@/test-utils/act.ts'
+import type { DayScrollPosition } from '@reflect/app'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { getIsoToday } from '@reflect/utils'
 import { createSystemClock, type ClockService, formatDayLabel } from '@reflect/core'
-import {
-  createDayWindow,
-  dateAtIndex,
-  extendDayWindowBack,
-  indexOfDate,
-  PAST_DAYS,
-} from '@reflect/app'
+import { createDayWindow, dateAtIndex, indexOfDate } from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -66,14 +61,52 @@ async function renderStream(children: ReactNode, clock: ClockService = createSys
 }
 
 /**
- * Records `offset` on the current history entry, as a view's scroll would.
+ * A test clock at noon on 2026-06-15, for the app of {@link renderStream}.
  */
-function SaveScrollProbe({ offset }: { offset: number }): ReactElement | null {
+function fixedClock(): ReturnType<typeof createTestClockService> {
+  return createTestClockService({ now: new Date(2026, 5, 15, 12, 0, 0).getTime() })
+}
+
+/**
+ * Records `position` on the current history entry, as the stream's scroll would.
+ */
+function SaveScrollProbe({ position }: { position: DayScrollPosition }): ReactElement | null {
   const { saveScrollState } = useRouter()
   useEffect(() => {
-    saveScrollState(offset)
-  }, [saveScrollState, offset])
+    saveScrollState(position)
+  }, [saveScrollState, position])
   return null
+}
+
+/**
+ * Resolves once the stream's layout has held still for longer than virtua's
+ * 150ms window, during which it re-applies an arrival's scroll target as rows
+ * measure (and so would undo a scroll made inside it).
+ */
+async function waitForLayoutToSettle(element: Element): Promise<void> {
+  const quietMs = 250
+  let layout = ''
+  let changedAt = performance.now()
+  while (performance.now() - changedAt < quietMs) {
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const next = `${element.scrollTop}:${element.scrollHeight}`
+    if (next !== layout) {
+      layout = next
+      changedAt = performance.now()
+    }
+  }
+}
+
+/**
+ * Waits until the viewport top sits `offset` pixels into `date`'s row.
+ */
+async function expectDayAtTop(date: string, offset = 0): Promise<void> {
+  const stream = page.getByTestId('daily-stream').element()
+  await vi.waitFor(() => {
+    const row = page.getByText(formatDayLabel(date, 'mdy')).element().closest('section')
+    const rowTop = row?.getBoundingClientRect().top ?? NaN
+    expect(stream.getBoundingClientRect().top - rowTop).toBeCloseTo(offset, 0)
+  })
 }
 
 function NavigateTodayProbe({ onReady }: { onReady: (navigateToday: () => void) => void }): null {
@@ -130,32 +163,55 @@ describe('DailyStream', () => {
     await view.unmount()
   })
 
-  it('restores an offset saved before its window grew back', async () => {
-    const view = await renderStream(<SaveScrollProbe offset={4321} />)
+  it('restores a day it scrolled to before its window grew back', async () => {
     const routerRef: RefObject<ReturnType<typeof useRouter> | null> = createRef()
-    await view.rerender(
-      <Stream>
-        <SaveScrollProbe offset={4321} />
+    const view = await renderStream(
+      <>
         <RouterProbe routerRef={routerRef} />
         <RoutedStream />
-      </Stream>,
+      </>,
+      fixedClock(),
     )
-    const stream = page.getByTestId('daily-stream')
-    await vi.waitFor(() => expect(stream.element().scrollTop).toBeCloseTo(4321, -1))
+    await act(() => {
+      routerRef.current?.navigate({ kind: 'daily', date: '2026-06-01' })
+    })
+    await expectDayAtTop('2026-06-01')
+    // Partway into the day, so the restore must keep the offset within it. The
+    // stream saves on the scroll event, which fires a frame after the move.
+    const stream = page.getByTestId('daily-stream').element()
+    await waitForLayoutToSettle(stream)
+    const scrolled = new Promise((resolve) => {
+      stream.addEventListener('scroll', resolve, { once: true })
+    })
+    await act(async () => {
+      stream.scrollTop += 80
+      await scrolled
+    })
+    await expectDayAtTop('2026-06-01', 80)
 
     await act(() => {
       routerRef.current?.navigate({ kind: 'daily', date: '2003-05-01' })
     })
-    await expect.element(page.getByText(formatDayLabel('2003-05-01', 'mdy'))).toBeVisible()
+    await expectDayAtTop('2003-05-01')
     await act(() => {
       routerRef.current?.back()
     })
 
-    const extended = extendDayWindowBack(createDayWindow(getIsoToday()), '2003-05-01')
-    const addedPastHeight = (extended.anchorIndex - PAST_DAYS) * ESTIMATED_DAY_HEIGHT
-    await vi.waitFor(() => {
-      expect(stream.element().scrollTop).toBeCloseTo(4321 + addedPastHeight, -1)
-    })
+    await expectDayAtTop('2026-06-01', 80)
+    await view.unmount()
+  })
+
+  it('grows its window to restore a saved day before it', async () => {
+    const saved = { date: '2004-03-01', offset: 0 }
+    const view = await renderStream(<SaveScrollProbe position={saved} />, fixedClock())
+    await view.rerender(
+      <Stream>
+        <SaveScrollProbe position={saved} />
+        <DailyStream target={{ kind: 'today' }} />
+      </Stream>,
+    )
+
+    await expectDayAtTop('2004-03-01')
     await view.unmount()
   })
 
@@ -231,18 +287,17 @@ describe('DailyStream', () => {
     await view.unmount()
   })
 
-  it('mounts straight at a restored entry’s saved offset, not the anchor', async () => {
-    const view = await renderStream(<SaveScrollProbe offset={4321} />)
+  it('mounts straight at a restored entry’s saved day, not the anchor', async () => {
+    const saved = { date: '2026-06-01', offset: 80 }
+    const view = await renderStream(<SaveScrollProbe position={saved} />, fixedClock())
     await view.rerender(
       <Stream>
-        <SaveScrollProbe offset={4321} />
+        <SaveScrollProbe position={saved} />
         <DailyStream target={{ kind: 'today' }} />
       </Stream>,
     )
 
-    await vi.waitFor(() => {
-      expect(page.getByTestId('daily-stream').element().scrollTop).toBeCloseTo(4321, -1)
-    })
+    await expectDayAtTop('2026-06-01', 80)
     await view.unmount()
   })
 

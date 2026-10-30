@@ -10,7 +10,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import type { NavigateOptions, Route } from '@reflect/app'
+import type { NavigateOptions, Route, ScrollPosition } from '@reflect/app'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export type RouterNavigate = (route: Route, options?: NavigateOptions) => void
@@ -54,8 +54,8 @@ interface RouterValue {
    * a pushed note so the back-swipe gesture reveals a live screen.
    */
   backRoute: Route | null
-  /** Record the active view's scroll offset on the current history entry. */
-  saveScrollState: (offset: number) => void
+  /** Record the active view's scroll position on the current history entry. */
+  saveScrollState: (position: ScrollPosition) => void
   /**
    * Discard the current view's saved scroll offsets — the active history
    * entry's and, when the route belongs to a long-lived surface, the surface's
@@ -63,8 +63,8 @@ interface RouterValue {
    * or a `restoreSurfaceScroll` nav-tab return alike).
    */
   clearScrollState: () => void
-  /** The current entry's recorded offset (present when revisited), or `null`. */
-  savedScroll: () => number | null
+  /** The current entry's recorded position (present when revisited), or `null`. */
+  savedScroll: () => ScrollPosition | null
 }
 
 const RouterContext = createContext<RouterValue | null>(null)
@@ -135,7 +135,7 @@ export function RouterProvider({
   )
 
   const saveScrollState = useCallback(
-    (offset: number) => navigation.saveScrollState(offset, renderedRef.current),
+    (position: ScrollPosition) => navigation.saveScrollState(position, renderedRef.current),
     [navigation],
   )
   const clearScrollState = useCallback(

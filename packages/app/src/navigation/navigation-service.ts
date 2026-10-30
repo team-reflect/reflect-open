@@ -9,6 +9,7 @@ import { normalizeRoute, routesEqual, type Route } from './route.ts'
  * Each history entry can carry a **scroll offset** (Plan 06b): views report
  * theirs via `saveScrollState` (never notifies subscribers — safe from scroll
  * handlers) and read `savedScroll()` after a back/forward restores an entry.
+ * Plain views save a pixel offset; the daily stream saves a {@link DayScrollPosition}.
  *
  * Long-lived surfaces (the daily stream, shared by the today/daily routes)
  * additionally keep a **surface offset** — the last reported position,
@@ -16,6 +17,22 @@ import { normalizeRoute, routesEqual, type Route } from './route.ts'
  * where the user left it (`restoreSurfaceScroll`) even though it lands on a
  * fresh entry.
  */
+
+/** A daily-stream scroll position: the day at the viewport top, and pixels into it. */
+export interface DayScrollPosition {
+  readonly date: string
+  readonly offset: number
+}
+
+/** A view's saved scroll position: a pixel offset, or a daily-stream day. */
+export type ScrollPosition = number | DayScrollPosition
+
+/** Is `position` a daily-stream day rather than a pixel offset? */
+export function isDayScrollPosition(
+  position: ScrollPosition | null,
+): position is DayScrollPosition {
+  return position !== null && typeof position === 'object'
+}
 
 export interface NavigateOptions {
   /**
@@ -106,9 +123,9 @@ export interface NavigationService {
    */
   navigationRevision(): number
   /**
-   * Record a view's scroll offset on its history entry (the current one by default).
+   * Record a view's scroll position on its history entry (the current one by default).
    */
-  saveScrollState(offset: number, at?: NavigationPosition): void
+  saveScrollState(position: ScrollPosition, at?: NavigationPosition): void
   /**
    * Discard a view's saved scroll offsets — its history entry's and, when the
    * route belongs to a long-lived surface, the surface's too — so the view
@@ -117,9 +134,9 @@ export interface NavigationService {
    */
   clearScrollState(at?: NavigationPosition): void
   /**
-   * The entry's recorded offset (present when revisited), or `null`.
+   * The entry's recorded position (present when revisited), or `null`.
    */
-  savedScroll(at?: NavigationPosition): number | null
+  savedScroll(at?: NavigationPosition): ScrollPosition | null
   /**
    * A note file moved (Plan 17): rewrite every history entry that points at
    * the old path — the current route follows the file without an arrival
@@ -176,11 +193,11 @@ class NavigationServiceImpl implements NavigationService {
   /**
    * Scroll offsets by entry id.
    */
-  readonly #scrollById = new Map<number, number>()
+  readonly #scrollById = new Map<number, ScrollPosition>()
   /**
    * Last offset per long-lived surface, independent of history entries.
    */
-  readonly #scrollBySurface = new Map<string, number>()
+  readonly #scrollBySurface = new Map<string, ScrollPosition>()
   readonly #listeners = new Set<() => void>()
   #state: NavigationState
 
@@ -269,11 +286,11 @@ class NavigationServiceImpl implements NavigationService {
     return this.#revision
   }
 
-  saveScrollState(offset: number, at: NavigationPosition = this.#state): void {
-    this.#scrollById.set(at.entryId, offset)
+  saveScrollState(position: ScrollPosition, at: NavigationPosition = this.#state): void {
+    this.#scrollById.set(at.entryId, position)
     const surface = scrollSurfaceForRoute(at.route)
     if (surface !== null) {
-      this.#scrollBySurface.set(surface, offset)
+      this.#scrollBySurface.set(surface, position)
     }
   }
 
@@ -285,7 +302,7 @@ class NavigationServiceImpl implements NavigationService {
     }
   }
 
-  savedScroll(at: NavigationPosition = this.#state): number | null {
+  savedScroll(at: NavigationPosition = this.#state): ScrollPosition | null {
     return this.#scrollById.get(at.entryId) ?? null
   }
 
