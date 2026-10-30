@@ -15,6 +15,7 @@ export interface ScrollLinkedOpacity {
  * and the opacity returns to the stylesheet's, when `signal` aborts.
  */
 export function linkOpacityToScroll(
+  // FIXME just use a bit object for all options: { target, scroller, axis, from, to, signal  }
   target: HTMLElement,
   scroller: HTMLElement,
   { axis, from, to }: ScrollLinkedOpacity,
