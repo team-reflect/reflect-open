@@ -1,5 +1,6 @@
 import type { RenderResult } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
+import { mouse } from 'vitest-browser-commands/playwright'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
@@ -959,13 +960,10 @@ describe('MobileStack transitions & back pager', () => {
   })
 
   /**
-   * A mouse press on the edge strip at the back button's height, then moves
-   * and a release on the window.
+   * Drags the real mouse from the edge strip, at the back button's height,
+   * `dx` px to the right and releases it.
    */
-  async function mouseDragFromStrip(
-    view: BrowserView,
-    dx: number,
-  ): Promise<{ x: number; y: number }> {
+  async function mouseDragFromStrip(view: BrowserView, dx: number): Promise<void> {
     const strip = visibleLayer(view).querySelector<HTMLElement>('[data-pager-edge]')!
     const back = page
       .elementLocator(visibleLayer(view))
@@ -974,16 +972,10 @@ describe('MobileStack transitions & back pager', () => {
       .getBoundingClientRect()
     const x = strip.getBoundingClientRect().left + 10
     const y = back.top + back.height / 2
-    const init = { bubbles: true, cancelable: true, pointerType: 'mouse', button: 0, clientY: y }
-    await act(() => {
-      strip.dispatchEvent(new PointerEvent('pointerdown', { ...init, clientX: x }))
-      window.dispatchEvent(new PointerEvent('pointermove', { ...init, clientX: x + dx / 2 }))
-      window.dispatchEvent(new PointerEvent('pointermove', { ...init, clientX: x + dx }))
-      window.dispatchEvent(new PointerEvent('pointerup', { ...init, clientX: x + dx }))
-      // The click that ends the drag lands where the press began.
-      strip.dispatchEvent(new MouseEvent('click', { ...init, clientX: x }))
-    })
-    return { x, y }
+    await mouse.move(x, y, { steps: 3 })
+    await mouse.down()
+    await mouse.move(x + dx, y, { steps: 5 })
+    await mouse.up()
   }
 
   it('pops when a mouse drags the edge strip past half', async () => {
