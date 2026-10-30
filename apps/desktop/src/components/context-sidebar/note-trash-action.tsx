@@ -10,6 +10,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -28,29 +29,26 @@ export function NoteTrashAction({ path }: NoteTrashActionProps): ReactElement | 
   const { noteActions } = useCoreServices()
   const { operations } = useAppServices()
   const [confirmingTrash, setConfirmingTrash] = useState(false)
-  const [isTrashing, setIsTrashing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const trashAction = useAsyncAction()
 
   if (!canTrashNote(path)) {
     return null
   }
 
   const onTrash = async (): Promise<void> => {
-    const operation = operations.start('Trashing note')
-    setIsTrashing(true)
-    setError(null)
-    try {
-      await noteActions.trashOne(path)
-      operation.done()
-      setConfirmingTrash(false)
-      navigate({ kind: 'today' })
-    } catch (cause) {
-      const message = errorMessage(cause)
-      setError(message)
-      operation.fail(message)
-    } finally {
-      setIsTrashing(false)
-    }
+    await trashAction.run(async () => {
+      const operation = operations.start('Trashing note')
+      try {
+        await noteActions.trashOne(path)
+        operation.done()
+        setConfirmingTrash(false)
+        navigate({ kind: 'today' })
+      } catch (cause) {
+        operation.fail(errorMessage(cause))
+        // Rethrown so `trashAction.error` shows it in the dialog.
+        throw cause
+      }
+    })
   }
 
   return (
@@ -70,23 +68,29 @@ export function NoteTrashAction({ path }: NoteTrashActionProps): ReactElement | 
 
       <Dialog
         open={confirmingTrash}
-        onOpenChange={(open) => !isTrashing && setConfirmingTrash(open)}
+        onOpenChange={(open) => !trashAction.pending && setConfirmingTrash(open)}
       >
         <DialogContent>
           <DialogTitle>Trash this note?</DialogTitle>
           <DialogDescription>
             It moves to your system Trash, where you can restore it.
           </DialogDescription>
-          {error !== null ? <p className="text-sm text-destructive">{error}</p> : null}
+          {trashAction.error !== null ? (
+            <p className="text-sm text-destructive">{trashAction.error}</p>
+          ) : null}
           <DialogFooter>
             <DialogClose
               render={
-                <Button variant="ghost" disabled={isTrashing}>
+                <Button variant="ghost" disabled={trashAction.pending}>
                   Cancel
                 </Button>
               }
             />
-            <Button variant="destructive" disabled={isTrashing} onClick={() => void onTrash()}>
+            <Button
+              variant="destructive"
+              disabled={trashAction.pending}
+              onClick={() => void onTrash()}
+            >
               Trash note
             </Button>
           </DialogFooter>

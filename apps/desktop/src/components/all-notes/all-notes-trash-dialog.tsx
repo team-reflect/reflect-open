@@ -8,6 +8,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useNoteTrash } from '@/lib/notes/use-note-trash.ts'
 
 interface AllNotesTrashDialogProps {
@@ -41,36 +42,30 @@ export function AllNotesTrashDialog({
   paths,
   onTrashed,
 }: AllNotesTrashDialogProps): ReactElement {
-  const { trash, isTrashing } = useNoteTrash()
+  const { trash } = useNoteTrash()
+  // Also guards against a double-submit: the button's `disabled` only takes
+  // effect after a re-render, so a fast second click/Return could start a
+  // second trash pass on the same snapshot before it disables. `run` drops a
+  // call made while one is in flight.
+  const confirm = useAsyncAction()
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
-  // Guards against a double-submit: the button's `disabled={isTrashing}` only
-  // takes effect after a re-render, so a fast second click/Return could start a
-  // second trash pass on the same snapshot before it disables. The ref flips
-  // synchronously, so the second call is dropped.
-  const submittingRef = useRef(false)
   const count = paths.length
 
   const onConfirm = async (): Promise<void> => {
-    if (submittingRef.current) {
-      return
-    }
-    submittingRef.current = true
-    try {
+    await confirm.run(async () => {
       const trashed = await trash(paths)
       if (trashed) {
         onTrashed()
       }
       onOpenChange(false)
-    } finally {
-      submittingRef.current = false
-    }
+    })
   }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (isTrashing) {
+        if (confirm.pending) {
           return // a trash in flight owns the dialog until it settles
         }
         onOpenChange(next)
@@ -90,7 +85,7 @@ export function AllNotesTrashDialog({
         <DialogFooter>
           <DialogClose
             render={
-              <Button variant="ghost" disabled={isTrashing}>
+              <Button variant="ghost" disabled={confirm.pending}>
                 Cancel
               </Button>
             }
@@ -98,7 +93,7 @@ export function AllNotesTrashDialog({
           <Button
             ref={confirmButtonRef}
             variant="destructive"
-            disabled={isTrashing}
+            disabled={confirm.pending}
             onClick={() => void onConfirm()}
           >
             Trash

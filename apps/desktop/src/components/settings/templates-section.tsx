@@ -5,18 +5,19 @@ import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { createTemplatesQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { ConfirmActionDialog } from './confirm-action-dialog.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 import { isModEvent } from '@meowdown/core'
@@ -110,20 +111,17 @@ interface TemplateDialogProps {
 function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): ReactElement {
   const { templates } = useCoreServices()
   const [name, setName] = useState(template.title)
-  const [error, setError] = useState<string | null>(null)
+  const { run, pending, error } = useAsyncAction()
 
-  const rename = async (): Promise<void> => {
+  const rename = (): void => {
     const trimmed = name.trim()
     if (trimmed === '') {
       return
     }
-    setError(null)
-    try {
+    void run(async () => {
       await templates.renameTemplate(template.path, trimmed)
       onClose()
-    } catch (cause) {
-      setError(errorMessage(cause))
-    }
+    })
   }
 
   return (
@@ -144,7 +142,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
           className="flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault()
-            void rename()
+            rename()
           }}
         >
           <Input
@@ -164,7 +162,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={name.trim() === ''}>
+            <Button type="submit" size="sm" disabled={pending || name.trim() === ''}>
               Rename
             </Button>
           </DialogFooter>
@@ -178,60 +176,27 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
 function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): ReactElement {
   const { noteActions } = useCoreServices()
   const { operations } = useAppServices()
-  const [error, setError] = useState<string | null>(null)
 
   const trash = async (): Promise<void> => {
     const operation = operations.start('Trashing template')
-    setError(null)
     try {
       await noteActions.trashOne(template.path)
-      operation.done()
-      onClose()
     } catch (cause) {
       operation.fail(errorMessage(cause))
-      setError(errorMessage(cause))
+      throw cause
     }
+    operation.done()
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          onClose()
-        }
-      }}
-    >
-      <DialogContent showCloseButton={false} className="max-w-sm">
-        <DialogTitle>Delete template?</DialogTitle>
-        <DialogDescription>
-          “{template.title}” moves to the trash and can be recovered from there.
-        </DialogDescription>
-        {error !== null ? (
-          <span role="alert" className="text-xs text-red-600 dark:text-red-400">
-            {error}
-          </span>
-        ) : null}
-        <DialogFooter>
-          <DialogClose
-            render={
-              <Button type="button" variant="outline" size="sm">
-                Cancel
-              </Button>
-            }
-          />
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              void trash()
-            }}
-          >
-            Delete
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmActionDialog
+      title="Delete template?"
+      description={`“${template.title}” moves to the trash and can be recovered from there.`}
+      confirmLabel="Delete"
+      pendingLabel="Deleting…"
+      variant="destructive"
+      onConfirm={trash}
+      onClose={onClose}
+    />
   )
 }

@@ -1,5 +1,6 @@
-import { useState, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { SettingsField } from './field.tsx'
@@ -15,19 +16,7 @@ import { SettingsField } from './field.tsx'
 export function RebuildIndexField(): ReactElement {
   const { indexGeneration } = useGraph()
   const { indexLifecycle } = useCoreServices()
-  const [rebuilding, setRebuilding] = useState(false)
-
-  const rebuild = async (): Promise<void> => {
-    if (rebuilding) {
-      return
-    }
-    setRebuilding(true)
-    try {
-      await indexLifecycle.rebuildVisibly()
-    } finally {
-      setRebuilding(false)
-    }
-  }
+  const rebuild = useAsyncAction()
 
   return (
     <SettingsField
@@ -39,11 +28,11 @@ export function RebuildIndexField(): ReactElement {
           type="button"
           variant="outline"
           size="sm"
-          disabled={indexGeneration === null || rebuilding}
-          onClick={() => void rebuild()}
+          disabled={indexGeneration === null || rebuild.pending}
+          onClick={() => void rebuild.run(() => indexLifecycle.rebuildVisibly())}
           className="text-text-secondary"
         >
-          {rebuilding ? 'Rebuilding…' : 'Rebuild index'}
+          {rebuild.pending ? 'Rebuilding…' : 'Rebuild index'}
         </Button>
       </div>
     </SettingsField>

@@ -105,14 +105,15 @@ export function useTaskActions(): TaskActions {
     write: () => Promise<T>,
   ): Promise<T | null> {
     count(kind, 1)
+    let result: T | null = null
     try {
-      return await write()
+      result = await write()
     } catch (cause) {
       operations.start(label).fail(errorMessage(cause))
-      return null
-    } finally {
-      count(kind, -1)
     }
+    // No `finally`: the React Compiler skips any function that has one.
+    count(kind, -1)
+    return result
   }
 
   const complete = (tasks: OpenTask[]): void => {

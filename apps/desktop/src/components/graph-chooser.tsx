@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
 import {
   DEFAULT_GRAPH_NAME,
@@ -201,7 +202,8 @@ function IcloudCard({
   createAt: (root: string) => Promise<boolean>
 }): ReactElement {
   const [typedName, setTypedName] = useState<string | null>(null)
-  const [busy, setBusy] = useState<IcloudBusy>(null)
+  const [target, setTarget] = useState<IcloudBusy>(null)
+  const action = useAsyncAction()
   const nameId = useId()
   const { icloudNative } = useCoreServices()
   const { data: status } = useQuery({
@@ -209,7 +211,8 @@ function IcloudCard({
     queryFn: () => icloudNative.status(),
   })
 
-  const pending = busy !== null
+  const pending = action.pending
+  const busy: IcloudBusy = pending ? target : null
   const available = status?.available === true
   const existing = status?.existingGraphRoots ?? []
   // "Notes" pre-fills only the fresh-container form. Next to an existing
@@ -222,21 +225,25 @@ function IcloudCard({
   // land inside the existing graph instead of next to it.
   const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, existing)
 
-  async function create(): Promise<void> {
+  function start(nextTarget: string, work: () => Promise<boolean>): void {
+    // setTarget runs inside the action, so a call the guard drops never
+    // moves the spinner off the control that is actually running.
+    void action.run(async () => {
+      setTarget(nextTarget)
+      await work()
+    })
+  }
+
+  function create(): void {
     if (status?.documentsRoot == null || cleanName === null || nameTaken) {
       return
     }
-    setBusy('create')
-    try {
-      await createAt(`${status.documentsRoot}/${cleanName}`)
-    } finally {
-      setBusy(null)
-    }
+    const root = `${status.documentsRoot}/${cleanName}`
+    start('create', () => createAt(root))
   }
 
   function open(root: string): void {
-    setBusy(root)
-    void openRecent(root).finally(() => setBusy(null))
+    start(root, () => openRecent(root))
   }
 
   return (
@@ -291,7 +298,7 @@ function IcloudCard({
                   return
                 }
                 if (event.key === 'Enter') {
-                  void create()
+                  create()
                 }
               }}
             />
@@ -300,7 +307,7 @@ function IcloudCard({
               variant="outline"
               className="shrink-0"
               disabled={pending || cleanName === null || nameTaken}
-              onClick={() => void create()}
+              onClick={() => create()}
             >
               {busy === 'create' ? <Spinner /> : null}
               Create
@@ -326,7 +333,7 @@ function IcloudCard({
                   return
                 }
                 if (event.key === 'Enter') {
-                  void create()
+                  create()
                 }
               }}
             />
@@ -335,13 +342,14 @@ function IcloudCard({
             type="button"
             className="w-full"
             disabled={!available || pending || cleanName === null}
-            onClick={() => void create()}
+            onClick={() => create()}
           >
             {busy === 'create' ? <Spinner /> : <Cloud aria-hidden strokeWidth={1.75} />}
             {busy === 'create' ? 'Setting up…' : 'Create'}
           </Button>
         </div>
       )}
+      {action.error !== null ? <InlineAlert tone="error">{action.error}</InlineAlert> : null}
     </section>
   )
 }
