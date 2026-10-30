@@ -1,10 +1,16 @@
-import type { MaybePromise } from '@reflect/utils'
+import { type MaybePromise, monthOf } from '@reflect/utils'
+import {
+  type DailyNoteService,
+  type NoteRow,
+  type RetrievalService,
+  formatDayLabel,
+} from '@reflect/core'
+import { deepLinkForRoute, monthLabel } from '@reflect/app'
 import { createTestWindowService } from '@reflect/app/testing'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
-import type { DailyNoteService, NoteRow, RetrievalService } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestNoteFileService,
@@ -13,8 +19,6 @@ import {
   type TestNoteFileService,
   type TestStorageService,
 } from '@reflect/core/testing'
-import { formatDayLabel, monthLabel, monthOf } from '@reflect/utils'
-import { deepLinkForRoute } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'

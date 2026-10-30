@@ -1,22 +1,5 @@
 import { useId, useState, type ReactElement, type ReactNode } from 'react'
-import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
 import { useQuery } from '@tanstack/react-query'
-import {
-  aiProvider,
-  aiProviderRequiresApiKey,
-  errorMessage,
-  marketingVersion,
-  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
-  TRANSCRIPTION_PROMPT_MAX_LENGTH,
-  normalizeChatSystemPrompt,
-  normalizeTranscriptionPrompt,
-  type AiPrompt,
-  type AiProviderConfig,
-  type EditorTextSize,
-  type ThemePreference,
-  type TimeFormat,
-  type WeekStartDay,
-} from '@reflect/core'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
@@ -47,7 +30,25 @@ import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { DATE_FORMATS, formatFullDate } from '@reflect/utils'
+import {
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  marketingVersion,
+  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
+  TRANSCRIPTION_PROMPT_MAX_LENGTH,
+  normalizeChatSystemPrompt,
+  normalizeTranscriptionPrompt,
+  type AiPrompt,
+  type AiProviderConfig,
+  type EditorTextSize,
+  type ThemePreference,
+  type TimeFormat,
+  type WeekStartDay,
+  DATE_FORMATS,
+  formatFullDate,
+} from '@reflect/core'
+import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'

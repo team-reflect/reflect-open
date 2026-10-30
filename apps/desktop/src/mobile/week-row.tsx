@@ -1,5 +1,6 @@
 import { memo, type ReactElement } from 'react'
-import { addDaysIso, formatDayLabel, parseIsoDate, weekdayInitial } from '@reflect/utils'
+import { addDaysIso, formatDate, parseIsoDate } from '@reflect/utils'
+import { formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -76,7 +77,9 @@ function WeekRowComponent({
             }}
             className="relative flex flex-1 flex-col items-center gap-0.5 py-1"
           >
-            <span className="text-[11px] font-medium text-text-muted">{weekdayInitial(day)}</span>
+            <span className="text-[11px] font-medium text-text-muted">
+              {formatDate(parseIsoDate(day), 'EEEEE')}
+            </span>
             <span
               className={cn(
                 'flex size-8 items-center justify-center rounded-full text-sm tabular-nums transition-colors duration-200',

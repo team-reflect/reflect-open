@@ -6,10 +6,6 @@ import {
   formatRecencyLabel,
   formatShortDate,
   formatTimeOfDay,
-  monthLabel,
-  monthShortLabel,
-  weekdayInitial,
-  weekdayLabels,
 } from './date-labels.ts'
 
 describe('date labels', () => {
@@ -91,16 +87,5 @@ describe('date labels', () => {
         '31/12/2025',
       )
     })
-  })
-
-  it('labels a YYYY-MM month', () => {
-    expect(monthLabel('2026-06')).toBe('June 2026')
-    expect(monthShortLabel('2026-06')).toBe('Jun')
-  })
-
-  it('labels weekdays', () => {
-    expect(weekdayInitial('2026-06-12')).toBe('F')
-    expect(weekdayLabels('monday')).toEqual(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'])
-    expect(weekdayLabels('saturday')).toEqual(['Sa', 'Su', 'Mo', 'Tu', 'We', 'Th', 'Fr'])
   })
 })

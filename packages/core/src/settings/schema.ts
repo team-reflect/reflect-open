@@ -1,4 +1,4 @@
-import { DATE_FORMATS, TIME_FORMATS, WEEK_START_DAYS } from '@reflect/utils'
+import { startOfWeekIso, type Weekday } from '@reflect/utils'
 import { z } from 'zod'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 
@@ -151,6 +151,9 @@ export type ThemePreference = z.infer<typeof themePreferenceSchema>
  * renders `8:22pm`; `24h` renders `20:22`. Display-only — stored timestamps
  * and daily-note keys are unaffected.
  */
+/** The time-format setting's choices. */
+export const TIME_FORMATS = ['12h', '24h'] as const
+
 export const timeFormatSchema = z.enum(TIME_FORMATS).catch('12h')
 
 export type TimeFormat = z.infer<typeof timeFormatSchema>
@@ -161,6 +164,9 @@ export type TimeFormat = z.infer<typeof timeFormatSchema>
  * renders `2026-06-10`. Display-only — daily-note filenames and stored dates
  * stay ISO `YYYY-MM-DD` regardless.
  */
+/** The date-format setting's choices. */
+export const DATE_FORMATS = ['mdy', 'dmy', 'iso'] as const
+
 export const dateFormatSchema = z.enum(DATE_FORMATS).catch('mdy')
 
 export type DateFormat = z.infer<typeof dateFormatSchema>
@@ -170,9 +176,21 @@ export type DateFormat = z.infer<typeof dateFormatSchema>
  * `sunday` matches the North-American convention; `saturday` matches the
  * convention of most Middle-East and North-Africa locales.
  */
-export const weekStartDaySchema = z.enum(WEEK_START_DAYS).catch('monday')
+export const weekStartDaySchema = z.enum(['monday', 'sunday', 'saturday']).catch('monday')
 
 export type WeekStartDay = z.infer<typeof weekStartDaySchema>
+
+const WEEK_START_DOW: Record<WeekStartDay, Weekday> = { sunday: 0, monday: 1, saturday: 6 }
+
+/** The week-start day as a {@link Weekday} (0 = Sunday, 6 = Saturday). */
+export function weekStartDow(weekStartDay: WeekStartDay): Weekday {
+  return WEEK_START_DOW[weekStartDay]
+}
+
+/** The first day of `date`'s week, honoring the week-start setting. */
+export function weekStartOf(date: string, weekStartDay: WeekStartDay): string {
+  return startOfWeekIso(date, weekStartDow(weekStartDay))
+}
 
 /**
  * Tags pinned as one-click filters on the All Notes screen, in display order.

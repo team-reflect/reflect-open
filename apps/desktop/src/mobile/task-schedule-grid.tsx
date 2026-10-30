@@ -1,13 +1,8 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import {
-  addMonthsToMonth,
-  formatDayLabel,
-  monthLabel,
-  monthOf,
-  weekdayLabels,
-} from '@reflect/utils'
-import { buildMonthGrid } from '@reflect/app'
+import { addMonthsToMonth, monthOf } from '@reflect/utils'
+import { formatDayLabel } from '@reflect/core'
+import { buildMonthGrid, monthLabel, weekdayLabels } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 

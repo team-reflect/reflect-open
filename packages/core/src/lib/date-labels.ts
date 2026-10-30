@@ -1,23 +1,5 @@
-import { format, formatDistanceToNow, isSameDay, isSameWeek } from 'date-fns'
-import {
-  addDaysIso,
-  isIsoDate,
-  monthStartIso,
-  parseIsoDate,
-  startOfWeekIso,
-  todayIso,
-  type WeekStartDay,
-} from './dates.ts'
-
-/** The date-format setting's choices. */
-export const DATE_FORMATS = ['mdy', 'dmy', 'iso'] as const
-
-export type DateFormat = (typeof DATE_FORMATS)[number]
-
-/** The time-format setting's choices. */
-export const TIME_FORMATS = ['12h', '24h'] as const
-
-export type TimeFormat = (typeof TIME_FORMATS)[number]
+import { formatDate, formatIsoDate, isIsoDate, parseIsoDate, startOfWeekIso } from '@reflect/utils'
+import type { DateFormat, TimeFormat } from '../settings/schema.ts'
 
 /**
  * The display-format preferences the date/time formatters need — a structural
@@ -28,16 +10,13 @@ export interface DateTimePrefs {
   dateFormat: DateFormat
 }
 
-/**
- * Render `date` with the date-fns pattern of the chosen format, or as ISO
- * `YYYY-MM-DD` for `iso`.
- */
-function formatByDateFormat(
-  date: Date,
-  dateFormat: DateFormat,
-  patterns: Record<Exclude<DateFormat, 'iso'>, string>,
-): string {
-  return format(date, dateFormat === 'iso' ? 'yyyy-MM-dd' : patterns[dateFormat])
+type DatePatterns = Record<Exclude<DateFormat, 'iso'>, string>
+
+const SHORT_DATE_PATTERNS: DatePatterns = { dmy: 'd/M/yyyy', mdy: 'M/d/yyyy' }
+
+/** Render `date` with the pattern of the chosen format, or as ISO `YYYY-MM-DD` for `iso`. */
+function formatByDateFormat(date: Date, dateFormat: DateFormat, patterns: DatePatterns): string {
+  return dateFormat === 'iso' ? formatIsoDate(date) : formatDate(date, patterns[dateFormat])
 }
 
 /**
@@ -47,7 +26,7 @@ function formatByDateFormat(
 function formatIsoByDateFormat(
   date: string,
   dateFormat: DateFormat,
-  patterns: Record<Exclude<DateFormat, 'iso'>, string>,
+  patterns: DatePatterns,
 ): string {
   return isIsoDate(date) ? formatByDateFormat(parseIsoDate(date), dateFormat, patterns) : date
 }
@@ -63,8 +42,6 @@ export function formatDayLabel(date: string, dateFormat: DateFormat): string {
     mdy: 'EEE, MMMM do, yyyy',
   })
 }
-
-const SHORT_DATE_PATTERNS = { dmy: 'd/M/yyyy', mdy: 'M/d/yyyy' }
 
 /**
  * Compact date for inline chips (the Tasks view's `[[YYYY-MM-DD]]` due link,
@@ -97,14 +74,14 @@ export function formatFullDate(date: Date, dateFormat: DateFormat): string {
  * `20:22` for `24h`. Every time the app displays goes through this.
  */
 export function formatTimeOfDay(date: Date, timeFormat: TimeFormat): string {
-  return format(date, timeFormat === '24h' ? 'HH:mm' : 'h:mmaaa')
+  return formatDate(date, timeFormat === '24h' ? 'HH:mm' : 'h:mmaaa')
 }
 
 /**
  * Compact recency label for list rows (the original app's Updated column):
- * the time for today (per `timeFormat`), the weekday within the current week
- * (`Mon`), the short date otherwise (`6/3/2026`, `3/6/2026`, or
- * `2026-06-03`). `now` is injectable for tests.
+ * the time for today (per `timeFormat`), the weekday within the current
+ * Sunday-first week (`Mon`), the short date otherwise (`6/3/2026`, `3/6/2026`,
+ * or `2026-06-03`). `now` is injectable for tests.
  */
 export function formatRecencyLabel(
   epochMs: number,
@@ -112,39 +89,13 @@ export function formatRecencyLabel(
   now: Date = new Date(),
 ): string {
   const date = new Date(epochMs)
-  if (isSameDay(date, now)) {
+  const day = formatIsoDate(date)
+  const today = formatIsoDate(now)
+  if (day === today) {
     return formatTimeOfDay(date, prefs.timeFormat)
   }
-  if (isSameWeek(date, now)) {
-    return format(date, 'EEE')
+  if (startOfWeekIso(day, 0) === startOfWeekIso(today, 0)) {
+    return formatDate(date, 'EEE')
   }
   return formatByDateFormat(date, prefs.dateFormat, SHORT_DATE_PATTERNS)
-}
-
-/** How long ago `epochMs` was, in words: `about 2 hours ago`. */
-export function formatTimeAgo(epochMs: number): string {
-  return formatDistanceToNow(epochMs, { addSuffix: true })
-}
-
-/** Human label for a `YYYY-MM` month, e.g. `June 2026`. */
-export function monthLabel(month: string): string {
-  return format(parseIsoDate(monthStartIso(month)), 'MMMM yyyy')
-}
-
-/** Short label for a `YYYY-MM` month, e.g. `Jun` — month-picker grid cells. */
-export function monthShortLabel(month: string): string {
-  return format(parseIsoDate(monthStartIso(month)), 'MMM')
-}
-
-/** The one-letter weekday of an ISO date, e.g. `T`. */
-export function weekdayInitial(date: string): string {
-  return format(parseIsoDate(date), 'EEEEE')
-}
-
-/** Two-letter weekday labels for a calendar's header row, e.g. `Mo`. */
-export function weekdayLabels(weekStartDay: WeekStartDay): string[] {
-  const weekStart = startOfWeekIso(todayIso(), weekStartDay)
-  return Array.from({ length: 7 }, (_, index) => {
-    return format(parseIsoDate(addDaysIso(weekStart, index)), 'EEEEEE')
-  })
 }

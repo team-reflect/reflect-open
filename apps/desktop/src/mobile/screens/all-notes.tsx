@@ -1,17 +1,15 @@
 import { useDeferredValue, useMemo, useRef, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ChevronLeft, FileText, SearchX } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner.tsx'
 import {
   foldTag,
   parseHighlights,
   type DateFormat,
   type FilteredSearchHit,
   type NoteTagFacet,
+  formatDayLabel,
 } from '@reflect/core'
-import { Spinner } from '@/components/ui/spinner.tsx'
-import { formatDayLabel } from '@reflect/utils'
-import { queryKeys } from '@/lib/query-client.ts'
-import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import {
   buildAllNotesSearch,
   pendingTagToken,
@@ -19,6 +17,8 @@ import {
   type AllNotesFilters,
   routeForPath,
 } from '@reflect/app'
+import { queryKeys } from '@/lib/query-client.ts'
+import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import { NoteRowList } from '@/mobile/note-row-list.tsx'
 import { SearchInput } from '@/mobile/search-input.tsx'
 import type { NoteRowModel } from '@/mobile/swipeable-note-row.tsx'

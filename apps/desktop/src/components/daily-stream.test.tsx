@@ -9,11 +9,11 @@ import {
   type RefObject,
 } from 'react'
 import { act } from '@/test-utils/act.ts'
-import { createSystemClock, type ClockService } from '@reflect/core'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
-import { formatDayLabel, todayIso } from '@reflect/utils'
+import { todayIso } from '@reflect/utils'
+import { createSystemClock, type ClockService, formatDayLabel } from '@reflect/core'
 import {
   createDayWindow,
   dateAtIndex,

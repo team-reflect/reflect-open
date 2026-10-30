@@ -1,10 +1,11 @@
-import { formatDayLabel, formatIsoDate } from '@reflect/utils'
+import { formatIsoDate } from '@reflect/utils'
 import {
   aliasHint,
   ambiguousNoteTitleMessage,
   contactDetailsMarkdown,
   displayNoteTitle,
   errorMessage,
+  formatDayLabel,
   type ClockService,
   type ContactMatch,
   type ContactsService,

@@ -3,6 +3,7 @@ import {
   addMonths,
   differenceInCalendarDays,
   format,
+  formatDistanceToNow,
   getDay,
   isExists,
   isValid,
@@ -15,8 +16,8 @@ import {
 /**
  * Calendar math on local ISO `YYYY-MM-DD` dates and `YYYY-MM` months. Daily
  * notes are keyed by the user's local calendar day, so every date here is a
- * local-midnight {@link Date} under the hood. This module and `date-labels.ts`
- * are the only places in the workspace that call date-fns.
+ * local-midnight {@link Date} under the hood. This module is the only place in
+ * the workspace that calls date-fns.
  */
 
 /** Regex source of an ISO `YYYY-MM-DD` date, for building larger patterns. */
@@ -72,18 +73,12 @@ export function weekdayIso(iso: string): number {
   return getDay(parseIsoDate(iso))
 }
 
-/** The week-start setting's choices. */
-export const WEEK_START_DAYS = ['monday', 'sunday', 'saturday'] as const
+/** A day of the week: 0 = Sunday … 6 = Saturday. */
+export type Weekday = Day
 
-export type WeekStartDay = (typeof WEEK_START_DAYS)[number]
-
-const WEEK_STARTS_ON: Record<WeekStartDay, Day> = { sunday: 0, monday: 1, saturday: 6 }
-
-/** The first day of `iso`'s week, for a week that starts on `weekStartDay`. */
-export function startOfWeekIso(iso: string, weekStartDay: WeekStartDay): string {
-  return formatIsoDate(
-    startOfWeek(parseIsoDate(iso), { weekStartsOn: WEEK_STARTS_ON[weekStartDay] }),
-  )
+/** The first day of `iso`'s week, for a week that starts on `weekStartsOn`. */
+export function startOfWeekIso(iso: string, weekStartsOn: Weekday): string {
+  return formatIsoDate(startOfWeek(parseIsoDate(iso), { weekStartsOn }))
 }
 
 /** Epoch ms of the local start of the ISO day `days` after `iso`. */
@@ -116,21 +111,18 @@ export function monthsOfYear(year: number): string[] {
   return Array.from({ length: 12 }, (_, index) => format(new Date(year, index, 1), 'yyyy-MM'))
 }
 
-const FILE_STAMP_FORMAT = 'yyyy-MM-dd-HHmmss-SSS'
-
-/** Regex source of a {@link formatFileStamp} stamp, for building larger patterns. */
-export const FILE_STAMP_PATTERN = String.raw`${ISO_DATE_PATTERN}-\d{6}-\d{3}`
-
-/** A local timestamp for file names: `2026-06-12-153022-845`. */
-export function formatFileStamp(date: Date): string {
-  return format(date, FILE_STAMP_FORMAT)
+/** Format `date` with a date-fns pattern, such as `MMMM yyyy`. */
+export function formatDate(date: Date, pattern: string): string {
+  return format(date, pattern)
 }
 
-/**
- * The local ISO date and `HH:mm:ss` time of a {@link formatFileStamp} stamp, or
- * `null` when the stamp names no real moment.
- */
-export function parseFileStamp(stamp: string): { date: string; time: string } | null {
-  const date = parse(stamp, FILE_STAMP_FORMAT, new Date())
-  return isValid(date) ? { date: formatIsoDate(date), time: format(date, 'HH:mm:ss') } : null
+/** Parse `value` with a date-fns pattern, or `null` when it names no real moment. */
+export function parseDate(value: string, pattern: string): Date | null {
+  const date = parse(value, pattern, new Date())
+  return isValid(date) ? date : null
+}
+
+/** How long ago `epochMs` was, in words: `about 2 hours ago`. */
+export function formatTimeAgo(epochMs: number): string {
+  return formatDistanceToNow(epochMs, { addSuffix: true })
 }

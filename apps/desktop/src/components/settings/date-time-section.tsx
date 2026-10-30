@@ -1,12 +1,5 @@
 import { useState, type ReactElement } from 'react'
 import {
-  dateFormatSchema,
-  timeFormatSchema,
-  weekStartDaySchema,
-  type TimeFormat,
-  type WeekStartDay,
-} from '@reflect/core'
-import {
   Select,
   SelectContent,
   SelectGroup,
@@ -14,7 +7,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
-import { DATE_FORMATS, formatFullDate } from '@reflect/utils'
+import {
+  dateFormatSchema,
+  timeFormatSchema,
+  weekStartDaySchema,
+  type TimeFormat,
+  type WeekStartDay,
+  DATE_FORMATS,
+  formatFullDate,
+} from '@reflect/core'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'

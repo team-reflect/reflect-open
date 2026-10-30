@@ -22,11 +22,10 @@ import {
   isoDateFromParts,
   monthOf,
   monthStartIso,
-  startOfWeekIso,
   weekdayIso,
   yearOf,
 } from '@reflect/utils'
-import type { WeekStartDay } from '../settings/schema.ts'
+import { weekStartOf, type WeekStartDay } from '../settings/schema.ts'
 import type { DateSuggestion, DateSuggestionContext } from './date-suggestion-types.ts'
 import { monthNameSuggestions } from './date-suggestions-months.ts'
 
@@ -198,7 +197,7 @@ function upcomingWeekday(today: string, target: number): string {
  */
 function weekendOf(today: string, weekStartDay: WeekStartDay): string {
   const weekendDow = weekStartDay === 'saturday' ? 5 : 6
-  const weekStart = startOfWeekIso(today, weekStartDay)
+  const weekStart = weekStartOf(today, weekStartDay)
   return addDaysIso(weekStart, (weekendDow - weekdayIso(weekStart) + 7) % 7)
 }
 
@@ -240,7 +239,7 @@ const NL_UNITS: readonly NlUnit[] = [
     display: 'Week',
     order: 7,
     resolve: (context, modifier) => {
-      return resolveFromAnchor(startOfWeekIso(context.today, context.weekStartDay), modifier, 7)
+      return resolveFromAnchor(weekStartOf(context.today, context.weekStartDay), modifier, 7)
     },
   },
   {

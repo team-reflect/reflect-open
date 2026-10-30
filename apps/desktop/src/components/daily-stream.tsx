@@ -1,12 +1,8 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
-import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane.tsx'
 import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
-import { formatDayLabel } from '@reflect/utils'
-import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
-import { useToday } from '@/lib/use-today.ts'
+import { dailyPath, formatDayLabel } from '@reflect/core'
 import {
   createDayWindow,
   dateAtIndex,
@@ -15,6 +11,9 @@ import {
   neighborDate,
   PAST_DAYS,
 } from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useToday } from '@/lib/use-today.ts'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'

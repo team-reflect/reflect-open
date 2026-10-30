@@ -7,14 +7,9 @@ import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
-import {
-  addMonthsToMonth,
-  formatDayLabel,
-  monthLabel,
-  monthOf,
-  weekdayLabels,
-} from '@reflect/utils'
-import { buildMonthGrid } from '@reflect/app'
+import { addMonthsToMonth, monthOf } from '@reflect/utils'
+import { formatDayLabel } from '@reflect/core'
+import { buildMonthGrid, monthLabel, weekdayLabels } from '@reflect/app'
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'

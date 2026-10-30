@@ -1,11 +1,5 @@
-import {
-  addDaysIso,
-  differenceInDaysIso,
-  monthOf,
-  monthStartIso,
-  startOfWeekIso,
-  type WeekStartDay,
-} from '@reflect/utils'
+import { addDaysIso, differenceInDaysIso, monthOf, monthStartIso } from '@reflect/utils'
+import { weekStartOf, type WeekStartDay } from '@reflect/core'
 
 /**
  * Date math for the V1-parity Daily surface's **calendar strip** — the month
@@ -19,7 +13,7 @@ import {
  * The seven ISO dates of `date`'s week, honoring the week-start setting.
  */
 export function weekOf(date: string, weekStart: WeekStartDay): string[] {
-  const first = startOfWeekIso(date, weekStart)
+  const first = weekStartOf(date, weekStart)
   return Array.from({ length: 7 }, (_, index) => addDaysIso(first, index))
 }
 
@@ -73,7 +67,7 @@ export function createWeekWindow(
   radius: number = WEEK_WINDOW_RADIUS,
 ): WeekWindow {
   return {
-    start: addDaysIso(startOfWeekIso(date, weekStart), -radius * 7),
+    start: addDaysIso(weekStartOf(date, weekStart), -radius * 7),
     count: radius * 2 + 1,
     anchorIndex: radius,
   }
@@ -92,7 +86,7 @@ export function weekAtIndex(window: WeekWindow, index: number): string {
  * day** (its weeks no longer align), the strip's signal to rebuild it.
  */
 export function weekIndexOf(window: WeekWindow, date: string, weekStart: WeekStartDay): number {
-  const target = startOfWeekIso(date, weekStart)
+  const target = weekStartOf(date, weekStart)
   const offset = differenceInDaysIso(target, window.start)
   if (offset % 7 !== 0) {
     return -1

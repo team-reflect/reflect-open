@@ -1,5 +1,5 @@
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcription-service.ts'
-import { FILE_STAMP_PATTERN, formatFileStamp, parseFileStamp } from '@reflect/utils'
+import { FILE_STAMP_PATTERN, formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
 import { audioMemoPath, notePath } from '../graph/paths.ts'
 import type { AudioMemoIdentity } from './audio-memo-session.ts'
 

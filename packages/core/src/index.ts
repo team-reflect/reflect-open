@@ -256,9 +256,13 @@ export {
   clampSidebarWidth,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeTranscriptionPrompt,
+  TIME_FORMATS,
   timeFormatSchema,
+  DATE_FORMATS,
   dateFormatSchema,
   weekStartDaySchema,
+  weekStartDow,
+  weekStartOf,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
@@ -280,6 +284,15 @@ export {
   type AiPromptMode,
 } from './settings/schema.ts'
 export { type SettingsLoadOutcome, type SettingsService } from './settings/settings-service.ts'
+export {
+  formatDayLabel,
+  formatFullDate,
+  formatMonthDay,
+  formatRecencyLabel,
+  formatShortDate,
+  formatTimeOfDay,
+  type DateTimePrefs,
+} from './lib/date-labels.ts'
 export { type ContactsAuthorization, type ContactMatch } from './contacts/commands.ts'
 export {
   contactsCanLookup,

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ChevronDown, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { addDaysIso, monthOf, startOfWeekIso } from '@reflect/utils'
+import { addDaysIso, monthOf } from '@reflect/utils'
+import { weekStartOf } from '@reflect/core'
 import { monthPickTarget, weekAtIndex } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
@@ -65,7 +66,7 @@ export function CalendarStrip({
 
   // Header month: the selection's own month while its week is on screen;
   // while browsing, the visible week's dominant (middle-day) month.
-  const selectionWeekStart = startOfWeekIso(date, settings.weekStartDay)
+  const selectionWeekStart = weekStartOf(date, settings.weekStartDay)
   const headerDate =
     displayedWeekStart === selectionWeekStart ? date : addDaysIso(displayedWeekStart, 3)
   const showToday = date !== today

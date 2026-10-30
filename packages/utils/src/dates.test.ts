@@ -3,12 +3,10 @@ import {
   addDaysIso,
   addMonthsIso,
   addMonthsToMonth,
-  formatFileStamp,
   isIsoDate,
   isoDateFromParts,
   monthOf,
   monthsOfYear,
-  parseFileStamp,
   startOfWeekIso,
   todayIso,
   weekdayIso,
@@ -80,20 +78,20 @@ describe('isIsoDate / todayIso', () => {
  * 2026-06-12 is a Friday; 2026-06-14 a Sunday.
  */
 describe('startOfWeekIso', () => {
-  it('finds the first day of the week for each week-start day', () => {
-    expect(startOfWeekIso('2026-06-12', 'monday')).toBe('2026-06-08')
-    expect(startOfWeekIso('2026-06-12', 'sunday')).toBe('2026-06-07')
-    expect(startOfWeekIso('2026-06-12', 'saturday')).toBe('2026-06-06')
+  it('finds the first day of the week for each week start', () => {
+    expect(startOfWeekIso('2026-06-12', 1)).toBe('2026-06-08')
+    expect(startOfWeekIso('2026-06-12', 0)).toBe('2026-06-07')
+    expect(startOfWeekIso('2026-06-12', 6)).toBe('2026-06-06')
   })
 
   it('keeps a Sunday in its own Monday-first week', () => {
-    expect(startOfWeekIso('2026-06-14', 'monday')).toBe('2026-06-08')
+    expect(startOfWeekIso('2026-06-14', 1)).toBe('2026-06-08')
   })
 
   it('is a fixed point on the week-start day itself', () => {
-    expect(startOfWeekIso('2026-06-08', 'monday')).toBe('2026-06-08')
-    expect(startOfWeekIso('2026-06-07', 'sunday')).toBe('2026-06-07')
-    expect(startOfWeekIso('2026-06-13', 'saturday')).toBe('2026-06-13')
+    expect(startOfWeekIso('2026-06-08', 1)).toBe('2026-06-08')
+    expect(startOfWeekIso('2026-06-07', 0)).toBe('2026-06-07')
+    expect(startOfWeekIso('2026-06-13', 6)).toBe('2026-06-13')
   })
 })
 
@@ -123,19 +121,5 @@ describe('months', () => {
       '2026-11',
       '2026-12',
     ])
-  })
-})
-
-describe('file stamps', () => {
-  it('round-trips a local moment', () => {
-    const stamp = formatFileStamp(new Date(2026, 5, 12, 15, 30, 22, 845))
-    expect(stamp).toBe('2026-06-12-153022-845')
-    expect(parseFileStamp(stamp)).toEqual({ date: '2026-06-12', time: '15:30:22' })
-  })
-
-  it('rejects a stamp that names no real moment', () => {
-    expect(parseFileStamp('2026-02-31-153022-845')).toBeNull()
-    expect(parseFileStamp('2026-06-12-243022-845')).toBeNull()
-    expect(parseFileStamp('2026-06-12-156022-845')).toBeNull()
   })
 })

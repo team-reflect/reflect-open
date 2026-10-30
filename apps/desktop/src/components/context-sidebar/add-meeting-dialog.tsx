@@ -1,13 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { X } from 'lucide-react'
-import {
-  defaultAttendees,
-  errorMessage,
-  mergeAttendeeUpgrades,
-  withAttendee,
-  type CalendarEvent,
-  type MeetingAttendee,
-} from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
@@ -20,7 +12,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
-import { formatTimeOfDay } from '@reflect/utils'
+import {
+  defaultAttendees,
+  errorMessage,
+  mergeAttendeeUpgrades,
+  withAttendee,
+  type CalendarEvent,
+  type MeetingAttendee,
+  formatTimeOfDay,
+} from '@reflect/core'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'

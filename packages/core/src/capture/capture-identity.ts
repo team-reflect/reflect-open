@@ -1,4 +1,5 @@
-import { FILE_STAMP_PATTERN, formatFileStamp, formatIsoDate, parseFileStamp } from '@reflect/utils'
+import { formatIsoDate } from '@reflect/utils'
+import { FILE_STAMP_PATTERN, formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
 import { assetPath, notePath } from '../graph/paths.ts'
 
 const INBOX_PREFIX = '.reflect/inbox/'

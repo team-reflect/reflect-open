@@ -1,15 +1,20 @@
 import { Fragment, type MouseEvent, type ReactElement, type ReactNode } from 'react'
 import { CalendarDays, FileText, History, Paperclip, Search } from 'lucide-react'
-import { isTagName, isToolPending, type AssistantPart, type NoteHitSummary } from '@reflect/core'
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
-import { routeForPath } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
 import { useDateFormat } from '@/hooks/use-date-format.ts'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
-import { formatShortDate } from '@reflect/utils'
+import {
+  isTagName,
+  isToolPending,
+  type AssistantPart,
+  type NoteHitSummary,
+  formatShortDate,
+} from '@reflect/core'
+import { routeForPath } from '@reflect/app'
 
 interface ChatToolChipProps {
   part: Extract<AssistantPart, { kind: 'tool' }>

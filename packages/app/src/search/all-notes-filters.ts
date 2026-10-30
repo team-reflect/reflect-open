@@ -1,6 +1,7 @@
-import { formatMonthDay, isoDayStartMs } from '@reflect/utils'
+import { isoDayStartMs } from '@reflect/utils'
 import {
   foldTag,
+  formatMonthDay,
   parseSearchQuery,
   type DateFormat,
   type FilteredSearchOptions,

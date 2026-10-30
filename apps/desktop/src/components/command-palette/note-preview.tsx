@@ -1,14 +1,13 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { splitFrontmatter } from '@reflect/core'
 import { MarkdownPreview } from '@/editor/markdown-preview.tsx'
 import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
-import { formatDayLabel } from '@reflect/utils'
+import { splitFrontmatter, formatDayLabel } from '@reflect/core'
+import type { NoteEntry } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import type { NoteEntry } from '@reflect/app'
 
 /**
  * The palette's live preview pane: the highlighted result's markdown, read

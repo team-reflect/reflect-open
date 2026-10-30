@@ -94,7 +94,14 @@ export {
   type DayWindow,
   type DayWindowRadius,
 } from './daily/day-window.ts'
-export { buildMonthGrid, type MonthGrid, type MonthGridCell } from './daily/month-grid.ts'
+export {
+  buildMonthGrid,
+  monthLabel,
+  monthShortLabel,
+  weekdayLabels,
+  type MonthGrid,
+  type MonthGridCell,
+} from './daily/month-grid.ts'
 export {
   createWeekWindow,
   monthPickTarget,
