@@ -1,4 +1,4 @@
-import { useState, useTransition, type ReactElement } from 'react'
+import { useCallback, useState, useTransition, type ReactElement } from 'react'
 import { CloudOff, CloudUpload } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
@@ -45,20 +45,23 @@ export function NoteGistAction({
   const [isBusy, startGistTransition] = useTransition()
   const [busyKind, setBusyKind] = useState<GistKind>('publish')
 
+  const runGist = useCallback(
+    (kind: GistKind): void => {
+      setBusyKind(kind)
+      startGistTransition(async () => {
+        if (kind === 'publish') {
+          await publishGistAndCopyLink(services, app, path)
+        } else {
+          await gistPublish.unpublish(path)
+        }
+      })
+    },
+    [services, app, path, gistPublish],
+  )
+
   const published = optimistic || (row?.gistUrl ?? null) !== null
   if (!connected || row?.isPrivate === true) {
     return null
-  }
-
-  const runGist = (kind: GistKind): void => {
-    setBusyKind(kind)
-    startGistTransition(async () => {
-      if (kind === 'publish') {
-        await publishGistAndCopyLink(services, app, path)
-      } else {
-        await gistPublish.unpublish(path)
-      }
-    })
   }
 
   const label = isBusy

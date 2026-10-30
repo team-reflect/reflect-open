@@ -1,4 +1,11 @@
-import { useEffect, useState, useTransition, type MouseEvent, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useTransition,
+  type MouseEvent,
+  type ReactElement,
+} from 'react'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
@@ -47,6 +54,12 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
     return () => window.clearTimeout(timeout)
   }, [copyState])
 
+  const updateGist = useCallback((): void => {
+    startUpdate(async () => {
+      await publishGistAndCopyLink(services, app, path)
+    })
+  }, [services, app, path])
+
   if (url === null) {
     return null
   }
@@ -66,12 +79,6 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
     if (url.startsWith('https://') || url.startsWith('http://')) {
       opener.openUrlSync(url)
     }
-  }
-
-  const updateGist = (): void => {
-    startUpdate(async () => {
-      await publishGistAndCopyLink(services, app, path)
-    })
   }
 
   const Icon = copyState === 'copied' ? Check : Copy
