@@ -23,11 +23,17 @@ export function ImageLightboxContent({
   return (
     <>
       {mobileSurface ? (
-        <div aria-hidden className="absolute inset-0 bg-black" style={dismissDrag.backdropStyle} />
+        <div
+          ref={dismissDrag.backdropRef}
+          aria-hidden
+          className="absolute inset-0 bg-black"
+          style={dismissDrag.backdropStyle}
+        />
       ) : null}
       {mobileSurface ? (
         <LightboxChromeButton
           side="left"
+          wrapperRef={dismissDrag.chromeRef}
           wrapperStyle={dismissDrag.chromeStyle}
           size="icon-lg"
           aria-label="Close"
@@ -39,6 +45,7 @@ export function ImageLightboxContent({
       {onOpenImage ? (
         <LightboxChromeButton
           side="right"
+          wrapperRef={dismissDrag.chromeRef}
           wrapperStyle={dismissDrag.chromeStyle}
           size="sm"
           className="h-9 px-3"
@@ -58,6 +65,7 @@ export function ImageLightboxContent({
         {...dismissDrag.handlers}
       >
         <LightboxImage
+          ref={dismissDrag.imageRef}
           item={item}
           className="select-none"
           onTransitionEnd={dismissDrag.finishSettle}
