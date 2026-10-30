@@ -1,6 +1,6 @@
 import { useId, useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 
 interface TextSettingDrawerProps {

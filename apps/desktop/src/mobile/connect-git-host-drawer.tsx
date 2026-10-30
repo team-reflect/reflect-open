@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { FormProvider } from 'react-hook-form'
 import { ConnectGitHostFields } from '@/components/settings/connect-git-host-form.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { useConnectGitHostForm } from '@/hooks/use-connect-git-host-form.ts'
 
 interface ConnectGitHostDrawerProps {

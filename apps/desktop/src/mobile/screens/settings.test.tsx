@@ -20,6 +20,7 @@ import { TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileSettings } from './settings.tsx'
+import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 
 /**
  * The mobile Settings screen (the pushed card that replaced the bottom
@@ -29,16 +30,6 @@ import { MobileSettings } from './settings.tsx'
  * one door to a repository, the device's Accounts group, and graceful
  * degradation where the graph runs no sync lifecycle.
  */
-
-// The prompt editor's state and save wiring render through this open-state shell.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: import('react').ReactNode }) => {
-    return open ? <div data-testid="drawer">{children}</div> : null
-  },
-  DrawerContent: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: import('react').ReactNode }) => <h2>{children}</h2>,
-}))
 
 function connected(status: Extract<GitSyncState, { phase: 'connected' }>['status']): GitSyncState {
   return {
@@ -332,7 +323,7 @@ describe('MobileSettings', () => {
     const view = await mount()
 
     await user.click(page.getByRole('button', { name: 'Add prompt' }))
-    const sheet = page.getByTestId('drawer')
+    const sheet = page.getByRole('dialog')
     await user.fill(sheet.getByRole('textbox', { name: 'Label' }), 'Shorten')
     await user.fill(sheet.getByRole('textbox', { name: 'Prompt' }), 'Shorten: {{selectedText}}')
     await user.click(sheet.getByRole('button', { name: 'Add prompt' }))
@@ -359,7 +350,7 @@ describe('MobileSettings', () => {
     const view = await mount({ settings: { aiPrompts: [saved] } })
 
     await user.click(page.getByRole('button', { name: 'Translate to French' }))
-    const sheet = page.getByTestId('drawer')
+    const sheet = page.getByRole('dialog')
     await user.fill(sheet.getByRole('textbox', { name: 'Label' }), 'Translate to German')
     await user.click(sheet.getByRole('button', { name: 'Save' }))
 
@@ -379,7 +370,7 @@ describe('MobileSettings', () => {
     })
 
     await user.click(page.getByRole('button', { name: 'Shorten' }))
-    await user.click(page.getByTestId('drawer').getByRole('button', { name: 'Remove' }))
+    await user.click(page.getByRole('dialog').getByRole('button', { name: 'Remove' }))
 
     await vi.waitFor(() => expect(view.core.settings.get().aiPrompts).toEqual([]))
   })
@@ -413,6 +404,7 @@ describe('MobileSettings', () => {
     await expect.element(page.getByRole('heading', { name: 'Sign in to GitHub' })).toBeVisible()
 
     await act(() => view.core.githubAuth.save({ kind: 'pat', token: 'ghp_test' }))
+    await swipeDrawerClosed()
     await userEvent.click(page.getByRole('button', { name: 'Sign out of GitHub' }))
 
     await vi.waitFor(() => expect(view.core.githubAuth.getState().connected).toBe(false))

@@ -2,7 +2,7 @@ import { useDeferredValue, useState, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { parseSearchQuery } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { queryKeys } from '@/lib/query-client.ts'
 import { SearchInput } from '@/mobile/search-input.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -77,7 +77,7 @@ export function NotePickerDrawer({
             value={query}
             onValueChange={setQuery}
           />
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex-1">
             {hits !== undefined && hits.length === 0 && (
               <p className="py-6 text-center text-sm text-text-muted">No matches</p>
             )}

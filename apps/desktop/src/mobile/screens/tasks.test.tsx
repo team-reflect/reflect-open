@@ -11,6 +11,7 @@ import {
 } from '@reflect/core/testing'
 import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
 import { useRouter } from '@/routing/router.tsx'
+import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { swipe, translateX } from '@/test-utils/swipe.ts'
@@ -123,32 +124,6 @@ function isWrite(actions: readonly TaskAction[], kinds: readonly TaskActionKind[
 function writesOf(...kinds: TaskActionKind[]): unknown[][] {
   return writeTask.mock.calls.filter((call) => isWrite(call[1], kinds))
 }
-
-// Vaul's drag/animation is verified on-device. This passthrough honours `open` and
-// exposes the dismissal path as a button, so commit-on-dismiss is testable.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({
-    open,
-    onOpenChange,
-    children,
-  }: {
-    open?: boolean
-    onOpenChange?: (open: boolean) => void
-    children?: ReactNode
-  }) => {
-    return open ? (
-      <div data-testid="drawer">
-        {children}
-        <button type="button" onClick={() => onOpenChange?.(false)}>
-          dismiss-drawer
-        </button>
-      </div>
-    ) : null
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
 
 /**
  * Narrow a queried element to the editor stub's textarea so `.value` typechecks.
@@ -369,14 +344,14 @@ describe('MobileTasks', () => {
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     expect(haptics.impacts()).toBe(1)
 
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
     await user.click(view.getByRole('button', { name: 'Task filters' }))
     expect(haptics.impacts()).toBe(2)
 
     await user.click(view.getByRole('checkbox', { name: 'Current' }))
     expect(haptics.impacts()).toBe(3)
 
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
     await user.click(view.getByRole('button', { name: 'New task' }))
     expect(haptics.impacts()).toBe(4)
     await view.unmount()
@@ -393,7 +368,7 @@ describe('MobileTasks', () => {
 
     await user.clear(input)
     await user.type(input, 'buy oat milk')
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
 
     expect(writesOf('setMarkdown')).toHaveLength(1)
     expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
@@ -408,7 +383,7 @@ describe('MobileTasks', () => {
     const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
 
     expect(writesOf('setMarkdown')).toHaveLength(0)
     expect(writesOf('remove')).toHaveLength(0)
@@ -422,7 +397,7 @@ describe('MobileTasks', () => {
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
 
     expect(writesOf('remove')).toHaveLength(1)
     expect(writesOf('setMarkdown')).toHaveLength(0)
@@ -440,7 +415,7 @@ describe('MobileTasks', () => {
       'buy milk [[2026-06-15]]',
     )
 
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
     expect(writesOf('setMarkdown')).toHaveLength(1)
     expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
       { kind: 'setMarkdown', markdown: 'buy milk [[2026-06-15]]' },
@@ -525,7 +500,7 @@ describe('MobileTasks', () => {
     const input = asTextArea(view.getByRole('textbox', { name: 'Task text' }).element())
     await user.clear(input)
     await user.type(input, 'buy oat milk')
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
 
     expect(writesOf('setMarkdown')).toHaveLength(1)
     expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
@@ -640,7 +615,7 @@ describe('MobileTasks', () => {
     expect(input.value).toBe('')
 
     await user.type(input, 'new thing')
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
     expect(writesOf('setMarkdown')).toHaveLength(1)
     expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
       { kind: 'setMarkdown', markdown: 'new thing' },
@@ -722,7 +697,7 @@ describe('MobileTasks', () => {
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
     await view.findByRole('textbox', { name: 'Task text' })
-    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await swipeDrawerClosed()
 
     await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
     expect(writesOf('setMarkdown')).toHaveLength(0)
@@ -853,7 +828,7 @@ describe('MobileTasks', () => {
     await expect.element(view.getByRole('button', { name: 'Delete: buy milk' })).toBeInTheDocument()
     expect(translateX(surface)).toBe(-136)
     // The drag's synthetic click was swallowed; the sheet did not open.
-    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    expect(page.getByRole('dialog').query()).toBeNull()
     await view.unmount()
   })
 
@@ -867,7 +842,7 @@ describe('MobileTasks', () => {
     await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
     // Optimistic removal: the row leaves the list before the reindex.
     await waitFor(() => expect(view.queryByRole('button', { name: 'Edit: buy milk' })).toBeNull())
-    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    expect(page.getByRole('dialog').query()).toBeNull()
     await view.unmount()
   })
 
@@ -881,7 +856,7 @@ describe('MobileTasks', () => {
     await waitFor(() => {
       expect(view.getByTestId('route').element().textContent).toContain('notes/n.md')
     })
-    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    expect(page.getByRole('dialog').query()).toBeNull()
     await view.unmount()
   })
 
@@ -893,7 +868,7 @@ describe('MobileTasks', () => {
     await view.getByRole('button', { name: 'Edit: buy milk' }).click()
 
     await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: buy milk' })).toBeNull())
-    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    expect(page.getByRole('dialog').query()).toBeNull()
     await view.unmount()
   })
 

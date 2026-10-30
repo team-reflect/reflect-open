@@ -3,7 +3,7 @@ import { ArrowRight, CalendarDays, Check, CircleCheck, List, Trash2, Undo2, X } 
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { markModeFromSyntax } from '@/editor/mark-mode.ts'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
@@ -205,20 +205,18 @@ export function MobileTaskEditSheet({
         aria-label="Edit task"
         // On the "+"-add path the editor takes focus instead of the sheet
         // container, so typing can start immediately.
-        initialFocus={() => {
-          if (!autoFocusEditor) {
-            return true
-          }
-          editorRef.current?.focus()
-          return false
-        }}
+        initialFocus={
+          autoFocusEditor
+            ? () => {
+                editorRef.current?.focus()
+                return false
+              }
+            : undefined
+        }
       >
         <DrawerTitle className="sr-only">Edit task</DrawerTitle>
         <div className="flex flex-col gap-3 p-4">
-          <div
-            data-base-ui-swipe-ignore
-            className="rounded-md border border-border bg-surface px-3 py-2 focus-within:ring-1 focus-within:ring-accent"
-          >
+          <div className="rounded-md border border-border bg-surface px-3 py-2 focus-within:ring-1 focus-within:ring-accent">
             <NoteEditor
               key={editorSeed}
               initialContent={draft}
