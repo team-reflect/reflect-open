@@ -1,5 +1,5 @@
 import { memo, type ReactElement } from 'react'
-import { addDaysToIsoDate, formatDate, parseIsoDate } from '@reflect/utils'
+import { addDaysToIsoDate, formatDate } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
@@ -78,7 +78,7 @@ function WeekRowComponent({
             className="relative flex flex-1 flex-col items-center gap-0.5 py-1"
           >
             <span className="text-[11px] font-medium text-text-muted">
-              {formatDate(parseIsoDate(day), 'EEEEE')}
+              {formatDate(day, 'EEEEE')}
             </span>
             <span
               className={cn(
@@ -88,7 +88,7 @@ function WeekRowComponent({
                 !selected && !isToday && 'text-text',
               )}
             >
-              {parseIsoDate(day).getDate()}
+              {formatDate(day, 'd')}
             </span>
             {/* A daily note takes the strip's marker slot. Otherwise it keeps
                 V1's Today dot when today is not selected. */}

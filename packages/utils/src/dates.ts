@@ -113,9 +113,12 @@ export function getYearMonthsOfYear(year: number): string[] {
   return Array.from({ length: 12 }, (_, index) => format(new UTCDate(year, index, 1), 'yyyy-MM'))
 }
 
-/** Format `date` with a date-fns pattern, such as `MMMM yyyy`. */
-export function formatDate(date: Date, pattern: string): string {
-  return format(date, pattern)
+/**
+ * Format `date` with a date-fns pattern, such as `MMMM yyyy`. A string is an
+ * ISO date and renders its calendar day in any time zone.
+ */
+export function formatDate(date: Date | string, pattern: string): string {
+  return format(typeof date === 'string' ? parseUtcDate(date) : date, pattern)
 }
 
 /** Parse `value` with a date-fns pattern, or `null` when it names no real moment. */

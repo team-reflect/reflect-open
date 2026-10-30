@@ -1,4 +1,4 @@
-import { formatDate, formatIsoDate, isIsoDate, parseIsoDate, getWeekStart } from '@reflect/utils'
+import { formatDate, formatIsoDate, isIsoDate, getWeekStart } from '@reflect/utils'
 import type { DateFormat, TimeFormat } from '../settings/schema.ts'
 
 /**
@@ -32,7 +32,7 @@ function formatIsoByDateFormat(
   if (dateFormat === 'iso' || !isIsoDate(date)) {
     return date
   }
-  return formatDate(parseIsoDate(date), patterns[dateFormat])
+  return formatDate(date, patterns[dateFormat])
 }
 
 /**
