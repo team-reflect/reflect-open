@@ -180,6 +180,10 @@ export function watchScrollSettle(
   if (mouseDrag) {
     const endMouseDrag = (): void => {
       mouseDragging = false
+      if (!pending) {
+        // The drag moved nothing, for example at the end of the range.
+        fingerScroll = false
+      }
       flush()
     }
     ;(mouseDrag.handle ?? element).addEventListener(
@@ -199,7 +203,18 @@ export function watchScrollSettle(
         const origin = x ? down.clientX : down.clientY
         const snapType = element.style.scrollSnapType
         let dragging = false
-        const drag = new AbortController()
+        const controller = new AbortController()
+        const drag = AbortSignal.any([signal, controller.signal])
+        drag.addEventListener(
+          'abort',
+          () => {
+            if (signal.aborted && dragging) {
+              element.style.scrollSnapType = snapType
+              mouseDragging = false
+            }
+          },
+          { once: true },
+        )
         // On the window, so the drag keeps going when the mouse leaves the element.
         window.addEventListener(
           'pointermove',
@@ -217,10 +232,10 @@ export function watchScrollSettle(
             }
             element.scrollTo({ [x ? 'left' : 'top']: start - delta, behavior: 'instant' })
           },
-          { signal: drag.signal },
+          { signal: drag },
         )
         const release = (): void => {
-          drag.abort()
+          controller.abort()
           if (!dragging) {
             return
           }
@@ -228,11 +243,18 @@ export function watchScrollSettle(
           // The click that ends a drag is not a click. It fires in the same
           // task as `pointerup`, if at all.
           const click = new AbortController()
-          window.addEventListener('click', (event) => event.preventDefault(), {
-            capture: true,
-            once: true,
-            signal: AbortSignal.any([signal, click.signal]),
-          })
+          window.addEventListener(
+            'click',
+            (event) => {
+              event.preventDefault()
+              event.stopImmediatePropagation()
+            },
+            {
+              capture: true,
+              once: true,
+              signal: AbortSignal.any([signal, click.signal]),
+            },
+          )
           setTimeout(() => click.abort(), 0)
           const position = x ? element.scrollLeft : element.scrollTop
           const range = x
@@ -274,8 +296,8 @@ export function watchScrollSettle(
           signal.addEventListener('abort', () => clearTimeout(quiet), { once: true })
           element.scrollTo({ [x ? 'left' : 'top']: end, behavior: 'smooth' })
         }
-        window.addEventListener('pointerup', release, { signal: drag.signal })
-        window.addEventListener('pointercancel', release, { signal: drag.signal })
+        window.addEventListener('pointerup', release, { signal: drag })
+        window.addEventListener('pointercancel', release, { signal: drag })
       },
       { signal },
     )

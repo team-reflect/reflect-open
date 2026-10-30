@@ -182,7 +182,13 @@ describe('watchScrollSettle', () => {
       // Past half of the 200px range.
       mouse('pointermove', window, 80)
       mouse('pointerup', window, 80)
+      const onClick = vi.fn()
+      element.addEventListener('click', onClick)
+      const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+      element.dispatchEvent(click)
 
+      expect(click.defaultPrevented).toBe(true)
+      expect(onClick).not.toHaveBeenCalled()
       expect(element.style.scrollSnapType).toBe('')
       await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
       expect(element.scrollLeft).toBe(200)
@@ -208,6 +214,40 @@ describe('watchScrollSettle', () => {
       expect(onClick).toHaveReturnedWith(false)
       await new Promise((resolve) => setTimeout(resolve, 200))
       expect(onSettle).not.toHaveBeenCalled()
+    })
+
+    it('does not count a later scroll as the user’s after a drag that moved nothing', async () => {
+      const element = mountScroller()
+      const onSettle = vi.fn()
+      const watch = watchScrollSettle(element, onSettle, listeners.controller.signal, {
+        mouseDrag: { axis: 'x' },
+      })
+
+      // Already at the start: dragging right cannot scroll.
+      mouse('pointerdown', element, 100)
+      mouse('pointermove', window, 150)
+      mouse('pointerup', window, 150)
+      expect(watch.isTouching()).toBe(false)
+      await scrollElement(element, { left: 50 })
+
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(watch.isUserScroll()).toBe(false)
+    })
+
+    it('stops following the mouse when the watch aborts mid-drag', () => {
+      const element = mountScroller()
+      watchScrollSettle(element, vi.fn(), listeners.controller.signal, {
+        mouseDrag: { axis: 'x' },
+      })
+
+      mouse('pointerdown', element, 200)
+      mouse('pointermove', window, 150)
+      listeners.controller.abort()
+      const left = element.scrollLeft
+      mouse('pointermove', window, 50)
+
+      expect(element.scrollLeft).toBe(left)
+      expect(element.style.scrollSnapType).toBe('')
     })
 
     it('starts no drag on a button', () => {
