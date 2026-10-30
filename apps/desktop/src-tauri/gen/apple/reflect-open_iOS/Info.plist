@@ -63,6 +63,11 @@
 	</dict>
 	<key>ReflectSentryDSN</key>
 	<string>$(REFLECT_SENTRY_DSN)</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>
