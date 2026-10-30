@@ -218,6 +218,40 @@ describe('createUpdateService', () => {
     expect(service.getState()).toEqual({ phase: 'available', version: '0.3.0' })
   })
 
+  it('a re-check that finds an update closes the one it replaces', async () => {
+    const { service, updater, clock } = setup({ available: { version: '0.3.0' } })
+    service.start()
+    await clock.advance(0)
+
+    updater.configure({ available: { version: '0.3.1' } })
+    await clock.advance(SIX_HOURS_MS)
+    expect(updater.calls).toEqual(['check', 'check', 'close'])
+    expect(service.getState()).toEqual({ phase: 'available', version: '0.3.1' })
+  })
+
+  it('a manual check answering "no update" closes the found update', async () => {
+    const { service, updater } = setup({ available: { version: '0.3.0' } })
+    await service.checkNow()
+
+    updater.configure({})
+    await service.checkNow()
+    expect(updater.calls).toEqual(['check', 'check', 'close'])
+    expect(service.getState()).toEqual({ phase: 'upToDate' })
+  })
+
+  it('a check resolving after an install starts closes the update it found', async () => {
+    const { service, updater } = setup({ available: { version: '0.3.0' } })
+    await service.checkNow()
+
+    const releaseSecond = updater.holdNextCheck()
+    const second = service.checkNow()
+    await service.install()
+    releaseSecond()
+    await second
+    expect(updater.calls).toEqual(['check', 'check', 'downloadAndInstall', 'close'])
+    expect(service.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
+  })
+
   it('install without a found update is a no-op', async () => {
     const { service, updater } = setup()
     await service.install()

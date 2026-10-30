@@ -28,7 +28,7 @@ export interface TestUpdaterOptions {
   holdInstall?: boolean
 }
 
-export type TestUpdaterCall = 'check' | 'downloadAndInstall' | 'relaunch'
+export type TestUpdaterCall = 'check' | 'downloadAndInstall' | 'close' | 'relaunch'
 
 /**
  * An {@link UpdaterAdapter} whose answers and download progress a test controls.
@@ -60,19 +60,27 @@ const CONTENT_LENGTH = 100
 
 class TestAvailableUpdate implements AvailableUpdate {
   readonly #download: (onEvent: (event: UpdateDownloadEvent) => void) => Promise<void>
+  readonly #onClose: () => void
 
   readonly version: string
 
   constructor(
     version: string,
     download: (onEvent: (event: UpdateDownloadEvent) => void) => Promise<void>,
+    onClose: () => void,
   ) {
     this.version = version
     this.#download = download
+    this.#onClose = onClose
   }
 
   downloadAndInstall(onEvent: (event: UpdateDownloadEvent) => void): Promise<void> {
     return this.#download(onEvent)
+  }
+
+  close(): Promise<void> {
+    this.#onClose()
+    return Promise.resolve()
   }
 }
 
@@ -148,20 +156,26 @@ class TestUpdaterAdapterImpl implements TestUpdaterAdapter {
   }
 
   #offer(version: string): AvailableUpdate {
-    return new TestAvailableUpdate(version, (onEvent) => {
-      this.calls.push('downloadAndInstall')
-      onEvent({ event: 'Started', data: { contentLength: CONTENT_LENGTH } })
-      if (!this.#options.holdInstall) {
-        return this.#settleDownload(onEvent)
-      }
-      const { promise, resolve, reject } = Promise.withResolvers<void>()
-      this.#download = {
-        onEvent,
-        received: 0,
-        settle: () => this.#settleDownload(onEvent).then(resolve, reject),
-      }
-      return promise
-    })
+    return new TestAvailableUpdate(
+      version,
+      (onEvent) => {
+        this.calls.push('downloadAndInstall')
+        onEvent({ event: 'Started', data: { contentLength: CONTENT_LENGTH } })
+        if (!this.#options.holdInstall) {
+          return this.#settleDownload(onEvent)
+        }
+        const { promise, resolve, reject } = Promise.withResolvers<void>()
+        this.#download = {
+          onEvent,
+          received: 0,
+          settle: () => this.#settleDownload(onEvent).then(resolve, reject),
+        }
+        return promise
+      },
+      () => {
+        this.calls.push('close')
+      },
+    )
   }
 }
 

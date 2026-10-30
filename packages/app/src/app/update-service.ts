@@ -43,6 +43,10 @@ export interface AvailableUpdate {
    * Download, verify, and install the update, reporting progress through `onEvent`.
    */
   downloadAndInstall(onEvent: (event: UpdateDownloadEvent) => void): Promise<void>
+  /**
+   * Release the native resource that holds this update.
+   */
+  close(): Promise<void>
 }
 
 /**
@@ -229,6 +233,14 @@ class UpdateServiceImpl implements UpdateService {
     }
   }
 
+  async #close(update: AvailableUpdate | null): Promise<void> {
+    try {
+      await update?.close()
+    } catch (error) {
+      this.#deps.logger.warn('closing an update failed', error)
+    }
+  }
+
   async #runCheck(silent: boolean): Promise<void> {
     const phase = this.#state.phase
     if (phase === 'checking' || phase === 'downloading' || phase === 'ready') {
@@ -248,12 +260,15 @@ class UpdateServiceImpl implements UpdateService {
     try {
       const update = await this.#deps.updater.check()
       if (this.#state !== baseline) {
+        void this.#close(update)
         return
       }
       if (update) {
+        void this.#close(this.#pendingUpdate)
         this.#pendingUpdate = update
         this.#setState({ phase: 'available', version: update.version })
       } else if (!silent) {
+        void this.#close(this.#pendingUpdate)
         this.#pendingUpdate = null
         this.#setState({ phase: 'upToDate' })
       }
