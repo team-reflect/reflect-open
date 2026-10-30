@@ -81,7 +81,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    name: test-chromium (shard ${{ matrix.shard }}/3)
+    name: test-chromium (${{ matrix.shard }}/3)
     env:
       REFLECT_TEST_BROWSER: chromium
       # Chromium on Linux does not promptly free the iframe of a finished
