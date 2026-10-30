@@ -45,6 +45,7 @@ export function watchScrollSettle(
   let touchLeft = 0
   let touchTop = 0
   let wheelAt = -Infinity
+  let scrollAt = -Infinity
   let userScroll = false
   let pending = false
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -106,8 +107,18 @@ export function watchScrollSettle(
   element.addEventListener(
     'scroll',
     () => {
+      const now = performance.now()
+      // A snap animation can pass the settled position and keep moving inside
+      // it (to 0 after 1). Those last frames belong to the scroll that was
+      // already reported, so they get no new report and keep its user flag.
+      const tail =
+        !pending && !touching && now - scrollAt < SETTLE_IDLE_MS && (isSettled?.() ?? false)
+      scrollAt = now
+      if (tail) {
+        return
+      }
       scrolledSinceTouch = true
-      if (fingerScroll || performance.now() - wheelAt < SETTLE_IDLE_MS) {
+      if (fingerScroll || now - wheelAt < SETTLE_IDLE_MS) {
         userScroll = true
       } else if (!pending) {
         // A new scroll that no finger or wheel started.

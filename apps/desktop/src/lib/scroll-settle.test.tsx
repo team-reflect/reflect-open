@@ -81,6 +81,25 @@ describe('watchScrollSettle', () => {
     expect(onSettle).toHaveBeenCalledOnce()
   })
 
+  it('does not report again when a settled snap moves on inside the settled range', async () => {
+    const element = mountScroller()
+    const onSettle = vi.fn()
+    const watch = watchScrollSettle(element, onSettle, listeners.controller.signal, {
+      isSettled: () => element.scrollLeft <= 1,
+    })
+
+    await touch(element, 'start')
+    element.scrollLeft = 50
+    await touch(element, 'end')
+    await scrollElement(element, { left: 1 })
+    expect(onSettle).toHaveBeenCalledOnce()
+
+    await scrollElement(element, { left: 0 })
+
+    expect(onSettle).toHaveBeenCalledOnce()
+    expect(watch.isUserScroll()).toBe(true)
+  })
+
   it('does not count a scroll right after a tap as the finger’s', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
