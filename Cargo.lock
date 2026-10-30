@@ -4643,10 +4643,13 @@ dependencies = [
 name = "reflect-graph-io"
 version = "0.0.0"
 dependencies = [
+ "block2",
  "core-foundation 0.10.1",
  "git2",
  "infer",
  "jiff",
+ "objc2",
+ "objc2-foundation",
  "proptest",
  "reconcile-text",
  "reflect-graph-paths",

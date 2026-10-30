@@ -17,6 +17,7 @@ use reflect_graph_paths::{
     evicted_logical_path, eviction_placeholder, is_dataless, normalize_line_endings, to_slash_lossy,
 };
 
+use crate::coordinate::coordinated_replace;
 use crate::graph_gitignore;
 use reflect_types::{AppError, AppResult};
 
@@ -294,7 +295,7 @@ pub fn atomic_create(root: &Path, target: &Path, contents: &str) -> AppResult<At
         return Ok(AtomicCreateOutcome::Collision);
     }
     let temp = stage_bytes(root, target, contents.as_bytes())?;
-    match temp.persist_noclobber(target) {
+    coordinated_replace(target, || match temp.persist_noclobber(target) {
         Ok(file) => Ok(AtomicCreateOutcome::Created(
             file.metadata().ok().as_ref().and_then(modified_ms),
         )),
@@ -302,7 +303,7 @@ pub fn atomic_create(root: &Path, target: &Path, contents: &str) -> AppResult<At
             Ok(AtomicCreateOutcome::Collision)
         }
         Err(error) => Err(AppError::io(error.error.to_string())),
-    }
+    })
 }
 
 /// Byte-level atomic write — shared by notes (text) and assets (binary).
@@ -315,13 +316,16 @@ pub fn atomic_create(root: &Path, target: &Path, contents: &str) -> AppResult<At
 /// note directories may live inside a file-sync folder (iCloud Drive —
 /// Plan 21), and a temp created there is synced and, after a crash, stranded
 /// on every device. `.reflect/` is excluded from sync and swept on graph open,
-/// and it shares `target`'s volume, so the final rename stays atomic.
+/// and it shares `target`'s volume, so the final rename stays atomic. The
+/// rename runs under file coordination ([`coordinated_replace`]).
 pub fn atomic_write_bytes(root: &Path, target: &Path, contents: &[u8]) -> AppResult<Option<u64>> {
     let tmp = stage_bytes(root, target, contents)?;
-    let file = tmp
-        .persist(target)
-        .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(file.metadata().ok().as_ref().and_then(modified_ms))
+    coordinated_replace(target, || {
+        let file = tmp
+            .persist(target)
+            .map_err(|err| AppError::io(err.to_string()))?;
+        Ok(file.metadata().ok().as_ref().and_then(modified_ms))
+    })
 }
 
 /** Stage synced bytes on `target`'s volume, ready for an atomic persist. */

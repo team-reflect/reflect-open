@@ -59,6 +59,15 @@ The ladder, the merge-base store, and the conflict sweep are plain Rust with uni
 watch, `NSFileVersion` conflict delivery, and download/eviction need a real container (and the
 two-device manual matrix in the plan doc).
 
+## Coordinated writes
+
+Note and asset writes stage their bytes under `.reflect/tmp/` and rename them into place. On
+macOS and iOS the rename in `atomic_write_bytes`, `atomic_create` (`crates/graph-io/src/io.rs`)
+and `persist_planned` (`crates/graph-io/src/import_assets.rs`) runs inside an
+`NSFileCoordinator` writing claim with the replacing option (`crates/graph-io/src/coordinate.rs`),
+for every graph, in iCloud or not. File-sync daemons then see one ordered save of the item. A
+write waits at most 10 seconds for other coordinators, then fails like any other write error.
+
 ## Why the desktop app runs no metadata query
 
 `.reflect/` and `.git/` are marked local-only (`mark_dir_local_only` in `fs/io.rs`), which keeps
