@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import { foldGraphPath, type IndexedNote } from '@reflect/core'
+import {
+  createAssetStoreService,
+  createIpcBridgeService,
+  foldGraphPath,
+  type IndexedNote,
+} from '@reflect/core'
+import {
+  createTestClockService,
+  createTestFileChangeService,
+  createTestLoggerService,
+} from '@reflect/core/testing'
 import { createDevBridge } from '@/dev/dev-bridge.ts'
 import { createDevFileStore } from '@/dev/dev-file-store.ts'
 import { createDevIndexDb } from '@/dev/dev-index-db.ts'
@@ -204,5 +214,38 @@ describe('dev bridge note_create parity', () => {
     })
     expect(files.read('notes/new.md')).toBeNull()
     expect(files.read('notes/existing.md')).toBe('# Existing\n')
+  })
+})
+
+describe('dev bridge assets', () => {
+  it('serves the asset store end to end', async () => {
+    const bridge = createDevBridge({
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+    })
+    const assetStore = createAssetStoreService({
+      ipc: createIpcBridgeService({ transport: bridge, logger: createTestLoggerService() }),
+      clock: createTestClockService(),
+      fileChanges: createTestFileChangeService(),
+    })
+    const image = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' })
+
+    await expect(assetStore.uploadBlob('cat.png', image, 1)).resolves.toBe('assets/cat.png')
+    await expect(assetStore.uploadBlob('cat.png', image, 1)).resolves.toBe('assets/cat-2.png')
+    await assetStore.uploadToPath('assets/dog.png', image, 1)
+
+    await expect(assetStore.readBytes('assets/cat-2.png', 1)).resolves.toEqual(
+      new Uint8Array([1, 2, 3]),
+    )
+    await expect(assetStore.readBase64('assets/dog.png', 1)).resolves.toBe('AQID')
+    const listed = (await bridge.invoke('list_attachments', { generation: 1 })) as Array<{
+      path: string
+    }>
+    expect(listed.map((file) => file.path)).toEqual([
+      'assets/cat.png',
+      'assets/cat-2.png',
+      'assets/dog.png',
+    ])
+    expect(bridge.convertFileSrc('1/assets/cat.png', 'reflect-asset')).toMatch(/^blob:/)
   })
 })

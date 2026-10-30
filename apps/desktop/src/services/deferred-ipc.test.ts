@@ -18,9 +18,16 @@ describe('createDeferredIpcTransport', () => {
     )
   })
 
-  it('has plugin events but no binary path', () => {
-    const { transport } = createDeferredIpcTransport()
-    expect(transport.listenPlugin).toBeDefined()
-    expect(transport.invokeBinary).toBeUndefined()
+  it('forwards binary calls and file URLs to the connected transport', async () => {
+    const deferred = createDeferredIpcTransport()
+    const binary = deferred.transport.invokeBinary?.('upload', new Uint8Array([1]), {})
+    deferred.connect(
+      { ...createTestIpcBridgeService().transport, invokeBinary: async () => 'stored' },
+      { convertFileSrc: (filePath) => `blob:${filePath}` },
+    )
+    await expect(binary).resolves.toBe('stored')
+    expect(deferred.convertFileSrc('1/assets/cat.png', 'reflect-asset')).toBe(
+      'blob:1/assets/cat.png',
+    )
   })
 })

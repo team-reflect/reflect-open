@@ -1,12 +1,10 @@
-import type { IpcBridge } from '@reflect/core'
-
 import { coreServices, pendingDevIpc } from '@/boot.ts'
-import { createDevBridge } from '@/dev/dev-bridge.ts'
+import { createDevBridge, type DevBridge } from '@/dev/dev-bridge.ts'
 import { createDevFileStore } from '@/dev/dev-file-store.ts'
 import { createDevIndexDb } from '@/dev/dev-index-db.ts'
 import { seedGraphFiles } from '@/dev/seed-graph.ts'
 
-async function createDevIpc(): Promise<IpcBridge> {
+async function createDevIpc(): Promise<DevBridge> {
   const index = await createDevIndexDb()
   const files = createDevFileStore(seedGraphFiles())
   return createDevBridge({ files, index })
@@ -15,7 +13,8 @@ async function createDevIpc(): Promise<IpcBridge> {
 const { appPlatform } = coreServices.platform
 
 if (pendingDevIpc !== null) {
-  pendingDevIpc.connect(await createDevIpc())
+  const bridge = await createDevIpc()
+  pendingDevIpc.connect(bridge, bridge)
 }
 
 const { PlatformRoot, warmPlatformRoot } = await (async () => {

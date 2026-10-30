@@ -49,7 +49,7 @@ export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'
 export { createSystemClock, type ClockService, type TimerHandle } from './ports/clock-service.ts'
 export { type IdService } from './ports/id-service.ts'
 export { type BuildPlatform, type PlatformFacts } from './ports/platform-facts.ts'
-export { type FileSrcConverter } from './ports/file-src.ts'
+export { appleFileSrc, type FileSrcConverter, type FileSrcSource } from './ports/file-src.ts'
 
 export {
   createPathService,
@@ -209,6 +209,7 @@ export {
   dailyPath,
   notePath,
   assetPath,
+  pickFreeAssetPath,
   isDaily,
   isNotePath,
   dateFromDailyPath,
@@ -329,6 +330,7 @@ export {
   type IapService,
 } from './ipc/iap-service.ts'
 export { createAppStoreService, type AppStoreService } from './ipc/app-store-service.ts'
+export { createAssetStoreService } from './graph/asset-store-service.ts'
 export {
   AI_PROVIDERS,
   aiProvider,

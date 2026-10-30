@@ -1,4 +1,14 @@
-import { IAP_PRODUCT_IDS, indexedNoteSchema, AppError, type IpcBridge } from '@reflect/core'
+import {
+  IAP_PRODUCT_IDS,
+  indexedNoteSchema,
+  AppError,
+  appleFileSrc,
+  pickFreeAssetPath,
+  type FileMeta,
+  type FileSrcSource,
+  type IpcBridge,
+} from '@reflect/core'
+import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import type { DevIndexDb } from '@/dev/dev-index-db.ts'
@@ -55,6 +65,9 @@ const chatSaveArgsSchema = z.object({
     createdMs: z.number(),
   }),
 })
+const uploadIdArgsSchema = z.object({ id: z.string() })
+const uploadCommitArgsSchema = uploadIdArgsSchema.extend({ desiredName: z.string() })
+const uploadCommitPathArgsSchema = uploadIdArgsSchema.extend({ path: z.string() })
 const chatDeleteArgsSchema = z.object({ id: z.string() })
 const iapPayloadSchema = z.object({ productType: z.literal('subs') })
 const iapProductArgsSchema = z.object({
@@ -64,17 +77,34 @@ const iapProductsArgsSchema = z.object({
   payload: iapPayloadSchema.extend({ productIds: z.array(z.string()) }),
 })
 
+/**
+ * One in-memory asset: its bytes, a last-modified stamp, and the `blob:` URL
+ * that serves it once an image asks for one.
+ */
+interface DevAsset {
+  readonly bytes: Uint8Array<ArrayBuffer>
+  readonly modifiedMs: number
+  url: string | null
+}
+
+/**
+ * The dev bridge: the IPC surface plus the URLs that serve its assets.
+ */
+export interface DevBridge extends IpcBridge, FileSrcSource {}
+
 // Fixed preview prices, independent of App Store Connect and browser locale.
 const iapProducts = [
   { productId: IAP_PRODUCT_IDS.monthly, formattedPrice: '$9999.99' },
   { productId: IAP_PRODUCT_IDS.yearly, formattedPrice: '$99999.99' },
 ]
 
-class DevBridgeImpl implements IpcBridge {
+class DevBridgeImpl implements DevBridge {
   readonly #deps: DevBridgeBackend
   readonly #graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   #settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
-  readonly #assets = new Map<string, string>()
+  readonly #assets = new Map<string, DevAsset>()
+  readonly #uploads = new Map<string, Uint8Array<ArrayBuffer>[]>()
+  #uploadCount = 0
   #ownedProductId: string | null = null
   // In-memory keychain stand-in so the AI-provider settings flow (and chat,
   // against a CORS-permissive provider) works end-to-end in the harness.
@@ -89,6 +119,31 @@ class DevBridgeImpl implements IpcBridge {
     return new Promise((resolve) => {
       resolve(this.#runCommand(command, args))
     })
+  }
+
+  invokeBinary(
+    command: string,
+    body: Uint8Array,
+    headers: Record<string, string>,
+  ): Promise<unknown> {
+    return new Promise((resolve) => {
+      if (command !== 'asset_upload_append') {
+        throw new AppError('unknown', `dev bridge: unimplemented binary command "${command}"`)
+      }
+      const id = headers['x-upload-id'] ?? ''
+      this.#upload(id).push(new Uint8Array(body))
+      resolve(null)
+    })
+  }
+
+  convertFileSrc(filePath: string, protocol: string): string {
+    // Asset URLs carry a `<generation>/` prefix before the graph path.
+    const asset = this.#assets.get(filePath.replace(/^\d+\//, ''))
+    if (asset === undefined) {
+      return appleFileSrc(filePath, protocol)
+    }
+    asset.url ??= URL.createObjectURL(new Blob([asset.bytes]))
+    return asset.url
   }
 
   #runCommand(command: string, args: Record<string, unknown>): unknown {
@@ -149,9 +204,7 @@ class DevBridgeImpl implements IpcBridge {
         // A browser has no embedding runtime.
         return { status: 'unsupported' }
       case 'vault_scan_stats':
-        return { notes: files.list().length, attachments: 0, skipped: 0 }
-      case 'list_attachments':
-        return []
+        return { notes: files.list().length, attachments: this.#assets.size, skipped: 0 }
       case 'forget_recent':
       case 'capture_host_register':
       case 'watch_start':
@@ -232,16 +285,39 @@ class DevBridgeImpl implements IpcBridge {
         const { path, contentsBase64 } = z
           .object({ path: z.string(), contentsBase64: z.string() })
           .parse(args)
-        this.#assets.set(path, contentsBase64)
+        this.#writeAsset(path, base64ToBytes(contentsBase64))
         return null
       }
-      case 'asset_read': {
-        const { path } = pathArgsSchema.parse(args)
-        const contents = this.#assets.get(path)
-        if (contents === undefined) {
-          throw new AppError('notFound', `asset not found: ${path}`)
-        }
-        return contents
+      case 'asset_read':
+        return bytesToBase64(this.#readAsset(pathArgsSchema.parse(args).path))
+      case 'asset_read_binary':
+        return this.#readAsset(pathArgsSchema.parse(args).path).slice().buffer
+      case 'list_attachments':
+        return [...this.#assets].map(([path, asset]): FileMeta => ({
+          path,
+          size: asset.bytes.byteLength,
+          modifiedMs: asset.modifiedMs,
+        }))
+      case 'asset_upload_begin': {
+        this.#uploadCount += 1
+        const id = `upload-${this.#uploadCount}`
+        this.#uploads.set(id, [])
+        return id
+      }
+      case 'asset_upload_commit': {
+        const { id, desiredName } = uploadCommitArgsSchema.parse(args)
+        const path = pickFreeAssetPath(desiredName, (candidate) => this.#assets.has(candidate))
+        this.#writeAsset(path, this.#finishUpload(id))
+        return path
+      }
+      case 'asset_upload_commit_path': {
+        const { id, path } = uploadCommitPathArgsSchema.parse(args)
+        this.#writeAsset(path, this.#finishUpload(id))
+        return null
+      }
+      case 'asset_upload_abort': {
+        this.#uploads.delete(uploadIdArgsSchema.parse(args).id)
+        return null
       }
       case 'asset_open':
         return null
@@ -343,6 +419,42 @@ class DevBridgeImpl implements IpcBridge {
     }
   }
 
+  #upload(id: string): Uint8Array<ArrayBuffer>[] {
+    const chunks = this.#uploads.get(id)
+    if (chunks === undefined) {
+      throw new AppError('notFound', `unknown upload: ${id}`)
+    }
+    return chunks
+  }
+
+  #finishUpload(id: string): Uint8Array<ArrayBuffer> {
+    const chunks = this.#upload(id)
+    this.#uploads.delete(id)
+    const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0))
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return bytes
+  }
+
+  #writeAsset(path: string, bytes: Uint8Array<ArrayBuffer>): void {
+    const previous = this.#assets.get(path)?.url
+    if (previous !== undefined && previous !== null) {
+      URL.revokeObjectURL(previous)
+    }
+    this.#assets.set(path, { bytes, modifiedMs: Date.now(), url: null })
+  }
+
+  #readAsset(path: string): Uint8Array<ArrayBuffer> {
+    const asset = this.#assets.get(path)
+    if (asset === undefined) {
+      throw new AppError('notFound', `asset not found: ${path}`)
+    }
+    return asset.bytes
+  }
+
   // Native event streams (watcher, embeddings, EventKit) don't exist in the
   // browser; subscriptions succeed and simply never fire. Local writes still
   // refresh the UI through core's in-process local-write echo. Plugin event
@@ -367,7 +479,7 @@ class DevBridgeImpl implements IpcBridge {
  * quietly rendering empty because a stub answered wrong is worse than an
  * error naming the gap.
  */
-export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
+export function createDevBridge(backend: DevBridgeBackend): DevBridge {
   return new DevBridgeImpl(backend)
 }
 
