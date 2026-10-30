@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent, type ReactElement } from 'react'
+import { useEffect, useState, useTransition, type MouseEvent, type ReactElement } from 'react'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
@@ -29,7 +29,8 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
   const row = useNoteRow(path)
   const url = row?.gistUrl ?? null
   const [copyState, setCopyState] = useState<CopyState>('idle')
-  const [isUpdating, setIsUpdating] = useState(false)
+  // The gist service never rejects, so the transition only drives the spinner.
+  const [isUpdating, startUpdate] = useTransition()
 
   // Reset the transient "copied" badge whenever the published URL changes.
   const [appliedUrl, setAppliedUrl] = useState(url)
@@ -67,13 +68,10 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
     }
   }
 
-  const updateGist = async (): Promise<void> => {
-    setIsUpdating(true)
-    try {
+  const updateGist = (): void => {
+    startUpdate(async () => {
       await publishGistAndCopyLink(services, app, path)
-    } finally {
-      setIsUpdating(false)
-    }
+    })
   }
 
   const Icon = copyState === 'copied' ? Check : Copy
@@ -116,7 +114,7 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Update published gist"
-                onClick={() => void updateGist()}
+                onClick={updateGist}
                 disabled={isUpdating}
                 className={cn(
                   'text-text-muted hover:text-text',
