@@ -252,9 +252,27 @@ describe('DailyEventsSection', () => {
     await renderSection()
     await page.getByRole('button', { name: /standup/i }).click()
 
+    await page.getByLabelText('Meeting name').fill('Standup notes')
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
     await expect.element(page.getByText(/disk full/i)).toBeInTheDocument()
-    await expect.element(page.getByLabelText('Meeting name')).toBeInTheDocument()
+    // The form action's automatic reset must not clear the controlled fields.
+    await expect.element(page.getByLabelText('Meeting name')).toHaveValue('Standup notes')
+  })
+
+  it('Cancel is disabled while the submit is in flight', async () => {
+    const { promise, resolve } =
+      Promise.withResolvers<Awaited<ReturnType<MeetingService['addMeetingToDaily']>>>()
+    addMeetingToDaily.mockReturnValueOnce(promise)
+    calendar.setEvents([eventAt(9, { title: 'Standup' })])
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
+
+    await page.getByRole('button', { name: /add to daily note/i }).click()
+
+    await vi.waitFor(() => expect(addMeetingToDaily).toHaveBeenCalled())
+    await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    resolve({ appended: true, createdNotes: [] })
+    await expectLocatorToHaveCount(page.getByLabelText('Meeting name'), 0)
   })
 })
