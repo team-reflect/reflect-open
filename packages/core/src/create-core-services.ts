@@ -220,6 +220,10 @@ import {
 import { createPrivacyService, type PrivacyService } from './privacy/privacy-service.ts'
 import { createSettingsService, type SettingsService } from './settings/settings-service.ts'
 import { createAgentSkillService, type AgentSkillService } from './ai/agent-skill-service.ts'
+import {
+  createDiagnosticsService,
+  type DiagnosticsService,
+} from './diagnostics/diagnostics-service.ts'
 import { createAppInfoService, type AppInfoService } from './ports/app-info-service.ts'
 import { createBackgroundReconcilerFactory } from './reconcile/background-reconciler.ts'
 import type { ClockService } from './ports/clock-service.ts'
@@ -277,6 +281,10 @@ export interface CoreServices {
    * Facts about the running application build.
    */
   readonly appInfo: AppInfoService
+  /**
+   * The support report for a bug about memory or speed.
+   */
+  readonly diagnostics: DiagnosticsService
   /**
    * Live reads of the OS calendar database.
    */
@@ -666,6 +674,7 @@ export const coreServiceFactories = {
   chatEngine: createChatEngineService,
   chatGraphContext: createChatGraphContextService,
   appInfo: createAppInfoService,
+  diagnostics: createDiagnosticsService,
   contactSuggestions: createContactSuggestionService,
   meetings: createMeetingService,
   agentSkill: createAgentSkillService,
@@ -1146,6 +1155,7 @@ export function composeCoreServices(
     progress,
   }
   const icloudDownloadDeps: ICloudDownloadServiceDeps = { icloudNative, activity, clock, logger }
+  const appInfo = create.appInfo({ ipc })
   const services: CoreServices = {
     ipc,
     logger,
@@ -1154,7 +1164,14 @@ export function composeCoreServices(
     platform,
     storage,
     path,
-    appInfo: create.appInfo({ ipc }),
+    appInfo,
+    diagnostics: create.diagnostics({
+      appInfo,
+      embeddingRuntime,
+      graphSession,
+      noteFile,
+      settings,
+    }),
     calendar,
     contacts,
     contactSuggestions: create.contactSuggestions({

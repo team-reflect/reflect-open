@@ -69,3 +69,19 @@ export async function publishGistAndCopyLink(
     operations.start('Copying the gist link').fail(errorMessage(cause))
   }
 }
+
+/**
+ * Put the support diagnostics on the clipboard and report through the
+ * operations status line. Never rejects.
+ */
+export async function copyDiagnostics(
+  { diagnostics }: CoreServices,
+  { clipboard, operations }: AppServices,
+): Promise<void> {
+  try {
+    await clipboard.writeText(await diagnostics.collect())
+    operations.start('Diagnostics copied').done()
+  } catch (cause) {
+    operations.start('Copying diagnostics').fail(errorMessage(cause))
+  }
+}

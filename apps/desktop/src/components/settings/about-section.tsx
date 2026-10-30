@@ -4,8 +4,10 @@ import { LicensesDialog } from '@/components/licenses/licenses-dialog.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAppVersion } from '@/hooks/use-app-version.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
+import { copyDiagnostics } from '@/lib/clipboard-actions.ts'
 import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
 import { useUpdate } from '@/providers/update-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { SettingsSection } from './section.tsx'
 import { SettingsSwitchField } from './switch-field.tsx'
 import { UpdateField } from './update-field.tsx'
@@ -16,6 +18,8 @@ export function AboutSection(): ReactElement {
   const crashTest = useCrashTest()
   const perfHudEnabled = usePerfHudEnabled()
   const { supported } = useUpdate()
+  const core = useCoreServices()
+  const app = useAppServices()
   const [licensesOpen, setLicensesOpen] = useState(false)
   return (
     <SettingsSection id="about">
@@ -35,6 +39,22 @@ export function AboutSection(): ReactElement {
         <span className="text-sm font-medium text-text">Open Source Licenses</span>
         <ChevronRight aria-hidden className="size-4 shrink-0 text-text-muted" />
       </button>
+      <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-text">Diagnostics</div>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Memory use, enabled integrations, and graph size for a bug report. No note content.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void copyDiagnostics(core, app)}
+          className="shrink-0"
+        >
+          Copy
+        </Button>
+      </div>
       {debugUnlocked ? (
         <>
           <div className="flex items-center justify-between gap-4 px-4 py-3.5">
