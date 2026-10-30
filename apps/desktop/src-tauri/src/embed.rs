@@ -38,8 +38,8 @@ const MODEL_FILES: [&str; 5] = [
 const INTRA_OP_THREADS: usize = 2;
 /// Texts per ONNX Runtime run. Peak memory grows with the batch (fastembed's
 /// default of 256 needs about 17 GB for a 300 KB note), and the freed memory
-/// stays in the process. Four is as fast as larger batches.
-const EMBED_BATCH_SIZE: usize = 4;
+/// stays in the process. One text keeps the peak near the model's own size.
+const EMBED_BATCH_SIZE: usize = 1;
 
 /// Byte counts for an active model download. Absent until the download
 /// starts (cache probing, or a cached model that skips downloading); after
