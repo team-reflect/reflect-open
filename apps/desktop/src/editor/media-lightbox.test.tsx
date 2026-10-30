@@ -194,17 +194,23 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
   })
 
   it('keeps the dragged position when the lightbox re-renders mid-drag', async () => {
-    const { preview, image, backdrop, closeChrome, rerender } = await renderMobileLightbox()
+    const { preview, image, backdrop, closeChrome, rerender, getCommitCount } =
+      await renderMobileLightbox()
 
     touchDown(preview, 180, 120)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 182, clientY: 180 })
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 190, clientY: 260 })
+    expect(image.style.transform).toContain('translate3d(8px, 80px, 0px)')
+    expect(backdrop!.style.opacity).not.toBe('')
+    expect(closeChrome.style.opacity).not.toBe('')
     const transform = image.style.transform
     const backdropOpacity = backdrop!.style.opacity
     const chromeOpacity = closeChrome.style.opacity
+    const commitsBefore = getCommitCount()
 
     await rerender()
 
+    expect(getCommitCount()).toBeGreaterThan(commitsBefore)
     expect(image.style.transform).toBe(transform)
     expect(backdrop!.style.opacity).toBe(backdropOpacity)
     expect(closeChrome.style.opacity).toBe(chromeOpacity)
