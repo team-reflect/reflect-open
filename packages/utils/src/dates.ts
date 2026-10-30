@@ -20,10 +20,7 @@ import {
  * the workspace that calls date-fns.
  */
 
-/** Regex source of an ISO `YYYY-MM-DD` date, for building larger patterns. */
-export const ISO_DATE_PATTERN = String.raw`\d{4}-\d{2}-\d{2}`
-
-const ISO_DATE_RE = new RegExp(`^${ISO_DATE_PATTERN}$`)
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Is `value` an ISO `YYYY-MM-DD` string naming a real calendar day? */
 export function isIsoDate(value: string): boolean {

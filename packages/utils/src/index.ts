@@ -9,7 +9,6 @@ export {
   formatDate,
   formatIsoDate,
   formatTimeAgo,
-  ISO_DATE_PATTERN,
   isIsoDate,
   isoDateFromParts,
   isoDayStartMs,

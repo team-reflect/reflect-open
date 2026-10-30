@@ -1,13 +1,10 @@
-import { formatDate, formatIsoDate, ISO_DATE_PATTERN, parseDate } from '@reflect/utils'
+import { formatDate, formatIsoDate, parseDate } from '@reflect/utils'
 
 /**
  * The local timestamp in capture and audio-memo file names, such as
  * `2026-06-12-153022-845`.
  */
 const FILE_STAMP_FORMAT = 'yyyy-MM-dd-HHmmss-SSS'
-
-/** Regex source of a {@link formatFileStamp} stamp, for building path patterns. */
-export const FILE_STAMP_PATTERN = String.raw`${ISO_DATE_PATTERN}-\d{6}-\d{3}`
 
 /** The file-name stamp of `date`, in local time. */
 export function formatFileStamp(date: Date): string {

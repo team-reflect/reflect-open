@@ -1,5 +1,5 @@
 import { formatIsoDate } from '@reflect/utils'
-import { FILE_STAMP_PATTERN, formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
+import { formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
 import { assetPath, notePath } from '../graph/paths.ts'
 
 const INBOX_PREFIX = '.reflect/inbox/'
@@ -26,9 +26,7 @@ export interface CaptureIdentity {
   assetPath: string
 }
 
-const CAPTURE_PATH_RE = new RegExp(
-  String.raw`^notes/(capture-(${FILE_STAMP_PATTERN})-[0-9a-f]{4})\.md$`,
-)
+const CAPTURE_PATH_RE = /^notes\/(capture-(\d{4}-\d{2}-\d{2}-\d{6}-\d{3})-[0-9a-f]{4})\.md$/
 
 function buildIdentity(base: string, date: string): CaptureIdentity {
   return {

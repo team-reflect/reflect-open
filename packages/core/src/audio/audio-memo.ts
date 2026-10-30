@@ -1,5 +1,5 @@
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcription-service.ts'
-import { FILE_STAMP_PATTERN, formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
+import { formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
 import { audioMemoPath, notePath } from '../graph/paths.ts'
 import type { AudioMemoIdentity } from './audio-memo-session.ts'
 
@@ -26,9 +26,8 @@ const MIME_BY_EXTENSION: Record<string, string> = Object.fromEntries(
  * Part numbers are zero-padded to three digits and grow past it: a session
  * has no duration cap, so `part-1000` must parse like `part-999`.
  */
-const MEMO_PATH_RE = new RegExp(
-  String.raw`^audio-memos/(audio-memo-(${FILE_STAMP_PATTERN}))(?:\.part-(\d{3,})(-end)?)?\.([a-z0-9]+)$`,
-)
+const MEMO_PATH_RE =
+  /^audio-memos\/(audio-memo-(\d{4}-\d{2}-\d{2}-\d{6}-\d{3}))(?:\.part-(\d{3,})(-end)?)?\.([a-z0-9]+)$/
 
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0')
