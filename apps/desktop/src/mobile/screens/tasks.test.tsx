@@ -13,7 +13,8 @@ import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflec
 import { useRouter } from '@/routing/router.tsx'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import { swipe, translateX } from '@/test-utils/swipe.ts'
+import { act } from '@/test-utils/act.ts'
+import { scrollElement } from '@/test-utils/scroll.ts'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileTasks } from './tasks.tsx'
 
@@ -209,21 +210,16 @@ function renderScreen() {
 const waitFor = vi.waitFor
 
 /**
- * Swipe a row far enough left that its release settles open, and return its moving surface.
+ * Swipe a row open the way a finger leaves it, and return its scroller.
  */
 async function revealSwipeActions(
   view: Awaited<ReturnType<typeof renderScreen>>,
   label: string,
 ): Promise<HTMLElement> {
   const body = await view.findByRole('button', { name: `Edit: ${label}` })
-  const surface = body.parentElement!
-  const rect = surface.getBoundingClientRect()
-  await swipe(
-    surface,
-    { x: rect.right - 20, y: rect.top + 16 },
-    { x: rect.right - 160, y: rect.top + 16 },
-  )
-  return surface
+  const scroller = body.closest<HTMLElement>('[data-slot="swipe-row"]')!
+  await scrollElement({ element: scroller, left: 136, touch: true })
+  return scroller
 }
 
 let storage: TestStorageService
@@ -235,7 +231,7 @@ beforeEach(async () => {
   // A fresh service per test, so its recently-completed set starts empty.
   core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
-    // Reduced motion: an instant settle, so row transforms can be asserted synchronously.
+    // Reduced motion: a row closes with an instant scroll, not a smooth one.
     platform: createTestPlatformService({ reducedMotion: true }),
   })
   const { tasks } = core
@@ -845,14 +841,13 @@ describe('MobileTasks', () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
     const view = await renderScreen()
 
-    const surface = await revealSwipeActions(view, 'buy milk')
+    const scroller = await revealSwipeActions(view, 'buy milk')
 
     await expect
       .element(view.getByRole('button', { name: 'Open note: buy milk' }))
       .toBeInTheDocument()
     await expect.element(view.getByRole('button', { name: 'Delete: buy milk' })).toBeInTheDocument()
-    expect(translateX(surface)).toBe(-136)
-    // The drag's synthetic click was swallowed; the sheet did not open.
+    expect(scroller.scrollLeft).toBe(136)
     expect(view.queryByText('dismiss-drawer')).toBeNull()
     await view.unmount()
   })
@@ -889,10 +884,13 @@ describe('MobileTasks', () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
     const view = await renderScreen()
 
-    await revealSwipeActions(view, 'buy milk')
-    await view.getByRole('button', { name: 'Edit: buy milk' }).click()
+    const scroller = await revealSwipeActions(view, 'buy milk')
+    // A tap leaves the row where it is; a locator click would scroll it into view first.
+    const body = view.getByRole('button', { name: 'Edit: buy milk' }).element() as HTMLElement
+    await act(() => body.click())
 
     await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: buy milk' })).toBeNull())
+    expect(scroller.scrollLeft).toBe(0)
     expect(view.queryByText('dismiss-drawer')).toBeNull()
     await view.unmount()
   })

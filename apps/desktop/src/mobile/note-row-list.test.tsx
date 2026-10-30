@@ -10,8 +10,10 @@ import { useQuery } from '@tanstack/react-query'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mouse } from 'vitest-browser-commands/playwright'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
-import { pointer, swipe, translateX } from '@/test-utils/swipe.ts'
+import { act } from '@/test-utils/act.ts'
+import { scrollElement } from '@/test-utils/scroll.ts'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteRowList } from './note-row-list.tsx'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row.tsx'
@@ -19,7 +21,7 @@ import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row.tsx'
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
 
 /**
- * Render `ui` in the graph `/g` with reduced motion, so a swipe settles at once.
+ * Render `ui` in the graph `/g` with reduced motion, so a row closes at once.
  */
 function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
@@ -39,6 +41,15 @@ function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
     graph: { root: '/g', name: 'g', generation: 1 },
     settings: { dateFormat: 'mdy', timeFormat: '12h' },
   })
+}
+
+/**
+ * Scroll the row around `surface` the way a finger swipe leaves it.
+ */
+async function swipeRow(surface: Element, left: number): Promise<HTMLElement> {
+  const scroller = surface.closest<HTMLElement>('[data-slot="swipe-row"]')!
+  await scrollElement({ element: scroller, left, touch: true })
+  return scroller
 }
 
 const onOpen = vi.fn()
@@ -120,12 +131,7 @@ describe('NoteRowList', () => {
       .element(view.getByRole('button', { name: /Alpha.*First line/ }))
       .toBeInTheDocument()
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const rect = surface.getBoundingClientRect()
-    await swipe(
-      surface,
-      { x: rect.right - 20, y: rect.top + 32 },
-      { x: rect.right - 120, y: rect.top + 32 },
-    )
+    await swipeRow(surface, 136)
     await view.getByRole('button', { name: 'Pin Alpha', exact: true }).click()
     await vi.waitFor(() => {
       expect(view.core.noteRows.getOverlay('notes/alpha.md')).toMatchObject({
@@ -160,65 +166,52 @@ describe('NoteRowList', () => {
     await expect.element(view.getByRole('button')).toMatchTextContent('Tim MacCaw')
   })
 
-  it('tracks a leftward touch and reveals pin and delete actions', async () => {
+  it('reveals pin and delete actions once a leftward swipe settles open', async () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const rect = surface.getBoundingClientRect()
-
-    await swipe(
-      surface,
-      { x: rect.right - 20, y: rect.top + 32 },
-      { x: rect.right - 120, y: rect.top + 32 },
-    )
+    const scroller = await swipeRow(surface, 136)
 
     await expect.element(view.getByRole('button', { name: 'Pin Alpha' })).toBeInTheDocument()
     await expect.element(view.getByRole('button', { name: 'Delete Alpha' })).toBeInTheDocument()
-    expect(translateX(surface)).toBe(-136)
+    expect(scroller.scrollLeft).toBe(136)
     expect(onOpen).not.toHaveBeenCalled()
   })
 
-  it('leaves vertical scrolling in control and keeps the actions closed', async () => {
+  it('reveals the actions with a mouse drag', async () => {
     const view = await mount(<SwipeHarness />)
-    const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const rect = surface.getBoundingClientRect()
+    const box = view
+      .getByRole('button', { name: /Alpha.*First line/ })
+      .element()
+      .getBoundingClientRect()
+    const y = box.top + box.height / 2
 
-    await swipe(
-      surface,
-      { x: rect.right - 20, y: rect.top + 12 },
-      { x: rect.right - 22, y: rect.top + 52 },
-    )
+    await mouse.move(box.right - 20, y, { steps: 5 })
+    await mouse.down()
+    await mouse.move(box.right - 120, y, { steps: 5 })
+    await mouse.up()
 
-    expect(view.getByRole('button', { name: 'Delete Alpha' }).query()).toBeNull()
-    expect(translateX(surface)).toBe(0)
+    await expect.element(view.getByRole('button', { name: 'Delete Alpha' })).toBeInTheDocument()
+    expect(onOpen).not.toHaveBeenCalled()
   })
 
   it('closes an open row when its note surface is tapped', async () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const rect = surface.getBoundingClientRect()
-
-    await swipe(
-      surface,
-      { x: rect.right - 20, y: rect.top + 32 },
-      { x: rect.right - 120, y: rect.top + 32 },
-    )
-    await view.getByRole('button', { name: /Alpha.*First line/ }).click()
+    const scroller = await swipeRow(surface, 136)
+    // A tap leaves the row where it is; a locator click would scroll it into view first.
+    await act(() => (surface as HTMLElement).click())
 
     await vi.waitFor(() => {
       expect(view.getByRole('button', { name: 'Delete Alpha' }).query()).toBeNull()
     })
+    expect(scroller.scrollLeft).toBe(0)
     expect(onOpen).not.toHaveBeenCalled()
   })
 
   it('runs the revealed delete action without opening the note', async () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const rect = surface.getBoundingClientRect()
-    await swipe(
-      surface,
-      { x: rect.right - 20, y: rect.top + 32 },
-      { x: rect.right - 120, y: rect.top + 32 },
-    )
+    await swipeRow(surface, 136)
 
     await view.getByRole('button', { name: 'Delete Alpha' }).click()
 
@@ -231,30 +224,32 @@ describe('NoteRowList', () => {
       <SwipeHarness note={row({ path: 'daily/2026-08-15.md', canDelete: false })} />,
     )
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const rect = surface.getBoundingClientRect()
-    await swipe(
-      surface,
-      { x: rect.right - 20, y: rect.top + 32 },
-      { x: rect.right - 90, y: rect.top + 32 },
-    )
+    await swipeRow(surface, 68)
 
     await expect.element(view.getByRole('button', { name: 'Pin Alpha' })).toBeInTheDocument()
     expect(view.getByRole('button', { name: 'Delete Alpha' }).query()).toBeNull()
   })
 
-  it('recovers when a pre-threshold touch is abandoned outside the row', async () => {
-    const view = await mount(<SwipeHarness />)
-    const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
-    const rect = surface.getBoundingClientRect()
-
-    // No move/up reaches the row for this first armed touch.
-    await pointer(surface, 'pointerdown', rect.right - 20, rect.top + 32)
-    await swipe(
-      surface,
-      { x: rect.right - 20, y: rect.top + 32 },
-      { x: rect.right - 120, y: rect.top + 32 },
+  it('closes an open row when the list scrolls', async () => {
+    const rows = Array.from({ length: 20 }, (_, index) => {
+      return row({
+        path: `notes/n${index}.md`,
+        titleSegments: [{ text: `Note ${index}`, highlighted: false }],
+      })
+    })
+    const view = await mount(
+      <div style={{ width: 360, height: 300, display: 'flex' }}>
+        <NoteRowList rows={rows} onOpen={onOpen} />
+      </div>,
     )
+    await expect.element(view.getByRole('button', { name: /Note 0/ })).toBeInTheDocument()
+    const surface = view.getByRole('button', { name: /Note 0/ }).element()
+    const scroller = await swipeRow(surface, 136)
+    await expect.element(view.getByRole('button', { name: 'Delete Note 0' })).toBeInTheDocument()
 
-    await expect.element(view.getByRole('button', { name: 'Delete Alpha' })).toBeInTheDocument()
+    await scrollElement({ element: scroller.closest('ul')!.parentElement!, top: 40 })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
+    expect(view.getByRole('button', { name: 'Delete Note 0' }).query()).toBeNull()
   })
 })
