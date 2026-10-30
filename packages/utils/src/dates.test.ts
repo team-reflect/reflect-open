@@ -58,6 +58,8 @@ describe('getIsoDateFromParts', () => {
     expect(getIsoDateFromParts(2020, 1, 2)).toBe('2020-01-02')
     expect(getIsoDateFromParts(2024, 2, 29)).toBe('2024-02-29')
     expect(getIsoDateFromParts(2023, 2, 29)).toBeNull()
+    // `Pacific/Apia` had no 2011-12-30, but the ISO date exists.
+    expect(getIsoDateFromParts(2011, 12, 30)).toBe('2011-12-30')
     expect(getIsoDateFromParts(2026, 13, 1)).toBeNull()
   })
 })

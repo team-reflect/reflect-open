@@ -5,7 +5,6 @@ import {
   format,
   formatDistanceToNow,
   getDay,
-  isExists,
   isValid,
   parse,
   parseISO,
@@ -34,7 +33,7 @@ function parseUtcDate(date: string): UTCDate {
 
 /** Is `value` an ISO `YYYY-MM-DD` string naming a real calendar day? */
 export function isIsoDate(value: string): boolean {
-  return ISO_DATE_RE.test(value) && isValid(parseISO(value))
+  return ISO_DATE_RE.test(value) && isValid(parseUtcDate(value))
 }
 
 /** Local midnight of an ISO `YYYY-MM-DD` date. */
@@ -54,7 +53,8 @@ export function getIsoToday(): string {
 
 /** The ISO date of `year`, `month` (1-based), and `day`, or `null` when no such day exists. */
 export function getIsoDateFromParts(year: number, month: number, day: number): string | null {
-  return isExists(year, month - 1, day) ? formatIsoDate(new UTCDate(year, month - 1, day)) : null
+  const date = parse(`${year}-${month}-${day}`, 'y-M-d', new Date(), { in: utc })
+  return isValid(date) ? formatIsoDate(date) : null
 }
 
 /** The ISO date `days` after `date` (negative for before). */
