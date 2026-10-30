@@ -83,7 +83,7 @@ export function formatMonthLabel(yearMonth: string): string {
 }
 
 /** Short label for a `YYYY-MM` year-month, e.g. `Jun` — month-picker grid cells. */
-export function formatMonthShortLabel(yearMonth: string): string {
+export function formatShortMonthLabel(yearMonth: string): string {
   return formatDate(parseIsoDate(getMonthStart(yearMonth)), 'MMM')
 }
 

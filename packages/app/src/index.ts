@@ -97,7 +97,7 @@ export {
 export {
   buildMonthGrid,
   formatMonthLabel,
-  formatMonthShortLabel,
+  formatShortMonthLabel,
   getWeekdayLabels,
   type MonthGrid,
   type MonthGridCell,

@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
 import { getYearMonthsOfYear, getYear } from '@reflect/utils'
-import { formatMonthLabel, formatMonthShortLabel } from '@reflect/app'
+import { formatMonthLabel, formatShortMonthLabel } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -96,7 +96,7 @@ export function MonthPickerDrawer({
                   !isSelected && !isThisMonth && 'text-text',
                 )}
               >
-                {formatMonthShortLabel(candidate)}
+                {formatShortMonthLabel(candidate)}
               </button>
             )
           })}

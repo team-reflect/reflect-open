@@ -20,6 +20,12 @@ describe('addDaysToIsoDate', () => {
     expect(addDaysToIsoDate('2020-01-01', 0)).toBe('2020-01-01')
   })
 
+  it('does not skip a day that a time zone skipped', () => {
+    // `Pacific/Apia` had no 2011-12-30.
+    expect(addDaysToIsoDate('2011-12-29', 1)).toBe('2011-12-30')
+    expect(addDaysToIsoDate('2011-12-31', -1)).toBe('2011-12-30')
+  })
+
   it('is DST-safe (a spring-forward day still advances by one calendar day)', () => {
     // 2020-03-08 is the US spring-forward day.
     expect(addDaysToIsoDate('2020-03-08', 1)).toBe('2020-03-09')

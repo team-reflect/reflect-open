@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildMonthGrid,
   formatMonthLabel,
-  formatMonthShortLabel,
+  formatShortMonthLabel,
   getWeekdayLabels,
 } from './month-grid.ts'
 
@@ -13,10 +13,10 @@ describe('formatMonthLabel', () => {
   })
 })
 
-describe('formatMonthShortLabel', () => {
+describe('formatShortMonthLabel', () => {
   it('formats the abbreviated month name', () => {
-    expect(formatMonthShortLabel('2026-06')).toBe('Jun')
-    expect(formatMonthShortLabel('2026-01')).toBe('Jan')
+    expect(formatShortMonthLabel('2026-06')).toBe('Jun')
+    expect(formatShortMonthLabel('2026-01')).toBe('Jan')
   })
 })
 

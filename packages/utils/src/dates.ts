@@ -12,15 +12,25 @@ import {
   startOfWeek,
   type Day,
 } from 'date-fns'
+import { UTCDate, utc } from '@date-fns/utc'
 
 /**
- * Calendar math on local ISO `YYYY-MM-DD` dates and `YYYY-MM` year-months. Daily
- * notes are keyed by the user's local calendar day, so every date here is a
- * local-midnight {@link Date} under the hood. This module is the only place in
- * the workspace that calls date-fns.
+ * Calendar math on ISO `YYYY-MM-DD` dates and `YYYY-MM` year-months. Daily
+ * notes are keyed by the user's local calendar day: `parseIsoDate` and
+ * `formatIsoDate` convert between those keys and local {@link Date}s, while the
+ * math runs on UTC dates so it never depends on the time zone. This module is
+ * the only place in the workspace that calls date-fns.
  */
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * An ISO date as UTC midnight, for calendar math. Local midnight can be
+ * missing: `Pacific/Apia` skipped `2011-12-30`.
+ */
+function parseUtcDate(date: string): UTCDate {
+  return parseISO(date, { in: utc })
+}
 
 /** Is `value` an ISO `YYYY-MM-DD` string naming a real calendar day? */
 export function isIsoDate(value: string): boolean {
@@ -44,12 +54,12 @@ export function getIsoToday(): string {
 
 /** The ISO date of `year`, `month` (1-based), and `day`, or `null` when no such day exists. */
 export function getIsoDateFromParts(year: number, month: number, day: number): string | null {
-  return isExists(year, month - 1, day) ? formatIsoDate(new Date(year, month - 1, day)) : null
+  return isExists(year, month - 1, day) ? formatIsoDate(new UTCDate(year, month - 1, day)) : null
 }
 
 /** The ISO date `days` after `date` (negative for before). */
 export function addDaysToIsoDate(date: string, days: number): string {
-  return formatIsoDate(addDays(parseIsoDate(date), days))
+  return formatIsoDate(addDays(parseUtcDate(date), days))
 }
 
 /**
@@ -57,17 +67,17 @@ export function addDaysToIsoDate(date: string, days: number): string {
  * of the target month: `2024-01-31` plus one month is `2024-02-29`.
  */
 export function addMonthsToIsoDate(date: string, months: number): string {
-  return formatIsoDate(addMonths(parseIsoDate(date), months))
+  return formatIsoDate(addMonths(parseUtcDate(date), months))
 }
 
 /** The number of calendar days from `earlier` to `later` (negative when `later` is earlier). */
 export function getDaysBetweenIsoDates(later: string, earlier: string): number {
-  return differenceInCalendarDays(parseIsoDate(later), parseIsoDate(earlier))
+  return differenceInCalendarDays(parseUtcDate(later), parseUtcDate(earlier))
 }
 
 /** Day of week of an ISO date: 0 = Sunday … 6 = Saturday. */
 export function getWeekday(date: string): Weekday {
-  return getDay(parseIsoDate(date)) as Weekday
+  return getDay(parseUtcDate(date)) as Weekday
 }
 
 /** A day of the week: 0 = Sunday … 6 = Saturday. */
@@ -75,7 +85,7 @@ export type Weekday = Day
 
 /** The first day of `date`'s week, for a week that starts on `weekStartsOn`. */
 export function getWeekStart(date: string, weekStartsOn: Weekday): string {
-  return formatIsoDate(startOfWeek(parseIsoDate(date), { weekStartsOn }))
+  return formatIsoDate(startOfWeek(parseUtcDate(date), { weekStartsOn }))
 }
 
 /** The calendar year of an ISO date or a `YYYY-MM` year-month. */
@@ -100,7 +110,7 @@ export function addMonthsToYearMonth(yearMonth: string, months: number): string 
 
 /** The twelve `YYYY-MM` year-months of `year`, January first. */
 export function getYearMonthsOfYear(year: number): string[] {
-  return Array.from({ length: 12 }, (_, index) => format(new Date(year, index, 1), 'yyyy-MM'))
+  return Array.from({ length: 12 }, (_, index) => format(new UTCDate(year, index, 1), 'yyyy-MM'))
 }
 
 /** Format `date` with a date-fns pattern, such as `MMMM yyyy`. */
