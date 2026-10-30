@@ -130,6 +130,21 @@ export function assetPath(name: string): string {
   return `${ASSETS_DIR}/${name}`
 }
 
+/**
+ * The graph-relative path of `desiredName` under `assets/`, or of the first
+ * `-2`-suffixed variant that `exists` rejects, like Rust's `persist_unique`.
+ */
+export function pickFreeAssetPath(desiredName: string, exists: (path: string) => boolean): string {
+  const dot = desiredName.lastIndexOf('.')
+  const stem = dot > 0 ? desiredName.slice(0, dot) : desiredName
+  const extension = dot > 0 ? desiredName.slice(dot) : ''
+  let path = assetPath(desiredName)
+  for (let suffix = 2; exists(path); suffix++) {
+    path = assetPath(`${stem}-${suffix}${extension}`)
+  }
+  return path
+}
+
 /** Graph-relative path to a stored recording under `audio-memos/`. */
 export function audioMemoPath(name: string): string {
   return `${AUDIO_MEMOS_DIR}/${name}`

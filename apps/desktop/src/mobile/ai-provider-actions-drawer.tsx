@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import {
   aiModelLabel,
   aiProvider,
@@ -7,6 +7,7 @@ import {
   type AiProviderConfig,
 } from '@reflect/core'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
@@ -39,7 +40,7 @@ export function AiProviderActionsDrawer({
   onRemove,
 }: AiProviderActionsDrawerProps): ReactElement {
   const { logger } = useCoreServices()
-  const [removing, setRemoving] = useState(false)
+  const { run, pending: removing } = useAsyncAction()
   const providerInfo = provider === null ? null : aiProvider(provider.provider)
   const models =
     provider === null || providerInfo === null
@@ -63,15 +64,14 @@ export function AiProviderActionsDrawer({
   // A failed removal (keychain write, settings store) keeps the sheet open —
   // closing would read as success — and logs; the row is still there to retry.
   const remove = async (id: string): Promise<void> => {
-    setRemoving(true)
-    try {
-      await onRemove(id)
-      onOpenChange(false)
-    } catch (cause) {
-      logger.error('AI provider removal failed:', errorMessage(cause))
-    } finally {
-      setRemoving(false)
-    }
+    await run(async () => {
+      try {
+        await onRemove(id)
+        onOpenChange(false)
+      } catch (cause) {
+        logger.error('AI provider removal failed:', errorMessage(cause))
+      }
+    })
   }
 
   return (

@@ -13,6 +13,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog.tsx'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useGitSync } from '@/providers/sync-provider.tsx'
@@ -43,7 +45,8 @@ export function IcloudSettingsField(): ReactElement | null {
   const { state, disconnectGraph } = useGitSync()
   const { icloudMigration: migration, icloudNative, platform } = useCoreServices()
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const move = useAsyncAction()
+  // The move's own failure text: a return value, set mid-action by `onCopied`.
   const [error, setError] = useState<string | null>(null)
   const hosted = graph !== null && isICloudRoot(graph.root)
   const { data: status } = useQuery({
@@ -72,22 +75,20 @@ export function IcloudSettingsField(): ReactElement | null {
   const gitSyncConnected = state.phase === 'connected'
 
   async function moveToICloud(): Promise<void> {
-    setBusy(true)
     setError(null)
-    try {
-      const failure = await migration.moveGraph({
-        disconnectGitSync: gitSyncConnected ? disconnectGraph : null,
-        openGraph: openRecent,
-        onCopied: (failureSoFar) => {
-          setError(failureSoFar)
-          setConfirmOpen(false)
-        },
-      })
-      setError(failure)
-    } finally {
-      setBusy(false)
-    }
+    // Never rejects: the result is the user-facing failure text.
+    const failure = await migration.moveGraph({
+      disconnectGitSync: gitSyncConnected ? disconnectGraph : null,
+      openGraph: openRecent,
+      onCopied: (failureSoFar) => {
+        setError(failureSoFar)
+        setConfirmOpen(false)
+      },
+    })
+    setError(failure)
   }
+
+  const shownError = error ?? move.error
 
   return (
     <>
@@ -106,7 +107,10 @@ export function IcloudSettingsField(): ReactElement | null {
         ) : null}
         {hosted ? null : (
           <div className="mt-2">
-            <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <Dialog
+              open={confirmOpen}
+              onOpenChange={(open) => !move.pending && setConfirmOpen(open)}
+            >
               <DialogTrigger
                 render={
                   <Button size="xs" variant="outline" disabled={status?.available !== true}>
@@ -125,23 +129,25 @@ export function IcloudSettingsField(): ReactElement | null {
                       : ''}
                   </DialogDescription>
                 </DialogHeader>
+                {/* A failure before the copy lands keeps the dialog open; show it here too. */}
+                {shownError !== null ? <InlineAlert tone="error">{shownError}</InlineAlert> : null}
                 <DialogFooter>
                   <DialogClose
                     render={
-                      <Button variant="ghost" disabled={busy}>
+                      <Button variant="ghost" disabled={move.pending}>
                         Cancel
                       </Button>
                     }
                   />
-                  <Button disabled={busy} onClick={() => void moveToICloud()}>
-                    {busy ? 'Moving…' : 'Move to iCloud'}
+                  <Button disabled={move.pending} onClick={() => void move.run(moveToICloud)}>
+                    {move.pending ? 'Moving…' : 'Move to iCloud'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
         )}
-        {error !== null ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+        {shownError !== null ? <p className="mt-2 text-xs text-destructive">{shownError}</p> : null}
       </SettingsField>
     </>
   )

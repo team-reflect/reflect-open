@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.3...v0.17.0-beta.4) (2026-10-30)
+
+
+### Bug Fixes
+
+* **desktop:** close superseded updates ([#1775](https://github.com/team-reflect/reflect-open/issues/1775)) ([d946e3b](https://github.com/team-reflect/reflect-open/commit/d946e3bb147717c0d17c650d5d80b67fcb366065))
+* **desktop:** embed one text per ONNX Runtime run ([#1780](https://github.com/team-reflect/reflect-open/issues/1780)) ([199302c](https://github.com/team-reflect/reflect-open/commit/199302c2a6f5a061c75579199dd1347b8774d5ac))
+* **desktop:** open daily notes older than five years ([#1767](https://github.com/team-reflect/reflect-open/issues/1767)) ([3718baa](https://github.com/team-reflect/reflect-open/commit/3718baa26cbe8ddb7a6b91136eaabe293e74b36a))
+* **desktop:** wrap Objective-C calls in an autorelease pool ([#1781](https://github.com/team-reflect/reflect-open/issues/1781)) ([2c6d35e](https://github.com/team-reflect/reflect-open/commit/2c6d35ec78c53a151a7f3e6195abe3e83be43759))
+* **mobile:** drag the image lightbox without re-rendering per move ([#1785](https://github.com/team-reflect/reflect-open/issues/1785)) ([df93c54](https://github.com/team-reflect/reflect-open/commit/df93c54f76fe36148d55322144fdfb7f9d941392))
+
 ## [0.17.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.2...v0.17.0-beta.3) (2026-10-29)
 
 
