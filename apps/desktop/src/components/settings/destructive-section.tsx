@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useCallback, useState, type ReactElement } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
@@ -11,6 +11,14 @@ export function DestructiveSection(): ReactElement {
   const { graph, forget } = useGraph()
   const [confirming, setConfirming] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const graphRoot = graph?.root ?? null
+  const forgetGraph = useCallback(async () => {
+    if (graphRoot !== null) {
+      await forget(graphRoot)
+    }
+  }, [forget, graphRoot])
+  const closeForget = useCallback(() => setConfirming(false), [])
+  const closeDelete = useCallback(() => setConfirmingDelete(false), [])
   const graphId = graph?.root ?? 'this graph'
 
   return (
@@ -59,17 +67,13 @@ export function DestructiveSection(): ReactElement {
           confirmLabel="Forget graph"
           pendingLabel="Forgetting…"
           variant="destructive"
-          onConfirm={() => forget(graph.root)}
-          onClose={() => setConfirming(false)}
+          onConfirm={forgetGraph}
+          onClose={closeForget}
         />
       ) : null}
 
       {confirmingDelete && graph !== null ? (
-        <DeleteGraphDialog
-          root={graph.root}
-          name={graph.name}
-          onClose={() => setConfirmingDelete(false)}
-        />
+        <DeleteGraphDialog root={graph.root} name={graph.name} onClose={closeDelete} />
       ) : null}
     </>
   )

@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useCallback, useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
@@ -31,13 +31,14 @@ export function DescribeAssetsField(): ReactElement {
 
   const hasProvider = settings.aiProviders.length > 0
 
-  const runBackfill = (): void => {
+  const { run: runAction } = backfill
+  const runBackfill = useCallback((): void => {
     setConfirming(false)
     // `error` is intentionally not rendered: the operations UI owns failures.
-    void backfill.run(async () => {
+    void runAction(async () => {
       await assetDescription.backfillVisibly()
     })
-  }
+  }, [runAction, assetDescription])
 
   return (
     <SettingsField

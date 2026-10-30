@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useCallback, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { displayNoteTitle, errorMessage, type TemplateEntry } from '@reflect/core'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
@@ -35,6 +35,8 @@ export function TemplatesSection(): ReactElement {
   const { openTemplateCreate } = useNoteTemplates()
   const [renaming, setRenaming] = useState<TemplateEntry | null>(null)
   const [deleting, setDeleting] = useState<TemplateEntry | null>(null)
+  const closeRename = useCallback(() => setRenaming(null), [])
+  const closeDelete = useCallback(() => setDeleting(null), [])
   const { data: templates } = useQuery({
     ...createTemplatesQueryOptions(indexQuery, graph?.root),
     enabled: graph !== null,
@@ -93,10 +95,10 @@ export function TemplatesSection(): ReactElement {
         </div>
       </SettingsField>
       {renaming !== null ? (
-        <TemplateRenameDialog template={renaming} onClose={() => setRenaming(null)} />
+        <TemplateRenameDialog template={renaming} onClose={closeRename} />
       ) : null}
       {deleting !== null ? (
-        <TemplateDeleteDialog template={deleting} onClose={() => setDeleting(null)} />
+        <TemplateDeleteDialog template={deleting} onClose={closeDelete} />
       ) : null}
     </SettingsSection>
   )
@@ -113,7 +115,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
   const [name, setName] = useState(template.title)
   const { run, pending, error } = useAsyncAction()
 
-  const rename = (): void => {
+  const rename = useCallback((): void => {
     const trimmed = name.trim()
     if (trimmed === '') {
       return
@@ -122,7 +124,7 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
       await templates.renameTemplate(template.path, trimmed)
       onClose()
     })
-  }
+  }, [name, run, templates, template.path, onClose])
 
   return (
     <Dialog
@@ -177,7 +179,7 @@ function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): React
   const { noteActions } = useCoreServices()
   const { operations } = useAppServices()
 
-  const trash = async (): Promise<void> => {
+  const trash = useCallback(async (): Promise<void> => {
     const operation = operations.start('Trashing template')
     try {
       await noteActions.trashOne(template.path)
@@ -186,7 +188,7 @@ function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): React
       throw cause
     }
     operation.done()
-  }
+  }, [operations, noteActions, template.path])
 
   return (
     <ConfirmActionDialog

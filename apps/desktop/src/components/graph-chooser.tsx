@@ -1,4 +1,4 @@
-import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { useCallback, useId, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Cloud, Folder, FolderPlus } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
@@ -225,26 +225,34 @@ function IcloudCard({
   // land inside the existing graph instead of next to it.
   const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, existing)
 
-  function start(nextTarget: string, work: () => Promise<boolean>): void {
-    // setTarget runs inside the action, so a call the guard drops never
-    // moves the spinner off the control that is actually running.
-    void action.run(async () => {
-      setTarget(nextTarget)
-      await work()
-    })
-  }
+  const { run } = action
+  const start = useCallback(
+    (nextTarget: string, work: () => Promise<boolean>): void => {
+      // setTarget runs inside the action, so a call the guard drops never
+      // moves the spinner off the control that is actually running.
+      void run(async () => {
+        setTarget(nextTarget)
+        await work()
+      })
+    },
+    [run],
+  )
 
-  function create(): void {
-    if (status?.documentsRoot == null || cleanName === null || nameTaken) {
+  const documentsRoot = status?.documentsRoot ?? null
+  const create = useCallback((): void => {
+    if (documentsRoot === null || cleanName === null || nameTaken) {
       return
     }
-    const root = `${status.documentsRoot}/${cleanName}`
+    const root = `${documentsRoot}/${cleanName}`
     start('create', () => createAt(root))
-  }
+  }, [documentsRoot, cleanName, nameTaken, start, createAt])
 
-  function open(root: string): void {
-    start(root, () => openRecent(root))
-  }
+  const open = useCallback(
+    (root: string): void => {
+      start(root, () => openRecent(root))
+    },
+    [start, openRecent],
+  )
 
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
