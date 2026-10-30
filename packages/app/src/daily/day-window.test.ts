@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createDayWindow,
   dateAtIndex,
+  extendDayWindowBack,
   indexOfDate,
   indexWithin,
   FUTURE_DAYS,
@@ -63,5 +64,21 @@ describe('indexWithin', () => {
   it('returns -1 one day past each edge', () => {
     expect(indexWithin(window, dateAtIndex(window, -1))).toBe(-1)
     expect(indexWithin(window, dateAtIndex(window, window.count))).toBe(-1)
+  })
+})
+
+describe('extendDayWindowBack', () => {
+  const window = createDayWindow('2026-06-12')
+
+  it('returns the same window for a date not before its start', () => {
+    expect(extendDayWindowBack(window, '2026-01-01')).toBe(window)
+    expect(extendDayWindowBack(window, '2040-01-01')).toBe(window)
+  })
+
+  it('grows back to the usual reach behind an earlier date, keeping the anchor day', () => {
+    const extended = extendDayWindowBack(window, '2003-05-01')
+    expect(indexWithin(extended, '2003-05-01')).toBe(PAST_DAYS)
+    expect(dateAtIndex(extended, extended.anchorIndex)).toBe('2026-06-12')
+    expect(dateAtIndex(extended, extended.count - 1)).toBe(dateAtIndex(window, window.count - 1))
   })
 })

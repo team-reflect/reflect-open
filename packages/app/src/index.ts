@@ -85,6 +85,7 @@ export { dailyArrivalIntent } from './daily/daily-arrivals.ts'
 export {
   createDayWindow,
   dateAtIndex,
+  extendDayWindowBack,
   FUTURE_DAYS,
   indexOfDate,
   indexWithin,

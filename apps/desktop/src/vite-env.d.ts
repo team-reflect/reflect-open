@@ -9,9 +9,3 @@ interface ImportMetaEnv {
   /** Public Sentry project endpoint injected only into official release builds. */
   readonly VITE_SENTRY_DSN?: string
 }
-
-/**
- * App version injected by Vite.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-declare const __REFLECT_VERSION__: string
