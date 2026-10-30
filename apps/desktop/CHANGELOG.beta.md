@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.4...v0.17.0-beta.5) (2026-10-30)
+
+
+### Bug Fixes
+
+* update meowdown ([#1795](https://github.com/team-reflect/reflect-open/issues/1795)) ([1bbfb2d](https://github.com/team-reflect/reflect-open/commit/1bbfb2d1d84a2ef9c3ded5ed774624344475819c))
+
 ## [0.17.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.3...v0.17.0-beta.4) (2026-10-30)
 
 
