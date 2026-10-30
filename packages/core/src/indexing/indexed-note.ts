@@ -1,16 +1,11 @@
+import { isCalendarDate } from '@reflect/utils'
 import { z } from 'zod'
 import {
   markdownNoteReference,
   noteBasenameKey,
   wikiNoteReference,
 } from '../graph/note-reference.ts'
-import {
-  dateFromDailyPath,
-  foldGraphPath,
-  isCalendarDate,
-  isDaily,
-  isTemplatePath,
-} from '../graph/paths.ts'
+import { dateFromDailyPath, foldGraphPath, isDaily, isTemplatePath } from '../graph/paths.ts'
 import { hasSearchableChar } from '../lib/searchable-char.ts'
 import {
   canonicalEmail,

@@ -8,11 +8,11 @@ import {
   dateFromDailyPath,
   encodeTaskBreadcrumbs,
   foldGraphPath,
-  isCalendarDate,
   noteBasenameKey,
   AppError,
   type IndexedNote,
 } from '@reflect/core'
+import { isCalendarDate } from '@reflect/utils'
 
 /**
  * The dev bridge's SQLite index: the real `crates/index-schema` migrations

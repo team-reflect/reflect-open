@@ -1,6 +1,7 @@
+import { isCalendarDate } from '@reflect/utils'
 import { AppError } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
-import { dateFromDailyPath, foldGraphPath, isCalendarDate } from '../graph/paths.ts'
+import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import { CLAIM_TIER, type IndexedNote } from '../indexing/indexed-note.ts'
 import {
   createIndexApplyBatchWriter,

@@ -200,7 +200,6 @@ export {
   isNotePath,
   dateFromDailyPath,
   foldGraphPath,
-  isCalendarDate,
 } from './graph/paths.ts'
 export { noteBasenameKey } from './graph/note-reference.ts'
 export {

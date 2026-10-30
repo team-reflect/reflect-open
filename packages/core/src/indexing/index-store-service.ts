@@ -1,8 +1,8 @@
-import type { MaybePromise } from '@reflect/utils'
+import { isCalendarDate, type MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
-import { dateFromDailyPath, foldGraphPath, isCalendarDate } from '../graph/paths.ts'
+import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { DatabaseService } from './database-service.ts'
 
