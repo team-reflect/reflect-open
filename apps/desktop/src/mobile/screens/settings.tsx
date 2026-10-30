@@ -4,6 +4,7 @@ import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { useAppVersion } from '@/hooks/use-app-version.ts'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
@@ -129,9 +130,8 @@ export function MobileSettings(): ReactElement {
   const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
   const sync = useGitSyncContext()
   const githubConnected = useGithubConnected()
-  const [disconnecting, setDisconnecting] = useState(false)
-  const [signingOut, setSigningOut] = useState(false)
-  const [signOutError, setSignOutError] = useState<string | null>(null)
+  const disconnectAction = useAsyncAction()
+  const signOutAction = useAsyncAction()
   const [signInOpen, setSignInOpen] = useState(false)
   // Which connect sheet is open: the host choice, or one host's own flow.
   // `remoteUrl` prefills the host form for a remote that is already set.
@@ -191,29 +191,27 @@ export function MobileSettings(): ReactElement {
     if (sync === null) {
       return
     }
-    setDisconnecting(true)
-    try {
-      await sync.disconnectGraph()
-    } catch (err) {
-      logger.error('stop syncing failed:', errorMessage(err))
-    } finally {
-      setDisconnecting(false)
-    }
+    await disconnectAction.run(async () => {
+      try {
+        await sync.disconnectGraph()
+      } catch (err) {
+        logger.error('stop syncing failed:', errorMessage(err))
+      }
+    })
   }
 
   // Forget the GitHub sign-in of this device; every GitHub repository stops
   // syncing until the next sign-in.
   async function signOut(): Promise<void> {
-    setSigningOut(true)
-    setSignOutError(null)
-    try {
-      await githubAuth.clear()
-    } catch (err) {
-      setSignOutError(errorMessage(err))
-      logger.error('GitHub sign-out failed:', errorMessage(err))
-    } finally {
-      setSigningOut(false)
-    }
+    await signOutAction.run(async () => {
+      try {
+        await githubAuth.clear()
+      } catch (err) {
+        logger.error('GitHub sign-out failed:', errorMessage(err))
+        // Rethrown so `signOutAction.error` shows it in the Accounts footer.
+        throw err
+      }
+    })
   }
 
   const storageLabel =
@@ -415,7 +413,7 @@ export function MobileSettings(): ReactElement {
                 <SettingsActionRow
                   label="Stop syncing"
                   tone="destructive"
-                  pending={disconnecting}
+                  pending={disconnectAction.pending}
                   onPress={() => void disconnect()}
                 />
               ) : null}
@@ -425,7 +423,7 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup
             header="Accounts"
             footer={
-              signOutError ??
+              signOutAction.error ??
               'GitHub is used for GitHub repositories and for sharing notes as gists.'
             }
           >
@@ -433,7 +431,7 @@ export function MobileSettings(): ReactElement {
               <SettingsActionRow
                 label="Sign out of GitHub"
                 tone="destructive"
-                pending={signingOut}
+                pending={signOutAction.pending}
                 onPress={() => void signOut()}
               />
             ) : (

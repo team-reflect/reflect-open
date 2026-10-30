@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 export interface NoteTrash {
@@ -11,7 +11,6 @@ export interface NoteTrash {
    * succeeded (to clear the selection) and can close its confirm either way.
    */
   trash: (paths: readonly string[]) => Promise<boolean>
-  isTrashing: boolean
 }
 
 /**
@@ -33,23 +32,17 @@ export interface NoteTrash {
  */
 export function useNoteTrash(): NoteTrash {
   const { noteActions } = useCoreServices()
-  const [isTrashing, setIsTrashing] = useState(false)
 
   const trash = useCallback(
     async (paths: readonly string[]): Promise<boolean> => {
       if (paths.length === 0) {
         return true
       }
-      setIsTrashing(true)
-      try {
-        const { failed } = await noteActions.trashMany(paths)
-        return failed.length === 0
-      } finally {
-        setIsTrashing(false)
-      }
+      const { failed } = await noteActions.trashMany(paths)
+      return failed.length === 0
     },
     [noteActions],
   )
 
-  return { trash, isTrashing }
+  return { trash }
 }

@@ -72,6 +72,9 @@ export function GitSyncSettingsField(): ReactElement {
   const [dialog, setDialog] = useState<OpenDialog | null>(null)
   const openRepoAttemptRef = useRef(0)
   const action = useAsyncAction()
+  // Opening the repository in the browser is separate from sync/disconnect,
+  // so neither clears the other's message.
+  const [openError, setOpenError] = useState<string | null>(null)
 
   const hosted = graph !== null && isICloudRoot(graph.root)
   const repo = state.phase === 'connected' ? githubRepoOf(state.remote) : null
@@ -89,17 +92,17 @@ export function GitSyncSettingsField(): ReactElement {
     const url = githubRepoBrowserUrl(repo)
     const attempt = openRepoAttemptRef.current + 1
     openRepoAttemptRef.current = attempt
-    action.setError(null)
+    setOpenError(null)
     void opener
       .openUrl(url)
       .then(() => {
         if (openRepoAttemptRef.current === attempt) {
-          action.setError(null)
+          setOpenError(null)
         }
       })
       .catch(() => {
         if (openRepoAttemptRef.current === attempt) {
-          action.setError(`Couldn’t open the browser — visit ${url} yourself.`)
+          setOpenError(`Couldn’t open the browser — visit ${url} yourself.`)
         }
       })
   }
@@ -109,6 +112,7 @@ export function GitSyncSettingsField(): ReactElement {
       variant="ghost"
       size="sm"
       title="This graph stops syncing; its history and your sign-ins stay"
+      disabled={action.pending}
       onClick={() => void action.run(disconnectGraph)}
     >
       Stop syncing
@@ -211,6 +215,10 @@ export function GitSyncSettingsField(): ReactElement {
 
           {action.error !== null ? (
             <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
+          ) : null}
+          {/* Only while the repository it names is still connected. */}
+          {openError !== null && repo !== null ? (
+            <p className="text-xs text-red-700 dark:text-red-300">{openError}</p>
           ) : null}
         </div>
       </SettingsField>

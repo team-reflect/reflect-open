@@ -1,68 +1,25 @@
-import { useState, type ReactElement } from 'react'
-import { errorMessage } from '@reflect/core'
+import { useCallback, useState, type ReactElement } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button.tsx'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 
 export function DestructiveSection(): ReactElement {
-  const { graph, forget, deleteGraph } = useGraph()
+  const { graph, forget } = useGraph()
   const [confirming, setConfirming] = useState(false)
-  const [forgetting, setForgetting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteName, setDeleteName] = useState('')
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const graphRoot = graph?.root ?? null
+  const forgetGraph = useCallback(async () => {
+    if (graphRoot !== null) {
+      await forget(graphRoot)
+    }
+  }, [forget, graphRoot])
+  const closeForget = useCallback(() => setConfirming(false), [])
+  const closeDelete = useCallback(() => setConfirmingDelete(false), [])
   const graphId = graph?.root ?? 'this graph'
-  const graphName = graph?.name ?? ''
-  // GitHub-style guard: the delete button stays dead until the typed name
-  // matches the graph's folder name exactly.
-  const nameConfirmed = graph !== null && deleteName === graph.name
-
-  const forgetGraph = async (): Promise<void> => {
-    if (graph === null || forgetting) {
-      return
-    }
-    setForgetting(true)
-    try {
-      await forget(graph.root)
-      setConfirming(false)
-    } finally {
-      setForgetting(false)
-    }
-  }
-
-  const openDeleteDialog = (): void => {
-    setDeleteName('')
-    setDeleteError(null)
-    setConfirmingDelete(true)
-  }
-
-  const deleteGraphToTrash = async (): Promise<void> => {
-    if (!nameConfirmed || deleting) {
-      return
-    }
-    setDeleting(true)
-    setDeleteError(null)
-    try {
-      await deleteGraph()
-      setConfirmingDelete(false)
-    } catch (err) {
-      setDeleteError(errorMessage(err))
-    } finally {
-      setDeleting(false)
-    }
-  }
 
   return (
     <>
@@ -73,7 +30,7 @@ export function DestructiveSection(): ReactElement {
               type="button"
               variant="destructive"
               size="sm"
-              disabled={graph === null || forgetting}
+              disabled={graph === null}
               onClick={() => setConfirming(true)}
             >
               Forget graph
@@ -89,8 +46,8 @@ export function DestructiveSection(): ReactElement {
               type="button"
               variant="destructive"
               size="sm"
-              disabled={graph === null || deleting}
-              onClick={openDeleteDialog}
+              disabled={graph === null}
+              onClick={() => setConfirmingDelete(true)}
             >
               Delete graph
             </Button>
@@ -98,81 +55,84 @@ export function DestructiveSection(): ReactElement {
         </SettingsField>
       </SettingsSection>
 
-      <Dialog open={confirming} onOpenChange={(open) => !forgetting && setConfirming(open)}>
-        <DialogContent>
-          <DialogTitle>Forget graph?</DialogTitle>
-          <DialogDescription className="min-w-0">
-            Remove <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span>{' '}
-            from saved graphs. Files stay on disk.
-          </DialogDescription>
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button variant="ghost" disabled={forgetting}>
-                  Cancel
-                </Button>
-              }
-            />
-            <Button variant="destructive" disabled={forgetting} onClick={() => void forgetGraph()}>
-              {forgetting ? 'Forgetting…' : 'Forget graph'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirming && graph !== null ? (
+        <ConfirmActionDialog
+          title="Forget graph?"
+          description={
+            <>
+              Remove <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span>{' '}
+              from saved graphs. Files stay on disk.
+            </>
+          }
+          confirmLabel="Forget graph"
+          pendingLabel="Forgetting…"
+          variant="destructive"
+          onConfirm={forgetGraph}
+          onClose={closeForget}
+        />
+      ) : null}
 
-      <Dialog
-        open={confirmingDelete}
-        onOpenChange={(open) => !deleting && setConfirmingDelete(open)}
-      >
-        <DialogContent>
-          <DialogTitle>Delete graph?</DialogTitle>
-          <DialogDescription className="min-w-0">
-            Move the entire selected folder{' '}
-            <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span> and
-            everything inside it to Trash. Type{' '}
-            <span className="font-mono text-text">{graphName}</span> to confirm.
-          </DialogDescription>
-          <Input
-            aria-label="Graph name"
-            placeholder={graphName}
-            value={deleteName}
-            autoComplete="off"
-            spellCheck={false}
-            disabled={deleting}
-            onChange={(event) => setDeleteName(event.target.value)}
-            onKeyDown={(event) => {
-              if (getIsComposing()) {
-                return
-              }
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                void deleteGraphToTrash()
-              }
-            }}
-          />
-          {deleteError !== null && (
-            <p role="alert" className="text-xs text-destructive">
-              {deleteError}
-            </p>
-          )}
-          <DialogFooter>
-            <DialogClose
-              render={
-                <Button variant="ghost" disabled={deleting}>
-                  Cancel
-                </Button>
-              }
-            />
-            <Button
-              variant="destructive"
-              disabled={!nameConfirmed || deleting}
-              onClick={() => void deleteGraphToTrash()}
-            >
-              {deleting ? 'Deleting…' : 'Delete graph'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {confirmingDelete && graph !== null ? (
+        <DeleteGraphDialog root={graph.root} name={graph.name} onClose={closeDelete} />
+      ) : null}
     </>
+  )
+}
+
+/** Mounted only while open, so the typed name and any error start fresh each time. */
+function DeleteGraphDialog({
+  root,
+  name,
+  onClose,
+}: {
+  root: string
+  name: string
+  onClose: () => void
+}): ReactElement {
+  const { deleteGraph } = useGraph()
+  const [typedName, setTypedName] = useState('')
+  // GitHub-style guard: the delete button stays dead until the typed name
+  // matches the graph's folder name exactly.
+  const nameConfirmed = typedName === name
+
+  return (
+    <ConfirmActionDialog
+      title="Delete graph?"
+      description={
+        <>
+          Move the entire selected folder{' '}
+          <span className="font-mono text-text [overflow-wrap:anywhere]">{root}</span> and
+          everything inside it to Trash. Type <span className="font-mono text-text">{name}</span> to
+          confirm.
+        </>
+      }
+      confirmLabel="Delete graph"
+      pendingLabel="Deleting…"
+      variant="destructive"
+      confirmDisabled={!nameConfirmed}
+      onConfirm={deleteGraph}
+      onClose={onClose}
+    >
+      {({ confirm, pending }) => (
+        <Input
+          aria-label="Graph name"
+          placeholder={name}
+          value={typedName}
+          autoComplete="off"
+          spellCheck={false}
+          disabled={pending}
+          onChange={(event) => setTypedName(event.target.value)}
+          onKeyDown={(event) => {
+            if (getIsComposing()) {
+              return
+            }
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              confirm()
+            }
+          }}
+        />
+      )}
+    </ConfirmActionDialog>
   )
 }
