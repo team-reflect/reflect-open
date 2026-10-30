@@ -7,7 +7,21 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 /** The per-provider management sheet: make-default and remove wiring. */
 
 vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  // "Dismiss sheet" stands in for a swipe-down or backdrop tap.
+  Drawer: ({
+    children,
+    onOpenChange,
+  }: {
+    children?: ReactNode
+    onOpenChange?: (open: boolean) => void
+  }) => (
+    <>
+      {children}
+      <button type="button" onClick={() => onOpenChange?.(false)}>
+        Dismiss sheet
+      </button>
+    </>
+  ),
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
@@ -81,6 +95,29 @@ describe('AiProviderActionsDrawer', () => {
 
     await vi.waitFor(() => expect(onRemove).toHaveBeenCalledWith('p1'))
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  })
+
+  it('cannot be dismissed while the removal is pending', async () => {
+    const pending = Promise.withResolvers<void>()
+    onRemove.mockReturnValue(pending.promise)
+    await renderSheet()
+
+    await page.getByRole('button', { name: 'Remove provider' }).click()
+    await vi.waitFor(() => expect(onRemove).toHaveBeenCalledWith('p1'))
+    await page.getByRole('button', { name: 'Dismiss sheet' }).click()
+    expect(onOpenChange).not.toHaveBeenCalled()
+
+    pending.resolve()
+    await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(onOpenChange).toHaveBeenCalledTimes(1)
+  })
+
+  it('can be dismissed while idle', async () => {
+    await renderSheet()
+
+    await page.getByRole('button', { name: 'Dismiss sheet' }).click()
+
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   it('a failed removal keeps the sheet open for a retry', async () => {

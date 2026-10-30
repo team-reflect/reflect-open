@@ -75,7 +75,15 @@ export function AiProviderActionsDrawer({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer
+      open={open}
+      onOpenChange={(next) => {
+        // A swipe cannot dismiss the sheet while the removal is running.
+        if (next || !removing) {
+          onOpenChange(next)
+        }
+      }}
+    >
       <DrawerContent aria-label="Manage AI provider">
         {provider !== null && providerInfo !== null ? (
           <>

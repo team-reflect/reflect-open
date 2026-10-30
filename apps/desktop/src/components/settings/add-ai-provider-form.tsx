@@ -23,12 +23,15 @@ import {
 } from '@/components/ui/select.tsx'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit.ts'
+import { useReportPending } from '@/hooks/use-report-pending.ts'
 import { ModelCombobox } from './model-combobox.tsx'
 
 interface AddAiProviderFormProps {
   /** Persists the new provider (keychain + settings); rejects on failure. */
   onAdd: (draft: NewAiProvider) => Promise<void>
   onClose: () => void
+  /** Reports whether a submit is running, so the host can refuse to dismiss. */
+  onPendingChange: (pending: boolean) => void
 }
 
 interface AddAiProviderValues {
@@ -46,7 +49,11 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * inline, unreachable providers downgrading to "Save anyway") is
  * {@link useAddAiProviderSubmit}, shared with the mobile sheet.
  */
-export function AddAiProviderForm({ onAdd, onClose }: AddAiProviderFormProps): ReactElement {
+export function AddAiProviderForm({
+  onAdd,
+  onClose,
+  onPendingChange,
+}: AddAiProviderFormProps): ReactElement {
   const { register, control, handleSubmit, setValue, formState } = useForm<AddAiProviderValues>({
     defaultValues: {
       provider: AI_PROVIDERS[0].id,
@@ -60,6 +67,9 @@ export function AddAiProviderForm({ onAdd, onClose }: AddAiProviderFormProps): R
     onAdd,
     onDone: onClose,
   })
+
+  const pending = formState.isSubmitting
+  useReportPending(pending, onPendingChange)
 
   const providerId = useWatch({ control, name: 'provider' })
   const selectedModel = useWatch({ control, name: 'model' })
@@ -210,10 +220,10 @@ export function AddAiProviderForm({ onAdd, onClose }: AddAiProviderFormProps): R
       ) : null}
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onClose}>
+        <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={formState.isSubmitting}>
+        <Button type="submit" size="sm" disabled={pending}>
           {unverified ? 'Save anyway' : 'Add provider'}
         </Button>
       </div>

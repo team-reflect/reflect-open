@@ -31,6 +31,8 @@ const TemplateCreateForm = lazy(async () => {
 export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): ReactElement {
   const { createOpen, closeTemplateCreate } = useNoteTemplates()
   const [showForm, setShowForm] = useState(createOpen)
+  // A create in flight would still land and navigate, so it cannot be dismissed.
+  const [pending, setPending] = useState(false)
 
   if (createOpen && !showForm) {
     setShowForm(true)
@@ -40,7 +42,7 @@ export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): Re
     <Dialog
       open={createOpen}
       onOpenChange={(isOpen) => {
-        if (!isOpen) {
+        if (!isOpen && !pending) {
           closeTemplateCreate()
         }
       }}
@@ -59,7 +61,13 @@ export function TemplateCreateDialog({ context }: TemplateCreateDialogProps): Re
             </DialogDescription>
           </DialogHeader>
 
-          {showForm ? <TemplateCreateForm onClose={closeTemplateCreate} context={context} /> : null}
+          {showForm ? (
+            <TemplateCreateForm
+              onClose={closeTemplateCreate}
+              onPendingChange={setPending}
+              context={context}
+            />
+          ) : null}
         </DialogContent>
       </Suspense>
     </Dialog>
