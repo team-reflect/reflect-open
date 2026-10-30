@@ -230,6 +230,9 @@ export function watchScrollSettle({
     const controller = new AbortController()
     press = controller
     const pressSignal = AbortSignal.any([signal, controller.signal])
+    // The button is down: from `pointerdown` until `pointerup` or `pointercancel`.
+    const released = new AbortController()
+    const held = AbortSignal.any([pressSignal, released.signal])
     pressSignal.addEventListener(
       'abort',
       () => {
@@ -265,43 +268,44 @@ export function watchScrollSettle({
         }
         element.scrollTo({ [x ? 'left' : 'top']: start - delta, behavior: 'instant' })
       },
-      { signal: pressSignal },
+      { signal: held },
     )
-    window.addEventListener(
-      'pointerup',
-      () => {
-        if (!dragging) {
-          controller.abort()
-          return
-        }
-        element.style.scrollSnapType = ''
-        suppressNextClick()
-        const range = x
-          ? element.scrollWidth - element.clientWidth
-          : element.scrollHeight - element.clientHeight
-        const end = position() < range / 2 ? 0 : range
-        // The press lasts until the release scroll stops: on `scrollend` at
-        // `end`, or after the quiet time. A late `scrollend` from the drag
-        // itself does not end it, and an interrupted scroll cannot hold it.
-        const wait = (): void => {
-          clearTimeout(quiet)
-          quiet = setTimeout(finish, SETTLE_IDLE_MS)
-        }
-        element.addEventListener('scroll', wait, { passive: true, signal: pressSignal })
-        element.addEventListener(
-          'scrollend',
-          () => {
-            if (Math.abs(position() - end) < 1) {
-              finish()
-            }
-          },
-          { signal: pressSignal },
-        )
-        wait()
-        element.scrollTo({ [x ? 'left' : 'top']: end, behavior: 'smooth' })
-      },
-      { once: true, signal: pressSignal },
-    )
+    // `pointercancel` ends the press like `pointerup`, so a lost pointer cannot
+    // hold the element.
+    const release = (): void => {
+      released.abort()
+      if (!dragging) {
+        controller.abort()
+        return
+      }
+      element.style.scrollSnapType = ''
+      suppressNextClick()
+      const range = x
+        ? element.scrollWidth - element.clientWidth
+        : element.scrollHeight - element.clientHeight
+      const end = position() < range / 2 ? 0 : range
+      // The press lasts until the release scroll stops: on `scrollend` at
+      // `end`, or after the quiet time. A late `scrollend` from the drag
+      // itself does not end it, and an interrupted scroll cannot hold it.
+      const wait = (): void => {
+        clearTimeout(quiet)
+        quiet = setTimeout(finish, SETTLE_IDLE_MS)
+      }
+      element.addEventListener('scroll', wait, { passive: true, signal: pressSignal })
+      element.addEventListener(
+        'scrollend',
+        () => {
+          if (Math.abs(position() - end) < 1) {
+            finish()
+          }
+        },
+        { signal: pressSignal },
+      )
+      wait()
+      element.scrollTo({ [x ? 'left' : 'top']: end, behavior: 'smooth' })
+    }
+    window.addEventListener('pointerup', release, { signal: held })
+    window.addEventListener('pointercancel', release, { signal: held })
   }
 
   return {

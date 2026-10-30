@@ -290,6 +290,33 @@ describe('watchScrollSettle', () => {
       expect(watch.isUserScroll()).toBe(true)
     })
 
+    it('ends a drag on `pointercancel`', async () => {
+      const element = mountSnapScroller()
+      const onSettle = vi.fn()
+      const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+
+      mouse('pointerdown', element, 200)
+      mouse('pointermove', window, 150)
+      mouse('pointercancel', window, 150)
+
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(watch.isTouching()).toBe(false)
+      expect(element.style.scrollSnapType).toBe('')
+    })
+
+    it('stops following the mouse once the button is up', () => {
+      const element = mountSnapScroller()
+      watchScrollSettle({ element, onSettle: vi.fn(), signal: listeners.controller.signal })
+
+      mouse('pointerdown', element, 200)
+      mouse('pointermove', window, 150)
+      mouse('pointerup', window, 150)
+      const scrollTo = vi.spyOn(element, 'scrollTo')
+      mouse('pointermove', window, 20)
+
+      expect(scrollTo).not.toHaveBeenCalled()
+    })
+
     it('starts a drag only on the drag handle', () => {
       const element = mountSnapScroller()
       const handle = document.createElement('div')
