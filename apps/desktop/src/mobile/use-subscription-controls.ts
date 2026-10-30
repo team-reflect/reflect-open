@@ -86,7 +86,7 @@ export function useSubscriptionControls(): SubscriptionControls {
       opener.openUrlSync('https://apps.apple.com/account/subscriptions')
     },
     restore: async () => {
-      redeemAction.setError(null)
+      redeemAction.reset()
       await restoreAction.run(async () => {
         let found
         try {
@@ -95,12 +95,12 @@ export function useSubscriptionControls(): SubscriptionControls {
           throw new Error('Restore failed. Check your connection and try again.', { cause: error })
         }
         if (found === null) {
-          restoreAction.setError('No previous purchase found for this Apple account.')
+          throw new Error('No previous purchase found for this Apple account.')
         }
       })
     },
     redeem: async () => {
-      restoreAction.setError(null)
+      restoreAction.reset()
       await redeemAction.run(async () => {
         try {
           await paywall.redeemCode()
