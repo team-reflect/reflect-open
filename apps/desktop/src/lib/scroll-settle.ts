@@ -3,7 +3,35 @@
  */
 const SETTLE_IDLE_MS = 120
 
+/**
+ * Mouse travel (px) before a press becomes a drag, so a click stays a click.
+ */
+const DRAG_THRESHOLD_PX = 4
+
+/**
+ * Press targets that keep their own meaning (focus, caret, text selection) and
+ * start no mouse drag.
+ */
+const NO_DRAG_SELECTOR = 'input, textarea, select, [contenteditable]'
+
+/**
+ * The finger id a mouse drag holds. Touch identifiers are never negative.
+ */
+const MOUSE = -1
+
 export interface ScrollSettleOptions {
+  /**
+   * The scroller to watch. Its `scroll-snap-type` axis is the mouse drag axis.
+   */
+  element: HTMLElement
+  /**
+   * Called each time the element settles.
+   */
+  onSettle: () => void
+  /**
+   * Stops the watch and any mouse drag in progress.
+   */
+  signal: AbortSignal
   /**
    * Whether the element already rests where no further scroll can follow, for
    * example a pager at its first page. When this returns true on a `scroll` or
@@ -12,23 +40,10 @@ export interface ScrollSettleOptions {
    */
   isSettled?: (() => boolean) | undefined
   /**
-   * Lets a mouse drag scroll the element along `axis`, the way a finger does.
-   * A drag starts on `handle` (the element by default), not on a control or
-   * editable text. Snapping is off while the mouse moves; on release the
-   * element scrolls smoothly to the nearer end of its range.
+   * Where a mouse drag may start. Defaults to `element`.
    */
-  mouseDrag?: { axis: 'x' | 'y'; handle?: HTMLElement | undefined } | undefined
+  dragHandle?: HTMLElement | undefined
 }
-
-/**
- * Pointer travel (px) before a mouse press becomes a drag, so a click stays a click.
- */
-const DRAG_THRESHOLD_PX = 4
-
-/**
- * Targets where a mouse press keeps its own meaning and starts no drag.
- */
-const NO_DRAG_SELECTOR = 'button, a, input, textarea, select, [contenteditable]'
 
 export interface ScrollSettleWatch {
   /**
@@ -38,8 +53,7 @@ export interface ScrollSettleWatch {
   isTouching: () => boolean
   /**
    * True when the current or last scroll began from a touch, a mouse drag, or
-   * a wheel. False
-   * for scrolls that code, focus, or the keyboard started.
+   * a wheel. False for scrolls that code, focus, or the keyboard started.
    */
   isUserScroll: () => boolean
 }
@@ -49,15 +63,19 @@ export interface ScrollSettleWatch {
  * after a swipe, its momentum, and its snap, or after a scroll that code,
  * focus, or a re-snap started. `scrollend` reports early where the engine has
  * it; a quiet-time timer covers the engines without it.
+ *
+ * A mouse drag scrolls the element the way a finger does: snapping is off
+ * while the mouse moves, and on release the element scrolls smoothly to the
+ * nearer end of its range. The drag and that scroll count as one user scroll.
  */
-export function watchScrollSettle(
-  element: HTMLElement,
-  onSettle: () => void,
-  signal: AbortSignal,
-  options?: ScrollSettleOptions,
-): ScrollSettleWatch {
-  const isSettled = options?.isSettled
-  // Fingers that landed on the element and have not lifted.
+export function watchScrollSettle({
+  element,
+  onSettle,
+  signal,
+  isSettled,
+  dragHandle = element,
+}: ScrollSettleOptions): ScrollSettleWatch {
+  // Fingers that landed on the element and have not lifted, plus `MOUSE`.
   const fingers = new Set<number>()
   // A finger is down, or lifted after it moved the element, and that scroll has not settled.
   let fingerScroll = false
@@ -73,10 +91,8 @@ export function watchScrollSettle(
   // frames belong to the reported scroll.
   let snapTail = false
   let snapTailTimer: ReturnType<typeof setTimeout> | undefined
-  // A mouse drag or its release scroll is running.
-  let mouseDragging = false
 
-  const isTouching = (): boolean => fingers.size > 0 || mouseDragging
+  const isTouching = (): boolean => fingers.size > 0
   const endSnapTail = (): void => {
     snapTail = false
     clearTimeout(snapTailTimer)
@@ -176,132 +192,7 @@ export function watchScrollSettle(
     { passive: true, signal },
   )
   element.addEventListener('scrollend', flush, { signal })
-  const mouseDrag = options?.mouseDrag
-  if (mouseDrag) {
-    const endMouseDrag = (): void => {
-      mouseDragging = false
-      if (!pending) {
-        // The drag moved nothing, for example at the end of the range.
-        fingerScroll = false
-      }
-      flush()
-    }
-    ;(mouseDrag.handle ?? element).addEventListener(
-      'pointerdown',
-      (down: PointerEvent) => {
-        if (
-          down.pointerType !== 'mouse' ||
-          down.button !== 0 ||
-          (down.target instanceof Element && down.target.closest(NO_DRAG_SELECTOR))
-        ) {
-          return
-        }
-        // Stops text selection and keeps the press from focusing anything.
-        down.preventDefault()
-        const x = mouseDrag.axis === 'x'
-        const start = x ? element.scrollLeft : element.scrollTop
-        const origin = x ? down.clientX : down.clientY
-        const snapType = element.style.scrollSnapType
-        let dragging = false
-        const controller = new AbortController()
-        const drag = AbortSignal.any([signal, controller.signal])
-        drag.addEventListener(
-          'abort',
-          () => {
-            if (signal.aborted && dragging) {
-              element.style.scrollSnapType = snapType
-              mouseDragging = false
-            }
-          },
-          { once: true },
-        )
-        // On the window, so the drag keeps going when the mouse leaves the element.
-        window.addEventListener(
-          'pointermove',
-          (move: PointerEvent) => {
-            const delta = (x ? move.clientX : move.clientY) - origin
-            if (!dragging) {
-              if (Math.abs(delta) < DRAG_THRESHOLD_PX) {
-                return
-              }
-              dragging = true
-              mouseDragging = true
-              endSnapTail()
-              fingerScroll = true
-              element.style.scrollSnapType = 'none'
-            }
-            element.scrollTo({ [x ? 'left' : 'top']: start - delta, behavior: 'instant' })
-          },
-          { signal: drag },
-        )
-        const release = (): void => {
-          controller.abort()
-          if (!dragging) {
-            return
-          }
-          element.style.scrollSnapType = snapType
-          // The click that ends a drag is not a click. It fires in the same
-          // task as `pointerup`, if at all.
-          const click = new AbortController()
-          window.addEventListener(
-            'click',
-            (event) => {
-              event.preventDefault()
-              event.stopImmediatePropagation()
-            },
-            {
-              capture: true,
-              once: true,
-              signal: AbortSignal.any([signal, click.signal]),
-            },
-          )
-          setTimeout(() => click.abort(), 0)
-          const position = x ? element.scrollLeft : element.scrollTop
-          const range = x
-            ? element.scrollWidth - element.clientWidth
-            : element.scrollHeight - element.clientHeight
-          const end = position < range / 2 ? 0 : range
-          if (Math.abs(end - position) < 1) {
-            endMouseDrag()
-            return
-          }
-          // The drag lasts until the release scroll reaches the end. A late
-          // `scrollend` from the drag itself, or an interrupted scroll that
-          // goes quiet, must not leave it running.
-          const settle = new AbortController()
-          const finish = (): void => {
-            clearTimeout(quiet)
-            settle.abort()
-            endMouseDrag()
-          }
-          let quiet = setTimeout(finish, SETTLE_IDLE_MS)
-          element.addEventListener(
-            'scroll',
-            () => {
-              clearTimeout(quiet)
-              quiet = setTimeout(finish, SETTLE_IDLE_MS)
-            },
-            { passive: true, signal: AbortSignal.any([signal, settle.signal]) },
-          )
-          element.addEventListener(
-            'scrollend',
-            () => {
-              const now = x ? element.scrollLeft : element.scrollTop
-              if (Math.abs(end - now) < 1) {
-                finish()
-              }
-            },
-            { signal: AbortSignal.any([signal, settle.signal]) },
-          )
-          signal.addEventListener('abort', () => clearTimeout(quiet), { once: true })
-          element.scrollTo({ [x ? 'left' : 'top']: end, behavior: 'smooth' })
-        }
-        window.addEventListener('pointerup', release, { signal: drag })
-        window.addEventListener('pointercancel', release, { signal: drag })
-      },
-      { signal },
-    )
-  }
+  dragHandle.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
   signal.addEventListener(
     'abort',
     () => {
@@ -311,8 +202,136 @@ export function watchScrollSettle(
     { once: true },
   )
 
+  // One press, from `pointerdown` until the release scroll stops. Aborting
+  // `press` undoes everything it set.
+  function dragWithMouse(down: PointerEvent): void {
+    const axis = snapAxis(element)
+    if (
+      down.pointerType !== 'mouse' ||
+      down.button !== 0 ||
+      !axis ||
+      (down.target instanceof Element && down.target.closest(NO_DRAG_SELECTOR))
+    ) {
+      return
+    }
+    // Stops text selection.
+    down.preventDefault()
+    const x = axis === 'x'
+    const position = (): number => (x ? element.scrollLeft : element.scrollTop)
+    const pointer = (event: PointerEvent): number => (x ? event.clientX : event.clientY)
+    const start = position()
+    const origin = pointer(down)
+    let dragging = false
+    let quiet: ReturnType<typeof setTimeout> | undefined
+    const controller = new AbortController()
+    const press = AbortSignal.any([signal, controller.signal])
+    press.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(quiet)
+        fingers.delete(MOUSE)
+        element.style.scrollSnapType = ''
+      },
+      { once: true },
+    )
+    const finish = (): void => {
+      controller.abort()
+      if (!pending) {
+        // The drag moved nothing, for example at the end of the range.
+        fingerScroll = false
+      }
+      flush()
+    }
+
+    // On the window, so the drag goes on when the mouse leaves the element.
+    window.addEventListener(
+      'pointermove',
+      (move) => {
+        const delta = pointer(move) - origin
+        if (!dragging && Math.abs(delta) < DRAG_THRESHOLD_PX) {
+          return
+        }
+        if (!dragging) {
+          dragging = true
+          fingers.add(MOUSE)
+          fingerScroll = true
+          endSnapTail()
+          element.style.scrollSnapType = 'none'
+        }
+        element.scrollTo({ [x ? 'left' : 'top']: start - delta, behavior: 'instant' })
+      },
+      { signal: press },
+    )
+    window.addEventListener(
+      'pointerup',
+      () => {
+        if (!dragging) {
+          controller.abort()
+          return
+        }
+        element.style.scrollSnapType = ''
+        suppressNextClick()
+        const range = x
+          ? element.scrollWidth - element.clientWidth
+          : element.scrollHeight - element.clientHeight
+        const end = position() < range / 2 ? 0 : range
+        // The press lasts until the release scroll stops: on `scrollend` at
+        // `end`, or after the quiet time. A late `scrollend` from the drag
+        // itself does not end it, and an interrupted scroll cannot hold it.
+        const wait = (): void => {
+          clearTimeout(quiet)
+          quiet = setTimeout(finish, SETTLE_IDLE_MS)
+        }
+        element.addEventListener('scroll', wait, { passive: true, signal: press })
+        element.addEventListener(
+          'scrollend',
+          () => {
+            if (Math.abs(position() - end) < 1) {
+              finish()
+            }
+          },
+          { signal: press },
+        )
+        wait()
+        element.scrollTo({ [x ? 'left' : 'top']: end, behavior: 'smooth' })
+      },
+      { once: true, signal: press },
+    )
+  }
+
   return {
     isTouching,
     isUserScroll: () => userScroll,
   }
+}
+
+/**
+ * The axis of `element`'s `scroll-snap-type`, if it snaps on one axis.
+ */
+function snapAxis(element: HTMLElement): 'x' | 'y' | undefined {
+  const type = getComputedStyle(element).scrollSnapType
+  if (/^(?:x|inline)\b/.test(type)) {
+    return 'x'
+  }
+  if (/^(?:y|block)\b/.test(type)) {
+    return 'y'
+  }
+  return undefined
+}
+
+/**
+ * Swallows the click that ends a drag, if one comes. It fires in the same task
+ * as `pointerup`, so the trap is gone by the next task either way.
+ */
+function suppressNextClick(): void {
+  const controller = new AbortController()
+  window.addEventListener(
+    'click',
+    (event) => {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    },
+    { capture: true, once: true, signal: controller.signal },
+  )
+  setTimeout(() => controller.abort(), 0)
 }

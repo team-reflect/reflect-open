@@ -11,7 +11,9 @@ export function dispatchTouch(element: Element, phase: 'start' | 'end'): void {
   element.dispatchEvent(event)
 }
 
-/** `dispatchTouch` inside `act`. */
+/**
+ * `dispatchTouch` inside `act`.
+ */
 export async function touch(element: Element, phase: 'start' | 'end'): Promise<void> {
   await act(() => {
     dispatchTouch(element, phase)
@@ -19,28 +21,36 @@ export async function touch(element: Element, phase: 'start' | 'end'): Promise<v
 }
 
 /**
- * Scrolls `element` to `position` the way a finished gesture leaves it: one
- * `scroll` event, then `scrollend`. With `touch`, a `touchstart` comes first
- * and a `touchend` lands before `scrollend`, so the scroll counts as a
- * finger's. When `element` is already at `position`, no `scroll` or
- * `scrollend` follows. It does not wait for any settle report; tests wait for
- * the effect they expect.
+ * Scrolls `element` to `left` / `top` the way a finished gesture leaves it:
+ * one `scroll` event, then `scrollend`. With `touch`, a `touchstart` comes
+ * first and a `touchend` lands before `scrollend`, so the scroll counts as a
+ * finger's. When `element` is already there, no `scroll` or `scrollend`
+ * follows. It does not wait for any settle report; tests wait for the effect
+ * they expect.
  */
-export async function scrollElement(
-  element: HTMLElement,
-  position: { left?: number; top?: number },
-  options?: { touch?: boolean | undefined },
-): Promise<void> {
-  const finger = options?.touch ?? false
+export async function scrollElement({
+  element,
+  left,
+  top,
+  touch: finger = false,
+}: {
+  element: HTMLElement
+  left?: number | undefined
+  top?: number | undefined
+  touch?: boolean | undefined
+}): Promise<void> {
   if (finger) {
     await touch(element, 'start')
   }
   let moved = false
   await act(async () => {
-    const left = element.scrollLeft
-    const top = element.scrollTop
-    element.scrollTo({ ...position, behavior: 'instant' })
-    moved = element.scrollLeft !== left || element.scrollTop !== top
+    const before = [element.scrollLeft, element.scrollTop]
+    element.scrollTo({
+      ...(left === undefined ? {} : { left }),
+      ...(top === undefined ? {} : { top }),
+      behavior: 'instant',
+    })
+    moved = element.scrollLeft !== before[0] || element.scrollTop !== before[1]
     if (moved) {
       await new Promise<void>((resolve) => {
         element.addEventListener('scroll', () => resolve(), { once: true })
