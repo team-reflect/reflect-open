@@ -34,7 +34,8 @@ const writeArgsSchema = z.object({
   checkContents: z.boolean().optional(),
   expectedContents: z.string().nullable().optional(),
 })
-const createArgsSchema = writeArgsSchema.extend({ generation: z.number().int().nonnegative() })
+const generationArgsSchema = z.object({ generation: z.number().int().nonnegative() })
+const createArgsSchema = writeArgsSchema.extend(generationArgsSchema.shape)
 const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
 const moveRequestArgsSchema = z.object({
   request: z.object({ from: z.string(), to: z.string() }),
@@ -66,8 +67,14 @@ const chatSaveArgsSchema = z.object({
   }),
 })
 const uploadIdArgsSchema = z.object({ id: z.string() })
-const uploadCommitArgsSchema = uploadIdArgsSchema.extend({ desiredName: z.string() })
-const uploadCommitPathArgsSchema = uploadIdArgsSchema.extend({ path: z.string() })
+const uploadCommitArgsSchema = uploadIdArgsSchema.extend({
+  ...generationArgsSchema.shape,
+  desiredName: z.string(),
+})
+const uploadCommitPathArgsSchema = uploadIdArgsSchema.extend({
+  ...generationArgsSchema.shape,
+  path: z.string(),
+})
 const chatDeleteArgsSchema = z.object({ id: z.string() })
 const iapPayloadSchema = z.object({ productType: z.literal('subs') })
 const iapProductArgsSchema = z.object({
@@ -248,9 +255,7 @@ class DevBridgeImpl implements DevBridge {
       }
       case 'note_create': {
         const { path, contents, generation } = createArgsSchema.parse(args)
-        if (generation !== this.#graphInfo.generation) {
-          throw new AppError('io', 'the graph changed since this command was issued; dropping it')
-        }
+        this.#checkGeneration(generation)
         return files.create(path, contents)
       }
       case 'note_exists':
@@ -282,9 +287,10 @@ class DevBridgeImpl implements DevBridge {
       }
 
       case 'asset_write': {
-        const { path, contentsBase64 } = z
-          .object({ path: z.string(), contentsBase64: z.string() })
+        const { path, contentsBase64, generation } = generationArgsSchema
+          .extend({ path: z.string(), contentsBase64: z.string() })
           .parse(args)
+        this.#checkGeneration(generation)
         this.#writeAsset(path, base64ToBytes(contentsBase64))
         return null
       }
@@ -299,19 +305,22 @@ class DevBridgeImpl implements DevBridge {
           modifiedMs: asset.modifiedMs,
         }))
       case 'asset_upload_begin': {
+        this.#checkGeneration(generationArgsSchema.parse(args).generation)
         this.#uploadCount += 1
         const id = `upload-${this.#uploadCount}`
         this.#uploads.set(id, [])
         return id
       }
       case 'asset_upload_commit': {
-        const { id, desiredName } = uploadCommitArgsSchema.parse(args)
+        const { id, desiredName, generation } = uploadCommitArgsSchema.parse(args)
+        this.#checkGeneration(generation)
         const path = pickFreeAssetPath(desiredName, (candidate) => this.#assets.has(candidate))
         this.#writeAsset(path, this.#finishUpload(id))
         return path
       }
       case 'asset_upload_commit_path': {
-        const { id, path } = uploadCommitPathArgsSchema.parse(args)
+        const { id, path, generation } = uploadCommitPathArgsSchema.parse(args)
+        this.#checkGeneration(generation)
         const bytes = this.#finishUpload(id)
         if (this.#assets.has(path)) {
           throw new AppError('io', `target already exists: ${path}`)
@@ -420,6 +429,12 @@ class DevBridgeImpl implements DevBridge {
       default:
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)
         throw new AppError('unknown', `dev bridge: unimplemented command "${command}"`)
+    }
+  }
+
+  #checkGeneration(generation: number): void {
+    if (generation !== this.#graphInfo.generation) {
+      throw new AppError('io', 'the graph changed since this command was issued; dropping it')
     }
   }
 
