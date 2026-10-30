@@ -11,15 +11,34 @@ export interface ScrollSettleOptions {
    * the quiet time.
    */
   isSettled?: (() => boolean) | undefined
+  /**
+   * Lets a mouse drag scroll the element along `axis`, the way a finger does.
+   * A drag starts on `handle` (the element by default), not on a control or
+   * editable text. Snapping is off while the mouse moves; on release the
+   * element scrolls smoothly to the nearer end of its range.
+   */
+  mouseDrag?: { axis: 'x' | 'y'; handle?: HTMLElement | undefined } | undefined
 }
+
+/**
+ * Pointer travel (px) before a mouse press becomes a drag, so a click stays a click.
+ */
+const DRAG_THRESHOLD_PX = 4
+
+/**
+ * Targets where a mouse press keeps its own meaning and starts no drag.
+ */
+const NO_DRAG_SELECTOR = 'button, a, input, textarea, select, [contenteditable]'
 
 export interface ScrollSettleWatch {
   /**
-   * True while a finger that landed on the element is down.
+   * True while a finger that landed on the element is down, or a mouse drag
+   * and its release scroll are running.
    */
   isTouching: () => boolean
   /**
-   * True when the current or last scroll began from a touch or a wheel. False
+   * True when the current or last scroll began from a touch, a mouse drag, or
+   * a wheel. False
    * for scrolls that code, focus, or the keyboard started.
    */
   isUserScroll: () => boolean
@@ -54,8 +73,10 @@ export function watchScrollSettle(
   // frames belong to the reported scroll.
   let snapTail = false
   let snapTailTimer: ReturnType<typeof setTimeout> | undefined
+  // A mouse drag or its release scroll is running.
+  let mouseDragging = false
 
-  const isTouching = (): boolean => fingers.size > 0
+  const isTouching = (): boolean => fingers.size > 0 || mouseDragging
   const endSnapTail = (): void => {
     snapTail = false
     clearTimeout(snapTailTimer)
@@ -155,6 +176,110 @@ export function watchScrollSettle(
     { passive: true, signal },
   )
   element.addEventListener('scrollend', flush, { signal })
+  const mouseDrag = options?.mouseDrag
+  if (mouseDrag) {
+    const endMouseDrag = (): void => {
+      mouseDragging = false
+      flush()
+    }
+    ;(mouseDrag.handle ?? element).addEventListener(
+      'pointerdown',
+      (down: PointerEvent) => {
+        if (
+          down.pointerType !== 'mouse' ||
+          down.button !== 0 ||
+          (down.target instanceof Element && down.target.closest(NO_DRAG_SELECTOR))
+        ) {
+          return
+        }
+        // Stops text selection and keeps the press from focusing anything.
+        down.preventDefault()
+        const x = mouseDrag.axis === 'x'
+        const start = x ? element.scrollLeft : element.scrollTop
+        const origin = x ? down.clientX : down.clientY
+        const snapType = element.style.scrollSnapType
+        let dragging = false
+        const drag = new AbortController()
+        // On the window, so the drag keeps going when the mouse leaves the element.
+        window.addEventListener(
+          'pointermove',
+          (move: PointerEvent) => {
+            const delta = (x ? move.clientX : move.clientY) - origin
+            if (!dragging) {
+              if (Math.abs(delta) < DRAG_THRESHOLD_PX) {
+                return
+              }
+              dragging = true
+              mouseDragging = true
+              endSnapTail()
+              fingerScroll = true
+              element.style.scrollSnapType = 'none'
+            }
+            element.scrollTo({ [x ? 'left' : 'top']: start - delta, behavior: 'instant' })
+          },
+          { signal: drag.signal },
+        )
+        const release = (): void => {
+          drag.abort()
+          if (!dragging) {
+            return
+          }
+          element.style.scrollSnapType = snapType
+          // The click that ends a drag is not a click. It fires in the same
+          // task as `pointerup`, if at all.
+          const click = new AbortController()
+          window.addEventListener('click', (event) => event.preventDefault(), {
+            capture: true,
+            once: true,
+            signal: AbortSignal.any([signal, click.signal]),
+          })
+          setTimeout(() => click.abort(), 0)
+          const position = x ? element.scrollLeft : element.scrollTop
+          const range = x
+            ? element.scrollWidth - element.clientWidth
+            : element.scrollHeight - element.clientHeight
+          const end = position < range / 2 ? 0 : range
+          if (Math.abs(end - position) < 1) {
+            endMouseDrag()
+            return
+          }
+          // The drag lasts until the release scroll reaches the end. A late
+          // `scrollend` from the drag itself, or an interrupted scroll that
+          // goes quiet, must not leave it running.
+          const settle = new AbortController()
+          const finish = (): void => {
+            clearTimeout(quiet)
+            settle.abort()
+            endMouseDrag()
+          }
+          let quiet = setTimeout(finish, SETTLE_IDLE_MS)
+          element.addEventListener(
+            'scroll',
+            () => {
+              clearTimeout(quiet)
+              quiet = setTimeout(finish, SETTLE_IDLE_MS)
+            },
+            { passive: true, signal: AbortSignal.any([signal, settle.signal]) },
+          )
+          element.addEventListener(
+            'scrollend',
+            () => {
+              const now = x ? element.scrollLeft : element.scrollTop
+              if (Math.abs(end - now) < 1) {
+                finish()
+              }
+            },
+            { signal: AbortSignal.any([signal, settle.signal]) },
+          )
+          signal.addEventListener('abort', () => clearTimeout(quiet), { once: true })
+          element.scrollTo({ [x ? 'left' : 'top']: end, behavior: 'smooth' })
+        }
+        window.addEventListener('pointerup', release, { signal: drag.signal })
+        window.addEventListener('pointercancel', release, { signal: drag.signal })
+      },
+      { signal },
+    )
+  }
   signal.addEventListener(
     'abort',
     () => {

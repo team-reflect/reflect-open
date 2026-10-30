@@ -160,6 +160,71 @@ describe('watchScrollSettle', () => {
     expect(watch.isUserScroll()).toBe(true)
   })
 
+  describe('mouse drag', () => {
+    function mouse(type: string, target: EventTarget, clientX: number): void {
+      target.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'mouse', clientX }),
+      )
+    }
+
+    it('scrolls with the mouse, then settles at the nearer end as a user scroll', async () => {
+      const element = mountScroller()
+      const onSettle = vi.fn()
+      const watch = watchScrollSettle(element, onSettle, listeners.controller.signal, {
+        mouseDrag: { axis: 'x' },
+      })
+
+      mouse('pointerdown', element, 200)
+      mouse('pointermove', window, 150)
+      await vi.waitFor(() => expect(element.scrollLeft).toBe(50))
+      expect(element.style.scrollSnapType).toBe('none')
+      expect(watch.isTouching()).toBe(true)
+      // Past half of the 200px range.
+      mouse('pointermove', window, 80)
+      mouse('pointerup', window, 80)
+
+      expect(element.style.scrollSnapType).toBe('')
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(element.scrollLeft).toBe(200)
+      expect(watch.isUserScroll()).toBe(true)
+      expect(watch.isTouching()).toBe(false)
+    })
+
+    it('leaves a click under the drag distance alone', async () => {
+      const element = mountScroller()
+      const onSettle = vi.fn()
+      watchScrollSettle(element, onSettle, listeners.controller.signal, {
+        mouseDrag: { axis: 'x' },
+      })
+      const onClick = vi.fn((event: MouseEvent) => event.defaultPrevented)
+
+      mouse('pointerdown', element, 200)
+      mouse('pointermove', window, 198)
+      mouse('pointerup', window, 198)
+      element.addEventListener('click', onClick)
+      element.click()
+
+      expect(element.scrollLeft).toBe(0)
+      expect(onClick).toHaveReturnedWith(false)
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      expect(onSettle).not.toHaveBeenCalled()
+    })
+
+    it('starts no drag on a button', () => {
+      const element = mountScroller()
+      const button = document.createElement('button')
+      element.firstElementChild!.append(button)
+      watchScrollSettle(element, vi.fn(), listeners.controller.signal, {
+        mouseDrag: { axis: 'x' },
+      })
+
+      mouse('pointerdown', button, 200)
+      mouse('pointermove', window, 100)
+
+      expect(element.scrollLeft).toBe(0)
+    })
+  })
+
   it('stops reporting after abort', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
