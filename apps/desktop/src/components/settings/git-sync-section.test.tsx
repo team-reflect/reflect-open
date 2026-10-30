@@ -169,6 +169,7 @@ describe('GitSyncSettingsField', () => {
 
     await userEvent.click(page.getByRole('button', { name: 'Sync now' }))
 
+    await vi.waitFor(() => expect(gitSync.calls()).toContainEqual({ method: 'syncNow' }))
     await expect.element(page.getByText(/Couldn’t open the browser/)).toBeVisible()
   })
 

@@ -216,7 +216,8 @@ export function GitSyncSettingsField(): ReactElement {
           {action.error !== null ? (
             <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
           ) : null}
-          {openError !== null ? (
+          {/* Only while the repository it names is still connected. */}
+          {openError !== null && repo !== null ? (
             <p className="text-xs text-red-700 dark:text-red-300">{openError}</p>
           ) : null}
         </div>
