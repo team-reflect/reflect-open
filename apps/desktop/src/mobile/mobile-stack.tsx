@@ -215,7 +215,7 @@ interface MobileStackProps {
  * thread. Stacked screens pan only vertically (`.mobile-pager-content` in
  * index.css); a strip along the card's left edge takes the horizontal drag,
  * by finger or by mouse, and hands taps to what lies under it. A horizontal scroller inside a
- * stacked screen needs `data-pager-pan-x`.
+ * stacked screen needs `data-scroll-x`.
  *
  * A stacked screen must not hold a `position: fixed` element: it stays put
  * while the card moves. Put floating UI in a portal or the top layer.
