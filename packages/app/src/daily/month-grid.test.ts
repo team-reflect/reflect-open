@@ -1,27 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { buildMonthGrid, monthLabel, monthShortLabel, weekdayLabels } from './month-grid.ts'
+import {
+  buildMonthGrid,
+  formatMonthLabel,
+  formatMonthShortLabel,
+  getWeekdayLabels,
+} from './month-grid.ts'
 
-describe('monthLabel', () => {
+describe('formatMonthLabel', () => {
   it('formats a human month label', () => {
-    expect(monthLabel('2026-06')).toBe('June 2026')
-    expect(monthLabel('2026-01')).toBe('January 2026')
+    expect(formatMonthLabel('2026-06')).toBe('June 2026')
+    expect(formatMonthLabel('2026-01')).toBe('January 2026')
   })
 })
 
-describe('monthShortLabel', () => {
+describe('formatMonthShortLabel', () => {
   it('formats the abbreviated month name', () => {
-    expect(monthShortLabel('2026-06')).toBe('Jun')
-    expect(monthShortLabel('2026-01')).toBe('Jan')
+    expect(formatMonthShortLabel('2026-06')).toBe('Jun')
+    expect(formatMonthShortLabel('2026-01')).toBe('Jan')
   })
 })
 
-describe('weekdayLabels', () => {
+describe('getWeekdayLabels', () => {
   it('returns seven labels starting on Monday', () => {
-    expect(weekdayLabels('monday')).toEqual(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'])
+    expect(getWeekdayLabels('monday')).toEqual(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'])
   })
 
   it('returns Saturday-first labels when configured', () => {
-    expect(weekdayLabels('saturday')).toEqual(['Sa', 'Su', 'Mo', 'Tu', 'We', 'Th', 'Fr'])
+    expect(getWeekdayLabels('saturday')).toEqual(['Sa', 'Su', 'Mo', 'Tu', 'We', 'Th', 'Fr'])
   })
 })
 

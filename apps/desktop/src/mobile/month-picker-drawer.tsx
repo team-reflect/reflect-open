@@ -2,8 +2,8 @@ import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
-import { monthsOfYear, yearOf } from '@reflect/utils'
-import { monthLabel, monthShortLabel } from '@reflect/app'
+import { getYearMonthsOfYear, getYear } from '@reflect/utils'
+import { formatMonthLabel, formatMonthShortLabel } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -36,18 +36,18 @@ export function MonthPickerDrawer({
   onPick,
 }: MonthPickerDrawerProps): ReactElement {
   const { haptics } = useMobileServices()
-  const [year, setYear] = useState(() => yearOf(month))
+  const [year, setYear] = useState(() => getYear(month))
   // Each open starts from the currently displayed month's year, not wherever
   // the previous visit browsed to. Adjust-on-render, mirroring MonthTitle.
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
     if (open) {
-      setYear(yearOf(month))
+      setYear(getYear(month))
     }
   }
 
-  const months = monthsOfYear(year)
+  const months = getYearMonthsOfYear(year)
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -82,7 +82,7 @@ export function MonthPickerDrawer({
               <button
                 key={candidate}
                 type="button"
-                aria-label={monthLabel(candidate)}
+                aria-label={formatMonthLabel(candidate)}
                 aria-pressed={isSelected}
                 aria-current={isThisMonth ? 'date' : undefined}
                 onClick={() => {
@@ -96,7 +96,7 @@ export function MonthPickerDrawer({
                   !isSelected && !isThisMonth && 'text-text',
                 )}
               >
-                {monthShortLabel(candidate)}
+                {formatMonthShortLabel(candidate)}
               </button>
             )
           })}

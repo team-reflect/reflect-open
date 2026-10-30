@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ChevronDown, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { addDaysIso, monthOf } from '@reflect/utils'
-import { weekStartOf } from '@reflect/core'
+import { addDaysToIsoDate, getYearMonth } from '@reflect/utils'
+import { getUserWeekStart } from '@reflect/core'
 import { monthPickTarget, weekAtIndex } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
@@ -61,14 +61,14 @@ export function CalendarStrip({
   )
   const dailyNoteDates = useDailyNoteDates(
     weekWindow.start,
-    addDaysIso(weekAtIndex(weekWindow, weekWindow.count - 1), 6),
+    addDaysToIsoDate(weekAtIndex(weekWindow, weekWindow.count - 1), 6),
   )
 
   // Header month: the selection's own month while its week is on screen;
   // while browsing, the visible week's dominant (middle-day) month.
-  const selectionWeekStart = weekStartOf(date, settings.weekStartDay)
+  const selectionWeekStart = getUserWeekStart(date, settings.weekStartDay)
   const headerDate =
-    displayedWeekStart === selectionWeekStart ? date : addDaysIso(displayedWeekStart, 3)
+    displayedWeekStart === selectionWeekStart ? date : addDaysToIsoDate(displayedWeekStart, 3)
   const showToday = date !== today
 
   const jumpToToday = (): void => {
@@ -132,7 +132,7 @@ export function CalendarStrip({
             className="flex min-w-0 items-center gap-1"
             onClick={openMonthPicker}
           >
-            <MonthTitle month={monthOf(headerDate)} />
+            <MonthTitle month={getYearMonth(headerDate)} />
             <ChevronDown aria-hidden className="size-4 shrink-0 text-text-muted" />
           </button>
         </h1>
@@ -158,7 +158,7 @@ export function CalendarStrip({
         <div className="flex">
           {Array.from({ length: weekWindow.count }, (_, index) => {
             const weekStart = weekAtIndex(weekWindow, index)
-            const weekEnd = addDaysIso(weekStart, 6)
+            const weekEnd = addDaysToIsoDate(weekStart, 6)
             const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
             return (
               <WeekRow
@@ -176,9 +176,9 @@ export function CalendarStrip({
       <MonthPickerDrawer
         open={monthPickerOpen}
         onOpenChange={setMonthPickerOpen}
-        month={monthOf(headerDate)}
-        selected={monthOf(date)}
-        today={monthOf(today)}
+        month={getYearMonth(headerDate)}
+        selected={getYearMonth(date)}
+        today={getYearMonth(today)}
         onPick={pickMonth}
       />
     </header>

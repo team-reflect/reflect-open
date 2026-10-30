@@ -2,7 +2,7 @@ import { act } from '@/test-utils/act.ts'
 import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WeekStartDay } from '@reflect/core'
-import { weekStartOf } from '@reflect/core'
+import { getUserWeekStart } from '@reflect/core'
 import { createWeekWindow, weekAtIndex, weekIndexOf } from '@reflect/app'
 import { shouldRecenterWeeks, useWeekStrip } from './use-week-strip.ts'
 
@@ -156,7 +156,7 @@ describe('useWeekStrip', () => {
     expect(embla.api.reInit).toHaveBeenCalledWith({
       startIndex: rebuilt.anchorIndex,
     })
-    expect(result.current.displayedWeekStart).toBe(weekStartOf(target, WEEK_START))
+    expect(result.current.displayedWeekStart).toBe(getUserWeekStart(target, WEEK_START))
     expect(embla.api.scrollTo).not.toHaveBeenCalled()
   })
 
@@ -170,7 +170,7 @@ describe('useWeekStrip', () => {
     expect(embla.api.reInit).toHaveBeenCalledWith({
       startIndex: rebuilt.anchorIndex,
     })
-    expect(result.current.displayedWeekStart).toBe(weekStartOf('2027-06-12', WEEK_START))
+    expect(result.current.displayedWeekStart).toBe(getUserWeekStart('2027-06-12', WEEK_START))
   })
 
   it('rebuilds when the week-start setting re-aligns the weeks', async () => {
@@ -186,7 +186,7 @@ describe('useWeekStrip', () => {
     expect(embla.api.reInit).toHaveBeenCalledWith({
       startIndex: rebuilt.anchorIndex,
     })
-    expect(result.current.displayedWeekStart).toBe(weekStartOf(DATE, 'sunday'))
+    expect(result.current.displayedWeekStart).toBe(getUserWeekStart(DATE, 'sunday'))
   })
 })
 

@@ -17,7 +17,7 @@
  * A malformed token (impossible date, empty value) stays search text — typing
  * never makes results vanish behind a filter the user didn't form yet.
  */
-import { isIsoDate, isoDayStartMs } from '@reflect/utils'
+import { addDaysToIsoDate, isIsoDate, parseIsoDate } from '@reflect/utils'
 import { foldTag } from '../markdown/index.ts'
 
 export interface SearchFilters {
@@ -158,12 +158,12 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
       const date = op === null ? value : value.slice(1)
       if (isIsoDate(date)) {
         if (op === '>') {
-          filters.updatedAfterMs = isoDayStartMs(date, 0)
+          filters.updatedAfterMs = parseIsoDate(date).getTime()
         } else if (op === '<') {
-          filters.updatedBeforeMs = isoDayStartMs(date, 0)
+          filters.updatedBeforeMs = parseIsoDate(date).getTime()
         } else {
-          filters.updatedAfterMs = isoDayStartMs(date, 0)
-          filters.updatedBeforeMs = isoDayStartMs(date, 1)
+          filters.updatedAfterMs = parseIsoDate(date).getTime()
+          filters.updatedBeforeMs = parseIsoDate(addDaysToIsoDate(date, 1)).getTime()
         }
         filtered = true
         continue

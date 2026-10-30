@@ -1,9 +1,9 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
-import { addMonthsToMonth, monthOf } from '@reflect/utils'
+import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
-import { buildMonthGrid, monthLabel, weekdayLabels } from '@reflect/app'
+import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 
@@ -35,13 +35,13 @@ export function TaskScheduleCalendar({
   children,
 }: TaskScheduleCalendarProps): ReactElement {
   const { settings } = useSettings()
-  const [month, setMonth] = useState(() => monthOf(today))
+  const [month, setMonth] = useState(() => getYearMonth(today))
   // Re-anchor to today's month each time the popover opens, without an effect.
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
     if (open) {
-      setMonth(monthOf(today))
+      setMonth(getYearMonth(today))
     }
   }
 
@@ -56,12 +56,12 @@ export function TaskScheduleCalendar({
       <PopoverTrigger render={children} />
       <PopoverContent align="end" className="w-auto p-0" aria-label="Schedule">
         <header className="flex items-center justify-between px-4 pt-3 pb-1">
-          <div className="text-sm font-semibold text-text">{monthLabel(month)}</div>
+          <div className="text-sm font-semibold text-text">{formatMonthLabel(month)}</div>
           <nav className="flex items-center gap-1 text-text-muted">
             <button
               type="button"
               aria-label="Previous month"
-              onClick={() => setMonth(addMonthsToMonth(month, -1))}
+              onClick={() => setMonth(addMonthsToYearMonth(month, -1))}
               className="rounded-md p-0.5 transition-colors hover:bg-surface-hover hover:text-text"
             >
               <ChevronLeft className="size-4" />
@@ -69,7 +69,7 @@ export function TaskScheduleCalendar({
             <button
               type="button"
               aria-label="Next month"
-              onClick={() => setMonth(addMonthsToMonth(month, 1))}
+              onClick={() => setMonth(addMonthsToYearMonth(month, 1))}
               className="rounded-md p-0.5 transition-colors hover:bg-surface-hover hover:text-text"
             >
               <ChevronRight className="size-4" />
@@ -78,7 +78,7 @@ export function TaskScheduleCalendar({
         </header>
 
         <div className="grid grid-cols-7 px-3 text-center">
-          {weekdayLabels(settings.weekStartDay).map((weekday) => (
+          {getWeekdayLabels(settings.weekStartDay).map((weekday) => (
             <div key={weekday} className="py-1 text-xs font-medium text-text-muted">
               {weekday}
             </div>

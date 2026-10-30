@@ -7,9 +7,9 @@ import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
-import { addMonthsToMonth, monthOf } from '@reflect/utils'
+import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
-import { buildMonthGrid, monthLabel, weekdayLabels } from '@reflect/app'
+import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -47,13 +47,13 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   const { dailyNotes } = useCoreServices()
   const { settings } = useSettings()
 
-  const [month, setMonth] = useState(() => monthOf(selectedDate))
+  const [month, setMonth] = useState(() => getYearMonth(selectedDate))
   // Render-time state adjustment (not an effect): navigating to another day
   // re-anchors the visible month before the stale grid can paint.
   const [lastSelected, setLastSelected] = useState(selectedDate)
   if (selectedDate !== lastSelected) {
     setLastSelected(selectedDate)
-    setMonth(monthOf(selectedDate))
+    setMonth(getYearMonth(selectedDate))
   }
 
   const grid = buildMonthGrid(month, settings.weekStartDay)
@@ -69,14 +69,16 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   return (
     <div aria-label="Calendar" className="group min-w-36">
       <header className="flex items-center justify-between px-4 py-4">
-        <div className="cursor-default text-sm font-semibold text-text">{monthLabel(month)}</div>
+        <div className="cursor-default text-sm font-semibold text-text">
+          {formatMonthLabel(month)}
+        </div>
         {/* window-drag-control lifts the buttons above the WindowDragRegion strip
             overlaying the title-bar band (see NavigateArrows for the contract). */}
         <nav className="window-drag-control flex items-center justify-center space-x-1 text-text-muted">
           <button
             type="button"
             aria-label="Previous month"
-            onClick={() => setMonth(addMonthsToMonth(month, -1))}
+            onClick={() => setMonth(addMonthsToYearMonth(month, -1))}
             className={HEADER_BUTTON_CLASS}
           >
             <ChevronLeftIcon />
@@ -101,7 +103,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
           <button
             type="button"
             aria-label="Next month"
-            onClick={() => setMonth(addMonthsToMonth(month, 1))}
+            onClick={() => setMonth(addMonthsToYearMonth(month, 1))}
             className={HEADER_BUTTON_CLASS}
           >
             <ChevronRightIcon />
@@ -111,7 +113,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
 
       <div>
         <div className="grid grid-cols-7 border-b border-black/5 px-4 text-center dark:border-white/10">
-          {weekdayLabels(settings.weekStartDay).map((weekday) => (
+          {getWeekdayLabels(settings.weekStartDay).map((weekday) => (
             <div key={weekday} className="py-2 text-xs font-medium text-text">
               {weekday}
             </div>

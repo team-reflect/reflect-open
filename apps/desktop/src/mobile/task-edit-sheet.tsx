@@ -10,7 +10,7 @@ import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
 import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
 import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
-import { addDaysIso } from '@reflect/utils'
+import { addDaysToIsoDate } from '@reflect/utils'
 import { getTaskDueDate, type OpenTask, withDraftDueDate, formatDayLabel } from '@reflect/core'
 import type { TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { cn } from '@/lib/utils.ts'
@@ -249,13 +249,13 @@ export function MobileTaskEditSheet({
             />
             <ScheduleChip
               label="Tomorrow"
-              active={dueDate === addDaysIso(today, 1)}
-              onClick={() => schedule(addDaysIso(today, 1))}
+              active={dueDate === addDaysToIsoDate(today, 1)}
+              onClick={() => schedule(addDaysToIsoDate(today, 1))}
             />
             <ScheduleChip
               label="Next week"
-              active={dueDate === addDaysIso(today, 7)}
-              onClick={() => schedule(addDaysIso(today, 7))}
+              active={dueDate === addDaysToIsoDate(today, 7)}
+              onClick={() => schedule(addDaysToIsoDate(today, 7))}
             />
             <ScheduleChip
               label={dueDate !== null ? formatDayLabel(dueDate, settings.dateFormat) : 'Pick date'}

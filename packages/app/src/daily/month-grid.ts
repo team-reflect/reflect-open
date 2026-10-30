@@ -1,12 +1,12 @@
 import {
-  addDaysIso,
+  addDaysToIsoDate,
   formatDate,
-  monthOf,
-  monthStartIso,
+  getYearMonth,
+  getYearMonthStart,
   parseIsoDate,
-  todayIso,
+  getIsoToday,
 } from '@reflect/utils'
-import { weekStartOf, type WeekStartDay } from '@reflect/core'
+import { getUserWeekStart, type WeekStartDay } from '@reflect/core'
 
 /**
  * Pure month-grid math for the daily sidebar's calendar (no DOM, no queries).
@@ -50,37 +50,37 @@ export interface MonthGrid {
 }
 
 /**
- * Build the full-week grid for a `YYYY-MM` month, its weeks starting on `weekStartDay`.
+ * Build the full-week grid for a `YYYY-MM` year-month, its weeks starting on `weekStartDay`.
  */
-export function buildMonthGrid(month: string, weekStartDay: WeekStartDay): MonthGrid {
+export function buildMonthGrid(yearMonth: string, weekStartDay: WeekStartDay): MonthGrid {
   const weeks: MonthGridCell[][] = []
-  const start = weekStartOf(monthStartIso(month), weekStartDay)
+  const start = getUserWeekStart(getYearMonthStart(yearMonth), weekStartDay)
   let cursor = start
-  while (monthOf(cursor) <= month) {
+  while (getYearMonth(cursor) <= yearMonth) {
     const week: MonthGridCell[] = []
     for (let day = 0; day < 7; day += 1) {
-      week.push({ date: cursor, inMonth: monthOf(cursor) === month })
-      cursor = addDaysIso(cursor, 1)
+      week.push({ date: cursor, inMonth: getYearMonth(cursor) === yearMonth })
+      cursor = addDaysToIsoDate(cursor, 1)
     }
     weeks.push(week)
   }
-  return { month, weeks, start, end: addDaysIso(cursor, -1) }
+  return { month: yearMonth, weeks, start, end: addDaysToIsoDate(cursor, -1) }
 }
 
-/** Human label for a `YYYY-MM` month, e.g. `June 2026`. */
-export function monthLabel(month: string): string {
-  return formatDate(parseIsoDate(monthStartIso(month)), 'MMMM yyyy')
+/** Human label for a `YYYY-MM` year-month, e.g. `June 2026`. */
+export function formatMonthLabel(yearMonth: string): string {
+  return formatDate(parseIsoDate(getYearMonthStart(yearMonth)), 'MMMM yyyy')
 }
 
-/** Short label for a `YYYY-MM` month, e.g. `Jun` — month-picker grid cells. */
-export function monthShortLabel(month: string): string {
-  return formatDate(parseIsoDate(monthStartIso(month)), 'MMM')
+/** Short label for a `YYYY-MM` year-month, e.g. `Jun` — month-picker grid cells. */
+export function formatMonthShortLabel(yearMonth: string): string {
+  return formatDate(parseIsoDate(getYearMonthStart(yearMonth)), 'MMM')
 }
 
 /** Two-letter weekday labels for the grid's header row, e.g. `Mo`. */
-export function weekdayLabels(weekStartDay: WeekStartDay): string[] {
-  const weekStart = weekStartOf(todayIso(), weekStartDay)
+export function getWeekdayLabels(weekStartDay: WeekStartDay): string[] {
+  const weekStart = getUserWeekStart(getIsoToday(), weekStartDay)
   return Array.from({ length: 7 }, (_, index) => {
-    return formatDate(parseIsoDate(addDaysIso(weekStart, index)), 'EEEEEE')
+    return formatDate(parseIsoDate(addDaysToIsoDate(weekStart, index)), 'EEEEEE')
   })
 }

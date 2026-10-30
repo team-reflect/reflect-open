@@ -1,4 +1,4 @@
-import { formatIsoDate, isoDayStartMs } from '@reflect/utils'
+import { addDaysToIsoDate, formatIsoDate, parseIsoDate } from '@reflect/utils'
 /**
  * An updated-at constraint: resolved epoch-ms bounds plus the chip label.
  */
@@ -34,5 +34,9 @@ export const UPDATED_PRESETS: readonly { preset: UpdatedPreset; label: string }[
 export function updatedPresetFilter(preset: UpdatedPreset, now: Date = new Date()): UpdatedFilter {
   const days = preset === 'today' ? 0 : preset === 'week' ? -6 : -29
   const label = UPDATED_PRESETS.find((entry) => entry.preset === preset)!.label
-  return { label, afterMs: isoDayStartMs(formatIsoDate(now), days), beforeMs: null }
+  return {
+    label,
+    afterMs: parseIsoDate(addDaysToIsoDate(formatIsoDate(now), days)).getTime(),
+    beforeMs: null,
+  }
 }

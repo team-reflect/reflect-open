@@ -1,4 +1,4 @@
-import { isoDayStartMs } from '@reflect/utils'
+import { addDaysToIsoDate, parseIsoDate } from '@reflect/utils'
 import {
   foldTag,
   formatMonthDay,
@@ -214,7 +214,7 @@ export function updatedRangeFilter(
           `Until ${dayLabel(to!)}`
   return {
     label,
-    afterMs: from === null ? null : isoDayStartMs(from, 0),
-    beforeMs: to === null ? null : isoDayStartMs(to, 1),
+    afterMs: from === null ? null : parseIsoDate(from).getTime(),
+    beforeMs: to === null ? null : parseIsoDate(addDaysToIsoDate(to, 1)).getTime(),
   }
 }

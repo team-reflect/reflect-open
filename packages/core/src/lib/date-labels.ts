@@ -1,4 +1,4 @@
-import { formatDate, formatIsoDate, isIsoDate, parseIsoDate, startOfWeekIso } from '@reflect/utils'
+import { formatDate, formatIsoDate, isIsoDate, parseIsoDate, getWeekStart } from '@reflect/utils'
 import type { DateFormat, TimeFormat } from '../settings/schema.ts'
 
 /**
@@ -94,7 +94,7 @@ export function formatRecencyLabel(
   if (day === today) {
     return formatTimeOfDay(date, prefs.timeFormat)
   }
-  if (startOfWeekIso(day, 0) === startOfWeekIso(today, 0)) {
+  if (getWeekStart(day, 0) === getWeekStart(today, 0)) {
     return formatDate(date, 'EEE')
   }
   return formatByDateFormat(date, prefs.dateFormat, SHORT_DATE_PATTERNS)

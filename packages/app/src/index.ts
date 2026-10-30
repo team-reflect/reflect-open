@@ -96,9 +96,9 @@ export {
 } from './daily/day-window.ts'
 export {
   buildMonthGrid,
-  monthLabel,
-  monthShortLabel,
-  weekdayLabels,
+  formatMonthLabel,
+  formatMonthShortLabel,
+  getWeekdayLabels,
   type MonthGrid,
   type MonthGridCell,
 } from './daily/month-grid.ts'

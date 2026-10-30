@@ -1,5 +1,5 @@
 import { memo, type ReactElement } from 'react'
-import { addDaysIso, formatDate, parseIsoDate } from '@reflect/utils'
+import { addDaysToIsoDate, formatDate, parseIsoDate } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
@@ -36,7 +36,7 @@ function WeekRowComponent({
 }: WeekRowProps): ReactElement {
   const { haptics } = useMobileServices()
   const dateFormat = useDateFormat()
-  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(weekStart, index))
+  const days = Array.from({ length: 7 }, (_, index) => addDaysToIsoDate(weekStart, index))
   const selectedIndex = selectedDay ? days.indexOf(selectedDay) : -1
   return (
     <div className="relative flex min-w-0 flex-[0_0_100%]">

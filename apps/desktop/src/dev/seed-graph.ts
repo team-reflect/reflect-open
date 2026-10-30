@@ -1,4 +1,4 @@
-import { addDaysIso, todayIso } from '@reflect/utils'
+import { addDaysToIsoDate, getIsoToday } from '@reflect/utils'
 /**
  * The demo graph the dev bridge boots with: enough daily notes, tagged notes,
  * wiki links, pins, tasks, and a private note that every mobile surface — the
@@ -9,7 +9,7 @@ import { addDaysIso, todayIso } from '@reflect/utils'
 
 /** Local-time `YYYY-MM-DD` for `offsetDays` before today. */
 function isoDay(offsetDays: number): string {
-  return addDaysIso(todayIso(), -offsetDays)
+  return addDaysToIsoDate(getIsoToday(), -offsetDays)
 }
 
 /** Frontmatter block for a seeded note. Ids are fixed Crockford-base32 ULIDs. */

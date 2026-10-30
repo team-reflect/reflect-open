@@ -1,4 +1,4 @@
-import { startOfWeekIso, type Weekday } from '@reflect/utils'
+import { getWeekStart, type Weekday } from '@reflect/utils'
 import { z } from 'zod'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 
@@ -180,16 +180,16 @@ export const weekStartDaySchema = z.enum(['monday', 'sunday', 'saturday']).catch
 
 export type WeekStartDay = z.infer<typeof weekStartDaySchema>
 
-const WEEK_START_DOW: Record<WeekStartDay, Weekday> = { sunday: 0, monday: 1, saturday: 6 }
+const WEEK_START_WEEKDAYS: Record<WeekStartDay, Weekday> = { sunday: 0, monday: 1, saturday: 6 }
 
 /** The week-start day as a {@link Weekday} (0 = Sunday, 6 = Saturday). */
-export function weekStartDow(weekStartDay: WeekStartDay): Weekday {
-  return WEEK_START_DOW[weekStartDay]
+export function getWeekStartWeekday(weekStartDay: WeekStartDay): Weekday {
+  return WEEK_START_WEEKDAYS[weekStartDay]
 }
 
 /** The first day of `date`'s week, honoring the week-start setting. */
-export function weekStartOf(date: string, weekStartDay: WeekStartDay): string {
-  return startOfWeekIso(date, weekStartDow(weekStartDay))
+export function getUserWeekStart(date: string, weekStartDay: WeekStartDay): string {
+  return getWeekStart(date, getWeekStartWeekday(weekStartDay))
 }
 
 /**
