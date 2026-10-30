@@ -20,14 +20,22 @@ describe('createDeferredIpcTransport', () => {
 
   it('forwards binary calls and file URLs to the connected transport', async () => {
     const deferred = createDeferredIpcTransport()
-    const binary = deferred.transport.invokeBinary?.('upload', new Uint8Array([1]), {})
+    const body = new Uint8Array([1])
+    const binary = deferred.transport.invokeBinary?.('upload', body, { 'x-upload-id': 'u1' })
     deferred.connect(
-      { ...createTestIpcBridgeService().transport, invokeBinary: () => Promise.resolve('stored') },
-      { convertFileSrc: (filePath) => `blob:${filePath}` },
+      {
+        ...createTestIpcBridgeService().transport,
+        invokeBinary: (command, body, headers) => Promise.resolve({ command, body, headers }),
+      },
+      { convertFileSrc: (filePath, protocol) => `${protocol}:${filePath}` },
     )
-    await expect(binary).resolves.toBe('stored')
+    await expect(binary).resolves.toEqual({
+      command: 'upload',
+      body,
+      headers: { 'x-upload-id': 'u1' },
+    })
     expect(deferred.convertFileSrc('1/assets/cat.png', 'reflect-asset')).toBe(
-      'blob:1/assets/cat.png',
+      'reflect-asset:1/assets/cat.png',
     )
   })
 })

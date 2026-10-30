@@ -233,6 +233,9 @@ describe('dev bridge assets', () => {
     await expect(assetStore.uploadBlob('cat.png', image, 1)).resolves.toBe('assets/cat.png')
     await expect(assetStore.uploadBlob('cat.png', image, 1)).resolves.toBe('assets/cat-2.png')
     await assetStore.uploadToPath('assets/dog.png', image, 1)
+    await expect(assetStore.uploadToPath('assets/dog.png', image, 1)).rejects.toThrow(
+      'target already exists',
+    )
 
     await expect(assetStore.readBytes('assets/cat-2.png', 1)).resolves.toEqual(
       new Uint8Array([1, 2, 3]),

@@ -312,7 +312,11 @@ class DevBridgeImpl implements DevBridge {
       }
       case 'asset_upload_commit_path': {
         const { id, path } = uploadCommitPathArgsSchema.parse(args)
-        this.#writeAsset(path, this.#finishUpload(id))
+        const bytes = this.#finishUpload(id)
+        if (this.#assets.has(path)) {
+          throw new AppError('io', `target already exists: ${path}`)
+        }
+        this.#writeAsset(path, bytes)
         return null
       }
       case 'asset_upload_abort': {
