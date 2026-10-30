@@ -1,9 +1,9 @@
-import { cleanup, render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiPrompt } from '@reflect/core'
 import '@/test-utils/locator.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { AiPromptDrawer } from './ai-prompt-drawer.tsx'
 
 /**
  * The mobile add/edit sheet for a saved AI prompt: collecting a draft for
@@ -11,17 +11,6 @@ import '@/test-utils/locator.ts'
  * edited prompt, gating save on the required fields, and removing only from
  * the edit sheet.
  */
-
-// Keep the sheet content inline so this suite exercises its state flow
-// without depending on the drawer's drag and animation behavior.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
-
-const { AiPromptDrawer } = await import('./ai-prompt-drawer.tsx')
 
 const onSave = vi.fn<(draft: unknown) => void>()
 const onRemove = vi.fn<(id: string) => void>()
@@ -40,12 +29,8 @@ beforeEach(() => {
   onOpenChange.mockReset()
 })
 
-afterEach(async () => {
-  await cleanup()
-})
-
 async function renderSheet(prompt: AiPrompt | 'new'): Promise<void> {
-  await render(
+  await renderInApp(
     <AiPromptDrawer
       prompt={prompt}
       open
@@ -63,7 +48,10 @@ describe('AiPromptDrawer', () => {
 
     // `fill`, not `type`: userEvent's type treats `{{` as an escaped brace.
     await user.fill(page.getByLabelText('Label'), '  Shorten  ')
-    await user.fill(page.getByLabelText('Prompt'), 'Shorten this: {{selectedText}} ')
+    await user.fill(
+      page.getByRole('textbox', { name: 'Prompt' }),
+      'Shorten this: {{selectedText}} ',
+    )
     // Options render in a portal, so query them from the page.
     await user.click(page.getByRole('combobox', { name: 'Result' }))
     await user.click(page.getByRole('option', { name: 'Inserted below the selection' }))
@@ -87,7 +75,7 @@ describe('AiPromptDrawer', () => {
     await user.type(page.getByLabelText('Label'), 'Shorten')
     await expect.element(save).toBeDisabled()
 
-    await user.type(page.getByLabelText('Prompt'), 'Shorten this.')
+    await user.type(page.getByRole('textbox', { name: 'Prompt' }), 'Shorten this.')
     await expect.element(save).toBeEnabled()
   })
 
@@ -96,7 +84,9 @@ describe('AiPromptDrawer', () => {
     await renderSheet(SAVED_PROMPT)
 
     await expect.element(page.getByLabelText('Label')).toHaveValue(SAVED_PROMPT.label)
-    await expect.element(page.getByLabelText('Prompt')).toHaveValue(SAVED_PROMPT.body)
+    await expect
+      .element(page.getByRole('textbox', { name: 'Prompt' }))
+      .toHaveValue(SAVED_PROMPT.body)
 
     await user.fill(page.getByLabelText('Label'), 'Translate to German')
     await user.click(page.getByRole('button', { name: 'Save' }))

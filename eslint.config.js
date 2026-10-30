@@ -118,8 +118,6 @@ const architecturePlugin = {
 
 /** Mocked in any desktop test: pure UI children and heavy children. */
 const DESKTOP_VI_MOCK_ALLOW = [
-  // Vaul's drag and animation are verified on a device; tests use a passthrough.
-  '@/components/ui/drawer.tsx',
   // The Base UI toast manager needs its viewport; tests record the `toast.add` calls.
   '@/components/ui/toast.tsx',
   // The ProseKit editor: a test of a screen around it uses a probe.

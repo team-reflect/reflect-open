@@ -1,13 +1,6 @@
 import { page } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  createRef,
-  useLayoutEffect,
-  useState,
-  type ReactElement,
-  type ReactNode,
-  type RefObject,
-} from 'react'
+import { createRef, useLayoutEffect, useState, type ReactElement, type RefObject } from 'react'
 import { aiKeySecretName, type AiProviderConfig, type ChatStreamEvent } from '@reflect/core'
 import {
   createTestCoreServices,
@@ -35,14 +28,6 @@ const settingsState = {
   models: [] as AiProviderConfig[],
   defaultId: null as string | null,
 }
-
-// Keep sheet content inline so this suite isolates the chat flow.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
 
 const GRAPH = { root: '/graphs/test', name: 'test-graph', generation: 1 }
 

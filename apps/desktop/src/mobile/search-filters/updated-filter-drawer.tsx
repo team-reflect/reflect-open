@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useDateFormat } from '@/hooks/use-date-format.ts'
 import { useAppServices } from '@/services/services-provider.tsx'

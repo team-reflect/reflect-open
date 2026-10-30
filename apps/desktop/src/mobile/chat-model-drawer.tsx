@@ -1,5 +1,5 @@
 import { useMemo, type ReactElement } from 'react'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { groupModelOptions } from '@/lib/chat-model-groups.ts'
 import { SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useChatSession } from '@/providers/chat-provider.tsx'

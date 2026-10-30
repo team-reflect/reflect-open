@@ -1,4 +1,3 @@
-import { useEffect, type ReactNode } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { MobileOnboardingService } from '@reflect/app'
@@ -19,25 +18,6 @@ import { MobileGraphs } from './graphs.tsx'
  * on-device root — switching through the persist-and-open onboarding flow,
  * and graph creation in its own sheet instead of an inline form.
  */
-
-// Keep the sheet content inline so this suite focuses on graph switching.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({
-    children,
-    onOpenChange,
-  }: {
-    children?: ReactNode
-    onOpenChange?: (open: boolean) => void
-  }) => {
-    useEffect(() => {
-      onOpenChange?.(true)
-    }, [onOpenChange])
-    return <>{children}</>
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
 
 const STORAGE: MobileStorageInfo = {
   localRoot: '/Documents',

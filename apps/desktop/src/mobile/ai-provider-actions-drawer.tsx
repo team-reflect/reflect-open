@@ -6,7 +6,7 @@ import {
   errorMessage,
   type AiProviderConfig,
 } from '@reflect/core'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 

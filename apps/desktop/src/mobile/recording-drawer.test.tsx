@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,15 +22,6 @@ const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
   onDrawerOpenChange: vi.fn(),
   retry: vi.fn(),
   discard: vi.fn(),
-}))
-
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) => {
-    return open ? <div data-testid="drawer">{children}</div> : null
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
 vi.mock('@/mobile/audio-memo-provider.tsx', () => ({

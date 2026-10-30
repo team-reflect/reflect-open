@@ -1,0 +1,91 @@
+/*
+ * Native-scroll bottom sheet. The scroller's scrollTop is the sheet position:
+ * 0 shows only the spacer (closed), the end shows the whole slide (open).
+ * Entry and exit move the panel with `translate` while the popup carries Base
+ * UI's `data-starting-style` / `data-ending-style`.
+ */
+
+.scroll-drawer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.scroll-drawer::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-drawer-spacer {
+  flex: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: start;
+}
+
+.scroll-drawer-slide {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 6rem);
+  overflow: clip;
+  scroll-snap-align: end;
+}
+
+.scroll-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 450ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.scroll-drawer-panel {
+  transition: translate 450ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-starting-style] .scroll-drawer-panel,
+[data-ending-style] .scroll-drawer-panel {
+  translate: 0 100%;
+}
+
+[data-starting-style] .scroll-drawer-backdrop,
+[data-ending-style] .scroll-drawer-backdrop {
+  opacity: 0;
+}
+
+/* Base UI waits only for the popup's own animations before it unmounts, so the
+   popup runs an invisible transition as long as the panel's. */
+.scroll-drawer-popup {
+  transition: opacity 450ms;
+}
+
+.scroll-drawer-popup[data-ending-style] {
+  opacity: 0.9999;
+  pointer-events: none;
+}
+
+/* A swipe already moved the sheet off screen: unmount at once. */
+.scroll-drawer-popup[data-closed-by='swipe'],
+.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-panel,
+.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-backdrop {
+  transition-duration: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-drawer-panel {
+    transition-property: opacity;
+  }
+
+  [data-starting-style] .scroll-drawer-panel,
+  [data-ending-style] .scroll-drawer-panel {
+    translate: none;
+    opacity: 0;
+  }
+}

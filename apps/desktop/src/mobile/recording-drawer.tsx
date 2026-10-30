@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { formatElapsed } from '@reflect/utils'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform.tsx'

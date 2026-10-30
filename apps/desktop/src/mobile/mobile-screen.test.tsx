@@ -92,20 +92,6 @@ vi.mock('@/editor/note-editor.tsx', async () => {
     },
   }
 })
-// Vaul's drag/animation is verified on-device. This passthrough
-// honours `open`, so the month-picker sheet renders only once the title
-// opens it.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: import('react').ReactNode }) => {
-    return open ? <div data-testid="drawer">{children}</div> : null
-  },
-  DrawerContent: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
-  DrawerDescription: ({ children }: { children?: import('react').ReactNode }) => <p>{children}</p>,
-  DrawerTitle: ({ children }: { children?: import('react').ReactNode }) => <h2>{children}</h2>,
-  DrawerTrigger: ({ children }: { children?: import('react').ReactNode }) => <>{children}</>,
-}))
-
 // The daily spine renders the capture menu; this suite is about screens,
 // not recording — an unavailable memo surface keeps its mic action out.
 vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
@@ -346,7 +332,7 @@ describe('MobileShell', () => {
     const pickedMonth = `${Number(getYearMonth(today).slice(0, 4)) + 1}-01`
     await user.click(view.getByRole('button', { name: formatMonthLabel(pickedMonth) }))
 
-    expect(view.getByTestId('drawer').query()).toBeNull()
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
     await waitFor(() => expect(shownMonth(view)).toBe(formatMonthLabel(pickedMonth)))
     const firstDay = `${pickedMonth}-01`
     expect(
@@ -366,7 +352,7 @@ describe('MobileShell', () => {
     await user.click(view.getByRole('button', { name: 'Change month' }))
     await user.click(view.getByRole('button', { name: formatMonthLabel(getYearMonth(today)) }))
 
-    expect(view.getByTestId('drawer').query()).toBeNull()
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
     await waitFor(() => {
       expect(
         view
