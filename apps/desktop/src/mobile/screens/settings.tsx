@@ -28,6 +28,7 @@ import {
 } from '@/mobile/settings-list.tsx'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
+import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import {
@@ -120,6 +121,7 @@ export function MobileSettings(): ReactElement {
   const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
+  const perfHudEnabled = usePerfHudEnabled()
   const environment = useAppStoreEnvironment()
   // Development and TestFlight installs show the prerelease tag; anything else hides it.
   const showPrerelease =
@@ -511,6 +513,11 @@ export function MobileSettings(): ReactElement {
                   value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
                 />
               ) : null}
+              <SettingsSwitchRow
+                label="Performance HUD"
+                checked={perfHudEnabled}
+                onCheckedChange={setPerfHudEnabled}
+              />
               <SettingsActionRow
                 label="Trigger test error"
                 tone="destructive"

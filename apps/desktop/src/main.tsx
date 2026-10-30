@@ -8,6 +8,7 @@ import { queryClient } from '@/lib/query-client.ts'
 import { registerAppCommands } from '@/lib/commands/app-commands.ts'
 import { installNativeMenu } from '@/lib/native-menu/menu.ts'
 import { registerAppKeymaps } from '@/lib/shortcuts.ts'
+import { startPerfHud } from '@/perf-hud/flag.ts'
 import { PlatformRoot, warmPlatformRoot } from '@platform-root'
 import { EditorFullWidthEffect } from '@/providers/editor-full-width.tsx'
 import { EditorTextSizeEffect } from '@/providers/editor-text-size.tsx'
@@ -23,6 +24,8 @@ registerAppKeymaps(appServices.keymap)
 installNativeMenu(appServices.nativeMenu).catch((cause: unknown) => {
   coreServices.logger.error('failed to install the native menu', cause)
 })
+
+startPerfHud()
 
 const rootElement = document.getElementById('root')
 if (!rootElement) {
