@@ -15,7 +15,7 @@ export interface ScrollSettleOptions {
 
 export interface ScrollSettleWatch {
   /**
-   * True while a finger is down on the element.
+   * True while a finger that landed on the element is down.
    */
   isTouching: () => boolean
   /**
@@ -38,21 +38,36 @@ export function watchScrollSettle(
   options?: ScrollSettleOptions,
 ): ScrollSettleWatch {
   const isSettled = options?.isSettled
-  let touching = false
+  // Fingers that landed on the element and have not lifted.
+  const fingers = new Set<number>()
   // A finger is down, or lifted after it moved the element, and that scroll has not settled.
   let fingerScroll = false
   let scrolledSinceTouch = false
   let touchLeft = 0
   let touchTop = 0
   let wheelAt = -Infinity
-  let scrollAt = -Infinity
   let userScroll = false
   let pending = false
   let timer: ReturnType<typeof setTimeout> | undefined
+  // A scroll was reported early because the element was settled. A snap
+  // animation can still move inside the settled range (to 0 after 1); those
+  // frames belong to the reported scroll.
+  let snapTail = false
+  let snapTailTimer: ReturnType<typeof setTimeout> | undefined
 
+  const isTouching = (): boolean => fingers.size > 0
+  const endSnapTail = (): void => {
+    snapTail = false
+    clearTimeout(snapTailTimer)
+  }
+  const extendSnapTail = (): void => {
+    snapTail = true
+    clearTimeout(snapTailTimer)
+    snapTailTimer = setTimeout(endSnapTail, SETTLE_IDLE_MS)
+  }
   const flush = (): void => {
     clearTimeout(timer)
-    if (!pending || touching) {
+    if (!pending || isTouching()) {
       return
     }
     pending = false
@@ -62,6 +77,7 @@ export function watchScrollSettle(
   const settleOrWait = (): void => {
     if (isSettled?.() ?? false) {
       flush()
+      extendSnapTail()
       return
     }
     clearTimeout(timer)
@@ -70,8 +86,11 @@ export function watchScrollSettle(
 
   element.addEventListener(
     'touchstart',
-    () => {
-      touching = true
+    (event: TouchEvent) => {
+      for (const touch of event.changedTouches) {
+        fingers.add(touch.identifier)
+      }
+      endSnapTail()
       fingerScroll = true
       scrolledSinceTouch = false
       touchLeft = element.scrollLeft
@@ -80,8 +99,10 @@ export function watchScrollSettle(
     { passive: true, signal },
   )
   const release = (event: TouchEvent): void => {
-    touching = event.touches.length > 0
-    if (touching) {
+    for (const touch of event.changedTouches) {
+      fingers.delete(touch.identifier)
+    }
+    if (isTouching()) {
       return
     }
     // A tap moved nothing. Without this, a focus scroll right after the tap
@@ -101,31 +122,30 @@ export function watchScrollSettle(
     'wheel',
     () => {
       wheelAt = performance.now()
+      endSnapTail()
     },
     { passive: true, signal },
   )
   element.addEventListener(
     'scroll',
     () => {
-      const now = performance.now()
-      // A snap animation can pass the settled position and keep moving inside
-      // it (to 0 after 1). Those last frames belong to the scroll that was
-      // already reported, so they get no new report and keep its user flag.
-      const tail =
-        !pending && !touching && now - scrollAt < SETTLE_IDLE_MS && (isSettled?.() ?? false)
-      scrollAt = now
-      if (tail) {
-        return
+      if (snapTail) {
+        if (isSettled?.() ?? false) {
+          // No new report, and the reported scroll keeps its user flag.
+          extendSnapTail()
+          return
+        }
+        endSnapTail()
       }
       scrolledSinceTouch = true
-      if (fingerScroll || now - wheelAt < SETTLE_IDLE_MS) {
+      if (fingerScroll || performance.now() - wheelAt < SETTLE_IDLE_MS) {
         userScroll = true
       } else if (!pending) {
         // A new scroll that no finger or wheel started.
         userScroll = false
       }
       pending = true
-      if (touching) {
+      if (isTouching()) {
         // The finger decides; `touchend` checks again.
         clearTimeout(timer)
         return
@@ -135,10 +155,17 @@ export function watchScrollSettle(
     { passive: true, signal },
   )
   element.addEventListener('scrollend', flush, { signal })
-  signal.addEventListener('abort', () => clearTimeout(timer), { once: true })
+  signal.addEventListener(
+    'abort',
+    () => {
+      clearTimeout(timer)
+      clearTimeout(snapTailTimer)
+    },
+    { once: true },
+  )
 
   return {
-    isTouching: () => touching,
+    isTouching,
     isUserScroll: () => userScroll,
   }
 }

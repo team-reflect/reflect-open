@@ -100,6 +100,40 @@ describe('watchScrollSettle', () => {
     expect(watch.isUserScroll()).toBe(true)
   })
 
+  it('reports a wheel scroll that comes right after an early report', async () => {
+    const element = mountScroller()
+    const onSettle = vi.fn()
+    const watch = watchScrollSettle(element, onSettle, listeners.controller.signal, {
+      isSettled: () => element.scrollLeft <= 1,
+    })
+    element.scrollLeft = 50
+    await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+    await scrollElement(element, { left: 1 })
+    expect(onSettle).toHaveBeenCalledTimes(2)
+
+    element.dispatchEvent(new WheelEvent('wheel', { deltaX: -1 }))
+    await scrollElement(element, { left: 0 })
+
+    expect(onSettle).toHaveBeenCalledTimes(3)
+    expect(watch.isUserScroll()).toBe(true)
+  })
+
+  it('reports a scroll inside the settled range once the quiet time has passed', async () => {
+    const element = mountScroller()
+    const onSettle = vi.fn()
+    const watch = watchScrollSettle(element, onSettle, listeners.controller.signal, {
+      isSettled: () => element.scrollLeft <= 1,
+    })
+    await scrollElement(element, { left: 1 }, { touch: true })
+    expect(onSettle).toHaveBeenCalledOnce()
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    await scrollElement(element, { left: 0 })
+
+    expect(onSettle).toHaveBeenCalledTimes(2)
+    expect(watch.isUserScroll()).toBe(false)
+  })
+
   it('does not count a scroll right after a tap as the finger’s', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()

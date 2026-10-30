@@ -1,12 +1,20 @@
 import { act } from '@/test-utils/act.ts'
 
 /**
- * Dispatches a `touchstart` or `touchend` with no touch points on `element`,
- * the way a finger lands or lifts. It moves nothing.
+ * Dispatches a `touchstart` or `touchend` on `element` for one finger
+ * (identifier 0), the way it lands or lifts. It moves nothing.
  */
+export function dispatchTouch(element: Element, phase: 'start' | 'end'): void {
+  const event = new TouchEvent(`touch${phase}`, { bubbles: true })
+  // WebKit has no `Touch` constructor, so plain objects stand in for the list.
+  Object.defineProperty(event, 'changedTouches', { value: [{ identifier: 0, target: element }] })
+  element.dispatchEvent(event)
+}
+
+/** `dispatchTouch` inside `act`. */
 export async function touch(element: Element, phase: 'start' | 'end'): Promise<void> {
   await act(() => {
-    element.dispatchEvent(new TouchEvent(`touch${phase}`, { bubbles: true }))
+    dispatchTouch(element, phase)
   })
 }
 
