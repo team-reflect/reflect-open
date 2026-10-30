@@ -253,6 +253,21 @@ describe('NoteActionsSection trash action', () => {
     expect(operations.findByLabel('Trashing note')).toBeDefined()
   })
 
+  it('starts a reopened trash confirmation without the last failure', async () => {
+    const view = await renderSection('notes/a.md', true)
+    trash.mockRejectedValueOnce(new Error('Disk is full'))
+    await userEvent.click(view.getByRole('button', { name: 'Trash note' }))
+    await userEvent.click(page.getByRole('dialog').getByRole('button', { name: 'Trash note' }))
+    await expect.element(page.getByRole('dialog').getByText('Disk is full')).toBeVisible()
+
+    await userEvent.click(page.getByRole('dialog').getByRole('button', { name: 'Cancel' }))
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+    await userEvent.click(view.getByRole('button', { name: 'Trash note' }))
+
+    await expect.element(page.getByRole('dialog')).toBeVisible()
+    expect(page.getByText('Disk is full').query()).toBeNull()
+  })
+
   it('does not offer trash for daily notes even if enabled', async () => {
     const view = await renderSection('daily/2026-06-10.md', true)
     expect(view.getByRole('button', { name: 'Trash note' }).query()).toBeNull()

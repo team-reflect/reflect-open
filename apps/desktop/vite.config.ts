@@ -31,7 +31,7 @@ const platform: 'mobile' | 'desktop' | '' = (() => {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react({ compiler: true }),
+    react({ compiler: { reportDiagnostics: true } }),
 
     tailwindcss(),
     sentryVitePlugin({

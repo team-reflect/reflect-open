@@ -17,7 +17,7 @@ import {
   type ExistingWikiTargetResolution,
   type NoteLinkResolverService,
 } from '../graph/note-link-resolver-service.ts'
-import { ASSETS_DIR, AUDIO_MEMOS_DIR, isAttachmentPath, isNotePath } from '../graph/paths.ts'
+import { AUDIO_MEMOS_DIR, isAttachmentPath, isNotePath, pickFreeAssetPath } from '../graph/paths.ts'
 import type { FileMeta, NoteCreateOutcome } from '../graph/schemas.ts'
 import {
   createWikiResolverService,
@@ -462,7 +462,7 @@ class TestAssetStoreServiceImpl implements TestAssetStoreService {
 
   async uploadBlob(desiredName: string, contents: Blob, pinned: number): Promise<string> {
     checkGeneration(this.#generation, pinned)
-    const path = this.#freePath(desiredName)
+    const path = pickFreeAssetPath(desiredName, (candidate) => this.#files.has(candidate))
     this.#store('blob', path, await blobBytes(contents), pinned)
     return path
   }
@@ -476,7 +476,7 @@ class TestAssetStoreServiceImpl implements TestAssetStoreService {
     return Promise.try(() => {
       checkGeneration(this.#generation, pinned)
       const bytes = this.#bytesOf(sourcePath, this.#sources)
-      const path = this.#freePath(desiredName)
+      const path = pickFreeAssetPath(desiredName, (candidate) => this.#files.has(candidate))
       this.#store('import', path, bytes, pinned)
       return path
     })
@@ -573,17 +573,6 @@ class TestAssetStoreServiceImpl implements TestAssetStoreService {
 
   revealed(): readonly string[] {
     return [...this.#revealLog]
-  }
-
-  #freePath(desiredName: string): string {
-    const dot = desiredName.lastIndexOf('.')
-    const stem = dot > 0 ? desiredName.slice(0, dot) : desiredName
-    const extension = dot > 0 ? desiredName.slice(dot) : ''
-    let path = `${ASSETS_DIR}/${desiredName}`
-    for (let suffix = 2; this.#files.has(path); suffix++) {
-      path = `${ASSETS_DIR}/${stem}-${suffix}${extension}`
-    }
-    return path
   }
 
   #store(

@@ -1,8 +1,9 @@
-import { useState, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { UserRound } from 'lucide-react'
-import { errorMessage, suggestedContactDetails } from '@reflect/core'
+import { suggestedContactDetails } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useSuggestedContact } from '@/hooks/use-suggested-contact.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { cn } from '@/lib/utils.ts'
@@ -32,17 +33,14 @@ export function SuggestedContactCard({
   const queryClient = useQueryClient()
   const { contactSuggestions } = useCoreServices()
   const contact = useSuggestedContact(path)
-  const [isBusy, setIsBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const resolveAction = useAsyncAction()
 
   if (contact === null) {
     return null
   }
 
   async function resolve(action: () => Promise<void>): Promise<void> {
-    setIsBusy(true)
-    setError(null)
-    try {
+    await resolveAction.run(async () => {
       await action()
       // Invalidate rather than hand-set null: the refetch reads the live
       // source, so a handled note computes null (card hides) while a stale
@@ -51,11 +49,7 @@ export function SuggestedContactCard({
       await queryClient.invalidateQueries({
         queryKey: queryKeys.index.suggestedContact(graph?.root, path),
       })
-    } catch (cause) {
-      setError(errorMessage(cause))
-    } finally {
-      setIsBusy(false)
-    }
+    })
   }
 
   const details = suggestedContactDetails(contact)
@@ -72,9 +66,9 @@ export function SuggestedContactCard({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-text">{contact.fullName}</div>
         <div className="truncate text-xs text-text-muted">
-          {error !== null ? (
+          {resolveAction.error !== null ? (
             <span role="alert" className="text-red-500">
-              {error}
+              {resolveAction.error}
             </span>
           ) : (
             details
@@ -84,14 +78,14 @@ export function SuggestedContactCard({
       <Button
         size="xs"
         variant="ghost"
-        disabled={isBusy}
+        disabled={resolveAction.pending}
         onClick={() => void resolve(() => contactSuggestions.ignore(path, contact))}
       >
         Ignore
       </Button>
       <Button
         size="xs"
-        disabled={isBusy}
+        disabled={resolveAction.pending}
         onClick={() => void resolve(() => contactSuggestions.addToNote(path, contact))}
       >
         Add
