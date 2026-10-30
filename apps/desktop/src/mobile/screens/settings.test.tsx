@@ -670,6 +670,25 @@ describe('MobileSettings subscription', () => {
     })
   })
 
+  it('keeps a restore that fails after a redeem started from replacing the message', async () => {
+    const view = await mount({ ios: true })
+    const pendingSync = Promise.withResolvers<void>()
+    vi.spyOn(view.appStore, 'sync').mockImplementation(() => pendingSync.promise)
+
+    await userEvent.click(page.getByRole('button', { name: 'Restore Purchases' }))
+    await expect.element(page.getByRole('button', { name: 'Restore Purchases' })).toBeDisabled()
+    await userEvent.click(page.getByRole('button', { name: 'Redeem Code' }))
+    pendingSync.reject(new Error('offline'))
+
+    // The redeem waits for the restore in the shared IAP scope.
+    await vi.waitFor(() => {
+      expect(view.appStore.calls()).toContain('presentOfferCodeRedeemSheet')
+    })
+    await expect.element(page.getByRole('button', { name: 'Redeem Code' })).not.toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Restore Purchases' })).not.toBeDisabled()
+    expect(page.getByText(/Restore failed/).query()).toBeNull()
+  })
+
   it('opens the terms of use', async () => {
     const view = await mount({ ios: true })
 

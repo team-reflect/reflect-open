@@ -1,19 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { linkOpacityToScroll } from '@/lib/scroll-linked-opacity.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
 
-/**
- * Scroll-linked opacity on both paths: the engine's `ScrollTimeline` where it
- * exists, and the `scroll` listener that iOS 16 to 25 runs.
- */
-
 const listeners = { controller: new AbortController() }
 
-function mount(): { scroller: HTMLElement; content: HTMLElement; target: HTMLElement } {
+function mount(axis: 'x' | 'y'): {
+  scroller: HTMLElement
+  content: HTMLElement
+  target: HTMLElement
+} {
   const scroller = document.createElement('div')
-  scroller.style.cssText = 'height: 100px; overflow-y: auto'
+  scroller.style.cssText =
+    axis === 'x' ? 'width: 100px; overflow-x: auto' : 'height: 100px; overflow-y: auto'
   const content = document.createElement('div')
-  content.style.height = '300px'
+  content.style.cssText = axis === 'x' ? 'width: 300px; height: 10px' : 'height: 300px'
   scroller.append(content)
   // Outside the scroller.
   const target = document.createElement('div')
@@ -32,41 +32,55 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
-describe.each([
-  { path: 'ScrollTimeline', available: typeof ScrollTimeline === 'function', stub: false },
-  { path: 'scroll listener', available: true, stub: true },
-])('linkOpacityToScroll ($path)', ({ available, stub }) => {
-  beforeEach(() => {
-    if (stub) {
-      vi.stubGlobal('ScrollTimeline', undefined)
-    }
-  })
+describe('linkOpacityToScroll', () => {
+  const native = typeof ScrollTimeline === 'function'
 
-  it.skipIf(!available)('follows the scroll position between `from` and `to`', async () => {
-    const { scroller, target } = mount()
-    linkOpacityToScroll(
+  it.skipIf(!native)('follows the scroll position between `from` and `to`', async () => {
+    const { scroller, target } = mount('y')
+    linkOpacityToScroll({
       target,
       scroller,
-      { axis: 'y', from: 0.2, to: 1 },
-      listeners.controller.signal,
-    )
+      axis: 'y',
+      from: 0.2,
+      to: 1,
+      signal: listeners.controller.signal,
+    })
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.2, 2))
 
     // Halfway through the 200px range.
-    await scrollElement(scroller, { top: 100 })
+    await scrollElement({ element: scroller, top: 100 })
 
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.6, 2))
   })
 
-  it.skipIf(!available)('follows a scroll range that grows with no scroll', async () => {
-    const { scroller, content, target } = mount()
-    linkOpacityToScroll(
+  it.skipIf(!native)('follows the horizontal scroll position on the x axis', async () => {
+    const { scroller, target } = mount('x')
+    linkOpacityToScroll({
       target,
       scroller,
-      { axis: 'y', from: 0, to: 1 },
-      listeners.controller.signal,
-    )
-    await scrollElement(scroller, { top: 100 })
+      axis: 'x',
+      from: 0,
+      to: 1,
+      signal: listeners.controller.signal,
+    })
+    await vi.waitFor(() => expect(opacity(target)).toBe(0))
+
+    await scrollElement({ element: scroller, left: 50 })
+
+    await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.25, 2))
+  })
+
+  it.skipIf(!native)('follows a scroll range that grows with no scroll', async () => {
+    const { scroller, content, target } = mount('y')
+    linkOpacityToScroll({
+      target,
+      scroller,
+      axis: 'y',
+      from: 0,
+      to: 1,
+      signal: listeners.controller.signal,
+    })
+    await scrollElement({ element: scroller, top: 100 })
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.5, 2))
 
     // The range becomes 400px; the position stays at 100px.
@@ -75,18 +89,60 @@ describe.each([
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.25, 2))
   })
 
-  it.skipIf(!available)('hands the opacity back to the stylesheet on abort', async () => {
-    const { scroller, target } = mount()
-    linkOpacityToScroll(
+  it.skipIf(!native)('hands the opacity back to the stylesheet on abort', async () => {
+    const { scroller, target } = mount('y')
+    linkOpacityToScroll({
       target,
       scroller,
-      { axis: 'y', from: 0, to: 1 },
-      listeners.controller.signal,
-    )
+      axis: 'y',
+      from: 0,
+      to: 1,
+      signal: listeners.controller.signal,
+    })
     await vi.waitFor(() => expect(opacity(target)).toBe(0))
 
     listeners.controller.abort()
 
     await vi.waitFor(() => expect(opacity(target)).toBe(1))
+  })
+
+  it('does nothing when the signal has already aborted', () => {
+    const { scroller, target } = mount('y')
+    listeners.controller.abort()
+
+    linkOpacityToScroll({
+      target,
+      scroller,
+      axis: 'y',
+      from: 0,
+      to: 1,
+      signal: listeners.controller.signal,
+    })
+
+    expect(target.getAnimations()).toHaveLength(0)
+    expect(opacity(target)).toBe(1)
+  })
+
+  it('writes the opacity on scroll when the engine has no `ScrollTimeline`', async () => {
+    vi.stubGlobal('ScrollTimeline', undefined)
+    const { scroller, target } = mount('y')
+    target.style.opacity = '0.9'
+    linkOpacityToScroll({
+      target,
+      scroller,
+      axis: 'y',
+      from: 0.2,
+      to: 1,
+      signal: listeners.controller.signal,
+    })
+    expect(target.getAnimations()).toHaveLength(0)
+    expect(opacity(target)).toBeCloseTo(0.2, 2)
+
+    // Halfway through the 200px range.
+    await scrollElement({ element: scroller, top: 100 })
+    expect(opacity(target)).toBeCloseTo(0.6, 2)
+
+    listeners.controller.abort()
+    expect(target.style.opacity).toBe('0.9')
   })
 })

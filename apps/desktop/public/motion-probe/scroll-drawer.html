@@ -242,15 +242,15 @@
         // The app unmounts here; the probe opens again so the next check can run.
         setTimeout(() => scrollOpen(), 800)
       }
-      const watch = watchScrollSettle(
-        scroller,
-        () => {
+      const watch = watchScrollSettle({
+        element: scroller,
+        onSettle: () => {
           log(`settle top=${scroller.scrollTop.toFixed(1)} user=${watch.isUserScroll()}`)
           settle()
         },
         signal,
-        { isSettled: () => scroller.scrollTop <= 1 },
-      )
+        isSettled: () => scroller.scrollTop <= 1,
+      })
 
       new IntersectionObserver(
         (entries) => {
@@ -274,7 +274,7 @@
       resize.observe(slide)
       resize.observe(scroller)
 
-      linkOpacityToScroll($('tint'), scroller, { axis: 'y', from: 0, to: 1 }, signal)
+      linkOpacityToScroll({ target: $('tint'), scroller, axis: 'y', from: 0, to: 1, signal })
 
       // Raw events, to compare with the settle lines.
       for (const type of [

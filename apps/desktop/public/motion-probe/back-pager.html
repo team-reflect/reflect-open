@@ -372,18 +372,25 @@ const line = 'a long line that overflows the code block to the right, keep going
         const { watchScrollSettle } = await import('/src/lib/scroll-settle.ts')
         const { linkOpacityToScroll } = await import('/src/lib/scroll-linked-opacity.ts')
         const controller = new AbortController()
-        const watch = watchScrollSettle(
-          pager,
-          () => {
+        const watch = watchScrollSettle({
+          element: pager,
+          onSettle: () => {
             log(
               `settle left=${pager.scrollLeft.toFixed(1)} user=${watch.isUserScroll()} +${(performance.now() - touchEndAt).toFixed(0)}ms`,
             )
             if (watch.isUserScroll() && pager.scrollLeft <= 1) setTimeout(pin, 600)
           },
-          controller.signal,
-          { isSettled: () => pager.scrollLeft <= 1 },
-        )
-        linkOpacityToScroll(scrim, pager, { axis: 'x', from: 0, to: 1 }, controller.signal)
+          signal: controller.signal,
+          isSettled: () => pager.scrollLeft <= 1,
+        })
+        linkOpacityToScroll({
+          target: scrim,
+          scroller: pager,
+          axis: 'x',
+          from: 0,
+          to: 1,
+          signal: controller.signal,
+        })
         log('s1 modules loaded')
       }
     </script>

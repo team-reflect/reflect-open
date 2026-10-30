@@ -1,4 +1,11 @@
-import { useEffect, useState, type MouseEvent, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useTransition,
+  type MouseEvent,
+  type ReactElement,
+} from 'react'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
@@ -29,7 +36,8 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
   const row = useNoteRow(path)
   const url = row?.gistUrl ?? null
   const [copyState, setCopyState] = useState<CopyState>('idle')
-  const [isUpdating, setIsUpdating] = useState(false)
+  // The gist service never rejects, so the transition only drives the spinner.
+  const [isUpdating, startUpdate] = useTransition()
 
   // Reset the transient "copied" badge whenever the published URL changes.
   const [appliedUrl, setAppliedUrl] = useState(url)
@@ -45,6 +53,12 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
     const timeout = window.setTimeout(() => setCopyState('idle'), COPY_RESET_MS)
     return () => window.clearTimeout(timeout)
   }, [copyState])
+
+  const updateGist = useCallback((): void => {
+    startUpdate(async () => {
+      await publishGistAndCopyLink(services, app, path)
+    })
+  }, [services, app, path])
 
   if (url === null) {
     return null
@@ -64,15 +78,6 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
     event.preventDefault()
     if (url.startsWith('https://') || url.startsWith('http://')) {
       opener.openUrlSync(url)
-    }
-  }
-
-  const updateGist = async (): Promise<void> => {
-    setIsUpdating(true)
-    try {
-      await publishGistAndCopyLink(services, app, path)
-    } finally {
-      setIsUpdating(false)
     }
   }
 
@@ -116,7 +121,7 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Update published gist"
-                onClick={() => void updateGist()}
+                onClick={updateGist}
                 disabled={isUpdating}
                 className={cn(
                   'text-text-muted hover:text-text',

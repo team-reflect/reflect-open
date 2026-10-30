@@ -1,25 +1,43 @@
-export interface ScrollLinkedOpacity {
-  /** The scroll axis that drives the opacity. */
+export interface LinkOpacityToScrollOptions {
+  /**
+   * The element whose opacity follows the scroll. It may sit anywhere in the document.
+   */
+  target: HTMLElement
+  /**
+   * The element whose scroll position drives the opacity.
+   */
+  scroller: HTMLElement
+  /**
+   * The scroll axis that drives the opacity.
+   */
   axis: 'x' | 'y'
-  /** The opacity at scroll position 0. */
+  /**
+   * The opacity at scroll position 0.
+   */
   from: number
-  /** The opacity at the end of the scroll range. */
+  /**
+   * The opacity at the end of the scroll range.
+   */
   to: number
+  /**
+   * Ends the link. The opacity then returns to the stylesheet's.
+   */
+  signal: AbortSignal
 }
 
 /**
  * Ties `target`'s opacity to how far `scroller` has scrolled:
- * `from + (to - from) * position / range`. With `ScrollTimeline` (iOS 26+)
- * the engine drives it; elsewhere a passive `scroll` listener writes
- * `style.opacity`. `target` may sit anywhere in the document. The link ends,
- * and the opacity returns to the stylesheet's, when `signal` aborts.
+ * `from + (to - from) * position / range`. A WAAPI `ScrollTimeline` drives it
+ * where the engine has one (iOS 26+); elsewhere a `scroll` listener writes it.
  */
-export function linkOpacityToScroll(
-  target: HTMLElement,
-  scroller: HTMLElement,
-  { axis, from, to }: ScrollLinkedOpacity,
-  signal: AbortSignal,
-): void {
+export function linkOpacityToScroll({
+  target,
+  scroller,
+  axis,
+  from,
+  to,
+  signal,
+}: LinkOpacityToScrollOptions): void {
   if (signal.aborted) {
     return
   }
@@ -31,7 +49,7 @@ export function linkOpacityToScroll(
     signal.addEventListener('abort', () => animation.cancel(), { once: true })
     return
   }
-
+  const inline = target.style.opacity
   const paint = (): void => {
     const range =
       axis === 'x'
@@ -43,18 +61,5 @@ export function linkOpacityToScroll(
   }
   paint()
   scroller.addEventListener('scroll', paint, { passive: true, signal })
-  // The range moves when the scroller or its content resizes, with no scroll event.
-  const resize = new ResizeObserver(paint)
-  resize.observe(scroller)
-  for (const child of scroller.children) {
-    resize.observe(child)
-  }
-  signal.addEventListener(
-    'abort',
-    () => {
-      resize.disconnect()
-      target.style.removeProperty('opacity')
-    },
-    { once: true },
-  )
+  signal.addEventListener('abort', () => (target.style.opacity = inline), { once: true })
 }

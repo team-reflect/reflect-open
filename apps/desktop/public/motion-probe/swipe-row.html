@@ -112,13 +112,13 @@
           })
         }
         current.append(row)
-        const watch = watchScrollSettle(
-          row,
-          () => {
+        const watch = watchScrollSettle({
+          element: row,
+          onSettle: () => {
             log(`row ${i} settle left=${row.scrollLeft} user=${watch.isUserScroll()}`)
           },
-          controller.signal,
-        )
+          signal: controller.signal,
+        })
       }
       log(`scrollend=${'onscrollend' in window} scrollsnapchange=${'onscrollsnapchange' in window}`)
     </script>
