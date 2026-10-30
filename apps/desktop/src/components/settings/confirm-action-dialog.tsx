@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from 'react'
+import { useCallback, type ReactElement, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
@@ -44,7 +44,7 @@ export function ConfirmActionDialog({
 }: ConfirmActionDialogProps): ReactElement {
   const { run, pending, error } = useAsyncAction()
 
-  const confirm = (): void => {
+  const confirm = useCallback((): void => {
     if (confirmDisabled) {
       return
     }
@@ -52,7 +52,7 @@ export function ConfirmActionDialog({
       await onConfirm()
       onClose()
     })
-  }
+  }, [confirmDisabled, run, onConfirm, onClose])
 
   return (
     <Dialog

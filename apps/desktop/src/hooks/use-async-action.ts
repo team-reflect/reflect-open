@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { errorMessage } from '@reflect/core'
 
 export interface AsyncAction {
@@ -31,7 +31,7 @@ export function useAsyncAction(): AsyncAction {
   // (before `disabled={pending}` has rendered) is still rejected.
   const inFlightRef = useRef(false)
 
-  async function run(action: () => MaybePromise<void>): Promise<boolean> {
+  const run = useCallback(async (action: () => MaybePromise<void>): Promise<boolean> => {
     if (inFlightRef.current) {
       return false
     }
@@ -48,11 +48,11 @@ export function useAsyncAction(): AsyncAction {
     inFlightRef.current = false
     setPending(false)
     return true
-  }
+  }, [])
 
-  function reset(): void {
+  const reset = useCallback((): void => {
     setError(null)
-  }
+  }, [])
 
-  return { run, pending, error, reset }
+  return useMemo(() => ({ run, pending, error, reset }), [run, pending, error, reset])
 }
