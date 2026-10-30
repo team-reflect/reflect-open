@@ -2,14 +2,12 @@ import {
   IAP_PRODUCT_IDS,
   indexedNoteSchema,
   AppError,
-  appleFileSrc,
   pickFreeAssetPath,
-  type FileMeta,
-  type FileSrcSource,
   type IpcBridge,
 } from '@reflect/core'
 import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
 import { z } from 'zod'
+import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import type { DevIndexDb } from '@/dev/dev-index-db.ts'
 
@@ -24,6 +22,7 @@ export const DEV_GRAPH_ROOT = '/dev-graph'
 export interface DevBridgeBackend {
   readonly files: DevFileStore
   readonly index: DevIndexDb
+  readonly assets: DevAssetStore
 }
 
 const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
@@ -84,32 +83,16 @@ const iapProductsArgsSchema = z.object({
   payload: iapPayloadSchema.extend({ productIds: z.array(z.string()) }),
 })
 
-/**
- * One in-memory asset: its bytes, a last-modified stamp, and the `blob:` URL
- * that serves it once an image asks for one.
- */
-interface DevAsset {
-  readonly bytes: Uint8Array<ArrayBuffer>
-  readonly modifiedMs: number
-  url: string | null
-}
-
-/**
- * The dev bridge: the IPC surface plus the URLs that serve its assets.
- */
-export interface DevBridge extends IpcBridge, FileSrcSource {}
-
 // Fixed preview prices, independent of App Store Connect and browser locale.
 const iapProducts = [
   { productId: IAP_PRODUCT_IDS.monthly, formattedPrice: '$9999.99' },
   { productId: IAP_PRODUCT_IDS.yearly, formattedPrice: '$99999.99' },
 ]
 
-class DevBridgeImpl implements DevBridge {
+class DevBridgeImpl implements IpcBridge {
   readonly #deps: DevBridgeBackend
   readonly #graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   #settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
-  readonly #assets = new Map<string, DevAsset>()
   readonly #uploads = new Map<string, Uint8Array<ArrayBuffer>[]>()
   #uploadCount = 0
   #ownedProductId: string | null = null
@@ -143,18 +126,8 @@ class DevBridgeImpl implements DevBridge {
     })
   }
 
-  convertFileSrc(filePath: string, protocol: string): string {
-    // Asset URLs carry a `<generation>/` prefix before the graph path.
-    const asset = this.#assets.get(filePath.replace(/^\d+\//, ''))
-    if (asset === undefined) {
-      return appleFileSrc(filePath, protocol)
-    }
-    asset.url ??= URL.createObjectURL(new Blob([asset.bytes]))
-    return asset.url
-  }
-
   #runCommand(command: string, args: Record<string, unknown>): unknown {
-    const { files, index } = this.#deps
+    const { files, index, assets } = this.#deps
     switch (command) {
       case 'app_version':
         return '0.0.0-dev'
@@ -211,7 +184,7 @@ class DevBridgeImpl implements DevBridge {
         // A browser has no embedding runtime.
         return { status: 'unsupported' }
       case 'vault_scan_stats':
-        return { notes: files.list().length, attachments: this.#assets.size, skipped: 0 }
+        return { notes: files.list().length, attachments: assets.list().length, skipped: 0 }
       case 'forget_recent':
       case 'capture_host_register':
       case 'watch_start':
@@ -291,7 +264,7 @@ class DevBridgeImpl implements DevBridge {
           .extend({ path: z.string(), contentsBase64: z.string() })
           .parse(args)
         this.#checkGeneration(generation)
-        this.#writeAsset(path, base64ToBytes(contentsBase64))
+        assets.write(path, base64ToBytes(contentsBase64))
         return null
       }
       case 'asset_read':
@@ -299,11 +272,7 @@ class DevBridgeImpl implements DevBridge {
       case 'asset_read_binary':
         return this.#readAsset(pathArgsSchema.parse(args).path).slice().buffer
       case 'list_attachments':
-        return [...this.#assets].map(([path, asset]): FileMeta => ({
-          path,
-          size: asset.bytes.byteLength,
-          modifiedMs: asset.modifiedMs,
-        }))
+        return assets.list()
       case 'asset_upload_begin': {
         this.#checkGeneration(generationArgsSchema.parse(args).generation)
         this.#uploadCount += 1
@@ -314,18 +283,18 @@ class DevBridgeImpl implements DevBridge {
       case 'asset_upload_commit': {
         const { id, desiredName, generation } = uploadCommitArgsSchema.parse(args)
         this.#checkGeneration(generation)
-        const path = pickFreeAssetPath(desiredName, (candidate) => this.#assets.has(candidate))
-        this.#writeAsset(path, this.#finishUpload(id))
+        const path = pickFreeAssetPath(desiredName, (candidate) => assets.exists(candidate))
+        assets.write(path, this.#finishUpload(id))
         return path
       }
       case 'asset_upload_commit_path': {
         const { id, path, generation } = uploadCommitPathArgsSchema.parse(args)
         this.#checkGeneration(generation)
         const bytes = this.#finishUpload(id)
-        if (this.#assets.has(path)) {
+        if (assets.exists(path)) {
           throw new AppError('io', `target already exists: ${path}`)
         }
-        this.#writeAsset(path, bytes)
+        assets.write(path, bytes)
         return null
       }
       case 'asset_upload_abort': {
@@ -458,20 +427,12 @@ class DevBridgeImpl implements DevBridge {
     return bytes
   }
 
-  #writeAsset(path: string, bytes: Uint8Array<ArrayBuffer>): void {
-    const previous = this.#assets.get(path)?.url
-    if (previous !== undefined && previous !== null) {
-      URL.revokeObjectURL(previous)
-    }
-    this.#assets.set(path, { bytes, modifiedMs: Date.now(), url: null })
-  }
-
   #readAsset(path: string): Uint8Array<ArrayBuffer> {
-    const asset = this.#assets.get(path)
-    if (asset === undefined) {
+    const bytes = this.#deps.assets.read(path)
+    if (bytes === null) {
       throw new AppError('notFound', `asset not found: ${path}`)
     }
-    return asset.bytes
+    return bytes
   }
 
   // Native event streams (watcher, embeddings, EventKit) don't exist in the
@@ -498,7 +459,7 @@ class DevBridgeImpl implements DevBridge {
  * quietly rendering empty because a stub answered wrong is worse than an
  * error naming the gap.
  */
-export function createDevBridge(backend: DevBridgeBackend): DevBridge {
+export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   return new DevBridgeImpl(backend)
 }
 
