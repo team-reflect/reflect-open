@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { dateAtIndex } from '@/lib/day-window.ts'
+import { dateAtIndex } from '@reflect/app'
 import { DaySlide } from '@/mobile/day-slide.tsx'
 import { useDayCarousel } from '@/mobile/use-day-carousel.ts'
 

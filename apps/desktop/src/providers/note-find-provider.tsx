@@ -1,10 +1,9 @@
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { focusedNotePathForRoute } from '@/routing/route.ts'
+import { focusedNotePathForRoute, type FocusedNoteMenuCommand } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
-import type { FocusedNoteMenuCommand } from '@reflect/app'
 import { getIsComposing, isModEvent, type SearchStatus } from '@meowdown/core'
 import {
   createContext,

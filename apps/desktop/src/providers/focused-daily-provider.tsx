@@ -11,7 +11,7 @@ import {
   type ContextSidebarTarget,
 } from '@/components/context-sidebar/sidebar-route.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { effectiveDailyDate } from '@/routing/route.ts'
+import { effectiveDailyDate } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 
 /**

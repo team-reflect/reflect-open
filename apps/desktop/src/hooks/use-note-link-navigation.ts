@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useLinkNavigationHost } from '@/hooks/use-link-navigation-host.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
-import type { NoteRoute } from '@/routing/route.ts'
+import type { NoteRoute } from '@reflect/app'
 
 /**
  * The modifier fields meowdown's `isModEvent` reads off a link-like control's click.

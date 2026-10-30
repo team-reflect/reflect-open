@@ -1,9 +1,8 @@
 import { useCallback } from 'react'
-import type { WikilinkClickHandler } from '@meowdown/core'
+import { type WikilinkClickHandler, isModEvent } from '@meowdown/core'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { routeForPath } from '@/routing/route.ts'
-import { isModEvent } from '@meowdown/core'
+import { routeForPath } from '@reflect/app'
 
 /** The click plumbing a backlinks surface wires into its rows and snippets. */
 export interface BacklinkNavigation {

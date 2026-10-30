@@ -14,7 +14,7 @@ import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useTheme } from '@/providers/theme-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { focusedNotePathForRoute } from './route.ts'
+import { focusedNotePathForRoute } from '@reflect/app'
 import { useRouter } from './router.tsx'
 
 /**

@@ -7,7 +7,7 @@ import {
   monthOf,
   weekdayLabels,
 } from '@reflect/utils'
-import { buildMonthGrid } from '@/lib/month-grid.ts'
+import { buildMonthGrid } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 

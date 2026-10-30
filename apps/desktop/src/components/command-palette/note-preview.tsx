@@ -8,7 +8,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import type { NoteEntry } from './entries.ts'
+import type { NoteEntry } from '@reflect/app'
 
 /**
  * The palette's live preview pane: the highlighted result's markdown, read

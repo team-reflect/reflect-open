@@ -9,12 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import type {
-  AudioMemoPhase,
-  AudioMemoSession,
-  AudioMemoSessionState,
-  GraphInfo,
-} from '@reflect/core'
+import type { AudioMemoSession, AudioMemoSessionState, GraphInfo } from '@reflect/core'
 import {
   dismissRecordingReminder,
   showRecordingReminder,
@@ -31,8 +26,6 @@ import { useServiceState } from '@/services/use-service-state.ts'
  * (`Mod-\`); the shell tells the session when the sidebar collapses, and the
  * session stops and saves instead of leaving a hidden hot microphone.
  */
-
-export type { AudioMemoPhase }
 
 export type AudioMemoContextValue = AudioMemoSessionState &
   Pick<AudioMemoSession, 'cancel' | 'retry' | 'discard'> & {

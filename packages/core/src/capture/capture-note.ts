@@ -8,8 +8,6 @@ import type { Frontmatter } from '../markdown/model.ts'
 import type { CaptureIdentity } from './capture-identity.ts'
 import type { CaptureEnvelope } from './capture-envelope.ts'
 
-export { notePrivate } from '../privacy/checkers.ts'
-
 /**
  * Enrichment lifecycle of a capture note, in its frontmatter. `skipped` means
  * enrichment stopped touching the note — an edit, a privacy flip, or a

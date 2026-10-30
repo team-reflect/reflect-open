@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { GraphImportProgress, GraphImportSummary } from '@reflect/core'
+import type { GraphImportProgress, GraphImportSummary, V1ImportState } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
@@ -9,7 +9,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Progress } from '@/components/ui/progress.tsx'
-import type { V1ImportState } from '@/lib/v1-import-state.ts'
 
 interface V1ImportDialogProps {
   state: V1ImportState

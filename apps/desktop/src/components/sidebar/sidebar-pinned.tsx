@@ -12,7 +12,7 @@ import {
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useReorderPinnedNotes } from '@/hooks/use-reorder-pinned-notes.ts'
-import { routeForPath, routesEqual } from '@/routing/route.ts'
+import { routeForPath, routesEqual } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview.tsx'
 import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row.tsx'

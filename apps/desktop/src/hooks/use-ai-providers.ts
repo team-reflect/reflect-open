@@ -2,8 +2,6 @@ import type { AiProviderConfig, NewAiProvider } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 
-export type { NewAiProvider } from '@reflect/core'
-
 interface UseAiProvidersValue {
   providers: AiProviderConfig[]
   /**

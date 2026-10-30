@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
-import type { NewAiProvider } from '@/hooks/use-ai-providers.ts'
+import type { NewAiProvider } from '@reflect/core'
 
 interface AddAiProviderDialogProps {
   /** Persists the new provider (keychain + settings); rejects on failure. */

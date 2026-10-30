@@ -1,5 +1,5 @@
 import type { GraphSessionSource } from '../graph/graph-session.ts'
-import type { RetrievalHit } from '../embeddings/retrieve.ts'
+import type { RetrievalHit } from '../embeddings/retrieval-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { CloudSafe } from './cloud-safe.ts'
@@ -14,8 +14,6 @@ import type { CloudSafe } from './cloud-safe.ts'
  * checks run. An unchecked payload can't be built: adding a new outbound
  * integration means minting its content here or it won't typecheck.
  */
-
-export type { CloudSafe } from './cloud-safe.ts'
 
 /**
  * The one place a `CloudSafe` is born. Private by design.

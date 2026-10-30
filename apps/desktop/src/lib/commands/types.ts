@@ -1,8 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
-import type { AppServices, Command } from '@reflect/app'
+import type { AppServices, Command, Route, NavigateOptions } from '@reflect/app'
 import type { CoreServices } from '@reflect/core'
-import type { Route } from '@/routing/route.ts'
-import type { NavigateOptions } from '@/routing/router.tsx'
 
 /**
  * The typed command contract (Plan 08): one registry powers the ⌘K palette,

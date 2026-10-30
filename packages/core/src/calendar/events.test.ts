@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CalendarAttendee, CalendarEvent } from './commands.ts'
+import type { CalendarAttendee, CalendarEvent } from './calendar-service.ts'
 import { dayRange, defaultAttendees, displayEvents, isDeclinedByUser } from './events.ts'
 
 function attendee(overrides: Partial<CalendarAttendee> = {}): CalendarAttendee {

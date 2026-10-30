@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { appendBlock, clearTaskDueDate, setTaskDueDate } from './edit.ts'
+import { clearTaskDueDate, setTaskDueDate } from './edit.ts'
+import { appendBlock } from './append-section.ts'
 
 describe('appendBlock', () => {
   it('appends one blank line after the existing content', () => {

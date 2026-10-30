@@ -20,7 +20,7 @@ import {
   extendDayWindowBack,
   indexOfDate,
   PAST_DAYS,
-} from '@/lib/day-window.ts'
+} from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'

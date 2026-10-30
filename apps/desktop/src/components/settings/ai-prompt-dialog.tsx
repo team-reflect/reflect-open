@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactElement } from 'react'
-import type { AiPrompt } from '@reflect/core'
+import type { AiPrompt, AiPromptDraft } from '@reflect/core'
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
-import type { AiPromptDraft } from '@/hooks/use-ai-prompts.ts'
 
 interface AiPromptDialogProps {
   /** The prompt being edited, or null when adding a new one. */

@@ -11,7 +11,7 @@ import type { NoteTagFacet } from './note-list-service.ts'
  *
  * Every figure is computed over `is_private = 0` rows only. These are
  * provider-bound aggregates; the privacy contract is documented on
- * `cloudSafeGraphContext` in `../privacy/checkers`, which is the only way this
+ * `cloudSafeGraphContext` in `../privacy/privacy-service`, which is the only way this
  * data reaches a prompt.
  */
 

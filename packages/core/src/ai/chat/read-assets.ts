@@ -9,9 +9,9 @@ import type { AssetReferences } from '../../indexing/asset-refs.ts'
 import {
   isPrivateNoteError,
   type CloudAssetDescription,
-  type CloudSafe,
   type PrivacyService,
 } from '../../privacy/privacy-service.ts'
+import type { CloudSafe } from '../../privacy/cloud-safe.ts'
 import type { XArchiveService } from '../../embeds/x-archive-service.ts'
 
 /**

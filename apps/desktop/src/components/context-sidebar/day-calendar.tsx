@@ -14,7 +14,7 @@ import {
   monthOf,
   weekdayLabels,
 } from '@reflect/utils'
-import { buildMonthGrid } from '@/lib/month-grid.ts'
+import { buildMonthGrid } from '@reflect/app'
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'

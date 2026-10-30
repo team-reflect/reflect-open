@@ -14,9 +14,7 @@ import {
   type TestEmbeddingIndexService,
   type TestEmbeddingRuntimeService,
 } from '@reflect/core/testing'
-import { deepLinkForRoute } from '@reflect/app'
-import { notePathForRoute, type Route } from '@/routing/route.ts'
-import type { NavigateOptions } from '@/routing/router.tsx'
+import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } from '@reflect/app'
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
 import type { CommandContext } from './types.ts'
 

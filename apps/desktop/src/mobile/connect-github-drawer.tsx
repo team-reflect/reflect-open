@@ -6,10 +6,8 @@ import { GithubAuthStep } from '@/components/settings/github-auth-step.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
 import { Input } from '@/components/ui/input.tsx'
-import {
-  useConnectGithubWizard,
-  type ConnectWizardStep,
-} from '@/hooks/use-connect-github-wizard.ts'
+import { useConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
+import type { ConnectWizardStep } from '@reflect/app'
 
 interface ConnectGithubDrawerProps {
   open: boolean

@@ -2,8 +2,6 @@ import type { AiPrompt, AiPromptDraft } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 
-export type { AiPromptDraft } from '@reflect/core'
-
 interface UseAiPromptsValue {
   prompts: AiPrompt[]
   addPrompt: (draft: AiPromptDraft) => void

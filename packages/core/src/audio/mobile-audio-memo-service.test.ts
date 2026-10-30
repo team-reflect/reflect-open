@@ -31,11 +31,8 @@ import {
   createTestSettingsService,
   createTestTranscriptionService,
 } from '../testing/index.ts'
-import type {
-  AudioRecorderFinalSegment,
-  AudioRecorderSegment,
-  StagedRecordingFile,
-} from './audio-recorder-service.ts'
+import type { AudioRecorderFinalSegment, AudioRecorderSegment } from './audio-recorder-service.ts'
+import type { StagedRecordingFile } from '../ipc/recording-plugin.ts'
 
 const PROVIDERS: AiProvidersState = {
   providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],

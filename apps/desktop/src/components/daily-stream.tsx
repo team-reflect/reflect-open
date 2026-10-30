@@ -14,7 +14,7 @@ import {
   indexOfDate,
   neighborDate,
   PAST_DAYS,
-} from '@/lib/day-window.ts'
+} from '@reflect/app'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'

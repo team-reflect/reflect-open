@@ -59,10 +59,29 @@ jobs:
       - name: Build
         run: pnpm build
 
+  test-node:
+    needs: classify
+    if: needs.classify.outputs.stack-middle == 'false'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Test
+        run: pnpm run test:node
+
   test-chromium:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    name: test-chromium (${{ matrix.shard }}/3)
     env:
       REFLECT_TEST_BROWSER: chromium
       # Chromium on Linux does not promptly free the iframe of a finished
@@ -85,21 +104,7 @@ jobs:
         run: pnpm --filter @reflect/desktop test:install:chromium
 
       - name: Test
-        run: pnpm run test:browser
-
-  test-node:
-    needs: classify
-    if: needs.classify.outputs.stack-middle == 'false'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: ./.github/actions/setup-node
-
-      - name: Test
-        run: pnpm run test:node
+        run: pnpm run test:browser --shard=${{ matrix.shard }}/3
 
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
@@ -197,7 +202,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [classify, lint-node, test-chromium, test-node, lint-rust, test-rust]
+    needs: [classify, lint-node, test-node, test-chromium, lint-rust, test-rust]
 
     steps:
       - name: Fail because this PR is in the middle of a stack

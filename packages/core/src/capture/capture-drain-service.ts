@@ -1,5 +1,4 @@
-import { formatIsoDate, safeParseJson, sha256Hex } from '@reflect/utils'
-import type { MaybePromise } from '@reflect/utils'
+import { formatIsoDate, type MaybePromise, safeParseJson, sha256Hex } from '@reflect/utils'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import {
   inboxEnvelopeSchema,
@@ -16,11 +15,11 @@ import {
   captureNoteMeta,
   captureNoteSource,
   displayTitle,
-  notePrivate,
   noteSource,
   retitleDailyEntry,
   type CaptureStatus,
 } from './capture-note.ts'
+import { notePrivate } from '../privacy/privacy-service.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ReconcileStop } from '../reconcile/reconcile.ts'

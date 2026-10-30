@@ -3,7 +3,7 @@ import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WeekStartDay } from '@reflect/core'
 import { startOfWeekIso } from '@reflect/utils'
-import { createWeekWindow, weekAtIndex, weekIndexOf } from './calendar.ts'
+import { createWeekWindow, weekAtIndex, weekIndexOf } from '@reflect/app'
 import { shouldRecenterWeeks, useWeekStrip } from './use-week-strip.ts'
 
 /**

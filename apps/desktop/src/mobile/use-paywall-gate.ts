@@ -5,8 +5,6 @@ import { useClassicAccess } from '@/mobile/use-classic-access.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useServiceState } from '@/services/use-service-state.ts'
 
-export type { PaywallGate } from '@reflect/core'
-
 /**
  * Whether to render the paywall. Mounting starts the subscription, Reflect
  * Classic, and install-channel checks that the gate reads.

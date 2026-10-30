@@ -7,7 +7,7 @@ import {
   hasActiveFilters,
   type AllNotesFilters,
   type NoteFilterRef,
-} from './filter-state.ts'
+} from '@reflect/app'
 import { NotePickerDrawer } from './note-picker-drawer.tsx'
 import { TagFilterDrawer } from './tag-filter-drawer.tsx'
 import { UpdatedFilterDrawer } from './updated-filter-drawer.tsx'

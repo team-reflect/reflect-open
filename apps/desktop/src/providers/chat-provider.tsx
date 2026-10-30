@@ -10,8 +10,6 @@ import { useServiceState } from '@/services/use-service-state.ts'
  * attachments, sending, and persistence.
  */
 
-export type { ChatStatus } from '@reflect/core'
-
 export type ChatContextValue = ChatSessionState &
   Omit<ChatSession, 'getState' | 'subscribe' | 'attach'>
 

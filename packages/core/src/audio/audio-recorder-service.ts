@@ -9,15 +9,6 @@ import type {
   StartRecordingOptions,
 } from '../ipc/recording-plugin.ts'
 
-export type {
-  RecordingLevelEvent,
-  RecordingNativeActionEvent,
-  RecordingSessionStart,
-  RecordingStatus,
-  StagedRecordingFile,
-  StartRecordingOptions,
-} from '../ipc/recording-plugin.ts'
-
 /**
  * The local recorder state.
  */
