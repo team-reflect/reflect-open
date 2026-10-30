@@ -123,20 +123,26 @@ describe('linkOpacityToScroll', () => {
     expect(opacity(target)).toBe(1)
   })
 
-  it('does nothing when the engine has no `ScrollTimeline`', () => {
+  it('writes the opacity on scroll when the engine has no `ScrollTimeline`', async () => {
     vi.stubGlobal('ScrollTimeline', undefined)
     const { scroller, target } = mount('y')
-
+    target.style.opacity = '0.9'
     linkOpacityToScroll({
       target,
       scroller,
       axis: 'y',
-      from: 0,
+      from: 0.2,
       to: 1,
       signal: listeners.controller.signal,
     })
-
     expect(target.getAnimations()).toHaveLength(0)
-    expect(opacity(target)).toBe(1)
+    expect(opacity(target)).toBeCloseTo(0.2, 2)
+
+    // Halfway through the 200px range.
+    await scrollElement(scroller, { top: 100 })
+    expect(opacity(target)).toBeCloseTo(0.6, 2)
+
+    listeners.controller.abort()
+    expect(target.style.opacity).toBe('0.9')
   })
 })
