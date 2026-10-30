@@ -120,8 +120,8 @@ export function SwipeRow({
     <div
       ref={scrollerRef}
       data-slot="swipe-row"
-      // Keeps `touch-action: auto` on this row inside a pager that pans with `pan-y`.
-      data-pager-pan-x=""
+      // Marks a horizontal scroller, which keeps `touch-action: auto` inside a pager that pans with `pan-y`.
+      data-scroll-x=""
       onPointerDown={onPointerDown}
       className={cn(
         'flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
