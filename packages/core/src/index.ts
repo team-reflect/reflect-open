@@ -48,8 +48,6 @@ export { type GistPublishService } from './sync/gist-publish-service.ts'
 export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'
 export { createSystemClock, type ClockService, type TimerHandle } from './ports/clock-service.ts'
 export { type IdService } from './ports/id-service.ts'
-export { localIsoDate, parseIsoDate, todayIso } from './lib/dates.ts'
-export { formatDayLabel, formatMonthDay, formatShortDate } from './lib/date-labels.ts'
 export { type BuildPlatform, type PlatformFacts } from './ports/platform-facts.ts'
 export { type FileSrcConverter } from './ports/file-src.ts'
 
@@ -246,7 +244,6 @@ export {
   timeFormatSchema,
   dateFormatSchema,
   weekStartDaySchema,
-  weekStartDow,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,

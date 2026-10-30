@@ -1,4 +1,4 @@
-import { todayIso } from '../lib/dates.ts'
+import { todayIso } from '@reflect/utils'
 
 /**
  * An opaque timer handle owned by a {@link ClockService}.

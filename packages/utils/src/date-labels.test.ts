@@ -1,38 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDaysIso,
   formatDayLabel,
   formatFullDate,
   formatMonthDay,
   formatRecencyLabel,
   formatShortDate,
   formatTimeOfDay,
-  isIsoDate,
-  todayIso,
-} from './dates.ts'
+  monthLabel,
+  monthShortLabel,
+  weekdayInitial,
+  weekdayLabels,
+} from './date-labels.ts'
 
-describe('dates', () => {
-  it('todayIso returns a valid local ISO date', () => {
-    const today = todayIso()
-    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(isIsoDate(today)).toBe(true)
-  })
-
-  it('isIsoDate rejects malformed and impossible dates', () => {
-    expect(isIsoDate('2026-06-09')).toBe(true)
-    expect(isIsoDate('2026-6-9')).toBe(false)
-    expect(isIsoDate('2026-13-01')).toBe(false)
-    expect(isIsoDate('2026-02-31')).toBe(false)
-    expect(isIsoDate('not a date')).toBe(false)
-  })
-
-  it('addDaysIso crosses month and year boundaries', () => {
-    expect(addDaysIso('2026-06-09', 1)).toBe('2026-06-10')
-    expect(addDaysIso('2026-06-09', -1)).toBe('2026-06-08')
-    expect(addDaysIso('2026-12-31', 1)).toBe('2027-01-01')
-    expect(addDaysIso('2026-03-01', -1)).toBe('2026-02-28')
-  })
-
+describe('date labels', () => {
   it('formatDayLabel renders the V1 daily-subject format per the date format', () => {
     expect(formatDayLabel('2026-06-09', 'mdy')).toBe('Tue, June 9th, 2026')
     expect(formatDayLabel('2026-06-09', 'dmy')).toBe('Tue, 9th June, 2026')
@@ -111,5 +91,16 @@ describe('dates', () => {
         '31/12/2025',
       )
     })
+  })
+
+  it('labels a YYYY-MM month', () => {
+    expect(monthLabel('2026-06')).toBe('June 2026')
+    expect(monthShortLabel('2026-06')).toBe('Jun')
+  })
+
+  it('labels weekdays', () => {
+    expect(weekdayInitial('2026-06-12')).toBe('F')
+    expect(weekdayLabels('monday')).toEqual(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'])
+    expect(weekdayLabels('saturday')).toEqual(['Sa', 'Su', 'Mo', 'Tu', 'We', 'Th', 'Fr'])
   })
 })

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
-import { todayIso } from '@/lib/dates.ts'
+import { todayIso } from '@reflect/utils'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useMaybeChatSession } from '@/providers/chat-provider.tsx'

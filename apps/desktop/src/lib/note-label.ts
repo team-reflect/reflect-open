@@ -1,5 +1,5 @@
 import { dateFromDailyPath, displayNoteTitle, type DateFormat } from '@reflect/core'
-import { formatDayLabel } from '@/lib/dates.ts'
+import { formatDayLabel } from '@reflect/utils'
 
 /** The two fields that decide how a note is named. */
 export interface LabeledNote {

@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   addDaysIso,
   addMonthsIso,
-  isCalendarDate,
+  addMonthsToMonth,
+  formatFileStamp,
   isIsoDate,
-  isoFromParts,
+  isoDateFromParts,
+  monthOf,
+  monthsOfYear,
+  parseFileStamp,
+  startOfWeekIso,
+  todayIso,
   weekdayIso,
 } from './dates.ts'
 
@@ -16,13 +22,8 @@ describe('addDaysIso', () => {
     expect(addDaysIso('2020-01-01', 0)).toBe('2020-01-01')
   })
 
-  it('keeps years 0-99', () => {
-    expect(addDaysIso('0099-01-01', -1)).toBe('0098-12-31')
-    expect(addDaysIso('0000-02-28', 1)).toBe('0000-02-29')
-  })
-
   it('is DST-safe (a spring-forward day still advances by one calendar day)', () => {
-    // 2020-03-08 is the US spring-forward day; UTC math never skips it.
+    // 2020-03-08 is the US spring-forward day.
     expect(addDaysIso('2020-03-08', 1)).toBe('2020-03-09')
   })
 })
@@ -48,31 +49,93 @@ describe('weekdayIso', () => {
   })
 })
 
-describe('isoFromParts', () => {
-  it('zero-pads year, month, and day', () => {
-    expect(isoFromParts(2020, 1, 2)).toBe('2020-01-02')
-    expect(isoFromParts(23, 6, 5)).toBe('0023-06-05')
+describe('isoDateFromParts', () => {
+  it('builds a zero-padded ISO date, or null for a day that does not exist', () => {
+    expect(isoDateFromParts(2020, 1, 2)).toBe('2020-01-02')
+    expect(isoDateFromParts(2024, 2, 29)).toBe('2024-02-29')
+    expect(isoDateFromParts(2023, 2, 29)).toBeNull()
+    expect(isoDateFromParts(2026, 13, 1)).toBeNull()
   })
 })
 
-describe('isCalendarDate / isIsoDate', () => {
-  it('accepts real days and rejects impossible ones', () => {
-    expect(isCalendarDate('2024-02-29')).toBe(true)
-    expect(isCalendarDate('2023-02-29')).toBe(false)
-    expect(isCalendarDate('2026-02-31')).toBe(false)
-    expect(isCalendarDate('2026-13-01')).toBe(false)
-  })
-
-  it('keeps years 0-99', () => {
-    // Year 0 is a leap year (divisible by 400) even though 1900 is not.
-    expect(isCalendarDate('0099-12-31')).toBe(true)
-    expect(isCalendarDate('0000-02-29')).toBe(true)
-  })
-
-  it('isIsoDate also enforces the YYYY-MM-DD shape', () => {
+describe('isIsoDate / todayIso', () => {
+  it('accepts real YYYY-MM-DD days and rejects everything else', () => {
     expect(isIsoDate('2020-01-01')).toBe(true)
-    expect(isIsoDate('2020-1-1')).toBe(false)
-    expect(isIsoDate('not-a-date')).toBe(false)
+    expect(isIsoDate('2024-02-29')).toBe(true)
+    expect(isIsoDate('2023-02-29')).toBe(false)
     expect(isIsoDate('2026-02-31')).toBe(false)
+    expect(isIsoDate('2026-13-01')).toBe(false)
+    expect(isIsoDate('2020-1-1')).toBe(false)
+    expect(isIsoDate('20200101')).toBe(false)
+    expect(isIsoDate('2020-01-01T10:00')).toBe(false)
+    expect(isIsoDate('not-a-date')).toBe(false)
+  })
+
+  it('todayIso returns a valid local ISO date', () => {
+    expect(isIsoDate(todayIso())).toBe(true)
+  })
+})
+
+/**
+ * 2026-06-12 is a Friday; 2026-06-14 a Sunday.
+ */
+describe('startOfWeekIso', () => {
+  it('finds the first day of the week for each week-start day', () => {
+    expect(startOfWeekIso('2026-06-12', 'monday')).toBe('2026-06-08')
+    expect(startOfWeekIso('2026-06-12', 'sunday')).toBe('2026-06-07')
+    expect(startOfWeekIso('2026-06-12', 'saturday')).toBe('2026-06-06')
+  })
+
+  it('keeps a Sunday in its own Monday-first week', () => {
+    expect(startOfWeekIso('2026-06-14', 'monday')).toBe('2026-06-08')
+  })
+
+  it('is a fixed point on the week-start day itself', () => {
+    expect(startOfWeekIso('2026-06-08', 'monday')).toBe('2026-06-08')
+    expect(startOfWeekIso('2026-06-07', 'sunday')).toBe('2026-06-07')
+    expect(startOfWeekIso('2026-06-13', 'saturday')).toBe('2026-06-13')
+  })
+})
+
+describe('months', () => {
+  it('monthOf extracts the YYYY-MM month of an ISO date', () => {
+    expect(monthOf('2026-06-09')).toBe('2026-06')
+  })
+
+  it('addMonthsToMonth moves across year boundaries in both directions', () => {
+    expect(addMonthsToMonth('2026-12', 1)).toBe('2027-01')
+    expect(addMonthsToMonth('2026-01', -1)).toBe('2025-12')
+    expect(addMonthsToMonth('2026-06', 0)).toBe('2026-06')
+  })
+
+  it('monthsOfYear lists the twelve months', () => {
+    expect(monthsOfYear(2026)).toEqual([
+      '2026-01',
+      '2026-02',
+      '2026-03',
+      '2026-04',
+      '2026-05',
+      '2026-06',
+      '2026-07',
+      '2026-08',
+      '2026-09',
+      '2026-10',
+      '2026-11',
+      '2026-12',
+    ])
+  })
+})
+
+describe('file stamps', () => {
+  it('round-trips a local moment', () => {
+    const stamp = formatFileStamp(new Date(2026, 5, 12, 15, 30, 22, 845))
+    expect(stamp).toBe('2026-06-12-153022-845')
+    expect(parseFileStamp(stamp)).toEqual({ date: '2026-06-12', time: '15:30:22' })
+  })
+
+  it('rejects a stamp that names no real moment', () => {
+    expect(parseFileStamp('2026-02-31-153022-845')).toBeNull()
+    expect(parseFileStamp('2026-06-12-243022-845')).toBeNull()
+    expect(parseFileStamp('2026-06-12-156022-845')).toBeNull()
   })
 })

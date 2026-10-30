@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
-import { formatTimeOfDay } from '@/lib/dates.ts'
+import { formatTimeOfDay } from '@reflect/utils'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'

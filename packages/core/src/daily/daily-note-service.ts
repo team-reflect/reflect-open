@@ -3,7 +3,7 @@ import type { ClockService } from '../ports/clock-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import { localIsoDate } from '../lib/dates.ts'
+import { formatIsoDate } from '@reflect/utils'
 
 /**
  * One daily-note row of a date-ranged listing (the AI chat's daily tool).
@@ -143,7 +143,7 @@ class DailyNoteServiceImpl implements DailyNoteService {
   }
 
   #wallDate(): string {
-    return localIsoDate(new Date(this.#deps.clock.now()))
+    return formatIsoDate(new Date(this.#deps.clock.now()))
   }
 }
 

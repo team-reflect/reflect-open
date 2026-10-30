@@ -1,6 +1,6 @@
+import { formatIsoDate } from '@reflect/utils'
 import {
   dateFromDailyPath,
-  localIsoDate,
   parseSearchQuery,
   updatedPresetFilter,
   type ClockService,
@@ -91,7 +91,7 @@ class PaletteSearchServiceImpl<Context> implements PaletteSearchService<Context>
   }
 
   today(): string {
-    return localIsoDate(new Date(this.#deps.clock.now()))
+    return formatIsoDate(new Date(this.#deps.clock.now()))
   }
 
   async suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]> {

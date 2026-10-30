@@ -1,83 +1,136 @@
+import {
+  addDays,
+  addMonths,
+  differenceInCalendarDays,
+  format,
+  getDay,
+  isExists,
+  isValid,
+  parse,
+  parseISO,
+  startOfWeek,
+  type Day,
+} from 'date-fns'
+
 /**
- * Calendar arithmetic on ISO `YYYY-MM-DD` date strings, computed in UTC.
- *
- * UTC sidesteps daylight saving entirely: adding days or months can never skip
- * or repeat a day, so callers get correct calendar shifts without a
- * timezone-aware date library. "Today" is intentionally absent — it depends on
- * the local clock and belongs to `@reflect/core`'s `ClockService`.
+ * Calendar math on local ISO `YYYY-MM-DD` dates and `YYYY-MM` months. Daily
+ * notes are keyed by the user's local calendar day, so every date here is a
+ * local-midnight {@link Date} under the hood. This module and `date-labels.ts`
+ * are the only places in the workspace that call date-fns.
  */
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+/** Regex source of an ISO `YYYY-MM-DD` date, for building larger patterns. */
+export const ISO_DATE_PATTERN = String.raw`\d{4}-\d{2}-\d{2}`
 
-/**
- * UTC midnight on the given day. `setUTCFullYear` rather than `Date.UTC`: the
- * latter remaps years 0-99 to 1900-1999.
- */
-function utcDate(year: number, monthIndex: number, day: number): Date {
-  const date = new Date(0)
-  date.setUTCFullYear(year, monthIndex, day)
-  return date
+const ISO_DATE_RE = new RegExp(`^${ISO_DATE_PATTERN}$`)
+
+/** Is `value` an ISO `YYYY-MM-DD` string naming a real calendar day? */
+export function isIsoDate(value: string): boolean {
+  return ISO_DATE_RE.test(value) && isValid(parseISO(value))
 }
 
-/** Parse an ISO `YYYY-MM-DD` string as a UTC-midnight {@link Date}. */
-export function parseIsoUtc(iso: string): Date {
-  const [year, month, day] = iso.split('-').map(Number) as [number, number, number]
-  return utcDate(year, month - 1, day)
+/** Local midnight of an ISO `YYYY-MM-DD` date. */
+export function parseIsoDate(iso: string): Date {
+  return parseISO(iso)
 }
 
-/** Format a {@link Date} as an ISO `YYYY-MM-DD` string from its UTC fields. */
-export function formatIsoUtc(date: Date): string {
-  return isoFromParts(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate())
+/** The local calendar day of `date` as ISO `YYYY-MM-DD`. */
+export function formatIsoDate(date: Date): string {
+  return format(date, 'yyyy-MM-dd')
 }
 
-/** Build an ISO `YYYY-MM-DD` string from numeric parts (1-based `month`). */
-export function isoFromParts(year: number, month: number, day: number): string {
-  const pad = (value: number, width: number): string => String(value).padStart(width, '0')
-  return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`
+/** Today's local calendar day as ISO `YYYY-MM-DD`. */
+export function todayIso(): string {
+  return formatIsoDate(new Date())
 }
 
-/** The ISO date `days` after `iso` (negative for before). DST-safe. */
+/** The ISO date of `year`, `month` (1-based), and `day`, or `null` when no such day exists. */
+export function isoDateFromParts(year: number, month: number, day: number): string | null {
+  return isExists(year, month - 1, day) ? formatIsoDate(new Date(year, month - 1, day)) : null
+}
+
+/** The ISO date `days` after `iso` (negative for before). */
 export function addDaysIso(iso: string, days: number): string {
-  const date = parseIsoUtc(iso)
-  date.setUTCDate(date.getUTCDate() + days)
-  return formatIsoUtc(date)
+  return formatIsoDate(addDays(parseIsoDate(iso), days))
 }
 
 /**
  * The ISO date `months` after `iso` (negative for before), clamping to the end
- * of the target month — so `2024-01-31` plus one month is `2024-02-29`, matching
- * date-fns `addMonths`.
+ * of the target month: `2024-01-31` plus one month is `2024-02-29`.
  */
 export function addMonthsIso(iso: string, months: number): string {
-  const [year, month, day] = iso.split('-').map(Number) as [number, number, number]
-  const zeroBased = month - 1 + months
-  const targetYear = year + Math.floor(zeroBased / 12)
-  const targetMonth = ((zeroBased % 12) + 12) % 12
-  const lastDay = utcDate(targetYear, targetMonth + 1, 0).getUTCDate()
-  return isoFromParts(targetYear, targetMonth + 1, Math.min(day, lastDay))
+  return formatIsoDate(addMonths(parseIsoDate(iso), months))
 }
 
-/** Day of week for an ISO date: 0 = Sunday … 6 = Saturday. */
+/** The number of calendar days from `earlier` to `later` (negative when `later` is earlier). */
+export function differenceInDaysIso(later: string, earlier: string): number {
+  return differenceInCalendarDays(parseIsoDate(later), parseIsoDate(earlier))
+}
+
+/** Day of week of an ISO date: 0 = Sunday … 6 = Saturday. */
 export function weekdayIso(iso: string): number {
-  return parseIsoUtc(iso).getUTCDay()
+  return getDay(parseIsoDate(iso))
+}
+
+/** The week-start setting's choices. */
+export const WEEK_START_DAYS = ['monday', 'sunday', 'saturday'] as const
+
+export type WeekStartDay = (typeof WEEK_START_DAYS)[number]
+
+const WEEK_STARTS_ON: Record<WeekStartDay, Day> = { sunday: 0, monday: 1, saturday: 6 }
+
+/** The first day of `iso`'s week, for a week that starts on `weekStartDay`. */
+export function startOfWeekIso(iso: string, weekStartDay: WeekStartDay): string {
+  return formatIsoDate(
+    startOfWeek(parseIsoDate(iso), { weekStartsOn: WEEK_STARTS_ON[weekStartDay] }),
+  )
+}
+
+/** Epoch ms of the local start of the ISO day `days` after `iso`. */
+export function isoDayStartMs(iso: string, days: number): number {
+  return addDays(parseIsoDate(iso), days).getTime()
+}
+
+/** The calendar year of an ISO date or a `YYYY-MM` month. */
+export function yearOf(isoOrMonth: string): number {
+  return Number(isoOrMonth.slice(0, 4))
+}
+
+/** The `YYYY-MM` month of an ISO date. */
+export function monthOf(iso: string): string {
+  return iso.slice(0, 7)
+}
+
+/** The ISO date of the first day of a `YYYY-MM` month. */
+export function monthStartIso(month: string): string {
+  return `${month}-01`
+}
+
+/** The `YYYY-MM` month `months` after `month` (negative for before). */
+export function addMonthsToMonth(month: string, months: number): string {
+  return monthOf(addMonthsIso(monthStartIso(month), months))
+}
+
+/** The twelve `YYYY-MM` months of `year`, January first. */
+export function monthsOfYear(year: number): string[] {
+  return Array.from({ length: 12 }, (_, index) => format(new Date(year, index, 1), 'yyyy-MM'))
+}
+
+const FILE_STAMP_FORMAT = 'yyyy-MM-dd-HHmmss-SSS'
+
+/** Regex source of a {@link formatFileStamp} stamp, for building larger patterns. */
+export const FILE_STAMP_PATTERN = String.raw`${ISO_DATE_PATTERN}-\d{6}-\d{3}`
+
+/** A local timestamp for file names: `2026-06-12-153022-845`. */
+export function formatFileStamp(date: Date): string {
+  return format(date, FILE_STAMP_FORMAT)
 }
 
 /**
- * Is `value` a real calendar day, not merely `YYYY-MM-DD`-shaped? Rejects
- * impossible dates such as `2026-02-31`. Assumes the input is already
- * ISO-shaped; use {@link isIsoDate} for untrusted strings.
+ * The local ISO date and `HH:mm:ss` time of a {@link formatFileStamp} stamp, or
+ * `null` when the stamp names no real moment.
  */
-export function isCalendarDate(value: string): boolean {
-  const [year, month, day] = value.split('-').map(Number) as [number, number, number]
-  if (month < 1 || month > 12) {
-    return false
-  }
-  // Day 0 of the next month = the last day of `month` (leap years included).
-  const daysInMonth = utcDate(year, month, 0).getUTCDate()
-  return day >= 1 && day <= daysInMonth
-}
-
-/** Is `value` a syntactically ISO `YYYY-MM-DD` string naming a real calendar day? */
-export function isIsoDate(value: string): boolean {
-  return ISO_DATE_RE.test(value) && isCalendarDate(value)
+export function parseFileStamp(stamp: string): { date: string; time: string } | null {
+  const date = parse(stamp, FILE_STAMP_FORMAT, new Date())
+  return isValid(date) ? { date: formatIsoDate(date), time: format(date, 'HH:mm:ss') } : null
 }

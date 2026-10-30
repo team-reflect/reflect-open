@@ -3,7 +3,6 @@ import {
   dateFormatSchema,
   timeFormatSchema,
   weekStartDaySchema,
-  type DateFormat,
   type TimeFormat,
   type WeekStartDay,
 } from '@reflect/core'
@@ -15,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
-import { formatFullDate } from '@/lib/dates.ts'
+import { DATE_FORMATS, formatFullDate } from '@reflect/utils'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
@@ -43,12 +42,10 @@ const WEEK_START_OPTIONS: WeekStartOption[] = [
 
 // The options demonstrate themselves: each shows today's date in its format,
 // so the day/month order is visible rather than described.
-const DATE_FORMAT_VALUES: DateFormat[] = ['mdy', 'dmy', 'iso']
-
 /**
  * Date & time display preferences. Both formats feed every date and time the
  * app renders (via `formatDayLabel`/`formatTimeOfDay`/`formatRecencyLabel` in
- * `lib/dates.ts`) — display-only, so switching them never touches stored
+ * `@reflect/utils`) — display-only, so switching them never touches stored
  * timestamps or daily-note keys.
  */
 export function DateTimeSection(): ReactElement {
@@ -64,7 +61,7 @@ export function DateTimeSection(): ReactElement {
         <div className="mt-3">
           <Select
             value={settings.dateFormat}
-            items={DATE_FORMAT_VALUES.map((value) => ({
+            items={DATE_FORMATS.map((value) => ({
               value,
               label: formatFullDate(today, value),
             }))}
@@ -75,7 +72,7 @@ export function DateTimeSection(): ReactElement {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {DATE_FORMAT_VALUES.map((value) => (
+                {DATE_FORMATS.map((value) => (
                   <SelectItem key={value} value={value}>
                     {formatFullDate(today, value)}
                   </SelectItem>

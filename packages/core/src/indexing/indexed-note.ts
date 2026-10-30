@@ -1,4 +1,4 @@
-import { isCalendarDate } from '@reflect/utils'
+import { isIsoDate } from '@reflect/utils'
 import { z } from 'zod'
 import {
   markdownNoteReference,
@@ -306,7 +306,7 @@ export function projectNoteClaims(
     }
   }
   const date = isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null
-  if (date !== null && isCalendarDate(date)) {
+  if (date !== null && isIsoDate(date)) {
     claim(date, CLAIM_TIER.dailyDate)
   }
   claim(foldKey(parsed.title), CLAIM_TIER.title)

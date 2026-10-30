@@ -2,7 +2,7 @@ import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
-import { monthLabel, monthShortLabel } from '@/lib/month-grid.ts'
+import { monthLabel, monthShortLabel, monthsOfYear, yearOf } from '@reflect/utils'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -18,10 +18,6 @@ interface MonthPickerDrawerProps {
   today: string
   /** Pick a `YYYY-MM` month — the strip navigates and closes the sheet. */
   onPick: (month: string) => void
-}
-
-function yearOf(month: string): number {
-  return Number(month.slice(0, 4))
 }
 
 /**
@@ -50,10 +46,7 @@ export function MonthPickerDrawer({
     }
   }
 
-  const months = Array.from(
-    { length: 12 },
-    (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`,
-  )
+  const months = monthsOfYear(year)
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>

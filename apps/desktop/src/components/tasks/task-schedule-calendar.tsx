@@ -1,9 +1,14 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { weekStartDow } from '@reflect/core'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
-import { formatDayLabel } from '@/lib/dates.ts'
-import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid.ts'
+import {
+  addMonthsToMonth,
+  formatDayLabel,
+  monthLabel,
+  monthOf,
+  weekdayLabels,
+} from '@reflect/utils'
+import { buildMonthGrid } from '@/lib/month-grid.ts'
 import { cn } from '@/lib/utils.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 
@@ -35,7 +40,6 @@ export function TaskScheduleCalendar({
   children,
 }: TaskScheduleCalendarProps): ReactElement {
   const { settings } = useSettings()
-  const weekStartsOn = weekStartDow(settings.weekStartDay)
   const [month, setMonth] = useState(() => monthOf(today))
   // Re-anchor to today's month each time the popover opens, without an effect.
   const [wasOpen, setWasOpen] = useState(open)
@@ -46,7 +50,7 @@ export function TaskScheduleCalendar({
     }
   }
 
-  const grid = buildMonthGrid(month, weekStartsOn)
+  const grid = buildMonthGrid(month, settings.weekStartDay)
   const pick = (isoDate: string | null): void => {
     onSchedule(isoDate)
     onOpenChange(false)
@@ -62,7 +66,7 @@ export function TaskScheduleCalendar({
             <button
               type="button"
               aria-label="Previous month"
-              onClick={() => setMonth(addMonths(month, -1))}
+              onClick={() => setMonth(addMonthsToMonth(month, -1))}
               className="rounded-md p-0.5 transition-colors hover:bg-surface-hover hover:text-text"
             >
               <ChevronLeft className="size-4" />
@@ -70,7 +74,7 @@ export function TaskScheduleCalendar({
             <button
               type="button"
               aria-label="Next month"
-              onClick={() => setMonth(addMonths(month, 1))}
+              onClick={() => setMonth(addMonthsToMonth(month, 1))}
               className="rounded-md p-0.5 transition-colors hover:bg-surface-hover hover:text-text"
             >
               <ChevronRight className="size-4" />
@@ -79,7 +83,7 @@ export function TaskScheduleCalendar({
         </header>
 
         <div className="grid grid-cols-7 px-3 text-center">
-          {weekdayLabels(weekStartsOn).map((weekday) => (
+          {weekdayLabels(settings.weekStartDay).map((weekday) => (
             <div key={weekday} className="py-1 text-xs font-medium text-text-muted">
               {weekday}
             </div>

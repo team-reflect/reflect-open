@@ -1,6 +1,6 @@
+import { formatMonthDay, isoDayStartMs } from '@reflect/utils'
 import {
   foldTag,
-  formatMonthDay,
   parseSearchQuery,
   type DateFormat,
   type FilteredSearchOptions,
@@ -189,14 +189,6 @@ export function searchPlanFor(parsed: ParsedSearchQuery): FilteredSearchOptions 
 }
 
 /**
- * Epoch ms of the local start of an ISO `YYYY-MM-DD` day, shifted by `days`.
- */
-function isoDayStartMs(date: string, days = 0): number {
-  const [year, month, day] = date.split('-').map(Number)
-  return new Date(year!, month! - 1, day! + days).getTime()
-}
-
-/**
  * Resolve a custom range from the two date inputs (`''` = unbounded side).
  * The end date is inclusive — its bound is the start of the following day.
  * Returns null when both sides are empty (no constraint was formed).
@@ -221,7 +213,7 @@ export function updatedRangeFilter(
           `Until ${dayLabel(to!)}`
   return {
     label,
-    afterMs: from === null ? null : isoDayStartMs(from),
+    afterMs: from === null ? null : isoDayStartMs(from, 0),
     beforeMs: to === null ? null : isoDayStartMs(to, 1),
   }
 }

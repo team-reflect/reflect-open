@@ -11,7 +11,7 @@ import {
   type TestEmbeddingRuntimeService,
   type TestOpenGraph,
 } from '@reflect/core/testing'
-import { formatFullDate } from '@/lib/dates.ts'
+import { formatFullDate } from '@reflect/utils'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'

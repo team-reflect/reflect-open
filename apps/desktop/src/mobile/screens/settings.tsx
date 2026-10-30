@@ -12,7 +12,6 @@ import {
   normalizeTranscriptionPrompt,
   type AiPrompt,
   type AiProviderConfig,
-  type DateFormat,
   type EditorTextSize,
   type ThemePreference,
   type TimeFormat,
@@ -48,7 +47,7 @@ import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { formatFullDate } from '@/lib/dates.ts'
+import { DATE_FORMATS, formatFullDate } from '@reflect/utils'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
@@ -73,8 +72,6 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
   { value: 'medium', label: 'Medium' },
   { value: 'large', label: 'Large' },
 ]
-
-const DATE_FORMATS: readonly DateFormat[] = ['mdy', 'dmy', 'iso']
 
 const WEEK_START_OPTIONS: readonly SegmentedOption<WeekStartDay>[] = [
   { value: 'sunday', label: 'Sunday' },

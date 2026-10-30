@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
-import { formatRecordingElapsed } from '@/lib/recording-time.ts'
+import { formatElapsed } from '@reflect/utils'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -120,9 +120,7 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
           <p className="text-sm text-text-muted">Waiting for the microphone…</p>
         )}
       </div>
-      <span className="text-lg font-medium tabular-nums">
-        {formatRecordingElapsed(memo.elapsedMs)}
-      </span>
+      <span className="text-lg font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
       <div className="flex w-full flex-col items-center gap-3">
         <Button
           variant="destructive"

@@ -1,7 +1,11 @@
-import { differenceInCalendarDays, getDay } from 'date-fns'
-import { addDaysIso } from '@reflect/utils'
-import { parseIsoDate, weekStartDow, type WeekStartDay } from '@reflect/core'
-import { monthOf } from './month-grid.ts'
+import {
+  addDaysIso,
+  differenceInDaysIso,
+  monthOf,
+  monthStartIso,
+  startOfWeekIso,
+  type WeekStartDay,
+} from '@reflect/utils'
 
 /**
  * Date math for the V1-parity Daily surface's **calendar strip** — the month
@@ -12,18 +16,10 @@ import { monthOf } from './month-grid.ts'
  */
 
 /**
- * The first day of `date`'s week, honoring the week-start setting.
- */
-export function weekStartOf(date: string, weekStart: WeekStartDay): string {
-  const weekday = getDay(parseIsoDate(date)) // 0 = Sunday … 6 = Saturday
-  return addDaysIso(date, -((weekday - weekStartDow(weekStart) + 7) % 7))
-}
-
-/**
  * The seven ISO dates of `date`'s week, honoring the week-start setting.
  */
 export function weekOf(date: string, weekStart: WeekStartDay): string[] {
-  const first = weekStartOf(date, weekStart)
+  const first = startOfWeekIso(date, weekStart)
   return Array.from({ length: 7 }, (_, index) => addDaysIso(first, index))
 }
 
@@ -39,7 +35,7 @@ export function monthPickTarget(month: string, selected: string, today: string):
   if (monthOf(today) === month) {
     return today
   }
-  return `${month}-01`
+  return monthStartIso(month)
 }
 
 /**
@@ -77,7 +73,7 @@ export function createWeekWindow(
   radius: number = WEEK_WINDOW_RADIUS,
 ): WeekWindow {
   return {
-    start: addDaysIso(weekStartOf(date, weekStart), -radius * 7),
+    start: addDaysIso(startOfWeekIso(date, weekStart), -radius * 7),
     count: radius * 2 + 1,
     anchorIndex: radius,
   }
@@ -96,8 +92,8 @@ export function weekAtIndex(window: WeekWindow, index: number): string {
  * day** (its weeks no longer align), the strip's signal to rebuild it.
  */
 export function weekIndexOf(window: WeekWindow, date: string, weekStart: WeekStartDay): number {
-  const target = weekStartOf(date, weekStart)
-  const offset = differenceInCalendarDays(parseIsoDate(target), parseIsoDate(window.start))
+  const target = startOfWeekIso(date, weekStart)
+  const offset = differenceInDaysIso(target, window.start)
   if (offset % 7 !== 0) {
     return -1
   }

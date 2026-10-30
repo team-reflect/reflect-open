@@ -3,10 +3,8 @@
  * is pure and does not depend on a database.
  */
 
-import { isCalendarDate } from '@reflect/utils'
+import { isIsoDate } from '@reflect/utils'
 import { foldKey } from './keys.ts'
-
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** A wiki-link target normalized for matching. */
 export interface NormalizedTarget {
@@ -28,7 +26,7 @@ export interface NormalizedTarget {
 export function normalizeWikiTarget(target: string): NormalizedTarget {
   const raw = target.trim()
   const normalized: NormalizedTarget = { raw, key: foldKey(raw) }
-  if (ISO_DATE_RE.test(raw) && isCalendarDate(raw)) {
+  if (isIsoDate(raw)) {
     normalized.date = raw
   }
   return normalized

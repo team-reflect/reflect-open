@@ -1,4 +1,4 @@
-import { isCalendarDate } from '@reflect/utils'
+import { ISO_DATE_PATTERN, isIsoDate } from '@reflect/utils'
 
 /**
  * Pure helpers for the graph's on-disk path conventions (Plan 02). These build
@@ -90,17 +90,12 @@ function asciiLowerCase(value: string): string {
 }
 
 /** Matches a daily-note path and captures its ISO date. */
-const DAILY_PATH_RE = /^daily\/(\d{4}-\d{2}-\d{2})\.md$/
-/** A bare ISO date (`YYYY-MM-DD`). */
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const DAILY_PATH_RE = new RegExp(String.raw`^daily/(${ISO_DATE_PATTERN})\.md$`)
 
 /** Graph-relative path to a daily note for an ISO `YYYY-MM-DD` date. */
 export function dailyPath(date: string): string {
-  if (!ISO_DATE_RE.test(date)) {
+  if (!isIsoDate(date)) {
     throw new Error(`dailyPath expects an ISO YYYY-MM-DD date, got: ${date}`)
-  }
-  if (!isCalendarDate(date)) {
-    throw new Error(`dailyPath expects a valid calendar date, got: ${date}`)
   }
   return `${DAILY_DIR}/${date}.md`
 }

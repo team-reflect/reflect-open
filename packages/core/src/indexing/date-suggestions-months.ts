@@ -1,4 +1,4 @@
-import { isCalendarDate, isoFromParts } from '@reflect/utils'
+import { isoDateFromParts, yearOf } from '@reflect/utils'
 import type { DateSuggestion, DateSuggestionContext } from './date-suggestion-types.ts'
 
 const MIN_PHRASE_CHARS = 3
@@ -85,6 +85,6 @@ export function monthNameSuggestions(
   if (month === null || day === null) {
     return []
   }
-  const iso = isoFromParts(year ?? Number(context.today.slice(0, 4)), month, day)
-  return isCalendarDate(iso) ? [{ date: iso, phrase: rawQuery }] : []
+  const iso = isoDateFromParts(year ?? yearOf(context.today), month, day)
+  return iso === null ? [] : [{ date: iso, phrase: rawQuery }]
 }

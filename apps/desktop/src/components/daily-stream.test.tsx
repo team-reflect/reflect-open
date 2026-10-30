@@ -13,7 +13,7 @@ import { createSystemClock, type ClockService } from '@reflect/core'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
-import { formatDayLabel, todayIso } from '@/lib/dates.ts'
+import { formatDayLabel, todayIso } from '@reflect/utils'
 import {
   createDayWindow,
   dateAtIndex,

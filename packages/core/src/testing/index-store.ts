@@ -1,4 +1,4 @@
-import { isCalendarDate } from '@reflect/utils'
+import { isIsoDate } from '@reflect/utils'
 import { AppError } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
 import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
@@ -283,7 +283,7 @@ class TestIndexStoreServiceImpl implements TestIndexStoreService {
       throw new AppError('io', `cannot move note: ${to} is already indexed`)
     }
     const date = dateFromDailyPath(to)
-    const dailyDate = date !== null && isCalendarDate(date) ? date : null
+    const dailyDate = date !== null && isIsoDate(date) ? date : null
     const restateClaim = `INSERT INTO note_claims(note_path, key, tier)
       SELECT ?, ?, ?
       WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ? AND key = ?)`

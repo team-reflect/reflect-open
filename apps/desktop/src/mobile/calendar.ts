@@ -9,6 +9,5 @@ export {
   weekAtIndex,
   weekIndexOf,
   weekOf,
-  weekStartOf,
   type WeekWindow,
 } from '@reflect/app'

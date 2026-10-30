@@ -1,5 +1,5 @@
 import { toast } from '@/components/ui/toast.tsx'
-import { formatRecordingElapsed } from '@/lib/recording-time.ts'
+import { formatElapsed } from '@reflect/utils'
 
 const REMINDER_TOAST_ID = 'audio-memo-reminder'
 
@@ -13,7 +13,7 @@ export function showRecordingReminder(elapsedMs: number, stop: () => void): void
   toast.add({
     id: REMINDER_TOAST_ID,
     title: 'Still recording',
-    description: formatRecordingElapsed(elapsedMs),
+    description: formatElapsed(elapsedMs),
     actionProps: {
       children: 'Stop and save',
       onClick: stop,

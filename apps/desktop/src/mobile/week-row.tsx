@@ -1,6 +1,5 @@
 import { memo, type ReactElement } from 'react'
-import { format } from 'date-fns'
-import { addDaysIso, formatDayLabel, parseIsoDate } from '@/lib/dates.ts'
+import { addDaysIso, formatDayLabel, parseIsoDate, weekdayInitial } from '@reflect/utils'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -77,9 +76,7 @@ function WeekRowComponent({
             }}
             className="relative flex flex-1 flex-col items-center gap-0.5 py-1"
           >
-            <span className="text-[11px] font-medium text-text-muted">
-              {format(parseIsoDate(day), 'EEEEE')}
-            </span>
+            <span className="text-[11px] font-medium text-text-muted">{weekdayInitial(day)}</span>
             <span
               className={cn(
                 'flex size-8 items-center justify-center rounded-full text-sm tabular-nums transition-colors duration-200',
@@ -88,7 +85,7 @@ function WeekRowComponent({
                 !selected && !isToday && 'text-text',
               )}
             >
-              {format(parseIsoDate(day), 'd')}
+              {parseIsoDate(day).getDate()}
             </span>
             {/* A daily note takes the strip's marker slot. Otherwise it keeps
                 V1's Today dot when today is not selected. */}

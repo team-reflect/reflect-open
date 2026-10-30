@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { WikilinkResolver } from '@meowdown/core'
 import { displayNoteTitle, type DateFormat } from '@reflect/core'
-import { formatDayLabel, isIsoDate } from '@/lib/dates.ts'
+import { formatDayLabel, isIsoDate } from '@reflect/utils'
 import { useDateFormat } from '@/hooks/use-date-format.ts'
 
 /**

@@ -1,6 +1,6 @@
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested.ts'
-import { formatFullDate } from '@/lib/dates.ts'
+import { formatFullDate } from '@reflect/utils'
 import { TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useActiveSubscription } from '@/mobile/use-active-subscription.ts'

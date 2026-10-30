@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
+import { formatTimeAgo } from '@reflect/utils'
 import { Check, History, X } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -72,7 +72,7 @@ export function ChatHistoryMenu(): ReactElement | null {
               >
                 <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
                 <span className="shrink-0 text-xs text-text-muted">
-                  {formatDistanceToNow(conversation.updatedMs, { addSuffix: true })}
+                  {formatTimeAgo(conversation.updatedMs)}
                 </span>
                 {current ? (
                   <Check aria-hidden className="size-3.5 shrink-0 text-accent" />

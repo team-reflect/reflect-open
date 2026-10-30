@@ -1,6 +1,4 @@
-import { differenceInCalendarDays } from 'date-fns'
-import { addDaysIso } from '@reflect/utils'
-import { parseIsoDate } from '@reflect/core'
+import { addDaysIso, differenceInDaysIso } from '@reflect/utils'
 
 /**
  * The daily surfaces' virtual window (Plan 06b / Plan 19): a chronological
@@ -94,7 +92,7 @@ export function dateAtIndex(window: DayWindow, index: number): string {
  * Signed offset of `date` from the window's first day (may fall out of range).
  */
 function offsetOfDate(window: DayWindow, date: string): number {
-  return differenceInCalendarDays(parseIsoDate(date), parseIsoDate(window.start))
+  return differenceInDaysIso(date, window.start)
 }
 
 /**

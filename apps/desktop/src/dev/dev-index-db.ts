@@ -12,7 +12,7 @@ import {
   AppError,
   type IndexedNote,
 } from '@reflect/core'
-import { isCalendarDate } from '@reflect/utils'
+import { isIsoDate } from '@reflect/utils'
 
 /**
  * The dev bridge's SQLite index: the real `crates/index-schema` migrations
@@ -255,7 +255,7 @@ export function openDevIndexDb(sqlite3: Sqlite3Static): DevIndexDb {
           ])
           const date = dateFromDailyPath(to)
           const restated = [
-            ...(date !== null && isCalendarDate(date)
+            ...(date !== null && isIsoDate(date)
               ? [{ key: date, tier: CLAIM_TIER.dailyDate }]
               : []),
             { key: noteBasenameKey(to), tier: CLAIM_TIER.basename },

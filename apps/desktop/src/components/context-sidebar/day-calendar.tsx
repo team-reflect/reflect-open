@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { weekStartDow } from '@reflect/core'
 import { CalendarIcon } from '@/components/icons/calendar-icon.tsx'
 import { ChevronLeftIcon } from '@/components/icons/chevron-left-icon.tsx'
 import { ChevronRightIcon } from '@/components/icons/chevron-right-icon.tsx'
@@ -8,8 +7,14 @@ import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
-import { formatDayLabel } from '@/lib/dates.ts'
-import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid.ts'
+import {
+  addMonthsToMonth,
+  formatDayLabel,
+  monthLabel,
+  monthOf,
+  weekdayLabels,
+} from '@reflect/utils'
+import { buildMonthGrid } from '@/lib/month-grid.ts'
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
@@ -46,7 +51,6 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   const { graph } = useGraph()
   const { dailyNotes } = useCoreServices()
   const { settings } = useSettings()
-  const weekStartsOn = weekStartDow(settings.weekStartDay)
 
   const [month, setMonth] = useState(() => monthOf(selectedDate))
   // Render-time state adjustment (not an effect): navigating to another day
@@ -57,7 +61,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
     setMonth(monthOf(selectedDate))
   }
 
-  const grid = buildMonthGrid(month, weekStartsOn)
+  const grid = buildMonthGrid(month, settings.weekStartDay)
   const { data: notedDates } = useQuery({
     ...createDailyDatesQueryOptions(dailyNotes, graph?.root, grid.start, grid.end),
     enabled: graph !== null,
@@ -77,7 +81,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
           <button
             type="button"
             aria-label="Previous month"
-            onClick={() => setMonth(addMonths(month, -1))}
+            onClick={() => setMonth(addMonthsToMonth(month, -1))}
             className={HEADER_BUTTON_CLASS}
           >
             <ChevronLeftIcon />
@@ -102,7 +106,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
           <button
             type="button"
             aria-label="Next month"
-            onClick={() => setMonth(addMonths(month, 1))}
+            onClick={() => setMonth(addMonthsToMonth(month, 1))}
             className={HEADER_BUTTON_CLASS}
           >
             <ChevronRightIcon />
@@ -112,7 +116,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
 
       <div>
         <div className="grid grid-cols-7 border-b border-black/5 px-4 text-center dark:border-white/10">
-          {weekdayLabels(weekStartsOn).map((weekday) => (
+          {weekdayLabels(settings.weekStartDay).map((weekday) => (
             <div key={weekday} className="py-2 text-xs font-medium text-text">
               {weekday}
             </div>

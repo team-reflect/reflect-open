@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
 import { Pin, PinOff, Trash2 } from 'lucide-react'
 import type { HighlightSegment } from '@reflect/core'
-import { formatRecencyLabel } from '@/lib/dates.ts'
+import { formatRecencyLabel } from '@reflect/utils'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { useRowSwipe } from '@/mobile/use-row-swipe.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'

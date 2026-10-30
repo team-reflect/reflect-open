@@ -2,7 +2,7 @@ import { useLayoutEffect, useState, type ReactElement } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
 import { dateFromDailyPath, type DateFormat } from '@reflect/core'
 import { MarkdownPreview } from '@/editor/markdown-preview.tsx'
-import { formatDayLabel } from '@/lib/dates.ts'
+import { formatDayLabel } from '@reflect/utils'
 import { cn } from '@/lib/utils.ts'
 
 interface WikiLinkHoverPreviewProps {

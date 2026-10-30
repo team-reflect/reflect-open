@@ -9,7 +9,7 @@ import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
 import { useDateFormat } from '@/hooks/use-date-format.ts'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
-import { formatShortDate } from '@/lib/dates.ts'
+import { formatShortDate } from '@reflect/utils'
 
 interface ChatToolChipProps {
   part: Extract<AssistantPart, { kind: 'tool' }>

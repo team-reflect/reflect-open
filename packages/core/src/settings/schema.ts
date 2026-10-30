@@ -1,3 +1,4 @@
+import { DATE_FORMATS, TIME_FORMATS, WEEK_START_DAYS } from '@reflect/utils'
 import { z } from 'zod'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 
@@ -150,7 +151,7 @@ export type ThemePreference = z.infer<typeof themePreferenceSchema>
  * renders `8:22pm`; `24h` renders `20:22`. Display-only — stored timestamps
  * and daily-note keys are unaffected.
  */
-export const timeFormatSchema = z.enum(['12h', '24h']).catch('12h')
+export const timeFormatSchema = z.enum(TIME_FORMATS).catch('12h')
 
 export type TimeFormat = z.infer<typeof timeFormatSchema>
 
@@ -160,7 +161,7 @@ export type TimeFormat = z.infer<typeof timeFormatSchema>
  * renders `2026-06-10`. Display-only — daily-note filenames and stored dates
  * stay ISO `YYYY-MM-DD` regardless.
  */
-export const dateFormatSchema = z.enum(['mdy', 'dmy', 'iso']).catch('mdy')
+export const dateFormatSchema = z.enum(DATE_FORMATS).catch('mdy')
 
 export type DateFormat = z.infer<typeof dateFormatSchema>
 
@@ -169,19 +170,9 @@ export type DateFormat = z.infer<typeof dateFormatSchema>
  * `sunday` matches the North-American convention; `saturday` matches the
  * convention of most Middle-East and North-Africa locales.
  */
-export const weekStartDaySchema = z.enum(['monday', 'sunday', 'saturday']).catch('monday')
+export const weekStartDaySchema = z.enum(WEEK_START_DAYS).catch('monday')
 
 export type WeekStartDay = z.infer<typeof weekStartDaySchema>
-
-const WEEK_START_DOW: Record<WeekStartDay, 0 | 1 | 6> = { sunday: 0, monday: 1, saturday: 6 }
-
-/**
- * The week-start day in JS `getDay()` numbering (0 = Sunday, 6 = Saturday),
- * which is also date-fns' `weekStartsOn` convention.
- */
-export function weekStartDow(weekStartDay: WeekStartDay): 0 | 1 | 6 {
-  return WEEK_START_DOW[weekStartDay]
-}
 
 /**
  * Tags pinned as one-click filters on the All Notes screen, in display order.

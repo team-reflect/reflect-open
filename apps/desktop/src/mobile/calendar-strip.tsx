@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ChevronDown, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { addDaysIso } from '@/lib/dates.ts'
-import { monthOf } from '@/lib/month-grid.ts'
+import { addDaysIso, monthOf, startOfWeekIso } from '@reflect/utils'
 import { cn } from '@/lib/utils.ts'
-import { monthPickTarget, weekAtIndex, weekStartOf } from '@/mobile/calendar.ts'
+import { monthPickTarget, weekAtIndex } from '@/mobile/calendar.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MonthPickerDrawer } from '@/mobile/month-picker-drawer.tsx'
@@ -66,7 +65,7 @@ export function CalendarStrip({
 
   // Header month: the selection's own month while its week is on screen;
   // while browsing, the visible week's dominant (middle-day) month.
-  const selectionWeekStart = weekStartOf(date, settings.weekStartDay)
+  const selectionWeekStart = startOfWeekIso(date, settings.weekStartDay)
   const headerDate =
     displayedWeekStart === selectionWeekStart ? date : addDaysIso(displayedWeekStart, 3)
   const showToday = date !== today

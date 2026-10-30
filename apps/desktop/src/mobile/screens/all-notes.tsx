@@ -9,7 +9,7 @@ import {
   type NoteTagFacet,
 } from '@reflect/core'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { formatDayLabel } from '@/lib/dates.ts'
+import { formatDayLabel } from '@reflect/utils'
 import { queryKeys } from '@/lib/query-client.ts'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import {
