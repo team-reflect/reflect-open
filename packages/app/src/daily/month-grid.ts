@@ -80,6 +80,7 @@ export function monthShortLabel(month: string): string {
 /** Two-letter weekday labels for the grid's header row, e.g. `Mo`. */
 export function weekdayLabels(weekStartDay: WeekStartDay): string[] {
   const weekStart = weekStartOf(todayIso(), weekStartDay)
-  return Array.from({ length: 7 }, (_, index) => { return formatDate(parseIsoDate(addDaysIso(weekStart, index)), 'EEEEEE') },
-  )
+  return Array.from({ length: 7 }, (_, index) => {
+    return formatDate(parseIsoDate(addDaysIso(weekStart, index)), 'EEEEEE')
+  })
 }
