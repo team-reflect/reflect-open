@@ -107,6 +107,8 @@ objc2-app-kit = { workspace = true, features = [
 # non-Send Objective-C handles pinned to the main thread (`icloud/watch.rs`).
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 dispatch2 = { workspace = true }
+# Process memory footprint and OS version for the diagnostics report (`diagnostics.rs`).
+libc = { workspace = true }
 objc2 = { workspace = true }
 objc2-foundation = { workspace = true, features = ["default"] }
 objc2-contacts = { workspace = true }

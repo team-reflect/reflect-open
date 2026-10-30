@@ -10,9 +10,27 @@ export interface AppInfoService {
    * The application version reported by the native shell.
    */
   version(): MaybePromise<string>
+  /**
+   * Memory, uptime, and OS facts of the native process.
+   */
+  processDiagnostics(): MaybePromise<ProcessDiagnostics>
 }
 
 const appVersionSchema = z.string()
+
+const processDiagnosticsSchema = z.object({
+  /**
+   * The physical footprint (Activity Monitor's Memory); null where the
+   * platform has no such number.
+   */
+  footprintBytes: z.number().nullable(),
+  uptimeMs: z.number(),
+  os: z.string(),
+  osVersion: z.string().nullable(),
+  arch: z.string(),
+})
+
+export type ProcessDiagnostics = z.infer<typeof processDiagnosticsSchema>
 
 export interface AppInfoServiceDeps {
   readonly ipc: IpcBridgeService
@@ -28,10 +46,14 @@ class AppInfoServiceImpl implements AppInfoService {
   async version(): Promise<string> {
     return await this.#deps.ipc.call('app_version', {}, appVersionSchema)
   }
+
+  async processDiagnostics(): Promise<ProcessDiagnostics> {
+    return await this.#deps.ipc.call('process_diagnostics', {}, processDiagnosticsSchema)
+  }
 }
 
 /**
- * App info over the `app_version` command.
+ * App info over the `app_version` and `process_diagnostics` commands.
  */
 export function createAppInfoService(deps: AppInfoServiceDeps): AppInfoService {
   return new AppInfoServiceImpl(deps)

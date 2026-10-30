@@ -79,6 +79,7 @@ image = { version = "0.25.10", default-features = false }
 infer = "0.22.0"
 jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
+libc = "0.2.189"
 log = "0.4.34"
 notify = "9.0.0-rc.6"
 notify-debouncer-full = "0.8.0-rc.2"

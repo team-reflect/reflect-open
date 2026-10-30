@@ -21,6 +21,7 @@ mod capture;
 mod contacts;
 mod db;
 mod devtools;
+mod diagnostics;
 mod editor_link_preview;
 mod error;
 mod fs;
@@ -108,6 +109,7 @@ mod capability_tests {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    diagnostics::mark_start();
     let builder = tauri::Builder::default();
 
     // Single-instance must be the first plugin so a second launch is caught
@@ -272,6 +274,7 @@ pub fn run() {
             fs::x_archive::x_archive_owners,
             fs::x_syndication::x_syndication_fetch,
             app_version,
+            diagnostics::process_diagnostics,
             background_task::background_task_begin,
             background_task::background_task_end,
             icloud::storage::mobile_storage,

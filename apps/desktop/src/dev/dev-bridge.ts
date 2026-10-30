@@ -96,6 +96,14 @@ class DevBridgeImpl implements IpcBridge {
     switch (command) {
       case 'app_version':
         return '0.0.0-dev'
+      case 'process_diagnostics':
+        return {
+          footprintBytes: null,
+          uptimeMs: 0,
+          os: 'browser',
+          osVersion: null,
+          arch: 'browser',
+        }
       case 'background_task_begin':
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.

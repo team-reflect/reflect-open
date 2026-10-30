@@ -141,7 +141,7 @@ export { type OpenDocumentsService } from './documents/open-documents-service.ts
 export { type RenameCoordinator } from './documents/title-rename-service.ts'
 export { createDocumentBinding, type DocumentBinding } from './documents/document-binding.ts'
 export { type ResolvedArchivedPost } from './embeds/x-archive-service.ts'
-export { marketingVersion } from './ports/app-info-service.ts'
+export { marketingVersion, type ProcessDiagnostics } from './ports/app-info-service.ts'
 export { reachWebStorage, type StorageService } from './ports/storage-service.ts'
 export {
   type Operation,

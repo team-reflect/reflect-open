@@ -4678,6 +4678,7 @@ dependencies = [
  "http-range-header",
  "image",
  "keyring-core",
+ "libc",
  "log",
  "notify",
  "notify-debouncer-full",

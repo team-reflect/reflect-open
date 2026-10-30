@@ -1,4 +1,4 @@
-import type { AppInfoService } from '../ports/app-info-service.ts'
+import type { AppInfoService, ProcessDiagnostics } from '../ports/app-info-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 
 export interface TestSecretStoreService extends SecretStoreService {
@@ -52,6 +52,10 @@ class TestAppInfoServiceImpl implements AppInfoService {
 
   version(): string {
     return this.#version
+  }
+
+  processDiagnostics(): ProcessDiagnostics {
+    return { footprintBytes: null, uptimeMs: 0, os: 'test', osVersion: null, arch: 'test' }
   }
 }
 
