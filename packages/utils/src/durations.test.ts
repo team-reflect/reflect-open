@@ -11,5 +11,6 @@ describe('formatElapsed', () => {
   it('switches to h:mm:ss from one hour', () => {
     expect(formatElapsed(60 * 60_000)).toBe('1:00:00')
     expect(formatElapsed(2 * 60 * 60_000 + 3 * 60_000 + 4_000)).toBe('2:03:04')
+    expect(formatElapsed(24 * 60 * 60_000)).toBe('24:00:00')
   })
 })

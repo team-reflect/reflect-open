@@ -66,8 +66,8 @@ export function getDaysBetweenIsoDates(later: string, earlier: string): number {
 }
 
 /** Day of week of an ISO date: 0 = Sunday … 6 = Saturday. */
-export function getWeekday(date: string): number {
-  return getDay(parseIsoDate(date))
+export function getWeekday(date: string): Weekday {
+  return getDay(parseIsoDate(date)) as Weekday
 }
 
 /** A day of the week: 0 = Sunday … 6 = Saturday. */

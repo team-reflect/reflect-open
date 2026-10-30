@@ -73,11 +73,6 @@ describe('buildMonthGrid', () => {
     expect(() => buildMonthGrid('June', 'monday')).toThrow(/YYYY-MM/)
   })
 
-  it('rejects malformed months', () => {
-    expect(() => buildMonthGrid('2026-13', 'monday')).toThrow()
-    expect(() => buildMonthGrid('June', 'monday')).toThrow()
-  })
-
   it('stays contiguous day-by-day across US DST transitions', () => {
     // 2026-03 spans the spring-forward (Mar 8); 2026-11 the fall-back (Nov 1).
     const DAY_MILLIS = 86_400_000

@@ -1,5 +1,6 @@
+import { formatDate, formatIsoDate } from '@reflect/utils'
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcription-service.ts'
-import { formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
+import { type FileStamp, formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
 import { audioMemoPath, notePath } from '../graph/paths.ts'
 import type { AudioMemoIdentity } from './audio-memo-session.ts'
 
@@ -33,12 +34,11 @@ function pad(value: number, width: number): string {
   return String(value).padStart(width, '0')
 }
 
-function buildIdentity(base: string, stamp: string, extension: string): AudioMemoIdentity | null {
-  const parsed = parseFileStamp(stamp)
-  if (parsed === null) {
-    return null
-  }
-  const { date, time } = parsed
+function buildIdentity(
+  base: string,
+  { date, time }: FileStamp,
+  extension: string,
+): AudioMemoIdentity {
   return {
     base,
     date,
@@ -56,7 +56,8 @@ function buildIdentity(base: string, stamp: string, extension: string): AudioMem
 export function audioMemoIdentity(recordedAt: Date, mimeType: string): AudioMemoIdentity {
   const stamp = formatFileStamp(recordedAt)
   const extension = AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'
-  return buildIdentity(`audio-memo-${stamp}`, stamp, extension)!
+  const fields = { date: formatIsoDate(recordedAt), time: formatDate(recordedAt, 'HH:mm:ss') }
+  return buildIdentity(`audio-memo-${stamp}`, fields, extension)
 }
 
 /**
@@ -95,12 +96,12 @@ export function audioMemoPartFromPath(path: string): ParsedAudioMemoPart | null 
   if (partNumber < 1) {
     return null
   }
-  const memo = buildIdentity(base, stamp, extension)
-  if (memo === null) {
+  const fields = parseFileStamp(stamp)
+  if (fields === null) {
     return null
   }
   return {
-    memo,
+    memo: buildIdentity(base, fields, extension),
     part: partNumber,
     end: part === undefined ? true : end !== undefined,
   }

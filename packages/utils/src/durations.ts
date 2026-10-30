@@ -2,7 +2,7 @@ import prettyMs from 'pretty-ms'
 
 /** An elapsed time as `m:ss` under an hour and `h:mm:ss` from there. */
 export function formatElapsed(ms: number): string {
-  return prettyMs(ms, { colonNotation: true, secondsDecimalDigits: 0 })
+  return prettyMs(ms, { colonNotation: true, secondsDecimalDigits: 0, hideYearAndDays: true })
 }
 
 /** A duration in whole seconds and words, such as `2 minutes` or `0 seconds`. */

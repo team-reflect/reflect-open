@@ -1,4 +1,4 @@
-import { formatDate, formatIsoDate, parseDate } from '@reflect/utils'
+import { formatDate, parseDate } from '@reflect/utils'
 
 /**
  * The local timestamp in capture and audio-memo file names, such as
@@ -11,11 +11,21 @@ export function formatFileStamp(date: Date): string {
   return formatDate(date, FILE_STAMP_FORMAT)
 }
 
+/** The ISO date and `HH:mm:ss` time written in a {@link formatFileStamp} stamp. */
+export interface FileStamp {
+  date: string
+  time: string
+}
+
 /**
- * The local ISO date and `HH:mm:ss` time of a {@link formatFileStamp} stamp, or
- * `null` when the stamp names no real moment.
+ * The fields of a {@link formatFileStamp} stamp, or `null` when a field is out
+ * of range. The fields are read from the stamp as written: a local `Date` would
+ * shift a time that falls in this device's DST gap.
  */
-export function parseFileStamp(stamp: string): { date: string; time: string } | null {
-  const date = parseDate(stamp, FILE_STAMP_FORMAT)
-  return date === null ? null : { date: formatIsoDate(date), time: formatDate(date, 'HH:mm:ss') }
+export function parseFileStamp(stamp: string): FileStamp | null {
+  if (parseDate(stamp, FILE_STAMP_FORMAT) === null) {
+    return null
+  }
+  const time = `${stamp.slice(11, 13)}:${stamp.slice(13, 15)}:${stamp.slice(15, 17)}`
+  return { date: stamp.slice(0, 10), time }
 }
