@@ -1,15 +1,27 @@
 export interface LinkOpacityToScrollOptions {
-  /** The element whose opacity follows the scroll. It may sit anywhere in the document. */
+  /**
+   * The element whose opacity follows the scroll. It may sit anywhere in the document.
+   */
   target: HTMLElement
-  /** The element whose scroll position drives the opacity. */
+  /**
+   * The element whose scroll position drives the opacity.
+   */
   scroller: HTMLElement
-  /** The scroll axis that drives the opacity. */
+  /**
+   * The scroll axis that drives the opacity.
+   */
   axis: 'x' | 'y'
-  /** The opacity at scroll position 0. */
+  /**
+   * The opacity at scroll position 0.
+   */
   from: number
-  /** The opacity at the end of the scroll range. */
+  /**
+   * The opacity at the end of the scroll range.
+   */
   to: number
-  /** Ends the link. The opacity then returns to the stylesheet's. */
+  /**
+   * Ends the link. The opacity then returns to the stylesheet's.
+   */
   signal: AbortSignal
 }
 

@@ -48,7 +48,7 @@ describe('linkOpacityToScroll', () => {
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.2, 2))
 
     // Halfway through the 200px range.
-    await scrollElement(scroller, { top: 100 })
+    await scrollElement({ element: scroller, top: 100 })
 
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.6, 2))
   })
@@ -65,7 +65,7 @@ describe('linkOpacityToScroll', () => {
     })
     await vi.waitFor(() => expect(opacity(target)).toBe(0))
 
-    await scrollElement(scroller, { left: 50 })
+    await scrollElement({ element: scroller, left: 50 })
 
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.25, 2))
   })
@@ -80,7 +80,7 @@ describe('linkOpacityToScroll', () => {
       to: 1,
       signal: listeners.controller.signal,
     })
-    await scrollElement(scroller, { top: 100 })
+    await scrollElement({ element: scroller, top: 100 })
     await vi.waitFor(() => expect(opacity(target)).toBeCloseTo(0.5, 2))
 
     // The range becomes 400px; the position stays at 100px.
@@ -139,7 +139,7 @@ describe('linkOpacityToScroll', () => {
     expect(opacity(target)).toBeCloseTo(0.2, 2)
 
     // Halfway through the 200px range.
-    await scrollElement(scroller, { top: 100 })
+    await scrollElement({ element: scroller, top: 100 })
     expect(opacity(target)).toBeCloseTo(0.6, 2)
 
     listeners.controller.abort()
