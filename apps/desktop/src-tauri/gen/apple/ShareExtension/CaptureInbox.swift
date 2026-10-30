@@ -44,8 +44,8 @@ enum CaptureInboxError: Error {
 
 /// Field caps in UTF-16 code units — the unit zod's `.max()` counts on the
 /// drain side, so a capped value here can never be quarantined over length
-/// there. Applied at the producer so an envelope also stays inside the
-/// relay's 64 KiB spool cap. `textMax` mirrors `TEXT_CAPTURE_MAX_LENGTH`.
+/// there. Applied at the producer so an envelope also stays inside
+/// `spoolMaxBytes`. `textMax` mirrors `TEXT_CAPTURE_MAX_LENGTH`.
 private enum FieldCap {
     static let title = 1_000
     static let selection = 10_000
@@ -69,8 +69,10 @@ enum CaptureInbox {
     /// same directory name (`SHARED_INBOX_DIR`).
     static let inboxDir = "inbox"
 
-    /// The relay's spool cap (`INBOX_SPOOL_MAX_BYTES` in `capture.rs`) — an
-    /// envelope over it is quarantined unread, so it must never be spooled.
+    /// This extension's envelope budget: a share is one short link or line,
+    /// so anything near it is not a capture. Well inside the relay's cap
+    /// (`SHARED_ENVELOPE_MAX_BYTES` in `capture.rs`), which also takes the
+    /// Safari extension's page text.
     static let spoolMaxBytes = 64 * 1024
 
     /// Spool a link capture. Empty titles are allowed (the drain falls back

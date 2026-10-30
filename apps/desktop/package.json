@@ -9,6 +9,7 @@
     "build:ios": "node scripts/build-ios.ts",
     "build:linux": "node scripts/build-installers.ts",
     "build:macos": "node scripts/build-macos.ts",
+    "safari:embed": "node scripts/embed-safari-extension.ts",
     "build:windows": "node scripts/build-installers.ts",
     "preview": "vite preview",
     "sidecar": "node scripts/build-sidecar.ts",

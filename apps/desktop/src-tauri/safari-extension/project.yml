@@ -1,0 +1,44 @@
+# XcodeGen spec for the Safari app extension that ships inside Reflect.app
+# (`Contents/PlugIns/SafariExtension.appex`). Safari delivers the capture
+# extension's `sendNativeMessage` calls here instead of to
+# `reflect-capture-host`; the handler spools each capture into the App Group
+# inbox the desktop app relays into the graph (`capture.rs`). Swift only — no
+# Rust, no network.
+#
+# Tauri's bundler cannot build app extensions, so
+# `scripts/embed-safari-extension.ts` generates this project, builds the
+# target unsigned, copies the WXT Safari build into its Resources, then signs
+# and embeds it. The script passes the flavor's identifiers as build settings
+# (REFLECT_APP_IDENTIFIER, REFLECT_APP_GROUP) and the app's version.
+name: ReflectSafari
+options:
+  deploymentTarget:
+    macOS: '13.5'
+targets:
+  SafariExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Sources
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Reflect Capture
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        # The App Group the handler spools into. The app's relay
+        # (`capture.rs`) reads this key to find the same container.
+        ReflectAppGroup: $(REFLECT_APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.Safari.web-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SafariWebExtensionHandler
+    settings:
+      base:
+        PRODUCT_NAME: SafariExtension
+        # An appex bundle id must be prefixed by its containing app's.
+        PRODUCT_BUNDLE_IDENTIFIER: $(REFLECT_APP_IDENTIFIER).safari-extension
+        SWIFT_VERSION: '5.0'
+        # Signed by the embed script, with the sandbox and App Group
+        # entitlements, once the web extension is in its Resources.
+        CODE_SIGNING_ALLOWED: 'NO'

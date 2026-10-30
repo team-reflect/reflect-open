@@ -311,7 +311,11 @@ pub fn capture_inbox_reject(
     quarantine_spool(&root_for_generation(&state, generation)?, &name)
 }
 
-// ---- iOS App Group shared inbox ---------------------------------------------
+// ---- App Group shared inbox ---------------------------------------------------
+//
+// Sandboxed capture producers (the iOS share extension, the macOS Safari app
+// extension) cannot reach the graph folder, so they spool into their App
+// Group container and the app relays each spool file into the graph inbox.
 
 /// The App Group the iOS share extension spools into. Must match the
 /// `com.apple.security.application-groups` entitlement on the app and the
@@ -325,116 +329,211 @@ const SHARED_GROUP_ID: &str = "group.app.reflect.dev";
 #[cfg(all(target_os = "ios", not(debug_assertions)))]
 const SHARED_GROUP_ID: &str = "group.app.reflect";
 
-/// The envelope spool directory inside the App Group container. The extension
-/// creates it lazily; a missing directory relays as zero.
-#[cfg(any(target_os = "ios", test))]
+/// The Safari app extension's bundle inside `Contents/PlugIns/`
+/// (`safari-extension/project.yml`).
+#[cfg(target_os = "macos")]
+const SAFARI_APPEX: &str = "SafariExtension.appex";
+
+/// The app extension's Info.plist key naming its App Group. The group is
+/// per flavor and team-prefixed (`<team>.<app bundle id>`), set when
+/// `scripts/embed-safari-extension.ts` builds and signs the app extension,
+/// so the relay reads it back instead of keeping a second copy.
+#[cfg(target_os = "macos")]
+const SAFARI_APP_GROUP_KEY: &str = "ReflectAppGroup";
+
+/// The spool directory inside the App Group container. The extensions
+/// create it lazily; a missing directory relays as zero.
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 const SHARED_INBOX_DIR: &str = "inbox";
 
 /// Where oversized shared spools are quarantined, beside the shared inbox —
 /// moved, never deleted, mirroring the drain's `.reflect/inbox-rejected/`.
 const SHARED_REJECTED_DIR: &str = "inbox-rejected";
 
-/// A `.json.tmp` older than this is debris from an extension crash between
-/// its write and its commit rename — swept so the container can't accrete
-/// junk (the drain applies the same rule to orphan screenshots).
+/// A `.tmp` file, or a screenshot whose envelope never committed, older than
+/// this is debris from an extension crash between its write and its commit
+/// rename — swept so the container can't accrete junk (the drain applies
+/// the same rule to orphan screenshots).
 const SHARED_TMP_MAX_AGE: Duration = Duration::from_secs(60 * 60);
 
-/// Move every spooled `.json` envelope from the shared inbox into the graph's
-/// capture inbox. Copy + atomic write + delete-source, because the App Group
-/// container and the graph root (app sandbox or iCloud container) are
-/// different volumes where a rename cannot cross. A crash between the copy
-/// and the source delete re-relays the same envelope later — the drain's
-/// deterministic identity makes that idempotent. Bytes only: unparseable
-/// envelopes still relay, and the drain quarantines them with the rest.
+/// What the relay copies, matching the Safari app extension's caps
+/// (`CaptureSpool.swift`): a page capture can carry the page's extracted text
+/// and a full-window screenshot. Anything over them is not a capture.
+const SHARED_ENVELOPE_MAX_BYTES: u64 = 8 * 1024 * 1024;
+const SHARED_SCREENSHOT_MAX_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Move every committed `.json` envelope, and the `.jpg` screenshot beside
+/// it, from the shared inbox into the graph's capture inbox. Copy + atomic
+/// write + delete-source, because the App Group container and the graph root
+/// (app sandbox or iCloud container) can be different volumes where a rename
+/// cannot cross. A crash between the copy and the source delete re-relays
+/// the same envelope later — the drain's deterministic identity makes that
+/// idempotent. Bytes only: unparseable envelopes still relay, and the drain
+/// quarantines them with the rest.
 fn relay_shared_spools(shared_inbox: &Path, root: &Path) -> AppResult<u32> {
     let entries = match fs::read_dir(shared_inbox) {
         Ok(entries) => entries,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(0),
         Err(err) => return Err(err.into()),
     };
-    let mut relayed = 0;
+    let mut envelopes = Vec::new();
     for entry in entries {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().into_owned();
         let metadata = entry.metadata()?;
-        // Extension tmp files (`<id>.json.tmp`) and hidden files are not
-        // spool entries; only committed `.json` envelopes relay. Old tmp
-        // files are crash debris (write happened, commit rename didn't) —
-        // swept; the age guard covers an extension writing right now.
-        if !metadata.is_file() || name.starts_with('.') || !name.ends_with(".json") {
-            if metadata.is_file()
-                && name.ends_with(".json.tmp")
-                && metadata
-                    .modified()
-                    .ok()
-                    .and_then(|at| at.elapsed().ok())
-                    .is_some_and(|age| age > SHARED_TMP_MAX_AGE)
-            {
-                fs::remove_file(entry.path())?;
-            }
+        if !metadata.is_file() || name.starts_with('.') {
             continue;
         }
-        let Ok(target) = inbox_file(root, &name) else {
-            continue; // not a spool filename this app would ever address
-        };
-        if metadata.len() > INBOX_SPOOL_MAX_BYTES as u64 {
-            // Anything near the cap is not a capture. Quarantined beside the
-            // shared inbox so it can't wedge the relay forever.
-            let rejected = shared_inbox
-                .parent()
-                .ok_or_else(|| AppError::io("shared inbox has no parent directory"))?
-                .join(SHARED_REJECTED_DIR);
-            fs::create_dir_all(&rejected)?;
-            fs::rename(entry.path(), rejected.join(&name))?;
+        if name.ends_with(".json") {
+            envelopes.push(name);
             continue;
         }
-        let bytes = fs::read(entry.path())?;
-        atomic_write_bytes_to(&target, &bytes)?;
-        fs::remove_file(entry.path())?;
-        relayed += 1;
+        // Extension tmp files (`<id>.json.tmp`, `<id>.jpg.tmp`) and
+        // screenshots whose envelope hasn't committed are not spool entries.
+        // Old ones are crash debris — swept; the age guard covers an
+        // extension writing right now.
+        let orphan_screenshot = name
+            .strip_suffix(".jpg")
+            .is_some_and(|stem| !shared_inbox.join(format!("{stem}.json")).exists());
+        if (name.ends_with(".tmp") || orphan_screenshot)
+            && metadata
+                .modified()
+                .ok()
+                .and_then(|at| at.elapsed().ok())
+                .is_some_and(|age| age > SHARED_TMP_MAX_AGE)
+        {
+            fs::remove_file(entry.path())?;
+        }
+    }
+    let mut relayed = 0;
+    for name in envelopes {
+        if relay_shared_spool(shared_inbox, root, &name)? {
+            relayed += 1;
+        }
     }
     Ok(relayed)
 }
 
-/// The shared inbox the iOS share extension writes: `<App Group>/inbox`.
-/// `None` when the container is unavailable (non-iOS platforms; a build
-/// without the App Group entitlement).
-#[cfg(target_os = "ios")]
-fn shared_inbox_dir() -> Option<PathBuf> {
+/// Relay one committed envelope, its screenshot first, so the drain never
+/// reads an envelope whose screenshot is still in the App Group. The shared
+/// screenshot is removed only once the envelope has moved: a pass that fails
+/// in between retries the whole pair, possibly into another graph, instead
+/// of leaving the envelope without its screenshot. False when the pair was
+/// quarantined (or the name is not a spool filename) instead.
+fn relay_shared_spool(shared_inbox: &Path, root: &Path, name: &str) -> AppResult<bool> {
+    let Ok(target) = inbox_file(root, name) else {
+        return Ok(false); // not a spool filename this app would ever address
+    };
+    let envelope = shared_inbox.join(name);
+    let screenshot_name = format!("{}.jpg", name.trim_end_matches(".json"));
+    let screenshot = shared_inbox.join(&screenshot_name);
+    let screenshot_len = fs::metadata(&screenshot)
+        .ok()
+        .filter(fs::Metadata::is_file)
+        .map(|metadata| metadata.len());
+    if fs::metadata(&envelope)?.len() > SHARED_ENVELOPE_MAX_BYTES
+        || screenshot_len.is_some_and(|len| len > SHARED_SCREENSHOT_MAX_BYTES)
+    {
+        // Quarantined beside the shared inbox so it can't wedge the relay.
+        quarantine_shared_spool(shared_inbox, name)?;
+        if screenshot_len.is_some() {
+            quarantine_shared_spool(shared_inbox, &screenshot_name)?;
+        }
+        return Ok(false);
+    }
+    if screenshot_len.is_some() {
+        atomic_write_bytes_to(
+            &inbox_file(root, &screenshot_name)?,
+            &fs::read(&screenshot)?,
+        )?;
+    }
+    atomic_write_bytes_to(&target, &fs::read(&envelope)?)?;
+    fs::remove_file(&envelope)?;
+    if screenshot_len.is_some() {
+        fs::remove_file(&screenshot)?;
+    }
+    Ok(true)
+}
+
+fn quarantine_shared_spool(shared_inbox: &Path, name: &str) -> AppResult<()> {
+    let rejected = shared_inbox
+        .parent()
+        .ok_or_else(|| AppError::io("shared inbox has no parent directory"))?
+        .join(SHARED_REJECTED_DIR);
+    fs::create_dir_all(&rejected)?;
+    fs::rename(shared_inbox.join(name), rejected.join(name))?;
+    Ok(())
+}
+
+/// `<App Group container>/inbox`, or `None` when the container is
+/// unavailable (a build without the App Group entitlement).
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+fn group_inbox_dir(group: &str) -> Option<PathBuf> {
     use objc2_foundation::{NSFileManager, NSString};
     let manager = NSFileManager::defaultManager();
-    let group = NSString::from_str(SHARED_GROUP_ID);
+    let group = NSString::from_str(group);
     let container = manager.containerURLForSecurityApplicationGroupIdentifier(&group)?;
     let path = container.path()?.to_string();
     Some(PathBuf::from(path).join(SHARED_INBOX_DIR))
 }
 
-/// Only iOS has a share-extension producer; every other platform's capture
-/// producers write the graph inbox directly.
-#[cfg(not(target_os = "ios"))]
+/// The shared inbox the iOS share extension writes.
+#[cfg(target_os = "ios")]
+fn shared_inbox_dir() -> Option<PathBuf> {
+    group_inbox_dir(SHARED_GROUP_ID)
+}
+
+/// The shared inbox the Safari app extension writes. `None` unless this
+/// bundle embeds the app extension (never under `tauri dev`): only then is
+/// the app signed into the App Group, and reading another group's container
+/// without that entitlement makes macOS prompt for access.
+#[cfg(target_os = "macos")]
+fn shared_inbox_dir() -> Option<PathBuf> {
+    use objc2_foundation::{NSBundle, NSString};
+    let plug_ins = NSBundle::mainBundle().builtInPlugInsPath()?.to_string();
+    let appex_path = PathBuf::from(plug_ins).join(SAFARI_APPEX);
+    let appex = NSBundle::bundleWithPath(&NSString::from_str(appex_path.to_str()?))?;
+    let group = appex.objectForInfoDictionaryKey(&NSString::from_str(SAFARI_APP_GROUP_KEY))?;
+    group_inbox_dir(&group.downcast_ref::<NSString>()?.to_string())
+}
+
+/// Every other platform's capture producers write the graph inbox directly.
+#[cfg(not(any(target_os = "ios", target_os = "macos")))]
 fn shared_inbox_dir() -> Option<PathBuf> {
     None
 }
 
-/// Relay envelopes the iOS share extension spooled into the App Group inbox
-/// into the open graph's capture inbox, where the normal drain materializes
-/// them. Returns how many envelopes moved; zero without a shared container.
-/// Called by the mobile capture controller on launch and every foreground.
+/// One relay at a time, across graph sessions. A graph switch can start the
+/// new session's pass while the old session's relay is still running, and
+/// two relays sharing the inbox could split a screenshot from its envelope
+/// across the two graphs.
+static SHARED_RELAY: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Relay what the sandboxed capture extensions spooled into the App Group
+/// inbox into the open graph's capture inbox, where the normal drain
+/// materializes it. Returns how many envelopes moved; zero without a shared
+/// container. Called before every capture pass.
 #[tauri::command]
-pub async fn capture_shared_inbox_relay(
-    generation: u64,
-    state: State<'_, GraphState>,
-) -> AppResult<u32> {
-    let root = root_for_generation(&state, generation)?;
-    match shared_inbox_dir() {
-        // App Group directory IO belongs on the blocking pool: this fires on
-        // every launch and foreground, on what is the touch-delivery thread
-        // for sync commands on iOS.
-        Some(shared) => {
-            crate::blocking::run_blocking(move || relay_shared_spools(&shared, &root)).await
-        }
-        None => Ok(0),
-    }
+pub async fn capture_shared_inbox_relay(app: tauri::AppHandle, generation: u64) -> AppResult<u32> {
+    use tauri::Manager;
+    let Some(shared) = shared_inbox_dir() else {
+        return Ok(0);
+    };
+    // App Group directory IO belongs on the blocking pool: this fires on
+    // every launch and foreground, on what is the touch-delivery thread for
+    // sync commands on iOS.
+    crate::blocking::run_blocking(move || {
+        // The guard protects no data, so a relay that panicked leaves
+        // nothing to distrust.
+        let _relay = SHARED_RELAY
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Checked under the lock: a pass that waited out a graph switch
+        // must not relay into a graph it no longer belongs to.
+        let root = root_for_generation(&app.state::<GraphState>(), generation)?;
+        relay_shared_spools(&shared, &root)
+    })
+    .await
 }
 
 // ---- screenshot promote ---------------------------------------------------------
@@ -717,20 +816,112 @@ mod tests {
         let graph = tempfile::tempdir().unwrap();
         let shared_inbox = shared.path().join(SHARED_INBOX_DIR);
         fs::create_dir_all(&shared_inbox).unwrap();
-        let old = shared_inbox.join("dead.json.tmp");
-        let young = shared_inbox.join("live.json.tmp");
-        fs::write(&old, "crash debris").unwrap();
-        fs::write(&young, "being written").unwrap();
-        let file = fs::File::options().write(true).open(&old).unwrap();
-        let stale = std::time::SystemTime::now() - (SHARED_TMP_MAX_AGE + Duration::from_secs(60));
-        file.set_times(fs::FileTimes::new().set_modified(stale))
-            .unwrap();
+        // Crash debris: tmp files and screenshots whose envelope never committed.
+        let old = [
+            shared_inbox.join("dead.json.tmp"),
+            shared_inbox.join("dead.jpg.tmp"),
+            shared_inbox.join("dead.jpg"),
+        ];
+        let young = [
+            shared_inbox.join("live.json.tmp"),
+            shared_inbox.join("live.jpg"),
+        ];
+        for path in old.iter().chain(&young) {
+            fs::write(path, "partial").unwrap();
+        }
+        for path in &old {
+            age_past_tmp_limit(path);
+        }
 
         let relayed = relay_shared_spools(&shared_inbox, graph.path()).unwrap();
 
         assert_eq!(relayed, 0);
-        assert!(!old.exists());
-        assert!(young.exists());
+        assert!(old.iter().all(|path| !path.exists()));
+        assert!(young.iter().all(|path| path.exists()));
+    }
+
+    fn age_past_tmp_limit(path: &Path) {
+        let file = fs::File::options().write(true).open(path).unwrap();
+        let stale = std::time::SystemTime::now() - (SHARED_TMP_MAX_AGE + Duration::from_secs(60));
+        file.set_times(fs::FileTimes::new().set_modified(stale))
+            .unwrap();
+    }
+
+    #[test]
+    fn relay_moves_a_screenshot_with_its_envelope() {
+        let shared = tempfile::tempdir().unwrap();
+        let graph = tempfile::tempdir().unwrap();
+        let shared_inbox = shared.path().join(SHARED_INBOX_DIR);
+        fs::create_dir_all(&shared_inbox).unwrap();
+        fs::write(shared_inbox.join("7c9e6679.jpg"), b"jpeg-bytes").unwrap();
+        fs::write(
+            shared_inbox.join("7c9e6679.json"),
+            r#"{"screenshotRef":"7c9e6679.jpg"}"#,
+        )
+        .unwrap();
+        // An old screenshot is kept while its envelope is committed beside it.
+        age_past_tmp_limit(&shared_inbox.join("7c9e6679.jpg"));
+
+        let relayed = relay_shared_spools(&shared_inbox, graph.path()).unwrap();
+
+        assert_eq!(relayed, 1);
+        let inbox = graph.path().join(INBOX_DIR);
+        assert_eq!(fs::read(inbox.join("7c9e6679.jpg")).unwrap(), b"jpeg-bytes");
+        assert_eq!(
+            fs::read_to_string(inbox.join("7c9e6679.json")).unwrap(),
+            r#"{"screenshotRef":"7c9e6679.jpg"}"#
+        );
+        assert_eq!(fs::read_dir(&shared_inbox).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn relay_keeps_the_screenshot_until_its_envelope_moves() {
+        let shared = tempfile::tempdir().unwrap();
+        let graph = tempfile::tempdir().unwrap();
+        let shared_inbox = shared.path().join(SHARED_INBOX_DIR);
+        fs::create_dir_all(&shared_inbox).unwrap();
+        fs::write(shared_inbox.join("7c9e6679.jpg"), b"jpeg-bytes").unwrap();
+        fs::write(
+            shared_inbox.join("7c9e6679.json"),
+            r#"{"screenshotRef":"7c9e6679.jpg"}"#,
+        )
+        .unwrap();
+        // A directory where the envelope lands fails its write after the
+        // screenshot has copied.
+        let inbox = graph.path().join(INBOX_DIR);
+        let blocked = inbox.join("7c9e6679.json");
+        fs::create_dir_all(&blocked).unwrap();
+
+        assert!(relay_shared_spools(&shared_inbox, graph.path()).is_err());
+        assert!(shared_inbox.join("7c9e6679.jpg").is_file());
+        assert!(shared_inbox.join("7c9e6679.json").is_file());
+
+        fs::remove_dir(&blocked).unwrap();
+        let relayed = relay_shared_spools(&shared_inbox, graph.path()).unwrap();
+
+        assert_eq!(relayed, 1);
+        assert_eq!(fs::read(inbox.join("7c9e6679.jpg")).unwrap(), b"jpeg-bytes");
+        assert!(inbox.join("7c9e6679.json").is_file());
+        assert_eq!(fs::read_dir(&shared_inbox).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn relay_quarantines_an_oversized_screenshot_with_its_envelope() {
+        let shared = tempfile::tempdir().unwrap();
+        let graph = tempfile::tempdir().unwrap();
+        let shared_inbox = shared.path().join(SHARED_INBOX_DIR);
+        fs::create_dir_all(&shared_inbox).unwrap();
+        let oversized = usize::try_from(SHARED_SCREENSHOT_MAX_BYTES).unwrap() + 1;
+        fs::write(shared_inbox.join("big.jpg"), vec![0u8; oversized]).unwrap();
+        fs::write(shared_inbox.join("big.json"), "{}").unwrap();
+
+        let relayed = relay_shared_spools(&shared_inbox, graph.path()).unwrap();
+
+        assert_eq!(relayed, 0);
+        let rejected = shared.path().join(SHARED_REJECTED_DIR);
+        assert!(rejected.join("big.jpg").is_file());
+        assert!(rejected.join("big.json").is_file());
+        assert!(!graph.path().join(INBOX_DIR).exists());
     }
 
     #[test]
@@ -768,7 +959,7 @@ mod tests {
         fs::create_dir_all(&shared_inbox).unwrap();
         fs::write(
             shared_inbox.join("big.json"),
-            "x".repeat(INBOX_SPOOL_MAX_BYTES + 1),
+            "x".repeat(usize::try_from(SHARED_ENVELOPE_MAX_BYTES).unwrap() + 1),
         )
         .unwrap();
 

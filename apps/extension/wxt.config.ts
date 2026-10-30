@@ -35,12 +35,13 @@ export default defineConfig({
       ? {}
       : { artifactTemplate: '{{name}}-{{packageVersion}}-{{browser}}-unpacked{{modeSuffix}}.zip' }),
   },
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Reflect Capture',
     description: 'Save the page you are reading into Reflect.',
     homepage_url: 'https://github.com/team-reflect/reflect-open',
-    // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it there.
-    ...(isStoreBuild ? {} : { key: PUBLIC_KEY }),
+    // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it
+    // there. Safari ignores it: the containing app identifies the extension.
+    ...(isStoreBuild || browser === 'safari' ? {} : { key: PUBLIC_KEY }),
     // `activeTab` (granted by the action click / shortcut) covers the
     // screenshot and the selection grab; `webRequest` on x.com only observes
     // bookmark and like requests.
@@ -60,5 +61,5 @@ export default defineConfig({
         description: 'Save the current page to Reflect',
       },
     },
-  },
+  }),
 })
