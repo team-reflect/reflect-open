@@ -65,8 +65,9 @@ export interface ScrollSettleWatch {
  * it; a quiet-time timer covers the engines without it.
  *
  * A mouse drag scrolls the element the way a finger does: snapping is off
- * while the mouse moves, and on release the element scrolls smoothly to the
- * nearer end of its range. The drag and that scroll count as one user scroll.
+ * from the first move until the release scroll stops, and on release the
+ * element scrolls smoothly to the nearer end of its range. The drag and that
+ * scroll count as one user scroll.
  */
 export function watchScrollSettle({
   element,
@@ -207,17 +208,17 @@ export function watchScrollSettle({
   // One press, from `pointerdown` until the release scroll stops. Aborting
   // the press undoes everything it set.
   function dragWithMouse(down: PointerEvent): void {
-    const axis = snapAxis(element)
-    if (
-      down.pointerType !== 'mouse' ||
-      down.button !== 0 ||
-      !axis ||
-      (down.target instanceof Element && down.target.closest(NO_DRAG_SELECTOR))
-    ) {
+    if (down.pointerType !== 'mouse' || down.button !== 0) {
       return
     }
-    // Stops text selection.
-    down.preventDefault()
+    // A new press ends the last one, so the two never share `MOUSE`. It runs
+    // first: the last press may still hold the inline snap type the axis
+    // comes from.
+    press?.abort()
+    const axis = snapAxis(element)
+    if (!axis || (down.target instanceof Element && down.target.closest(NO_DRAG_SELECTOR))) {
+      return
+    }
     const x = axis === 'x'
     const position = (): number => (x ? element.scrollLeft : element.scrollTop)
     const pointer = (event: PointerEvent): number => (x ? event.clientX : event.clientY)
@@ -225,11 +226,15 @@ export function watchScrollSettle({
     const origin = pointer(down)
     let dragging = false
     let quiet: ReturnType<typeof setTimeout> | undefined
-    // A new press ends the last one, so the two never share `MOUSE`.
-    press?.abort()
     const controller = new AbortController()
     press = controller
     const pressSignal = AbortSignal.any([signal, controller.signal])
+    // Stops text selection, and leaves the press itself to the control under
+    // it: a `preventDefault` on `pointerdown` would cancel its `mousedown`.
+    window.addEventListener('selectstart', (event) => event.preventDefault(), {
+      capture: true,
+      signal: pressSignal,
+    })
     // The button is down: from `pointerdown` until `pointerup` or `pointercancel`.
     const released = new AbortController()
     const held = AbortSignal.any([pressSignal, released.signal])
@@ -278,7 +283,8 @@ export function watchScrollSettle({
         controller.abort()
         return
       }
-      element.style.scrollSnapType = ''
+      // Snap stays off until the release scroll stops. Turned back on here, it
+      // would re-snap to the target the drag started from.
       suppressNextClick()
       const range = x
         ? element.scrollWidth - element.clientWidth
