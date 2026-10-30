@@ -1,4 +1,4 @@
-import { appendBlock } from '../markdown/edit.ts'
+import { appendBlock } from '../markdown/append-section.ts'
 import { canonicalEmails } from '../markdown/email-fields.ts'
 import { splitFrontmatter } from '../markdown/frontmatter.ts'
 import type { ContactMatch } from './commands.ts'

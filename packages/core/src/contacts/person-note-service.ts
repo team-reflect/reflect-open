@@ -8,7 +8,7 @@ import { inClauseChunks } from '../indexing/query-utils.ts'
 import { serializeWikiSuggestionAddress } from '../indexing/suggest.ts'
 import type { WikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import { canonicalEmails } from '../markdown/email-fields.ts'
-import type { ContactMatch } from './contacts-service.ts'
+import type { ContactMatch } from './commands.ts'
 
 const PERSON_TAG_KEY = 'person'
 

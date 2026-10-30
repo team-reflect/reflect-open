@@ -91,15 +91,30 @@ export {
 } from './documents/attachment-service.ts'
 export {
   INITIAL_NOTE_SNAPSHOT,
-  frontmatterPatchToYaml,
-  type FrontmatterPatch,
   type NoteContentOrigin,
   type NoteSession,
   type NoteSessionOptions,
   type NoteSessionService,
   type NoteSessionSnapshot,
   type NoteSessionStatus,
-} from './documents/note-session-service.ts'
+} from './documents/note-session-types.ts'
+export {
+  frontmatterPatchToYaml,
+  type FrontmatterPatch,
+} from './documents/note-session-frontmatter.ts'
+export { type ChatModelSelection } from './settings/schema.ts'
+export {
+  type CloudGraphContext,
+  cloudSafeLinkHref,
+  notePrivate,
+} from './privacy/privacy-service.ts'
+export { type CloudSafe } from './privacy/cloud-safe.ts'
+export {
+  calendarEventSchema,
+  type CalendarAuthorizationStatus,
+  type CalendarInfo,
+  type CalendarEvent,
+} from './calendar/calendar-service.ts'
 export {
   UPDATED_PRESETS,
   updatedPresetFilter,
@@ -321,12 +336,7 @@ export {
 export { isHttpBaseUrl } from './lib/http-url.ts'
 
 export { TRANSCRIPTION_PROVIDERS } from './ai/provider-config.ts'
-export {
-  chatModelOptions,
-  type ChatModelOption,
-  type ChatModelSelection,
-} from './ai/chat/model-options.ts'
-export { type CloudGraphContext, type CloudSafe } from './privacy/checkers.ts'
+export { chatModelOptions, type ChatModelOption } from './ai/chat/model-options.ts'
 export { type NoteHitSummary } from './ai/chat/note-tools-service.ts'
 export { chatSystemPrompt } from './ai/chat/system-prompt.ts'
 export type { ChatStreamEvent } from './ai/chat/chat-engine-service.ts'
@@ -361,13 +371,7 @@ export {
   captureWireMessageSchema,
   type CaptureWireMessage,
 } from './capture/capture-envelope.ts'
-export {
-  canReadCalendars,
-  calendarEventSchema,
-  type CalendarAuthorizationStatus,
-  type CalendarInfo,
-  type CalendarEvent,
-} from './calendar/commands.ts'
+export { canReadCalendars } from './calendar/commands.ts'
 export { dayRange, displayEvents, defaultAttendees } from './calendar/events.ts'
 export { type MeetingAttendee } from './contacts/meeting-service.ts'
 export {
@@ -377,7 +381,7 @@ export {
   type LinkPreviewSession,
 } from './link-preview/link-preview-service.ts'
 export { parseLinkPreviewMeta } from './link-preview/metadata.ts'
-export { cloudSafeLinkHref, notePrivate } from './privacy/checkers.ts'
+
 export { suggestRepoName, type GithubAuth, type GithubUser } from './sync/index.ts'
 export {
   isPinned,

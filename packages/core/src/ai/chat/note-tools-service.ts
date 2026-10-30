@@ -15,11 +15,11 @@ import type { DailyNoteRow, DailyNotesRange } from '../../daily/daily-note-servi
 import { isTagName } from '../../markdown/extract.ts'
 import type {
   CloudNoteListing,
-  CloudSafe,
   CloudSearchHit,
   CloudSendable,
   PrivacyService,
 } from '../../privacy/privacy-service.ts'
+import type { CloudSafe } from '../../privacy/cloud-safe.ts'
 import type { XArchiveService } from '../../embeds/x-archive-service.ts'
 import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets.ts'
 import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes.ts'

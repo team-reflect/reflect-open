@@ -1,7 +1,7 @@
 import type { LoggerService } from '../ports/logger-service.ts'
-import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import type { IpcBridgeService, PluginSubscription } from '../ipc/ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { PluginEvent, PluginSubscription } from '../ipc/plugin.ts'
+import type { PluginEvent } from '../ipc/plugin.ts'
 import {
   actionPerformedCommand,
   actionsReadyCommand,
