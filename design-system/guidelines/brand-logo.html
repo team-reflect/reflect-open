@@ -1,28 +1,74 @@
 <!-- @dsCard group="Brand" viewport="700x180" name="Logo & mark" subtitle="The networked-graph sphere + wordmark" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 0; font-family: var(--font-sans); }
-  .stage { display: flex; align-items: center; gap: 40px; padding: 30px 32px; background: var(--space-black); position: relative; overflow: hidden; }
-  .stage::before { content:""; position:absolute; inset:0; background: radial-gradient(40% 120% at 30% -20%, rgba(148,101,255,.20), rgba(3,0,20,0) 70%); }
-  .lockup { display: flex; align-items: center; gap: 14px; position: relative; }
-  .lockup img { width: 56px; height: 56px; }
-  .word { font-size: 28px; font-weight: 500; color: #fff; letter-spacing: -0.01em; }
-  .mark { width: 84px; height: 84px; position: relative; }
-  .caption { position: relative; margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,.45); max-width: 160px; line-height: 1.5; }
-</style>
-</head>
-<body>
-  <div class="stage">
-    <div class="lockup">
-      <img src="../assets/reflect-app-icon.png" alt="Reflect" />
-      <span class="word">Reflect</span>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-sans);
+      }
+      .stage {
+        display: flex;
+        align-items: center;
+        gap: 40px;
+        padding: 30px 32px;
+        background: var(--space-black);
+        position: relative;
+        overflow: hidden;
+      }
+      .stage::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          40% 120% at 30% -20%,
+          rgba(148, 101, 255, 0.2),
+          rgba(3, 0, 20, 0) 70%
+        );
+      }
+      .lockup {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        position: relative;
+      }
+      .lockup img {
+        width: 56px;
+        height: 56px;
+      }
+      .word {
+        font-size: 28px;
+        font-weight: 500;
+        color: #fff;
+        letter-spacing: -0.01em;
+      }
+      .mark {
+        width: 84px;
+        height: 84px;
+        position: relative;
+      }
+      .caption {
+        position: relative;
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.45);
+        max-width: 160px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="lockup">
+        <img src="../assets/reflect-app-icon.png" alt="Reflect" />
+        <span class="word">Reflect</span>
+      </div>
+      <img class="mark" src="../assets/reflect-app-icon.png" alt="mark" />
+      <span class="caption">Glowing white nodes connected by purple arcs — a knowledge graph.</span>
     </div>
-    <img class="mark" src="../assets/reflect-app-icon.png" alt="mark" />
-    <span class="caption">Glowing white nodes connected by purple arcs — a knowledge graph.</span>
-  </div>
-</body>
+  </body>
 </html>

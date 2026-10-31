@@ -1,6 +1,6 @@
 /**
  * `@reflect/core` markdown document model (Plan 03) — the one canonical
- * parse/extract/edit layer over `@lezer/markdown` + `yaml`, shared by the
+ * parse/extract/edit layer over `@meowdown/markdown` + `yaml`, shared by the
  * indexer (Plan 04), editor (Plan 05), backlinks (Plan 07), and CLI (Plan 14).
  */
 export {
@@ -8,7 +8,6 @@ export {
   gistFrontmatterSchema,
   isPinned,
   pinnedOrder,
-  PARSED_NOTE_VERSION,
   type Frontmatter,
   type GistFrontmatter,
   type Span,
@@ -16,66 +15,65 @@ export {
   type MarkdownLink,
   type Heading,
   type AssetRef,
-  type TaskMarker,
   type ParsedNote,
-} from './model'
+} from './model.ts'
 export {
   splitFrontmatter,
   parseFrontmatter,
   upsertFrontmatter,
   type FrontmatterSplit,
   type ParsedFrontmatter,
-} from './frontmatter'
-export { parseBody, reflectMarkdownParser, wikiLinkExtension } from './grammar'
-export { parseNote, isTagName, hasAuthoredTitle } from './extract'
+} from './frontmatter.ts'
+export { parseBody } from './grammar.ts'
+export { parseNote, isTagName, hasAuthoredTitle } from './extract.ts'
 export {
   scanInlineWikiLinks,
-  scanInlineImages,
   scanInlineSegments,
   type InlineWikiLink,
-  type InlineImage,
   type InlineSegment,
-} from './scan'
-export {
-  appendBlock,
-  appendUnderHeading,
-  appendTaskLine,
-  appendTaskToContext,
-  wikiLinkSafe,
-  editTaskLine,
-  removeTaskLine,
-  renameWikiLink,
-  setTaskDueDate,
-  clearTaskDueDate,
-  taskLineToBullet,
-  toggleTaskMarker,
-  TaskStaleError,
-} from './edit'
-export { parseTaskMarker } from './task-marker'
-export {
-  conflictMarkerBlockCount,
-  conflictMarkerLabels,
-  detectConflictMarkers,
-  parseConflictMarkers,
-  resolveConflictMarkers,
-  type ConflictMarkerLabels,
-  type ConflictResolution,
-  type ConflictSegment,
-  type ConflictSide,
-} from './conflict-markers'
-export { extractEmailFields, foldEmail } from './email-fields'
-export { foldFallbackTitleKey, foldKey, foldTag } from './keys'
-export { gistBodyHash, gistFilename } from './gist'
-export { slugForTitle } from './slug'
-export { subjectAliases } from './subject-aliases'
+} from './scan.ts'
+export { wikiLinkSafe, setTaskDueDate, clearTaskDueDate } from './edit.ts'
+export { appendBlock } from './append-section.ts'
+export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle.ts'
+export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title.ts'
+export { canonicalEmail, canonicalEmails, extractEmailFields } from './email-fields.ts'
+export { foldFallbackTitleKey, foldKey, foldTag } from './keys.ts'
+export { gistBodyHash, gistFilename } from './gist.ts'
+export { slugForTitle } from './slug.ts'
+export { subjectAliases } from './subject-aliases.ts'
 export {
   normalizeWikiTarget,
   resolved,
-  resolveWikiLink,
-  resolveWikiLinkAsync,
   unresolved,
   type NormalizedTarget,
   type Resolution,
-  type WikiLookup,
-  type AsyncWikiLookup,
-} from './resolve'
+} from './resolve.ts'
+export { renderInlineText } from './inline-text.ts'
+export { compareTaskPaths, decodeTaskPath, encodeTaskPath, isSameTaskPath } from './task-path.ts'
+export {
+  appendListItem,
+  linkSectionHeading,
+  type ListItemInsert,
+  type ListItemKind,
+  type SectionTarget,
+  applyTaskEdits,
+  findTaskMove,
+  getFirstParagraphMarkdown,
+  getRoundTasks,
+  getTaskDueDate,
+  isRoundTask,
+  NoteNotSerializableError,
+  projectTasks,
+  renderTaskSnapshot,
+  TaskStaleError,
+  type InsertPosition,
+  type TaskEdit,
+  type TaskEditInsert,
+  type TaskEditItem,
+  type TaskEditResult,
+  type TaskLogContext,
+  type TaskMove,
+  type TaskEntry,
+  type TaskRow,
+} from './task-ast.ts'
+export type { ParsedTask, TaskLocator, TaskSnapshot } from './task-model.ts'

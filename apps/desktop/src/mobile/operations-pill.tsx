@@ -1,6 +1,6 @@
-import type { ReactElement } from 'react'
-import { dismissOperation, useOperations } from '@/lib/operations'
-import { cn } from '@/lib/utils'
+import { useCallback, useSyncExternalStore, type ReactElement } from 'react'
+import { cn } from '@/lib/utils.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
  * Failed and warning background operations as tappable pills (Plan 19
@@ -13,8 +13,14 @@ import { cn } from '@/lib/utils'
  * surface only speaks up when something went wrong.
  */
 export function MobileOperationsPills(): ReactElement | null {
-  const operations = useOperations()
-  const attention = operations.filter((operation) => operation.status !== 'running')
+  const { operations } = useAppServices()
+  const subscribe = useCallback(
+    (listener: () => void) => operations.subscribe(listener),
+    [operations],
+  )
+  const getAll = useCallback(() => operations.getAll(), [operations])
+  const all = useSyncExternalStore(subscribe, getAll)
+  const attention = all.filter((operation) => operation.status !== 'running')
 
   if (attention.length === 0) {
     return null
@@ -27,7 +33,7 @@ export function MobileOperationsPills(): ReactElement | null {
           key={operation.id}
           type="button"
           role={operation.status === 'failed' ? 'alert' : 'status'}
-          onClick={() => dismissOperation(operation.id)}
+          onClick={() => operations.dismiss(operation.id)}
           className="pointer-events-auto flex max-w-[85vw] items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium shadow-sm"
         >
           <span

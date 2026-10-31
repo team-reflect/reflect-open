@@ -1,25 +1,13 @@
-import { useEffect, useState, type ReactElement } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
-import { requestContactsAccess } from '@reflect/core'
-import { InlineAlert } from '@/components/inline-alert'
-import {
-  useContactsAuthorization,
-  useRefreshContactsAuthorization,
-} from '@/hooks/use-contacts-authorization'
-import { isMacosDesktop } from '@/lib/platform'
-import { useSettings } from '@/providers/settings-provider'
-import { CalendarIntegrationField } from './calendar-integration-field'
-import { SettingsSection } from './section'
-import { SettingsSwitchField } from './switch-field'
-
-/**
- * macOS System Settings, opened straight to the Contacts privacy pane. This
- * scheme is macOS-only, which holds today: this section lives in the desktop
- * settings surface (mobile has its own settings drawer, which doesn't offer
- * the integration yet). An iOS settings surface would use `app-settings:`.
- */
-const CONTACTS_PRIVACY_PANE =
-  'x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts'
+import { useEffect, type ReactElement } from 'react'
+import { canPromptForContacts, contactsAccessNotice, isContactsAvailable } from '@reflect/core'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useContactsState } from '@/hooks/use-contacts-state.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { CalendarIntegrationField } from './calendar-integration-field.tsx'
+import { SettingsSection } from './section.tsx'
+import { SettingsSwitchField } from './switch-field.tsx'
 
 /**
  * The Integrations section: Apple Contacts and Calendar live together here
@@ -32,10 +20,11 @@ const CONTACTS_PRIVACY_PANE =
  * {@link useVisibleSettingsSections}.
  */
 export function IntegrationsSection(): ReactElement | null {
-  const { settings, updateSettings } = useSettings()
-  const authorization = useContactsAuthorization()
-  const refreshAuthorization = useRefreshContactsAuthorization()
-  const [isPrompting, setIsPrompting] = useState(false)
+  const { settings } = useSettings()
+  const { contacts, contactSuggestions } = useCoreServices()
+  const { opener, calendarEvents } = useAppServices()
+  const { authorization } = useContactsState()
+  const prompt = useAsyncAction()
 
   // The user grants access in System Settings, not in the app, so re-read the
   // permission whenever the window regains focus while the integration is on.
@@ -45,44 +34,36 @@ export function IntegrationsSection(): ReactElement | null {
       return
     }
     function onFocus(): void {
-      void refreshAuthorization()
+      void contacts.refresh()
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [contactsEnabled, refreshAuthorization])
+  }, [contactsEnabled, contacts])
 
-  const contactsAvailable = authorization !== null && authorization !== 'unavailable'
-  const calendarAvailable = isMacosDesktop
+  const contactsAvailable = isContactsAvailable(authorization)
+  const calendarAvailable = calendarEvents.isAvailable()
 
   if (!contactsAvailable && !calendarAvailable) {
     return null
   }
 
-  const showDenied =
-    settings.contactsEnabled && (authorization === 'denied' || authorization === 'restricted')
-  // Enabled but never asked — the toggle-on prompt didn't complete (quit
-  // mid-prompt, settings restored from another machine). Offer the prompt
-  // again rather than sitting silently gated off. Suppressed while a prompt
-  // is up, so it doesn't flash under the OS dialog on a fresh toggle.
-  const showPrompt =
-    settings.contactsEnabled && authorization === 'notDetermined' && !isPrompting
+  // `denied` points at System Settings; `prompt` offers the OS prompt again
+  // (enabled but never asked), suppressed while a prompt is up so it doesn't
+  // flash under the OS dialog on a fresh toggle.
+  const notice = contactsAccessNotice(settings, authorization, prompt.pending)
+  const showDenied = notice === 'denied'
+  const showPrompt = notice === 'prompt'
 
   async function promptForAccess(): Promise<void> {
-    setIsPrompting(true)
-    try {
-      // A failed prompt (e.g. it timed out unanswered) isn't surfaced here —
-      // the refreshed status is the truth, and a denied/restricted answer
-      // shows the System Settings pointer below.
-      await requestContactsAccess().catch(() => {})
-      await refreshAuthorization()
-    } finally {
-      setIsPrompting(false)
-    }
+    // A failed prompt (e.g. it timed out unanswered) isn't surfaced here:
+    // the refreshed status is the truth, and a denied/restricted answer
+    // shows the System Settings pointer below.
+    await prompt.run(() => contactSuggestions.requestAccess())
   }
 
   async function enableContacts(): Promise<void> {
-    updateSettings({ contactsEnabled: true })
-    if (authorization === 'notDetermined') {
+    contactSuggestions.setEnabled(true)
+    if (canPromptForContacts(authorization)) {
       await promptForAccess()
     }
   }
@@ -99,7 +80,7 @@ export function IntegrationsSection(): ReactElement | null {
               if (checked) {
                 void enableContacts()
               } else {
-                updateSettings({ contactsEnabled: false })
+                contactSuggestions.setEnabled(false)
               }
             }}
           />
@@ -114,9 +95,7 @@ export function IntegrationsSection(): ReactElement | null {
                     // A rejection here is a capability-scope bug (the ACL must
                     // allow x-apple.systempreferences:*) — surface it, don't
                     // swallow it into a dead link.
-                    openUrl(CONTACTS_PRIVACY_PANE).catch((cause: unknown) => {
-                      console.error('failed to open System Settings', cause)
-                    })
+                    opener.openSystemSettings('contacts')
                   }}
                 >
                   Open System Settings

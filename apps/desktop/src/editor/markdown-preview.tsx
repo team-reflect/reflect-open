@@ -1,7 +1,11 @@
+import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
+import { useYouTubeVideoResolver } from '@/editor/youtube-video-resolver.ts'
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
+import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
 import { MarkdownView } from '@meowdown/react'
-import { useOpenExternalLink } from '@/editor/open-external-link'
-import { cn } from '@/lib/utils'
+import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
+import { useWikilinkResolver } from '@/editor/resolve-wikilink.ts'
+import { cn } from '@/lib/utils.ts'
 
 /**
  * A read-only rendering of note markdown via @meowdown/react's `<MarkdownView>`
@@ -17,39 +21,63 @@ import { cn } from '@/lib/utils'
 interface MarkdownPreviewProps {
   /** The markdown body to render (callers strip frontmatter first). */
   content: string
-  /** Resolve `![…](…)` sources to displayable URLs; unresolved images are skipped. */
-  resolveImageUrl?: (src: string) => string | null
+  /**
+   * Graph-relative path of the note `content` comes from; relative Markdown
+   * links and attachment links resolve from it. `null` when the content
+   * belongs to no note.
+   */
+  sourcePath: string | null
+  /**
+   * Resolve `![…](…)` sources to displayable URLs, possibly later; unresolved
+   * images are skipped. Pass a stable function.
+   */
+  resolveImageUrl?: ImageUrlResolver
+  /**
+   * Classify Obsidian `![[target]]` embeds (images, file pills, note chips);
+   * omitted, embeds stay literal text. Pass a stable function.
+   */
+  resolveWikiEmbed?: WikiEmbedResolver | undefined
   /**
    * Navigate a clicked `[[wiki link]]` target. Omitted, links render as
    * inert chips (the palette preview's behavior). `event` carries the
    * originating click so handlers can honor ⌘-click (open in new window).
    */
-  onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
+  onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
   /**
    * Whether rendered links, images, and task checkboxes can be activated
    * (default true). A passive preview renders no anchors, focusable controls,
    * or remote embeds.
    */
   interactive?: boolean
+  /**
+   * Render `content` as one paragraph of inline Markdown. A block prefix at
+   * the start (`+ [ ] `, `# `, `> `) stays text instead of opening a block.
+   * Task rows pass this: their content is one paragraph by definition.
+   */
+  singleParagraph?: boolean
   /** Extra classes for the rendered root. */
   className?: string
 }
 
 export function MarkdownPreview({
   content,
+  sourcePath,
+  singleParagraph = false,
   resolveImageUrl,
+  resolveWikiEmbed,
   onWikiLinkClick,
   interactive = true,
   className,
 }: MarkdownPreviewProps): ReactElement {
-  const openExternalLink = useOpenExternalLink()
-  // The resolver and click handler are read through refs so a changing prop
-  // never gives MarkdownView a new callback identity (which would re-render its
-  // whole tree).
-  const resolveRef = useRef(resolveImageUrl)
+  const onLinkClick = useMarkdownLinkClick(sourcePath)
+  // The click handler is read through a ref so a changing prop never gives
+  // MarkdownView a new callback identity (which would re-render its whole
+  // tree).
+  const resolveYouTubeVideo = useYouTubeVideoResolver()
+  const resolveXPost = useXPostResolver()
+  const resolveWikilink = useWikilinkResolver()
   const navigateRef = useRef(onWikiLinkClick)
   useEffect(() => {
-    resolveRef.current = resolveImageUrl
     navigateRef.current = onWikiLinkClick
   })
 
@@ -59,23 +87,26 @@ export function MarkdownPreview({
   // navigation.
   const navigates = interactive && onWikiLinkClick != null
 
-  const resolveImageUrlStable = useCallback(
-    (src: string) => resolveRef.current?.(src) ?? undefined,
-    [],
-  )
   const onWikilinkClickStable = useCallback(
-    (payload: { target: string; event: MouseEvent | KeyboardEvent }) =>
-      navigateRef.current?.(payload.target, payload.event),
+    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
+      return navigateRef.current?.({ target: payload.target, openInNewWindow: payload.mod })
+    },
     [],
   )
 
   return (
     <MarkdownView
+      resolveXPost={resolveXPost}
+      resolveYouTubeVideo={resolveYouTubeVideo}
+      mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
       markdown={content}
+      singleParagraph={singleParagraph}
       markMode="hide"
       interactive={interactive}
-      resolveImageUrl={resolveImageUrlStable}
-      {...(interactive ? { onLinkClick: openExternalLink } : {})}
+      resolveWikilink={resolveWikilink}
+      resolveImageUrl={resolveImageUrl}
+      resolveWikiEmbed={resolveWikiEmbed}
+      {...(interactive ? { onLinkClick } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}
     />

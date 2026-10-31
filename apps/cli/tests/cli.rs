@@ -16,6 +16,12 @@ use reflect_cli::keys::fold_key;
 use reflect_cli::note_file::parse_note_meta;
 use reflect_cli::paths::{daily_path, today_date};
 
+/// `note_claims.tier` values (the desktop's `claim_tier`): lower wins.
+const TIER_DAILY_DATE: i64 = 1;
+const TIER_TITLE: i64 = 2;
+const TIER_ALIAS: i64 = 3;
+const TIER_BASENAME: i64 = 4;
+
 struct Fixture {
     dir: TempDir,
 }
@@ -36,8 +42,9 @@ impl Fixture {
     /// title/aliases/private, content hash, file mtime, FTS row.
     fn build_index(&self) {
         let conn = reflect_index_schema::open_index_at(self.root()).unwrap();
-        for note in reflect_cli::note_file::walk_notes(self.root()).unwrap() {
-            let content = fs::read_to_string(self.root().join(&note.rel_path)).unwrap();
+        for note in reflect_cli::note_file::walk_notes(self.root()) {
+            let content =
+                reflect_cli::note_file::read_note_text(&self.root().join(&note.rel_path)).unwrap();
             let meta = parse_note_meta(&note.rel_path, &content);
             let daily_date = reflect_cli::paths::date_from_daily_path(&note.rel_path);
             let kind = if daily_date.is_some() {
@@ -66,6 +73,38 @@ impl Fixture {
                 conn.execute(
                     "INSERT INTO aliases(note_path, alias, alias_key) VALUES(?1, ?2, ?3)",
                     params![note.rel_path, alias, fold_key(alias)],
+                )
+                .unwrap();
+            }
+            // The spellings this note answers to, mirroring the desktop's
+            // `projectNoteClaims`: date, title, aliases, filename stem, first
+            // claim of a key wins.
+            let stem = {
+                let filename = note.rel_path.rsplit('/').next().unwrap_or(&note.rel_path);
+                filename.strip_suffix(".md").unwrap_or(filename)
+            };
+            let mut claims: Vec<(String, i64)> = Vec::new();
+            let claim = |claims: &mut Vec<(String, i64)>, key: String, tier: i64| {
+                if !key.is_empty() && !claims.iter().any(|(existing, _)| *existing == key) {
+                    claims.push((key, tier));
+                }
+            };
+            if let Some(date) = daily_date {
+                // Calendar-valid only: an impossible `daily/2026-02-31.md` is
+                // an ordinary note and must never claim a date.
+                if reflect_cli::paths::parse_calendar_date(date).is_some() {
+                    claim(&mut claims, date.to_string(), TIER_DAILY_DATE);
+                }
+            }
+            claim(&mut claims, fold_key(&meta.title), TIER_TITLE);
+            for alias in &meta.aliases {
+                claim(&mut claims, fold_key(alias), TIER_ALIAS);
+            }
+            claim(&mut claims, fold_key(stem), TIER_BASENAME);
+            for (key, tier) in &claims {
+                conn.execute(
+                    "INSERT INTO note_claims(note_path, key, tier) VALUES(?1, ?2, ?3)",
+                    params![note.rel_path, key, tier],
                 )
                 .unwrap();
             }
@@ -322,21 +361,122 @@ fn search_matches_latin_title_terms_at_word_starts_only() {
     );
 }
 
-/// Multi-term Latin title recall accepts a prefix of each word, even though
-/// FTS5 itself cannot match the partial `Mac` token against `MacCaw`.
+/// Multi-term Latin title recall accepts a prefix of each word while keeping
+/// title-only presentation independent of the lexical implementation.
 #[test]
 fn search_finds_a_multi_term_partial_latin_title() {
     let fixture = graph();
-    fixture.write_note(
-        "notes/tim-maccaw.md",
-        "# Tim MacCaw\nan otherwise unrelated body\n",
-    );
+    fixture.write_note("notes/Tim MacCaw.md", "an otherwise unrelated body\n");
     fixture.build_index();
 
     let text = stdout(&reflect(&fixture, &["search", "Tim Mac"]));
     assert!(
-        text.contains("notes/tim-maccaw.md"),
+        text.contains("notes/Tim MacCaw.md"),
         "expected the partial title match:\n{text}"
+    );
+
+    let value = json(&reflect(&fixture, &["search", "Tim Mac", "--json"]));
+    assert_eq!(value["results"][0]["snippet"], "");
+    assert_eq!(value["results"][0]["score"], 0.0);
+}
+
+#[test]
+fn search_keeps_tokenizer_normalized_title_matches_above_body_matches() {
+    let fixture = graph();
+    fixture.write_note("notes/Café Alpha.md", "an otherwise unrelated body\n");
+    fixture.write_note(
+        "notes/body-hit.md",
+        "# Unrelated note\na cafe appears here\n",
+    );
+    fixture.build_index();
+
+    let value = json(&reflect(&fixture, &["search", "cafe", "--json"]));
+    assert_eq!(value["results"][0]["path"], "notes/Café Alpha.md");
+    assert_eq!(value["results"][0]["snippet"], "");
+    assert!(value["results"][0]["score"].as_f64().unwrap() < 0.0);
+    assert_eq!(value["results"][1]["path"], "notes/body-hit.md");
+}
+
+#[test]
+fn search_breaks_title_prefix_ties_by_pinned_then_recency() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/Tim MacCaw Extended Project Planning.md",
+        "an otherwise unrelated body\n",
+    );
+    fixture.write_note("notes/Tim MacRae.md", "an otherwise unrelated body\n");
+    fixture.build_index();
+
+    let conn = rusqlite::Connection::open(fixture.root().join(".reflect/index.sqlite")).unwrap();
+    conn.execute(
+        "UPDATE notes SET mtime = 100, is_pinned = 1 WHERE path = 'notes/Tim MacCaw Extended Project Planning.md'",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE notes SET mtime = 200, is_pinned = 0 WHERE path = 'notes/Tim MacRae.md'",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let text = stdout(&reflect(&fixture, &["search", "Tim Mac"]));
+    let pinned_pos = text
+        .find("notes/Tim MacCaw Extended Project Planning.md")
+        .unwrap();
+    let plain_pos = text.find("notes/Tim MacRae.md").unwrap();
+    assert!(
+        pinned_pos < plain_pos,
+        "expected pinning to break the title-prefix tie:\n{text}"
+    );
+}
+
+/// Body search uses the same word-prefix behavior as title recall, so users
+/// get results while they are still typing each term.
+#[test]
+fn search_finds_partial_terms_in_note_bodies() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/security-rollout.md",
+        "# Security Rollout\nthe plan covers authentication migration\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "authent migr"]));
+    assert!(
+        text.contains("notes/security-rollout.md"),
+        "expected partial body terms to match:\n{text}"
+    );
+
+    let mixed = stdout(&reflect(&fixture, &["search", "secur migr"]));
+    assert!(
+        mixed.contains("notes/security-rollout.md"),
+        "expected partial title and body terms to match together:\n{mixed}"
+    );
+}
+
+/// A term of punctuation alone tokenizes to an empty FTS phrase, which would
+/// empty the whole `AND` chain; it is dropped, while a query of nothing but
+/// punctuation still matches nothing.
+#[test]
+fn search_ignores_terms_that_tokenize_to_nothing() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/meeting-notes.md",
+        "# Meeting Notes\nagenda items for the sync\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "meeting - notes"]));
+    assert!(
+        text.contains("notes/meeting-notes.md"),
+        "expected the punctuation term to be ignored:\n{text}"
+    );
+
+    let punctuation = stdout(&reflect(&fixture, &["search", ". -"]));
+    assert!(
+        !punctuation.contains("notes/meeting-notes.md"),
+        "expected a punctuation-only query to match nothing:\n{punctuation}"
     );
 }
 
@@ -427,6 +567,45 @@ fn search_warns_when_the_index_is_stale_but_still_returns_rows() {
 }
 
 #[test]
+fn search_fails_closed_when_an_indexed_note_is_unavailable() {
+    let fixture = graph();
+    let note = fixture.write_note("Projects/plan.md", "# Plan\nsecret searchable text\n");
+    fixture.build_index();
+    fs::remove_file(note).unwrap();
+    fs::write(
+        fixture.root().join("Projects/.plan.md.icloud"),
+        b"placeholder",
+    )
+    .unwrap();
+
+    let output = reflect(&fixture, &["search", "searchable"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "");
+}
+
+#[cfg(unix)]
+#[test]
+fn stale_index_never_follows_a_note_replaced_by_a_symlink() {
+    use std::os::unix::fs::symlink;
+
+    let fixture = graph();
+    let note = fixture.write_note("Projects/plan.md", "# Plan\nindexed text\n");
+    fixture.build_index();
+    let outside = tempfile::NamedTempFile::new().unwrap();
+    fs::write(outside.path(), "outside secret\n").unwrap();
+    fs::remove_file(note).unwrap();
+    symlink(outside.path(), fixture.root().join("Projects/plan.md")).unwrap();
+
+    let show = reflect(&fixture, &["show", "Plan"]);
+    assert!(!show.status.success());
+    assert!(!stdout(&show).contains("outside secret"));
+
+    let search = reflect(&fixture, &["search", "indexed"]);
+    assert!(search.status.success(), "stderr: {}", stderr(&search));
+    assert_eq!(stdout(&search), "");
+}
+
+#[test]
 fn search_json_shape() {
     let fixture = graph();
     fixture.write_note("notes/a.md", "# Alpha\nsearchable text\n");
@@ -439,10 +618,12 @@ fn search_json_shape() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0]["path"], "notes/a.md");
     assert_eq!(results[0]["title"], "Alpha");
-    assert!(results[0]["snippet"]
-        .as_str()
-        .unwrap()
-        .contains("searchable"));
+    assert!(
+        results[0]["snippet"]
+            .as_str()
+            .unwrap()
+            .contains("searchable")
+    );
     assert!(results[0]["score"].is_number());
 }
 
@@ -663,4 +844,66 @@ fn open_json_shape() {
     assert_eq!(daily["date"], "2026-01-02");
     assert_eq!(daily["path"], "daily/2026-01-02.md");
     assert_eq!(daily["url"], "reflect://daily/2026-01-02");
+}
+
+#[test]
+fn show_resolves_a_note_by_its_filename_stem() {
+    // The H1 differs from the filename: Obsidian's convention. Both spellings
+    // must resolve, with or without an index.
+    let fixture = graph();
+    fixture.write_note("Projects/Plan.md", "# Weekly Planning\nstem body\n");
+
+    let by_stem = reflect(&fixture, &["show", "Plan"]);
+    assert!(by_stem.status.success(), "{}", stderr(&by_stem));
+    assert!(stdout(&by_stem).contains("stem body"));
+
+    fixture.build_index();
+    let indexed = reflect(&fixture, &["show", "Plan"]);
+    assert!(indexed.status.success(), "{}", stderr(&indexed));
+    assert!(stdout(&indexed).contains("stem body"));
+}
+
+#[test]
+fn show_prefers_a_title_over_a_filename_stem() {
+    let fixture = graph();
+    fixture.write_note("Archive/old.md", "# Plan\ntitled body\n");
+    fixture.write_note("Projects/Plan.md", "# Weekly Planning\nstem body\n");
+
+    let scanned = reflect(&fixture, &["show", "Plan"]);
+    assert!(scanned.status.success(), "{}", stderr(&scanned));
+    assert!(stdout(&scanned).contains("titled body"));
+
+    fixture.build_index();
+    let indexed = reflect(&fixture, &["show", "Plan"]);
+    assert!(indexed.status.success(), "{}", stderr(&indexed));
+    assert!(stdout(&indexed).contains("titled body"));
+}
+
+#[test]
+fn show_resolves_a_nested_vault_path_argument() {
+    let fixture = graph();
+    fixture.write_note("Projects/deep/Plan.md", "# Anything\nnested body\n");
+
+    let output = reflect(&fixture, &["show", "Projects/deep/Plan.md"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(stdout(&output).contains("nested body"));
+}
+
+#[test]
+fn scan_resolution_agrees_with_the_index_on_stems() {
+    // The same vault answers the same way whether or not `.reflect` has an
+    // index — the parity commit 4 exists to keep.
+    let fixture = graph();
+    fixture.write_note("a/Plan.md", "# One Thing\nfirst body\n");
+    fixture.write_note("b/Plan.md", "# Another Thing\nsecond body\n");
+
+    let scanned = reflect(&fixture, &["path", "Plan"]);
+    assert!(scanned.status.success(), "{}", stderr(&scanned));
+    let scanned_path = stdout(&scanned);
+
+    fixture.build_index();
+    let indexed = reflect(&fixture, &["path", "Plan"]);
+    assert!(indexed.status.success(), "{}", stderr(&indexed));
+    assert_eq!(stdout(&indexed), scanned_path);
+    assert!(scanned_path.contains("a/Plan.md"));
 }

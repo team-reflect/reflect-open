@@ -1,4 +1,4 @@
-import type { AiPrompt } from '../settings/schema'
+import type { AiPrompt } from '../settings/schema.ts'
 
 /**
  * The editor AI menu's prompt library: the user's saved prompts followed by a

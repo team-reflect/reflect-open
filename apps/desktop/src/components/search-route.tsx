@@ -1,7 +1,7 @@
 import { useEffect, type ReactElement } from 'react'
-import { usePalette } from '@/components/command-palette/palette-provider'
-import { DailyStream } from '@/components/daily-stream'
-import { useRouter } from '@/routing/router'
+import { usePalette } from '@/components/command-palette/palette-provider.tsx'
+import { DailyStream } from '@/components/daily-stream.tsx'
+import { useRouter } from '@/routing/router.tsx'
 
 interface SearchRouteProps {
   /** The query carried by the `search/:query` route. */

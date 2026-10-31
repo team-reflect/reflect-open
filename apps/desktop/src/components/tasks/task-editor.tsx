@@ -8,16 +8,18 @@ import {
 } from 'react'
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
-import { type OpenTask } from '@reflect/core'
-import { markModeFromSyntax } from '@/editor/mark-mode'
-import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
-import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
-import { useTagNavigation } from '@/editor/use-tag-navigation'
-import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
-import { taskContent } from '@/lib/tasks/task-content'
-import { useTaskEditorFinalizer, type TaskEditorApi } from '@/lib/tasks/use-task-editor-finalizer'
-import { useGraph } from '@/providers/graph-provider'
-import { useSettings } from '@/providers/settings-provider'
+import type { OpenTask } from '@reflect/core'
+import { markModeFromSyntax } from '@/editor/mark-mode.ts'
+import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor.tsx'
+import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
+import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
+import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
+import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
+import {
+  useTaskEditorFinalizer,
+  type TaskEditorApi,
+} from '@/lib/tasks/use-task-editor-finalizer.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
 
 /**
  * The inline task editor (Plan 18, V1 parity): the sole-selected task swaps its
@@ -159,16 +161,15 @@ export function TaskEditor({
   checkboxToggleControllerRef,
   convertControllerRef,
 }: TaskEditorProps): ReactElement {
-  const { graph } = useGraph()
   const { settings } = useSettings()
-  const generation = graph?.generation ?? null
-  const navigate = useWikiLinkNavigation(generation)
+  const navigate = useWikiLinkNavigation()
+  const onLinkClick = useMarkdownLinkClick(null)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
   // Frozen at mount: the editor is seeded once (uncontrolled), so the commit
-  // baseline must stay the seed even if `task.raw` is re-derived mid-edit.
-  const [initial] = useState(() => taskContent(task.raw))
+  // baseline must stay the seed even if `task.markdown` is re-derived mid-edit.
+  const [initial] = useState(() => task.markdown)
   const { apiRef, onChange } = useTaskEditorFinalizer({
     initial,
     onCommit,
@@ -213,17 +214,20 @@ export function TaskEditor({
     <div data-task-editor className="min-w-0 flex-1">
       <NoteEditor
         initialContent={initial}
+        singleParagraph
         onChange={onChange}
         markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}
+        smoothCaretAnimation={settings.editorSmoothCaretAnimation}
         timeFormat={settings.timeFormat}
         // A one-line editor has nothing to reorder, so keep the gutter grip off.
         blockHandle={false}
         onWikiLinkClick={navigate}
+        onLinkClick={onLinkClick}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}
-        className="reflect-task-editor text-sm leading-6"
+        className="reflect-task-editor text-sm"
         handleRef={handleRef}
       >
         <TaskCommitKeymap apiRef={apiRef} onNavigate={onNavigate} />

@@ -1,74 +1,58 @@
 /**
  * `@reflect/core` sync domain (Plan 12) — GitHub backup & sync over the Rust
- * git primitives: typed command bindings, the GitHub module (device flow,
- * token refresh, repo API), and the debounced sync engine.
+ * git primitives: the git schemas, the GitHub module (device flow, token
+ * refresh, repo API), and the debounced sync engine's types.
  */
 export {
-  gitStatus,
-  gitSetup,
-  gitDisconnect,
-  gitClone,
-  gitCommitAll,
-  gitFetch,
-  gitMergeRemote,
-  gitPush,
   gitStatusSchema,
   commitOutcomeSchema,
   remoteDeltaSchema,
-  mergeOutcomeSchema,
+  pullOutcomeSchema,
   pushOutcomeSchema,
   skippedFileSchema,
   changedFileSchema,
+  type GitCredential,
   type GitStatus,
   type CommitOutcome,
   type RemoteDelta,
-  type MergeOutcome,
+  type PullOutcome,
   type PushOutcome,
   type SkippedFile,
   type ChangedFile,
-} from './commands'
+} from './git-repository-service.ts'
 export {
   GITHUB_APP_CLIENT_ID,
   GITHUB_APP_SLUG,
   GITHUB_AUTH_SECRET,
   githubAppInstallUrl,
-  isDeviceFlowConfigured,
   githubAuthSchema,
-  saveGithubAuth,
-  loadGithubAuth,
-  clearGithubAuth,
-  deviceFlowStart,
-  deviceFlowPoll,
-  runDeviceFlow,
-  refreshGithubAuth,
-  getGithubToken,
-  parseGithubRemote,
-  githubRemoteUrl,
-  newRepoUrl,
-  BACKUP_REPO_DESCRIPTION,
-  createGithubRepo,
-  getGithubRepo,
-  getAuthenticatedUser,
+  githubCredential,
   type GithubAuth,
   type DeviceFlowStart,
   type DevicePollResult,
   type RunDeviceFlowOptions,
-  type GithubRepoRef,
-  type GithubRepo,
   type GithubUser,
-} from './github'
+} from './github-auth-service.ts'
 export {
-  createGist,
-  updateGist,
-  deleteGist,
-  type PublishedGist,
-  type GistFile,
-} from './gists'
+  parseRepoInput,
+  suggestRepoName,
+  newRepoUrl,
+  BACKUP_REPO_DESCRIPTION,
+  type GithubRepo,
+} from './github-repo-service.ts'
 export {
-  createSyncEngine,
+  classifyRemote,
+  githubRemoteUrl,
+  githubRepoOf,
+  redactRemoteUrl,
+  type GitRemote,
+} from './remote-url.ts'
+export type { GithubRepoRef } from './types.ts'
+export type { PublishedGist, GistFile } from './gist-service.ts'
+export {
   isSyncError,
   type SyncEngine,
   type SyncEngineOptions,
   type SyncErrorKind,
   type SyncStatus,
-} from './engine'
+} from './engine.ts'

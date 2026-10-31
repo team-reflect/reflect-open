@@ -1,23 +1,22 @@
-import type { SyntaxNode } from '@lezer/common'
-import { dateFromDailyPath, isDaily } from '../graph/paths'
-import { parseFrontmatter, splitFrontmatter } from './frontmatter'
-import { parseBody } from './grammar'
-import { foldTag } from './keys'
-import { parseInlineLink } from './link-syntax'
-import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-text'
-import { normalizeWikiTarget } from './resolve'
-import { taskBreadcrumbs } from './task-breadcrumbs'
-import { parseTaskMarker } from './task-marker'
+import { parseXPostId } from '@post-embed/schema'
+import { dateFromDailyPath, isAttachmentPath, isDaily } from '../graph/paths.ts'
+import { parseFrontmatter, splitFrontmatter } from './frontmatter.ts'
+import { parseBody } from './grammar.ts'
+import { foldTag } from './keys.ts'
+import { parseInlineLink } from './link-syntax.ts'
+import { headingLevelOf } from './node-types.ts'
+import { buildPlainText, stripAtxHeadingMarks, unescapeMarkdownText } from './plain-text.ts'
+import { projectTasks } from './task-ast.ts'
+import { isWikiNodeName, wikiBracketStart } from './wiki-nodes.ts'
 import type {
   AssetRef,
   Frontmatter,
   Heading,
   MarkdownLink,
   ParsedNote,
-  ParsedTask,
   Span,
   WikiLink,
-} from './model'
+} from './model.ts'
 
 /**
  * Extraction (Plan 03): one walk of the Lezer tree derives every entity the
@@ -56,7 +55,7 @@ function isTagExcludedNode(name: string): boolean {
     name === 'FencedCode' ||
     name === 'CodeBlock' ||
     name === 'URL' ||
-    name === 'WikiLink'
+    isWikiNodeName(name)
   )
 }
 
@@ -64,18 +63,12 @@ function isLiteralPlainTextNode(name: string): boolean {
   return name === 'InlineCode' || name === 'FencedCode' || name === 'CodeBlock'
 }
 
-function headingLevelOf(name: string): number | null {
-  const match = /^(?:ATXHeading|SetextHeading)([1-6])$/.exec(name)
-  return match ? Number(match[1]) : null
-}
-
 function cleanHeadingText(raw: string): string {
   const newline = raw.indexOf('\n')
   if (newline !== -1) {
     return unescapeMarkdownText(raw.slice(0, newline).trim()) // setext: heading text is the first line
   }
-  const text = raw.replace(/^#{1,6}[ \t]*/, '').replace(/[ \t]*#*[ \t]*$/, '').trim()
-  return unescapeMarkdownText(text)
+  return unescapeMarkdownText(stripAtxHeadingMarks(raw))
 }
 
 /** GitHub-style anchor slug. */
@@ -83,8 +76,8 @@ function slugify(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, '')
-    .replace(/\s+/g, '-')
+    .replaceAll(/[^\p{L}\p{N}\s-]/gu, '')
+    .replaceAll(/\s+/g, '-')
 }
 
 function hostOf(href: string): string | undefined {
@@ -103,7 +96,108 @@ function isAssetHref(href: string): boolean {
   if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//') || href.startsWith('#')) {
     return false // external scheme, protocol-relative, or in-page anchor
   }
-  return /(^|\/)assets\//.test(href)
+  return /(?:^|\/)assets\//.test(href)
+}
+
+/**
+ * Every graph-relative path an authored attachment reference can mean, in
+ * resolution order.
+ *
+ * `assets/x.png` is genuinely two things: Reflect has always written it
+ * vault-root relative, while CommonMark and Obsidian read it as
+ * source-relative. Both spellings are kept so neither an old Reflect note nor
+ * an imported vault loses its images. The index stores both, which is inert
+ * because only a path that exists on disk is ever consulted.
+ *
+ * An explicit `/x`, `./x`, or `../x` has one meaning and gets one candidate.
+ */
+export function attachmentReferenceCandidates(sourcePath: string, reference: string): string[] {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(reference) || reference.startsWith('//')) {
+    return []
+  }
+  const authored = decodeReferencePath(reference)
+  if (authored === '') {
+    return []
+  }
+  if (authored.startsWith('/')) {
+    return keepAttachments([resolveSegments([], authored.slice(1))])
+  }
+  if (authored.startsWith('./') || authored.startsWith('../')) {
+    return keepAttachments([resolveSegments(parentSegments(sourcePath), authored)])
+  }
+  return keepAttachments([
+    resolveSegments(parentSegments(sourcePath), authored),
+    resolveSegments([], authored),
+  ])
+}
+
+/** Strip the fragment and query, then percent-decode. */
+function decodeReferencePath(reference: string): string {
+  const beforeQuery = (reference.split('#')[0] ?? '').split('?')[0] ?? ''
+  try {
+    return decodeURIComponent(beforeQuery)
+  } catch {
+    return beforeQuery // a malformed escape keeps the raw spelling, as before
+  }
+}
+
+function parentSegments(sourcePath: string): readonly string[] {
+  const segments = sourcePath.split('/')
+  segments.pop()
+  return segments
+}
+
+function resolveSegments(base: readonly string[], authored: string): string | null {
+  if (authored.includes('\\') || authored.includes('\0')) {
+    return null
+  }
+  const segments = [...base]
+  for (const segment of authored.split('/')) {
+    if (segment === '' || segment === '.') {
+      continue
+    }
+    if (segment === '..') {
+      if (segments.pop() === undefined) {
+        return null
+      }
+      continue
+    }
+    if (segment.startsWith('.')) {
+      return null
+    }
+    segments.push(segment)
+  }
+  return segments.length === 0 ? null : segments.join('/')
+}
+
+function keepAttachments(candidates: readonly (string | null)[]): string[] {
+  return [
+    ...new Set(
+      candidates.filter((path): path is string => path !== null && isAttachmentPath(path)),
+    ),
+  ]
+}
+
+/**
+ * Does this wiki-embed target name a supported attachment rather than a note?
+ * The one classification the index and the editor share, so `![[x]]` can
+ * never be a file in one and a note link in the other.
+ */
+export function isAttachmentEmbedTarget(target: string): boolean {
+  return target !== '' && isAttachmentPath(target.split('/').at(-1) ?? target)
+}
+
+/**
+ * Wiki embeds are vault-root relative and never URL-decoded (Obsidian's
+ * rules). A bare filename stays bare: which folder it lives in is a question
+ * only a live catalog can answer, and the privacy gate matches such a
+ * reference by basename. A target that resolves to no safe attachment path
+ * (traversal, hidden components) returns null — it must never reach the
+ * asset projection.
+ */
+export function wikiEmbedAssetPath(target: string): string | null {
+  const path = resolveSegments([], target.replace(/^\//, ''))
+  return path !== null && isAttachmentPath(path) ? path : null
 }
 
 /**
@@ -180,74 +274,6 @@ function readLink(body: string, from: number, to: number, offset: number): Markd
   return { href, text, from: from + offset, to: to + offset, domain: hostOf(href) }
 }
 
-/**
- * A Reflect task is the round Meowdown checkbox syntax: optional indentation,
- * then `+`, then whitespace, then the GFM marker. Square checklist items
- * (`- [ ]`/`* [ ]`) are intentionally not projected into Tasks.
- */
-function hasRoundTaskListMarker(body: string, markerStart: number): boolean {
-  const lineStart = body.lastIndexOf('\n', markerStart - 1) + 1
-  return /^[\t ]*\+[\t ]+$/.test(body.slice(lineStart, markerStart))
-}
-
-function lineEndAfter(body: string, from: number): number {
-  const newline = body.indexOf('\n', from)
-  return newline === -1 ? body.length : newline
-}
-
-/**
- * Resolve a `Task` Lezer node (the marker starts at `from`) into a
- * {@link ParsedTask}, or `null` when the marker shape isn't Reflect's task
- * syntax. `text` is the marker line minus its syntax; `raw` is that physical
- * line verbatim from the marker onward for the write-back guard.
- */
-function readTask(
-  body: string,
-  taskNode: SyntaxNode,
-  bodyOffset: number,
-  cuts: Span[],
-  literalRanges: Span[],
-  wikiLinks: WikiLink[],
-): ParsedTask | null {
-  const { from, to } = taskNode
-  if (!hasRoundTaskListMarker(body, from)) {
-    return null
-  }
-  const marker = parseTaskMarker(body.slice(from, from + 3))
-  if (marker === null) {
-    return null
-  }
-  const lineEnd = lineEndAfter(body, from)
-  const markerOffset = from + bodyOffset
-  return {
-    text: plainTextOfRange(body, from, lineEnd, cuts, literalRanges),
-    breadcrumbs: taskBreadcrumbs(body, taskNode, cuts, literalRanges),
-    raw: body.slice(from, lineEnd),
-    checked: marker.checked,
-    markerOffset,
-    dueDate: firstDueDate(wikiLinks, markerOffset, to + bodyOffset),
-  }
-}
-
-/**
- * The task's due date: the first calendar-valid `[[YYYY-MM-DD]]` link inside the
- * task's span `[from, to)` (file coords). `wikiLinks` are in document order, so
- * "first" is the first such link in the item. Reuses {@link normalizeWikiTarget}
- * so an impossible date (`2026-02-31`) is not treated as a due date — exactly the
- * dailies the resolver recognises.
- */
-function firstDueDate(wikiLinks: WikiLink[], from: number, to: number): string | null {
-  for (const link of wikiLinks) {
-    if (link.from >= from && link.from < to) {
-      const { date } = normalizeWikiTarget(link.target)
-      if (date !== undefined) {
-        return date
-      }
-    }
-  }
-  return null
-}
-
 function inAnyRange(index: number, ranges: Span[]): boolean {
   return ranges.some((range) => index >= range.from && index < range.to)
 }
@@ -320,7 +346,6 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
   const cuts: Span[] = [] // body coords — syntax to drop from plain text
   const tagExcluded: Span[] = [] // body coords — regions that don't yield tags
   const literalPlainText: Span[] = [] // body coords — regions that render backslashes literally
-  const taskNodes: SyntaxNode[] = [] // body coords — `Task` nodes, resolved after the walk
 
   tree.iterate({
     enter: (node) => {
@@ -329,13 +354,6 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
       if (isSyntaxNode(name)) {
         cuts.push({ from, to })
       }
-      if (name === 'Task') {
-        // Resolve after the walk: the child `TaskMarker`/emphasis cuts this task
-        // needs to strip its text — and the `[[date]]` due-date link inside it —
-        // aren't collected until their own `enter`. The node span bounds the
-        // due-date search to this task.
-        taskNodes.push(node.node)
-      }
       if (isTagExcludedNode(name)) {
         tagExcluded.push({ from, to })
       }
@@ -343,24 +361,57 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         literalPlainText.push({ from, to })
       }
 
-      if (name === 'WikiLink') {
-        wikiLinks.push(readWikiLink(body, from, to, bodyOffset))
+      if (isWikiNodeName(name)) {
+        const wiki = readWikiLink(body, wikiBracketStart(node), to, bodyOffset)
+        // `![[photo.png]]` names a file, not a note: it must never become a
+        // backlink row or resolve through the note-key tiers. An unsafe
+        // target (traversal, hidden components) stays a visible wiki link
+        // that resolves to nothing, never an asset row.
+        const assetPath =
+          name === 'WikiEmbed' && isAttachmentEmbedTarget(wiki.target)
+            ? wikiEmbedAssetPath(wiki.target)
+            : null
+        if (assetPath !== null) {
+          assets.push({ path: assetPath, from: wiki.from, to: wiki.to })
+        } else {
+          wikiLinks.push(wiki)
+        }
         return false
       }
 
-      const headingLevel = headingLevelOf(name)
-      if (headingLevel) {
+      const headingLevel = headingLevelOf(node)
+      if (headingLevel !== null) {
         const text = cleanHeadingText(body.slice(from, to))
-        headings.push({ level: headingLevel, text, slug: slugify(text), from: from + bodyOffset, to: to + bodyOffset })
+        // `isTop` is the `Document` node: a heading anywhere else is nested in a
+        // blockquote or list item, so it never opens or ends a real section.
+        const topLevel = node.node.parent?.type.isTop === true
+        headings.push({
+          level: headingLevel,
+          text,
+          slug: slugify(text),
+          topLevel,
+          from: from + bodyOffset,
+          to: to + bodyOffset,
+        })
         return true
       }
 
       if (name === 'Link' || name === 'Image') {
         const link = readLink(body, from, to, bodyOffset)
         if (link) {
-          const assetPath = canonicalAssetPath(link.href)
-          if (assetPath !== null) {
-            assets.push({ path: assetPath, from: link.from, to: link.to })
+          const postId = parseXPostId(link.href)
+          if (postId)
+            // Index the logical archive reference even before capture, just like an
+            // attachment link can precede its file. This also tracks archives and
+            // media synced from another device without local transfer state.
+            assets.push({ path: 'assets/x/post-' + postId + '.json', from: link.from, to: link.to })
+          const candidates = attachmentReferenceCandidates(path, link.href)
+          if (candidates.length > 0) {
+            // One authored reference, several spellings of the same file: the
+            // span is shared, and consumers treat `assets` as a path set.
+            for (const candidate of candidates) {
+              assets.push({ path: candidate, from: link.from, to: link.to })
+            }
           } else {
             links.push(link)
           }
@@ -375,14 +426,6 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
   const tags = new Map<string, string>()
   collectTags(body, tagExcluded, tags)
 
-  const tasks: ParsedTask[] = []
-  for (const taskNode of taskNodes) {
-    const task = readTask(body, taskNode, bodyOffset, cuts, literalPlainText, wikiLinks)
-    if (task) {
-      tasks.push(task)
-    }
-  }
-
   return {
     path,
     id: stringField(frontmatter, 'id'),
@@ -394,7 +437,7 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
     tags: [...tags.values()],
     headings,
     assets,
-    tasks,
-    text: buildPlainText(body, cuts, literalPlainText),
+    tasks: projectTasks(body),
+    displayText: buildPlainText(body, cuts, literalPlainText),
   }
 }

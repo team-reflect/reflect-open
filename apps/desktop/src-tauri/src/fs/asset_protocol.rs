@@ -22,7 +22,7 @@
 
 use std::borrow::Cow;
 
-use tauri::http::{header, Request, Response, StatusCode};
+use tauri::http::{Request, Response, StatusCode, header};
 use tauri::utils::mime_type::MimeType;
 use tauri::{AppHandle, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 
@@ -46,6 +46,10 @@ pub(crate) fn handle<R: Runtime>(
     let request_path = percent_encoding::percent_decode(&request.uri().path().as_bytes()[1..])
         .decode_utf8_lossy()
         .into_owned();
+    if request_path.split('/').nth(1) == Some("x-media") {
+        super::x_media_protocol::handle(app, request, request_path, responder);
+        return;
+    }
     let preview_raster_only = requests_preview_raster(request.uri().query());
     let method_allowed = request.method() == tauri::http::Method::GET;
     tauri::async_runtime::spawn_blocking(move || {
@@ -109,7 +113,7 @@ fn serve<R: Runtime>(
     let (generation, rel) = parse_request_path(request_path)?;
     let state = app.state::<GraphState>();
     let root = super::root_for_generation(&state, generation).map_err(|_| StatusCode::FORBIDDEN)?;
-    let abs = super::resolve::resolve(&root, rel).map_err(|_| StatusCode::FORBIDDEN)?;
+    let abs = super::resolve(&root, rel).map_err(|_| StatusCode::FORBIDDEN)?;
     // On an iCloud graph this read blocks until the file is materialized on
     // the device — acceptable here on the blocking pool, and exactly the wait
     // that must never happen on the UI thread.
@@ -122,15 +126,16 @@ fn serve<R: Runtime>(
     Ok((mime, bytes))
 }
 
-/// Split `<generation>/<graph-relative path>` and vet the path shape. The
-/// `assets/` restriction mirrors `asset_open`: images in note markdown are
-/// the only consumer, and they never reference anything else.
+/// Split `<generation>/<graph-relative path>` and vet the path shape. Any
+/// supported attachment anywhere in the vault qualifies, mirroring
+/// `asset_open`: an adopted vault keeps its images beside its notes. Notes,
+/// hidden components, and traversal shapes stay forbidden.
 fn parse_request_path(request_path: &str) -> Result<(u64, &str), StatusCode> {
     let (generation, rel) = request_path
         .split_once('/')
         .ok_or(StatusCode::BAD_REQUEST)?;
     let generation: u64 = generation.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
-    super::ensure_asset_path(rel).map_err(|_| StatusCode::FORBIDDEN)?;
+    super::ensure_readable_attachment_path(rel).map_err(|_| StatusCode::FORBIDDEN)?;
     Ok((generation, rel))
 }
 
@@ -147,6 +152,10 @@ mod tests {
         assert_eq!(
             parse_request_path("12/assets/sub dir/photo 1.jpeg").unwrap(),
             (12, "assets/sub dir/photo 1.jpeg"),
+        );
+        assert_eq!(
+            parse_request_path("3/Projects/Media/cat.png").unwrap(),
+            (3, "Projects/Media/cat.png"),
         );
     }
 
@@ -167,9 +176,17 @@ mod tests {
     }
 
     #[test]
-    fn rejects_paths_outside_assets() {
+    fn rejects_notes_hidden_and_traversal_paths() {
         assert_eq!(
             parse_request_path("3/notes/secret.md").unwrap_err(),
+            StatusCode::FORBIDDEN,
+        );
+        assert_eq!(
+            parse_request_path("3/.obsidian/cat.png").unwrap_err(),
+            StatusCode::FORBIDDEN,
+        );
+        assert_eq!(
+            parse_request_path("3/../cat.png").unwrap_err(),
             StatusCode::FORBIDDEN,
         );
         assert_eq!(

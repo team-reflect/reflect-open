@@ -1,26 +1,27 @@
-import { useState, type ReactElement } from 'react'
+import { useCallback, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { errorMessage, listTemplates, type TemplateEntry } from '@reflect/core'
+import { displayNoteTitle, errorMessage, type TemplateEntry } from '@reflect/core'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import { deleteOpenNote } from '@/lib/note-delete'
-import { renameTemplate } from '@/lib/note-templates'
-import { startOperation } from '@/lib/operations'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useGraph } from '@/providers/graph-provider'
-import { useNoteTemplates } from '@/providers/note-templates-provider'
-import { SettingsField } from './field'
-import { SettingsSection } from './section'
+} from '@/components/ui/dialog.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
+import { createTemplatesQueryOptions } from '@/lib/query-options.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { SettingsField } from './field.tsx'
+import { SettingsSection } from './section.tsx'
+import { isModEvent } from '@meowdown/core'
 
 /**
  * Note templates (docs/porting/note-templates.md): the `templates/` folder as
@@ -30,13 +31,15 @@ import { SettingsSection } from './section'
  */
 export function TemplatesSection(): ReactElement {
   const { graph } = useGraph()
+  const { indexQuery } = useCoreServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const { openTemplateCreate } = useNoteTemplates()
   const [renaming, setRenaming] = useState<TemplateEntry | null>(null)
   const [deleting, setDeleting] = useState<TemplateEntry | null>(null)
+  const closeRename = useCallback(() => setRenaming(null), [])
+  const closeDelete = useCallback(() => setDeleting(null), [])
   const { data: templates } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'templates'],
-    queryFn: listTemplates,
+    ...createTemplatesQueryOptions(indexQuery, graph?.root),
     enabled: graph !== null,
   })
 
@@ -52,20 +55,23 @@ export function TemplatesSection(): ReactElement {
               <li key={template.path} className="group flex items-center gap-2 px-3 py-2">
                 <button
                   type="button"
-                  onClick={(event) =>
-                    navigateNoteLink({ kind: 'note', path: template.path }, event)
-                  }
+                  onClick={(event) => {
+                    navigateNoteLink({
+                      target: { kind: 'note', path: template.path },
+                      openInNewWindow: isModEvent(event),
+                    })
+                  }}
                   className="min-w-0 flex-1 text-left"
                 >
                   <span className="block truncate text-sm text-text hover:text-accent">
-                    {template.title}
+                    {displayNoteTitle(template.title)}
                   </span>
                   <span className="block truncate text-xs text-text-muted">{template.path}</span>
                 </button>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Rename ${template.title}`}
+                  aria-label={`Rename ${displayNoteTitle(template.title)}`}
                   onClick={() => setRenaming(template)}
                 >
                   <Pencil aria-hidden strokeWidth={1.75} />
@@ -73,7 +79,7 @@ export function TemplatesSection(): ReactElement {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Delete ${template.title}`}
+                  aria-label={`Delete ${displayNoteTitle(template.title)}`}
                   onClick={() => setDeleting(template)}
                 >
                   <Trash2 aria-hidden strokeWidth={1.75} />
@@ -90,10 +96,10 @@ export function TemplatesSection(): ReactElement {
         </div>
       </SettingsField>
       {renaming !== null ? (
-        <TemplateRenameDialog template={renaming} onClose={() => setRenaming(null)} />
+        <TemplateRenameDialog template={renaming} onClose={closeRename} />
       ) : null}
       {deleting !== null ? (
-        <TemplateDeleteDialog template={deleting} onClose={() => setDeleting(null)} />
+        <TemplateDeleteDialog template={deleting} onClose={closeDelete} />
       ) : null}
     </SettingsSection>
   )
@@ -106,30 +112,26 @@ interface TemplateDialogProps {
 
 /** Rename = move onto the new name's slug and rewrite the authored title. */
 function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): ReactElement {
-  const { graph } = useGraph()
+  const { templates } = useCoreServices()
   const [name, setName] = useState(template.title)
-  const [error, setError] = useState<string | null>(null)
+  const { run, pending, error } = useAsyncAction()
 
-  const rename = async (): Promise<void> => {
-    const generation = graph?.generation
+  const rename = useCallback((): void => {
     const trimmed = name.trim()
-    if (generation === undefined || trimmed === '') {
+    if (trimmed === '') {
       return
     }
-    setError(null)
-    try {
-      await renameTemplate(template.path, trimmed, generation)
+    void run(async () => {
+      await templates.renameTemplate(template.path, trimmed)
       onClose()
-    } catch (cause) {
-      setError(errorMessage(cause))
-    }
-  }
+    })
+  }, [name, run, templates, template.path, onClose])
 
   return (
     <Dialog
       open
       onOpenChange={(isOpen) => {
-        if (!isOpen) {
+        if (!isOpen && !pending) {
           onClose()
         }
       }}
@@ -137,13 +139,13 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
       <DialogContent showCloseButton={false} className="max-w-sm">
         <DialogTitle>Rename template</DialogTitle>
         <DialogDescription className="sr-only">
-          Renames the template — its title and its file's slug.
+          Renames the template and its file.
         </DialogDescription>
         <form
           className="flex flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault()
-            void rename()
+            rename()
           }}
         >
           <Input
@@ -154,16 +156,12 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
             autoComplete="off"
             spellCheck={false}
           />
-          {error !== null ? (
-            <span role="alert" className="text-xs text-red-600 dark:text-red-400">
-              {error}
-            </span>
-          ) : null}
+          {error !== null ? <InlineAlert tone="error">{error}</InlineAlert> : null}
           <DialogFooter>
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={name.trim() === ''}>
+            <Button type="submit" size="sm" disabled={pending || name.trim() === ''}>
               Rename
             </Button>
           </DialogFooter>
@@ -175,63 +173,29 @@ function TemplateRenameDialog({ template, onClose }: TemplateDialogProps): React
 
 /** Delete = move the file to the trash (recoverable), confirmed first. */
 function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): ReactElement {
-  const { graph } = useGraph()
-  const [error, setError] = useState<string | null>(null)
+  const { noteActions } = useCoreServices()
+  const { operations } = useAppServices()
 
-  const trash = async (): Promise<void> => {
-    const generation = graph?.generation
-    if (generation === undefined) {
-      return
-    }
-    const operation = startOperation('Trashing template')
-    setError(null)
+  const trash = useCallback(async (): Promise<void> => {
+    const operation = operations.start('Trashing template')
     try {
-      await deleteOpenNote(template.path, generation)
-      operation.done()
-      onClose()
+      await noteActions.trashOne(template.path)
     } catch (cause) {
       operation.fail(errorMessage(cause))
-      setError(errorMessage(cause))
+      throw cause
     }
-  }
+    operation.done()
+  }, [operations, noteActions, template.path])
 
   return (
-    <Dialog
-      open
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          onClose()
-        }
-      }}
-    >
-      <DialogContent showCloseButton={false} className="max-w-sm">
-        <DialogTitle>Delete template?</DialogTitle>
-        <DialogDescription>
-          “{template.title}” moves to the trash and can be recovered from there.
-        </DialogDescription>
-        {error !== null ? (
-          <span role="alert" className="text-xs text-red-600 dark:text-red-400">
-            {error}
-          </span>
-        ) : null}
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline" size="sm">
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => {
-              void trash()
-            }}
-          >
-            Delete
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <ConfirmActionDialog
+      title="Delete template?"
+      description={`“${template.title}” moves to the trash and can be recovered from there.`}
+      confirmLabel="Delete"
+      pendingLabel="Deleting…"
+      variant="destructive"
+      onConfirm={trash}
+      onClose={onClose}
+    />
   )
 }

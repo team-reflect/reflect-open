@@ -1,10 +1,17 @@
 import { useEffect, type ReactNode } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GraphInfo } from '@reflect/core'
-import { MobileGraphs } from './graphs'
+import { page, userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { MobileOnboardingService } from '@reflect/app'
+import { createTestAppServices } from '@reflect/app/testing'
+import type { MobileStorageInfo } from '@reflect/core'
+import {
+  createTestCoreServices,
+  createTestMobileStorageService,
+  createTestPlatformService,
+} from '@reflect/core/testing'
+import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { MobileGraphs } from './graphs.tsx'
 
 /**
  * The Graphs screen (the mobile graph switcher): a checkmark-selection list
@@ -13,9 +20,8 @@ import { MobileGraphs } from './graphs'
  * and graph creation in its own sheet instead of an inline form.
  */
 
-// vaul needs browser APIs jsdom doesn't provide; passthrough so the sheet
-// content always renders (the drawer itself is verified on-device).
-vi.mock('@/components/ui/drawer', () => ({
+// Keep the sheet content inline so this suite focuses on graph switching.
+vi.mock('@/components/ui/drawer.tsx', () => ({
   Drawer: ({
     children,
     onOpenChange,
@@ -29,139 +35,111 @@ vi.mock('@/components/ui/drawer', () => ({
     return <>{children}</>
   },
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
-const storageInfo = vi.hoisted(() => ({
-  current: {
-    localRoot: '/Documents',
-    icloudDocumentsRoot: null as string | null,
-    icloudGraphRoots: [] as string[],
-  },
-}))
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  hasBridge: () => true,
-  mobileStorage: vi.fn(async () => storageInfo.current),
-}))
+const STORAGE: MobileStorageInfo = {
+  localRoot: '/Documents',
+  icloudDocumentsRoot: '/iCloud/Documents',
+  icloudGraphRoots: ['/iCloud/Documents/Notes', '/iCloud/Documents/Work'],
+}
 
-const completeOnboarding = vi.hoisted(() =>
-  vi.fn(async (_kind: string, _root?: string) => {}),
-)
-const graphState = vi.hoisted(() => ({ root: '/iCloud/Documents/Notes' }))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({
-    graph: { root: graphState.root, name: 'Notes', generation: 1 } as GraphInfo,
-    completeOnboarding,
-  }),
-}))
+type CompleteOnboarding = MobileOnboardingService['completeOnboarding']
 
-const navigate = vi.hoisted(() => vi.fn())
-const back = vi.hoisted(() => vi.fn())
-vi.mock('@/routing/router', () => ({
-  useRouter: () => ({ navigate, back, canBack: true }),
-}))
+let completeOnboarding: MockInstance<CompleteOnboarding>
 
-let queryClient: QueryClient
+/**
+ * Render the screen on the mobile platform, with the switch flow observed and answered by the spy.
+ */
+async function mount(storage: MobileStorageInfo = STORAGE): Promise<void> {
+  const core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    platform: createTestPlatformService(MOBILE_PLATFORM),
+    mobileStorage: createTestMobileStorageService({ storage }),
+  })
+  const appServices = createTestAppServices(core)
+  completeOnboarding = vi
+    .spyOn(appServices.mobileOnboarding, 'completeOnboarding')
+    .mockImplementation(completeOnboardingResult)
+  await renderInApp(<MobileGraphs />, {
+    core,
+    appServices,
+    graph: { root: '/iCloud/Documents/Notes', name: 'Notes' },
+    route: { kind: 'graphs' },
+  })
+}
+
+let completeOnboardingResult: CompleteOnboarding
 
 beforeEach(() => {
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  graphState.root = '/iCloud/Documents/Notes'
-  storageInfo.current = {
-    localRoot: '/Documents',
-    icloudDocumentsRoot: '/iCloud/Documents',
-    icloudGraphRoots: ['/iCloud/Documents/Notes', '/iCloud/Documents/Work'],
-  }
-  completeOnboarding.mockImplementation(async () => {})
+  completeOnboardingResult = async () => {}
 })
-
-afterEach(() => {
-  cleanup()
-  queryClient.clear()
-  vi.clearAllMocks()
-})
-
-function mount(): void {
-  render(
-    <QueryClientProvider client={queryClient}>
-      <MobileGraphs />
-    </QueryClientProvider>,
-  )
-}
 
 describe('MobileGraphs', () => {
   it('checkmarks the open graph and switches on tapping another', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    const current = await screen.findByRole('button', { name: 'Notes' })
-    expect(current.getAttribute('aria-current')).toBe('true')
+    await expect
+      .element(page.getByRole('button', { name: 'Notes' }))
+      .toHaveAttribute('aria-current', 'true')
 
-    await user.click(screen.getByRole('button', { name: 'Work' }))
-    await waitFor(() =>
-      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work'),
-    )
+    await userEvent.click(page.getByRole('button', { name: 'Work' }))
+    await vi.waitFor(() => {
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work')
+    })
   })
 
   it('ignores a tap on the graph that is already open', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'Notes' }))
+    await userEvent.click(page.getByRole('button', { name: 'Notes' }))
     expect(completeOnboarding).not.toHaveBeenCalled()
   })
 
   it('switches to the on-device root', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'This device' }))
-    await waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('local', '/Documents'))
+    await userEvent.click(page.getByRole('button', { name: 'This device' }))
+    await vi.waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('local', '/Documents'))
   })
 
   it('creates a graph through the sheet, not an inline form', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'New graph' }))
-    await user.type(screen.getByLabelText('Name'), 'Journal')
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await userEvent.click(page.getByRole('button', { name: 'New graph' }))
+    await userEvent.fill(page.getByLabelText('Name'), 'Journal')
+    await userEvent.click(page.getByRole('button', { name: 'Create' }))
 
-    await waitFor(() =>
-      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
-    )
+    await vi.waitFor(() => {
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal')
+    })
   })
 
   it('rejects a colliding name before it ever reaches the backend', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'New graph' }))
-    await user.type(screen.getByLabelText('Name'), 'Work')
+    await userEvent.click(page.getByRole('button', { name: 'New graph' }))
+    await userEvent.fill(page.getByLabelText('Name'), 'Work')
 
-    expect(await screen.findByText(/already exists in iCloud Drive/)).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await expect.element(page.getByText(/already exists in iCloud Drive/)).toBeVisible()
+    // The collision disables Create, so the name can never reach the backend.
+    await expect.element(page.getByRole('button', { name: 'Create' })).toBeDisabled()
     expect(completeOnboarding).not.toHaveBeenCalled()
   })
 
   it('surfaces a failed switch and stays on the list', async () => {
-    completeOnboarding.mockRejectedValueOnce(new Error('clone failed'))
-    const user = userEvent.setup()
-    mount()
+    completeOnboardingResult = () => Promise.reject(new Error('clone failed'))
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'Work' }))
-    expect(await screen.findByText('clone failed')).toBeTruthy()
+    await userEvent.click(page.getByRole('button', { name: 'Work' }))
+    await expect.element(page.getByText('clone failed')).toBeVisible()
   })
 
   it('says so when iCloud Drive is unavailable', async () => {
-    storageInfo.current = {
-      localRoot: '/Documents',
-      icloudDocumentsRoot: null,
-      icloudGraphRoots: [],
-    }
-    mount()
+    await mount({ localRoot: '/Documents', icloudDocumentsRoot: null, icloudGraphRoots: [] })
 
-    expect(await screen.findByText(/iCloud Drive isn’t available/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'New graph' })).toBeNull()
+    await expect.element(page.getByText(/iCloud Drive isn’t available/)).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'New graph' })).not.toBeInTheDocument()
   })
 })

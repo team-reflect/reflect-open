@@ -7,10 +7,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
-use hf_hub::api::sync::ApiBuilder;
-use hf_hub::api::Progress;
+use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
 use hf_hub::Cache;
+use hf_hub::api::Progress;
+use hf_hub::api::sync::ApiBuilder;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -32,8 +32,14 @@ const MODEL_FILES: [&str; 5] = [
     "special_tokens_map.json",
     "tokenizer_config.json",
 ];
-#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-const ONNX_RUNTIME_DYLIB_RESOURCE: &str = "libonnxruntime.dylib";
+/// ONNX Runtime intra-op threads. The default is one per logical CPU, and the
+/// workers spin-wait between ops. A call embeds one note (two or three
+/// chunks), so a large pool mostly spins.
+const INTRA_OP_THREADS: usize = 2;
+/// Texts per ONNX Runtime run. Peak memory grows with the batch (fastembed's
+/// default of 256 needs about 17 GB for a 300 KB note), and the freed memory
+/// stays in the process. One text keeps the peak near the model's own size.
+const EMBED_BATCH_SIZE: usize = 1;
 
 /// Byte counts for an active model download. Absent until the download
 /// starts (cache probing, or a cached model that skips downloading); after
@@ -84,9 +90,7 @@ enum Runtime {
 #[derive(Default)]
 pub struct EmbedState(Mutex<Runtime>);
 
-fn lock_state<'a>(
-    state: &'a State<'a, EmbedState>,
-) -> AppResult<std::sync::MutexGuard<'a, Runtime>> {
+fn lock_state<'a>(state: &'a EmbedState) -> AppResult<std::sync::MutexGuard<'a, Runtime>> {
     state.0.lock().map_err(|err| {
         tracing::error!(?err, "embed state lock poisoned by an earlier panic");
         AppError::io("embed state lock poisoned")
@@ -243,34 +247,6 @@ fn download_model_files(app: &AppHandle, cache_dir: &Path) -> Result<(), String>
     Ok(())
 }
 
-fn configure_onnx_runtime(app: &AppHandle) -> Result<(), String> {
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    {
-        let dylib = app
-            .path()
-            .resource_dir()
-            .map_err(|err| format!("locating app resources: {err}"))?
-            .join(ONNX_RUNTIME_DYLIB_RESOURCE);
-        if !dylib.exists() {
-            return Err(format!(
-                "ONNX Runtime library is missing from app resources: {}",
-                dylib.display()
-            ));
-        }
-        let committed = ort::init_from(&dylib)
-            .map_err(|err| format!("loading ONNX Runtime from {}: {err}", dylib.display()))?
-            .commit();
-        if committed {
-            tracing::info!(path = %dylib.display(), "loaded bundled ONNX Runtime");
-        }
-    }
-    #[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
-    {
-        let _ = app;
-    }
-    Ok(())
-}
-
 /// Current runtime status (poll on startup; live changes arrive on
 /// `embed:status` events).
 #[tauri::command]
@@ -309,10 +285,11 @@ pub async fn embed_ensure(app: AppHandle, state: State<'_, EmbedState>) -> AppRe
     let app_for_progress = app.clone();
     let loaded: Result<TextEmbedding, String> =
         match tauri::async_runtime::spawn_blocking(move || {
-            configure_onnx_runtime(&app_for_progress)?;
             download_model_files(&app_for_progress, &cache_dir)?;
             TextEmbedding::try_new(
-                InitOptions::new(EmbeddingModel::AllMiniLML6V2).with_cache_dir(cache_dir),
+                TextInitOptions::new(EmbeddingModel::AllMiniLML6V2)
+                    .with_cache_dir(cache_dir)
+                    .with_intra_threads(INTRA_OP_THREADS),
             )
             .map_err(|err| err.to_string())
         })
@@ -356,7 +333,7 @@ pub async fn embed_texts(
             .lock()
             .map_err(|_| AppError::io("embedding model lock poisoned"))?;
         model
-            .embed(texts, None)
+            .embed(texts, Some(EMBED_BATCH_SIZE))
             .map_err(|err| AppError::io(format!("embedding failed: {err}")))
     })
     .await

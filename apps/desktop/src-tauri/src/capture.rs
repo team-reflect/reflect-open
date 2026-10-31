@@ -3,18 +3,21 @@
 //! meta-scrape fetch, and the native-messaging plumbing (pointer file +
 //! browser host manifests) that lets the `reflect-capture-host` sidecar spool
 //! captures while this app is closed. Policy — what gets written where, the
-//! privacy gate, enrichment — lives in `@reflect/core` (`actions/capture`);
+//! privacy gate, enrichment — lives in `@reflect/core` (`capture/`);
 //! this module only moves bytes.
 
 use std::fs;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
-use crate::fs::{current_root, modified_ms, root_for_generation, FileMeta, GraphState};
+use crate::fs::{FileMeta, GraphState, current_root, modified_ms, root_for_generation};
+#[cfg(test)]
+use crate::web_fetch::classify_fetch_status;
+use crate::web_fetch::{fetch_capture_html, fetch_capture_json};
 
 /// The native-messaging host name browsers route on; must match the name the
 /// extension passes to `runtime.sendNativeMessage`.
@@ -52,6 +55,8 @@ fn pointer_json(root: &Path) -> String {
     serde_json::json!({
         "version": 1,
         "graphRoot": root.to_string_lossy(),
+        "bookmarkVersion": 2,
+        "xLikeVersion": 2,
     })
     .to_string()
 }
@@ -416,21 +421,45 @@ fn shared_inbox_dir() -> Option<PathBuf> {
 /// them. Returns how many envelopes moved; zero without a shared container.
 /// Called by the mobile capture controller on launch and every foreground.
 #[tauri::command]
-pub fn capture_shared_inbox_relay(generation: u64, state: State<GraphState>) -> AppResult<u32> {
+pub async fn capture_shared_inbox_relay(
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<u32> {
     let root = root_for_generation(&state, generation)?;
     match shared_inbox_dir() {
-        Some(shared) => relay_shared_spools(&shared, &root),
+        // App Group directory IO belongs on the blocking pool: this fires on
+        // every launch and foreground, on what is the touch-delivery thread
+        // for sync commands on iOS.
+        Some(shared) => {
+            crate::blocking::run_blocking(move || relay_shared_spools(&shared, &root)).await
+        }
         None => Ok(0),
     }
 }
 
 // ---- screenshot promote ---------------------------------------------------------
 
+// Maximum decoded image width or height, in pixels.
+const CAPTURE_IMAGE_MAX_DIMENSION: u32 = 8192;
+// Maximum memory the image decoder may allocate, in bytes.
+const CAPTURE_IMAGE_MAX_ALLOC: u64 = 128 * 1024 * 1024;
+// Long-edge target for persisted capture JPEGs, in pixels.
+const CAPTURE_IMAGE_LONG_EDGE: u32 = 1600;
+
 /// Decode, downscale to `max_dim` on the long edge, re-encode as JPEG. Pure —
 /// the unit tests exercise this without Tauri state.
 fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
-    let decoded = image::load_from_memory(bytes)
-        .map_err(|err| AppError::parse(format!("screenshot does not decode: {err}")))?;
+    let mut reader = image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|err| AppError::parse(format!("image format is invalid: {err}")))?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(CAPTURE_IMAGE_MAX_DIMENSION);
+    limits.max_image_height = Some(CAPTURE_IMAGE_MAX_DIMENSION);
+    limits.max_alloc = Some(CAPTURE_IMAGE_MAX_ALLOC);
+    reader.limits(limits);
+    let decoded = reader
+        .decode()
+        .map_err(|err| AppError::parse(format!("image does not decode: {err}")))?;
     let resized = if decoded.width() > max_dim || decoded.height() > max_dim {
         decoded.resize(max_dim, max_dim, image::imageops::FilterType::CatmullRom)
     } else {
@@ -439,10 +468,24 @@ fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
     let mut out = Vec::new();
     let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 80);
     resized
-        .into_rgb8() // JPEG carries no alpha; screenshots are opaque
+        .into_rgb8() // JPEG carries no alpha
         .write_with_encoder(encoder)
-        .map_err(|err| AppError::io(format!("screenshot re-encode failed: {err}")))?;
+        .map_err(|err| AppError::io(format!("image re-encode failed: {err}")))?;
     Ok(out)
+}
+
+fn persist_asset(root: &Path, asset_path: &str, bytes: &[u8]) -> AppResult<()> {
+    let target = crate::fs::resolve_in_graph(root, asset_path)?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| AppError::io("asset path has no parent"))?;
+    fs::create_dir_all(parent)?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(bytes)?;
+    tmp.flush()?;
+    tmp.persist(&target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
 }
 
 /// Copy a spooled screenshot into the graph as a downscaled JPEG asset. Copy,
@@ -459,101 +502,86 @@ pub fn capture_screenshot_promote(
     let root = root_for_generation(&state, generation)?;
     let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
     let jpeg = downscale_jpeg(&bytes, max_dim)?;
-    let target = crate::fs::resolve_in_graph(&root, &asset_path)?;
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let mut tmp = tempfile::NamedTempFile::new_in(
-        target
-            .parent()
-            .ok_or_else(|| AppError::io("asset path has no parent"))?,
-    )?;
-    tmp.write_all(&jpeg)?;
-    tmp.flush()?;
-    tmp.persist(&target)
-        .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(())
+    persist_asset(&root, &asset_path, &jpeg)
+}
+
+/// Ask the platform link-preview service for one representative image and
+/// return a normalized JPEG for the policy layer to persist after its
+/// post-request privacy check.
+#[tauri::command]
+pub async fn capture_link_preview(app: tauri::AppHandle, url: String) -> AppResult<Option<String>> {
+    use base64::Engine;
+
+    let Some(bytes) = crate::link_preview::fetch(&app, &url).await? else {
+        return Ok(None);
+    };
+    let jpeg = tauri::async_runtime::spawn_blocking(move || {
+        downscale_jpeg(&bytes, CAPTURE_IMAGE_LONG_EDGE)
+    })
+    .await
+    .map_err(|err| AppError::io(format!("link preview task failed: {err}")))??;
+    Ok(Some(base64::engine::general_purpose::STANDARD.encode(jpeg)))
 }
 
 // ---- meta fetch -----------------------------------------------------------------
 
-/// How much HTML the meta scrape reads: `<head>` metadata lives well inside
-/// the first half-megabyte of any real page.
-const META_FETCH_MAX_BYTES: usize = 512 * 1024;
-const META_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
-
-fn classify_fetch_error(err: reqwest::Error) -> AppError {
-    if err.is_timeout() || err.is_connect() || err.is_request() {
-        AppError::Network {
-            message: err.to_string(),
-        }
-    } else {
-        AppError::io(err.to_string())
-    }
-}
-
 /// Fetch a captured page's HTML for meta-tag scraping, hard-capped (timeout,
 /// byte cap, redirect limit, http(s) only). Lives here rather than widening
-/// the webview's HTTP-plugin capability to every URL — the only thing that
-/// can reach arbitrary hosts is this bounded, HTML-only primitive, and the
-/// privacy gate in `@reflect/core` runs before it is ever called.
+/// the webview's HTTP-plugin capability to every URL — the only things that
+/// can reach arbitrary hosts are this module's bounded fetch primitives, and
+/// the privacy gate in `@reflect/core` runs before either is ever called.
 #[tauri::command]
-pub async fn capture_meta_fetch<R: tauri::Runtime>(
-    url: String,
-    app: tauri::AppHandle<R>,
-) -> AppResult<String> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err(AppError::parse(format!("not an http(s) url: {url}")));
-    }
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(5))
-        .timeout(META_FETCH_TIMEOUT)
-        .user_agent(crate::app_user_agent(&app))
-        .build()
-        .map_err(|err| AppError::io(err.to_string()))?;
-    let response = client
-        .get(&url)
-        .header("Accept", "text/html,application/xhtml+xml")
-        .send()
-        .await
-        .map_err(classify_fetch_error)?;
+pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
+    let response = fetch_capture_html(&url).await?;
+    Ok(String::from_utf8_lossy(&response.body).into_owned())
+}
 
-    let status = response.status();
-    if status.is_server_error() {
-        return Err(AppError::Network {
-            message: format!("{url} answered {status}"),
-        });
-    }
-    if !status.is_success() {
-        return Err(AppError::io(format!("{url} answered {status}")));
-    }
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_ascii_lowercase(); // MIME types are case-insensitive (`TEXT/HTML`)
-    if !content_type.contains("html") {
-        return Err(AppError::parse(format!(
-            "{url} is not an HTML page ({content_type})"
-        )));
-    }
+// ---- oEmbed fetch ---------------------------------------------------------------
 
-    let mut body: Vec<u8> = Vec::new();
-    let mut response = response;
-    while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
-        let remaining = META_FETCH_MAX_BYTES - body.len();
-        body.extend_from_slice(&chunk[..chunk.len().min(remaining)]);
-        if body.len() >= META_FETCH_MAX_BYTES {
-            break;
-        }
-    }
-    Ok(String::from_utf8_lossy(&body).into_owned())
+/// oEmbed answers are ~1 KB of JSON; anything past this cap is not an oEmbed
+/// answer, and a truncated one would be unparseable, so oversize is an error
+/// rather than a cut.
+const OEMBED_FETCH_MAX_BYTES: usize = 64 * 1024;
+
+/// Fetch an oEmbed endpoint's JSON answer for the capture meta scrape. Which
+/// URLs are oEmbed endpoints is policy and lives in `@reflect/core`
+/// (`embeds/oembed`), behind the same privacy gate as `capture_meta_fetch`;
+/// this side only bounds the transport, strictly tighter than the HTML
+/// fetch: https only, JSON only, a small byte cap, and no redirects (oEmbed
+/// endpoints answer directly, so a redirect is a failure).
+#[tauri::command]
+pub async fn capture_oembed_fetch(url: String) -> AppResult<String> {
+    let response = fetch_capture_json(&url, OEMBED_FETCH_MAX_BYTES).await?;
+    String::from_utf8(response.body)
+        .map_err(|err| AppError::parse(format!("{url} answered non-UTF-8: {err}")))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn meta_fetch_statuses_classify_rate_limits_as_retryable() {
+        use reqwest::StatusCode;
+        let url = "https://www.instagram.com/reel/example/";
+        assert!(classify_fetch_status(url, StatusCode::OK).is_none());
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::TOO_MANY_REQUESTS),
+            Some(AppError::Network { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::BAD_GATEWAY),
+            Some(AppError::Network { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::NOT_FOUND),
+            Some(AppError::Io { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::FORBIDDEN),
+            Some(AppError::Io { .. })
+        ));
+    }
 
     #[test]
     fn manifest_pins_name_path_and_origins() {
@@ -611,6 +639,8 @@ mod tests {
             serde_json::from_str(&pointer_json(Path::new("/graphs/personal"))).unwrap();
         assert_eq!(parsed["version"], 1);
         assert_eq!(parsed["graphRoot"], "/graphs/personal");
+        assert_eq!(parsed["bookmarkVersion"], 2);
+        assert_eq!(parsed["xLikeVersion"], 2);
     }
 
     #[test]
@@ -746,11 +776,13 @@ mod tests {
 
         assert_eq!(relayed, 0);
         assert!(!shared_inbox.join("big.json").exists());
-        assert!(shared
-            .path()
-            .join(SHARED_REJECTED_DIR)
-            .join("big.json")
-            .is_file());
+        assert!(
+            shared
+                .path()
+                .join(SHARED_REJECTED_DIR)
+                .join("big.json")
+                .is_file()
+        );
         assert!(!graph.path().join(INBOX_DIR).join("big.json").exists());
     }
 
@@ -782,6 +814,21 @@ mod tests {
     fn downscale_rejects_non_images() {
         assert!(matches!(
             downscale_jpeg(b"not an image", 1600),
+            Err(AppError::Parse { .. })
+        ));
+    }
+
+    #[test]
+    fn downscale_rejects_images_over_the_dimension_limit() {
+        let too_wide =
+            image::DynamicImage::new_rgb8(CAPTURE_IMAGE_MAX_DIMENSION.saturating_add(1), 1);
+        let mut png = Vec::new();
+        too_wide
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+
+        assert!(matches!(
+            downscale_jpeg(&png, CAPTURE_IMAGE_LONG_EDGE),
             Err(AppError::Parse { .. })
         ));
     }

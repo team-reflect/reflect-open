@@ -1,5 +1,5 @@
-import type { MeetingAttendee } from '../actions/add-meeting'
-import type { CalendarAttendee, CalendarEvent } from './commands'
+import type { MeetingAttendee } from '../contacts/meeting-service.ts'
+import type { CalendarAttendee, CalendarEvent } from './calendar-service.ts'
 
 /**
  * Display policy for the daily-note events panel — the TypeScript half of the
@@ -10,7 +10,9 @@ import type { CalendarAttendee, CalendarEvent } from './commands'
 
 /** Did the current user decline this event? */
 export function isDeclinedByUser(event: CalendarEvent): boolean {
-  return event.attendees.some((attendee) => attendee.isCurrentUser && attendee.status === 'declined')
+  return event.attendees.some(
+    (attendee) => attendee.isCurrentUser && attendee.status === 'declined',
+  )
 }
 
 /** Calendar-blocking placeholders v1 filtered by name, case-insensitively. */
@@ -45,7 +47,9 @@ export function displayEvents(events: CalendarEvent[]): CalendarEvent[] {
       seen.add(key)
       return true
     })
-    .sort((first, second) => first.startsAt - second.startsAt || first.title.localeCompare(second.title))
+    .sort((first, second) => {
+      return first.startsAt - second.startsAt || first.title.localeCompare(second.title)
+    })
 }
 
 /** Is `attendee` someone to suggest a person note for? */
@@ -78,7 +82,7 @@ export function defaultAttendees(event: CalendarEvent): MeetingAttendee[] {
       continue
     }
     seen.add(key)
-    attendees.push(attendee.email === null ? { name } : { name, email: attendee.email })
+    attendees.push(attendee.email === null ? { name } : { name, emails: [attendee.email] })
   }
   return attendees
 }

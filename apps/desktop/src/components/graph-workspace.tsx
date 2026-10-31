@@ -1,22 +1,18 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { PaletteProvider } from '@/components/command-palette/palette-provider'
-import { NoteWindowContent } from '@/components/note-window-content'
-import { WorkspaceContent } from '@/components/workspace-content'
-import { getInitialWindowRoute } from '@/lib/windows/initial-window-route'
-import { isMainWindow } from '@/lib/windows/window-role'
-import { AssetDescribeProvider } from '@/providers/asset-describe-provider'
-import { AudioMemoProvider } from '@/providers/audio-memo-provider'
-import { FocusedDailyProvider } from '@/providers/focused-daily-provider'
-import { CaptureProvider } from '@/providers/capture-provider'
-import { ChatProvider } from '@/providers/chat-provider'
-import { DeepLinkProvider } from '@/providers/deep-link-provider'
-import { NoteTemplatesProvider } from '@/providers/note-templates-provider'
-import { ShortcutsProvider } from '@/providers/shortcuts-provider'
-import { SidebarProvider } from '@/providers/sidebar-provider'
-import { SyncProvider } from '@/providers/sync-provider'
-import { V1ImportProvider } from '@/providers/v1-import-provider'
-import { RouterProvider } from '@/routing/router'
+import { PaletteProvider } from '@/components/command-palette/palette-provider.tsx'
+import { NoteWindowContent } from '@/components/note-window-content.tsx'
+import { WorkspaceContent } from '@/components/workspace-content.tsx'
+import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
+import { FocusedDailyProvider } from '@/providers/focused-daily-provider.tsx'
+import { DeepLinkProvider } from '@/providers/deep-link-provider.tsx'
+import { NoteFindProvider } from '@/providers/note-find-provider.tsx'
+import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
+import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
+import { SidebarProvider } from '@/providers/sidebar-provider.tsx'
+import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
+import { RouterProvider } from '@/routing/router.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 interface GraphWorkspaceProps {
   graph: GraphInfo
@@ -30,53 +26,47 @@ interface GraphWorkspaceProps {
  * fresh history.
  */
 export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
+  const { deepLinkRouter, window: appWindow } = useAppServices()
   // A note window's first route is its ⌘-clicked target (seeded by the boot
   // hook) — starting on the default today route would flash the daily note
   // until the deep link navigated.
-  const initialRoute = isMainWindow() ? null : getInitialWindowRoute()
+  const initialRoute = appWindow.isMainWindow() ? null : deepLinkRouter.getInitialWindowRoute()
   return (
     <RouterProvider key={graph.root} {...(initialRoute !== null ? { initialRoute } : {})}>
-      <SyncProvider graph={graph}>
-        <PaletteProvider>
-          <ShortcutsProvider>
-            <NoteTemplatesProvider>
-              <SidebarProvider>
-                {/* Above the sidebar: a recording must survive the sidebar (and its
-                    mic button) unmounting on collapse. */}
-                <AudioMemoProvider graph={graph}>
-                  <CaptureProvider graph={graph}>
-                    {/* Inside the router (deep links navigate) and beside capture
-                        (deep-link writes spool into the same inbox drain). */}
-                    <DeepLinkProvider graph={graph}>
-                      <AssetDescribeProvider graph={graph}>
-                        <ChatProvider graph={graph}>
-                          {/* Tracks the focused day in the daily stream so the right
-                              sidebar describes it, not just the routed day. */}
-                          <FocusedDailyProvider>
-                            {/* A ⌘-clicked note window is chrome-free: the
-                                routed view only, no sidebar/palette shell.
-                                The V1 import lives above the routed views so
-                                closing settings can't orphan a running
-                                import; main window only — its dialog is the
-                                import's single face. */}
-                            {isMainWindow() ? (
-                              <V1ImportProvider graph={graph}>
-                                <WorkspaceContent graph={graph} />
-                              </V1ImportProvider>
-                            ) : (
-                              <NoteWindowContent />
-                            )}
-                          </FocusedDailyProvider>
-                        </ChatProvider>
-                      </AssetDescribeProvider>
-                    </DeepLinkProvider>
-                  </CaptureProvider>
-                </AudioMemoProvider>
-              </SidebarProvider>
-            </NoteTemplatesProvider>
-          </ShortcutsProvider>
-        </PaletteProvider>
-      </SyncProvider>
+      <PaletteProvider>
+        <ShortcutsProvider>
+          <NoteTemplatesProvider>
+            <SidebarProvider>
+              {/* Above the sidebar: a recording must survive the sidebar (and its
+                  mic button) unmounting on collapse. */}
+              <AudioMemoProvider graph={graph}>
+                {/* Inside the router: deep links navigate. */}
+                <DeepLinkProvider>
+                  {/* Tracks the focused day in the daily stream so the right
+                      sidebar describes it, not just the routed day. */}
+                  <FocusedDailyProvider>
+                    <NoteFindProvider>
+                      {/* A ⌘-clicked note window is chrome-free: the
+                          routed view only, no sidebar/palette shell.
+                          The V1 import lives above the routed views so
+                          closing settings can't orphan a running
+                          import; main window only — its dialog is the
+                          import's single face. */}
+                      {appWindow.isMainWindow() ? (
+                        <V1ImportProvider>
+                          <WorkspaceContent graph={graph} />
+                        </V1ImportProvider>
+                      ) : (
+                        <NoteWindowContent />
+                      )}
+                    </NoteFindProvider>
+                  </FocusedDailyProvider>
+                </DeepLinkProvider>
+              </AudioMemoProvider>
+            </SidebarProvider>
+          </NoteTemplatesProvider>
+        </ShortcutsProvider>
+      </PaletteProvider>
     </RouterProvider>
   )
 }

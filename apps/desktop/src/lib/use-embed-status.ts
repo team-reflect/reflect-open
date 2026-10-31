@@ -1,41 +1,24 @@
-import { useEffect, useState } from 'react'
-import { embedStatus, hasBridge, subscribeEmbedStatus, type EmbedStatus } from '@reflect/core'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
+import type { EmbedStatus, Unlisten } from '@reflect/core'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The embedding runtime's live status (Plan 09). Polls once on mount, then
- * tracks `embed:status` events. Without a bridge (browser dev) semantic
- * features stay in `uninitialized` — i.e. invisible.
+ * tracks `embed:status` events; a later mount starts from the last status
+ * the runtime observed.
  */
 export function useEmbedStatus(): EmbedStatus {
-  const [status, setStatus] = useState<EmbedStatus>({ status: 'uninitialized' })
+  const { embeddingRuntime } = useCoreServices()
+  const subscribe = useCallback(
+    (onChange: () => void): Unlisten => embeddingRuntime.subscribe(onChange),
+    [embeddingRuntime],
+  )
+
+  const getSnapshot = useCallback(() => embeddingRuntime.lastStatus(), [embeddingRuntime])
 
   useEffect(() => {
-    if (!hasBridge()) {
-      return
-    }
-    let active = true
-    let unlisten: (() => void) | null = null
-    void embedStatus().then((current) => {
-      if (active) {
-        setStatus(current)
-      }
-    })
-    void subscribeEmbedStatus((next) => {
-      if (active) {
-        setStatus(next)
-      }
-    }).then((fn) => {
-      if (active) {
-        unlisten = fn
-      } else {
-        fn()
-      }
-    })
-    return () => {
-      active = false
-      unlisten?.()
-    }
-  }, [])
+    void embeddingRuntime.status()
+  }, [embeddingRuntime])
 
-  return status
+  return useSyncExternalStore(subscribe, getSnapshot)
 }

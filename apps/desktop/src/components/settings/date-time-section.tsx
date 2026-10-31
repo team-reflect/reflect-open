@@ -1,23 +1,24 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select.tsx'
 import {
   dateFormatSchema,
   timeFormatSchema,
   weekStartDaySchema,
-  type DateFormat,
   type TimeFormat,
   type WeekStartDay,
+  DATE_FORMATS,
+  formatFullDate,
 } from '@reflect/core'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { formatFullDate } from '@/lib/dates'
-import { useSettings } from '@/providers/settings-provider'
-import { SettingsField } from './field'
-import { SettingsSection } from './section'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { SettingsField } from './field.tsx'
+import { SettingsSection } from './section.tsx'
 
 interface TimeFormatOption {
   value: TimeFormat
@@ -35,23 +36,22 @@ const TIME_FORMAT_OPTIONS: TimeFormatOption[] = [
 ]
 
 const WEEK_START_OPTIONS: WeekStartOption[] = [
-  { value: 'monday', label: 'Monday' },
   { value: 'sunday', label: 'Sunday' },
+  { value: 'monday', label: 'Monday' },
+  { value: 'saturday', label: 'Saturday' },
 ]
 
 // The options demonstrate themselves: each shows today's date in its format,
 // so the day/month order is visible rather than described.
-const DATE_FORMAT_VALUES: DateFormat[] = ['mdy', 'dmy', 'iso']
-
 /**
  * Date & time display preferences. Both formats feed every date and time the
  * app renders (via `formatDayLabel`/`formatTimeOfDay`/`formatRecencyLabel` in
- * `lib/dates.ts`) — display-only, so switching them never touches stored
+ * `@reflect/core`) — display-only, so switching them never touches stored
  * timestamps or daily-note keys.
  */
 export function DateTimeSection(): ReactElement {
   const { settings, updateSettings } = useSettings()
-  const today = new Date()
+  const [today] = useState(() => new Date())
 
   return (
     <SettingsSection id="date-time">
@@ -62,41 +62,47 @@ export function DateTimeSection(): ReactElement {
         <div className="mt-3">
           <Select
             value={settings.dateFormat}
+            items={DATE_FORMATS.map((value) => ({
+              value,
+              label: formatFullDate(today, value),
+            }))}
             onValueChange={(value) => updateSettings({ dateFormat: dateFormatSchema.parse(value) })}
           >
             <SelectTrigger aria-label="Date format" className="w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {DATE_FORMAT_VALUES.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {formatFullDate(today, value)}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {DATE_FORMATS.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {formatFullDate(today, value)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
       </SettingsField>
-      <SettingsField
-        legend="Start week on"
-        description="The first day shown in calendars."
-      >
+      <SettingsField legend="Start week on" description="The first day shown in calendars.">
         <div className="mt-3">
           <Select
             value={settings.weekStartDay}
-            onValueChange={(value) =>
+            items={WEEK_START_OPTIONS}
+            onValueChange={(value) => {
               updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
-            }
+            }}
           >
             <SelectTrigger aria-label="Start week on" className="w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {WEEK_START_OPTIONS.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {WEEK_START_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -108,17 +114,20 @@ export function DateTimeSection(): ReactElement {
         <div className="mt-3">
           <Select
             value={settings.timeFormat}
+            items={TIME_FORMAT_OPTIONS}
             onValueChange={(value) => updateSettings({ timeFormat: timeFormatSchema.parse(value) })}
           >
             <SelectTrigger aria-label="Time format" className="w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TIME_FORMAT_OPTIONS.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {TIME_FORMAT_OPTIONS.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>

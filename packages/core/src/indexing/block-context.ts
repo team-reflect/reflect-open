@@ -1,13 +1,13 @@
-import type { SyntaxNode, Tree } from '@lezer/common'
-import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
-import { parseBody } from '../markdown/grammar'
-import { unescapeMarkdownText } from '../markdown/plain-text'
-import { normalizeWikiTarget } from '../markdown/resolve'
+import type { SyntaxNode, Tree } from '@meowdown/markdown'
+import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter.ts'
+import { parseBody } from '../markdown/grammar.ts'
+import { stripAtxHeadingMarks, unescapeMarkdownText } from '../markdown/plain-text.ts'
+import { normalizeWikiTarget } from '../markdown/resolve.ts'
+import { isWikiNodeName, wikiBracketStart } from '../markdown/wiki-nodes.ts'
 
 /**
  * Block-level context extraction for the backlinks panel, ported from old
- * Reflect's `getBacklinkContextHtml`. Where {@link lineAt} returns only the
- * physical line around a link, this walks the parsed block structure and
+ * Reflect's `getBacklinkContextHtml`. This walks the parsed block structure and
  * returns the whole unit of meaning the mention sits in:
  *
  * - **Paragraph** — the whole paragraph (which may wrap across lines).
@@ -60,9 +60,9 @@ function selfOrAncestor(
   return null
 }
 
-/** The normalized match key of a `[[…]]` node, or `null` for a blank target. */
+/** The normalized match key of a `[[…]]` / `![[…]]` node, or `null` for a blank target. */
 function wikiTargetKeyOf(body: string, link: SyntaxNode): string | null {
-  const inner = body.slice(link.from + 2, link.to - 2)
+  const inner = body.slice(wikiBracketStart(link) + 2, link.to - 2)
   const pipe = inner.indexOf('|')
   const target = unescapeMarkdownText((pipe === -1 ? inner : inner.slice(0, pipe)).trim())
   return target === '' ? null : normalizeWikiTarget(target).key
@@ -71,7 +71,7 @@ function wikiTargetKeyOf(body: string, link: SyntaxNode): string | null {
 /** Does the textblock's inline content hold a wiki link with one of these match keys? */
 function textblockMentions(body: string, block: SyntaxNode, keys: ReadonlySet<string>): boolean {
   for (let child = block.firstChild; child; child = child.nextSibling) {
-    if (child.name === 'WikiLink') {
+    if (isWikiNodeName(child.name)) {
       const key = wikiTargetKeyOf(body, child)
       if (key !== null && keys.has(key)) {
         return true
@@ -123,16 +123,14 @@ function lineEndAt(body: string, pos: number): number {
 interface ContextLines {
   lines: string[]
   origins: number[]
-  sourceLines: string[]
 }
 
 /** Drop trailing all-whitespace lines, then trailing whitespace of the last line. */
 function trimTrailing(context: ContextLines): ContextLines {
-  const { lines, origins, sourceLines } = context
+  const { lines, origins } = context
   while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') {
     lines.pop()
     origins.pop()
-    sourceLines.pop()
   }
   if (lines.length > 0) {
     lines[lines.length - 1] = lines[lines.length - 1]!.replace(/\s+$/, '')
@@ -150,17 +148,15 @@ function dedentedSlice(body: string, from: number, to: number, prefix: string): 
   const end = to > from && body[to - 1] === '\n' ? to - 1 : to
   const lines: string[] = []
   const origins: number[] = []
-  const sourceLines: string[] = []
   let lineStart = start
   for (const raw of body.slice(start, lineEndAt(body, end)).split('\n')) {
     const stripped = prefix !== '' && raw.startsWith(prefix)
     const line = stripped ? raw.slice(prefix.length) : raw
     lines.push(line)
-    sourceLines.push(line)
     origins.push(stripped ? lineStart + prefix.length : lineStart)
     lineStart += raw.length + 1
   }
-  return trimTrailing({ lines, origins, sourceLines })
+  return trimTrailing({ lines, origins })
 }
 
 /**
@@ -186,12 +182,7 @@ function headingSectionEnd(heading: SyntaxNode): number {
 /** Does the heading's text line carry anything beyond ATX `#` marks? */
 function headingHasText(body: string, heading: SyntaxNode): boolean {
   const firstLine = body.slice(heading.from, lineEndAt(body, heading.from))
-  return (
-    firstLine
-      .replace(/^#{1,6}[ \t]*/, '')
-      .replace(/[ \t]*#*[ \t]*$/, '')
-      .trim() !== ''
-  )
+  return stripAtxHeadingMarks(firstLine) !== ''
 }
 
 /**
@@ -261,7 +252,6 @@ function listItemContext(
   return {
     lines: pieces.flatMap((piece) => piece.lines),
     origins: pieces.flatMap((piece) => piece.origins),
-    sourceLines: pieces.flatMap((piece) => piece.sourceLines),
   }
 }
 
@@ -302,11 +292,6 @@ export interface BlockContextLines {
   text: string
   /** Whole-file offset of each snippet line's first character. */
   lineOrigins: number[]
-  /**
-   * Each snippet line's exact source text from `lineOrigins[i]` to the physical
-   * line end, before display-only trailing whitespace trimming.
-   */
-  lineSourceTexts: string[]
 }
 
 function contextLinesAt(
@@ -319,7 +304,7 @@ function contextLinesAt(
   const bodyPos = Math.max(0, Math.min(pos - bodyOffset, body.length))
   const leaf: SyntaxNode = tree.resolveInner(bodyPos, 1)
 
-  const link = selfOrAncestor(leaf, (node) => node.name === 'WikiLink')
+  const link = selfOrAncestor(leaf, (node) => isWikiNodeName(node.name))
   const posKey = link ? wikiTargetKeyOf(body, link) : null
   const keys = new Set(targetKeys)
   if (posKey !== null) {
@@ -354,7 +339,10 @@ function contextLinesAt(
   const raw = body.slice(lineStart, lineEndAt(body, bodyPos))
   const leading = raw.length - raw.trimStart().length
   return {
-    context: { lines: [raw.trim()], origins: [lineStart + leading], sourceLines: [raw.slice(leading)] },
+    context: {
+      lines: [raw.trim()],
+      origins: [lineStart + leading],
+    },
     bodyOffset,
   }
 }
@@ -386,8 +374,8 @@ export function blockContextAt(
  * {@link blockContextAt} plus each snippet line's whole-file origin, for
  * mapping an interaction inside the rendered snippet (a task checkbox click)
  * back to the exact source offset it came from. Origins are as of this read;
- * a later edit can drift them, which the task toggle's staleness guard
- * ({@link toggleTaskMarker}) turns into a refusal rather than a wrong write.
+ * a later edit can drift them, which the task write's staleness guard turns
+ * into a refusal rather than a wrong write.
  */
 export function blockContextLinesAt(
   source: string | BlockContextSource,
@@ -398,6 +386,5 @@ export function blockContextLinesAt(
   return {
     text: context.lines.join('\n'),
     lineOrigins: context.origins.map((origin) => origin + bodyOffset),
-    lineSourceTexts: context.sourceLines,
   }
 }

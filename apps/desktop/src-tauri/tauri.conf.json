@@ -7,14 +7,18 @@
     "beforeDevCommand": "pnpm sidecar && pnpm dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm sidecar && pnpm build",
-    "frontendDist": "../dist"
+    "frontendDist": "../dist",
+    "removeUnusedCommands": true
   },
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Reflect",
         "width": 1300,
         "height": 650,
+        "minWidth": 200,
+        "minHeight": 200,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "dragDropEnabled": false,
@@ -22,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: reflect-asset: https:; font-src 'self' data:; frame-src 'self' https://platform.twitter.com https://platform.x.com https://syndication.twitter.com https://www.youtube-nocookie.com https://www.youtube.com; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://github.com https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io"
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: reflect-asset: http://reflect-asset.localhost https://reflect-asset.localhost https:; media-src 'self' https: reflect-asset: http://reflect-asset.localhost https://reflect-asset.localhost; font-src 'self' data:; frame-src 'self' https://platform.twitter.com https://platform.x.com https://syndication.twitter.com https://www.youtube-nocookie.com https://www.youtube.com https://youtube-relay-reflect.vercel.app; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://github.com https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io"
     }
   },
   "plugins": {
@@ -34,13 +38,15 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDREQ0RBRkJBN0ZDODdDMzkKUldRNWZNaC91cS9OVFhtTHdrSWVOV3p2cEdhc3RZbmtXM0g0bnpxUnZXVjlQMjZRNXFlWUdPNWMK",
       "endpoints": [
-        "https://github.com/team-reflect/reflect-open/releases/download/updater-beta/latest.json"
+        "https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json"
       ]
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "shortDescription": "Local-first, Markdown-backed note-taking",
+    "copyright": "Copyright © 2026 Reflect App, LLC",
     "iOS": {
       "developmentTeam": "789ULN5MZB",
       "template": "src-tauri/ios.project.yml"
@@ -50,7 +56,8 @@
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/Assets.car"
     ]
   }
 }

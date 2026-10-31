@@ -1,39 +1,53 @@
 import { useDeferredValue, useMemo, useRef, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ChevronLeft, FileText, SearchX } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner.tsx'
 import {
   foldTag,
-  hasBridge,
-  listNoteTags,
   parseHighlights,
-  searchWithFilters,
+  type DateFormat,
   type FilteredSearchHit,
   type NoteTagFacet,
+  formatDayLabel,
 } from '@reflect/core'
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { FilterBar } from '@/mobile/search-filters/filter-bar'
 import {
   buildAllNotesSearch,
   pendingTagToken,
   searchPlanFor,
   type AllNotesFilters,
-} from '@/mobile/search-filters/filter-state'
-import { NoteRowList, type NoteRowModel } from '@/mobile/note-row-list'
-import { SearchInput } from '@/mobile/search-input'
-import { useArrivalFocus } from '@/mobile/use-arrival-focus'
-import { useGraph } from '@/providers/graph-provider'
-import { routeForPath } from '@/routing/route'
-import { useRouter } from '@/routing/router'
+  routeForPath,
+} from '@reflect/app'
+import { queryKeys } from '@/lib/query-client.ts'
+import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
+import { NoteRowList } from '@/mobile/note-row-list.tsx'
+import { SearchInput } from '@/mobile/search-input.tsx'
+import type { NoteRowModel } from '@/mobile/swipeable-note-row.tsx'
+import {
+  MobileTopBar,
+  MobileTopBarIconButton,
+  MobileTopBarRow,
+  MobileTopBarScrollableRow,
+} from '@/mobile/top-bar.tsx'
+import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useNoteRows } from '@/hooks/note-row-overlay.ts'
+import { useRouter } from '@/routing/router.tsx'
 
 /** A search hit resolved into the shared row shape. */
-export function rowForHit(hit: FilteredSearchHit): NoteRowModel {
+export function rowForHit(hit: FilteredSearchHit, dateFormat: DateFormat): NoteRowModel {
   return {
     path: hit.path,
-    titleSegments: parseHighlights(hit.highlightedTitle),
+    // A daily note reads as its day, which no longer lines up with the match
+    // offsets of its ISO title.
+    titleSegments:
+      hit.dailyDate !== null
+        ? [{ text: formatDayLabel(hit.dailyDate, dateFormat), highlighted: false }]
+        : parseHighlights(hit.highlightedTitle),
     mtime: hit.mtime,
     isPinned: hit.isPinned,
+    canDelete: hit.dailyDate === null,
     snippet:
       hit.snippet !== null
         ? parseHighlights(hit.snippet)
@@ -79,8 +93,9 @@ export function MobileAllNotes({
   onFiltersChange,
 }: MobileAllNotesProps): ReactElement {
   const { graph } = useGraph()
+  const { noteList, search } = useCoreServices()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
-  const enabled = hasBridge() && graph !== null
+  const enabled = graph !== null
 
   // The All-tab double-tap (`focusEditor` arrivals) lands in the search bar,
   // the tab's capture surface — the daily double-tap's All-flavored twin.
@@ -90,6 +105,7 @@ export function MobileAllNotes({
   // Defer the query the index sees (desktop's search debounce): fast typing
   // coalesces while the input stays live, and a seeded query (a `search`
   // history entry) catches up within a frame instead of a fixed delay.
+  const dateFormat = useDateFormat()
   const deferredQuery = useDeferredValue(query)
   const pending = pendingTagToken(query)
   const parsed = useMemo(
@@ -98,21 +114,26 @@ export function MobileAllNotes({
   )
 
   const { data: facets } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'all-notes-tags'],
-    queryFn: () => listNoteTags(),
+    queryKey: queryKeys.index.allNotesTags(graph?.root),
+    queryFn: () => noteList.listNoteTags(),
     enabled,
   })
-  const { data: hits } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-all-notes', parsed],
-    queryFn: () => searchWithFilters(parsed, searchPlanFor(parsed)),
+  const { data: indexedHits, isPlaceholderData } = useQuery({
+    queryKey: queryKeys.index.mobileAllNotesWithSearch(graph?.root, parsed),
+    queryFn: () => search.searchWithFilters(parsed, searchPlanFor(parsed)),
     enabled,
     // Typing re-keys the query as the deferred value settles; holding the
     // previous rows avoids a blank flash between keystrokes.
     placeholderData: keepPreviousData,
   })
 
-  const rows = useMemo(() => (hits ?? []).map(rowForHit), [hits])
   const pristine = parsed.text === '' && !parsed.filtered
+  // The pristine feed lists every note; a held previous result may not.
+  const hits = useNoteRows(indexedHits, { complete: pristine && !isPlaceholderData })
+  const rows = useMemo(
+    () => (hits ?? []).map((hit) => rowForHit(hit, dateFormat)),
+    [hits, dateFormat],
+  )
 
   const addPendingTag = (facet: NoteTagFacet): void => {
     const key = foldTag(facet.tag)
@@ -123,22 +144,13 @@ export function MobileAllNotes({
   }
 
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
-      <header className="shrink-0 space-y-2 border-b border-border px-4 pb-2 pt-1">
-        <div className="flex items-center gap-1">
+    <div className="flex h-full w-screen flex-col pt-safe">
+      <MobileTopBar>
+        <MobileTopBarRow>
           {tag !== null && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="-ml-2 size-9 shrink-0"
-              aria-label="Back"
-              onClick={back}
-            >
+            <MobileTopBarIconButton edge="leading" aria-label="Back" onClick={back}>
               <ChevronLeft />
-            </Button>
+            </MobileTopBarIconButton>
           )}
           <SearchInput
             ref={searchInputRef}
@@ -147,22 +159,24 @@ export function MobileAllNotes({
             value={query}
             onValueChange={onQueryChange}
           />
-        </div>
-        {pending !== null ? (
-          <TagSuggestions
-            facets={matchingTagFacets(facets ?? [], pending.partial)}
-            onPick={addPendingTag}
-          />
-        ) : (
-          <FilterBar
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            facets={facets ?? []}
-            routeTag={tag}
-            onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
-          />
-        )}
-      </header>
+        </MobileTopBarRow>
+        <MobileTopBarScrollableRow>
+          {pending !== null ? (
+            <TagSuggestions
+              facets={matchingTagFacets(facets ?? [], pending.partial)}
+              onPick={addPendingTag}
+            />
+          ) : (
+            <FilterBar
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              facets={facets ?? []}
+              routeTag={tag}
+              onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
+            />
+          )}
+        </MobileTopBarScrollableRow>
+      </MobileTopBar>
       {/* Undefined hits mean "still fetching" only while the query can run —
           with no bridge/graph it never will, and the empty state is honest. */}
       {enabled && hits === undefined ? (
@@ -194,7 +208,7 @@ function TagSuggestions({
     return <p className="pb-1 text-xs text-text-muted">No matching tags</p>
   }
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1" role="listbox" aria-label="Matching tags">
+    <div className="flex gap-1.5 w-max pb-2" role="listbox" aria-label="Matching tags">
       {facets.map((facet) => (
         <button
           key={facet.tag}

@@ -1,33 +1,69 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { runDeviceFlow, setBridge } from '@reflect/core'
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
-import { openUrl } from '@tauri-apps/plugin-opener'
-import { GithubAuthStep } from './github-auth-step'
+import type { ReactNode } from 'react'
+import { page, userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { GithubAuthService } from '@reflect/core'
+import {
+  createTestClipboardService,
+  createTestOpenerService,
+  type TestClipboardService,
+  type TestOpenerService,
+} from '@reflect/app/testing'
+import {
+  createTestCoreServices,
+  createTestHttpService,
+  createTestPlatformService,
+  createTestSecretStoreService,
+  type TestHttpService,
+  type TestSecretStoreService,
+} from '@reflect/core/testing'
+import { fireEvent } from '@/test-utils/fire-event.ts'
+import '@/test-utils/locator.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { GithubAuthStep } from './github-auth-step.tsx'
 
-// The Reflect GitHub App is registered, so the device flow leads and the PAT
-// path sits behind a "use a personal access token instead" toggle. The
-// keychain is the bridge fake; GET /user (instant token validation) goes
-// through the mocked Tauri HTTP plugin. The device-flow tests stub core's
-// runDeviceFlow (polling policy is unit-tested in core) to drive the
-// code-handoff view.
+// The device flow leads and the PAT path sits behind a "use a personal access
+// token instead" toggle. The
+// keychain is the in-memory secret store; GET /user (instant token validation) goes
+// through the fake HTTP service. The device-flow tests script the app's
+// GithubAuthService's runDeviceFlow (polling policy is unit-tested in core)
+// to drive the code-handoff view.
 
-vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
-vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  runDeviceFlow: vi.fn(),
-}))
-const httpFetch = vi.mocked(tauriFetch)
-const openedUrls = vi.mocked(openUrl)
-const mockFlow = vi.mocked(runDeviceFlow)
+const USER_URL = 'https://api.github.com/user'
+let http: TestHttpService
+let clipboard: TestClipboardService
+let opener: TestOpenerService
+let openedUrls: MockInstance<(url: string) => Promise<void>>
+let keychain: TestSecretStoreService
+const mockFlow = vi.fn<GithubAuthService['runDeviceFlow']>()
+
+beforeEach(() => {
+  http = createTestHttpService()
+  clipboard = createTestClipboardService()
+  opener = createTestOpenerService()
+  openedUrls = vi.spyOn(opener, 'openUrl')
+  keychain = createTestSecretStoreService()
+  mockFlow.mockReset()
+})
+
+/**
+ * Render the step in an app over the test's keychain, HTTP, clipboard and opener.
+ */
+async function renderStep(step: ReactNode): Promise<void> {
+  const core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    http,
+    secretStore: keychain,
+    platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
+  })
+  core.githubAuth.onRunDeviceFlow(mockFlow)
+  await renderInApp(step, { core, appServices: { clipboard, opener } })
+}
 
 /** Switch the step from the device-flow lead to PAT entry. */
 async function switchToPat(): Promise<void> {
-  fireEvent.click(
-    await screen.findByRole('button', { name: /use a personal access token instead/i }),
-  )
-  await screen.findByLabelText('Personal access token')
+  await userEvent.click(page.getByRole('button', { name: /use a personal access token instead/i }))
+  await expect.element(page.getByLabelText('Personal access token')).toBeVisible()
 }
 
 /** Render with no stored credential and a flow that stays at the code view. */
@@ -35,65 +71,27 @@ async function renderCodeView(): Promise<void> {
   fakeKeychain()
   mockFlow.mockImplementation(async (options) => {
     options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
-    return new Promise(() => {}) // polling stays in flight
+    return await new Promise(() => {}) // polling stays in flight
   })
-  render(<GithubAuthStep onAuthed={vi.fn()} />)
-  fireEvent.click(await screen.findByRole('button', { name: 'Sign in with GitHub' }))
-  await screen.findByText('ABCD-1234')
+  await renderStep(<GithubAuthStep onAuthed={vi.fn()} />)
+  await userEvent.click(page.getByRole('button', { name: 'Sign in with GitHub' }))
+  await expect.element(page.getByText('ABCD-1234')).toBeVisible()
 }
 
-function stubClipboard(writeText: (text: string) => Promise<void>): void {
-  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-}
-
-afterEach(() => {
-  cleanup()
-  setBridge(null)
-  httpFetch.mockReset()
-  openedUrls.mockClear() // clear calls, keep the resolving implementation
-  mockFlow.mockReset()
-  Reflect.deleteProperty(navigator, 'clipboard')
-})
-
-function fakeKeychain(initial: Record<string, string> = {}) {
-  const store = new Map(Object.entries(initial))
-  setBridge({
-    invoke: async (command, args) => {
-      const name = args['name'] as string
-      if (command === 'secret_get') {
-        return store.get(name) ?? null
-      }
-      if (command === 'secret_set') {
-        store.set(name, args['value'] as string)
-        return null
-      }
-      if (command === 'secret_delete') {
-        store.delete(name)
-        return null
-      }
-      throw new Error(`unexpected command ${command}`)
-    },
-    listen: async () => () => {},
-  })
-  return store
+/**
+ * The in-memory keychain of the app under test, holding `initial`.
+ */
+function fakeKeychain(initial: Record<string, string> = {}): TestSecretStoreService {
+  keychain = createTestSecretStoreService(initial)
+  return keychain
 }
 
 function githubAccepts(login: string): void {
-  httpFetch.mockResolvedValue(
-    new Response(JSON.stringify({ login }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }),
-  )
+  http.on('GET', USER_URL, { status: 200, json: { login } })
 }
 
 function githubRejects(): void {
-  httpFetch.mockResolvedValue(
-    new Response(JSON.stringify({ message: 'Bad credentials' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    }),
-  )
+  http.on('GET', USER_URL, { status: 401, json: { message: 'Bad credentials' } })
 }
 
 describe('GithubAuthStep', () => {
@@ -101,29 +99,29 @@ describe('GithubAuthStep', () => {
     fakeKeychain({ 'github-auth': JSON.stringify({ kind: 'pat', token: 'ghp_abc' }) })
     githubAccepts('alex')
     const onAuthed = vi.fn()
-    render(<GithubAuthStep onAuthed={onAuthed} />)
+    await renderStep(<GithubAuthStep onAuthed={onAuthed} />)
 
-    await waitFor(() =>
-      expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null }),
-    )
+    await vi.waitFor(() => {
+      expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null })
+    })
   })
 
   it('stores a pasted PAT, verifies it against GitHub, and reports the identity', async () => {
     const store = fakeKeychain()
     githubAccepts('alex')
     const onAuthed = vi.fn()
-    render(<GithubAuthStep onAuthed={onAuthed} />)
+    await renderStep(<GithubAuthStep onAuthed={onAuthed} />)
     await switchToPat()
 
-    fireEvent.change(screen.getByLabelText('Personal access token'), {
+    fireEvent.change(page.getByLabelText('Personal access token'), {
       target: { value: '  github_pat_abc  ' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save token' }))
+    await userEvent.click(page.getByRole('button', { name: 'Save token' }))
 
-    await waitFor(() =>
-      expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null }),
-    )
-    expect(JSON.parse(store.get('github-auth') ?? '{}')).toEqual({
+    await vi.waitFor(() => {
+      expect(onAuthed).toHaveBeenCalledWith({ login: 'alex', avatarUrl: null })
+    })
+    expect(JSON.parse(store.snapshot()['github-auth'] ?? '{}')).toEqual({
       kind: 'pat',
       token: 'github_pat_abc',
     })
@@ -136,37 +134,37 @@ describe('GithubAuthStep', () => {
     const store = fakeKeychain()
     githubRejects()
     const onAuthed = vi.fn()
-    render(<GithubAuthStep onAuthed={onAuthed} />)
+    await renderStep(<GithubAuthStep onAuthed={onAuthed} />)
     await switchToPat()
 
-    fireEvent.change(screen.getByLabelText('Personal access token'), {
+    fireEvent.change(page.getByLabelText('Personal access token'), {
       target: { value: 'github_pat_typo' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save token' }))
+    await userEvent.click(page.getByRole('button', { name: 'Save token' }))
 
-    expect(await screen.findByText(/rejected the token/i)).toBeTruthy()
+    await expect.element(page.getByText(/rejected the token/i)).toBeVisible()
     expect(onAuthed).not.toHaveBeenCalled()
-    expect(store.has('github-auth')).toBe(false)
+    expect(store.snapshot()).not.toHaveProperty('github-auth')
   })
 
   it('rejects an empty token with an inline message', async () => {
     fakeKeychain()
     const onAuthed = vi.fn()
-    render(<GithubAuthStep onAuthed={onAuthed} />)
+    await renderStep(<GithubAuthStep onAuthed={onAuthed} />)
     await switchToPat()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save token' }))
+    await userEvent.click(page.getByRole('button', { name: 'Save token' }))
 
-    expect(await screen.findByText('Paste a token first.')).toBeTruthy()
+    await expect.element(page.getByText('Paste a token first.')).toBeVisible()
     expect(onAuthed).not.toHaveBeenCalled()
   })
 
   it('names the backup repository in the token instructions when known', async () => {
     fakeKeychain()
-    render(<GithubAuthStep onAuthed={vi.fn()} repoName="my-notes-backup" />)
+    await renderStep(<GithubAuthStep onAuthed={vi.fn()} repoName="my-notes-backup" />)
     await switchToPat()
 
-    expect(await screen.findByText('my-notes-backup')).toBeTruthy()
+    await expect.element(page.getByText('my-notes-backup')).toBeVisible()
   })
 
   it('reports auth exactly once when the mount probe races a fresh sign-in', async () => {
@@ -175,25 +173,22 @@ describe('GithubAuthStep', () => {
     // onAuthed, so the late probe must be swallowed, not start a second run.
     fakeKeychain({ 'github-auth': JSON.stringify({ kind: 'pat', token: 'ghp_old' }) })
     let resolveProbe: (response: Response) => void = () => {}
-    httpFetch.mockImplementationOnce(
-      () => new Promise<Response>((resolve) => (resolveProbe = resolve)),
-    )
-    httpFetch.mockImplementation(
-      async () =>
-        new Response(JSON.stringify({ login: 'alex' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-    )
+    let probes = 0
+    http.on('GET', USER_URL, () => {
+      probes += 1
+      return probes === 1
+        ? new Promise<Response>((resolve) => (resolveProbe = resolve))
+        : Response.json({ login: 'alex' })
+    })
     const onAuthed = vi.fn()
-    render(<GithubAuthStep onAuthed={onAuthed} />)
+    await renderStep(<GithubAuthStep onAuthed={onAuthed} />)
     await switchToPat()
 
-    fireEvent.change(screen.getByLabelText('Personal access token'), {
+    fireEvent.change(page.getByLabelText('Personal access token'), {
       target: { value: 'github_pat_new' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Save token' }))
-    await waitFor(() => expect(onAuthed).toHaveBeenCalledTimes(1))
+    await userEvent.click(page.getByRole('button', { name: 'Save token' }))
+    await vi.waitFor(() => expect(onAuthed).toHaveBeenCalledTimes(1))
 
     // The old credential turns out valid too — its late arrival must not
     // re-fire the step's completion.
@@ -208,56 +203,52 @@ describe('GithubAuthStep', () => {
   })
 
   it('copies the code to the clipboard before opening GitHub', async () => {
-    const writeText = vi.fn(async () => {})
-    stubClipboard(writeText)
+    const writeText = vi.spyOn(clipboard, 'writeText')
     await renderCodeView()
 
     // GitHub's page asks for the code immediately, so the browser must not
     // open (and steal focus from the visible code) until it's in hand.
     expect(openedUrls).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy code and open GitHub' }))
+    await userEvent.click(page.getByRole('button', { name: 'Copy code and open GitHub' }))
 
-    await waitFor(() =>
-      expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device'),
-    )
+    await vi.waitFor(() => {
+      expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device')
+    })
     expect(writeText).toHaveBeenCalledWith('ABCD-1234')
     expect(writeText.mock.invocationCallOrder[0]!).toBeLessThan(
       openedUrls.mock.invocationCallOrder[0]!,
     )
-    expect(await screen.findByText(/code copied/i)).toBeTruthy()
+    await expect.element(page.getByText(/code copied/i)).toBeVisible()
   })
 
   it('surfaces the device URL when the browser cannot be opened', async () => {
     // The handoff URL appears only on failure — it is the one way left to
     // reach the page asking for the code.
-    stubClipboard(vi.fn(async () => {}))
     openedUrls.mockRejectedValueOnce(new Error('no handler for https'))
     await renderCodeView()
-    expect(screen.queryByText(/login\/device/)).toBeNull()
+    await expect.element(page.getByText(/login\/device/)).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy code and open GitHub' }))
+    await userEvent.click(page.getByRole('button', { name: 'Copy code and open GitHub' }))
 
-    expect(
-      await screen.findByText(/visit https:\/\/github\.com\/login\/device yourself/i),
-    ).toBeTruthy()
+    await expect
+      .element(page.getByText(/visit https:\/\/github\.com\/login\/device yourself/i))
+      .toBeVisible()
   })
 
   it('holds the GitHub handoff when the clipboard is unavailable', async () => {
-    stubClipboard(async () => {
-      throw new Error('denied')
-    })
+    clipboard.failWith(new Error('denied'))
     await renderCodeView()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy code and open GitHub' }))
+    await userEvent.click(page.getByRole('button', { name: 'Copy code and open GitHub' }))
 
     // The user is told to copy by hand first; only then does GitHub open.
-    expect(await screen.findByText(/select the code above/i)).toBeTruthy()
+    await expect.element(page.getByText(/select the code above/i)).toBeVisible()
     expect(openedUrls).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open GitHub' }))
-    await waitFor(() =>
-      expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device'),
-    )
+    await userEvent.click(page.getByRole('button', { name: 'Open GitHub' }))
+    await vi.waitFor(() => {
+      expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device')
+    })
   })
 })

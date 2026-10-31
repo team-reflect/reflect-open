@@ -58,10 +58,17 @@ which covers the iOS keychain), the Kysely-over-IPC read layer, all of
 
 - **Keyboard:** the webview is pushed off-screen instead of resized when the
   iOS keyboard opens ([tauri#9907](https://github.com/tauri-apps/tauri/issues/9907),
-  open since 2024); `visualViewport` doesn't reflect keyboard height. There is
-  no official keyboard plugin (Capacitor has a mature one). We must ship a
-  small first-party Swift plugin (keyboard notifications → webview insets +
-  height events). This is the single biggest gap and is budgeted in Plan 19.
+  open since 2024). There is no official keyboard plugin (Capacitor has a
+  mature one), so we ship a small first-party Swift plugin that pins the
+  webview (inset adjustment off, scroll offset held at zero). With the page
+  pinned, `visualViewport` reflects the keyboard exactly (verified on iOS
+  18.4/26.5, iPhone and iPad; an earlier note here claimed otherwise): its
+  `resize` fires at the end of the keyboard animation, ~240ms after the
+  native notification, and carries no duration. `--keyboard-height` is
+  derived from it in `use-keyboard.ts`; the plugin's original native event
+  bridge was removed. Known OS bug: iOS 26.0 leaves the viewport stale after
+  dismissal ([forums 800125](https://developer.apple.com/forums/thread/800125),
+  fixed in 26.1); a focusout watchdog resets the variable.
 - **Lifecycle:** iOS kills the WebContent process in the background; apps must
   handle resume-with-dead-webview ([tauri#14371](https://github.com/tauri-apps/tauri/issues/14371),
   fixed upstream — verify the fix is in our pinned version). iOS suspends the

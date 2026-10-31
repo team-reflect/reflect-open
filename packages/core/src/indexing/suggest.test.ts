@@ -1,23 +1,25 @@
 import { describe, expect, it } from 'vitest'
+import { parseNote } from '../markdown/index.ts'
+import { foldKey } from '../markdown/keys.ts'
 import {
+  aliasHint,
+  isWikiLinkSafeText,
   mergeDateSuggestions,
   rankWikiSuggestions,
+  serializeWikiSuggestionAddress,
   type AliasCandidate,
   type TitleCandidate,
   type WikiSuggestion,
-} from './suggest'
+} from './suggest.ts'
 
-function note(
-  title: string,
-  mtime = 0,
-  extra?: Partial<TitleCandidate>,
-): TitleCandidate {
+function note(title: string, mtime = 0, extra?: Partial<TitleCandidate>): TitleCandidate {
   return {
     path: `notes/${title.toLowerCase().replaceAll(' ', '-')}.md`,
     title,
     titleKey: title.toLowerCase(),
     dailyDate: null,
     mtime,
+    linkCount: 0,
     ...extra,
   }
 }
@@ -27,6 +29,77 @@ function alias(target: TitleCandidate, aliasText: string): AliasCandidate {
 }
 
 describe('rankWikiSuggestions', () => {
+  it('ranks the more-linked note first inside a match rank', () => {
+    const result = rankWikiSuggestions(
+      'project',
+      [note('Project Rare', 900), note('Project Used', 1, { linkCount: 12 })],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Project Used', 'Project Rare'])
+  })
+
+  it('keeps an exact match above a more-linked partial match', () => {
+    const result = rankWikiSuggestions(
+      'ada',
+      [note('Ada Lovelace Notes', 900, { linkCount: 99 }), note('Ada', 1)],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Ada', 'Ada Lovelace Notes'])
+  })
+
+  it('breaks ties inside a usage bucket on recency', () => {
+    const result = rankWikiSuggestions(
+      'project',
+      [note('Project Older', 1, { linkCount: 7 }), note('Project Newer', 900, { linkCount: 4 })],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Project Newer', 'Project Older'])
+  })
+
+  it('ranks a more-linked alias hit above an unlinked title hit', () => {
+    const john = note('John Smith', 1, { linkCount: 40 })
+    const result = rankWikiSuggestions(
+      'johnn',
+      [note('Johnnie Walker Tasting', 900)],
+      [alias(john, 'Johnny')],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['John Smith', 'Johnnie Walker Tasting'])
+  })
+
+  it('ranks a word-start match above a mid-word match', () => {
+    const result = rankWikiSuggestions(
+      'smith',
+      [note('Blacksmithing', 900), note('John Smith', 1)],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['John Smith', 'Blacksmithing'])
+  })
+
+  it('treats a later word start like a title start', () => {
+    const result = rankWikiSuggestions(
+      'smith',
+      [note('Smithsonian Trip', 900), note('John Smith', 1, { linkCount: 40 })],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['John Smith', 'Smithsonian Trip'])
+  })
+
+  it('finds a word start after punctuation', () => {
+    const result = rankWikiSuggestions(
+      'beta',
+      [note('Alphabeta', 900), note('Launch (Beta)', 1)],
+      [],
+      8,
+    )
+    expect(result.map((s) => s.title)).toEqual(['Launch (Beta)', 'Alphabeta'])
+  })
+
   it('orders exact before prefix before substring', () => {
     const result = rankWikiSuggestions(
       'meet',
@@ -77,6 +150,74 @@ describe('rankWikiSuggestions', () => {
   it('honours the limit after merging', () => {
     const titles = Array.from({ length: 10 }, (_, i) => note(`Note ${i}`, i))
     expect(rankWikiSuggestions('note', titles, [], 3)).toHaveLength(3)
+  })
+})
+
+describe('aliasHint', () => {
+  it('names the alias unless it only repeats the displayed title', () => {
+    expect(aliasHint({ alias: 'Dad', title: 'Tim MacCaw // Dad' })).toBe('Dad')
+    expect(aliasHint({ alias: 'tim maccaw', title: 'Tim MacCaw // Dad' })).toBeNull()
+    expect(aliasHint({ alias: null, title: 'Tim MacCaw // Dad' })).toBeNull()
+  })
+})
+
+describe('isWikiLinkSafeText', () => {
+  it('accepts ordinary title text', () => {
+    expect(isWikiLinkSafeText('Meeting with Ada')).toBe(true)
+    expect(isWikiLinkSafeText('')).toBe(true)
+  })
+
+  it('rejects every character that would corrupt a link, backslash included', () => {
+    for (const text of ['a[b', 'a]b', 'a|b', String.raw`a\b`, 'a\rb', 'a\nb']) {
+      expect(isWikiLinkSafeText(text)).toBe(false)
+    }
+  })
+})
+
+describe('wiki suggestion serialization', () => {
+  it('preserves an alias as display text while targeting the canonical note', () => {
+    const suggestion = rankWikiSuggestions(
+      'dad',
+      [],
+      [alias(note('Tim MacCaw // Dad'), 'Dad')],
+      8,
+    )[0]!
+
+    const insertText = serializeWikiSuggestionAddress(suggestion.target, suggestion.alias)
+    expect(insertText).toBe('Tim MacCaw // Dad|Dad')
+    expect(parseNote({ path: 'notes/source.md', source: `[[${insertText}]]` }).wikiLinks).toEqual([
+      expect.objectContaining({ target: 'Tim MacCaw // Dad', alias: 'Dad' }),
+    ])
+  })
+
+  it('round-trips every accepted target and display value exactly', () => {
+    const accepted = [
+      { target: 'Road.map!', display: null },
+      { target: 'Tim MacCaw // Dad', display: 'D.ad!?' },
+      { target: 'Café — plans', display: '計画' },
+    ]
+    for (const { target, display } of accepted) {
+      const insertText = serializeWikiSuggestionAddress(target, display)
+      expect(insertText).not.toBeNull()
+      const links = parseNote({
+        path: 'notes/source.md',
+        source: `[[${insertText}]]`,
+      }).wikiLinks
+      expect(links).toHaveLength(1)
+      expect(links[0]!.target).toBe(target)
+      expect(links[0]!.alias ?? null).toBe(display)
+    }
+  })
+
+  it('rejects every unescaped wiki-link delimiter in targets and display text', () => {
+    for (const reserved of ['[', ']', '|', '\\', '\r', '\n']) {
+      expect(serializeWikiSuggestionAddress(`Road${reserved}map`, null)).toBeNull()
+      expect(serializeWikiSuggestionAddress('Roadmap', `Plan${reserved}`)).toBeNull()
+    }
+  })
+
+  it('rejects a blank target rather than inserting an empty link', () => {
+    expect(serializeWikiSuggestionAddress('   ', null)).toBeNull()
   })
 })
 
@@ -155,5 +296,56 @@ describe('mergeDateSuggestions', () => {
     })
     expect(result).toHaveLength(5)
     expect(result[0]!.target).toBe('2020-01-02')
+  })
+})
+
+describe('rankWikiSuggestions — rich titles', () => {
+  const rich = note('Meeting with [[Ada Lovelace|Ada]]', 0, {
+    path: 'notes/meeting.md',
+  })
+
+  it('targets the linkable form while the title stays raw', () => {
+    const [row] = rankWikiSuggestions('meeting', [rich], [], 8)
+    expect(row).toMatchObject({
+      target: 'Meeting with Ada',
+      title: 'Meeting with [[Ada Lovelace|Ada]]',
+      alias: null,
+    })
+  })
+
+  it('folds the derived alias row into a plain suggestion (no self-alias)', () => {
+    const derived = alias(rich, 'Meeting with Ada')
+    const [row] = rankWikiSuggestions('meeting with ada', [], [derived], 8)
+    expect(row).toMatchObject({ target: 'Meeting with Ada', alias: null })
+  })
+
+  it('keeps a real alias as display text on a rich-title note', () => {
+    const standup = alias(rich, 'Standup')
+    const [row] = rankWikiSuggestions('standup', [], [standup], 8)
+    expect(row).toMatchObject({ target: 'Meeting with Ada', alias: 'Standup' })
+  })
+
+  it('keeps an authored alias that differs from the target only by case', () => {
+    const plain = note('Meeting with Ada', 0, { path: 'notes/meeting.md' })
+    const authored = alias(plain, 'meeting with ada')
+    const [row] = rankWikiSuggestions('meeting with ada', [], [authored], 8)
+    expect(row).toMatchObject({ target: 'Meeting with Ada', alias: 'meeting with ada' })
+  })
+})
+
+describe('mergeDateSuggestions — rich titles', () => {
+  it('an exact raw-title hit keeps the top slot ahead of generated dates', () => {
+    const [ranked] = rankWikiSuggestions(
+      foldKey('3 days ago [[Trip]]'),
+      [note('3 days ago [[Trip]]')],
+      [],
+      8,
+    )
+    const merged = mergeDateSuggestions([ranked!], [{ date: '2026-07-14', phrase: '3 days ago' }], {
+      key: foldKey('3 days ago [[Trip]]'),
+      limit: 8,
+    })
+    expect(merged[0]).toBe(ranked)
+    expect(merged[1]).toMatchObject({ date: '2026-07-14' })
   })
 })

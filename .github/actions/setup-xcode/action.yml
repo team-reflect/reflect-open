@@ -1,0 +1,28 @@
+# Run before setup-rust, which keys its cache on `xcrun clang`.
+name: Set up Xcode
+description: Select a fixed Xcode version
+inputs:
+  version:
+    description: Xcode version
+    required: false
+    default: '27.1'
+runs:
+  using: composite
+  steps:
+    - name: List installed Xcode versions
+      shell: bash
+      run: ls -d /Applications/Xcode*.app
+
+    - name: Print the Xcode version before
+      shell: bash
+      run: xcodebuild -version
+
+    - name: Select Xcode ${{ inputs.version }}
+      shell: bash
+      env:
+        XCODE_VERSION: ${{ inputs.version }}
+      run: sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+
+    - name: Print the Xcode version after
+      shell: bash
+      run: xcodebuild -version

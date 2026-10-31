@@ -1,276 +1,277 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '../ipc/bridge'
-import type { FileChange } from './file-changes'
-import { subscribeIndexApplied } from './index-applied'
-import { applyIndexChanges, subscribeIndexChanges } from './live'
+import { AppError } from '../errors.ts'
+import { createTestXArchiveService } from '../testing/capture.ts'
+import { createTestClockService } from '../testing/clock.ts'
+import { createNodeTestDatabaseService, seedNotes, type TestNote } from '../testing/database.ts'
+import { createTestFileChangeService } from '../testing/file-change.ts'
+import { createTestNoteFileService } from '../testing/graph.ts'
+import { createTestIndexStoreService } from '../testing/index-store.ts'
+import { createTestLoggerService } from '../testing/logger.ts'
+import type { FileChange } from './file-change-service.ts'
+import { createIndexQueryService } from './index-query-service.ts'
+import type { ChangesAppliedEmitter } from './indexer.ts'
+import { createLiveIndex } from './live.ts'
+
+const databases: { close(): void }[] = []
 
 afterEach(() => {
-  setBridge(null)
+  for (const database of databases.splice(0)) {
+    database.close()
+  }
 })
 
-/** Bridge fake recording invokes; `listen` hands the emitter back to the test. */
-function fakeBridge(invoke: (command: string, args: Record<string, unknown>) => Promise<unknown>) {
-  let emit: ((payload: unknown) => void) | null = null
-  setBridge({
-    invoke,
-    listen: async (_event, handler) => {
-      emit = handler
-      return () => {
-        emit = null
+/**
+ * The file generation of the test graph; the note file double rejects reads at any other.
+ */
+const FILE_GENERATION = 5
+
+/**
+ * A live index over test doubles. `read` stands in front of the note files:
+ * it runs before each read and may delay or reject it.
+ */
+function setup(options?: {
+  files?: Readonly<Record<string, string>>
+  indexed?: readonly TestNote[]
+  read?: (path: string) => Promise<void>
+}) {
+  const database = createNodeTestDatabaseService()
+  databases.push(database)
+  seedNotes(database, options?.indexed ?? [])
+  const store = createTestIndexStoreService()
+  const files = createTestNoteFileService({
+    files: options?.files ?? {},
+    generation: FILE_GENERATION,
+  })
+  const fileChanges = createTestFileChangeService()
+  const logger = createTestLoggerService()
+  const reads: string[] = []
+  const readFile = files.read.bind(files)
+  vi.spyOn(files, 'read').mockImplementation(async (path, generation) => {
+    reads.push(path)
+    await options?.read?.(path)
+    return await readFile(path, generation)
+  })
+  const appliedListeners = new Set<ChangesAppliedEmitter>()
+  /**
+   * Listen for the batches the live index reports as applied.
+   */
+  function subscribeIndexApplied(listener: ChangesAppliedEmitter): () => void {
+    appliedListeners.add(listener)
+    return () => {
+      appliedListeners.delete(listener)
+    }
+  }
+  const liveIndex = createLiveIndex({
+    emitChangesApplied: (changes, generation) => {
+      for (const listener of appliedListeners) {
+        listener(changes, generation)
       }
     },
+    indexStore: store,
+    noteFile: files,
+    fileChanges,
+    indexQuery: createIndexQueryService({ database }),
+    database,
+    xArchive: createTestXArchiveService(),
+    clock: createTestClockService({ now: 1_750_000_000_000 }),
+    logger,
   })
-  return { emitChanges: (payload: unknown) => emit?.(payload) }
+  /**
+   * The index writes so far, as `apply:<path>` / `remove:<path>` in call order.
+   */
+  function writes(): string[] {
+    const log: string[] = []
+    for (const call of store.calls()) {
+      if (call.method === 'applyBatch') {
+        log.push(...call.notes.map((note) => `apply:${note.path}`))
+      } else if (call.method === 'remove') {
+        log.push(`remove:${call.path}`)
+      }
+    }
+    return log
+  }
+  function emit(changes: FileChange[]): void {
+    fileChanges.emit({ changes, source: 'external' })
+  }
+  return { liveIndex, store, files, logger, reads, writes, emit, subscribeIndexApplied }
 }
 
-describe('applyIndexChanges', () => {
+describe('LiveIndex.apply', () => {
   it('reports a failing change and continues with the rest of the batch', async () => {
-    const applied: string[] = []
-    fakeBridge(async (command, args) => {
-      if (command === 'note_read') {
-        if (args['path'] === 'notes/bad.md') {
-          throw { kind: 'io', message: 'unreadable' }
+    const { liveIndex, writes } = setup({
+      files: { 'notes/bad.md': '# bad', 'notes/good.md': '# ok' },
+      read: (path) => {
+        if (path === 'notes/bad.md') {
+          return Promise.reject(new AppError('io', 'unreadable'))
         }
-        return '# ok'
-      }
-      if (command === 'index_apply_batch') {
-        applied.push(...(args['notes'] as Array<{ path: string }>).map((note) => note.path))
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      return null
+        return Promise.resolve()
+      },
     })
 
     const failures: Array<{ change: FileChange }> = []
-    await applyIndexChanges(
+    await liveIndex.apply(
       [
         { path: 'notes/bad.md', kind: 'upsert' },
         { path: 'notes/good.md', kind: 'upsert' },
       ],
       3,
-      (_error, change) => failures.push({ change }),
+      FILE_GENERATION,
+      (_error, change) => {
+        failures.push({ change })
+      },
     )
 
-    expect(applied).toEqual(['notes/good.md'])
+    expect(writes()).toEqual(['apply:notes/good.md'])
     expect(failures.map((failure) => failure.change.path)).toEqual(['notes/bad.md'])
   })
 
-  it('routes removes to index_remove at the given generation', async () => {
-    const calls: Array<[string, Record<string, unknown>]> = []
-    fakeBridge(async (command, args) => {
-      calls.push([command, args])
-      return null
-    })
+  it('logs a failing change when no error handler is given', async () => {
+    const { liveIndex, logger } = setup()
 
-    await applyIndexChanges([{ path: 'notes/gone.md', kind: 'remove' }], 9)
-    expect(calls).toEqual([['index_remove', { path: 'notes/gone.md', generation: 9 }]])
+    await liveIndex.apply([{ path: 'notes/missing.md', kind: 'upsert' }], 3, FILE_GENERATION)
+
+    expect(logger.getErrors().map((entry) => entry.message)).toEqual([
+      'failed to index change for notes/missing.md:',
+    ])
+  })
+
+  it('routes removes to the index store at the given generation', async () => {
+    const { liveIndex, store } = setup()
+
+    await liveIndex.apply([{ path: 'notes/gone.md', kind: 'remove' }], 9, FILE_GENERATION)
+
+    expect(store.calls()).toEqual([{ method: 'remove', path: 'notes/gone.md', generation: 9 }])
   })
 
   it('applies an upsert(x) … remove(x) sequence in order — the remove wins', async () => {
-    const order: string[] = []
-    fakeBridge(async (command, args) => {
-      if (command === 'note_read') {
-        return '# recreated then deleted'
-      }
-      if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
-      }
-      if (command === 'index_remove') {
-        order.push(`remove:${String(args['path'])}`)
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      return null
-    })
+    const { liveIndex, writes } = setup({ files: { 'notes/x.md': '# recreated then deleted' } })
 
-    await applyIndexChanges(
+    await liveIndex.apply(
       [
         { path: 'notes/x.md', kind: 'upsert', modifiedMs: 42 },
         { path: 'notes/x.md', kind: 'remove' },
       ],
       9,
+      FILE_GENERATION,
     )
 
     // The batched upsert must flush before the remove — a remove overtaken by
     // its own earlier upsert would resurrect a deleted note as a ghost row.
-    expect(order).toEqual(['apply:notes/x.md', 'remove:notes/x.md'])
+    expect(writes()).toEqual(['apply:notes/x.md', 'remove:notes/x.md'])
   })
 
   it('skips non-note paths — the watcher also reports audio-memo recordings', async () => {
-    const invoked: string[] = []
-    fakeBridge(async (command) => {
-      invoked.push(command)
-      return command === 'note_read' ? '# ok' : null
-    })
+    const { liveIndex, store, reads } = setup()
 
-    await applyIndexChanges(
+    await liveIndex.apply(
       [
         { path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'upsert' },
         { path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'remove' },
       ],
       3,
+      FILE_GENERATION,
     )
 
-    expect(invoked).toEqual([])
+    expect(store.calls()).toEqual([])
+    expect(reads).toEqual([])
   })
 })
 
-describe('subscribeIndexChanges', () => {
+describe('LiveIndex.subscribe', () => {
   it('serializes overlapping batches so later events cannot overtake earlier ones', async () => {
-    const order: string[] = []
-    let releaseFirstRead: () => void = () => {}
-    const { emitChanges } = fakeBridge(async (command, args) => {
-      if (command === 'note_read') {
-        order.push(`read:${String(args['path'])}`)
-        if (args['path'] === 'notes/slow.md') {
-          await new Promise<void>((resolve) => {
-            releaseFirstRead = resolve
-          })
+    const pendingFirstRead = Promise.withResolvers<void>()
+    const { liveIndex, reads, writes, emit } = setup({
+      files: { 'notes/slow.md': '# content', 'notes/fast.md': '# content' },
+      read: async (path) => {
+        if (path === 'notes/slow.md') {
+          await pendingFirstRead.promise
         }
-        return '# content'
-      }
-      if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      return null
+      },
     })
 
-    await subscribeIndexChanges(1)
-    emitChanges([{ path: 'notes/slow.md', kind: 'upsert' }])
-    emitChanges([{ path: 'notes/fast.md', kind: 'upsert' }])
+    liveIndex.subscribe(1, FILE_GENERATION)
+    emit([{ path: 'notes/slow.md', kind: 'upsert' }])
+    emit([{ path: 'notes/fast.md', kind: 'upsert' }])
     await vi.waitFor(() => {
-      expect(order).toContain('read:notes/slow.md')
+      expect(reads).toContain('notes/slow.md')
     })
     // The second batch must not start while the first is still applying.
-    expect(order).not.toContain('read:notes/fast.md')
+    expect(reads).not.toContain('notes/fast.md')
 
-    releaseFirstRead()
+    pendingFirstRead.resolve()
     await vi.waitFor(() => {
-      expect(order).toContain('apply:notes/fast.md')
+      expect(writes()).toContain('apply:notes/fast.md')
     })
-    expect(order).toEqual([
-      'read:notes/slow.md',
-      'apply:notes/slow.md',
-      'read:notes/fast.md',
-      'apply:notes/fast.md',
-    ])
+    expect(reads).toEqual(['notes/slow.md', 'notes/fast.md'])
+    expect(writes()).toEqual(['apply:notes/slow.md', 'apply:notes/fast.md'])
   })
 
   it('drops queued live writes when the lifecycle suspends and leaves replay to reconcile', async () => {
-    const order: string[] = []
     let canApply = true
-    let releaseRead: () => void = () => {}
-    const { emitChanges } = fakeBridge(async (command, args) => {
-      if (command === 'note_read') {
-        order.push(`read:${String(args['path'])}`)
-        await new Promise<void>((resolve) => {
-          releaseRead = resolve
-        })
-        order.push(`read-finished:${String(args['path'])}`)
-      }
-      if (command === 'index_apply_batch') {
-        order.push('apply')
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      return command === 'note_read' ? '# content' : null
+    const pendingRead = Promise.withResolvers<void>()
+    const finished: string[] = []
+    const { liveIndex, reads, writes, emit } = setup({
+      files: { 'notes/started-visible.md': '# content', 'notes/queued.md': '# content' },
+      read: async (path) => {
+        await pendingRead.promise
+        finished.push(path)
+      },
     })
 
-    await subscribeIndexChanges(1, undefined, undefined, () => canApply)
-    emitChanges([{ path: 'notes/started-visible.md', kind: 'upsert' }])
-    emitChanges([{ path: 'notes/queued.md', kind: 'upsert' }])
-    await vi.waitFor(() => expect(order).toContain('read:notes/started-visible.md'))
+    liveIndex.subscribe(1, FILE_GENERATION, undefined, () => canApply)
+    emit([{ path: 'notes/started-visible.md', kind: 'upsert' }])
+    emit([{ path: 'notes/queued.md', kind: 'upsert' }])
+    await vi.waitFor(() => expect(reads).toContain('notes/started-visible.md'))
 
     canApply = false
-    releaseRead()
-    await vi.waitFor(() => expect(order).toContain('read-finished:notes/started-visible.md'))
+    pendingRead.resolve()
+    await vi.waitFor(() => expect(finished).toContain('notes/started-visible.md'))
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     // The first batch had begun reading while visible, but did not start its
     // SQLite write after suspension. The second never began at all; the
     // foreground full reconcile is the durable replay path for both.
-    expect(order).not.toContain('apply')
-    expect(order).not.toContain('read:notes/queued.md')
-  })
-
-  it('fires onApplied only after the batch has been written to the index', async () => {
-    const order: string[] = []
-    const { emitChanges } = fakeBridge(async (command, args) => {
-      if (command === 'note_read') {
-        return '# content'
-      }
-      if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      return null
-    })
-
-    await subscribeIndexChanges(1, (changes) => {
-      order.push(`applied:${changes.map((change) => change.path).join(',')}`)
-    })
-    // A recordings-only batch never reaches the queue or onApplied; a mixed
-    // batch applies (and reports) only its notes.
-    emitChanges([{ path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'upsert' }])
-    emitChanges([
-      { path: 'notes/a.md', kind: 'upsert' },
-      { path: 'audio-memos/audio-memo-2026-06-12-091500-000.m4a', kind: 'upsert' },
-    ])
-    await vi.waitFor(() => {
-      expect(order).toContain('applied:notes/a.md')
-    })
-    expect(order).toEqual(['apply:notes/a.md', 'applied:notes/a.md'])
+    expect(writes()).toEqual([])
+    expect(reads).not.toContain('notes/queued.md')
   })
 
   it('emits index-applied to subscribers after the batch is written — notes settle first', async () => {
     const order: string[] = []
-    const { emitChanges } = fakeBridge(async (command, args) => {
-      if (command === 'note_read') {
-        return '# content'
-      }
-      if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      return null
+    const { liveIndex, writes, emit, subscribeIndexApplied } = setup({
+      files: { 'notes/a.md': '# content' },
     })
     const unsubscribe = subscribeIndexApplied((changes) => {
-      order.push(`applied:${changes.map((change) => change.path).join(',')}`)
+      order.push(
+        `applied:${changes.map((change) => change.path).join(',')} after ${writes().join(',')}`,
+      )
     })
 
-    await subscribeIndexChanges(1)
+    liveIndex.subscribe(1, FILE_GENERATION)
     // A note batch, then an asset-only batch: the asset emit must follow the
     // note's apply, so a gate reading the index off the asset emit sees the note.
-    emitChanges([{ path: 'notes/a.md', kind: 'upsert' }])
-    emitChanges([{ path: 'assets/x.png', kind: 'upsert' }])
+    emit([{ path: 'notes/a.md', kind: 'upsert' }])
+    emit([{ path: 'assets/x.png', kind: 'upsert' }])
     await vi.waitFor(() => {
-      expect(order).toContain('applied:assets/x.png')
+      expect(order).toHaveLength(2)
     })
 
-    expect(order).toEqual(['apply:notes/a.md', 'applied:notes/a.md', 'applied:assets/x.png'])
+    expect(order).toEqual([
+      'applied:notes/a.md after apply:notes/a.md',
+      'applied:assets/x.png after apply:notes/a.md',
+    ])
     unsubscribe()
   })
 
   it('does not emit index-applied for a recordings-only batch', async () => {
     const seen: string[] = []
-    const { emitChanges } = fakeBridge(async () => null)
+    const { liveIndex, emit, subscribeIndexApplied } = setup()
     const unsubscribe = subscribeIndexApplied((changes) => {
       seen.push(changes.map((change) => change.path).join(','))
     })
 
-    await subscribeIndexChanges(1)
-    emitChanges([{ path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'upsert' }])
-    emitChanges([{ path: 'assets/y.png', kind: 'upsert' }]) // something to wait on
+    liveIndex.subscribe(1, FILE_GENERATION)
+    emit([{ path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'upsert' }])
+    emit([{ path: 'assets/y.png', kind: 'upsert' }]) // something to wait on
     await vi.waitFor(() => {
       expect(seen).toContain('assets/y.png')
     })
@@ -280,159 +281,120 @@ describe('subscribeIndexChanges', () => {
   })
 
   it('stamps the indexed row with the modifiedMs carried by the event', async () => {
-    const mtimes: number[] = []
-    const { emitChanges } = fakeBridge(async (command, args) => {
-      if (command === 'note_read') {
-        return '# content'
-      }
-      if (command === 'index_apply_batch') {
-        mtimes.push(...(args['notes'] as Array<{ mtime: number }>).map((note) => note.mtime))
-      }
-      if (command === 'db_query') {
-        return []
-      }
-      return null
-    })
+    const { liveIndex, store, emit } = setup({ files: { 'notes/a.md': '# content' } })
 
-    await subscribeIndexChanges(1)
-    emitChanges([{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1234 }])
+    liveIndex.subscribe(1, FILE_GENERATION)
+    emit([{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1234 }])
     await vi.waitFor(() => {
-      expect(mtimes).toEqual([1234])
+      expect(store.applied().map((note) => note.mtime)).toEqual([1234])
     })
   })
 
-  it('drops malformed payloads instead of applying them', async () => {
-    const calls: string[] = []
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const { emitChanges } = fakeBridge(async (command) => {
-        calls.push(command)
-        return null
-      })
-      await subscribeIndexChanges(1)
-      emitChanges({ not: 'an array' })
-      emitChanges([{ path: 1, kind: 'upsert' }])
-      await Promise.resolve()
-      expect(calls).toEqual([])
-      expect(errorSpy).toHaveBeenCalled()
-    } finally {
-      errorSpy.mockRestore()
-    }
+  it('stops applying once unsubscribed', async () => {
+    const { liveIndex, store, reads, emit } = setup({ files: { 'notes/a.md': '# content' } })
+
+    liveIndex.subscribe(1, FILE_GENERATION)()
+    emit([{ path: 'notes/a.md', kind: 'upsert' }])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(reads).toEqual([])
+    expect(store.calls()).toEqual([])
   })
 })
 
-describe('applyIndexChanges move healing (Plan 17)', () => {
+describe('LiveIndex.apply move healing (Plan 17)', () => {
   const OLD = 'notes/01arz3ndektsv4rrffq69g5fav.md'
   const NEW = 'notes/meeting-notes.md'
   const CONTENT = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n'
 
-  /** Bridge where OLD is indexed (with the id) and NEW exists on disk. */
-  function renameBridge(options?: { rowId?: string | null }) {
-    const calls: Array<[string, Record<string, unknown>]> = []
-    fakeBridge(async (command, args) => {
-      calls.push([command, args])
-      if (command === 'note_read') {
-        if (args['path'] === NEW) {
-          return CONTENT
-        }
-        throw { kind: 'notFound', message: 'missing' }
-      }
-      if (command === 'db_query') {
-        const params = (args['params'] as unknown[]) ?? []
-        if (params.includes(OLD)) {
-          return [{ path: OLD, id: options?.rowId === undefined ? '01abcdefghjkmnpqrstvwxyz00' : options.rowId }]
-        }
-        return [] // the upsert path is not indexed
-      }
-      return null
+  /**
+   * OLD is indexed (with the id, unless `rowContent` says otherwise) and NEW exists on disk.
+   */
+  function setupRename(options?: { rowContent?: string }) {
+    return setup({
+      files: { [NEW]: CONTENT },
+      indexed: [{ path: OLD, markdown: options?.rowContent ?? CONTENT }],
     })
-    return calls
   }
 
   it('heals a same-batch external rename: rows move, nothing is removed', async () => {
-    const calls = renameBridge()
+    const { liveIndex, store } = setupRename()
 
-    await applyIndexChanges(
+    await liveIndex.apply(
       [
         { path: OLD, kind: 'remove' },
         { path: NEW, kind: 'upsert', modifiedMs: 42 },
       ],
       7,
+      FILE_GENERATION,
     )
 
-    const commands = calls.map(([command]) => command)
-    expect(commands).toContain('index_move')
-    expect(commands).not.toContain('index_remove')
-    const move = calls.find(([command]) => command === 'index_move')
-    expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 7 })
-    const apply = calls.find(([command]) => command === 'index_apply')
+    expect(store.calls().filter((call) => call.method === 'move')).toEqual([
+      { method: 'move', from: OLD, to: NEW, generation: 7 },
+    ])
+    expect(store.removed()).toEqual([])
+    const apply = store.calls().find((call) => call.method === 'apply')
     expect(apply).toBeDefined()
-    if (apply === undefined) {
+    if (apply?.method !== 'apply') {
       throw new Error('Expected rename heal to apply the renamed note')
     }
-    const note = apply[1]['note'] as { path: string; mtime: number }
-    expect(note.path).toBe(NEW)
-    expect(note.mtime).toBe(42)
+    expect(apply.note.path).toBe(NEW)
+    expect(apply.note.mtime).toBe(42)
   })
 
   it('announces the heal via onMoved so the app can follow', async () => {
-    renameBridge()
+    const { liveIndex } = setupRename()
     const moves: Array<[string, string]> = []
 
-    await applyIndexChanges(
+    await liveIndex.apply(
       [
         { path: OLD, kind: 'remove' },
         { path: NEW, kind: 'upsert' },
       ],
       7,
+      FILE_GENERATION,
       undefined,
-      (from, to) => moves.push([from, to]),
+      (from, to) => {
+        moves.push([from, to])
+      },
     )
 
     expect(moves).toEqual([[OLD, NEW]])
   })
 
   it('falls back to delete+create when the ids do not match', async () => {
-    const calls = renameBridge({ rowId: 'completely-different-id' })
+    const { liveIndex, store, writes } = setupRename({
+      rowContent: '---\nid: 01zzzzzzzzzzzzzzzzzzzzzzzz\n---\n# Meeting Notes\n',
+    })
 
-    await applyIndexChanges(
+    await liveIndex.apply(
       [
         { path: OLD, kind: 'remove' },
         { path: NEW, kind: 'upsert' },
       ],
       7,
+      FILE_GENERATION,
     )
 
-    const commands = calls.map(([command]) => command)
-    expect(commands).not.toContain('index_move')
-    expect(commands).toContain('index_remove')
-    expect(commands).toContain('index_apply_batch')
+    expect(store.moved()).toEqual([])
+    expect(writes()).toEqual([`remove:${OLD}`, `apply:${NEW}`])
   })
 
   it("Reflect's own move echo never pairs: the removed side has no row left", async () => {
-    const calls: Array<[string, Record<string, unknown>]> = []
-    fakeBridge(async (command, args) => {
-      calls.push([command, args])
-      if (command === 'note_read') {
-        return CONTENT
-      }
-      if (command === 'db_query') {
-        return [] // neither path has a row under the old key (already moved)
-      }
-      return null
-    })
+    // Neither path has a row under the old key (already moved).
+    const { liveIndex, store, writes } = setup({ files: { [NEW]: CONTENT } })
 
-    await applyIndexChanges(
+    await liveIndex.apply(
       [
         { path: OLD, kind: 'remove' },
         { path: NEW, kind: 'upsert' },
       ],
       7,
+      FILE_GENERATION,
     )
 
-    const commands = calls.map(([command]) => command)
-    expect(commands).not.toContain('index_move')
-    expect(commands).toContain('index_remove') // no-op against a moved row
-    expect(commands).toContain('index_apply_batch') // idempotent re-apply
+    expect(store.moved()).toEqual([])
+    // The remove no-ops against a moved row; the re-apply is idempotent.
+    expect(writes()).toEqual([`remove:${OLD}`, `apply:${NEW}`])
   })
 })

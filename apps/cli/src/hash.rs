@@ -1,6 +1,7 @@
 //! Content hashing — the Rust mirror of `packages/core/src/indexing/hash.ts`.
-//! The index's `notes.file_hash` is the lowercase-hex SHA-256 of the file's
-//! text; staleness detection must reproduce it byte-for-byte.
+//! The index's `notes.file_hash` is the lowercase-hex SHA-256 of the note's
+//! text with `\n` line endings; staleness detection must reproduce it
+//! byte-for-byte.
 
 use sha2::{Digest, Sha256};
 use std::fmt::Write;

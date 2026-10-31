@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { ShortcutKeys } from '@/components/shortcut-keys'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { keybindingFor } from '@/lib/commands/app-commands'
-import { useRouter } from '@/routing/router'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
+import { keybindingFor } from '@/lib/commands/app-commands.ts'
+import { useRouter } from '@/routing/router.tsx'
 
 const BACK_BINDING = keybindingFor('history.back')
 const FORWARD_BINDING = keybindingFor('history.forward')
@@ -30,37 +30,41 @@ export function NavigateArrows(): ReactElement {
       <Tooltip>
         {/* Span wrapper keeps pointer events alive when the button is disabled,
             so the tooltip still opens at the start of the history stack. */}
-        <TooltipTrigger asChild>
-          <span>
-            <button
-              type="button"
-              aria-label="Go back"
-              disabled={!canBack}
-              onClick={back}
-              className={BUTTON_CLASS}
-            >
-              <ChevronLeft aria-hidden className="size-4" />
-            </button>
-          </span>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <span>
+              <button
+                type="button"
+                aria-label="Go back"
+                disabled={!canBack}
+                onClick={back}
+                className={BUTTON_CLASS}
+              >
+                <ChevronLeft aria-hidden className="size-4" />
+              </button>
+            </span>
+          }
+        />
         <TooltipContent>
           Go back {BACK_BINDING && <ShortcutKeys binding={BACK_BINDING} />}
         </TooltipContent>
       </Tooltip>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <button
-              type="button"
-              aria-label="Go forward"
-              disabled={!canForward}
-              onClick={forward}
-              className={BUTTON_CLASS}
-            >
-              <ChevronRight aria-hidden className="size-4" />
-            </button>
-          </span>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <span>
+              <button
+                type="button"
+                aria-label="Go forward"
+                disabled={!canForward}
+                onClick={forward}
+                className={BUTTON_CLASS}
+              >
+                <ChevronRight aria-hidden className="size-4" />
+              </button>
+            </span>
+          }
+        />
         <TooltipContent>
           Go forward {FORWARD_BINDING && <ShortcutKeys binding={FORWARD_BINDING} />}
         </TooltipContent>

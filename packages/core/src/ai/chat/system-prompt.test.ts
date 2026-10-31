@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { cloudSafeGraphContext, type CloudGraphContext } from '../checkers'
-import { chatSystemPrompt } from './system-prompt'
+import { cloudSafeGraphContext, type CloudGraphContext } from '../../privacy/privacy-service.ts'
+import { chatSystemPrompt } from './system-prompt.ts'
 
 function context(overrides: Partial<CloudGraphContext> = {}) {
   return cloudSafeGraphContext({
@@ -27,6 +27,8 @@ describe('chatSystemPrompt', () => {
       customSystemPrompt: '',
     })
     expect(prompt).toContain('Today’s date is 2026-06-12.')
+    expect(prompt).toContain('Reflect-created regular notes live under notes/')
+    expect(prompt).toContain('Adopted notes may live at any eligible visible path')
     expect(prompt).toContain('Grounding rules:')
     expect(prompt).not.toContain('Graph overview')
   })

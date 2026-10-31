@@ -1,14 +1,16 @@
 # Plan 20 — Asset Descriptions
 
 > **Status (2026-06-16): Implemented.** Built end-to-end against the contracts
-> below: the AI call (`packages/core/src/ai/describe-asset.ts`), the reconcile +
-> privacy gate (`packages/core/src/actions/asset-description.ts`,
+> below: the AI call (`packages/core/src/ai/asset-describer-service.ts`), the
+> reconcile, session loop and backfill
+> (`packages/core/src/assets/asset-description-service.ts`), the privacy gate
+> (`packages/core/src/assets/asset-privacy-service.ts`,
 > `packages/core/src/indexing/asset-refs.ts`), the watcher carve-out
-> (`apps/desktop/src-tauri/src/watcher.rs`), the single-flight controller
-> (`apps/desktop/src/lib/asset-describe-controller.ts`) mounted by
+> (`apps/desktop/src-tauri/src/watcher.rs`), the session mounted by
 > `apps/desktop/src/providers/asset-describe-provider.tsx`, and the Settings
 > control (`describeAssets` setting + `apps/desktop/src/components/settings/
-> describe-assets-field.tsx` + `apps/desktop/src/lib/asset-backfill.ts`).
+> describe-assets-field.tsx`). The sections below keep the file and function
+> names of the original implementation.
 > Decisions D1 (auto-describe **on** for new assets) and D5 (index-candidate +
 > live recheck) landed as recommended. A post-release add-on in the spirit of
 > [Plan 18 — Tasks](18-tasks.md): an opt-in enrichment layer on top of the
@@ -31,11 +33,11 @@ almost verbatim.
 **Architecture:** all policy (eligibility, privacy, AI calls, description writes)
 lives in `@reflect/core`; the desktop app owns the watcher trigger, the
 single-flight controller, and the Settings UI. This mirrors capture
-([`actions/capture.ts`](../../packages/core/src/actions/capture.ts) +
-[`lib/capture-controller.ts`](../../apps/desktop/src/lib/capture-controller.ts))
+([`capture/capture-note.ts`](../../packages/core/src/capture/capture-note.ts) +
+`lib/capture-controller.ts`, today
+[`capture/capture-service.ts`](../../packages/core/src/capture/capture-service.ts))
 and audio memos
-([`actions/audio-memo.ts`](../../packages/core/src/actions/audio-memo.ts) +
-[`lib/transcription-reconciler.ts`](../../apps/desktop/src/lib/transcription-reconciler.ts)).
+([`audio/audio-memo-transcription-service.ts`](../../packages/core/src/audio/audio-memo-transcription-service.ts)).
 
 ## Scope
 
@@ -120,7 +122,8 @@ Capture → Inbox → Drain → Enrich
 
 ### AI module — `packages/core/src/ai/describe-asset.ts`
 
-A near-clone of [`describe-page.ts`](../../packages/core/src/ai/describe-page.ts),
+A near-clone of `describe-page.ts` (today
+[`page-describer-service.ts`](../../packages/core/src/ai/page-describer-service.ts)),
 same error contract:
 
 ```ts
@@ -148,8 +151,8 @@ Multimodal parts (AI SDK v6, `ai@^6`):
   endpoints reject `image/svg+xml`; SVG is XML, so describing the source is both
   correct and cheap.
 
-Errors mirror `describe-page.ts` exactly: `ReflectError('auth')` on 401/403,
-`ReflectError('network')` on 429/5xx/timeout (caller retries later), and a new
+Errors mirror `describe-page.ts` exactly: `AppError('auth')` on 401/403,
+`AppError('network')` on 429/5xx/timeout (caller retries later), and a new
 `AssetDescriptionRejectedError` on other 4xx (permanent — logged, no description).
 `maxRetries: 0`; the reconcile pass is the retry layer. 60s `AbortSignal.timeout`.
 
@@ -157,7 +160,8 @@ Provider resolution: `defaultAiProvider(state)` (the configured default, else th
 first configured provider), key via `getSecret(aiKeySecretName(config.id))` —
 identical to capture
 ([`provider-config.ts`](../../packages/core/src/ai/provider-config.ts),
-[`secrets.ts`](../../packages/core/src/ai/secrets.ts)).
+`secrets.ts`, today
+[`ai-credential-service.ts`](../../packages/core/src/ai/ai-credential-service.ts)).
 
 ### Privacy gate — the crux
 
@@ -172,8 +176,8 @@ async function classifyAsset(assetPath: string, generation: number): Promise<Ass
 ```
 
 Implementation (reusing the established live-recheck pattern from
-[`ai/chat/tools.ts` `isPrivateLive`](../../packages/core/src/ai/chat/tools.ts) and
-[`actions/capture.ts` `notePrivate`](../../packages/core/src/actions/capture.ts)):
+[`ai/chat/note-tools-service.ts`](../../packages/core/src/ai/chat/note-tools-service.ts) and
+[`capture/capture-note.ts` `notePrivate`](../../packages/core/src/capture/capture-note.ts)):
 
 1. **Candidate set** from the index `assets` join (already populated by the
    indexer — `crates/index-schema/migrations/0001_initial.sql`, surfaced as
@@ -240,7 +244,7 @@ with a non-private note (and no private note):
 4. Description decision (managed marker + hash) → skip up-to-date / skip user-authored;
    size cap → skip oversize.
 5. `describeAsset(...)`. On `AssetDescriptionRejectedError`: log, `refused++`,
-   continue. On `ReflectError('auth'|'network')`: stop the pass (`stopped`) for a
+   continue. On `AppError('auth'|'network')`: stop the pass (`stopped`) for a
    later retry — nothing written.
 6. Write the description (`writeNote(descriptionPath, body, generation)`), `described++`,
    `onProgress`.

@@ -1,7 +1,15 @@
-import { useState, type ReactElement } from 'react'
-import { aiModelLabel, aiProvider, errorMessage, type AiProviderConfig } from '@reflect/core'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list'
+import type { ReactElement } from 'react'
+import {
+  aiModelLabel,
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  type AiProviderConfig,
+} from '@reflect/core'
+import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface AiProviderActionsDrawerProps {
   /** The provider the sheet manages; null renders nothing (exit animation). */
@@ -31,7 +39,8 @@ export function AiProviderActionsDrawer({
   onSetDefaultModel,
   onRemove,
 }: AiProviderActionsDrawerProps): ReactElement {
-  const [removing, setRemoving] = useState(false)
+  const { logger } = useCoreServices()
+  const { run, pending: removing } = useAsyncAction()
   const providerInfo = provider === null ? null : aiProvider(provider.provider)
   const models =
     provider === null || providerInfo === null
@@ -45,19 +54,24 @@ export function AiProviderActionsDrawer({
             },
             ...providerInfo.models,
           ]
+  const title =
+    provider === null || providerInfo === null
+      ? ''
+      : aiProviderRequiresApiKey(provider.provider) || provider.keyHint !== ''
+        ? `${providerInfo.label} ·····${provider.keyHint}`
+        : `${providerInfo.label} · No API key`
 
   // A failed removal (keychain write, settings store) keeps the sheet open —
   // closing would read as success — and logs; the row is still there to retry.
   const remove = async (id: string): Promise<void> => {
-    setRemoving(true)
-    try {
-      await onRemove(id)
-      onOpenChange(false)
-    } catch (cause) {
-      console.error('AI provider removal failed:', errorMessage(cause))
-    } finally {
-      setRemoving(false)
-    }
+    await run(async () => {
+      try {
+        await onRemove(id)
+        onOpenChange(false)
+      } catch (cause) {
+        logger.error('AI provider removal failed:', errorMessage(cause))
+      }
+    })
   }
 
   return (
@@ -65,9 +79,7 @@ export function AiProviderActionsDrawer({
       <DrawerContent aria-label="Manage AI provider">
         {provider !== null && providerInfo !== null ? (
           <>
-            <DrawerTitle className="px-4 pt-1">
-              {`${providerInfo.label} ·····${provider.keyHint}`}
-            </DrawerTitle>
+            <DrawerTitle>{title}</DrawerTitle>
             <div className="flex flex-col gap-6 px-4 pb-8 pt-4">
               <SettingsGroup header="Default model">
                 {models.map((model) => (

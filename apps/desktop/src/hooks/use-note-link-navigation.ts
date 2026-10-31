@@ -1,26 +1,27 @@
-import { useCallback, useLayoutEffect, useRef } from 'react'
-import {
-  isNewWindowClick,
-  openRouteInNewWindow,
-  type NewWindowClickEvent,
-} from '@/lib/windows/open-in-new-window'
-import { useLinkIntentGuard } from '@/lib/windows/use-link-intent-guard'
-import type { NoteRoute } from '@/routing/route'
-import { useRouter } from '@/routing/router'
-
-/** Open one concrete note from a link-like UI control. */
-export type NoteLinkNavigation = (
-  route: NoteRoute,
-  event?: NewWindowClickEvent,
-) => void
+import { useCallback } from 'react'
+import { useLinkNavigationHost } from '@/hooks/use-link-navigation-host.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
+import type { NoteRoute } from '@reflect/app'
 
 /**
- * Apply the app-wide note-link convention: a plain click navigates in the
- * current window, while ⌘/Ctrl-click opens the note in a secondary window.
+ * The modifier fields meowdown's `isModEvent` reads off a link-like control's click.
+ */
+export interface ModClickEvent {
+  metaKey: boolean
+  ctrlKey: boolean
+}
+
+/** Open one concrete note from a link-like UI control. */
+export type NoteLinkNavigation = (options: { target: NoteRoute; openInNewWindow: boolean }) => void
+
+/**
+ * Apply the app-wide note-link convention: `openInNewWindow` (decided at
+ * the UI boundary from a ⌘/Ctrl click or a spare-`mod` keyboard follow)
+ * opens the note in a secondary window; otherwise navigate in place.
  *
  * A native open can be declined (browser/mobile) or fail. In that case the
  * click falls back to ordinary in-window navigation, unless the shared link
- * intent went stale ({@link useLinkIntentGuard}) or the host surface changed
+ * intent went stale (`useLinkIntentGuard`) or the host surface changed
  * scope while the open was in flight.
  *
  * @param scopeKey optional surface-local navigation state that should also
@@ -28,36 +29,13 @@ export type NoteLinkNavigation = (
  *   date, which can change without a router navigation).
  */
 export function useNoteLinkNavigation(scopeKey?: string | number | null): NoteLinkNavigation {
-  const { navigate } = useRouter()
-  const beginLinkIntent = useLinkIntentGuard()
-  const scopeKeyRef = useRef(scopeKey)
-
-  useLayoutEffect(() => {
-    scopeKeyRef.current = scopeKey
-  }, [scopeKey])
+  const { linkNavigation } = useAppServices()
+  const host = useLinkNavigationHost(scopeKey)
 
   return useCallback(
-    (target, event) => {
-      const isStale = beginLinkIntent()
-      if (!isNewWindowClick(event)) {
-        navigate(target)
-        return
-      }
-
-      const startedInScope = scopeKeyRef.current
-      void (async () => {
-        let opened = false
-        try {
-          opened = await openRouteInNewWindow(target)
-        } catch {
-          // Treat a native open failure like a declined open and fall back below.
-        }
-        if (opened || isStale() || !Object.is(scopeKeyRef.current, startedInScope)) {
-          return
-        }
-        navigate(target)
-      })()
+    (options) => {
+      linkNavigation.openNoteLink(options, host)
     },
-    [beginLinkIntent, navigate],
+    [host, linkNavigation],
   )
 }

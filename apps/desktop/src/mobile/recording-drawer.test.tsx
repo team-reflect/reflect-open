@@ -1,16 +1,20 @@
 import type { ReactNode } from 'react'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { act } from '@/test-utils/act.ts'
+import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@/test-utils/fire-event.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
+import type { Mutable } from '@reflect/utils'
 
-const memo = vi.hoisted(() => ({
-  phase: 'recording' as 'idle' | 'requesting' | 'recording' | 'transcribing' | 'error',
+const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
+  phase: 'recording',
   elapsedMs: 65_000,
   level: 0.4,
   pendingCount: 0,
   available: true,
   hasTranscriptionConfig: true,
-  error: null as string | null,
+  error: null,
   canRetry: false,
   drawerOpen: true,
   toggle: vi.fn(),
@@ -21,88 +25,98 @@ const memo = vi.hoisted(() => ({
   discard: vi.fn(),
 }))
 
-vi.mock('@/components/ui/drawer', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
-    open ? <div data-testid="drawer">{children}</div> : null,
+vi.mock('@/components/ui/drawer.tsx', () => ({
+  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) => {
+    return open ? <div data-testid="drawer">{children}</div> : null
+  },
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
-vi.mock('@/mobile/audio-memo-provider', () => ({
+vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
   useMobileAudioMemo: () => ({ ...memo }),
 }))
 
-const navigate = vi.hoisted(() => vi.fn())
-
-vi.mock('@/routing/router', () => ({
-  useRouter: () => ({ navigate }),
-}))
-
-const { RecordingDrawer } = await import('./recording-drawer')
+const { RecordingDrawer } = await import('./recording-drawer.tsx')
 
 beforeEach(() => {
   vi.useRealTimers()
   vi.clearAllMocks()
   memo.phase = 'recording'
+  memo.elapsedMs = 65_000
   memo.hasTranscriptionConfig = true
   memo.error = null
   memo.drawerOpen = true
 })
 
-afterEach(cleanup)
 afterEach(() => vi.useRealTimers())
 
 describe('RecordingDrawer', () => {
-  it('requires a second tap before discarding a live recording', async () => {
-    const user = userEvent.setup()
-    const view = render(<RecordingDrawer />)
+  it('counts past an hour: a session has no duration limit', async () => {
+    memo.elapsedMs = 65 * 60_000 + 3000
+    const view = await renderInApp(<RecordingDrawer />)
 
-    await user.click(view.getByRole('button', { name: 'Discard recording' }))
+    await expect.element(view.getByText('1:05:03')).toBeVisible()
+  })
+
+  it('requires a second tap before discarding a live recording', async () => {
+    const view = await renderInApp(<RecordingDrawer />)
+
+    await userEvent.click(view.getByRole('button', { name: 'Discard recording' }))
 
     expect(memo.cancelRecording).not.toHaveBeenCalled()
-    expect(
-      view.getByRole('button', { name: 'Confirm discard recording' }).textContent,
-    ).toContain('Tap again to discard')
+    await expect
+      .element(view.getByRole('button', { name: 'Confirm discard recording' }))
+      .toMatchTextContent('Tap again to discard')
 
-    await user.click(view.getByRole('button', { name: 'Confirm discard recording' }))
+    await userEvent.click(view.getByRole('button', { name: 'Confirm discard recording' }))
 
     expect(memo.cancelRecording).toHaveBeenCalledOnce()
   })
 
   it('lets the discard confirmation lapse back to a single safe tap', async () => {
     vi.useFakeTimers()
-    const view = render(<RecordingDrawer />)
+    const view = await renderInApp(<RecordingDrawer />)
 
-    fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
-    act(() => {
+    await act(() => {
+      fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
+    })
+    await act(() => {
       vi.advanceTimersByTime(3000)
     })
 
-    fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
+    await act(() => {
+      fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
+    })
 
     expect(memo.cancelRecording).not.toHaveBeenCalled()
-    expect(view.getByRole('button', { name: 'Confirm discard recording' })).toBeTruthy()
+    await expect
+      .element(view.getByRole('button', { name: 'Confirm discard recording' }))
+      .toBeVisible()
   })
 
   it('stops and saves from the primary control without confirmation', async () => {
-    const user = userEvent.setup()
-    const view = render(<RecordingDrawer />)
+    const view = await renderInApp(<RecordingDrawer />)
 
-    await user.click(view.getByRole('button', { name: 'Stop recording' }))
+    await userEvent.click(view.getByRole('button', { name: 'Stop recording' }))
 
     expect(memo.stopAndSave).toHaveBeenCalledOnce()
   })
 
   it('without a transcription model, guides key setup instead of recording', async () => {
     memo.hasTranscriptionConfig = false
-    const user = userEvent.setup()
-    const view = render(<RecordingDrawer />)
+    const view = await renderInApp(<RecordingDrawer />)
 
-    expect(view.getByText(/OpenAI or Gemini API key/)).not.toBeNull()
-    expect(view.queryByRole('button', { name: 'Stop recording' })).toBeNull()
+    await expect
+      .element(view.getByText(/send the recording to OpenAI or Google Gemini/))
+      .toBeVisible()
+    expect(view.getByRole('button', { name: 'Stop recording' }).query()).toBeNull()
 
-    await user.click(view.getByRole('button', { name: 'Open Settings' }))
-    expect(navigate).toHaveBeenCalledWith({ kind: 'settings' })
+    await userEvent.click(view.getByRole('button', { name: 'Open Settings' }))
+    expect(view.appServices.navigation.navigations()).toEqual([
+      { route: { kind: 'settings' }, options: undefined },
+    ])
     expect(memo.onDrawerOpenChange).toHaveBeenCalledWith(false)
   })
 })

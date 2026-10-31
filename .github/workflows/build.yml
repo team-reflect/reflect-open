@@ -1,0 +1,73 @@
+name: Build
+
+# Checks that the release build of each platform compiles and bundles. It uses
+# no secrets and uploads nothing.
+#
+# Only Release PRs change the desktop release-please manifests, so the paths
+# filter keeps this workflow off every other pull request.
+on:
+  pull_request:
+    paths:
+      - .github/release-please/manifest.stable.json
+      - .github/release-please/manifest.beta.json
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege default: the build only needs to read the repo.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos
+            os: xcode-27
+            command: pnpm build:macos --target=universal-apple-darwin --no-sign
+          - name: ios
+            os: xcode-27
+            command: pnpm build:ios --build-number=1 --no-sign
+          - name: windows
+            os: windows-2025
+            command: pnpm build:windows
+          # The oldest Ubuntu that can link the prebuilt ONNX Runtime, which
+          # needs glibc 2.38 and the libstdc++ of GCC 14.
+          - name: linux-x64
+            os: ubuntu-24.04
+            command: pnpm build:linux
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            command: pnpm build:linux
+
+    name: build-${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-xcode
+        if: runner.os == 'macOS'
+
+      - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: build-${{ matrix.name }}
+
+      # The universal build also compiles the x86_64 slice on this arm64 runner.
+      - name: Add the x86_64 macOS target
+        if: matrix.name == 'macos'
+        run: rustup target add x86_64-apple-darwin
+
+      - name: Build
+        shell: bash
+        run: ${{ matrix.command }}

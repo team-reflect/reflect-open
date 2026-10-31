@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HIGHLIGHT_END, HIGHLIGHT_START, parseHighlights } from './search'
+import { HIGHLIGHT_END, HIGHLIGHT_START, parseHighlights } from './search.ts'
 
 const mark = (text: string): string => `${HIGHLIGHT_START}${text}${HIGHLIGHT_END}`
 
@@ -20,8 +20,6 @@ describe('parseHighlights', () => {
   })
 
   it('handles a snippet that is one whole match', () => {
-    expect(parseHighlights(mark('everything'))).toEqual([
-      { text: 'everything', highlighted: true },
-    ])
+    expect(parseHighlights(mark('everything'))).toEqual([{ text: 'everything', highlighted: true }])
   })
 })

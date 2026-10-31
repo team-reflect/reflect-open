@@ -1,28 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  contactDetailsMarkdown,
-  contactNamesEqual,
-  hasBridge,
-  isContactsReadable,
-  isDaily,
-  noteHasContactDetails,
-  parseNote,
-  splitFrontmatter,
-  suggestContactForTitle,
-  type ContactMatch,
-} from '@reflect/core'
-import { readNoteSource } from '@/lib/note-frontmatter'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useGraph } from '@/providers/graph-provider'
-import { useSettings } from '@/providers/settings-provider'
-import { useContactsAuthorization } from './use-contacts-authorization'
-
-export function suggestedContactQueryKey(
-  graphRoot: string | undefined,
-  path: string,
-): readonly [typeof INDEX_QUERY_SCOPE, string | undefined, 'suggested-contact', string] {
-  return [INDEX_QUERY_SCOPE, graphRoot, 'suggested-contact', path]
-}
+import type { ContactMatch } from '@reflect/core'
+import { queryKeys } from '@/lib/query-client.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { useContactsState } from './use-contacts-state.ts'
 
 /**
  * The Apple Contact this note's title exactly matches, or `null` — the
@@ -43,28 +25,13 @@ export function suggestedContactQueryKey(
 export function useSuggestedContact(path: string): ContactMatch | null {
   const { graph } = useGraph()
   const { settings } = useSettings()
-  const authorization = useContactsAuthorization()
-  const readable = authorization !== null && isContactsReadable(authorization)
-  const enabled =
-    hasBridge() && graph !== null && settings.contactsEnabled && readable && !isDaily(path)
+  // Re-render when the permission state changes; the gate reads it.
+  useContactsState()
+  const { contactSuggestions } = useCoreServices()
+  const enabled = graph !== null && contactSuggestions.showsSuggestionFor(settings, path)
   const { data } = useQuery({
-    queryKey: suggestedContactQueryKey(graph?.root, path),
-    queryFn: async () => {
-      const source = await readNoteSource(path)
-      if (noteHasContactDetails(splitFrontmatter(source).body)) {
-        return null
-      }
-      const note = parseNote({ path, source })
-      const match = await suggestContactForTitle(note.title)
-      // A match with nothing to add (no email, no phone) has no card to offer.
-      if (match === null || contactDetailsMarkdown(match) === '') {
-        return null
-      }
-      const dismissed = note.frontmatter.ignoredContacts.some((name) =>
-        contactNamesEqual(name, match.fullName),
-      )
-      return dismissed ? null : match
-    },
+    queryKey: queryKeys.index.suggestedContact(graph?.root, path),
+    queryFn: () => contactSuggestions.suggestionFor(path),
     enabled,
   })
   // A disabled query still serves its last cached answer — but once the gate

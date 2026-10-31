@@ -1,9 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { setBridge } from '../ipc/bridge'
-import { detectExternalMoves } from './move-healing'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { AppError } from '../errors.ts'
+import { createNodeTestDatabaseService, seedNotes } from '../testing/database.ts'
+import { createTestNoteFileService } from '../testing/graph.ts'
+import { createIndexQueryService } from './index-query-service.ts'
+import { createMoveHealing } from './move-healing.ts'
+
+const databases: { close(): void }[] = []
 
 afterEach(() => {
-  setBridge(null)
+  for (const database of databases.splice(0)) {
+    database.close()
+  }
 })
 
 const ORPHAN = 'notes/01arz3ndektsv4rrffq69g5fav.md'
@@ -11,69 +18,70 @@ const ARRIVAL = 'notes/meeting-notes.md'
 const ID = '01abcdefghjkmnpqrstvwxyz00'
 const CONTENT = `---\nid: ${ID}\n---\n# Meeting Notes\n`
 
-function fakeBridge(invoke: (command: string, args: Record<string, unknown>) => Promise<unknown>) {
-  setBridge({
-    invoke,
-    listen: async () => () => {},
+/**
+ * Move healing where ORPHAN is indexed with its id and ARRIVAL exists on disk.
+ * `read` runs before each note read and may reject it; `lookup` runs before
+ * the id lookup.
+ */
+function setup(options?: { read?: () => void; lookup?: () => void }) {
+  const database = createNodeTestDatabaseService()
+  databases.push(database)
+  seedNotes(database, [{ path: ORPHAN, markdown: CONTENT }])
+  const files = createTestNoteFileService({ files: { [ARRIVAL]: CONTENT } })
+  const indexQuery = createIndexQueryService({ database })
+  const calls: string[] = []
+  const readFile = files.read.bind(files)
+  vi.spyOn(files, 'read').mockImplementation(async (path, generation) => {
+    calls.push('read')
+    options?.read?.()
+    return await readFile(path, generation)
   })
+  const getNoteIdsByPath = indexQuery.getNoteIdsByPath.bind(indexQuery)
+  vi.spyOn(indexQuery, 'getNoteIdsByPath').mockImplementation(async (paths) => {
+    calls.push('lookup')
+    options?.lookup?.()
+    return await getNoteIdsByPath(paths)
+  })
+  const healing = createMoveHealing({ noteFile: files, indexQuery })
+  return { healing, calls }
 }
 
-describe('detectExternalMoves', () => {
+describe('MoveHealing.detectExternalMoves', () => {
   it('pairs an orphan with the arrival carrying its id and hands back the content', async () => {
-    fakeBridge(async (command) => {
-      if (command === 'note_read') {
-        return CONTENT
-      }
-      if (command === 'db_query') {
-        return [{ path: ORPHAN, id: ID }]
-      }
-      return null
-    })
+    const { healing } = setup()
 
-    const scan = await detectExternalMoves([ORPHAN], [ARRIVAL])
+    const scan = await healing.detectExternalMoves([ORPHAN], [ARRIVAL], 1)
     expect(scan.moves).toEqual([{ from: ORPHAN, to: ARRIVAL }])
     expect(scan.content.get(ARRIVAL)).toBe(CONTENT)
   })
 
   it('skips an unreadable arrival: no pair, no content, no throw', async () => {
-    fakeBridge(async (command) => {
-      if (command === 'note_read') {
-        throw { kind: 'io', message: 'locked' }
-      }
-      if (command === 'db_query') {
-        return [{ path: ORPHAN, id: ID }]
-      }
-      return null
+    const { healing } = setup({
+      read: () => {
+        throw new AppError('io', 'locked')
+      },
     })
 
-    const scan = await detectExternalMoves([ORPHAN], [ARRIVAL])
+    const scan = await healing.detectExternalMoves([ORPHAN], [ARRIVAL], 1)
     expect(scan.moves).toEqual([])
     expect(scan.content.size).toBe(0)
   })
 
-  it('never touches the bridge when either side is empty', async () => {
-    const calls: string[] = []
-    fakeBridge(async (command) => {
-      calls.push(command)
-      return null
-    })
+  it('never reads or queries when either side is empty', async () => {
+    const { healing, calls } = setup()
 
-    expect((await detectExternalMoves([], [ARRIVAL])).moves).toEqual([])
-    expect((await detectExternalMoves([ORPHAN], [])).moves).toEqual([])
+    expect((await healing.detectExternalMoves([], [ARRIVAL], 1)).moves).toEqual([])
+    expect((await healing.detectExternalMoves([ORPHAN], [], 1)).moves).toEqual([])
     expect(calls).toEqual([])
   })
 
   it('returns no moves once aborted — the caller is bailing anyway', async () => {
     const controller = new AbortController()
-    fakeBridge(async (command) => {
-      if (command === 'db_query') {
-        controller.abort()
-        return [{ path: ORPHAN, id: ID }]
-      }
-      return CONTENT
-    })
+    const { healing } = setup({ lookup: () => controller.abort() })
 
-    const scan = await detectExternalMoves([ORPHAN], [ARRIVAL], { signal: controller.signal })
+    const scan = await healing.detectExternalMoves([ORPHAN], [ARRIVAL], 1, {
+      signal: controller.signal,
+    })
     expect(scan.moves).toEqual([])
   })
 })

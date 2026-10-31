@@ -1,18 +1,18 @@
-import { type ReactElement } from 'react'
-import { InlineAlert } from '@/components/inline-alert'
-import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step'
-import { GithubAuthStep } from '@/components/settings/github-auth-step'
-import { Button } from '@/components/ui/button'
+import type { ReactElement } from 'react'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step.tsx'
+import { GithubAuthStep } from '@/components/settings/github-auth-step.tsx'
+import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { useConnectGithubWizard, type ConnectWizardStep } from '@/hooks/use-connect-github-wizard'
-import { useRestoreFocus } from '@/hooks/use-restore-focus'
+} from '@/components/ui/dialog.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { useConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
+import type { ConnectWizardStep } from '@reflect/app'
 
 interface ConnectGithubDialogProps {
   /** A suggested name for a newly created backup repo (from the graph name). */
@@ -23,8 +23,8 @@ interface ConnectGithubDialogProps {
 }
 
 const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
-  repo: 'Back up this graph to a private GitHub repository.',
-  auth: 'Sign in so Reflect can push your backups.',
+  repo: 'Sync this graph through a private GitHub repository.',
+  auth: 'Sign in so Reflect can sync with it.',
   finish: 'Connecting your repository…',
 }
 
@@ -41,8 +41,6 @@ export function ConnectGithubDialog({
   pollIntervalMs = 3000,
 }: ConnectGithubDialogProps): ReactElement {
   const wizard = useConnectGithubWizard({ suggestedRepoName, onClose, pollIntervalMs })
-
-  useRestoreFocus()
 
   return (
     <Dialog
@@ -113,9 +111,7 @@ export function ConnectGithubDialog({
           />
         ) : null}
 
-        {wizard.step === 'finish' ? (
-          <ConnectGithubFinishStep wizard={wizard} layout="row" />
-        ) : null}
+        {wizard.step === 'finish' ? <ConnectGithubFinishStep wizard={wizard} layout="row" /> : null}
 
         {wizard.step !== 'finish' && wizard.error !== null ? (
           <InlineAlert tone="error">{wizard.error}</InlineAlert>

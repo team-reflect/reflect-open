@@ -1,0 +1,43 @@
+name: Stale
+
+# Closes issues and PRs that a maintainer labeled `likely resolved` once they
+# go quiet. Only people add or remove `likely resolved`; this workflow only
+# manages the `Stale` label. Any comment or update removes `Stale` and
+# restarts the clock.
+
+on:
+  schedule:
+    # Every day at 02:45 UTC (minute 45, hour 2).
+    - cron: '45 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Only log what would happen
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: stale
+
+jobs:
+  stale:
+    name: Stale
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write # cache the processing state between runs
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11.0.0
+        with:
+          any-of-labels: 'likely resolved'
+          days-before-stale: 4
+          days-before-close: 7
+          stale-issue-message: Thanks for the report! We believe this has been fixed, so we will close this issue in 7 days. If you still see the problem, please leave a comment and we will keep it open.
+          stale-pr-message: Thank you for this PR! We believe this has been resolved, so we will close it in 7 days. If it is still needed, please leave a comment and we will keep it open.
+          close-issue-reason: completed
+          close-issue-message: Closing this issue. If you still see the problem, please leave a comment and we will reopen it.
+          close-pr-message: Closing this PR. If it is still needed, please leave a comment and we will reopen it.
+          debug-only: ${{ inputs.dry-run == true }}

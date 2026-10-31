@@ -2,8 +2,9 @@
 
 > **Status (2026-06-14):** Closed by product decision. We are **not** building a
 > dedicated import/export portability surface. Reflect's portability contract is the
-> graph itself: ordinary markdown files in `daily/`, `notes/`, and `assets/`, plus a
-> rebuildable `.reflect/` index that can be deleted at any time.
+> graph itself: ordinary Markdown and attachment files wherever they already live,
+> plus a rebuildable `.reflect/` index that can be deleted at any time. Reflect-created
+> regular notes, daily notes, and pasted files use `notes/`, `daily/`, and `assets/`.
 
 ## Decision
 
@@ -17,12 +18,20 @@ tool.
 
 Reflect V1 exports are now emitted in Reflect V2's graph-compatible markdown shape, so
 there is no dedicated Reflect V1 import path. Users migrate by opening or copying the
-exported graph folder directly.
+exported graph folder directly. Opening an existing Markdown folder adopts it in place;
+it is not an import and does not rearrange its files.
 
 ## Portability Contract
 
 - The graph folder is the export. Copy or zip the folder directly.
-- `daily/`, `notes/`, and `assets/` contain the user-owned durable data.
+- Eligible Markdown can live at the graph root or in visible nested folders. Reflect
+  keeps adopted paths intact. Hidden trees, `assets/`/`audio-memos/`, well-known
+  dependency directories (`node_modules` and friends, plus anything stamped with a
+  `CACHEDIR.TAG`), and paths matched by the vault's own `.gitignore` or a
+  `.reflectignore` file are excluded from discovery; the scan reports a skipped
+  count so an excluded file is always explainable.
+- Reflect-created regular notes live in `notes/`, daily notes in `daily/`, and pasted
+  files in `assets/`; those defaults do not constrain files created by other tools.
 - `.reflect/` is excluded from the portability contract. It is a rebuildable local
   projection, except for explicitly documented durable local tables such as `chat_*`.
 - Markdown frontmatter carries minimal metadata such as stable IDs, aliases, `private`,
@@ -30,12 +39,41 @@ exported graph folder directly.
 - Backlinks, tags, daily-note dates, attachments, and readable filenames remain useful
   outside Reflect because they are encoded in the files themselves.
 
+## Attachments and Embeds in an Opened Vault
+
+An adopted vault keeps its images beside its notes, so attachment references resolve
+the way CommonMark and Obsidian read them (`packages/core/src/graph/attachment-resolution.ts`):
+
+- A Markdown destination (`![alt](../attachments/photo.png)`) resolves from the note's
+  own folder first, then from the vault root. Reflect's own `![](assets/…)` links are
+  vault-root relative, which is also the answer before the attachment catalog has
+  loaded, so Reflect-written images never wait on it. A bare filename that matches
+  neither reading is found by name anywhere in the vault (Obsidian's "shortest path").
+- An Obsidian embed, `![[photo.png]]`, is vault-root relative when it names a folder
+  and otherwise reads like a bare Markdown destination: beside the note, then the vault
+  root, then by name. Images render inline and other attachments render as file pills.
+  Name ties go to the file beside the note, then the shallowest one.
+- The editor asks for an image's URL once; when the catalog has not loaded yet, the
+  answer is a promise it waits for, so the first render already shows the right file.
+- Links to local attachments render as file pills and open in the OS default app.
+- The resolver only ever returns a spelling the index records for that reference, so
+  the asset privacy gate always sees the note that displays a file. A bare name is
+  stored bare and matches every file with that name, so a name lookup is covered too.
+
+**Note embeds are not transcluded.** `![[Deep Work]]` renders as a link chip to the
+note, like `[[Deep Work]]`, and counts as a backlink. The Markdown is left as written,
+so Obsidian still transcludes it. Transclusion stays out of scope for three reasons.
+It would bring a second note's content into the editor, which needs editing and
+round-trip rules. It would put another surface in competition with the editor. And a
+public note that transcluded a private one would render private content where AI
+features act on the public note.
+
 ## Non-Goals
 
 - No Markdown ZIP export button.
 - No JSON export.
 - No HTML export.
-- No Obsidian/folder import workflow.
+- No Obsidian/folder import workflow. Existing Markdown vaults open directly instead.
 - No generalized importer framework for Evernote, Roam, Notion, Readwise, Kindle, or
   other apps.
 - No export-to-import round-trip test suite beyond the normal markdown parser, writer,

@@ -11,16 +11,17 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::envelope::ValidatedCapture;
 use crate::HostError;
+use crate::envelope::ValidatedCapture;
 
 /// The pointer-file shape the desktop app writes. Versioned so a future
 /// layout change reads as a typed error here, never as a silent mis-spool.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Pointer {
+pub(crate) struct Pointer {
     version: u32,
-    graph_root: String,
+    pub graph_root: String,
+    pub x_like_version: Option<u32>,
 }
 
 /// Default pointer-file location, shared with the desktop app's conventions
@@ -35,11 +36,11 @@ pub fn default_pointer_path() -> Option<PathBuf> {
 
 /// Resolve the capture inbox from the pointer file, creating the inbox
 /// directory if missing. A missing pointer is the `no-graph` state.
-pub fn inbox_dir(pointer_path: &Path) -> Result<PathBuf, HostError> {
+pub(crate) fn read_pointer(pointer_path: &Path) -> Result<Pointer, HostError> {
     let raw = match std::fs::read(pointer_path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(HostError::NoGraph)
+            return Err(HostError::NoGraph);
         }
         Err(error) => return Err(HostError::Io(format!("pointer file unreadable: {error}"))),
     };
@@ -51,11 +52,23 @@ pub fn inbox_dir(pointer_path: &Path) -> Result<PathBuf, HostError> {
             pointer.version
         )));
     }
-    let root = PathBuf::from(pointer.graph_root);
+    let root = PathBuf::from(&pointer.graph_root);
     if !root.is_dir() {
         return Err(HostError::NoGraph);
     }
-    let inbox = root.join(".reflect").join("inbox");
+    Ok(pointer)
+}
+
+/// Resolve the inbox of the desktop-selected graph.
+pub fn inbox_dir(pointer_path: &Path) -> Result<PathBuf, HostError> {
+    inbox_dir_of(&read_pointer(pointer_path)?)
+}
+
+/// The pointed graph's inbox, created if missing.
+pub(crate) fn inbox_dir_of(pointer: &Pointer) -> Result<PathBuf, HostError> {
+    let inbox = PathBuf::from(&pointer.graph_root)
+        .join(".reflect")
+        .join("inbox");
     std::fs::create_dir_all(&inbox)
         .map_err(|error| HostError::Io(format!("cannot create inbox: {error}")))?;
     Ok(inbox)
@@ -63,7 +76,11 @@ pub fn inbox_dir(pointer_path: &Path) -> Result<PathBuf, HostError> {
 
 /// Tmp-then-rename write. The tmp name (`.tmp-…`) can never match the
 /// watcher's `*.json` filter, so renames are the only visible events.
-fn atomic_write(directory: &Path, filename: &str, bytes: &[u8]) -> Result<(), HostError> {
+pub(crate) fn atomic_write(
+    directory: &Path,
+    filename: &str,
+    bytes: &[u8],
+) -> Result<(), HostError> {
     let io_error = |error: std::io::Error| HostError::Io(format!("spool write failed: {error}"));
     let mut tmp = tempfile::Builder::new()
         .prefix(".tmp-")
@@ -71,8 +88,13 @@ fn atomic_write(directory: &Path, filename: &str, bytes: &[u8]) -> Result<(), Ho
         .map_err(io_error)?;
     tmp.write_all(bytes).map_err(io_error)?;
     tmp.flush().map_err(io_error)?;
+    tmp.as_file().sync_all().map_err(io_error)?;
     tmp.persist(directory.join(filename))
         .map_err(|error| HostError::Io(format!("spool rename failed: {}", error.error)))?;
+    #[cfg(unix)]
+    std::fs::File::open(directory)
+        .and_then(|file| file.sync_all())
+        .map_err(io_error)?;
     Ok(())
 }
 

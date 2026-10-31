@@ -1,123 +1,101 @@
-import { act, render, renderHook } from '@testing-library/react'
+import { act } from '@/test-utils/act.ts'
 import { describe, expect, it } from 'vitest'
-import type { ReactElement, ReactNode } from 'react'
-import { emitNoteMoved } from '@/lib/note-moves'
-import type { Route } from './route'
-import { RouterFreeze, RouterProvider, useRouter } from './router'
+import type { ReactElement } from 'react'
+import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import type { Route } from '@reflect/app'
+import { RouterFreeze, useRouter } from './router.tsx'
 
-function routerHook(initialRoute?: Route) {
-  return renderHook(() => useRouter(), {
-    wrapper: ({ children }: { children: ReactNode }) => (
-      <RouterProvider initialRoute={initialRoute}>{children}</RouterProvider>
-    ),
+/**
+ * `useRouter()` under the app's `RouterProvider`, mounted on `initialRoute`.
+ */
+function routerHook(
+  initialRoute?: Route,
+  core: TestCoreServices = createTestCoreServices({ database: createWasmTestDatabaseService() }),
+) {
+  return renderHookInApp(() => useRouter(), {
+    core,
+    ...(initialRoute === undefined ? {} : { route: initialRoute }),
   })
 }
 
+// The history itself is covered by the app layer's `navigation-service.test.ts`; these
+// cover the React shell over it.
 describe('router', () => {
-  it('starts on today with no history', () => {
-    const { result } = routerHook()
+  it('starts on today with no history', async () => {
+    const { result } = await routerHook()
     expect(result.current.route).toEqual({ kind: 'today' })
     expect(result.current.canBack).toBe(false)
     expect(result.current.canForward).toBe(false)
   })
 
-  it('navigate pushes; back and forward traverse the stack', () => {
-    const { result } = routerHook()
-    act(() => result.current.navigate({ kind: 'daily', date: '2026-06-08' }))
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    expect(result.current.route).toEqual({ kind: 'note', path: 'notes/a.md' })
+  it('starts on the initial route, normalized', async () => {
+    const { result } = await routerHook({ kind: 'daily', date: 'not-a-date' })
+    expect(result.current.route).toEqual({ kind: 'today' })
+  })
 
-    act(() => result.current.back())
+  it('renders the navigation service through navigate, back, and forward', async () => {
+    const { result, appServices } = await routerHook()
+    await act(() => result.current.navigate({ kind: 'daily', date: '2026-06-08' }))
+    await act(() => {
+      result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true })
+    })
+    expect(result.current.route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(result.current.arrivalSeq).toBe(2)
+    expect(result.current.arrivalFocusEditor).toBe(true)
+    expect(result.current.backRoute).toEqual({ kind: 'daily', date: '2026-06-08' })
+    expect(appServices.navigation.getState().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+
+    await act(() => result.current.back())
     expect(result.current.route).toEqual({ kind: 'daily', date: '2026-06-08' })
     expect(result.current.canForward).toBe(true)
 
-    act(() => result.current.forward())
+    await act(() => result.current.forward())
     expect(result.current.route).toEqual({ kind: 'note', path: 'notes/a.md' })
     expect(result.current.canForward).toBe(false)
   })
 
-  it('navigating from a back position truncates the forward branch', () => {
-    const { result } = routerHook()
-    act(() => result.current.navigate({ kind: 'daily', date: '2026-06-08' }))
-    act(() => result.current.navigate({ kind: 'daily', date: '2026-06-07' }))
-    act(() => result.current.back())
-    act(() => result.current.navigate({ kind: 'search', query: 'x' }))
-    expect(result.current.canForward).toBe(false)
-    act(() => result.current.back())
-    expect(result.current.route).toEqual({ kind: 'daily', date: '2026-06-08' })
+  it('follows navigation made on the service itself', async () => {
+    const { result, appServices } = await routerHook()
+    await act(() => appServices.navigation.navigate({ kind: 'tasks' }))
+    expect(result.current.route).toEqual({ kind: 'tasks' })
   })
 
-  it('re-navigating to the current route is a no-op (no stack growth)', () => {
-    const { result } = routerHook()
-    act(() => result.current.navigate({ kind: 'daily', date: '2026-06-08' }))
-    act(() => result.current.navigate({ kind: 'daily', date: '2026-06-08' }))
-    act(() => result.current.back())
+  it('a new mount starts a fresh history', async () => {
+    const first = await routerHook()
+    await act(() => first.result.current.navigate({ kind: 'tasks' }))
+    await act(() => first.result.current.saveScrollState(40))
+    await first.unmount()
+
+    const { result } = await routerHook(undefined, first.core)
     expect(result.current.route).toEqual({ kind: 'today' })
     expect(result.current.canBack).toBe(false)
+    expect(result.current.arrivalSeq).toBe(0)
+    expect(result.current.savedScroll()).toBeNull()
   })
 
-  it('back/forward at the edges are no-ops', () => {
-    const { result } = routerHook()
-    act(() => result.current.back())
-    expect(result.current.route).toEqual({ kind: 'today' })
-    act(() => result.current.forward())
-    expect(result.current.route).toEqual({ kind: 'today' })
-  })
-
-  it('advances the synchronous navigation revision for every navigation intent', () => {
-    const { result } = routerHook()
-    const revision = result.current.navigationRevision
-    const initial = revision()
-
-    // Even a same-route re-arrival is an intent (initial route is today).
-    act(() => result.current.navigate({ kind: 'today' }))
-    expect(revision()).toBe(initial + 1)
-    act(() => result.current.navigate({ kind: 'tasks' }))
-    expect(revision()).toBe(initial + 2)
-    act(() => result.current.back())
-    expect(revision()).toBe(initial + 3)
-    act(() => result.current.forward())
-    expect(revision()).toBe(initial + 4)
-  })
-
-  it('boundary back/forward no-ops leave the navigation revision alone', () => {
-    const { result } = routerHook()
-    const revision = result.current.navigationRevision
-    act(() => result.current.navigate({ kind: 'tasks' }))
-    const settled = revision()
-
-    // Nothing ahead: a stray ⌘] must not cancel a pending link fallback.
-    act(() => result.current.forward())
-    expect(revision()).toBe(settled)
-
-    act(() => result.current.back())
-    expect(revision()).toBe(settled + 1)
-    // Nothing behind either — same rule for ⌘[ at the history start.
-    act(() => result.current.back())
-    expect(revision()).toBe(settled + 1)
-  })
-
-  it('restores a saved scroll offset on back/forward, per entry', () => {
-    const { result } = routerHook()
-    act(() => result.current.saveScrollState(120)) // scrolling on today
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
+  it('restores a saved scroll offset on back/forward, per entry', async () => {
+    const { result } = await routerHook()
+    await act(() => result.current.saveScrollState(120)) // scrolling on today
+    await act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
     expect(result.current.savedScroll()).toBeNull() // fresh entry: no offset yet
 
-    act(() => result.current.saveScrollState(40))
-    act(() => result.current.back())
+    await act(() => result.current.saveScrollState(40))
+    await act(() => result.current.back())
     expect(result.current.savedScroll()).toBe(120) // today's offset restored
 
-    act(() => result.current.forward())
+    await act(() => result.current.forward())
     expect(result.current.savedScroll()).toBe(40) // the note's own offset
   })
 
-  it('can clear the active entry scroll offset without changing routes', () => {
-    const { result } = routerHook()
+  it('can clear the active entry scroll offset without changing routes', async () => {
+    const { result } = await routerHook()
     const entryId = result.current.entryId
     const arrivals = result.current.arrivalSeq
-    act(() => result.current.saveScrollState(120))
+    await act(() => result.current.saveScrollState(120))
 
-    act(() => result.current.clearScrollState())
+    await act(() => result.current.clearScrollState())
 
     expect(result.current.route).toEqual({ kind: 'today' })
     expect(result.current.entryId).toBe(entryId)
@@ -125,107 +103,7 @@ describe('router', () => {
     expect(result.current.savedScroll()).toBeNull()
   })
 
-  it('re-navigating to the current route clears its saved scroll (re-anchor intent)', () => {
-    const { result } = routerHook()
-    const seqBefore = result.current.arrivalSeq
-    act(() => result.current.saveScrollState(500)) // user scrolled away on today
-    act(() => result.current.navigate({ kind: 'today' })) // ⌘D while on today
-    expect(result.current.savedScroll()).toBeNull() // re-anchor, don't restore
-    expect(result.current.arrivalSeq).toBe(seqBefore + 1) // views are notified
-  })
-
-  it('can restore the daily surface scroll when a tab switch returns to today', () => {
-    const { result } = routerHook()
-    act(() => result.current.saveScrollState(500)) // user scrolled the daily stream
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
-
-    expect(result.current.route).toEqual({ kind: 'today' })
-    expect(result.current.savedScroll()).toBe(500)
-  })
-
-  it('keeps default fresh navigations to daily routes anchor-only', () => {
-    const { result } = routerHook()
-    act(() => result.current.saveScrollState(500))
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    act(() => result.current.navigate({ kind: 'today' }))
-
-    expect(result.current.savedScroll()).toBeNull()
-  })
-
-  it('a surface-scroll return from within the surface re-anchors instead', () => {
-    const { result } = routerHook({ kind: 'daily', date: '2026-06-08' })
-    act(() => result.current.saveScrollState(500)) // scrolled the stream on a dated day
-    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
-    expect(result.current.savedScroll()).toBeNull() // Daily tab on-stream = ⌘D re-anchor
-
-    act(() => result.current.saveScrollState(300))
-    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
-    expect(result.current.savedScroll()).toBeNull() // same while already on today
-  })
-
-  it('an explicit re-anchor arrival drops the daily surface offset too', () => {
-    const { result } = routerHook()
-    act(() => result.current.saveScrollState(500)) // user scrolled away on today
-    act(() => result.current.navigate({ kind: 'today' })) // ⌘D re-anchors the stream
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
-
-    expect(result.current.savedScroll()).toBeNull() // the tab can't resurrect pre-⌘D scroll
-  })
-
-  it('clearScrollState drops the daily surface offset too (new-note interaction)', () => {
-    const { result } = routerHook()
-    act(() => result.current.saveScrollState(500)) // scrolled the stream before ⌘N
-    act(() => result.current.clearScrollState()) // note.new discards the stream offsets
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-
-    act(() => result.current.back())
-    expect(result.current.savedScroll()).toBeNull() // ⌘[ re-anchors to today
-
-    act(() => result.current.saveScrollState(120)) // post-clear scrolling
-    act(() => result.current.forward())
-    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
-    expect(result.current.savedScroll()).toBe(120) // the tab restores only the new offset
-  })
-
-  it('carries the focusEditor intent on the arrival that asked for it, one-shot', () => {
-    const { result } = routerHook()
-    expect(result.current.arrivalFocusEditor).toBe(false)
-
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }))
-    expect(result.current.arrivalFocusEditor).toBe(true)
-
-    // The next arrival overwrites the intent — it can never leak onto a
-    // later, unrelated visit (the staleness class a keyed request store had).
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/b.md' }))
-    expect(result.current.arrivalFocusEditor).toBe(false)
-  })
-
-  it('clears the focusEditor intent on history moves', () => {
-    const { result } = routerHook()
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }))
-    act(() => result.current.back())
-    expect(result.current.arrivalFocusEditor).toBe(false)
-
-    act(() => result.current.forward())
-    expect(result.current.route).toEqual({ kind: 'note', path: 'notes/a.md' })
-    expect(result.current.arrivalFocusEditor).toBe(false)
-  })
-
-  it('entryId is stable per entry and changes across back/forward', () => {
-    const { result } = routerHook()
-    const todayId = result.current.entryId
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    const noteId = result.current.entryId
-    expect(noteId).not.toBe(todayId)
-    act(() => result.current.back())
-    expect(result.current.entryId).toBe(todayId)
-    act(() => result.current.forward())
-    expect(result.current.entryId).toBe(noteId)
-  })
-
-  it('RouterFreeze pins what a background subtree sees until it surfaces', () => {
+  it('RouterFreeze pins what a background subtree sees until it surfaces', async () => {
     let router: ReturnType<typeof useRouter> | null = null
     function Capture(): null {
       router = useRouter()
@@ -237,116 +115,50 @@ describe('router', () => {
     }
     function Harness({ frozen }: { frozen: boolean }): ReactElement {
       return (
-        <RouterProvider>
+        <>
           <Capture />
           <RouterFreeze frozen={frozen}>
             <Probe />
           </RouterFreeze>
-        </RouterProvider>
+        </>
       )
     }
 
-    const view = render(<Harness frozen={false} />)
-    expect(view.getByTestId('frozen-probe').textContent).toBe('today:0')
+    const view = await renderInApp(<Harness frozen={false} />)
+    await expect.element(view.getByTestId('frozen-probe')).toMatchTextContent('today:0')
 
     // Covered by a pushed note (the mobile stack hides it): navigations must
     // not reach it — the daily surface would read the arrivalSeq bump as a
     // re-arrival and re-anchor its scroll while hidden.
-    view.rerender(<Harness frozen={true} />)
-    act(() => router!.navigate({ kind: 'note', path: 'notes/a.md' }))
-    expect(view.getByTestId('frozen-probe').textContent).toBe('today:0')
+    await view.rerender(<Harness frozen={true} />)
+    router!.navigate({ kind: 'note', path: 'notes/a.md' })
+    await expect.element(view.getByTestId('frozen-probe')).toMatchTextContent('today:0')
 
     // Surfacing again resumes the live value.
-    view.rerender(<Harness frozen={false} />)
-    expect(view.getByTestId('frozen-probe').textContent).toBe('note:1')
-  })
-
-  it('exposes the route back() would land on (the mobile stack peeks it)', () => {
-    const { result } = routerHook()
-    expect(result.current.backRoute).toBeNull()
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    expect(result.current.backRoute).toEqual({ kind: 'today' })
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/b.md' }))
-    expect(result.current.backRoute).toEqual({ kind: 'note', path: 'notes/a.md' })
-    act(() => result.current.back())
-    expect(result.current.backRoute).toEqual({ kind: 'today' })
-    act(() => result.current.back())
-    expect(result.current.backRoute).toBeNull()
-  })
-
-  it('normalizes a malformed daily date to the today route on navigate', () => {
-    const { result } = routerHook()
-    // 2026-02-31 is well-formed but impossible — dailyPath would throw on it.
-    act(() => result.current.navigate({ kind: 'daily', date: '2026-02-31' }))
-    expect(result.current.route).toEqual({ kind: 'today' })
-    // Normalization happens before the no-op check: re-navigating doesn't push.
-    expect(result.current.canBack).toBe(false)
-  })
-
-  it('normalizes a malformed daily initial route to today', () => {
-    const { result } = routerHook({ kind: 'daily', date: 'not-a-date' })
-    expect(result.current.route).toEqual({ kind: 'today' })
-  })
-
-  it('keeps a real daily date intact', () => {
-    const { result } = routerHook()
-    act(() => result.current.navigate({ kind: 'daily', date: '2026-06-08' }))
-    expect(result.current.route).toEqual({ kind: 'daily', date: '2026-06-08' })
-  })
-
-  it('drops scroll offsets for a truncated forward branch', () => {
-    const { result } = routerHook()
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    act(() => result.current.saveScrollState(99))
-    act(() => result.current.back())
-    // Navigating from a back position truncates the branch holding notes/a.md.
-    act(() => result.current.navigate({ kind: 'search', query: 'x' }))
-    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
-    expect(result.current.savedScroll()).toBeNull() // a new entry, not the old one
+    await view.rerender(<Harness frozen={false} />)
+    await expect.element(view.getByTestId('frozen-probe')).toMatchTextContent('note:1')
   })
 
   describe('note moves (Plan 17)', () => {
-    it('rewrites the current route and history entries when a note moves', () => {
-      const { result } = routerHook()
-      act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
-      act(() => result.current.navigate({ kind: 'allNotes', tag: null }))
-      act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
+    it('rewrites the current route when a note moves', async () => {
+      const { result, core } = await routerHook()
+      await act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
       const arrivalsBefore = result.current.arrivalSeq
       const entryBefore = result.current.entryId
-      const revisionBefore = result.current.navigationRevision()
 
-      act(() => emitNoteMoved('notes/01abc.md', 'notes/meeting-notes.md'))
+      await act(() => core.noteMove.followHealedMove('notes/01abc.md', 'notes/meeting-notes.md'))
 
-      // The current entry followed the file — a rewrite, not an arrival, on
-      // the same entry (views keep their scroll; nothing re-anchors).
       expect(result.current.route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
       expect(result.current.arrivalSeq).toBe(arrivalsBefore)
       expect(result.current.entryId).toBe(entryBefore)
-      expect(result.current.navigationRevision()).toBe(revisionBefore + 1)
-
-      // The earlier history entry followed too: back over the rename lands
-      // on the file's real home, never the dead path.
-      act(() => result.current.back())
-      expect(result.current.route).toEqual({ kind: 'allNotes', tag: null })
-      act(() => result.current.back())
-      expect(result.current.route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
     })
 
-    it('leaves unrelated routes untouched', () => {
-      const { result } = routerHook()
-      act(() => result.current.navigate({ kind: 'note', path: 'notes/other.md' }))
+    it('a move settling after the workspace unmounts is harmless', async () => {
+      const { result, unmount, core } = await routerHook()
+      await act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
+      await unmount()
 
-      act(() => emitNoteMoved('notes/01abc.md', 'notes/meeting-notes.md'))
-
-      expect(result.current.route).toEqual({ kind: 'note', path: 'notes/other.md' })
-    })
-
-    it('a move settling after the workspace unmounts is harmless', () => {
-      const { result, unmount } = routerHook()
-      act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
-      unmount()
-
-      emitNoteMoved('notes/01abc.md', 'notes/meeting-notes.md')
+      core.noteMove.followHealedMove('notes/01abc.md', 'notes/meeting-notes.md')
     })
   })
 })

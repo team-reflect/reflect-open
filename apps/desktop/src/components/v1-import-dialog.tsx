@@ -1,15 +1,14 @@
 import type { ReactElement } from 'react'
-import type { GraphImportProgress, GraphImportSummary } from '@reflect/core'
-import { Button } from '@/components/ui/button'
+import type { GraphImportProgress, GraphImportSummary, V1ImportState } from '@reflect/core'
+import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Progress } from '@/components/ui/progress'
-import type { V1ImportState } from '@/providers/v1-import-provider'
+} from '@/components/ui/dialog.tsx'
+import { Progress } from '@/components/ui/progress.tsx'
 
 interface V1ImportDialogProps {
   state: V1ImportState
@@ -79,23 +78,18 @@ export function V1ImportDialog({ state, onCancel, onDismiss }: V1ImportDialogPro
   return (
     <Dialog
       open={state.phase !== 'idle'}
-      onOpenChange={(next) => {
-        if (!next && !running) {
-          onDismiss()
+      onOpenChange={(next, eventDetails) => {
+        if (next) {
+          return
         }
+        if (running || eventDetails.reason === 'outside-press') {
+          eventDetails.cancel()
+          return
+        }
+        onDismiss()
       }}
     >
-      <DialogContent
-        showCloseButton={false}
-        onInteractOutside={(event) => {
-          event.preventDefault()
-        }}
-        onEscapeKeyDown={(event) => {
-          if (running) {
-            event.preventDefault()
-          }
-        }}
-      >
+      <DialogContent showCloseButton={false}>
         {state.phase === 'running' ? (
           <>
             <DialogTitle>Importing from Reflect V1</DialogTitle>

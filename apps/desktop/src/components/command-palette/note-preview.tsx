@@ -1,13 +1,13 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { isAppError, readNote, splitFrontmatter } from '@reflect/core'
-import { MarkdownPreview } from '@/editor/markdown-preview'
-import { useAssetPersistence } from '@/editor/use-asset-persistence'
-import { formatDayLabel } from '@/lib/dates'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useGraph } from '@/providers/graph-provider'
-import { useSettings } from '@/providers/settings-provider'
-import type { NoteEntry } from './entries'
+import { MarkdownPreview } from '@/editor/markdown-preview.tsx'
+import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
+import { splitFrontmatter, formatDayLabel } from '@reflect/core'
+import type { NoteEntry } from '@reflect/app'
+import { queryKeys } from '@/lib/query-client.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The palette's live preview pane: the highlighted result's markdown, read
@@ -23,24 +23,14 @@ interface NotePreviewProps {
   entry: NoteEntry
 }
 
-async function readNoteForPreview(path: string): Promise<string | null> {
-  try {
-    return await readNote(path)
-  } catch (cause) {
-    if (isAppError(cause) && cause.kind === 'notFound') {
-      return null
-    }
-    throw cause
-  }
-}
-
 export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
-  const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
+  const { noteDocuments } = useCoreServices()
+  const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(entry.path)
   const { data, isError } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note-preview', entry.path],
-    queryFn: () => readNoteForPreview(entry.path),
+    queryKey: queryKeys.index.notePreview(graph?.root, entry.path),
+    queryFn: () => noteDocuments.readSource(entry.path),
     enabled: graph !== null,
   })
 
@@ -54,7 +44,15 @@ export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   } else if (body === null || body.trim() === '') {
     content = <p className="text-sm text-text-muted italic">Empty</p>
   } else {
-    content = <MarkdownPreview content={body} resolveImageUrl={resolveImageUrl} />
+    content = (
+      <MarkdownPreview
+        content={body}
+        // Note links stay inert, like the preview's wiki link chips.
+        sourcePath={null}
+        resolveImageUrl={resolveImageUrl}
+        resolveWikiEmbed={resolveWikiEmbed}
+      />
+    )
   }
 
   return (

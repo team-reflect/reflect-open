@@ -11,13 +11,16 @@ app is closed: the host spools into the graph's capture inbox
 [Plan 11](../../docs/plans/11-link-capture.md) is the design doc.
 
 Install the published extension from the
-[Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
+[Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd),
+or load the `-unpacked.zip` from the latest
+[`extension-v*` release](https://github.com/team-reflect/reflect-open/releases?q=extension-v)
+before store review finishes.
 
 ## Architecture in one breath
 
 popup → `chrome.storage` queue → background `sendNativeMessage` →
 `reflect-capture-host` (Tauri sidecar, registered by the desktop app on every
-launch) → capture inbox → desktop drain (`@reflect/core` `actions/capture`):
+launch) → capture inbox → desktop drain (`@reflect/core` `CaptureService`):
 raw note + daily `## [[Links]]` entry now (resolving or creating that category
 note), meta-scrape + BYOK AI title + description async. The extension stores no
 keys and makes no AI or network calls; its only honest status is **queued** — it
@@ -25,17 +28,17 @@ cannot observe the desktop drain.
 
 ## Develop
 
-```bash
-pnpm --filter @reflect/extension dev     # wxt dev server (auto-reloads in Chrome)
-pnpm --filter @reflect/extension build   # production build → .output/chrome-mv3
-pnpm --filter @reflect/extension test    # vitest over lib/
-```
+Scripts are in `package.json` (`dev`, `build`, `test`, `zip`).
 
 Load a build via `chrome://extensions` → Developer mode → **Load unpacked**.
-Prefer `pnpm … dev` (`.output/chrome-mv3-dev`) for development — it auto-reloads
-and always keeps the pinned `key`. You can also load the `pnpm … build` output
+The dev server does not open Chrome for you: load `.output/chrome-mv3-dev` once,
+and it hot-reloads from then on. You can also load the `build` output
 (`.output/chrome-mv3`), but **do not load the `pnpm zip` output**: the store
 artifact omits `key`, so it loads under a random ID the host won't allowlist.
+
+The options page opens from the toolbar icon's context menu (Options), from
+Details → Extension options on `chrome://extensions`, or from the gear in the
+popup's header.
 
 For the native hop to work, run the desktop app once (it writes the host
 manifests for detected browsers and the active-graph pointer file), then
@@ -43,17 +46,15 @@ restart Chrome so it re-reads the manifests.
 
 ### Troubleshooting: "Install Reflect to finish saving…" while Reflect is installed
 
-That message is the `no-host` state — Chrome could not reach (or was not
+That message is the `no-host` state: Chrome could not reach (or was not
 allowlisted by) the native-messaging host. Check, in order:
 
 1. **The extension's ID.** In `chrome://extensions`, the card must read either
-   `ccabifmooehighoonjeiololjfofkhkd` for the Chrome Web Store listing or
-   `dlbliojklpickgimjdmjjdnbjdiomjik` for an unpacked development build. Any
-   other ID means you loaded a **keyless** local build (typically
-   `.output/chrome-mv3` right after `pnpm zip`, which builds with
-   `WXT_STORE_BUILD=true`). Rebuild with `pnpm … dev` or `pnpm … build`, then
-   **Reload** the extension. The host allowlists only the store and pinned dev
-   IDs, so a wrong ID is rejected as "forbidden" → this message.
+   `ccabifmooehighoonjeiololjfofkhkd` (Chrome Web Store) or
+   `dlbliojklpickgimjdmjjdnbjdiomjik` (unpacked build). Any other ID means you
+   loaded a **keyless** local build (typically `.output/chrome-mv3` right after
+   `pnpm zip`). The host rejects it as "forbidden". Rebuild with `dev` or
+   `build`, then **Reload** the extension.
 2. **The desktop app has run at least once** on this machine, so it has written
    `~/Library/Application Support/<browser>/NativeMessagingHosts/app.reflect.capture.json`.
    If Chrome was already open when that file appeared, restart Chrome.
@@ -64,26 +65,13 @@ allowlisted by) the native-messaging host. Check, in order:
 The capture is never lost while held — it stays queued and retries automatically
 once the host is reachable.
 
-## The unpacked ID is pinned — and the store ID is not the same
+## The unpacked ID is pinned, and the store ID is different
 
-`wxt.config.ts` carries a public `key`, which fixes the extension ID to
-`dlbliojklpickgimjdmjjdnbjdiomjik` for **unpacked** loads — `wxt dev`, CI, and a
-`wxt build` you load by hand. The desktop app's host manifests
-(`apps/desktop/src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`) allowlist exactly
-this origin, so during development the native hop works. Changing the key without
-updating that constant silently breaks it. The private half of the key is
-deliberately discarded; unpacked loads only need the public key.
-
-**The Chrome Web Store does not use this key.** It rejects a `key` field in the
-uploaded package (`key field is not allowed in manifest`) and minted the live
-listing ID `ccabifmooehighoonjeiololjfofkhkd`. So:
-
-- The store artifact must **omit** `key`. `pnpm zip` sets `WXT_STORE_BUILD=true`,
-  which drops it; every other build keeps it. (`manifest-key.test.ts` still pins
-  the dev key against `EXTENSION_ORIGINS`.)
-- `apps/desktop/src-tauri/src/capture.rs` must keep both the store ID and the
-  pinned dev ID in `EXTENSION_ORIGINS`, or the native hop will fail for one of
-  the two install modes.
+`wxt.config.ts` explains the two IDs: a public `key` pins the unpacked ID, and
+the store rejects `key` and minted its own ID, so `pnpm zip` drops it.
+`EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs` must keep both
+IDs, or the native hop fails for one of the two install modes. Changing the key
+without updating that constant silently breaks unpacked loads.
 
 To derive an ID from a key (if it ever has to change):
 
@@ -96,22 +84,55 @@ openssl rsa -in key.pem -pubout -outform DER | shasum -a 256 \
 
 ## Releasing updates to the Chrome Web Store
 
-`pnpm --filter @reflect/extension zip` produces a key-stripped,
-signed-on-upload package whose manifest declares only the permissions the code
-uses (see the justifications below). Upload updates to the existing
-[Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
-in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
+release-please maintains a separate draft `chore(extension): release <version>` PR
+on `master`. Mark it ready and merge it to publish the GitHub release with an
+`extension-v<version>` tag and run the
+[Publish browser extension workflow](../../.github/workflows/publish-browser-extension.yml).
+The workflow builds the store ZIP from that commit and uses `wxt submit` to
+submit it to the existing
+[Reflect Capture listing](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd).
+After review approval, publish the staged update in the dashboard. The GitHub
+release does not indicate store review has finished.
 
-### Build & upload
+The extension version and changelog are independent of desktop beta/stable
+releases. Let release-please update `package.json` and `CHANGELOG.md`. Extension
+`feat`/`fix` changes must touch `apps/extension`; shared dependency changes that
+need an extension release should include an extension-local change describing
+the affected behavior. A `chore` commit alone does not trigger a release.
 
-1. `pnpm --filter @reflect/extension check` (typecheck + lint) and
-   `pnpm --filter @reflect/extension test` — both must be green.
-2. `pnpm --filter @reflect/extension zip` → upload
-   `.output/reflect-capture-<version>-chrome.zip`. This artifact omits the manifest
-   `key` (the store rejects it); a plain `wxt build` keeps it for unpacked loads.
-3. Keep `chrome-extension://ccabifmooehighoonjeiololjfofkhkd/` in
-   `EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs`; the
-   native-messaging host manifests rewrite themselves on each desktop launch.
+### Configuration
+
+The workflow reads its secrets from the `release_extension` environment. The
+service account must be linked to the existing publisher in the Chrome Web
+Store dashboard. See [Google's setup instructions](https://developer.chrome.com/docs/webstore/service-accounts).
+Use the v2 API service account credentials, not the deprecated v1 OAuth tokens.
+
+### Retries and manual recovery
+
+The workflow runs only through release-please. For a failed run, inspect the
+[Developer Dashboard](https://chrome.google.com/webstore/devconsole) first, then
+rerun the failed job in GitHub Actions if a fresh upload is appropriate. Each rerun
+builds a new ZIP from the release commit.
+
+`wxt submit` does not cancel pending reviews by default or skip already submitted
+versions. If the version is pending or published, finish recovery in the dashboard
+instead of uploading again. The pinned publisher also fails when Google processes
+an upload asynchronously; wait for processing and submit the uploaded package in
+the dashboard. A published regression needs a higher version containing the fix.
+
+Before merging a Release PR, update listing/privacy declarations for changed
+permissions or capture behavior and check compatibility with the oldest supported
+installed desktop host. Test the store-installed extension on macOS, including
+queued captures while the app is closed. For unpacked native-messaging tests, use
+a normal `build`, not a store ZIP.
+
+### Manual packaging fallback
+
+Run `pnpm check` at the repository root and
+`pnpm --filter @reflect/extension test`, then
+`pnpm --filter @reflect/extension zip`. Upload
+`apps/extension/.output/reflect-capture-<version>-chrome.zip` to the existing
+listing only after checking its current published and submitted versions.
 
 ### Listing copy
 
@@ -130,6 +151,16 @@ in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 > A capture includes the page's URL and title, your current text selection, and a
 > screenshot of the visible tab. Optionally, tick "Capture page text" to include the
 > page's readable text as well.
+>
+> Bookmarking a post on X also saves its link to Reflect. This is enabled by
+> default and can be turned off in the extension's options (right-click the
+> toolbar icon and choose Options). You can independently enable "Save new X
+> likes to my daily note" there. Likes are off by default. New likes are saved
+> under "X likes"; bookmarking and liking the same post on one day saves it once.
+> Existing likes are not imported, and unliking does not remove saved content.
+> The extension records requests on x.com in this browser, even if X later
+> rejects the action. When available, captured post data follows the same
+> offline archive path for likes and bookmarks; otherwise the URL is kept.
 >
 > Captures are handed to the **installed Reflect desktop app** over a local connection
 > on your own machine — there is no Reflect account and no Reflect server in the path.
@@ -155,7 +186,7 @@ submission.
 
 ### Permission justifications
 
-Each is reviewed individually; every permission below is exercised by the code:
+The store reviews each permission individually:
 
 | Permission | Why it's needed |
 | --- | --- |
@@ -165,12 +196,16 @@ Each is reviewed individually; every permission below is exercised by the code:
 | `storage` | Queue captures locally so a capture survives the app being closed and retries until it spools. |
 | `unlimitedStorage` | Queued captures embed a screenshot data URL, which can exceed the default storage quota while waiting for the app. |
 | `alarms` | A coarse retry timer so held captures flush once Reflect is installed/launched later. |
+| `webRequest` + `https://x.com/*` | Observe enabled bookmark and like requests on x.com to save the post to your daily note. |
 
 ### Data-handling disclosures (Privacy practices tab)
 
 - **Data collected:** *Website content* (the captured page's URL, title, selection,
-  screenshot, and — only when opted in — page text). Collected **only on an explicit
-  user action**, never in the background.
+  screenshot, and optional page text), plus the post identifier and available
+  post snapshot when you bookmark or like on X with that capture setting enabled.
+  The background worker observes the selected actions on x.com; it does not
+  capture unrelated browsing content. Disabling a setting stops new captures;
+  already accepted captures continue delivery.
 - **Where it goes:** to the user's own machine (the local Reflect desktop app). It is
   **not** sent to Reflect or any third party.
 - The three required certifications are all true and can be affirmed:

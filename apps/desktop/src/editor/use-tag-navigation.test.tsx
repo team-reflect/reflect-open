@@ -1,13 +1,21 @@
-import { act, render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import type { ReactNode } from 'react'
-import { RouterProvider, useRouter } from '@/routing/router'
-import { useTagNavigation } from './use-tag-navigation'
+import { describe, expect, it, vi } from 'vitest'
+import { createRef, useLayoutEffect, type ReactNode, type RefObject } from 'react'
+import { useRouter } from '@/routing/router.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { useTagNavigation, type TagNavigation } from './use-tag-navigation.ts'
 
-let lastHandler: ((tag: string) => void) | null = null
+const lastHandlerRef: RefObject<TagNavigation | null> = createRef()
 
 function Host(): ReactNode {
-  lastHandler = useTagNavigation()
+  const lastHandler = useTagNavigation()
+
+  useLayoutEffect(() => {
+    lastHandlerRef.current = lastHandler
+    return () => {
+      lastHandlerRef.current = null
+    }
+  }, [lastHandler])
+
   return null
 }
 
@@ -17,23 +25,24 @@ function RouteProbe(): ReactNode {
 }
 
 function renderHost() {
-  return render(
-    <RouterProvider>
+  return renderInApp(
+    <>
       <Host />
       <RouteProbe />
-    </RouterProvider>,
+    </>,
   )
 }
 
-function currentRoute(view: ReturnType<typeof renderHost>): string {
-  return view.getByTestId('route').textContent ?? ''
+function currentRoute(view: Awaited<ReturnType<typeof renderHost>>): string {
+  return view.getByTestId('route').element().textContent ?? ''
 }
 
 describe('useTagNavigation', () => {
-  it('opens All Notes filtered by the clicked tag', () => {
-    const view = renderHost()
-    act(() => lastHandler?.('book'))
-    expect(JSON.parse(currentRoute(view))).toEqual({ kind: 'allNotes', tag: 'book' })
-    view.unmount()
+  it('opens All Notes filtered by the clicked tag', async () => {
+    const view = await renderHost()
+    lastHandlerRef.current?.('book')
+    await vi.waitFor(() => {
+      expect(JSON.parse(currentRoute(view))).toEqual({ kind: 'allNotes', tag: 'book' })
+    })
   })
 })

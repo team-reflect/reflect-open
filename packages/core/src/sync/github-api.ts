@@ -1,7 +1,5 @@
-import { z } from 'zod'
-import { ReflectError } from '../errors'
-
-export type FetchFn = typeof fetch
+import type { z } from 'zod'
+import { AppError } from '../errors.ts'
 
 export const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/json' }
 
@@ -21,14 +19,14 @@ export async function readJson<Schema extends z.ZodType>(
   try {
     body = await response.json()
   } catch {
-    throw new ReflectError(
+    throw new AppError(
       'network',
       `${what}: GitHub returned an unreadable response (${response.status})`,
     )
   }
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
-    throw new ReflectError(
+    throw new AppError(
       'parse',
       `${what}: GitHub returned an unexpected response shape (${response.status})`,
     )

@@ -36,7 +36,9 @@ export function Input({
       }}
     >
       {leadingIcon && (
-        <span style={{ display: 'flex', color: 'var(--text-muted)', flex: 'none' }}>{leadingIcon}</span>
+        <span style={{ display: 'flex', color: 'var(--text-muted)', flex: 'none' }}>
+          {leadingIcon}
+        </span>
       )}
       <input
         type={type}

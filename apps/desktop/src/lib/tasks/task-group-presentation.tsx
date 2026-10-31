@@ -1,8 +1,6 @@
 import type { ReactElement } from 'react'
 import { AlarmClock, Calendar, FileText, Pin, Star } from 'lucide-react'
-import type { TaskGroup } from '@reflect/core'
-import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target'
-import { insertTargetForTask, todaysDailyTarget } from '@/lib/tasks/task-navigation'
+import { todaysDailyTarget, type InsertTaskTarget, type TaskGroup } from '@reflect/core'
 
 /**
  * The presentation contract a task-group section shares across surfaces —
@@ -16,7 +14,9 @@ export interface TaskGroupHeaderStyle {
   colorClass: string
 }
 
-/** The icon + accent colour for a group's sticky header, V1's per-bucket styling. */
+/**
+ * The icon + accent colour for a group's sticky header, V1's per-bucket styling.
+ */
 export function taskGroupHeaderStyle(group: TaskGroup): TaskGroupHeaderStyle {
   switch (group.kind) {
     case 'current':
@@ -42,5 +42,5 @@ export function addTargetForGroup(group: TaskGroup, today: string): InsertTaskTa
     return todaysDailyTarget(today)
   }
   const first = group.tasks[0]
-  return group.kind === 'note' && first !== undefined ? insertTargetForTask(first) : null
+  return group.kind === 'note' && first !== undefined ? first : null
 }

@@ -1,0 +1,81 @@
+import type { IdService } from '../ports/id-service.ts'
+import type { IndexStoreService } from '../indexing/index-store-service.ts'
+import { upsertFrontmatter } from '../markdown/frontmatter.ts'
+import { slugForTitle } from '../markdown/slug.ts'
+import type { NoteFileService } from './note-file-service.ts'
+import { notePath } from './paths.ts'
+
+/**
+ * The first-run seed (Plan 15 step 1): a brand-new graph gets one short,
+ * pinned "How to use Reflect" note. It doubles as the optional-setup surface:
+ * backup and AI keys are pointers into Settings, not a wizard, so onboarding
+ * never gates the editor and "skipping" is just not reading the note.
+ */
+
+const WELCOME_TITLE = 'How to use Reflect'
+
+/** Title-derived slug path, same birth rules as any titled note. */
+export const WELCOME_NOTE_PATH = notePath(slugForTitle(WELCOME_TITLE))
+
+/**
+ * The `index_meta` key marking that onboarding was considered for this graph.
+ * `index_clear` deliberately preserves `index_meta`, so the marker survives
+ * index rebuilds; only deleting `.reflect/` wholesale resets it.
+ */
+export const WELCOME_SEEDED_META_KEY = 'welcomeSeeded'
+
+const WELCOME_BODY = `# ${WELCOME_TITLE}
+
+Reflect is a daily notebook: press ⌘D any time to land on today's note and write.
+
+- **Link as you think.** Type \`[[\` and a title — [[Wiki Links]] connect notes. There are no folders.
+- **Find anything.** ⌘K searches your whole graph; ⌘/ lists every shortcut.
+- **Your files.** Every note is a markdown file in this folder, portable forever.
+
+When you want more, open Settings (⌘,):
+
+- **Backup** — free, private backup of your graph to GitHub.
+- **AI providers** — add your own API key to chat with your notes (⌘J). Notes marked private never leave this device.
+
+This note is pinned to the sidebar — unpin it (⌘O) when you're done.
+`
+
+export interface EnsureWelcomeNoteOptions {
+  /**
+   * File-write generation (`graph.generation`): pins the listing and write.
+   */
+  fileGeneration: number
+  /**
+   * Index-session generation (`index_open`): pins the meta marker.
+   */
+  indexGeneration: number
+}
+
+/**
+ * Consider onboarding for this graph **exactly once** (find-or-create): when
+ * the `welcomeSeeded` marker is absent, an **empty** graph gets the welcome
+ * note, while any existing content means this is someone's data and only gets
+ * marked. Empty means the scan found nothing at all (no notes, no
+ * attachments, and nothing it had to skip): a folder of PDFs, or one whose
+ * files were unreadable, must not be seeded into. Either way the marker lands,
+ * so deleting the note, or emptying the graph entirely, never re-onboards.
+ * The marker is stamped after the write: a failed seed retries on the next
+ * open, and a retry that finds the note already on disk converges to marking.
+ * Returns whether a seed happened.
+ */
+export async function ensureWelcomeNote(
+  ctx: { indexStore: IndexStoreService; noteFile: NoteFileService; id: IdService },
+  options: EnsureWelcomeNoteOptions,
+): Promise<boolean> {
+  if ((await ctx.indexStore.getMeta(WELCOME_SEEDED_META_KEY)) !== null) {
+    return false
+  }
+  const stats = await ctx.noteFile.vaultScanStats(options.fileGeneration)
+  const seeded = stats.notes === 0 && stats.attachments === 0 && stats.skipped === 0
+  if (seeded) {
+    const source = upsertFrontmatter(WELCOME_BODY, { id: ctx.id.noteId(), pinned: true })
+    await ctx.noteFile.write(WELCOME_NOTE_PATH, source, options.fileGeneration)
+  }
+  await ctx.indexStore.setMeta(WELCOME_SEEDED_META_KEY, 'true', options.indexGeneration)
+  return seeded
+}

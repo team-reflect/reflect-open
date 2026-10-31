@@ -1,9 +1,8 @@
 /**
- * Contact-field emails — the `- Email: ada@example.com` bullet shape of v1's
- * person template, written today by the contacts integration
- * (`contactDetailsMarkdown`) and the meeting flow's person-note pre-fill.
- * The indexer projects these into `note_emails` so an invite email can find
- * the person note that owns it (attendee resolution in the calendar flow).
+ * Contact-field emails — the canonical `- Email: ada@example.com` V2 shape,
+ * plus V1's `- Email:` / nested-value shape. The indexer projects these into
+ * `note_emails` so an invite email can find the person note that owns it
+ * (attendee resolution in the calendar flow).
  *
  * Ownership is deliberately narrow: only an explicit `Email:` field bullet
  * counts. A bare address in prose — a daily note quoting an email, a meeting
@@ -11,42 +10,113 @@
  * the address.
  */
 
-/** An `Email:` field bullet (any list marker, any case), capturing its value. */
-const EMAIL_FIELD_PATTERN = /^[ \t]*[-+*][ \t]+email:(.*)$/gim
+/**
+ * An `Email:` field bullet (or pre-2023 V1 `Emails`), capturing indentation
+ * and an optional inline value. A missing colon is accepted only when the
+ * label occupies the whole list item.
+ */
+const EMAIL_FIELD_PATTERN = /^([ \t]*)[-+*][ \t]+emails?[ \t]*(?::(.*))?$/i
+
+/** A nested unordered-list item, capturing indentation and value. */
+const LIST_ITEM_PATTERN = /^([ \t]*)[-+*][ \t](.*)$/
+const LEADING_WHITESPACE_PATTERN = /^[ \t]*/
+const MARKDOWN_TAB_WIDTH = 4
 
 /**
- * An address inside a field value (tolerates `mailto:` links and commas —
- * excluding `:` keeps the scheme out of the local part).
+ * An address inside a field value, captured in group 1. The local part is a
+ * practical subset (letters, digits, `._%+'-`). Leading `._%+'-` are skipped,
+ * so `'ada@example.com'` and `_ada@example.com_` yield the bare address.
+ * Each domain label starts and ends with a letter or digit, so trailing
+ * punctuation, `?query`, `/path`, and Markdown or CJK marks end the match.
+ * The leading non-capturing group starts a match only at a token boundary,
+ * which keeps the scan linear.
  */
-const EMAIL_PATTERN = /[^\s@<>(),;:[\]]+@[^\s@<>(),;:[\]]+\.[^\s@<>(),;:[\]]+/g
+const EMAIL_PATTERN =
+  /(?:^|[^\p{L}\p{N}._%+'-])[._%+'-]*([\p{L}\p{N}][\p{L}\p{N}._%+'-]*@(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?\.)+[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)/gu
 
-/** Normalize an email for matching: trimmed, lowercased. */
-export function foldEmail(email: string): string {
-  return email.trim().toLowerCase()
+/**
+ * Normalize an email identity for matching. Provider-specific transformations
+ * such as removing dots or `+tags` are deliberately not applied.
+ */
+export function canonicalEmail(email: string): string {
+  const trimmed = email.trim()
+  const wrapped = trimmed.match(/^[^<>]*<([^<>]+)>$/)
+  const unwrapped = wrapped?.[1]?.trimStart() ?? trimmed
+  const mailto = unwrapped.match(/^mailto:([^?#]*)/i)
+  return (mailto?.[1] ?? unwrapped).trim().toLowerCase()
+}
+
+/** Canonicalize, remove blanks, and deduplicate email identities in order. */
+export function canonicalEmails(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const emails: string[] = []
+  for (const value of values) {
+    const email = canonicalEmail(value)
+    if (email === '' || seen.has(email)) {
+      continue
+    }
+    seen.add(email)
+    emails.push(email)
+  }
+  return emails
+}
+
+function indentationWidth(whitespace: string): number {
+  let width = 0
+  for (const character of whitespace) {
+    if (character === '\t') {
+      width += MARKDOWN_TAB_WIDTH - (width % MARKDOWN_TAB_WIDTH)
+    } else {
+      width += 1
+    }
+  }
+  return width
+}
+
+function appendEmails(value: string, seen: Set<string>, emails: string[]): void {
+  for (const match of value.matchAll(EMAIL_PATTERN)) {
+    const email = match[1] ?? ''
+    const key = canonicalEmail(email)
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    emails.push(email)
+  }
 }
 
 /**
- * Every email a note body owns via `- Email:` field bullets, in document
- * order, case-insensitively deduplicated (first casing kept). One bullet may
- * carry several addresses (comma-separated, or a `mailto:` link whose text
- * repeats the address — the dedup collapses that pair). Run this on the
- * body, frontmatter split off.
+ * Every email a note body owns via a contact field, in document order and
+ * case-insensitively deduplicated (first casing kept). V2 writes the value on
+ * the `- Email:` line. V1 wrote an empty parent followed by nested address
+ * bullets. Run this on the body, frontmatter split off.
  */
 export function extractEmailFields(body: string): string[] {
   const seen = new Set<string>()
   const emails: string[] = []
-  for (const field of body.matchAll(EMAIL_FIELD_PATTERN)) {
-    const value = field[1] ?? ''
-    for (const match of value.matchAll(EMAIL_PATTERN)) {
-      // The field value is free-form prose; a sentence-final dot glued to an
-      // address is punctuation, not domain.
-      const email = match[0].replace(/\.+$/, '')
-      const key = foldEmail(email)
-      if (seen.has(key)) {
-        continue
-      }
-      seen.add(key)
-      emails.push(email)
+  let legacyParentIndent: number | null = null
+
+  for (const line of body.split(/\r\n?|\n/)) {
+    const field = line.match(EMAIL_FIELD_PATTERN)
+    if (field !== null) {
+      const inlineValue = field[2] ?? ''
+      appendEmails(inlineValue, seen, emails)
+      legacyParentIndent = inlineValue.trim() === '' ? indentationWidth(field[1] ?? '') : null
+      continue
+    }
+
+    if (legacyParentIndent === null || line.trim() === '') {
+      continue
+    }
+
+    const item = line.match(LIST_ITEM_PATTERN)
+    const whitespace = item?.[1] ?? line.match(LEADING_WHITESPACE_PATTERN)?.[0] ?? ''
+    if (indentationWidth(whitespace) <= legacyParentIndent) {
+      legacyParentIndent = null
+      continue
+    }
+    if (item !== null) {
+      appendEmails(item[2] ?? '', seen, emails)
     }
   }
   return emails

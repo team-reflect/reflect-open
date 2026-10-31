@@ -97,13 +97,14 @@ the original release scope and are **in** scope for the privacy/signing review.
     - **Flavors (shipped):** three coexisting apps via `--config` overlays — Reflect
       (stable, `app.reflect.desktop`, shipped blue/violet icon), Reflect Beta (`…​.beta`,
       purple/violet), Reflect Dev (`…​.dev`, green, no updates). Beta/dev icons are the stable
-      artwork recolored via `magick -modulate`. `release:macos` derives the flavor from the
-      version channel. See docs/macos-distribution.md → Build flavors.
-    - **Release automation (shipped):** versioning moved to release-please with one
-      channel per branch (`next` → beta Release PR, `master` → stable Release PR).
+      artwork in another color. `release:macos` derives the flavor from the
+      version channel. See docs/distribution.md.
+    - **Release automation (shipped):** versioning moved to release-please, which
+      maintains beta and stable channels side by side on `master` (one Release PR
+      per channel).
       The app version lives only in `apps/desktop/package.json`; releases are created
       as drafts and undrafted after the assets upload; `release-bump.mjs` was removed.
-      See docs/macos-distribution.md → Cutting a release.
+      See docs/distribution.md.
 
 11. **Definition-of-success walkthrough.** Manually verify the product-vision success
     list end-to-end (below) as the release checklist.

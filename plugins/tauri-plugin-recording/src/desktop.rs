@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use tauri::{plugin::PluginApi, AppHandle, Runtime};
+use tauri::{AppHandle, Runtime, plugin::PluginApi};
 
 use crate::models::*;
 
@@ -10,13 +10,11 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     Ok(Recording(app.clone()))
 }
 
-/// Desktop stand-in: desktop records through the webview's MediaRecorder
-/// (`use-audio-recorder.ts`), so every native-recorder call here is a plain
-/// unsupported error — loud, because nothing on desktop should reach it.
+/// Compiled only by workspace-wide desktop builds; the shipped desktop app never compiles it.
 pub struct Recording<R: Runtime>(AppHandle<R>);
 
 impl<R: Runtime> Recording<R> {
-    pub fn start_recording(&self, _request: StartRequest) -> crate::Result<()> {
+    pub fn start_recording(&self, _request: StartRequest) -> crate::Result<StartResponse> {
         Err(crate::Error::UnsupportedPlatform)
     }
 
@@ -45,10 +43,6 @@ impl<R: Runtime> Recording<R> {
     }
 
     pub fn list_staged(&self) -> crate::Result<ListStagedResponse> {
-        Err(crate::Error::UnsupportedPlatform)
-    }
-
-    pub fn read_staged(&self, _request: StagedPathRequest) -> crate::Result<ReadStagedResponse> {
         Err(crate::Error::UnsupportedPlatform)
     }
 

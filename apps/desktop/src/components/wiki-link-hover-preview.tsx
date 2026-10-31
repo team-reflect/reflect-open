@@ -1,15 +1,17 @@
 import { useLayoutEffect, useState, type ReactElement } from 'react'
-import { dateFromDailyPath, type DateFormat } from '@reflect/core'
-import { MarkdownPreview } from '@/editor/markdown-preview'
-import { formatDayLabel } from '@/lib/dates'
-import { cn } from '@/lib/utils'
+import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
+import { MarkdownPreview } from '@/editor/markdown-preview.tsx'
+import { dateFromDailyPath, type DateFormat, formatDayLabel } from '@reflect/core'
+import { cn } from '@/lib/utils.ts'
 
 interface WikiLinkHoverPreviewProps {
   path: string
   /** The note body with frontmatter already stripped. */
   markdown: string
   dateFormat: DateFormat
-  resolveImageUrl: (src: string) => string | null
+  resolveImageUrl: ImageUrlResolver
+  /** Classify the note's `![[embeds]]`, resolved from its own folder. */
+  resolveWikiEmbed?: WikiEmbedResolver
 }
 
 /**
@@ -58,6 +60,7 @@ export function WikiLinkHoverPreview({
   markdown,
   dateFormat,
   resolveImageUrl,
+  resolveWikiEmbed,
 }: WikiLinkHoverPreviewProps): ReactElement {
   const dailyDate = dateFromDailyPath(path)
   const empty = markdown.trim().length === 0
@@ -81,7 +84,9 @@ export function WikiLinkHoverPreview({
         ) : (
           <MarkdownPreview
             content={markdown}
+            sourcePath={path}
             resolveImageUrl={resolveImageUrl}
+            resolveWikiEmbed={resolveWikiEmbed}
             interactive={false}
             className="text-xs leading-relaxed"
           />

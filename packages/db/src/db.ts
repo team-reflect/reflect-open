@@ -1,6 +1,6 @@
 import { CamelCasePlugin, Kysely } from 'kysely'
-import { IpcDialect, type QueryRunner } from './dialect'
-import type { Database } from './schema'
+import { IpcDialect, type QueryRunner } from './dialect.ts'
+import type { Database } from './schema.ts'
 
 /**
  * Build a Kysely instance over an injected {@link QueryRunner}. The

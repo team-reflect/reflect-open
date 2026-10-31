@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils.ts'
 
 interface AppShellProps {
   /** The workspace sidebar; omit to render the note pane edge-to-edge. */
@@ -39,10 +39,7 @@ export function AppShell({
 }: AppShellProps): ReactElement {
   return (
     <div
-      className={cn(
-        'flex h-screen w-screen overflow-hidden bg-surface-app text-text',
-        className,
-      )}
+      className={cn('flex h-screen w-screen overflow-hidden bg-surface-app text-text', className)}
     >
       {sidebar ? (
         <aside

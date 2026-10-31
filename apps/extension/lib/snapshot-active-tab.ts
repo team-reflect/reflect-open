@@ -1,6 +1,6 @@
 import { browser, type Browser } from 'wxt/browser'
-import { isCapturableUrl, type CapturedPage } from './capture-message'
-import { samePageUrl } from './page-text'
+import { isCapturableUrl, type CapturedPage } from './capture-message.ts'
+import { samePageUrl } from './page-text.ts'
 
 /**
  * The result of trying to snapshot the active tab for capture.
@@ -78,5 +78,5 @@ export async function snapshotTab(tab: Browser.tabs.Tab | undefined): Promise<Ca
  */
 export async function snapshotActiveTab(): Promise<CapturedPageState> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true })
-  return snapshotTab(tab)
+  return await snapshotTab(tab)
 }

@@ -1,4 +1,22 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "include": ["src"]
+  "extends": "@ocavue/tsconfig/dom/app.json",
+  "compilerOptions": {
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": ["src", "src/**/*.json", "./*.ts"],
+  "references": [
+    {
+      "path": "../db/tsconfig.json"
+    },
+    {
+      "path": "../modules/tsconfig.json"
+    },
+    {
+      "path": "../utils/tsconfig.json"
+    }
+  ]
 }

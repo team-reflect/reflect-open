@@ -22,7 +22,7 @@ onboarding, target-gated Rust capabilities, and the first-party iOS keyboard plu
 physical-device validation and App Store/TestFlight hardening are still open.
 
 Two features landed beyond the original written plans: **audio memos** (raw-first
-capture with async BYOK cloud transcription via `actions/audio-memo`) and **durable AI
+capture with async BYOK cloud transcription via `audio/audio-memo`) and **durable AI
 chat persistence** (the `chat_*` tables in `index.sqlite` are the one sanctioned
 non-rebuildable exception to the projection-only rule). The AI copilot (Plan 10) ships
 as a dedicated, read-only chat view over local tools; patchsets/edits remain a later

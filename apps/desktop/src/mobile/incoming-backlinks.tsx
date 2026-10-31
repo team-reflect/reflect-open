@@ -1,11 +1,11 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { BacklinkLoadMore } from '@/components/backlink-load-more'
-import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation'
-import { useBacklinkSources } from '@/hooks/use-backlink-sources'
-import { useBacklinksExpanded } from '@/hooks/use-backlinks-expanded'
-import { IncomingBacklinkGroup } from '@/mobile/incoming-backlink-group'
-import { cn } from '@/lib/utils'
+import { BacklinkLoadMore } from '@/components/backlink-load-more.tsx'
+import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation.ts'
+import { useBacklinkSources } from '@/hooks/use-backlink-sources.ts'
+import { useBacklinksExpanded } from '@/hooks/use-backlinks-expanded.ts'
+import { IncomingBacklinkGroup } from '@/mobile/incoming-backlink-group.tsx'
+import { cn } from '@/lib/utils.ts'
 
 interface IncomingBacklinksProps {
   /** Graph-relative path of the note whose inbound links to show. */
@@ -29,7 +29,10 @@ interface IncomingBacklinksProps {
  * failed query surfaces as an alert, because a failing query means the index
  * is broken, not that the note is unlinked.
  */
-export function IncomingBacklinks({ path, className }: IncomingBacklinksProps): ReactElement | null {
+export function IncomingBacklinks({
+  path,
+  className,
+}: IncomingBacklinksProps): ReactElement | null {
   const {
     groups,
     count,
@@ -40,7 +43,7 @@ export function IncomingBacklinks({ path, className }: IncomingBacklinksProps): 
     loadMore,
   } = useBacklinkSources(path)
   const [expanded, setExpanded] = useBacklinksExpanded()
-  const { openSource, onWikilinkClick, resolveImageUrl } = useBacklinkNavigation()
+  const { openSource, onWikilinkClick } = useBacklinkNavigation()
 
   if (isError) {
     return (
@@ -89,7 +92,6 @@ export function IncomingBacklinks({ path, className }: IncomingBacklinksProps): 
             expanded={expanded}
             onOpen={openSource}
             onWikilinkClick={onWikilinkClick}
-            resolveImageUrl={resolveImageUrl}
           />
         ))}
         <BacklinkLoadMore

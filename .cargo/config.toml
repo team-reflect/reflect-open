@@ -1,0 +1,4 @@
+# Lint warnings in workspace crates fail the build. Use
+# `CARGO_BUILD_WARNINGS=warn` to allow them while iterating.
+[build]
+warnings = "deny"

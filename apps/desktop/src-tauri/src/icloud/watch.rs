@@ -1,15 +1,29 @@
 //! The iCloud change watcher: an `NSMetadataQuery` over the graph (Plan 21
-//! Phase 2).
+//! Phase 2). **Mobile only.**
 //!
-//! Two jobs, per platform:
+//! On iOS this query is the *sole* external-change source — there is no file
+//! watcher on mobile — so its snapshot diffs become the standard
+//! `index:changed` batches the indexer and open sessions already consume,
+//! and its `HasUnresolvedConflicts` flags are the conflict signal that
+//! triggers a prompt, candidate-scoped sweep.
 //!
-//! - **iOS**: the *sole* external-change source. There is no file watcher on
-//!   mobile — this query's snapshot diffs become the standard `index:changed`
-//!   batches the indexer and open sessions already consume.
-//! - **Both Apple platforms**: the conflict signal. A conflict version
-//!   appearing does not necessarily touch the working file, so the desktop
-//!   `notify` watcher alone would sit silent; the query's
-//!   `HasUnresolvedConflicts` flag is what triggers a sweep promptly.
+//! Desktop deliberately never installs it (issue #1180). The `notify` watcher
+//! already reports every iCloud write there as a plain FS event, and the
+//! query's cost is not confined to the graph: CloudDocs gathers the app's
+//! *entire* ubiquity container whatever the predicate says, building one
+//! observed collection per directory — including the sync-excluded
+//! `.reflect/` and `.git/` trees (`fs::io::mark_dir_local_only`), which carry
+//! no provider identity. Each of those fails with
+//! `NSFileProviderInternalErrorDomain 15`, is retried, and is finally given
+//! up on (`BRItemCollectionGatherer - Repeatedly can't watch item`), and every
+//! retry reloads the whole item tree through `fileproviderd`. macOS 26 bounds
+//! that at a handful of rounds per excluded directory; on macOS 15 the reload
+//! cycle was observed never to settle, pinning `fileproviderd` near 200% CPU
+//! for as long as the app stayed open. Excluding the trees from the
+//! predicate, restricting `searchItems`, or naming them `.nosync` changes
+//! nothing — the gather is scoped by the container, not by the query (see
+//! `docs/icloud-sync.md`). Desktop conflict handling rides the sweeps
+//! instead: arrival-scoped after external writes, full on resume.
 //!
 //! Threading follows the platform contract: the query starts/stops on the
 //! main thread (kept there via `MainThreadBound`), results are delivered on a
@@ -21,27 +35,101 @@
 //! a stub) and never as removes (eviction is not deletion; the item is still
 //! listed). When iCloud finishes a download, the next update round reports
 //! the real upsert.
+//!
+//! Download nudges are **changed-only**: a placeholder is requested when its
+//! content is something this device lacks (a new arrival, or a remote edit
+//! reaching an evicted item), never because the OS evicted content we already
+//! indexed — that would fight Optimize Storage indefinitely. Open-path
+//! catch-up (placeholders the *index* lacks) is the reconcile's targeted
+//! `icloud_request_downloads`, not this watch.
 
 use crate::error::AppResult;
 
-/// Command: watch the graph at `root` for iCloud changes. `emit_file_changes`
-/// turns snapshot diffs into `index:changed` events — pass `true` on mobile
-/// (no watcher there), `false` on desktop (the `notify` watcher already
-/// reports file events; double delivery is harmless but wasteful). Conflict
-/// paths always emit as `icloud:conflicts`.
+/// Command: watch the graph at `root` for iCloud changes — snapshot diffs
+/// emit as `index:changed` batches, conflict paths as `icloud:conflicts`.
+/// Mobile only: the module docs explain why desktop never calls this.
 #[tauri::command]
-pub fn icloud_watch_start(
-    root: String,
-    emit_file_changes: bool,
-    app: tauri::AppHandle,
-) -> AppResult<()> {
-    platform::start(app, root, emit_file_changes)
+pub async fn icloud_watch_start(root: String, app: tauri::AppHandle) -> AppResult<()> {
+    // Whether the query's scope actually covers this root — it lists the
+    // app's own ubiquity container only, so for any other iCloud path (a
+    // desktop graph in the user's general iCloud Drive) the gather produces
+    // an empty view that must read as "unknown", never "no conflicts".
+    // Resolved off the main thread: the container API can block on first
+    // use. Best-effort — a failed probe degrades to "not authoritative"
+    // (sweeps go full, the safe direction) rather than failing the start:
+    // on mobile this watch is the sole external-change source, and losing
+    // it over a coverage probe would be the far worse trade.
+    let authoritative = {
+        let root = root.clone();
+        crate::blocking::run_blocking(move || Ok(query_covers_root(&root)))
+            .await
+            .unwrap_or(false)
+    };
+    platform::start(app, root, authoritative)
+}
+
+/// See [`icloud_watch_start`]: `root` lives inside the app's own ubiquity
+/// container. The lookup is a pure path resolve — watching a graph kept
+/// elsewhere in iCloud Drive must not create the container as a side effect.
+fn query_covers_root(root: &str) -> bool {
+    match super::storage::ubiquity_documents_path() {
+        Some(documents) => root_within(std::path::Path::new(root), &documents),
+        None => false,
+    }
+}
+
+/// Canonicalized prefix check — iOS containers sit behind the `/var` →
+/// `/private/var` symlink, and a lexical compare would miss. A path that
+/// fails to canonicalize (not on disk) compares as spelled.
+fn root_within(root: &std::path::Path, documents: &std::path::Path) -> bool {
+    fn canonical(path: &std::path::Path) -> std::path::PathBuf {
+        std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    }
+    canonical(root).starts_with(canonical(documents))
+}
+
+#[cfg(test)]
+mod coverage_tests {
+    use super::root_within;
+
+    #[test]
+    fn resolves_symlinked_spellings_before_comparing() {
+        let dir = tempfile::tempdir().unwrap();
+        let documents = dir.path().join("container/Documents");
+        std::fs::create_dir_all(documents.join("Graph")).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("container"), dir.path().join("alias")).unwrap();
+
+        assert!(root_within(&documents.join("Graph"), &documents));
+        // The same graph reached through a symlinked spelling still matches —
+        // the iOS `/var` → `/private/var` shape.
+        assert!(root_within(
+            &dir.path().join("alias/Documents/Graph"),
+            &documents
+        ));
+        // A sibling outside the container never does.
+        let elsewhere = dir.path().join("CloudDocs/Graph");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        assert!(!root_within(&elsewhere, &documents));
+    }
 }
 
 /// Command: stop the active watch (graph switch or shutdown). Idempotent.
 #[tauri::command]
 pub fn icloud_watch_stop(app: tauri::AppHandle) -> AppResult<()> {
     platform::stop(app)
+}
+
+/// The paths the live metadata query currently flags as carrying unresolved
+/// conflict versions — the scoped conflict sweep's candidate set. `None`
+/// whenever the query cannot answer completely (no watch installed, or the
+/// gather round hasn't seeded the view yet); callers must treat `None` as
+/// "check everything". The set may run momentarily stale in the harmless
+/// direction only: a just-resolved path lingers until its update round lands
+/// (an extra no-op check), while a new conflict is always in the set before
+/// the `icloud:conflicts` signal that triggers a sweep, because both come
+/// from the same notification round.
+pub(crate) fn conflicted_paths() -> Option<std::collections::HashSet<String>> {
+    platform::conflicted_paths()
 }
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -54,7 +142,7 @@ mod platform {
     use dispatch2::MainThreadBound;
     use objc2::rc::Retained;
     use objc2::runtime::AnyObject;
-    use objc2::{msg_send, MainThreadMarker};
+    use objc2::{MainThreadMarker, msg_send};
     use objc2_foundation::{
         NSArray, NSCopying, NSDate, NSMetadataItem, NSMetadataItemFSContentChangeDateKey,
         NSMetadataItemPathKey, NSMetadataQuery, NSMetadataQueryDidFinishGatheringNotification,
@@ -65,8 +153,7 @@ mod platform {
         NSMetadataUbiquitousItemHasUnresolvedConflictsKey, NSNotification, NSNotificationCenter,
         NSNumber, NSOperationQueue, NSPredicate, NSString,
     };
-    use serde::Serialize;
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     use crate::error::{AppError, AppResult};
 
@@ -92,31 +179,67 @@ mod platform {
     /// the non-`Send` Objective-C handles sound inside a global.
     static ACTIVE: Mutex<Option<MainThreadBound<Watch>>> = Mutex::new(None);
 
-    /// Last reported state per graph-relative path: `Some(mtime)` when the
-    /// content is local, `None` while it is a placeholder (listed, not
-    /// downloaded). Plain Rust — safe to touch from the delivery queue.
-    static SNAPSHOT: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
+    /// One tracked item's last-known sync state.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    enum TrackedState {
+        /// Bytes are local, at this content-change mtime (epoch ms).
+        Local(u64),
+        /// Listed but not downloaded (a placeholder, or an eviction). The
+        /// provider's content-change date rides along — it is cloud
+        /// metadata, present without local bytes — so a *remote edit*
+        /// reaching an evicted item is distinguishable from the eviction
+        /// itself.
+        Evicted(Option<u64>),
+    }
+
+    /// Last reported state per graph-relative path. Plain Rust — safe to
+    /// touch from the delivery queue.
+    static SNAPSHOT: LazyLock<Mutex<HashMap<String, TrackedState>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    /// Graph-relative paths whose download this watch already requested.
+    /// The scoped sweep's candidate view: the paths the provider currently
+    /// flags as carrying unresolved conflict versions, maintained by the
+    /// same rounds that emit `icloud:conflicts`. Everything that decides
+    /// whether the view may be *trusted* lives in the same struct, under one
+    /// lock, so a reader can never observe a torn combination (readiness
+    /// from one watch, paths from another):
+    ///
+    /// - `epoch` pins the view to one install; rounds carry the epoch their
+    ///   watch was installed with, and a stale round — an old query's
+    ///   in-flight gather completing after teardown or after a newer graph's
+    ///   install — folds into nothing.
+    /// - `authoritative` records whether the query's scope actually covers
+    ///   the watched root (the app's own ubiquity container). For any other
+    ///   iCloud path the query gathers an *empty* view that must read as
+    ///   "unknown", never "no conflicts".
+    /// - `gathered` flips only when a full listing of this epoch lands;
+    ///   before that the set is empty for the wrong reason.
+    #[derive(Default)]
+    struct ConflictView {
+        epoch: u64,
+        authoritative: bool,
+        gathered: bool,
+        paths: HashSet<String>,
+    }
+
+    /// The live [`ConflictView`]. Install epochs start at 1, so the default
+    /// view (epoch 0) can never accept a round.
+    static CONFLICT_VIEW: LazyLock<Mutex<ConflictView>> =
+        LazyLock::new(|| Mutex::new(ConflictView::default()));
+
+    /// Content-change date last download-requested, per graph-relative path.
     /// The OS treats repeat requests as no-ops, but *issuing* them is not
     /// free: during an initial sync every update round used to re-request
     /// every still-pending placeholder — O(N) `NSFileManager` calls per
-    /// round, O(N²) across a large download. Each path is nudged once;
-    /// completion (or removal) clears it so a later eviction can re-nudge.
-    /// A download that silently stalls is retried by the resume-path
+    /// round, O(N²) across a large download. Each (path, date) is requested
+    /// once; completion (or removal from the listing) clears the entry. A
+    /// download that silently stalls is retried by the resume-path
     /// `icloud_download_pending` walk, which requests unconditionally.
-    static NUDGED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+    static NUDGED: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    /// The watcher's change event, matching `watcher::FileChange`.
-    #[derive(Debug, Clone, Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct FileChange {
-        path: String,
-        kind: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        modified_ms: Option<u64>,
-    }
+    use reflect_types::events::INDEX_CHANGED;
+    use reflect_types::{ChangeKind, FileChange};
 
     /// Lifecycle epoch: every `start`/`stop` bumps it, and a queued install
     /// only proceeds when its epoch is still current. Commands run off the
@@ -127,11 +250,11 @@ mod platform {
     /// (dropping observer tokens does not deregister them).
     static EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-    pub fn start(app: tauri::AppHandle, root: String, emit_file_changes: bool) -> AppResult<()> {
+    pub fn start(app: tauri::AppHandle, root: String, authoritative: bool) -> AppResult<()> {
         use std::sync::atomic::Ordering;
         let epoch = EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
         let handle = app.clone();
-        app.run_on_main_thread(move || install(handle, root, emit_file_changes, epoch))
+        app.run_on_main_thread(move || install(handle, root, authoritative, epoch))
             .map_err(|err| AppError::io(format!("failed to reach the main thread: {err}")))
     }
 
@@ -152,6 +275,8 @@ mod platform {
     /// caller is a main-thread closure, which is what serializes teardown
     /// against installs.
     fn teardown_active(mtm: MainThreadMarker) {
+        // A stopped watch must answer "unknown", never "no conflicts".
+        *CONFLICT_VIEW.lock().expect("conflict view lock") = ConflictView::default();
         let Some(bound) = ACTIVE.lock().expect("watch lock").take() else {
             return;
         };
@@ -188,7 +313,7 @@ mod platform {
     /// aborts when a later `start`/`stop` has superseded this one's epoch —
     /// so rapid graph switches can never leave two queries running or
     /// install a watch after its graph closed.
-    fn install(app: tauri::AppHandle, root: String, emit_file_changes: bool, epoch: u64) {
+    fn install(app: tauri::AppHandle, root: String, authoritative: bool, epoch: u64) {
         use std::sync::atomic::Ordering;
         let mtm = MainThreadMarker::new().expect("run_on_main_thread is the main thread");
         teardown_active(mtm);
@@ -197,6 +322,12 @@ mod platform {
         }
         SNAPSHOT.lock().expect("snapshot lock").clear();
         NUDGED.lock().expect("nudge lock").clear();
+        *CONFLICT_VIEW.lock().expect("conflict view lock") = ConflictView {
+            epoch,
+            authoritative,
+            gathered: false,
+            paths: HashSet::new(),
+        };
         let query = NSMetadataQuery::new();
         query.setNotificationBatchingInterval(UPDATE_BATCHING_INTERVAL_S);
 
@@ -232,12 +363,20 @@ mod platform {
         query.setPredicate(Some(&predicate));
 
         let queue = NSOperationQueue::new();
+        // Must stay serial: CloudDocs (BRQuery) schedules its own internal,
+        // unsynchronized gatherer work on this queue — not just notification
+        // delivery. On the default concurrent queue the initial gather and
+        // update batches classify items in parallel and corrupt BRQuery's
+        // result index sets, aborting with an uncaught NSRangeException
+        // (crash: NSMutableIndexSet addIndexesInRange in
+        // _handleReplacedItemsNotifications, ~10s after launch).
+        queue.setMaxConcurrentOperationCount(1);
         unsafe { query.setOperationQueue(Some(&queue)) };
 
         let handler_roots = roots.clone();
         let emit_app = app.clone();
         let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
-            handle_notification(&app, &handler_roots, emit_file_changes, notification);
+            handle_notification(&app, &handler_roots, epoch, notification);
         });
         let center = NSNotificationCenter::defaultCenter();
         let query_object: &AnyObject = &query;
@@ -308,10 +447,13 @@ mod platform {
     }
 
     impl ItemState {
-        /// The snapshot value for this item: `Some(mtime)` once local,
-        /// `None` while a placeholder.
-        fn snapshot_state(&self) -> Option<u64> {
-            self.downloaded.then(|| self.mtime.unwrap_or(0))
+        /// The snapshot value for this item.
+        fn snapshot_state(&self) -> TrackedState {
+            if self.downloaded {
+                TrackedState::Local(self.mtime.unwrap_or(0))
+            } else {
+                TrackedState::Evicted(self.mtime)
+            }
         }
     }
 
@@ -346,26 +488,55 @@ mod platform {
         conflicts: Vec<String>,
     }
 
-    /// Pure half of the nudge bookkeeping: mark placeholders not yet nudged
-    /// this watch (returning their absolute paths, for the caller to
-    /// request), and clear completed ones so a later eviction re-nudges.
-    fn plan_nudges(nudged: &mut HashSet<String>, items: &[ItemState]) -> Vec<String> {
+    /// Pure half of the nudge bookkeeping: the placeholders this round should
+    /// request downloads for. Only content the device *provably lacks* is
+    /// nudged — an item new to the snapshot (e.g. a note created on another
+    /// device), or one whose content-change date moved to a *known different*
+    /// date (a remote edit reaching an evicted item). Everything ambiguous
+    /// stays silent: an eviction of already-seen content, and any report
+    /// without a usable date on either side — re-downloading whatever the OS
+    /// just evicted turns Optimize Storage into a tug-of-war that keeps
+    /// `fileproviderd` pinned for as long as the app runs, and a genuinely
+    /// missed remote edit is caught by the reconcile's mtime comparison on
+    /// the next pass. Gather rounds never nudge (see
+    /// [`handle_notification`]) — open-path catch-up belongs to the
+    /// reconcile's targeted `icloud_request_downloads`, which consults the
+    /// *index* rather than this watch's session-local snapshot.
+    fn plan_nudges(
+        nudged: &mut HashMap<String, Option<u64>>,
+        snapshot: &HashMap<String, TrackedState>,
+        items: &[ItemState],
+    ) -> Vec<String> {
         let mut request: Vec<String> = Vec::new();
         for item in items {
             if item.downloaded {
                 nudged.remove(&item.rel);
-            } else if nudged.insert(item.rel.clone()) {
-                request.push(item.abs.clone());
+                continue;
             }
+            let missing = match snapshot.get(&item.rel) {
+                None => true, // an arrival: content this device has never had
+                Some(TrackedState::Local(mtime)) => item.mtime.is_some_and(|date| date != *mtime),
+                Some(TrackedState::Evicted(previous)) => item
+                    .mtime
+                    .is_some_and(|date| previous.is_some_and(|prev| date != prev)),
+            };
+            if !missing || nudged.get(&item.rel) == Some(&item.mtime) {
+                continue;
+            }
+            nudged.insert(item.rel.clone(), item.mtime);
+            request.push(item.abs.clone());
         }
         request
     }
 
-    /// Request downloads for the placeholders [`plan_nudges`] marked.
+    /// Request downloads for the placeholders [`plan_nudges`] marked. Must
+    /// run *before* the round's delta folds into [`SNAPSHOT`] — the plan
+    /// compares against the previous states.
     fn nudge_pending(items: &[ItemState]) {
         let request = {
+            let snapshot = SNAPSHOT.lock().expect("snapshot lock");
             let mut nudged = NUDGED.lock().expect("nudge lock");
-            plan_nudges(&mut nudged, items)
+            plan_nudges(&mut nudged, &snapshot, items)
         };
         for abs in request {
             crate::icloud::storage::request_download(std::path::Path::new(&abs));
@@ -381,6 +552,63 @@ mod platform {
             .collect()
     }
 
+    /// Fold one round's items into the conflicted-path set: a reported item
+    /// enters or leaves by its flag, a removed item leaves. Pure, so the set
+    /// semantics are unit-testable next to [`apply_update_delta`]'s.
+    fn apply_conflict_delta(
+        conflicted: &mut HashSet<String>,
+        upserted: &[ItemState],
+        removed: &[String],
+    ) {
+        for item in upserted {
+            if item.conflict {
+                conflicted.insert(item.rel.clone());
+            } else {
+                conflicted.remove(&item.rel);
+            }
+        }
+        for rel in removed {
+            conflicted.remove(rel);
+        }
+    }
+
+    /// The scoped sweep's candidate set — see the outer
+    /// [`super::conflicted_paths`] for the contract. One lock read: the
+    /// trust conditions and the paths come from the same view, and the
+    /// epoch check also covers "the watch was stopped but its main-thread
+    /// teardown hasn't run yet" (stop bumps [`EPOCH`] synchronously).
+    pub(crate) fn conflicted_paths() -> Option<HashSet<String>> {
+        use std::sync::atomic::Ordering;
+        let view = CONFLICT_VIEW.lock().expect("conflict view lock");
+        (view.authoritative && view.gathered && view.epoch == EPOCH.load(Ordering::SeqCst))
+            .then(|| view.paths.clone())
+    }
+
+    /// Fold one round's conflict information into the live view, iff the
+    /// round belongs to the view's install epoch — a stale round from a
+    /// torn-down watch (an old query's gather completing late) must never
+    /// seed or poison a newer watch's view. A full listing (`rebuild`)
+    /// replaces the set wholesale and is the only round shape that may
+    /// declare the view gathered.
+    fn fold_conflicts_into_view(
+        view: &mut ConflictView,
+        epoch: u64,
+        upserted: &[ItemState],
+        removed: &[String],
+        rebuild: bool,
+    ) {
+        if view.epoch != epoch {
+            return;
+        }
+        if rebuild {
+            view.paths.clear();
+        }
+        apply_conflict_delta(&mut view.paths, upserted, removed);
+        if rebuild {
+            view.gathered = true;
+        }
+    }
+
     /// One gathering/update round. Updates apply the notification's own
     /// added/changed/removed delta — O(changed items); a full results
     /// enumeration here would be O(all items) per round, O(n²) across an
@@ -389,7 +617,7 @@ mod platform {
     fn handle_notification(
         app: &tauri::AppHandle,
         roots: &[String],
-        emit_file_changes: bool,
+        epoch: u64,
         notification: NonNull<NSNotification>,
     ) {
         let notification = unsafe { notification.as_ref() };
@@ -403,15 +631,46 @@ mod platform {
         let is_update = &*notification.name() == unsafe { NSMetadataQueryDidUpdateNotification };
         let round = if is_update {
             match update_delta(notification, roots) {
-                Some((upserted, removed)) => update_round(&upserted, &removed),
-                None => full_round(&query, roots),
+                Some((upserted, removed)) => update_round(&upserted, &removed, epoch),
+                None => full_round(&query, roots, true, epoch),
             }
         } else {
-            full_round(&query, roots)
+            // The gather round: this watch just started, with an empty
+            // snapshot — every placeholder would compare as "new". Nudging
+            // here used to re-request every evicted file in the graph on
+            // every app open, an unpaced download storm that pinned
+            // fileproviderd. The reconcile's targeted downloads own
+            // open-path catch-up; this round only seeds the snapshot.
+            full_round(&query, roots, false, epoch)
         };
 
-        if emit_file_changes && !round.changes.is_empty() {
-            let _ = app.emit("index:changed", round.changes);
+        if !round.changes.is_empty() {
+            // The listing cache must not outlive a change this round observed
+            // (a download materialized, a Mac-side edit landed). Try every
+            // root variant: invalidation is root-checked, so the one matching
+            // the open graph wins and the others are no-ops.
+            let state = app.state::<crate::fs::GraphState>();
+            for root in roots {
+                let root = std::path::Path::new(root.trim_end_matches('/'));
+                crate::fs::invalidate_file_catalog(&state, root);
+            }
+            if is_update {
+                let _ = app.emit(INDEX_CHANGED, round.changes);
+            }
+        }
+        if !is_update {
+            // The gather round diffs against an empty snapshot, so its
+            // "changes" are every downloaded note in the graph — not news,
+            // just the watch coming up. Emitting them sent an O(graph)
+            // payload through every index:changed listener on each open.
+            // The open-path reconcile already covers on-disk state; one
+            // coarse reconcile signal (coalesced by the frontend) closes the
+            // window between its listing and the gather completing. Emitted
+            // regardless of the round's diff: what raced in may be invisible
+            // to it — a deletion leaves the empty-snapshot diff empty, and
+            // placeholders never appear as changes at all — so an empty
+            // gather proves nothing about that window.
+            let _ = app.emit(reflect_types::events::INDEX_RECONCILE, ());
         }
         if !round.conflicts.is_empty() {
             let mut conflicts = round.conflicts;
@@ -420,9 +679,10 @@ mod platform {
         }
     }
 
-    /// Apply one update notification's delta: nudge new placeholders, fold
-    /// the delta into the snapshot, and drop nudge marks for removed items.
-    fn update_round(upserted: &[ItemState], removed: &[String]) -> Round {
+    /// Apply one update notification's delta: nudge placeholders whose
+    /// content this device lacks, fold the delta into the snapshot, and drop
+    /// nudge marks for removed items.
+    fn update_round(upserted: &[ItemState], removed: &[String], epoch: u64) -> Round {
         nudge_pending(upserted);
         let changes = {
             let mut snapshot = SNAPSHOT.lock().expect("snapshot lock");
@@ -434,18 +694,24 @@ mod platform {
                 nudged.remove(rel);
             }
         }
+        {
+            let mut view = CONFLICT_VIEW.lock().expect("conflict view lock");
+            fold_conflicts_into_view(&mut view, epoch, upserted, removed, false);
+        }
         Round {
             changes,
             conflicts: conflicted_rels(upserted),
         }
     }
 
-    /// Snapshot the query's full results listing — the gather round, and the
-    /// fallback for an update notification without a usable delta. Expressed
-    /// through [`apply_update_delta`] (every listed item as an upsert, every
+    /// Snapshot the query's full results listing — the gather round (`nudge:
+    /// false`), and the fallback for an update notification without a usable
+    /// delta (`nudge: true`; the gather already seeded the snapshot, so the
+    /// changed-only comparison works). Expressed through
+    /// [`apply_update_delta`] (every listed item as an upsert, every
     /// snapshot row missing from the listing as a remove) so the full and
     /// incremental paths share one set of diff rules and can never drift.
-    fn full_round(query: &NSMetadataQuery, roots: &[String]) -> Round {
+    fn full_round(query: &NSMetadataQuery, roots: &[String], nudge: bool, epoch: u64) -> Round {
         query.disableUpdates();
         let results = query.results();
         let mut items: Vec<ItemState> = Vec::new();
@@ -459,13 +725,15 @@ mod platform {
         }
         query.enableUpdates();
 
-        nudge_pending(&items);
+        if nudge {
+            nudge_pending(&items);
+        }
         let listed: HashSet<&str> = items.iter().map(|item| item.rel.as_str()).collect();
         {
             // Placeholders that vanished from the listing can't complete —
             // drop their nudge marks along with the snapshot rows.
             let mut nudged = NUDGED.lock().expect("nudge lock");
-            nudged.retain(|rel| listed.contains(rel.as_str()));
+            nudged.retain(|rel, _| listed.contains(rel.as_str()));
         }
         let changes = {
             let mut snapshot = SNAPSHOT.lock().expect("snapshot lock");
@@ -476,6 +744,13 @@ mod platform {
                 .collect();
             apply_update_delta(&mut snapshot, &items, &removed)
         };
+        {
+            // A full listing is authoritative — rebuild the set wholesale;
+            // only a full listing may declare the view complete, and only
+            // for the epoch it belongs to.
+            let mut view = CONFLICT_VIEW.lock().expect("conflict view lock");
+            fold_conflicts_into_view(&mut view, epoch, &items, &[], true);
+        }
         Round {
             changes,
             conflicts: conflicted_rels(&items),
@@ -533,7 +808,7 @@ mod platform {
     /// is silent in both directions — eviction is not deletion, and its bytes
     /// aren't local to upsert — until iCloud downloads the item again.
     fn apply_update_delta(
-        snapshot: &mut HashMap<String, Option<u64>>,
+        snapshot: &mut HashMap<String, TrackedState>,
         upserted: &[ItemState],
         removed: &[String],
     ) -> Vec<FileChange> {
@@ -541,13 +816,13 @@ mod platform {
         for item in upserted {
             let state = item.snapshot_state();
             let previous = snapshot.insert(item.rel.clone(), state);
-            let Some(mtime) = state else {
+            let TrackedState::Local(mtime) = state else {
                 continue; // placeholder (or eviction): bytes aren't local
             };
-            if previous.flatten() != Some(mtime) {
+            if previous != Some(TrackedState::Local(mtime)) {
                 changes.push(FileChange {
                     path: item.rel.clone(),
-                    kind: "upsert".to_string(),
+                    kind: ChangeKind::Upsert,
                     modified_ms: Some(mtime),
                 });
             }
@@ -556,7 +831,7 @@ mod platform {
             if snapshot.remove(rel).is_some() {
                 changes.push(FileChange {
                     path: rel.clone(),
-                    kind: "remove".to_string(),
+                    kind: ChangeKind::Remove,
                     modified_ms: None,
                 });
             }
@@ -564,9 +839,10 @@ mod platform {
         changes
     }
 
-    /// The watcher's note-tracking rule, over absolute metadata paths:
-    /// `.md` under `daily/`, `notes/`, or `templates/`, graph-relative. Tries
-    /// every root variant — Spotlight may report either side of the
+    /// The watcher's note-tracking rule, over absolute metadata paths: an
+    /// eligible Markdown note anywhere visible (the shared
+    /// `reflect-graph-paths` policy), graph-relative. Tries every root
+    /// variant — Spotlight may report either side of the
     /// `/var` ↔ `/private/var` symlink. Variants are slash-terminated
     /// ([`root_variants`]), so the strip is a path boundary, not a string
     /// prefix — a sibling `…/Notes-old/` can never masquerade as the graph.
@@ -574,11 +850,7 @@ mod platform {
         let rel = roots
             .iter()
             .find_map(|root| path.strip_prefix(root.as_str()))?;
-        let tracked = (rel.starts_with("daily/")
-            || rel.starts_with("notes/")
-            || rel.starts_with("templates/"))
-            && rel.ends_with(".md");
-        tracked.then(|| rel.to_string())
+        reflect_graph_paths::is_note(rel).then(|| rel.to_string())
     }
 
     /// A metadata attribute as a string; `None` when absent or another type.
@@ -608,15 +880,24 @@ mod platform {
     #[cfg(test)]
     mod tests {
         use super::{
-            apply_update_delta, plan_nudges, root_variants, tracked_note_relpath, ItemState,
+            ConflictView, ItemState, TrackedState, apply_conflict_delta, apply_update_delta,
+            fold_conflicts_into_view, plan_nudges, root_variants, tracked_note_relpath,
         };
         use std::collections::{HashMap, HashSet};
 
-        fn state(entries: &[(&str, Option<u64>)]) -> HashMap<String, Option<u64>> {
+        fn state(entries: &[(&str, TrackedState)]) -> HashMap<String, TrackedState> {
             entries
                 .iter()
-                .map(|(rel, mtime)| (rel.to_string(), *mtime))
+                .map(|(rel, tracked)| (rel.to_string(), *tracked))
                 .collect()
+        }
+
+        fn local(mtime: u64) -> TrackedState {
+            TrackedState::Local(mtime)
+        }
+
+        fn evicted(mtime: Option<u64>) -> TrackedState {
+            TrackedState::Evicted(mtime)
         }
 
         fn item(rel: &str, downloaded: bool, mtime: Option<u64>) -> ItemState {
@@ -632,17 +913,98 @@ mod platform {
         fn shapes(changes: &[super::FileChange]) -> Vec<(String, String, Option<u64>)> {
             let mut shapes: Vec<_> = changes
                 .iter()
-                .map(|change| (change.path.clone(), change.kind.clone(), change.modified_ms))
+                .map(|change| {
+                    (
+                        change.path.clone(),
+                        change.kind.to_string(),
+                        change.modified_ms,
+                    )
+                })
                 .collect();
             shapes.sort();
             shapes
+        }
+
+        fn conflicted_item(rel: &str) -> ItemState {
+            ItemState {
+                conflict: true,
+                ..item(rel, true, Some(1))
+            }
+        }
+
+        #[test]
+        fn a_stale_rounds_conflicts_never_reach_a_newer_view() {
+            // The race: an old query's in-flight round completes after
+            // teardown (epoch 0) or after a newer install (epoch 2). Either
+            // way it must fold into nothing — a candidate sweep trusting a
+            // poisoned or resurrected view would skip real conflicts.
+            let mut view = ConflictView {
+                epoch: 2,
+                authoritative: true,
+                gathered: false,
+                paths: HashSet::new(),
+            };
+            fold_conflicts_into_view(&mut view, 1, &[conflicted_item("notes/a.md")], &[], true);
+            assert!(!view.gathered, "a stale gather must not declare readiness");
+            assert!(view.paths.is_empty());
+        }
+
+        #[test]
+        fn a_current_rounds_rebuild_replaces_and_seeds_the_view() {
+            let mut view = ConflictView {
+                epoch: 3,
+                authoritative: true,
+                gathered: false,
+                paths: HashSet::from(["notes/stale.md".to_string()]),
+            };
+            fold_conflicts_into_view(&mut view, 3, &[conflicted_item("notes/a.md")], &[], true);
+            assert!(view.gathered);
+            assert_eq!(view.paths, HashSet::from(["notes/a.md".to_string()]));
+
+            // A later delta of the same epoch edits in place without
+            // touching readiness.
+            fold_conflicts_into_view(
+                &mut view,
+                3,
+                &[item("notes/a.md", true, Some(2))],
+                &["notes/b.md".to_string()],
+                false,
+            );
+            assert!(view.gathered);
+            assert!(view.paths.is_empty());
+        }
+
+        #[test]
+        fn conflict_set_tracks_flags_across_rounds() {
+            let mut conflicted: HashSet<String> = HashSet::new();
+            let mut flagged = item("notes/a.md", true, Some(1));
+            flagged.conflict = true;
+
+            // A flagged report enters the set and stays across later rounds
+            // that don't mention the path.
+            apply_conflict_delta(&mut conflicted, std::slice::from_ref(&flagged), &[]);
+            apply_conflict_delta(
+                &mut conflicted,
+                &[item("notes/other.md", true, Some(2))],
+                &[],
+            );
+            assert!(conflicted.contains("notes/a.md"));
+
+            // Resolution (the flag dropping) leaves the set…
+            apply_conflict_delta(&mut conflicted, &[item("notes/a.md", true, Some(3))], &[]);
+            assert!(!conflicted.contains("notes/a.md"));
+
+            // …and so does the file disappearing from the listing.
+            apply_conflict_delta(&mut conflicted, std::slice::from_ref(&flagged), &[]);
+            apply_conflict_delta(&mut conflicted, &[], &["notes/a.md".to_string()]);
+            assert!(conflicted.is_empty());
         }
 
         #[test]
         fn upserts_need_local_bytes_and_a_new_mtime() {
             // A full listing applied as a delta (how `full_round` uses it):
             // every listed item upserts, removes come precomputed.
-            let mut snapshot = state(&[("notes/same.md", Some(1))]);
+            let mut snapshot = state(&[("notes/same.md", local(1))]);
             let listing = vec![
                 item("notes/same.md", true, Some(1)),    // unchanged: no event
                 item("notes/changed.md", true, Some(2)), // new content: upsert
@@ -660,8 +1022,10 @@ mod platform {
 
         #[test]
         fn eviction_is_not_deletion_but_disappearance_is() {
-            let mut snapshot =
-                state(&[("notes/evicted.md", Some(1)), ("notes/deleted.md", Some(1))]);
+            let mut snapshot = state(&[
+                ("notes/evicted.md", local(1)),
+                ("notes/deleted.md", local(1)),
+            ]);
             // The evicted note stays listed placeholder-state; the deleted one
             // is gone from the listing entirely.
             let listing = vec![item("notes/evicted.md", false, None)];
@@ -673,33 +1037,78 @@ mod platform {
         }
 
         #[test]
-        fn plan_nudges_requests_each_placeholder_once() {
-            let mut nudged: HashSet<String> = HashSet::new();
-            let stub = item("notes/a.md", false, None);
+        fn plan_nudges_requests_an_arrival_once() {
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            let snapshot = state(&[]);
+            let stub = item("notes/a.md", false, Some(5));
 
-            // First sighting: request it. Every later round: already marked.
+            // First sighting of unknown content: request it. Every later
+            // round with the same content date: already marked.
             assert_eq!(
-                plan_nudges(&mut nudged, std::slice::from_ref(&stub)),
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&stub)),
                 vec!["/container/Notes/notes/a.md".to_string()]
             );
-            assert!(plan_nudges(&mut nudged, std::slice::from_ref(&stub)).is_empty());
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&stub)).is_empty());
 
-            // Completion clears the mark, so a later eviction re-nudges.
+            // Completion clears the mark.
             let downloaded = item("notes/a.md", true, Some(5));
-            assert!(plan_nudges(&mut nudged, std::slice::from_ref(&downloaded)).is_empty());
-            assert!(!nudged.contains("notes/a.md"));
+            assert!(
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&downloaded)).is_empty()
+            );
+            assert!(!nudged.contains_key("notes/a.md"));
+        }
+
+        #[test]
+        fn plan_nudges_leaves_evictions_alone() {
+            // The OS evicted content we already saw locally: same content
+            // date, bytes offloaded. Re-requesting it would fight Optimize
+            // Storage — the eviction must be silent.
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            let snapshot = state(&[("notes/a.md", local(5))]);
+            let evictee = item("notes/a.md", false, Some(5));
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&evictee)).is_empty());
+        }
+
+        #[test]
+        fn plan_nudges_stays_silent_when_the_content_date_is_unknown() {
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            // An eviction reported without a content-change date must not
+            // read as "missing" — that would re-request what the OS just
+            // offloaded, the exact tug-of-war the policy forbids. A missed
+            // real edit is caught by the reconcile's mtime comparison.
+            let snapshot = state(&[("notes/a.md", local(5)), ("notes/b.md", evicted(None))]);
+            let dateless = item("notes/a.md", false, None);
+            assert!(
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&dateless)).is_empty()
+            );
+            // A date appearing on an item whose previous date was unknown is
+            // metadata arriving, not a provable remote edit — silent too.
+            let dated = item("notes/b.md", false, Some(7));
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&dated)).is_empty());
+        }
+
+        #[test]
+        fn plan_nudges_requests_a_remote_edit_reaching_an_evicted_item() {
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            // Already evicted at content date 5; the cloud now reports 7 — a
+            // remote edit whose bytes this device lacks.
+            let snapshot = state(&[("notes/a.md", evicted(Some(5)))]);
+            let edited = item("notes/a.md", false, Some(7));
             assert_eq!(
-                plan_nudges(&mut nudged, std::slice::from_ref(&stub)),
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&edited)),
                 vec!["/container/Notes/notes/a.md".to_string()]
             );
+            // The same report again: already requested for date 7.
+            let snapshot = state(&[("notes/a.md", evicted(Some(7)))]);
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&edited)).is_empty());
         }
 
         #[test]
         fn update_delta_applies_incrementally_with_the_same_rules() {
             let mut snapshot = state(&[
-                ("notes/same.md", Some(1)),
-                ("notes/evictee.md", Some(3)),
-                ("notes/deleted.md", Some(4)),
+                ("notes/same.md", local(1)),
+                ("notes/evictee.md", local(3)),
+                ("notes/deleted.md", local(4)),
             ]);
             let upserted = vec![
                 item("notes/same.md", true, Some(1)), // unchanged mtime: no event
@@ -724,22 +1133,23 @@ mod platform {
                 ]
             );
             // The snapshot now carries the delta: the placeholder and the
-            // evictee as `None`, the arrival's mtime, and no deleted row —
-            // exactly what a later full round must diff against.
+            // evictee as evicted (content dates preserved for the changed-only
+            // nudge), the arrival's mtime, and no deleted row — exactly what
+            // a later round must diff against.
             assert_eq!(
                 snapshot,
                 state(&[
-                    ("notes/same.md", Some(1)),
-                    ("notes/changed.md", Some(2)),
-                    ("notes/stub.md", None),
-                    ("notes/evictee.md", None),
+                    ("notes/same.md", local(1)),
+                    ("notes/changed.md", local(2)),
+                    ("notes/stub.md", evicted(Some(9))),
+                    ("notes/evictee.md", evicted(Some(3))),
                 ])
             );
         }
 
         #[test]
         fn a_download_completion_in_an_update_upserts_once() {
-            let mut snapshot = state(&[("notes/a.md", None)]);
+            let mut snapshot = state(&[("notes/a.md", evicted(None))]);
             let changes =
                 apply_update_delta(&mut snapshot, &[item("notes/a.md", true, Some(5))], &[]);
             assert_eq!(
@@ -807,11 +1217,16 @@ mod platform {
 
     /// No iCloud metadata queries off Apple platforms — honest no-ops so the
     /// command surface never branches.
-    pub fn start(_app: tauri::AppHandle, _root: String, _emit_file_changes: bool) -> AppResult<()> {
+    pub fn start(_app: tauri::AppHandle, _root: String, _authoritative: bool) -> AppResult<()> {
         Ok(())
     }
 
     pub fn stop(_app: tauri::AppHandle) -> AppResult<()> {
         Ok(())
+    }
+
+    /// No query, no view — "unknown", so scoped sweeps fall back to full.
+    pub(crate) fn conflicted_paths() -> Option<std::collections::HashSet<String>> {
+        None
     }
 }

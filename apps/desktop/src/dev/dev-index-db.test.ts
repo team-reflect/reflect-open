@@ -1,18 +1,28 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
+  buildIndexedNote,
+  createDailyNoteService,
+  createDatabaseService,
+  createIpcBridgeService,
+  createSearchService,
+  createSuggestionService,
+  createWikiResolverService,
   parseHighlights,
+  parseNote,
   parseSearchQuery,
-  searchNotes,
-  searchWithFilters,
-  setBridge,
+  type DailyNoteService,
   type IndexedNote,
+  type SearchService,
+  type SuggestionService,
+  type WikiResolverService,
 } from '@reflect/core'
-import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db'
 import {
-  buildAllNotesSearch,
-  EMPTY_ALL_NOTES_FILTERS,
-  searchPlanFor,
-} from '@/mobile/search-filters/filter-state'
+  createTestClockService,
+  createTestActivityPort,
+  createTestLoggerService,
+} from '@reflect/core/testing'
+import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db.ts'
+import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
 
 function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
   return {
@@ -20,12 +30,13 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     id: '01hv3xq7c2dm8k4t9w5e6r1n99',
     title: 'Sample Note',
     titleKey: 'sample note',
+    pathKey: 'notes/sample.md',
     kind: 'note',
     dailyDate: null,
     isPrivate: false,
     isPinned: false,
     pinnedOrder: null,
-    hasConflict: false,
+    hasContent: true,
     gistUrl: null,
     gistStale: false,
     fileHash: 'hash-1',
@@ -38,6 +49,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
         kind: 'wiki',
         targetRaw: 'Other Note',
         targetKey: 'other note',
+        targetPathKey: null,
         alias: null,
         posFrom: 3,
         posTo: 16,
@@ -45,14 +57,17 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     ],
     tags: [{ tag: 'book', tagKey: 'book' }],
     aliases: [],
+    claims: [
+      { key: 'sample note', tier: 2 },
+      { key: 'sample', tier: 4 },
+    ],
     emails: [{ email: 'Sample@Example.com', emailKey: 'sample@example.com' }],
     assets: [],
     tasks: [
       {
-        markerOffset: 40,
-        text: 'Do the thing',
+        astPath: '[1,0]',
+        markdown: 'Do the thing',
         breadcrumbs: ['Project'],
-        raw: '- [ ] Do the thing',
         checked: false,
         dueDate: null,
       },
@@ -61,8 +76,16 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
   }
 }
 
+async function searchTitles(
+  index: IndexServices,
+  query: string,
+): Promise<{ path: string; title: string }[]> {
+  const hits = await index.search.searchWithFilters(parseSearchQuery(query))
+  return hits.map(({ path, title }) => ({ path, title }))
+}
+
 async function openDb(): Promise<DevIndexDb> {
-  return createDevIndexDb()
+  return await createDevIndexDb()
 }
 
 interface CapturedQuery {
@@ -70,22 +93,47 @@ interface CapturedQuery {
   readonly params: readonly unknown[]
 }
 
-function installQueryBridge(db: DevIndexDb, captured: CapturedQuery[] = []): void {
-  setBridge({
-    invoke: async (command, args) => {
-      if (command !== 'db_query') {
-        throw new Error(`Unexpected command: ${command}`)
-      }
-      const sql = String(args['sql'])
-      const params = (args['params'] as readonly unknown[]) ?? []
-      captured.push({ sql, params })
-      return db.query(sql, params)
-    },
-    listen: async () => () => {},
-  })
+interface IndexServices {
+  readonly search: SearchService
+  readonly dailyNotes: DailyNoteService
+  readonly wikiResolver: WikiResolverService
+  readonly suggestions: SuggestionService
 }
 
-afterEach(() => setBridge(null))
+/**
+ * The index read services over a transport that answers `db_query` from `db`.
+ */
+function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServices {
+  const ipc = createIpcBridgeService({
+    transport: {
+      invoke: (command, args) => {
+        return Promise.try(() => {
+          if (command !== 'db_query') {
+            throw new Error(`Unexpected command: ${command}`)
+          }
+          const sql = String(args['sql'])
+          const params = (args['params'] as readonly unknown[]) ?? []
+          captured.push({ sql, params })
+          return db.query(sql, params)
+        })
+      },
+      listen: () => Promise.resolve(() => {}),
+    },
+    logger: createTestLoggerService(),
+  })
+  const database = createDatabaseService({ ipc })
+  const wikiResolver = createWikiResolverService({ database })
+  return {
+    search: createSearchService({ database, wikiResolver }),
+    dailyNotes: createDailyNoteService({
+      database,
+      clock: createTestClockService(),
+      activity: createTestActivityPort(),
+    }),
+    wikiResolver,
+    suggestions: createSuggestionService({ database }),
+  }
+}
 
 describe('createDevIndexDb', () => {
   it('applies the real migrations and answers db_query-style reads', async () => {
@@ -107,16 +155,60 @@ describe('createDevIndexDb', () => {
     const tags = db.query('SELECT tag FROM tags WHERE note_path = ?', ['notes/sample.md'])
     expect(tags).toEqual([{ tag: 'book' }])
 
-    const tasks = db.query('SELECT text, breadcrumbs, checked FROM tasks', [])
-    expect(tasks).toEqual([{ text: 'Do the thing', breadcrumbs: '["Project"]', checked: 0 }])
+    const tasks = db.query('SELECT ast_path, markdown, breadcrumbs, checked FROM tasks', [])
+    expect(tasks).toEqual([
+      { ast_path: '[1,0]', markdown: 'Do the thing', breadcrumbs: '["Project"]', checked: 0 },
+    ])
 
     const emails = db.query('SELECT email, email_key FROM note_emails', [])
-    expect(emails).toEqual([
-      { email: 'Sample@Example.com', email_key: 'sample@example.com' },
-    ])
+    expect(emails).toEqual([{ email: 'Sample@Example.com', email_key: 'sample@example.com' }])
 
     const hits = db.query("SELECT path FROM search_fts WHERE search_fts MATCH 'sync'", [])
     expect(hits).toEqual([{ path: 'notes/sample.md' }])
+  })
+
+  it('marks only the calendar days whose daily note has content', async () => {
+    const db = await openDb()
+    for (const [path, source] of [
+      ['daily/2026-06-01.md', 'Bought milk\n'],
+      ['daily/2026-06-02.md', '\n'],
+      ['daily/2026-06-03.md', '+ [ ] \n'],
+      ['daily/2026-06-04.md', '![](assets/beach.png)\n'],
+    ] as const) {
+      db.applyNote(
+        buildIndexedNote(parseNote({ path, source }), {
+          fileHash: `hash-${path}`,
+          mtime: 1_700_000_000_000,
+          source,
+        }),
+      )
+    }
+    const index = connectIndex(db)
+
+    await expect(index.dailyNotes.dailyDatesInRange('2026-06-01', '2026-06-30')).resolves.toEqual([
+      '2026-06-01',
+      '2026-06-04',
+    ])
+  })
+
+  it('finds a note by a URL it links to', async () => {
+    const db = await openDb()
+    const path = 'notes/field-jacket-hunter.md'
+    const source =
+      '# Field Jacket Hunter\n\n' +
+      '[Field Jacket Hunter](https://www.alfredorifugio.com/products/field-jacket-hunter?utm_source=Meta)\n'
+    db.applyNote(
+      buildIndexedNote(parseNote({ path, source }), {
+        fileHash: 'field-jacket-hunter-hash',
+        mtime: 1_700_000_000_000,
+        source,
+      }),
+    )
+    const index = connectIndex(db)
+
+    await expect(searchTitles(index, 'alfredorifugio')).resolves.toEqual([
+      { path, title: 'Field Jacket Hunter' },
+    ])
   })
 
   it('finds a short Japanese term inside a title as well as a note body', async () => {
@@ -146,14 +238,11 @@ describe('createDevIndexDb', () => {
       }),
     )
     const captured: CapturedQuery[] = []
-    installQueryBridge(db, captured)
+    const index = connectIndex(db, captured)
 
-    const hits = await searchWithFilters(parseSearchQuery('東京'))
+    const hits = await index.search.searchWithFilters(parseSearchQuery('東京'))
 
-    expect(hits.map((hit) => hit.path)).toEqual([
-      'notes/tokyo-trip.md',
-      'notes/body-hit.md',
-    ])
+    expect(hits.map((hit) => hit.path)).toEqual(['notes/tokyo-trip.md', 'notes/body-hit.md'])
     expect(parseHighlights(hits[0]!.highlightedTitle)).toEqual([
       { text: '来週の', highlighted: false },
       { text: '東京', highlighted: true },
@@ -164,11 +253,11 @@ describe('createDevIndexDb', () => {
     expect(hits[1]!.snippet).toContain('東京')
     const plan = db.query(`EXPLAIN QUERY PLAN ${captured[0]!.sql}`, captured[0]!.params)
     expect(plan.some((row) => String(row['detail']).includes('MATERIALIZE lexical'))).toBe(true)
-    await expect(searchNotes('東京')).resolves.toEqual([
+    await expect(searchTitles(index, '東京')).resolves.toEqual([
       { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画' },
       { path: 'notes/body-hit.md', title: '別のノート' },
     ])
-    const multiTermHits = await searchWithFilters(parseSearchQuery('東京 旅行'))
+    const multiTermHits = await index.search.searchWithFilters(parseSearchQuery('東京 旅行'))
     expect(multiTermHits).toMatchObject([
       { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画', snippet: null },
     ])
@@ -178,7 +267,7 @@ describe('createDevIndexDb', () => {
       { text: '計画', highlighted: false },
     ])
 
-    const filtered = await searchWithFilters(parseSearchQuery('is:pinned 東京'))
+    const filtered = await index.search.searchWithFilters(parseSearchQuery('is:pinned 東京'))
     expect(filtered.map((hit) => hit.path)).toEqual(['notes/body-hit.md'])
   })
 
@@ -236,12 +325,12 @@ describe('createDevIndexDb', () => {
         mtime: 200,
       }),
     )
-    installQueryBridge(db)
+    const index = connectIndex(db)
 
     // Title-prefix (rank 1) leads, then the word-start title match (rank 2),
     // then the FTS body hit (rank 3). `Oscar party plans` contains `car` only
     // mid-word and must not surface at all.
-    const hits = await searchWithFilters(parseSearchQuery('car'))
+    const hits = await index.search.searchWithFilters(parseSearchQuery('car'))
     expect(hits.map((hit) => hit.path)).toEqual([
       'notes/car-log.md',
       'notes/car-wash.md',
@@ -256,6 +345,142 @@ describe('createDevIndexDb', () => {
       highlighted: true,
     })
     expect(hits[2]!.highlightedTitle).toBe('Garage')
+  })
+
+  it('prefix-matches partial terms in note bodies', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/security-rollout.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n87',
+        title: 'Security rollout',
+        titleKey: 'security rollout',
+        text: 'The plan covers authentication migration.',
+        preview: 'The plan covers authentication migration.',
+        tags: [],
+      }),
+    )
+    const index = connectIndex(db)
+
+    const hits = await index.search.searchWithFilters(parseSearchQuery('authent migr'))
+
+    expect(hits).toMatchObject([{ path: 'notes/security-rollout.md', title: 'Security rollout' }])
+    expect(hits[0]!.snippet).toContain('authentication')
+    await expect(searchTitles(index, 'authent migr')).resolves.toEqual([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+    await expect(searchTitles(index, 'thentication')).resolves.toEqual([])
+
+    const mixedHits = await index.search.searchWithFilters(parseSearchQuery('secur migr'))
+    expect(mixedHits).toMatchObject([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+    expect(mixedHits[0]!.snippet).toContain('migration')
+    expect(parseHighlights(mixedHits[0]!.highlightedTitle)).toEqual([
+      { text: 'Secur', highlighted: true },
+      { text: 'ity rollout', highlighted: false },
+    ])
+    await expect(searchTitles(index, 'migr secur')).resolves.toEqual([
+      { path: 'notes/security-rollout.md', title: 'Security rollout' },
+    ])
+  })
+
+  it('ignores a term that tokenizes to nothing instead of emptying the result', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/meeting-notes.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n92',
+        title: 'Meeting Notes',
+        titleKey: 'meeting notes',
+        text: 'Agenda items for the sync.',
+        preview: 'Agenda items for the sync.',
+        tags: [],
+      }),
+    )
+    const index = connectIndex(db)
+
+    await expect(searchTitles(index, 'meeting - notes')).resolves.toEqual([
+      { path: 'notes/meeting-notes.md', title: 'Meeting Notes' },
+    ])
+    await expect(searchTitles(index, 'agenda &')).resolves.toEqual([
+      { path: 'notes/meeting-notes.md', title: 'Meeting Notes' },
+    ])
+  })
+
+  it('drops an ignored term from title recall, not just from the FTS match', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tokyo-trip.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n96',
+        title: '来週の東京旅行計画',
+        titleKey: '来週の東京旅行計画',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/dotfiles.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n97',
+        title: '.hidden files',
+        titleKey: '.hidden files',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    const index = connectIndex(db)
+
+    // Only title recall can reach a term inside an unsegmented title run, so
+    // the ignored term has to leave recall too, not just the FTS expression.
+    await expect(searchTitles(index, '東京 -')).resolves.toEqual([
+      { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画' },
+    ])
+    // A punctuation-only query keeps its terms, so recall still matches them.
+    await expect(searchTitles(index, '.')).resolves.toEqual([
+      { path: 'notes/dotfiles.md', title: '.hidden files' },
+    ])
+  })
+
+  it('uses pinning to break ties between title-only prefix hits', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tim-maccaw-planning.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n81',
+        title: 'Tim MacCaw Extended Project Planning',
+        titleKey: 'tim maccaw extended project planning',
+        isPinned: true,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 100,
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tim-macrae.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n82',
+        title: 'Tim MacRae',
+        titleKey: 'tim macrae',
+        isPinned: false,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 200,
+      }),
+    )
+    const index = connectIndex(db)
+
+    const hits = await index.search.searchWithFilters(parseSearchQuery('Tim Mac'))
+    expect(hits.map((hit) => hit.path)).toEqual([
+      'notes/tim-maccaw-planning.md',
+      'notes/tim-macrae.md',
+    ])
+    expect(hits.map((hit) => hit.snippet)).toEqual([null, null])
   })
 
   it('returns title markers from SQLite for tokenizer-normalized matches', async () => {
@@ -282,21 +507,34 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
-    installQueryBridge(db)
+    db.applyNote(
+      sampleNote({
+        path: 'notes/body-cafe.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n89',
+        title: 'Unrelated note',
+        titleKey: 'unrelated note',
+        text: 'A cafe appears in this body.',
+        preview: 'A cafe appears in this body.',
+        tags: [],
+      }),
+    )
+    const index = connectIndex(db)
 
-    const accentHit = (await searchWithFilters(parseSearchQuery('cafe')))[0]!
+    const accentHits = await index.search.searchWithFilters(parseSearchQuery('cafe'))
+    expect(accentHits.map((hit) => hit.path)).toEqual(['notes/cafe-alpha.md', 'notes/body-cafe.md'])
+    const accentHit = accentHits[0]!
     expect(parseHighlights(accentHit.highlightedTitle)).toEqual([
       { text: 'Café', highlighted: true },
       { text: ' Alpha', highlighted: false },
     ])
 
-    const punctuationHit = (await searchWithFilters(parseSearchQuery('alpha,')))[0]!
+    const punctuationHit = (await index.search.searchWithFilters(parseSearchQuery('alpha,')))[0]!
     expect(parseHighlights(punctuationHit.highlightedTitle)).toEqual([
       { text: 'Café ', highlighted: false },
       { text: 'Alpha', highlighted: true },
     ])
 
-    const mergedHit = (await searchWithFilters(parseSearchQuery('car,')))[0]!
+    const mergedHit = (await index.search.searchWithFilters(parseSearchQuery('car,')))[0]!
     expect(parseHighlights(mergedHit.highlightedTitle)).toEqual([
       { text: 'Car,', highlighted: true },
       { text: ' ', highlighted: false },
@@ -317,10 +555,10 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
-    installQueryBridge(db)
+    const index = connectIndex(db)
 
     const parsed = buildAllNotesSearch('Tim Mac', EMPTY_ALL_NOTES_FILTERS, null)
-    const hits = await searchWithFilters(parsed, searchPlanFor(parsed))
+    const hits = await index.search.searchWithFilters(parsed, searchPlanFor(parsed))
     expect(hits).toMatchObject([
       { path: 'notes/tim-maccaw.md', title: 'Tim MacCaw', snippet: null },
     ])
@@ -343,15 +581,44 @@ describe('createDevIndexDb', () => {
         tags: [],
       }),
     )
-    installQueryBridge(db)
+    const index = connectIndex(db)
 
-    const hit = (await searchWithFilters(parseSearchQuery('mac')))[0]!
+    const hit = (await index.search.searchWithFilters(parseSearchQuery('mac')))[0]!
     expect(hit.snippet).toContain('mac')
     expect(parseHighlights(hit.highlightedTitle)).toEqual([
       { text: 'Tim ', highlighted: false },
       { text: 'Mac', highlighted: true },
       { text: 'Caw', highlighted: false },
     ])
+  })
+
+  it('serves a rich title end to end: derived alias suggests, inserts, resolves', async () => {
+    const db = await openDb()
+    const source = '# Meeting with [[Ada Lovelace|Ada]]\n'
+    db.applyNote(
+      buildIndexedNote(parseNote({ path: 'notes/meeting.md', source }), {
+        fileHash: 'hash-rich',
+        mtime: 1,
+        source,
+      }),
+    )
+    const index = connectIndex(db)
+
+    const { suggestions } = await index.suggestions.suggestWikiLinkTargets('meeting with ada')
+    expect(suggestions).toMatchObject([
+      {
+        path: 'notes/meeting.md',
+        title: 'Meeting with [[Ada Lovelace|Ada]]',
+        target: 'Meeting with Ada',
+        insertText: 'Meeting with Ada',
+      },
+    ])
+    await expect(index.wikiResolver.resolveWikiTarget(suggestions[0]!.insertText)).resolves.toEqual(
+      {
+        kind: 'resolved',
+        ref: 'notes/meeting.md',
+      },
+    )
   })
 
   it('re-applying a note replaces its rows instead of duplicating them', async () => {
@@ -371,17 +638,13 @@ describe('createDevIndexDb', () => {
     db.moveNote('notes/sample.md', 'notes/renamed.md')
 
     expect(db.query('SELECT path FROM notes', [])).toEqual([{ path: 'notes/renamed.md' }])
-    expect(db.query('SELECT note_path FROM tags', [])).toEqual([
-      { note_path: 'notes/renamed.md' },
-    ])
+    expect(db.query('SELECT note_path FROM tags', [])).toEqual([{ note_path: 'notes/renamed.md' }])
     expect(db.query('SELECT note_path FROM note_emails', [])).toEqual([
       { note_path: 'notes/renamed.md' },
     ])
 
     db.applyNote(sampleNote({ path: 'notes/sample.md', id: '01hv3xq7c2dm8k4t9w5e6r1n98' }))
-    expect(() => db.moveNote('notes/sample.md', 'notes/renamed.md')).toThrowError(
-      /already indexed/,
-    )
+    expect(() => db.moveNote('notes/sample.md', 'notes/renamed.md')).toThrowError(/already indexed/)
     // The refused move must leave both notes' rows untouched.
     const paths = db.query('SELECT path FROM notes ORDER BY path', [])
     expect(paths).toEqual([{ path: 'notes/renamed.md' }, { path: 'notes/sample.md' }])
@@ -427,9 +690,7 @@ describe('createDevIndexDb', () => {
     expect(
       db.query('SELECT title, updated_ms FROM chat_conversations WHERE id = ?', ['c1']),
     ).toEqual([{ title: 'first question', updated_ms: 1 }])
-    expect(
-      db.query('SELECT id, seq, user_text FROM chat_messages ORDER BY seq', []),
-    ).toEqual([
+    expect(db.query('SELECT id, seq, user_text FROM chat_messages ORDER BY seq', [])).toEqual([
       { id: 'm1', seq: 0, user_text: 'one settled' },
       { id: 'm2', seq: 1, user_text: 'two' },
     ])
@@ -441,15 +702,18 @@ describe('createDevIndexDb', () => {
   it('clearing the index leaves chat history alone (the durable-tables rule)', async () => {
     const db = await openDb()
     db.applyNote(sampleNote())
-    db.saveChatMessage({ id: 'c1', title: 't', createdMs: 1, updatedMs: 1 }, {
-      id: 'm1',
-      conversationId: 'c1',
-      userText: 'hello',
-      attachments: '[]',
-      parts: '[]',
-      responseMessages: '[]',
-      createdMs: 1,
-    })
+    db.saveChatMessage(
+      { id: 'c1', title: 't', createdMs: 1, updatedMs: 1 },
+      {
+        id: 'm1',
+        conversationId: 'c1',
+        userText: 'hello',
+        attachments: '[]',
+        parts: '[]',
+        responseMessages: '[]',
+        createdMs: 1,
+      },
+    )
 
     db.clear()
 

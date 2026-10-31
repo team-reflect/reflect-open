@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { ErrorEvent } from '@sentry/react'
+import { createTestLoggerService } from '@reflect/core/testing'
+import type { BrowserOptions, ErrorEvent } from '@sentry/react'
 import {
-  createExceptionTelemetryOptions,
+  createExceptionTelemetry,
+  type ExceptionTelemetrySdk,
   parseExceptionTelemetryDsn,
   scrubExceptionEvent,
-} from './exception-telemetry'
+} from './exception-telemetry.ts'
 
 describe('parseExceptionTelemetryDsn', () => {
   it('accepts only the production Reflect Sentry project', () => {
@@ -12,9 +14,7 @@ describe('parseExceptionTelemetryDsn', () => {
       parseExceptionTelemetryDsn(
         ' https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200 ',
       ),
-    ).toBe(
-      'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200',
-    )
+    ).toBe('https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200')
     expect(
       parseExceptionTelemetryDsn(
         'https://0123456789abcdef0123456789abcdef@evil.example/4511705649971200',
@@ -71,7 +71,7 @@ describe('scrubExceptionEvent', () => {
             type: 'TypeError',
             value: 'Customer “Acme” failed at /Users/alex/Notes/Customers/Acme.md',
             mechanism: {
-              type: 'onerror',
+              type: 'auto.browser.global_handlers.onerror',
               handled: false,
               data: { target: 'person@example.com' },
             },
@@ -110,7 +110,7 @@ describe('scrubExceptionEvent', () => {
           {
             type: 'TypeError',
             value: '[redacted]',
-            mechanism: { type: 'onerror', handled: false },
+            mechanism: { type: 'auto.browser.global_handlers.onerror', handled: false },
             stacktrace: {
               frames: [
                 {
@@ -185,39 +185,160 @@ describe('scrubExceptionEvent', () => {
     })
   })
 
+  it('keeps allow-listed ProseMirror transform diagnostics', () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: {
+        values: [
+          { type: 'TransformError', value: 'Inconsistent open depths' },
+          { type: 'TransformError', value: 'Cannot join paragraph onto bullet_list' },
+        ],
+      },
+    }
+
+    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
+      { type: 'TransformError', value: 'Inconsistent open depths' },
+      { type: 'TransformError', value: 'Cannot join paragraph onto bullet_list' },
+    ])
+  })
+
+  it('keeps allow-listed diagnostics for React ErrorBoundary TransformErrors', () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: {
+        values: [
+          {
+            type: 'React ErrorBoundary TransformError',
+            value: 'Invalid content for node paragraph',
+          },
+        ],
+      },
+    }
+
+    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
+      {
+        type: 'ReactErrorBoundary<TransformError>',
+        value: 'Invalid content for node paragraph',
+      },
+    ])
+  })
+
+  it('redacts free-form values from otherwise trusted exception types', () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: {
+        values: [{ type: 'TransformError', value: 'Private roadmap note content' }],
+      },
+    }
+
+    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
+      { type: 'TransformError', value: '[redacted]' },
+    ])
+  })
+
   it('drops non-exception events', () => {
     expect(scrubExceptionEvent({ type: undefined, message: 'note content' })).toBeNull()
   })
 })
 
-describe('createExceptionTelemetryOptions', () => {
-  it('enables only exception integrations and disables ambient collection', () => {
-    const options = createExceptionTelemetryOptions(
-      'https://public@example.ingest.sentry.io/123',
-      'reflect@0.4.0-beta.45',
-    )
+const DSN = 'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200'
 
-    expect(options.defaultIntegrations).toBe(false)
-    expect(options.integrations).toEqual([
-      expect.objectContaining({ name: 'GlobalHandlers' }),
-      expect.objectContaining({ name: 'LinkedErrors' }),
-      expect.objectContaining({ name: 'Dedupe' }),
-    ])
-    expect(options.maxBreadcrumbs).toBe(0)
-    expect(options.tracesSampleRate).toBe(0)
-    expect(options.replaysSessionSampleRate).toBe(0)
-    expect(options.replaysOnErrorSampleRate).toBe(0)
-    expect(options.sendClientReports).toBe(false)
-    expect(options.sendDefaultPii).toBe(false)
-    expect(options.dataCollection).toEqual({
-      userInfo: false,
-      cookies: false,
-      httpHeaders: { request: false, response: false },
-      httpBodies: [],
-      queryParams: false,
-      genAI: { inputs: false, outputs: false },
-      stackFrameVariables: false,
-      frameContextLines: 0,
+interface HandledError {
+  readonly error: unknown
+  readonly componentStack: string | null
+  readonly callback: boolean
+}
+
+function createFakeSdk(options?: { initError?: Error }): ExceptionTelemetrySdk & {
+  inits: BrowserOptions[]
+  handled: HandledError[]
+} {
+  const inits: BrowserOptions[] = []
+  const handled: HandledError[] = []
+  return {
+    inits,
+    handled,
+    init(browserOptions) {
+      if (options?.initError !== undefined) {
+        throw options.initError
+      }
+      inits.push(browserOptions)
+    },
+    reactErrorHandler(callback) {
+      return (error, errorInfo) => {
+        handled.push({
+          error,
+          componentStack: errorInfo.componentStack ?? null,
+          callback: callback !== undefined,
+        })
+      }
+    },
+  }
+}
+
+describe('createExceptionTelemetry', () => {
+  it('initializes the SDK once with the release', () => {
+    const sdk = createFakeSdk()
+    const telemetry = createExceptionTelemetry({
+      dsn: DSN,
+      release: 'reflect@1.2.3',
+      sdk,
+      logger: createTestLoggerService(),
     })
+
+    telemetry.install()
+    telemetry.install()
+
+    expect(sdk.inits).toHaveLength(1)
+    expect(sdk.inits[0]).toMatchObject({ dsn: DSN, release: 'reflect@1.2.3' })
+  })
+
+  it('logs an SDK that fails to initialize', () => {
+    const failure = new Error('init failed')
+    const logger = createTestLoggerService()
+    createExceptionTelemetry({
+      dsn: DSN,
+      release: 'reflect@1.2.3',
+      sdk: createFakeSdk({ initError: failure }),
+      logger,
+    }).install()
+
+    expect(logger.getErrors()).toEqual([
+      { message: '[reflect-open] Failed to initialize exception telemetry', cause: failure },
+    ])
+  })
+
+  it('reports React root errors through the SDK handlers', () => {
+    const sdk = createFakeSdk()
+    const options = createExceptionTelemetry({
+      dsn: DSN,
+      release: 'reflect@1.2.3',
+      sdk,
+      logger: createTestLoggerService(),
+    }).reactRootOptions()
+    const error = new Error('render failed')
+
+    options.onCaughtError?.(error, { componentStack: 'at App' })
+    options.onUncaughtError?.(error, {})
+
+    expect(sdk.handled).toEqual([
+      { error, componentStack: 'at App', callback: true },
+      { error, componentStack: null, callback: false },
+    ])
+  })
+
+  it('does nothing without a DSN', () => {
+    const sdk = createFakeSdk()
+    const telemetry = createExceptionTelemetry({
+      dsn: null,
+      release: 'reflect@1.2.3',
+      sdk,
+      logger: createTestLoggerService(),
+    })
+
+    telemetry.install()
+
+    expect(sdk.inits).toEqual([])
+    expect(telemetry.reactRootOptions()).toEqual({})
   })
 })

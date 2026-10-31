@@ -1,4 +1,4 @@
-import type { NoteEditorHandle } from '@/editor/note-editor'
+import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 
 /**
  * The mounted note editors, keyed by graph-relative note path. Commands that

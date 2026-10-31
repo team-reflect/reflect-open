@@ -11,6 +11,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'all-notes', title: 'All notes' },
   { id: 'search', title: 'Search' },
   { id: 'ai-providers', title: 'AI providers' },
+  { id: 'audio-memos', title: 'Audio memos' },
   { id: 'ai-chat', title: 'AI chat' },
   { id: 'ai-prompts', title: 'AI prompts' },
   // macOS only — installs files under ~/.agents for terminal coding agents.
@@ -18,6 +19,7 @@ export const SETTINGS_SECTIONS = [
   // Only shown where the OS frameworks exist — see use-visible-settings-sections.
   { id: 'integrations', title: 'Integrations' },
   { id: 'sync', title: 'Sync' },
+  { id: 'accounts', title: 'Accounts' },
   { id: 'import', title: 'Import' },
   { id: 'about', title: 'About' },
   { id: 'destructive', title: 'Danger zone' },

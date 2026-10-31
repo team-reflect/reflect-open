@@ -1,9 +1,10 @@
-import type { ReactElement } from 'react'
-import { RecordingWaveform } from '@/components/audio-memo/recording-waveform'
-import { Button } from '@/components/ui/button'
-import { PopoverContent } from '@/components/ui/popover'
-import { Spinner } from '@/components/ui/spinner'
-import { useAudioMemo } from '@/providers/audio-memo-provider'
+import type { ComponentProps, ReactElement } from 'react'
+import { RecordingWaveform } from '@/components/audio-memo/recording-waveform.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { PopoverContent } from '@/components/ui/popover.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
+import { formatElapsed } from '@reflect/utils'
+import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 
 /**
  * The floating panel beside the mic while a memo is in flight: waveform +
@@ -16,7 +17,11 @@ import { useAudioMemo } from '@/providers/audio-memo-provider'
  * recording can start immediately. Clicks elsewhere don't dismiss; the
  * recording owns its lifecycle.
  */
-export function RecordingPopover(): ReactElement {
+export function RecordingPopover({
+  anchor,
+}: {
+  anchor?: ComponentProps<typeof PopoverContent>['anchor']
+}): ReactElement {
   const memo = useAudioMemo()
 
   return (
@@ -24,16 +29,9 @@ export function RecordingPopover(): ReactElement {
       side="right"
       align="center"
       sideOffset={10}
+      anchor={anchor}
       className="w-auto px-3 py-2"
-      onOpenAutoFocus={(event) => event.preventDefault()}
-      onEscapeKeyDown={() => {
-        if (memo.phase === 'recording') {
-          memo.cancel()
-        } else if (memo.phase === 'error') {
-          memo.discard()
-        }
-      }}
-      onInteractOutside={(event) => event.preventDefault()}
+      initialFocus={false}
     >
       {memo.phase === 'error' ? (
         <div className="flex max-w-72 flex-col gap-2">
@@ -62,11 +60,4 @@ export function RecordingPopover(): ReactElement {
       )}
     </PopoverContent>
   )
-}
-
-function formatElapsed(elapsedMs: number): string {
-  const totalSeconds = Math.floor(elapsedMs / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }

@@ -1,4 +1,7 @@
+import { parseXPostId } from '@post-embed/schema'
+import { z } from 'zod'
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
+import { PopupHeader } from './header.tsx'
 import { browser } from 'wxt/browser'
 import { readQueue } from '@/lib/flush'
 import type { FlushResult } from '@/lib/messages'
@@ -7,8 +10,8 @@ import {
   readIncludePageTextPreference,
   writeIncludePageTextPreference,
 } from '@/lib/popup-preferences'
-import { tryExtractPageText } from './extract-page-text'
-import { useCapturedPage } from './use-captured-page'
+import { tryExtractPageText } from './extract-page-text.ts'
+import { useCapturedPage } from './use-captured-page.ts'
 
 /**
  * The capture popup: a snapshot of the page, an optional note, one Save.
@@ -27,6 +30,8 @@ const RELEASES_URL = 'https://github.com/team-reflect/reflect-open/releases/late
 
 function holdMessage(result: FlushResult): string {
   switch (result.holdReason) {
+    case 'unsupported-version':
+      return 'Update Reflect to save X posts. Your captures are still queued.'
     case 'no-host':
       return 'Install Reflect to finish saving — the capture is kept and retries automatically.'
     case 'no-graph':
@@ -38,9 +43,10 @@ function holdMessage(result: FlushResult): string {
 
 export function CapturePopup(): ReactElement {
   const captured = useCapturedPage()
+  const postId = captured.status === 'ready' ? parseXPostId(captured.page.url) : undefined
   const [note, setNote] = useState('')
   const [includePageText, setIncludePageText] = useState(false)
-  const includePageTextTouched = useRef(false)
+  const includePageTextTouchedRef = useRef(false)
   const [includePageTextPreferenceLoaded, setIncludePageTextPreferenceLoaded] = useState(false)
   const [save, setSave] = useState<SaveState>({ phase: 'idle' })
   const [heldCount, setHeldCount] = useState(0)
@@ -53,7 +59,7 @@ export function CapturePopup(): ReactElement {
     let cancelled = false
     void readIncludePageTextPreference().then(
       (preference) => {
-        if (!cancelled && !includePageTextTouched.current) {
+        if (!cancelled && !includePageTextTouchedRef.current) {
           setIncludePageText(preference)
         }
         if (!cancelled) {
@@ -76,13 +82,25 @@ export function CapturePopup(): ReactElement {
     event.preventDefault()
     if (
       captured.status !== 'ready' ||
-      !includePageTextPreferenceLoaded ||
+      (!postId && !includePageTextPreferenceLoaded) ||
       save.phase === 'saving'
     ) {
       return
     }
     setSave({ phase: 'saving' })
     try {
+      if (postId) {
+        const result = z.object({ ok: z.boolean(), message: z.string().optional() }).parse(
+          await browser.runtime.sendMessage({
+            type: 'x-archive:save',
+            tabId: captured.tabId,
+            postId,
+          }),
+        )
+        if (!result.ok) throw new Error(result.message ?? 'Capture failed')
+        window.close()
+        return
+      }
       const contentText = includePageText
         ? await tryExtractPageText(captured.tabId, captured.page.url)
         : undefined
@@ -95,6 +113,12 @@ export function CapturePopup(): ReactElement {
           capturedAt: new Date(),
         },
         () => browser.runtime.sendMessage({ type: 'flush' }),
+        async (wire) => {
+          const response = z
+            .object({ ok: z.boolean(), message: z.string().optional() })
+            .parse(await browser.runtime.sendMessage({ type: 'enqueue', wire }))
+          if (!response.ok) throw new Error(response.message ?? 'Capture could not be queued')
+        },
       )
       if (outcome.fate === 'queued') {
         window.close()
@@ -110,18 +134,28 @@ export function CapturePopup(): ReactElement {
   }
 
   if (captured.status === 'loading') {
-    return <div className="h-24" />
+    return (
+      <>
+        <PopupHeader />
+        <div className="h-24" />
+      </>
+    )
   }
   if (captured.status === 'uncapturable') {
-    return <p className="p-4 text-sm text-text-muted">This page can’t be captured.</p>
+    return (
+      <>
+        <PopupHeader />
+        <p className="p-4 text-sm text-text-muted">This page can’t be captured.</p>
+      </>
+    )
   }
 
   const { page } = captured
   const host = new URL(page.url).host
-  const busy = save.phase === 'saving' || !includePageTextPreferenceLoaded
+  const busy = save.phase === 'saving' || (!postId && !includePageTextPreferenceLoaded)
 
   function onIncludePageTextChange(checked: boolean): void {
-    includePageTextTouched.current = true
+    includePageTextTouchedRef.current = true
     setIncludePageTextPreferenceLoaded(true)
     setIncludePageText(checked)
     void writeIncludePageTextPreference(checked).catch((cause) => {
@@ -130,67 +164,79 @@ export function CapturePopup(): ReactElement {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
-      {page.screenshotDataUrl ? (
-        <img
-          src={page.screenshotDataUrl}
-          alt=""
-          className="h-32 w-full rounded-md border border-border object-cover object-top"
-        />
-      ) : null}
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-text">{page.title || host}</p>
-        <p className="truncate text-xs text-text-muted">{host}</p>
-      </div>
-      {page.selection ? (
-        <blockquote className="max-h-16 overflow-hidden border-l-2 border-border pl-2 text-xs text-text-secondary">
-          {page.selection}
-        </blockquote>
-      ) : null}
-      <input
-        type="text"
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        placeholder="Add a note (optional)"
-        autoFocus
-        disabled={busy}
-        className="rounded-md border border-border bg-input-bg px-2 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus:ring-2 focus:ring-focus-ring"
-      />
-      <label className="flex items-center gap-2 text-xs text-text-secondary">
-        <input
-          type="checkbox"
-          checked={includePageText}
-          onChange={(event) => onIncludePageTextChange(event.target.checked)}
+    <>
+      <PopupHeader />
+      <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
+        {page.screenshotDataUrl ? (
+          <img
+            src={page.screenshotDataUrl}
+            alt=""
+            className="h-32 w-full rounded-md border border-border object-cover object-top"
+          />
+        ) : null}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-text">{page.title || host}</p>
+          <p className="truncate text-xs text-text-muted">{host}</p>
+        </div>
+        {page.selection ? (
+          <blockquote className="max-h-16 overflow-hidden border-l-2 border-border pl-2 text-xs text-text-secondary">
+            {page.selection}
+          </blockquote>
+        ) : null}
+        {!postId ? (
+          <>
+            <input
+              type="text"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Add a note (optional)"
+              autoFocus
+              disabled={busy}
+              className="rounded-md border border-border bg-input-bg px-2 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus:ring-2 focus:ring-focus-ring"
+            />
+            <label className="flex items-center gap-2 text-xs text-text-secondary">
+              <input
+                type="checkbox"
+                checked={includePageText}
+                onChange={(event) => onIncludePageTextChange(event.target.checked)}
+                disabled={busy}
+                className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
+              />
+              Capture page text
+            </label>
+          </>
+        ) : null}
+        <button
+          type="submit"
           disabled={busy}
-          className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
-        />
-        Capture page text
-      </label>
-      <button
-        type="submit"
-        disabled={busy}
-        className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-text-on-brand hover:bg-accent-hover disabled:opacity-60"
-      >
-        {save.phase === 'saving' ? 'Saving…' : 'Save to Reflect'}
-      </button>
-      {save.phase === 'held' ? (
-        <p className="text-xs text-text-muted">
-          {holdMessage(save.result)}{' '}
-          {save.result.holdReason === 'no-host' ? (
-            <a href={RELEASES_URL} target="_blank" rel="noreferrer" className="text-accent underline">
-              Download Reflect
-            </a>
-          ) : null}
-        </p>
-      ) : null}
-      {save.phase === 'failed' ? (
-        <p className="text-xs text-destructive">{save.message}</p>
-      ) : null}
-      {save.phase === 'idle' && heldCount > 0 ? (
-        <p className="text-xs text-text-muted">
-          {heldCount} earlier {heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.
-        </p>
-      ) : null}
-    </form>
+          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-text-on-brand hover:bg-accent-hover disabled:opacity-60"
+        >
+          {save.phase === 'saving' ? 'Saving…' : 'Save to Reflect'}
+        </button>
+        {save.phase === 'held' ? (
+          <p className="text-xs text-text-muted">
+            {holdMessage(save.result)}{' '}
+            {save.result.holdReason === 'no-host' ? (
+              <a
+                href={RELEASES_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent underline"
+              >
+                Download Reflect
+              </a>
+            ) : null}
+          </p>
+        ) : null}
+        {save.phase === 'failed' ? (
+          <p className="text-xs text-destructive">{save.message}</p>
+        ) : null}
+        {save.phase === 'idle' && heldCount > 0 ? (
+          <p className="text-xs text-text-muted">
+            {heldCount} earlier {heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.
+          </p>
+        ) : null}
+      </form>
+    </>
   )
 }

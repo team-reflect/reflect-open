@@ -41,22 +41,24 @@ another git remote are connected directly by the user.
 ## Install
 
 1. **Install the Mac app.** Download the latest release for your Mac:
-   - **Stable:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_x86_64.dmg)
-   - **Beta:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_x86_64.dmg)
+   - **Stable:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_aarch64.dmg) · [Universal (Intel and Apple silicon)](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_universal.dmg)
+   - **Beta:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_aarch64.dmg) · [Universal (Intel and Apple silicon)](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_universal.dmg)
 
-   Each build is signed, notarized, and auto-updated from GitHub Releases. You
-   can also [view all releases](https://github.com/team-reflect/reflect-open/releases).
+   Each build is signed, notarized, and auto-updated from GitHub Releases. See
+   [all releases](https://github.com/team-reflect/reflect-open/releases).
 2. **Install the iOS beta.** Join
    [TestFlight](https://testflight.apple.com/join/j2eEz43d). The iOS app uses
    the same plain-file graph and sync options as the Mac app.
-3. **Install the Chrome extension.** Add
+3. **Windows and Linux.** Each release includes unsigned builds. See
+   [docs/distribution.md](docs/distribution.md).
+4. **Install the Chrome extension.** Add
    [Reflect Capture from the Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
    to save the current page, selected text, screenshots, and optional page text
    from Chrome.
 
-You can also [build from source](#building-from-source).
+You can also build from source (below).
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
+See [CHANGELOG.md](apps/desktop/CHANGELOG.md) for release notes.
 
 ## Your Notes Are Files
 
@@ -126,41 +128,36 @@ and [AGENTS.md](AGENTS.md) for conventions and development guides.
 
 ## Development
 
-Common commands from the repository root:
+Common commands from the repository root (the rest are in `package.json`):
 
 ```bash
 pnpm dev              # Vite only, http://localhost:1420
-pnpm typecheck        # TypeScript
-pnpm lint             # oxlint
-pnpm test             # vitest; use --run path/to/test for one file
 pnpm check            # typecheck + lint
+pnpm test --run path/to/test
 
 # Rust tests that compile the desktop crate need sidecars staged first
 pnpm --filter @reflect/desktop sidecar
 cargo test --workspace
+
+pnpm tauri:ios:dev "iPhone 17 Pro"   # iOS simulator
 ```
 
-For iOS simulator development:
-
-```bash
-pnpm tauri:ios:dev "iPhone 17 Pro"
-```
-
-For TestFlight builds:
-
-```bash
-pnpm release:ios preflight --build-number=123
-pnpm release:ios testflight --build-number=123 --wait
-```
+Release and TestFlight builds are in [docs/distribution.md](docs/distribution.md).
 
 ## Status
 
 Reflect is in beta and used daily. The current focus is the Mac app, iOS
 companion, browser capture, local-first data model, and sync reliability.
 
-Windows, Android, and a plugin API are out of scope for now. See the
+Android and a plugin API are out of scope for now. See the
 [V2 product vision](docs/reflect-v2-product-vision.md) and the implementation
 plans in [docs/plans/](docs/plans/) for the longer-term direction.
+
+## Community
+
+Join the [Reflect Discord server](https://reflect.app/discord) to ask questions,
+share feedback, and follow the project. Report bugs and request features in
+[GitHub issues](https://github.com/team-reflect/reflect-open/issues).
 
 ## License
 

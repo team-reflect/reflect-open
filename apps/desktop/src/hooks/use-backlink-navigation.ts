@@ -1,11 +1,8 @@
 import { useCallback } from 'react'
-import type { WikilinkClickHandler } from '@meowdown/core'
-import { useAssetPersistence } from '@/editor/use-asset-persistence'
-import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
-import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
-import { useGraph } from '@/providers/graph-provider'
-import { routeForPath } from '@/routing/route'
+import { type WikilinkClickHandler, isModEvent } from '@meowdown/core'
+import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
+import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
+import { routeForPath } from '@reflect/app'
 
 /** The click plumbing a backlinks surface wires into its rows and snippets. */
 export interface BacklinkNavigation {
@@ -17,43 +14,38 @@ export interface BacklinkNavigation {
    * desktop autofocuses note arrivals anyway. `event` (desktop) lets ⌘-click
    * open a new window; mobile taps omit it.
    */
-  openSource: (path: string, event?: NewWindowClickEvent) => void
+  openSource: (path: string, event?: ModClickEvent) => void
   /**
    * Navigate a `[[wiki link]]` clicked *inside* a snippet — resolves its
    * target the same way the editor does, distinct from {@link openSource}.
    * Stable, so it never rebuilds the snippet trees.
    */
   onWikilinkClick: WikilinkClickHandler
-  /** Resolve `![…](…)` sources inside a snippet to displayable URLs. Stable. */
-  resolveImageUrl: (src: string) => string | undefined
 }
 
 /**
  * Navigation for an incoming-backlinks surface, shared by the desktop panel
- * and the mobile section. Wiki links and images inside snippets resolve
- * through the same pipelines as the editor.
+ * and the mobile section. Wiki links inside snippets resolve through the same
+ * pipeline as the editor.
  */
 export function useBacklinkNavigation(): BacklinkNavigation {
-  const { graph } = useGraph()
   const navigateNoteLink = useNoteLinkNavigation()
 
   const openSource = useCallback(
-    (target: string, event?: NewWindowClickEvent) => {
-      navigateNoteLink(routeForPath(target), event)
+    (target: string, event?: ModClickEvent) => {
+      navigateNoteLink({
+        target: routeForPath(target),
+        openInNewWindow: event !== undefined && isModEvent(event),
+      })
     },
     [navigateNoteLink],
   )
 
-  const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
-  const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
+  const navigateWikiLink = useWikiLinkNavigation()
   const onWikilinkClick = useCallback<WikilinkClickHandler>(
-    ({ target, event }) => navigateWikiLink(target, event),
+    (payload) => navigateWikiLink({ target: payload.target, openInNewWindow: payload.mod }),
     [navigateWikiLink],
   )
-  const resolveImageUrlStable = useCallback(
-    (src: string) => resolveImageUrl(src) ?? undefined,
-    [resolveImageUrl],
-  )
 
-  return { openSource, onWikilinkClick, resolveImageUrl: resolveImageUrlStable }
+  return { openSource, onWikilinkClick }
 }

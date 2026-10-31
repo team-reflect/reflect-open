@@ -2,7 +2,9 @@ import { z } from 'zod'
 
 export const EXTRACT_PAGE_TEXT_MESSAGE_TYPE = 'reflect:capture-page-text'
 
-/** Popup request sent to the injected content script. */
+/**
+ * Popup request sent to the injected content script.
+ */
 export const extractPageTextRequestSchema = z.object({
   type: z.literal(EXTRACT_PAGE_TEXT_MESSAGE_TYPE),
   expectedUrl: z.url(),
@@ -36,7 +38,7 @@ export function samePageUrl(first: string, second: string): boolean {
 
 /** Collapse intra-paragraph whitespace while preserving paragraph breaks. */
 export function normalizeParagraphText(text: string): string {
-  return text.replace(/\s+/g, ' ').trim()
+  return text.replaceAll(/\s+/g, ' ').trim()
 }
 
 /** Join non-empty paragraphs into plain text suitable for markdown capture. */

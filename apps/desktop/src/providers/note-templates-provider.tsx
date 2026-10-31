@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useMemo,
   useState,
   type ReactElement,
@@ -63,11 +63,11 @@ export function NoteTemplatesProvider({ children }: { children: ReactNode }): Re
       closeTemplateCreate,
     ],
   )
-  return <NoteTemplatesContext.Provider value={value}>{children}</NoteTemplatesContext.Provider>
+  return <NoteTemplatesContext value={value}>{children}</NoteTemplatesContext>
 }
 
 export function useNoteTemplates(): NoteTemplatesContextValue {
-  const context = useContext(NoteTemplatesContext)
+  const context = use(NoteTemplatesContext)
   if (!context) {
     throw new Error('useNoteTemplates must be used within a NoteTemplatesProvider')
   }

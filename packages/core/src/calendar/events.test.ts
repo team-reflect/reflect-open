@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { CalendarAttendee, CalendarEvent } from './commands'
-import { dayRange, defaultAttendees, displayEvents, isDeclinedByUser } from './events'
+import type { CalendarAttendee, CalendarEvent } from './calendar-service.ts'
+import { dayRange, defaultAttendees, displayEvents, isDeclinedByUser } from './events.ts'
 
 function attendee(overrides: Partial<CalendarAttendee> = {}): CalendarAttendee {
   return {
@@ -32,9 +32,7 @@ function event(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
 describe('isDeclinedByUser', () => {
   it('is true only when the current user declined', () => {
     expect(isDeclinedByUser(event())).toBe(false)
-    expect(
-      isDeclinedByUser(event({ attendees: [attendee({ status: 'declined' })] })),
-    ).toBe(false)
+    expect(isDeclinedByUser(event({ attendees: [attendee({ status: 'declined' })] }))).toBe(false)
     expect(
       isDeclinedByUser(
         event({ attendees: [attendee({ isCurrentUser: true, status: 'declined' })] }),
@@ -84,11 +82,7 @@ describe('displayEvents', () => {
       event({ id: 'early-b', title: 'Beta sync', startsAt: 1_000 }),
       event({ id: 'early-a', title: 'Alpha sync', startsAt: 1_000 }),
     ]
-    expect(displayEvents(events).map((entry) => entry.id)).toEqual([
-      'early-a',
-      'early-b',
-      'late',
-    ])
+    expect(displayEvents(events).map((entry) => entry.id)).toEqual(['early-a', 'early-b', 'late'])
   })
 })
 
@@ -118,7 +112,7 @@ describe('defaultAttendees', () => {
       }),
     )
     expect(attendees).toEqual([
-      { name: 'Ada Lovelace', email: 'ada@example.com' },
+      { name: 'Ada Lovelace', emails: ['ada@example.com'] },
       { name: 'Grace Hopper' },
     ])
   })

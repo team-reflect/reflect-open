@@ -1,11 +1,11 @@
 //! The `NSFileVersion` surface: what iCloud knows about a file's unresolved
-//! conflict versions, and the resolve/cleanup calls (Plan 21).
+//! conflict versions, and the resolve/cleanup calls.
 //!
 //! When two devices edit apart, iCloud keeps one content as the current file
 //! and stashes the others as conflict versions — full content in the local
-//! version store, plus the saving device's name and modification date. The
-//! sweep reads them through this module, resolves, then marks the versions
-//! handled so iCloud stops reporting the conflict.
+//! version store, plus its modification date. The sweep reads them through
+//! this module, resolves, then marks the versions handled so iCloud stops
+//! reporting the conflict.
 
 use std::path::PathBuf;
 
@@ -17,16 +17,11 @@ pub struct VersionRef {
     /// The version's modification time (epoch ms) — shared metadata, the
     /// deterministic ordering key.
     pub modified_ms: u64,
-    /// The saving device's name (`localizedNameOfSavingComputer`).
-    pub device: Option<String>,
 }
 
 /// A file's unresolved conflict versions, plus whether the listing is
-/// **complete**. `NSFileVersion.URL` can hand back a URL with no path (file
-/// reference URLs are id-based); such a version can't be read or archived.
-/// When that happens the sweep must not resolve the file at all this round —
-/// `mark_resolved` purges *every* version, including the one that was never
-/// archived, which is exactly the data loss the archive exists to prevent.
+/// **complete**. `NSFileVersion.URL` can hand back a URL with no path; such a
+/// version can't be read, so the sweep must not resolve the file.
 pub struct VersionScan {
     pub versions: Vec<VersionRef>,
     pub complete: bool,
@@ -45,7 +40,7 @@ pub use platform::{current_version_modified_ms, mark_resolved, unresolved_versio
 mod platform {
     use super::{VersionRef, VersionScan};
     use objc2_foundation::{NSDate, NSFileVersion, NSString, NSURL};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     /// The file's unresolved conflict versions (empty when none, or when the
     /// file isn't under iCloud at all).
@@ -87,17 +82,26 @@ mod platform {
         version.modificationDate().map(|date| date_ms(&date))
     }
 
-    /// Mark every conflict version of `abs` resolved and drop the stale
-    /// copies from the version store. Call strictly **after** the archive and
-    /// the resolved write have landed, and only when the version scan was
-    /// complete. Best-effort: a failure leaves the versions unresolved and
-    /// the next sweep retries.
-    pub fn mark_resolved(abs: &Path) {
+    /// Mark the conflict versions of `abs` whose store paths are in
+    /// `handled` resolved, then drop the stale copies from the version store
+    /// unless a version the sweep never saw is still unresolved. Call
+    /// strictly **after** the resolved write has landed. Best-effort: the next
+    /// sweep retries what is left.
+    pub fn mark_resolved(abs: &Path, handled: &[PathBuf]) {
         let url = file_url(abs);
-        if let Some(versions) = NSFileVersion::unresolvedConflictVersionsOfItemAtURL(&url) {
-            for version in versions.iter() {
+        let Some(listed) = NSFileVersion::unresolvedConflictVersionsOfItemAtURL(&url) else {
+            return;
+        };
+        let mut all_handled = true;
+        for version in listed.iter() {
+            if store_path(&version).is_some_and(|path| handled.contains(&path)) {
                 version.setResolved(true);
+            } else {
+                all_handled = false;
             }
+        }
+        if !all_handled {
+            return;
         }
         if let Err(err) = NSFileVersion::removeOtherVersionsOfItemAtURL_error(&url) {
             tracing::warn!(path = %abs.display(), %err, "failed to drop resolved iCloud versions");
@@ -105,19 +109,19 @@ mod platform {
     }
 
     fn describe(version: &NSFileVersion) -> Option<VersionRef> {
-        let store_path = version.URL().path()?.to_string();
+        let store_path = store_path(version)?;
         let modified_ms = version
             .modificationDate()
             .map(|date| date_ms(&date))
             .unwrap_or(0);
-        let device = version
-            .localizedNameOfSavingComputer()
-            .map(|name| name.to_string());
         Some(VersionRef {
-            store_path: store_path.into(),
+            store_path,
             modified_ms,
-            device,
         })
+    }
+
+    fn store_path(version: &NSFileVersion) -> Option<PathBuf> {
+        Some(version.URL().path()?.to_string().into())
     }
 
     /// `NSDate` → epoch ms, clamped at zero. Both the conflict-version and
@@ -140,7 +144,7 @@ mod platform {
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 mod platform {
     use super::VersionScan;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     /// No version store off Apple platforms.
     pub fn unresolved_versions(_abs: &Path) -> VersionScan {
@@ -154,5 +158,5 @@ mod platform {
         None
     }
 
-    pub fn mark_resolved(_abs: &Path) {}
+    pub fn mark_resolved(_abs: &Path, _handled: &[PathBuf]) {}
 }

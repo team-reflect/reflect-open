@@ -1,19 +1,13 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
-import type { BacklinkContext, BacklinkContextPage } from '@reflect/core'
-import { useBacklinkSources } from './use-backlink-sources'
+import { act } from '@/test-utils/act.ts'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { BacklinkContext, BacklinkContextPage, BacklinkService } from '@reflect/core'
+import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { useBacklinkSources } from './use-backlink-sources.ts'
 
-const getBacklinksWithContext = vi.hoisted(() => vi.fn())
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  hasBridge: () => true,
-  getBacklinksWithContext,
-}))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
-}))
+let core: TestCoreServices
+let getBacklinksWithContext: MockInstance<BacklinkService['getBacklinksWithContext']>
 
 function context(sourcePath: string, snippet: string, posFrom: number): BacklinkContext {
   return {
@@ -25,43 +19,41 @@ function context(sourcePath: string, snippet: string, posFrom: number): Backlink
   }
 }
 
-function makeWrapper() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return function Wrapper({ children }: { children: ReactNode }): ReactNode {
-    return <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  }
+/**
+ * Render the hook for `notes/target.md` in the graph `/g`.
+ */
+async function mount() {
+  return await renderHookInApp(() => useBacklinkSources('notes/target.md'), {
+    core,
+    graph: { root: '/g', name: 'g', generation: 1 },
+  })
 }
 
 beforeEach(() => {
-  getBacklinksWithContext.mockReset()
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  getBacklinksWithContext = vi.spyOn(core.backlinks, 'getBacklinksWithContext')
 })
 
 describe('useBacklinkSources', () => {
   it('loads source pages, deduplicates overlapping contexts, and preserves the indexed count', async () => {
     const nextCursor = { recencyMs: 100, sourcePath: 'notes/a.md' }
-    let resolveNextPage: ((page: BacklinkContextPage) => void) | undefined
-    const nextPage = new Promise<BacklinkContextPage>((resolve) => {
-      resolveNextPage = resolve
-    })
-    getBacklinksWithContext.mockImplementation(
-      (_path: string, options: { cursor: typeof nextCursor | null }) =>
-        options.cursor === null
-          ? Promise.resolve({
-              contexts: [
-                context('notes/a.md', 'shared context', 1),
-                context('notes/a.md', 'first-page context', 2),
-              ],
-              nextCursor,
-              indexedLinkCount: 12,
-            })
-          : nextPage,
-    )
-
-    const { result } = renderHook(() => useBacklinkSources('notes/target.md'), {
-      wrapper: makeWrapper(),
+    const nextPage = Promise.withResolvers<BacklinkContextPage>()
+    getBacklinksWithContext.mockImplementation((_path, options) => {
+      return options.cursor === null
+        ? Promise.resolve({
+            contexts: [
+              context('notes/a.md', 'shared context', 1),
+              context('notes/a.md', 'first-page context', 2),
+            ],
+            nextCursor,
+            indexedLinkCount: 12,
+          })
+        : nextPage.promise
     })
 
-    await waitFor(() => expect(result.current.groups).toHaveLength(1))
+    const { result } = await mount()
+
+    await vi.waitFor(() => expect(result.current.groups).toHaveLength(1))
     expect(getBacklinksWithContext).toHaveBeenNthCalledWith(1, 'notes/target.md', {
       cursor: null,
       limit: 10,
@@ -69,11 +61,11 @@ describe('useBacklinkSources', () => {
     expect(result.current.count).toBe(12)
     expect(result.current.hasNextPage).toBe(true)
 
-    act(() => {
+    await act(() => {
       result.current.loadMore()
       result.current.loadMore()
     })
-    await waitFor(() => expect(result.current.isFetchingNextPage).toBe(true))
+    await vi.waitFor(() => expect(result.current.isFetchingNextPage).toBe(true))
     expect(getBacklinksWithContext).toHaveBeenCalledTimes(2)
     expect(getBacklinksWithContext).toHaveBeenNthCalledWith(2, 'notes/target.md', {
       cursor: nextCursor,
@@ -81,7 +73,7 @@ describe('useBacklinkSources', () => {
     })
 
     await act(async () => {
-      resolveNextPage?.({
+      nextPage.resolve({
         contexts: [
           context('notes/a.md', 'shared context', 1),
           context('notes/b.md', 'second-page context', 3),
@@ -89,10 +81,10 @@ describe('useBacklinkSources', () => {
         nextCursor: null,
         indexedLinkCount: 99,
       })
-      await nextPage
+      await nextPage.promise
     })
 
-    await waitFor(() => expect(result.current.isFetchingNextPage).toBe(false))
+    await vi.waitFor(() => expect(result.current.isFetchingNextPage).toBe(false))
     expect(result.current.groups).toEqual([
       {
         path: 'notes/a.md',
@@ -122,13 +114,11 @@ describe('useBacklinkSources', () => {
       })
       .mockRejectedValueOnce(new Error('next page failed'))
 
-    const { result } = renderHook(() => useBacklinkSources('notes/target.md'), {
-      wrapper: makeWrapper(),
-    })
-    await waitFor(() => expect(result.current.groups).toHaveLength(1))
+    const { result } = await mount()
+    await vi.waitFor(() => expect(result.current.groups).toHaveLength(1))
 
-    act(() => result.current.loadMore())
-    await waitFor(() => expect(result.current.isFetchNextPageError).toBe(true))
+    await act(() => result.current.loadMore())
+    await vi.waitFor(() => expect(result.current.isFetchNextPageError).toBe(true))
 
     expect(result.current.isError).toBe(false)
     expect(result.current.groups).toHaveLength(1)
@@ -138,10 +128,8 @@ describe('useBacklinkSources', () => {
   it('reports an initial-page failure as the panel error', async () => {
     getBacklinksWithContext.mockRejectedValue(new Error('initial page failed'))
 
-    const { result } = renderHook(() => useBacklinkSources('notes/target.md'), {
-      wrapper: makeWrapper(),
-    })
-    await waitFor(() => expect(result.current.isError).toBe(true))
+    const { result } = await mount()
+    await vi.waitFor(() => expect(result.current.isError).toBe(true))
 
     expect(result.current.isFetchNextPageError).toBe(false)
     expect(result.current.groups).toEqual([])

@@ -1,19 +1,18 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '@reflect/core'
-import { SuggestedContactCard } from './suggested-contact-card'
+import { page, userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createTestCoreServices,
+  createTestContactsService,
+  createTestNoteFileService,
+  type TestContactsService,
+  type TestNoteFileService,
+} from '@reflect/core/testing'
+import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { SuggestedContactCard } from './suggested-contact-card.tsx'
 
-// The card reads the graph (generation for writes) and the contacts opt-in;
-// both providers are per-app plumbing the component test doesn't need.
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', generation: 3 } }),
-}))
-const contactsEnabled = vi.hoisted(() => ({ current: true }))
-vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({ settings: { contactsEnabled: contactsEnabled.current } }),
-}))
+const PATH = 'notes/Ada Lovelace.md'
 
 const ADA = {
   fullName: 'Ada Lovelace',
@@ -23,114 +22,84 @@ const ADA = {
   phones: ['+1 555 0100'],
 }
 
-let noteSource: string
-let written: Array<{ path: string; contents: string }>
-let lookups: string[]
+let noteFile: TestNoteFileService
+let contacts: TestContactsService
 
-function installFakeBridge(authorization = 'authorized'): void {
-  written = []
-  lookups = []
-  setBridge({
-    invoke: async (command, args) => {
-      switch (command) {
-        case 'contacts_authorization_status':
-          return authorization
-        case 'contacts_lookup_by_name':
-          lookups.push(String(args['name']))
-          return [ADA]
-        case 'note_read':
-          return noteSource
-        case 'note_write': {
-          const path = String(args['path'])
-          const contents = String(args['contents'])
-          written.push({ path, contents })
-          noteSource = contents
-          return null
-        }
-        default:
-          throw new Error(`unexpected command ${command}`)
-      }
-    },
-    listen: async () => () => {},
+/**
+ * Render the card with the contacts integration switched on or off.
+ */
+async function renderCard(contactsEnabled = true): Promise<void> {
+  await renderInApp(<SuggestedContactCard path={PATH} />, {
+    core: createTestCoreServices({ database: createWasmTestDatabaseService(), noteFile, contacts }),
+    // The card writes with the generation of the open graph.
+    graph: { root: '/g', generation: 3 },
+    settings: { contactsEnabled },
   })
 }
 
-function renderCard(): void {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
-    <QueryClientProvider client={queryClient}>
-      <SuggestedContactCard path="notes/Ada Lovelace.md" />
-    </QueryClientProvider>,
-  )
-}
-
 beforeEach(() => {
-  contactsEnabled.current = true
-  noteSource = '# Ada Lovelace\n'
-  installFakeBridge()
-})
-
-afterEach(() => {
-  cleanup()
-  setBridge(null)
+  noteFile = createTestNoteFileService()
+  noteFile.set(PATH, '# Ada Lovelace\n')
+  contacts = createTestContactsService({ contacts: [ADA] })
 })
 
 describe('SuggestedContactCard', () => {
   it('offers the matched contact with its primary details', async () => {
-    renderCard()
-    expect(await screen.findByText('Ada Lovelace')).toBeTruthy()
-    expect(screen.getByText('ada@example.com · +1 555 0100')).toBeTruthy()
-    expect(lookups).toEqual(['Ada Lovelace'])
+    await renderCard()
+    await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument()
+    await expect.element(page.getByText('ada@example.com · +1 555 0100')).toBeInTheDocument()
+    expect(contacts.lookups()).toEqual([{ kind: 'name', name: 'Ada Lovelace' }])
   })
 
   it('Add writes the details block in one write, then the content hides the card', async () => {
-    renderCard()
-    await userEvent.click(await screen.findByRole('button', { name: 'Add' }))
+    await renderCard()
+    await userEvent.click(page.getByRole('button', { name: 'Add' }))
 
-    await waitFor(() => expect(written.length).toBe(1))
-    expect(written[0]?.contents).toBe(
+    await vi.waitFor(() => expect(noteFile.writes()).toHaveLength(1))
+    expect(noteFile.getWrites(PATH)).toEqual([
       '# Ada Lovelace\n\n- Type: #person\n- Email: ada@example.com\n- Phone: +1 555 0100\n',
-    )
-    await waitFor(() => expect(screen.queryByText('Ada Lovelace')).toBeNull())
+    ])
+    await expectLocatorToHaveCount(page.getByText('Ada Lovelace'), 0)
   })
 
   it('Ignore records the contact in ignoredContacts, then hides the card', async () => {
-    renderCard()
-    await userEvent.click(await screen.findByRole('button', { name: 'Ignore' }))
+    await renderCard()
+    await userEvent.click(page.getByRole('button', { name: 'Ignore' }))
 
-    await waitFor(() => expect(written.length).toBe(1))
-    expect(written[0]?.contents).toBe(
-      '---\nignoredContacts:\n  - Ada Lovelace\n---\n# Ada Lovelace\n',
-    )
-    await waitFor(() => expect(screen.queryByText('Ada Lovelace')).toBeNull())
+    await vi.waitFor(() => expect(noteFile.writes()).toHaveLength(1))
+    expect(noteFile.getWrites(PATH)).toEqual([
+      '---\nignoredContacts:\n  - Ada Lovelace\n---\n\n# Ada Lovelace\n',
+    ])
+    await expectLocatorToHaveCount(page.getByText('Ada Lovelace'), 0)
   })
 
   it('renders nothing when the body already carries contact details — no lookup', async () => {
-    noteSource = '# Ada Lovelace\n\n- Email: ada@example.com\n'
-    renderCard()
-    await waitFor(() => expect(lookups).toEqual([]))
-    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    noteFile.set(PATH, '# Ada Lovelace\n\n- Email: ada@example.com\n')
+    await renderCard()
+    await vi.waitFor(() => expect(contacts.lookups()).toEqual([]))
+    expect(page.getByText('Ada Lovelace').query()).toBeNull()
   })
 
   it('renders nothing for a contact dismissed on this note', async () => {
-    noteSource = '---\nignoredContacts:\n  - ada lovelace\n---\n# Ada Lovelace\n'
-    renderCard()
+    noteFile.set(PATH, '---\nignoredContacts:\n  - ada lovelace\n---\n# Ada Lovelace\n')
+    await renderCard()
     // The dismissal check needs the match's name, so the lookup does run.
-    await waitFor(() => expect(lookups).toEqual(['Ada Lovelace']))
-    expect(screen.queryByText('ada@example.com · +1 555 0100')).toBeNull()
+    await vi.waitFor(() => {
+      expect(contacts.lookups()).toEqual([{ kind: 'name', name: 'Ada Lovelace' }])
+    })
+    expect(page.getByText('ada@example.com · +1 555 0100').query()).toBeNull()
   })
 
   it('renders nothing when the integration is off', async () => {
-    contactsEnabled.current = false
-    renderCard()
-    await waitFor(() => expect(lookups).toEqual([]))
-    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    await renderCard(false)
+    await vi.waitFor(() => expect(contacts.lookups()).toEqual([]))
+    expect(page.getByText('Ada Lovelace').query()).toBeNull()
   })
 
   it('renders nothing while contacts access is denied', async () => {
-    installFakeBridge('denied')
-    renderCard()
-    await waitFor(() => expect(lookups).toEqual([]))
-    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    contacts.setStatus('denied')
+    await renderCard()
+    await vi.waitFor(() => expect(contacts.lookups()).toEqual([]))
+    expect(page.getByText('Ada Lovelace').query()).toBeNull()
   })
 })

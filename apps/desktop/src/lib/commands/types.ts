@@ -1,5 +1,6 @@
-import type { Route } from '@/routing/route'
-import type { NavigateOptions } from '@/routing/router'
+import type { MaybePromise } from '@reflect/utils'
+import type { AppServices, Command, Route, NavigateOptions } from '@reflect/app'
+import type { CoreServices } from '@reflect/core'
 
 /**
  * The typed command contract (Plan 08): one registry powers the ⌘K palette,
@@ -9,6 +10,11 @@ import type { NavigateOptions } from '@/routing/router'
  */
 
 export interface CommandContext {
+  /**
+   * The core services, for the commands that call one directly.
+   */
+  services: CoreServices
+  app: AppServices
   navigate: (route: Route, options?: NavigateOptions) => void
   /** The current route, read at run time. */
   route: () => Route
@@ -19,6 +25,10 @@ export interface CommandContext {
    * describes — so a command and the sidebar never target different days.
    */
   notePath: () => string | null
+  /** Toggle the focused note pin with immediate shared feedback. */
+  togglePin: () => MaybePromise<void>
+  /** Toggle the focused note privacy with immediate shared feedback. */
+  togglePrivate: () => MaybePromise<void>
   back: () => void
   forward: () => void
   /** Discard the current view's saved scroll offsets so it re-anchors when revisited. */
@@ -28,16 +38,16 @@ export interface CommandContext {
   toggleSidebar: () => void
   /** Start a fresh chat conversation. */
   newChat: () => void
+  /** Open Find for the note currently targeted by {@link notePath}. */
+  openNoteFind: () => void
+  /** Advance the active or most recently closed note Find query. */
+  findNextInNote: () => void
+  /** Move backward through the active or most recently closed Find query. */
+  findPreviousInNote: () => void
   /** Switch to a recent graph by zero-based position in the graph switcher. */
   switchGraph: (index: number) => void
   /** Start an audio memo, or stop-and-save the one recording. */
   toggleAudioMemo: () => void
-  /**
-   * The open **index session** generation (`index_open`), or null when none —
-   * what index/embedding commands echo. File writes (`note_write`) take
-   * `graph.generation` instead; no current command needs that one.
-   */
-  generation: () => number | null
   /** Open the ⌘K palette (optionally pre-filled). */
   openPalette: (query?: string) => void
   /** Open the ⌘/ shortcuts cheat-sheet. */
@@ -54,14 +64,7 @@ export interface CommandContext {
   enableSemanticSearch: () => void
 }
 
-export interface AppCommand {
-  /** Stable id — the deep-link/CLI name (e.g. `nav.today`). */
-  id: string
-  /** Palette display title. */
-  title: string
-  /** Extra match terms for palette filtering. */
-  keywords?: string[]
-  /** Keymap-registry binding (app scope), e.g. `Mod-d`. */
-  keybinding?: string
-  run: (context: CommandContext) => void | Promise<void>
-}
+/**
+ * A command of this app: it runs with a {@link CommandContext}.
+ */
+export type AppCommand = Command<CommandContext>

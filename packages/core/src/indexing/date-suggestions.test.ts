@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { generateDateSuggestions, type DateSuggestion } from './date-suggestions'
-import type { DateFormat, WeekStartDay } from '../settings/schema'
+import type { DateSuggestion } from './date-suggestion-types.ts'
+import { generateDateSuggestions } from './date-suggestions.ts'
+import type { DateFormat, WeekStartDay } from '../settings/schema.ts'
 
 /**
  * The V1 backlink-menu doc's worked examples are the spec here: today is
@@ -39,6 +40,10 @@ describe('generateDateSuggestions', () => {
         { date: '2020-01-08', phrase: '1 week from now' },
         { date: '2020-02-01', phrase: '1 month from now' },
       ])
+    })
+
+    it('offers nothing for an amount past the relative limit', () => {
+      expect(gen('1000000')).toEqual([])
     })
 
     it('shows both directions when a unit but no direction is given', () => {
@@ -98,17 +103,57 @@ describe('generateDateSuggestions', () => {
     // "this week" also prefix-matches "weekend", so the Week row leads and the
     // Weekend row follows — we assert the leading Week row's anchor date.
     it('anchors this/next week to a Monday start', () => {
-      expect(gen('this week', 'dmy', 'monday')[0]).toEqual({ date: '2019-12-30', phrase: 'This Week' })
-      expect(gen('next week', 'dmy', 'monday')[0]).toEqual({ date: '2020-01-06', phrase: 'Next Week' })
+      expect(gen('this week', 'dmy', 'monday')[0]).toEqual({
+        date: '2019-12-30',
+        phrase: 'This Week',
+      })
+      expect(gen('next week', 'dmy', 'monday')[0]).toEqual({
+        date: '2020-01-06',
+        phrase: 'Next Week',
+      })
     })
 
     it('anchors this/next week to a Sunday start when configured', () => {
-      expect(gen('this week', 'dmy', 'sunday')[0]).toEqual({ date: '2019-12-29', phrase: 'This Week' })
-      expect(gen('next week', 'dmy', 'sunday')[0]).toEqual({ date: '2020-01-05', phrase: 'Next Week' })
+      expect(gen('this week', 'dmy', 'sunday')[0]).toEqual({
+        date: '2019-12-29',
+        phrase: 'This Week',
+      })
+      expect(gen('next week', 'dmy', 'sunday')[0]).toEqual({
+        date: '2020-01-05',
+        phrase: 'Next Week',
+      })
+    })
+
+    it('anchors this/next week to a Saturday start when configured', () => {
+      expect(gen('this week', 'dmy', 'saturday')[0]).toEqual({
+        date: '2019-12-28',
+        phrase: 'This Week',
+      })
+      expect(gen('next week', 'dmy', 'saturday')[0]).toEqual({
+        date: '2020-01-04',
+        phrase: 'Next Week',
+      })
+    })
+
+    it('keeps the weekend on Saturday for Monday and Sunday starts', () => {
+      expect(gen('this weekend', 'dmy', 'monday')).toEqual([
+        { date: '2020-01-04', phrase: 'This Weekend' },
+      ])
+      expect(gen('this weekend', 'dmy', 'sunday')).toEqual([
+        { date: '2020-01-04', phrase: 'This Weekend' },
+      ])
+    })
+
+    it('anchors the weekend to Friday for a Saturday start', () => {
+      expect(gen('this weekend', 'dmy', 'saturday')).toEqual([
+        { date: '2020-01-03', phrase: 'This Weekend' },
+      ])
     })
 
     it('leaves weekday phrases unaffected by the week start', () => {
-      expect(gen('this monday', 'dmy', 'sunday')).toEqual([{ date: '2020-01-06', phrase: 'This Monday' }])
+      expect(gen('this monday', 'dmy', 'sunday')).toEqual([
+        { date: '2020-01-06', phrase: 'This Monday' },
+      ])
     })
   })
 

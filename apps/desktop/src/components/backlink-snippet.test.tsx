@@ -1,21 +1,10 @@
-import { render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SnippetTask } from '@reflect/core'
-import { BacklinkSnippet } from './backlink-snippet'
-
-const toggleTask = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/note-task', () => ({ toggleTask }))
-
-const operationFail = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/operations', () => ({
-  startOperation: () => ({ fail: operationFail }),
-}))
-
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
-}))
+import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import { userEvent } from 'vitest/browser'
+import { describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { SnippetTask, TaskService } from '@reflect/core'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { BacklinkSnippet } from './backlink-snippet.tsx'
 
 /**
  * A context with one round task, one square box, and a nested round task —
@@ -32,101 +21,127 @@ const SNIPPET = [
 
 function anchors(): SnippetTask[] {
   return [
-    { markerOffset: 124, raw: '[ ] prep agenda', checked: false, round: true, text: 'prep agenda' },
-    { markerOffset: 144, raw: '[x] square box', checked: true, round: false, text: 'square box' },
-    { markerOffset: 164, raw: '[x] send invite', checked: true, round: true, text: 'send invite' },
+    {
+      locator: { astPath: [0, 1], markdown: 'prep agenda', checked: false },
+      checked: false,
+      text: 'prep agenda',
+    },
+    { locator: null, checked: true, text: 'square box' },
+    {
+      locator: { astPath: [0, 3], markdown: 'send invite', checked: true },
+      checked: true,
+      text: 'send invite',
+    },
   ]
 }
 
-function renderSnippet(tasks: SnippetTask[] = anchors()) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={client}>
-      <BacklinkSnippet
-        text={SNIPPET}
-        notePath="notes/meeting.md"
-        tasks={tasks}
-        onWikilinkClick={() => {}}
-        resolveImageUrl={() => undefined}
-      />
-    </QueryClientProvider>,
+let operations: TestCoreServices['progress']
+let writeTask: MockInstance<TaskService['writeTask']>
+
+async function renderSnippet(
+  tasks: SnippetTask[] = anchors(),
+  text: string = SNIPPET,
+  onWikilinkClick: () => void = () => {},
+) {
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  operations = core.progress
+  writeTask = vi
+    .spyOn(core.tasks, 'writeTask')
+    .mockResolvedValue({ source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 })
+  return await renderInApp(
+    <BacklinkSnippet
+      text={text}
+      notePath="notes/meeting.md"
+      tasks={tasks}
+      onWikilinkClick={onWikilinkClick}
+    />,
+    { core, graph: { root: '/g', name: 'g', generation: 7 } },
   )
 }
 
-beforeEach(() => {
-  toggleTask.mockReset()
-  toggleTask.mockResolvedValue(undefined)
-  operationFail.mockReset()
-})
-
 describe('BacklinkSnippet task checkboxes', () => {
   it('writes a round-task click through to the source note', async () => {
-    const view = renderSnippet()
+    const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     expect(boxes).toHaveLength(3)
     await userEvent.click(boxes[0]!)
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).toHaveBeenCalledWith(
-      { notePath: 'notes/meeting.md', markerOffset: 124, raw: '[ ] prep agenda' },
-      7,
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(
+      { notePath: 'notes/meeting.md', astPath: [0, 1], markdown: 'prep agenda', checked: false },
+      [{ kind: 'toggle' }],
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('toggles a checked round task by its own anchor', async () => {
-    const view = renderSnippet()
+    const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     await userEvent.click(boxes[2]!)
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).toHaveBeenCalledWith(
-      { notePath: 'notes/meeting.md', markerOffset: 164, raw: '[x] send invite' },
-      7,
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(
+      { notePath: 'notes/meeting.md', astPath: [0, 3], markdown: 'send invite', checked: true },
+      [{ kind: 'toggle' }],
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('leaves a square GFM checkbox read-only', async () => {
-    const view = renderSnippet()
+    const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     expect((boxes[1] as HTMLInputElement).checked).toBe(true)
-    await userEvent.click(boxes[1]!)
-    expect(toggleTask).not.toHaveBeenCalled()
-    expect(operationFail).not.toHaveBeenCalled()
-    view.unmount()
+    await userEvent.click(boxes[1]!, { force: true })
+    expect(writeTask).not.toHaveBeenCalled()
+    expect(operations.getAll()).toEqual([])
+    await view.unmount()
   })
 
   it('refuses instead of toggling when the anchors disagree with the rendered task', async () => {
     // Simulate anchor drift: the anchor for index 0 claims a different state.
     const drifted = anchors()
     drifted[0] = { ...drifted[0]!, checked: true }
-    const view = renderSnippet(drifted)
+    const view = await renderSnippet(drifted)
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     await userEvent.click(boxes[0]!)
-    expect(toggleTask).not.toHaveBeenCalled()
-    await waitFor(() => expect(operationFail).toHaveBeenCalled())
-    view.unmount()
+    expect(writeTask).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(operations.findByLabel('Updating task')?.status).toBe('failed'))
+    await view.unmount()
+  })
+
+  it('renders a collapsed source item expanded', async () => {
+    // The parent is folded in the source note (`+` marker), so its line is
+    // sliced into the context verbatim; the snippet must still show the
+    // mention underneath instead of folding it away.
+    const view = await renderSnippet([], '+ parent line\n  - mention of [[Roadmap]]')
+    expect(view.container.querySelector('[data-list-collapsed]')).toBeNull()
+    expect(view.container.textContent).toContain('mention of')
+    await view.unmount()
   })
 
   it('renders checkboxes inert when the snippet has no round tasks', async () => {
-    const squareOnly: SnippetTask[] = [
-      { markerOffset: 144, raw: '[x] square box', checked: true, round: false, text: 'square box' },
-    ]
-    const view = render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <BacklinkSnippet
-          text={'- [[Roadmap]] plan\n  - [x] square box'}
-          notePath="notes/meeting.md"
-          tasks={squareOnly}
-          onWikilinkClick={() => {}}
-          resolveImageUrl={() => undefined}
-        />
-      </QueryClientProvider>,
-    )
+    const squareOnly: SnippetTask[] = [{ locator: null, checked: true, text: 'square box' }]
+    const view = await renderSnippet(squareOnly, '- [[Roadmap]] plan\n  - [x] square box')
     const box = view.container.querySelector('input[type="checkbox"]')!
-    await userEvent.click(box)
-    expect(toggleTask).not.toHaveBeenCalled()
-    view.unmount()
+    await userEvent.click(box, { force: true })
+    expect(writeTask).not.toHaveBeenCalled()
+    await view.unmount()
+  })
+})
+
+describe('BacklinkSnippet wiki-link chips', () => {
+  it('labels chips through the host resolver and reports the full target', async () => {
+    const onWikilinkClick = vi.fn()
+    const view = await renderSnippet(
+      [],
+      '- see [[Tim MacCaw // Dad|Dad]] and [[Tim MacCaw // Dad]]',
+      onWikilinkClick,
+    )
+    const chips = view.getByTestId('wikilink')
+    await expect.element(chips.first()).toMatchTextContent(/^Dad$/)
+    await expect.element(chips.last()).toMatchTextContent(/^Tim MacCaw$/)
+    await chips.first().click()
+    expect(onWikilinkClick).toHaveBeenCalledWith(
+      expect.objectContaining({ target: 'Tim MacCaw // Dad' }),
+    )
+    await view.unmount()
   })
 })

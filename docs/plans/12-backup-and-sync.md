@@ -12,7 +12,7 @@ reconciliation for open notes — load-bearing for conflicts), Plan 10 (keychain
 **Unlocks:** multi-device durability; AI-assisted conflict resolution (deferred).
 
 **Architecture:** Git is a Rust primitive (`git2`/libgit2); sync orchestration, cadence,
-GitHub specifics, and conflict policy live in `@reflect/core` (`actions/sync`). See
+GitHub specifics, and conflict policy live in `@reflect/core` (`packages/core/src/sync/*-service.ts`). See
 [Architecture & Conventions](architecture-conventions.md).
 
 **Libraries:** `git2` (libgit2), `keyring` — Rust. (`diff`/jsdiff returns for the
@@ -32,7 +32,7 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    v2.0/SHA-256 upcoming — expect one breaking bump, isolated behind the Rust module).
 2. **GitHub-only surface, generic core.** The Rust layer speaks `remote URL + credential
    callback` — nothing GitHub-specific. GitHub specifics (device flow, repo creation,
-   error taxonomy) are isolated in `actions/sync/github.ts`. "Custom Git remote
+   error taxonomy) are isolated in `packages/core/src/sync/github-*-service.ts`. "Custom Git remote
    (advanced)" stays a future UX toggle, not an engineering project.
 3. **Auth: GitHub App device flow.** Fine-grained, per-repo permission ("Reflect can
    touch one repo, nothing else"); 8-hour user tokens + 6-month refresh tokens; device
@@ -47,9 +47,12 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    **Spike verdict (settled):** markers do **not** survive the editor's round-trip
    (`=======` re-parses as a setext underline; content is lost), so the round-trip
    guard (Plan 05b) opens conflicted notes **protected** — and resolution happens in
-   the conflict notice as a raw-text splice (`resolveConflictMarkers`): keep this
+   the conflict notice as a raw-text splice (since removed): keep this
    device's side, the other's, or both. Hand-merging stays possible in any external
    editor. Future: a meowdown conflict node unlocks in-editor resolution.
+
+   > **Current state:** a pull writes no markers. See
+   > [git-backup-safety.md](../git-backup-safety.md) S7 and S9.
 5. **Full loop in the first wave** — debounced commit→push *and* pull/merge, plus
    restore-from-GitHub in the graph chooser. Backup-only was rejected: a second device
    needs pull-before-push anyway, so deferral bought little.
@@ -61,8 +64,7 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 ## Product states
 
 `Backed up` · `Backing up` · `Offline` (changes queued locally; retried on the browser
-`online` event, window focus, and the next edit) · `Needs review` (conflict markers
-present) · `Backup failed` (action needed). Git mechanics never surface.
+`online` event, window focus, and the next edit) · `Backup failed` (action needed). Git mechanics never surface.
 
 ## Sync loop
 
@@ -72,8 +74,14 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
   the next launch pushes. A debounced pass that finds nothing committed and nothing
   ahead ends **without touching the network** (a pull's own writes re-enter via the
   watcher and must not buy a push negotiation each time).
-- **Pull cadence:** on launch, on window focus, on a periodic timer, and on a
-  **non-fast-forward** push rejection: fetch → merge → push again (bounded retries).
+- **Pull cadence:** on launch, on window resume (focus, visible, back online), on
+  Back up now, and on a **non-fast-forward** push rejection: fetch → merge → push
+  again (bounded retries). While the window is visible, a desktop folder graph asks
+  the remote for its branch tip every 90 s (one ref advertisement, no fetch) and runs
+  a full cycle only when the tip moved. For a graph in iCloud, see
+  [icloud-sync.md](../icloud-sync.md).
+- **Hidden windows (iOS):** a debounced commit that has begun still pushes after the
+  app is hidden. A pull's fetch and merge do not start or continue once it is hidden.
   Auth, push-protection, and size failures surface immediately — only divergence retries.
 - **Merge, not rebase.** Single branch; merge commits are fine — history is invisible
   product-wise, and rewriting published history breaks multi-device.
@@ -87,8 +95,7 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
 1. **Rust git primitives** (`src-tauri/src/git/`): `git_status`, `git_setup` (init or
    adopt-existing + `origin` + align the local branch with the remote's default),
    `git_commit_all(message)` (stage everything, no-op when clean, large-file
-   guardrail), `git_fetch`, `git_merge_remote` (fast-forward or merge; writes marker
-   files with labeled sides, commits conflicts, reports changed files for reindexing),
+   guardrail), `git_fetch`, `git_pull` (commits and merges under one lock, writes no markers),
    `git_push` (rejections returned as data). Health checks: refuse foreign states —
    detached HEAD, in-progress rebase — with a typed error, never guess. Remote-agnostic;
    credentials via callback from the keychain. `.reflect/` stays gitignored (Plan 02);
@@ -112,19 +119,11 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
    watcher subscription, focus/online listeners, quit-commit hook, connect/disconnect —
    with a single teardown path; the React provider is a `useSyncExternalStore` shim.
    (Every early review finding hit the React-effect/engine seam; this is the structural
-   fix.) Conflict state is a projection: the indexer detects markers and flags
-   `notes.has_conflict`, so `Needs review` survives rebuilds and clears itself.
+   fix.)
 
 4. **Conflict policy** (the load-bearing step):
-   - **Content conflicts** → marker blocks with readable labels (`<<<<<<< this device` /
-     `>>>>>>> other device`); merge committed + pushed; note flagged `Needs review`;
-     the flag clears when a reindex no longer sees markers.
-   - **Resolution UX (spike-settled):** markers are lossy in the editor, so conflicted
-     notes open **protected** (raw source visible, never editable — the editor can't
-     destroy the markers). The conflict notice resolves on the raw text:
-     keep this device's side / the other's / both (`resolveConflictMarkers`, pure and
-     unit-tested; "both" is the daily-note append case). Every version stays
-     recoverable in history.
+   - **Content conflicts** → a `.md` note runs the conflict ladder and always resolves to
+     text; any other file keeps both versions. The app writes no markers.
    - **Edit vs delete** → keep the edited version (never silently delete); record it.
    - **Binary/asset conflicts** → keep both (suffix the incoming copy); newest wins links.
    - Merges return their **changed files** (with real mtimes); the controller reindexes
@@ -169,21 +168,22 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
 
 9. **Tests:** round-trip backup to a local bare repo; two-clone divergence produces a
    committed marker merge both sides converge on; non-fast-forward push retries;
-   edit/delete + binary policies; marker removal clears `Needs review`; size guardrail;
+   edit/delete + binary policies; size guardrail;
    public-repo confirmation; echo suppression (a pull doesn't storm the indexer; commits
    don't re-dirty); `.reflect/` excluded; token never appears in the remote URL or
    `.git/config` (asserted). (Stale-`index.lock` recovery is deferred, below.)
 
 ## Key decisions / contracts
 
+- **Safety invariants** (2026-10): [`docs/git-backup-safety.md`](../git-backup-safety.md)
+  lists the rules S1 to S9 that every sync change must keep, each with the
+  test that enforces it.
 - **libgit2 (`git2`) is the engine**; the Rust surface is remote-agnostic, GitHub
-  specifics live only in `actions/sync/github.ts`.
+  specifics live only in `packages/core/src/sync/`.
 - **GitHub is the only supported remote in the UX**; file-sync providers (iCloud/
   Dropbox/Drive) remain unsupported by design (no safe conflict semantics).
 - **GitHub App device flow + keychain; PAT fallback; token never on disk.**
-- **Conflicts are committed as raw Git markers and sync continues** — no wedged states.
-  Markers are lossy in the editor (spike-verified), so conflicted notes open protected
-  and resolve through the conflict notice's raw-text splice (mine/theirs/both).
+- **Conflicts never wedge sync.** The ladder always produces text.
 - **Disconnect is per-graph; sign-out is per-machine** — never conflated.
 - **Checkpoint = commit** (shared recovery primitive with Plan 10); quit commits
   locally, never pushes.
@@ -195,9 +195,7 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
 
 - Editing a note passes through `Backing up` → `Backed up` within the debounce window;
   the commit is visible on GitHub.
-- Two devices editing the same note converge on one note containing labeled conflict
-  markers; both show `Needs review` and open protected with mine/theirs/both resolution;
-  resolving on either device clears it everywhere.
+- Two devices editing the same note converge on one merged note.
 - A conflict never blocks other notes from backing up.
 - Going offline shows `Offline`; reconnecting (the `online` event, focus, or the next
   edit) pushes without user action.
@@ -223,8 +221,7 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
   round-trip guard (Plan 05b) protects them, and a regression test pins the
   classification — if meowdown ever learns to round-trip markers, that test failing is
   the signal to build the in-editor widget.
-- **Markers confuse non-developers.** Mitigate with the `Needs review` state, the
-  protected view's plain-language notice, and one-click mine/theirs/both resolution.
+- **Markers confuse non-developers.** Mitigated by never writing them.
 - **libgit2 v2.0 breaking bump** — absorbed behind the Rust module.
 - **Auth feeling developer-oriented.** Device flow mitigates; PAT is the escape hatch.
 - **History privacy** (deleted notes persist on GitHub) — onboarding honesty now;

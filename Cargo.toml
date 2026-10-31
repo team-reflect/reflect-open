@@ -3,21 +3,131 @@
 # pins one SQLite everywhere — the desktop writer and the CLI reader can
 # never skew.
 [workspace]
-resolver = "2"
+resolver = "3"
 members = [
   "apps/cli",
   "apps/desktop/src-tauri",
   "apps/native-host",
+  "crates/graph-io",
+  "crates/git",
+  "crates/graph-paths",
+  "crates/index",
   "crates/index-schema",
+  "crates/types",
+  "plugins/tauri-plugin-app-store",
   "plugins/tauri-plugin-keyboard",
+  "plugins/tauri-plugin-mobile-haptics",
   "plugins/tauri-plugin-recording",
+  "plugins/tauri-plugin-web-auth",
 ]
 
+[workspace.package]
+authors = ["Reflect App, LLC"]
+edition = "2024"
+license = "MIT"
+publish = false
+
 [workspace.dependencies]
-rusqlite = { version = "0.40.1", features = ["bundled"] }
+# Every dependency of every member is declared here, once. A member writes
+# `{ workspace = true }` and adds only `features` and `optional`. Cargo ignores
+# a member's `default-features = false`, so it lives here; a member that needs
+# the default features adds `features = ["default"]`.
+
+# Workspace crates
+reflect-graph-io = { path = "crates/graph-io" }
+reflect-graph-paths = { path = "crates/graph-paths" }
+reflect-git = { path = "crates/git" }
+reflect-index = { path = "crates/index" }
+reflect-index-schema = { path = "crates/index-schema", default-features = false }
+reflect-types = { path = "crates/types" }
+tauri-plugin-app-store = { path = "plugins/tauri-plugin-app-store" }
+tauri-plugin-keyboard = { path = "plugins/tauri-plugin-keyboard" }
+tauri-plugin-mobile-haptics = { path = "plugins/tauri-plugin-mobile-haptics" }
+tauri-plugin-recording = { path = "plugins/tauri-plugin-recording" }
+tauri-plugin-web-auth = { path = "plugins/tauri-plugin-web-auth" }
+
+# Third-party crates
+apple-native-keyring-store = "1.0.2"
+base64 = "0.23.1"
+block2 = "0.6.2"
+clap = "4.6.7"
+core-foundation = "0.10.1"
+dbus-secret-service-keyring-store = "1.0.1"
+dirs = "7.0.0"
+dispatch2 = "0.3.1"
+# Text embeddings only. The default `image-models` feature turns on every
+# `image` format (AVIF encoder, EXR, TIFF, ...) through feature unification.
+fastembed = { version = "7.5.0", default-features = false, features = [
+  "hf-hub-native-tls",
+  "ort-download-binaries-native-tls",
+] }
+file-id = "0.2.3"
+# Everything is vendored/static: libssh2 and openssl must never link against
+# homebrew dylibs the distributed app won't have (libssh2-sys only consults
+# pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG is set, and vendored-openssl pins
+# the rest).
+git2 = { version = "0.21.0", default-features = false, features = [
+  "https",
+  "ssh",
+  "vendored-libgit2",
+  "vendored-openssl",
+] }
+hf-hub = { version = "0.5.0", default-features = false }
+http-range-header = "0.4.2"
+ignore = "0.4.33"
+image = { version = "0.25.10", default-features = false }
+infer = "0.22.0"
+jiff = { version = "0.2.38", default-features = false, features = ["std"] }
+keyring-core = "1.0.1"
+log = "0.4.34"
+notify = "9.0.0-rc.6"
+notify-debouncer-full = "0.8.0-rc.2"
+objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", default-features = false }
+objc2-contacts = "0.3.2"
+objc2-event-kit = { version = "0.3.2", default-features = false }
+objc2-foundation = { version = "0.3.2", default-features = false }
+objc2-link-presentation = { version = "0.3.2", default-features = false }
+objc2-ui-kit = { version = "0.3.2", default-features = false }
+percent-encoding = "2.3.2"
+proptest = "1.12.0"
+pulldown-cmark = "0.13.4"
+reconcile-text = "0.13.2"
+# reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
 rusqlite_migration = "2.6.0"
+saphyr = "0.2.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
 sqlite-vec = "0.1.9"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
-sha2 = "0.11.0"
+tauri = "2.12.5"
+tauri-build = "2.7.4"
+tauri-plugin = { version = "2.7.2", features = ["build"] }
+tauri-plugin-deep-link = "2.6.3"
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-http = "2.8.3"
+tauri-plugin-iap = "0.9.1"
+tauri-plugin-log = "2.10.1"
+tauri-plugin-opener = "2.7.2"
+tauri-plugin-process = "2.4.0"
+tauri-plugin-single-instance = "2.5.5"
+tauri-plugin-updater = "2.14.1"
+tauri-plugin-window-state = "2.5.0"
 tempfile = "3.27.0"
+thiserror = "2.0.21"
+tokio = "1.53.3"
+tracing = "0.1.44"
+trash = "5.2.9"
+unicode-normalization = "0.1.26"
+walkdir = "2.5.0"
+windows-native-keyring-store = "1.1.0"
+xattr = "1.6.1"
+zip = { version = "9.0.5", default-features = false }
+
+[profile.release]
+# One codegen unit lets LLVM optimize each crate as a whole: about 10% smaller
+# downloads, for slower release builds. Set CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
+# for faster local release builds.
+codegen-units = 1

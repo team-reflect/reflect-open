@@ -1,25 +1,17 @@
-import { useDeferredValue, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useDeferredValue, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import {
-  contactLinkSuggestions,
-  foldKey,
-  hasBridge,
-  isContactsReadable,
-  suggestWikiTargets,
-  type MeetingAttendee,
-} from '@reflect/core'
-import { CommandItem, CommandList } from '@/components/ui/command'
-import { INPUT_CLASS_NAME } from '@/components/ui/input'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
-import {
-  buildAutocompleteEntries,
-  type AutocompleteEntry,
-} from '@/editor/wiki-autocomplete-entries'
-import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useGraph } from '@/providers/graph-provider'
-import { useSettings } from '@/providers/settings-provider'
+import { aliasHint, displayNoteTitle, foldKey, type MeetingAttendee } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
+import { CommandItem, CommandList } from '@/components/ui/command.tsx'
+import { INPUT_CLASS_NAME } from '@/components/ui/input.tsx'
+import { Popover, PopoverContent } from '@/components/ui/popover.tsx'
+import { buildAutocompleteEntries, type AutocompleteEntry } from '@reflect/app'
+import { useContactsState } from '@/hooks/use-contacts-state.ts'
+import { queryKeys } from '@/lib/query-client.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 const SUGGESTION_LIMIT = 6
 
@@ -48,10 +40,10 @@ function entryName(entry: AutocompleteEntry): string {
 }
 
 function entryAttendee(entry: AutocompleteEntry): MeetingAttendee {
-  // A contact's invite email rides along so the submit-time contacts lookup
-  // can pre-fill the person note, exactly like calendar-sourced attendees.
+  // Every Contact email rides along so submit-time ownership cannot give the
+  // primary address special treatment.
   return entry.kind === 'contact'
-    ? { name: entry.contact.fullName, email: entry.contact.emails[0] }
+    ? { name: entry.contact.fullName, emails: entry.contact.emails }
     : { name: entryName(entry) }
 }
 
@@ -71,37 +63,42 @@ function entryAttendee(entry: AutocompleteEntry): MeetingAttendee {
 export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
-  const authorization = useContactsAuthorization()
-  const contactsInMenu =
-    settings.contactsEnabled && authorization !== null && isContactsReadable(authorization)
+  const { contacts, meetings } = useCoreServices()
+  // Re-render when the permission state changes; the gate reads it.
+  useContactsState()
+  const contactsInMenu = contacts.canLookup(settings)
 
   const [query, setQuery] = useState('')
   const [dismissed, setDismissed] = useState(false)
   const [highlighted, setHighlighted] = useState('')
+  const anchorRef = useRef<HTMLInputElement>(null)
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
 
-  const { data: fetched, isPlaceholderData } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'attendee-suggestions', searchTerm, contactsInMenu],
+  const {
+    data: fetched,
+    isFetching,
+    isPlaceholderData,
+  } = useQuery({
+    queryKey: queryKeys.index.attendeeSuggestions(graph?.root, searchTerm, contactsInMenu),
     queryFn: async () => {
-      const [suggestions, contacts] = await Promise.all([
-        suggestWikiTargets(searchTerm, SUGGESTION_LIMIT),
-        // A contacts hiccup must cost only its own rows, never the note
-        // suggestions (the same containment as the editor's `[[` menu).
-        contactsInMenu
-          ? contactLinkSuggestions(searchTerm).catch((error: unknown) => {
-              console.error('contact link suggestions failed:', error)
-              return []
-            })
-          : Promise.resolve([]),
-      ])
-      return buildAutocompleteEntries(
+      // A contacts hiccup costs only its own rows, never the note suggestions,
+      // and daily notes are left out: both are the service's rules.
+      const { suggestions, contacts } = await meetings.attendeeSuggestions(
         searchTerm,
-        suggestions.filter((suggestion) => suggestion.date === null),
-        { offerCreate: true, contacts },
+        SUGGESTION_LIMIT,
+        contactsInMenu,
       )
+      return buildAutocompleteEntries(searchTerm, suggestions, {
+        offerCreate: true,
+        contacts: contacts.map((contact) => ({
+          contact,
+          target: contact.fullName,
+          ownerPath: null,
+        })),
+      })
     },
-    enabled: hasBridge() && graph !== null && searchTerm !== '',
+    enabled: graph !== null && searchTerm !== '',
     // Typing re-keys the query as the deferred value settles; holding the
     // previous rows avoids the list flashing closed between keystrokes.
     placeholderData: keepPreviousData,
@@ -114,9 +111,14 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const open = !dismissed && query.trim() !== '' && entries.length > 0
   // The list lags the input twice over (the deferred value, then the fetch —
   // keepPreviousData shows the prior query's rows meanwhile). Enter may only
-  // take the highlighted row when the rows answer exactly what's typed;
-  // anything staler falls back to the typed text, like blur always does.
-  const entriesMatchInput = !isPlaceholderData && searchTerm === query.trim()
+  // take the highlighted row or add typed text only when the rows answer
+  // exactly what is typed. Pending results must not discard Contact emails.
+  const entriesMatchInput = !isFetching && !isPlaceholderData && searchTerm === query.trim()
+  const exactContact = entriesMatchInput
+    ? entries.find(
+        (entry) => entry.kind === 'contact' && foldKey(entry.contact.fullName) === foldKey(query),
+      )
+    : undefined
 
   const select = (entry: AutocompleteEntry): void => {
     onAdd(entryAttendee(entry))
@@ -126,7 +128,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
 
   const addTyped = (): void => {
     const name = query.trim()
-    if (name === '') {
+    if (name === '' || !entriesMatchInput || exactContact !== undefined) {
       return
     }
     onAdd({ name })
@@ -135,6 +137,14 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   }
 
   const onKeyDown = (keyEvent: KeyboardEvent<HTMLInputElement>): void => {
+    if (getIsComposing()) {
+      // preventDefault keeps cmdk's root handler from selecting the highlighted
+      // entry on the Enter that commits the composition.
+      if (keyEvent.key === 'Enter') {
+        keyEvent.preventDefault()
+      }
+      return
+    }
     if (keyEvent.key === 'Enter') {
       // Ours alone: preventDefault stops the dialog form submitting,
       // stopPropagation keeps cmdk's root handler from double-selecting.
@@ -144,8 +154,9 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
         open && entriesMatchInput
           ? entries.find((candidate) => entryKey(candidate) === highlighted)
           : undefined
-      if (entry !== undefined) {
-        select(entry)
+      const selected = entry ?? exactContact
+      if (selected !== undefined) {
+        select(selected)
       } else {
         addTyped()
       }
@@ -175,52 +186,59 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
         value={highlighted}
         onValueChange={setHighlighted}
       >
-        <PopoverAnchor asChild>
-          <CommandPrimitive.Input
-            value={query}
-            onValueChange={(value) => {
-              setQuery(value)
-              setDismissed(false)
-            }}
-            onKeyDown={onKeyDown}
-            onBlur={addTyped}
-            placeholder="Add attendee"
-            className={INPUT_CLASS_NAME}
-          />
-        </PopoverAnchor>
+        <CommandPrimitive.Input
+          ref={anchorRef}
+          value={query}
+          onValueChange={(value) => {
+            setQuery(value)
+            setDismissed(false)
+          }}
+          onKeyDown={onKeyDown}
+          onBlur={addTyped}
+          placeholder="Add attendee"
+          className={INPUT_CLASS_NAME}
+        />
         <PopoverContent
           align="start"
           sideOffset={4}
-          className="w-(--radix-popover-trigger-width) p-1"
+          anchor={anchorRef}
+          className="w-(--anchor-width) p-1"
           // The input keeps focus for the popover's whole life: no focus
           // steal on open/close, and no blur when a row is clicked (blur
           // would add the half-typed text before onSelect adds the row's).
-          onOpenAutoFocus={(focusEvent) => focusEvent.preventDefault()}
-          onCloseAutoFocus={(focusEvent) => focusEvent.preventDefault()}
+          initialFocus={false}
+          finalFocus={false}
           onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
         >
           <CommandList>
-            {entries.map((entry) => (
-              <CommandItem
-                key={entryKey(entry)}
-                value={entryKey(entry)}
-                onSelect={() => select(entry)}
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  {entry.kind === 'create' ? `Add “${entry.title}”` : entryName(entry)}
-                </span>
-                {entry.kind === 'suggestion' && entry.suggestion.alias !== null && (
-                  <span className="truncate text-xs text-text-muted">
-                    {entry.suggestion.alias} → {entry.suggestion.title}
+            {entries.map((entry) => {
+              const hint = entry.kind === 'suggestion' ? aliasHint(entry.suggestion) : null
+              return (
+                <CommandItem
+                  key={entryKey(entry)}
+                  value={entryKey(entry)}
+                  onSelect={() => select(entry)}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {entry.kind === 'create'
+                      ? `Add “${entry.title}”`
+                      : entry.kind === 'suggestion'
+                        ? displayNoteTitle(entry.suggestion.target)
+                        : entryName(entry)}
                   </span>
-                )}
-                {entry.kind === 'contact' && (
-                  <span className="truncate text-xs text-text-muted">
-                    {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
-                  </span>
-                )}
-              </CommandItem>
-            ))}
+                  {entry.kind === 'suggestion' && hint !== null && (
+                    <span className="truncate text-xs text-text-muted">
+                      {hint} → {displayNoteTitle(entry.suggestion.title)}
+                    </span>
+                  )}
+                  {entry.kind === 'contact' && (
+                    <span className="truncate text-xs text-text-muted">
+                      {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
+                    </span>
+                  )}
+                </CommandItem>
+              )
+            })}
           </CommandList>
         </PopoverContent>
       </CommandPrimitive>

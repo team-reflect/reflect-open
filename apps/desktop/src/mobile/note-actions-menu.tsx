@@ -1,26 +1,13 @@
 import { useState, type ReactElement } from 'react'
-import { MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'lucide-react'
+import { Lock, LockOpen, MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from '@/components/ui/drawer'
-import { toggleNotePinned } from '@/lib/note-pin'
-import { deleteOpenNote } from '@/lib/note-delete'
-import { shareNote } from '@/mobile/share'
-import { useGraph } from '@/providers/graph-provider'
-import { usePinnedNotes } from '@/hooks/use-pinned-notes'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer.tsx'
+import { useNoteRowState } from '@/hooks/use-note-row.ts'
+import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
+import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
+import { shareNote } from '@/mobile/share.ts'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 interface NoteActionsMenuProps {
   /** Graph-relative path of the note the actions operate on. */
@@ -30,57 +17,55 @@ interface NoteActionsMenuProps {
 }
 
 /**
- * The note screen's "⋯" action sheet (Plan 19): pin/unpin, share,
- * and delete-to-trash. Pin reflects the index's pinned set; {@link shareNote}
- * hands the note's body to the OS share sheet via the Web Share API
- * (`navigator.share`); delete confirms first (it's destructive, even if
- * recoverable from `.reflect/trash/`) and routes through
- * {@link deleteOpenNote} so the open session is discarded rather than flushed.
+ * The note screen's "⋯" action sheet (Plan 19): pin/unpin, lock/unlock from
+ * external services, share, and delete-to-trash. Pin reflects the index's
+ * pinned set; privacy reflects the note's indexed `private: true` flag,
+ * both with the note-row overlay merged over them while the index catches up. {@link shareNote} hands the note's body to the OS share sheet via
+ * the Web Share API (`navigator.share`); delete confirms first (it's
+ * destructive, even if recoverable from `.reflect/trash/`) and routes through
+ * `NoteActionsService.trashOne` so the open session is discarded rather than flushed.
  */
 export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
-  const { graph } = useGraph()
+  const { noteActions, logger } = useCoreServices()
+  const { share: shareService } = useAppServices()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
+  const { row: noteRow, settled: privacyReady } = useNoteRowState(path)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const isPrivate = noteRow?.isPrivate ?? false
+  const privacyActionLabel = !privacyReady
+    ? 'Loading privacy…'
+    : isPrivate
+      ? 'Unlock note'
+      : 'Lock note'
 
   const pin = (): void => {
-    if (graph !== null) {
-      void toggleNotePinned(path, graph.generation).catch(() => {})
-    }
+    void noteActions.togglePinned(path)
+  }
+
+  const togglePrivate = async (): Promise<void> => {
+    await noteActions.togglePrivate(path)
   }
 
   const share = (): void => {
-    void shareNote(path).catch((cause) => console.error('share failed:', errorMessage(cause)))
-  }
-
-  const confirmDelete = (): void => {
-    if (graph === null) {
-      return
-    }
-    setBusy(true)
-    setError(null)
-    void deleteOpenNote(path, graph.generation)
-      .then(() => {
-        setConfirmingDelete(false)
-        onDeleted()
-      })
-      .catch((cause) => setError(errorMessage(cause)))
-      .finally(() => setBusy(false))
+    void shareNote(shareService, path).catch((cause) => {
+      logger.error('share failed:', errorMessage(cause))
+    })
   }
 
   return (
     <>
       <Drawer open={actionsOpen} onOpenChange={setActionsOpen}>
-        <DrawerTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-10" aria-label="Note actions">
-            <MoreHorizontal />
-          </Button>
+        <DrawerTrigger
+          render={
+            <Button variant="ghost" size="icon" className="size-10" aria-label="Note actions" />
+          }
+        >
+          <MoreHorizontal />
         </DrawerTrigger>
         <DrawerContent>
           <DrawerTitle className="sr-only">Note actions</DrawerTitle>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 p-4">
             <Button
               variant="ghost"
               size="lg"
@@ -92,6 +77,19 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
             >
               {isPinned ? <PinOff /> : <Pin />}
               {isPinned ? 'Unpin' : 'Pin'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              disabled={!privacyReady}
+              onClick={() => {
+                void togglePrivate()
+                setActionsOpen(false)
+              }}
+            >
+              {privacyReady && isPrivate ? <LockOpen aria-hidden /> : <Lock aria-hidden />}
+              {privacyActionLabel}
             </Button>
             <Button
               variant="ghost"
@@ -121,26 +119,12 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
         </DrawerContent>
       </Drawer>
 
-      <Dialog open={confirmingDelete} onOpenChange={(open) => !busy && setConfirmingDelete(open)}>
-        <DialogContent>
-          <DialogTitle>Delete this note?</DialogTitle>
-          <DialogDescription>
-            It moves to the graph’s trash and disappears from your notes. You can recover it on
-            desktop.
-          </DialogDescription>
-          {error !== null && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="ghost" disabled={busy}>
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button variant="destructive" disabled={busy} onClick={confirmDelete}>
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NoteDeleteDrawer
+        path={path}
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        onDeleted={onDeleted}
+      />
     </>
   )
 }

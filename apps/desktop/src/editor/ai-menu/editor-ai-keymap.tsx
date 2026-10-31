@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
-import { AI_MENU_BINDING } from '@/editor/keymap'
+import { AI_MENU_BINDING } from '@/editor/keymap.ts'
 
 /**
  * Binds ⌘⇧J inside the editor's ProseKit context (meowdown renders children

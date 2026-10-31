@@ -4,79 +4,67 @@ name = "reflect-open"
 # tauri.conf.json points at it. The crate is never published, so its version
 # has no consumer — freezing it keeps Cargo.lock out of every release diff.
 version = "0.0.0"
-description = "A Tauri App"
-authors = ["you"]
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "The Reflect desktop and iOS app"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "reflect_open_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
-[build-dependencies]
-tauri-build = { version = "2.6.3", features = [] }
+# `staticlib` links into the iOS app as `libapp.a`; `rlib` serves the desktop
+# binary. There is no Android target, so no `cdylib`.
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
+http-range-header = { workspace = true }
+
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.
-tauri = { version = "2.11.3", features = ["devtools"] }
-tauri-plugin-opener = "2.5.4"
+tauri = { workspace = true, features = ["devtools"] }
+tauri-plugin-opener = { workspace = true }
 # Decodes `reflect-asset://` request paths (`fs/asset_protocol.rs`); the same
 # crate tauri itself uses for its protocol URLs.
-percent-encoding = "2.3.2"
+percent-encoding = { workspace = true }
 # `time` backs the bounded wait in `windows::close_note_windows` (tauri
 # already runs on tokio; this only makes the sleep primitive addressable).
-tokio = { version = "1.52.3", features = ["time"] }
+tokio = { workspace = true, features = ["time", "sync", "fs", "io-util"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-# `hooks` adds the authorizer API used to lock the read-only `db_query` bridge
-# down to pure reads (deny ATTACH/DETACH/PRAGMA); see `db/query.rs`.
-rusqlite = { workspace = true, features = ["hooks"] }
-reflect-index-schema = { path = "../../../crates/index-schema" }
+reflect-graph-paths = { workspace = true }
+reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
+reflect-index = { workspace = true }
+reflect-graph-io = { workspace = true }
+reflect-git = { workspace = true }
 tempfile = { workspace = true }
-sha2 = { workspace = true }
-dirs = "6.0.0"
-tauri-plugin-dialog = "2.7.1"
-base64 = "0.22.1"
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-keyring = { version = "3.6.3", features = [
-  "apple-native",
-  "windows-native",
-  "sync-secret-service",
-] }
-# Git backup/sync primitives (Plan 12) + SSH transport for generic remotes
-# (Plan 16 V1: agent auth only). Everything is vendored/static — libssh2 and
-# openssl must never link against homebrew dylibs the distributed app won't
-# have (libssh2-sys only consults pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG
-# is set, and vendored-openssl pins the rest).
-git2 = { version = "0.21.0", default-features = false, features = [
-  "https",
-  "ssh",
-  "vendored-libgit2",
-  "vendored-openssl",
-] }
-tauri-plugin-http = "2.5.9"
+dirs = { workspace = true }
+tauri-plugin-dialog = { workspace = true }
+base64 = { workspace = true }
+# `tracing` has no subscriber here: its `log` feature forwards every event to
+# the `log` crate, where `tauri-plugin-log` owns the sinks (see `logging.rs`).
+tracing = { workspace = true, features = ["log"] }
+log = { workspace = true }
+tauri-plugin-log = { workspace = true }
+keyring-core = { workspace = true }
+# unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
+# the plugin treats as "send no Origin header" (see providerFetch's doc).
+tauri-plugin-http = { workspace = true, features = ["unsafe-headers"] }
 # Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
-# reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
-image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
-reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
-# Reflect V1 exports are zip archives of the graph-folder layout. Keep the
-# reader lean: stored entries plus the usual deflate method are enough here.
-zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
+reqwest = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-xattr = "1.6.1"
+apple-native-keyring-store = { workspace = true, features = ["keychain"] }
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
-# objc2 bindings, trimmed to the classes the module touches. objc2-app-kit is
-# only here for EKCalendar's NSColor → hex conversion.
-objc2 = "0.6.4"
-block2 = "0.6.2"
-objc2-foundation = { version = "0.3.2", default-features = false, features = [
+# objc2 bindings, trimmed to the classes the modules touch. objc2-app-kit
+# backs EKCalendar's NSColor → hex conversion and the Edit menu's Paste and
+# Match Style item (`src/menu.rs`).
+objc2 = { workspace = true }
+block2 = { workspace = true }
+objc2-foundation = { workspace = true, features = [
   "std",
   "NSArray",
   "NSDate",
@@ -88,7 +76,7 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = [
   "NSString",
   "block2",
 ] }
-objc2-event-kit = { version = "0.3.2", default-features = false, features = [
+objc2-event-kit = { workspace = true, features = [
   "std",
   "EKCalendar",
   "EKCalendarItem",
@@ -101,80 +89,89 @@ objc2-event-kit = { version = "0.3.2", default-features = false, features = [
   "block2",
   "objc2-app-kit",
 ] }
-objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+objc2-app-kit = { workspace = true, features = [
   "std",
+  "NSApplication",
   "NSColor",
   "NSColorSpace",
+  "NSEvent",
+  "NSMenu",
+  "NSMenuItem",
+  "NSWorkspace",
 ] }
 
 # Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
 # macOS and iOS — never a mirrored copy of the address book. block2 bridges the
 # requestAccessForEntityType completion handler back into blocking Rust.
-# core-foundation backs the iCloud/backup sync-exclusion resource keys on
-# `.reflect/` and `.git/` (`fs/io.rs`), which matter on both Apple targets.
 # dispatch2 supplies MainThreadBound, keeping the iCloud metadata query's
 # non-Send Objective-C handles pinned to the main thread (`icloud/watch.rs`).
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-core-foundation = "0.10.1"
-dispatch2 = "0.3.1"
-objc2 = "0.6.4"
-objc2-foundation = "0.3.2"
-objc2-contacts = "0.3.2"
-block2 = "0.6.2"
+dispatch2 = { workspace = true }
+objc2 = { workspace = true }
+objc2-foundation = { workspace = true, features = ["default"] }
+objc2-contacts = { workspace = true }
+objc2-link-presentation = { workspace = true, features = [
+  "std",
+  "LPLinkMetadata",
+  "LPMetadataProvider",
+  "block2",
+] }
+block2 = { workspace = true }
 
 # Finite-length execution assertions around iOS persistence. UIKit's begin/end
 # methods keep file and SQLite locks from surviving process suspension.
 [target.'cfg(target_os = "ios")'.dependencies]
-objc2-ui-kit = { version = "0.3.2", default-features = false, features = [
-  "std",
-  "UIApplication",
-  "block2",
-] }
+objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"] }
+tauri-plugin-iap = { workspace = true }
+tauri-plugin-app-store = { workspace = true }
+tauri-plugin-web-auth = { workspace = true }
+apple-native-keyring-store = { workspace = true, features = ["protected"] }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
 # watcher (nothing else writes the mobile sandbox; local writes notify
-# in-process), the embedding runtime (fastembed/ORT is not built for mobile —
-# semantic search is desktop-only in the first mobile wave), and OS-trash
-# deletes (mobile moves into the graph-local `.reflect/trash/` instead).
+# in-process), and OS-trash deletes (mobile moves into the graph-local
+# `.reflect/trash/` instead).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.10.1"
-tauri-plugin-process = "2.3.1"
-tauri-plugin-window-state = "2.4.1"
-trash = "5.2.6"
-notify = "8.2.0"
-notify-debouncer-full = "0.7.0"
+tauri-plugin-updater = { workspace = true }
+tauri-plugin-process = { workspace = true }
+tauri-plugin-window-state = { workspace = true }
+trash = { workspace = true }
+notify = { workspace = true }
+notify-debouncer-full = { workspace = true }
+# The watcher's pruned file-ID cache (rename stitching without the full-tree
+# walk) reuses the debouncer's own building blocks directly.
+file-id = { workspace = true }
+walkdir = { workspace = true }
+tauri-plugin-deep-link = { workspace = true }
+tauri-plugin-single-instance = { workspace = true, features = ["deep-link"] }
+
+# The embedding runtime. Intel macOS has none: ONNX Runtime 1.24+ ships no
+# macOS x86_64 binaries.
+[target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
+fastembed = { workspace = true }
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
-hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
-tauri-plugin-deep-link = "2.4.9"
-tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
+hf-hub = { workspace = true, features = ["ureq", "native-tls"] }
 
-[target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
-fastembed = "5.13.0"
-
-[target.'cfg(all(target_os = "macos", target_arch = "x86_64"))'.dependencies]
-# fastembed 5.14+ pins ONNX Runtime API 24, but upstream ONNX Runtime 1.24
-# no longer ships macOS x86_64 binaries. Stay on API 23 for Intel until the
-# upstream binary set comes back or we replace the backend.
-fastembed = { version = ">=5.13.0, <5.14.0", default-features = false, features = [
-  "hf-hub-native-tls",
-  "image-models",
-  "ort-load-dynamic",
-] }
-ort = { version = "=2.0.0-rc.11", default-features = false, features = [
-  "ndarray",
-  "std",
-  "load-dynamic",
-] }
-
-# Mobile-only capabilities (Plan 19): the first-party keyboard bridge — no
-# software keyboard on desktop. (Sharing uses the webview's Web Share API,
-# `navigator.share`, so it needs no native plugin; haptics ride the keyboard
-# plugin's `impact_light` command.)
+# Mobile-only capabilities (Plan 19): the first-party keyboard bridge and
+# haptics plugins; desktop has no software keyboard and no haptic engine.
+# Sharing uses the webview's Web Share API, `navigator.share`, so it needs
+# no native plugin.
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
-tauri-plugin-keyboard = { path = "../../../plugins/tauri-plugin-keyboard" }
-tauri-plugin-recording = { path = "../../../plugins/tauri-plugin-recording" }
+tauri-plugin-keyboard = { workspace = true }
+tauri-plugin-mobile-haptics = { workspace = true }
+tauri-plugin-recording = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust"] }
+
+[build-dependencies]
+tauri-build = { workspace = true }
 
 [dev-dependencies]
-tauri = { version = "2.11.2", features = ["test"] }
+tauri = { workspace = true, features = ["test"] }
+reflect-graph-io = { workspace = true, features = ["test-support"] }

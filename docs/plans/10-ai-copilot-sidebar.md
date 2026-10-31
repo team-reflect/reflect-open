@@ -43,7 +43,7 @@ history, and privacy enforcement. The original summarize/rewrite/patchset scope 
 recorded below as the next wave.
 **Out:** local generative models (later), background auto-extraction beyond opt-in
 reviewable suggestions, agentic multi-step tools (later), audio memos (shipped
-separately through `actions/audio-memo`).
+separately through `audio/audio-memo`).
 
 ## Steps
 

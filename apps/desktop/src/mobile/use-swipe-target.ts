@@ -36,9 +36,9 @@ export function useSwipeTarget(navigationKey: string): SwipeTarget {
     setSwipeTarget({ navigationKey, date: null })
   }
   const followSwipeTarget = useCallback((date: string, sourceNavigationKey: string): void => {
-    setSwipeTarget((current) =>
-      current.navigationKey === sourceNavigationKey ? { ...current, date } : current,
-    )
+    setSwipeTarget((current) => {
+      return current.navigationKey === sourceNavigationKey ? { ...current, date } : current
+    })
   }, [])
   return { targetDate: swipeTarget.date, followSwipeTarget }
 }

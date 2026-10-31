@@ -1,9 +1,9 @@
-import { useListSelection, type ListSelection } from '@/lib/selection/use-list-selection'
+import { useListSelection, type ListSelection } from '@/lib/selection/use-list-selection.ts'
 
 /**
  * The Tasks view's multi-select (Plan 18, V1 parity). The implementation is the
  * generic {@link useListSelection} — selection over a flat, ordered list of
- * keys ({@link import('@/lib/tasks/task-identity').taskKey}) — which the Tasks
+ * keys ({@link import('@reflect/core').getTaskKey}) — which the Tasks
  * and All Notes views share. This module keeps the Tasks-facing names so the
  * view code and its tests read in task terms.
  *

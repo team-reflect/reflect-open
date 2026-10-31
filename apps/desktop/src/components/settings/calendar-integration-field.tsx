@@ -1,10 +1,10 @@
 import { useMemo, type ReactElement, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { openUrl } from '@tauri-apps/plugin-opener'
-import { canReadCalendars, requestCalendarAccess, type CalendarInfo } from '@reflect/core'
-import { InlineAlert } from '@/components/inline-alert'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { countSelectedCalendars, groupCalendarsBySource } from '@reflect/app'
+import { canReadCalendars } from '@reflect/core'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Checkbox } from '@/components/ui/checkbox.tsx'
 import {
   Dialog,
   DialogContent,
@@ -13,20 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { isMacosDesktop } from '@/lib/platform'
+} from '@/components/ui/dialog.tsx'
+import { queryKeys } from '@/lib/query-client.ts'
 import {
-  CALENDAR_QUERY_PREFIX,
   useCalendarAuthorization,
   useCalendarChangeInvalidation,
   useCalendars,
-} from '@/lib/use-calendar'
-import { useSettings } from '@/providers/settings-provider'
-import { SettingsSwitchField } from './switch-field'
-
-/** The macOS privacy pane where a revoked calendar grant is flipped back on. */
-const CALENDAR_PRIVACY_PANE =
-  'x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars'
+} from '@/lib/use-calendar.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
+import { SettingsSwitchField } from './switch-field.tsx'
 
 const ACTION_BUTTON_CLASS =
   'rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-100 hover:bg-surface-hover'
@@ -41,55 +37,36 @@ const ACTION_BUTTON_CLASS =
  * elsewhere.
  */
 export function CalendarIntegrationField(): ReactElement | null {
-  const { settings, updateSettings, updateSettingsWith } = useSettings()
+  const { settings } = useSettings()
   const queryClient = useQueryClient()
+  const { opener, calendarEvents } = useAppServices()
   const status = useCalendarAuthorization(settings.calendarEnabled)
   const canRead = status !== undefined && canReadCalendars(status)
   const { calendars, isLoaded } = useCalendars(settings.calendarEnabled && canRead)
   useCalendarChangeInvalidation(settings.calendarEnabled)
 
-  const groups = useMemo(() => {
-    const bySource = new Map<string, CalendarInfo[]>()
-    for (const calendar of calendars) {
-      const group = bySource.get(calendar.source)
-      if (group) {
-        group.push(calendar)
-      } else {
-        bySource.set(calendar.source, [calendar])
-      }
-    }
-    return [...bySource.entries()]
-  }, [calendars])
+  const groups = useMemo(() => groupCalendarsBySource(calendars), [calendars])
 
-  if (!isMacosDesktop) {
+  if (!calendarEvents.isAvailable()) {
     return null
+  }
+
+  const recheck = (): void => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
   }
 
   const requestAccess = (): void => {
     // Resolves instantly when the OS already remembers an answer; prompts
     // only on the very first request. Either way the queries re-check.
-    void requestCalendarAccess()
-      .catch((cause: unknown) => {
-        console.error('calendar access request failed:', cause)
-      })
-      .finally(() => {
-        void queryClient.invalidateQueries({ queryKey: CALENDAR_QUERY_PREFIX })
-      })
+    void calendarEvents.requestAccess().finally(recheck)
   }
 
   const handleToggle = (checked: boolean): void => {
-    updateSettings({ calendarEnabled: checked })
-    if (checked) {
-      requestAccess()
-    }
-  }
-
-  const toggleCalendar = (id: string, checked: boolean): void => {
-    updateSettingsWith((current) => ({
-      calendarIds: checked
-        ? [...current.calendarIds.filter((existing) => existing !== id), id]
-        : current.calendarIds.filter((existing) => existing !== id),
-    }))
+    void calendarEvents.setEnabled(checked).then(({ accessRequested }) => {
+      if (accessRequested) {
+        recheck()
+      }
+    })
   }
 
   let detail: ReactNode = null
@@ -110,9 +87,7 @@ export function CalendarIntegrationField(): ReactElement | null {
             <button
               type="button"
               onClick={() => {
-                void openUrl(CALENDAR_PRIVACY_PANE).catch((cause: unknown) => {
-                  console.error('failed to open System Settings:', cause)
-                })
+                opener.openSystemSettings('calendar')
               }}
               className={ACTION_BUTTON_CLASS}
             >
@@ -123,11 +98,7 @@ export function CalendarIntegrationField(): ReactElement | null {
       </div>
     )
   } else if (settings.calendarEnabled && canRead && isLoaded) {
-    // Count only ids the Mac still knows — settings may hold identifiers
-    // from since-removed accounts, and "3/2 calendars" would be nonsense.
-    const enabledCount = calendars.filter((calendar) =>
-      settings.calendarIds.includes(calendar.id),
-    ).length
+    const enabledCount = countSelectedCalendars(calendars, settings.calendarIds)
     detail =
       groups.length === 0 ? (
         <p className="text-xs text-text-muted">
@@ -139,11 +110,13 @@ export function CalendarIntegrationField(): ReactElement | null {
             {enabledCount}/{calendars.length} calendars selected
           </p>
           <Dialog>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline" size="sm">
-                Choose calendars…
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger
+              render={
+                <Button type="button" variant="outline" size="sm">
+                  Choose calendars…
+                </Button>
+              }
+            />
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Choose calendars</DialogTitle>
@@ -162,9 +135,9 @@ export function CalendarIntegrationField(): ReactElement | null {
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
                               <Checkbox
                                 checked={settings.calendarIds.includes(calendar.id)}
-                                onCheckedChange={(checked) =>
-                                  toggleCalendar(calendar.id, checked === true)
-                                }
+                                onCheckedChange={(checked) => {
+                                  calendarEvents.toggleCalendar(calendar.id, checked === true)
+                                }}
                                 aria-label={calendar.title}
                               />
                               {calendar.color !== null && (

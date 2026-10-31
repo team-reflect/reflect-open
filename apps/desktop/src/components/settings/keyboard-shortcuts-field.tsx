@@ -1,9 +1,9 @@
 import type { ReactElement } from 'react'
 import { Keyboard } from 'lucide-react'
-import { ShortcutKeys } from '@/components/shortcut-keys'
-import { Button } from '@/components/ui/button'
-import { keybindingFor } from '@/lib/commands/app-commands'
-import { useShortcuts } from '@/providers/shortcuts-provider'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { keybindingFor } from '@/lib/commands/app-commands.ts'
+import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 
 const SHORTCUTS_BINDING = keybindingFor('shortcuts.show')
 
@@ -14,9 +14,7 @@ export function KeyboardShortcutsField(): ReactElement {
     <div className="flex items-center justify-between gap-4 px-4 py-3.5">
       <div className="min-w-0">
         <div className="text-sm font-medium text-text">Keyboard shortcuts</div>
-        <p className="mt-0.5 text-xs text-text-muted">
-          Show every app and editor shortcut.
-        </p>
+        <p className="mt-0.5 text-xs text-text-muted">Show every app and editor shortcut.</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {SHORTCUTS_BINDING !== null ? (

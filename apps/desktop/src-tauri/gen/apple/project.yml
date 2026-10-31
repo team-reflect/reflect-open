@@ -1,8 +1,28 @@
+# XcodeGen (https://github.com/yonaskolb/XcodeGen) project spec: the copy
+# XcodeGen actually consumes to generate reflect-open.xcodeproj in this
+# directory. To regenerate the Xcode project after a spec change
+# (`brew install xcodegen` once):
+#
+#   cd apps/desktop/src-tauri/gen/apple && xcodegen generate
+#
+# then inspect the project.pbxproj diff before committing (`tauri ios dev`
+# may additionally normalize the generated files; see
+# docs/contributing/mobile-simulator.md).
+#
+# Kept in sync by hand with ../../ios.project.yml: every change here must
+# also be applied there, and vice versa.
 name: reflect-open
 options:
   bundleIdPrefix: app.reflect
   deploymentTarget:
-    iOS: 14.0
+    iOS: 16.0
+packages:
+  # Native crash/hang reporting (NativeDiagnostics.swift). Pinned exactly so
+  # upgrades are deliberate: any bump must re-audit the options set in
+  # NativeDiagnostics.swift.
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    exactVersion: 9.31.0
 fileGroups: [../../src]
 configs:
   debug: debug
@@ -50,6 +70,9 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      # Icon Composer documents; ASSETCATALOG_COMPILER_APPICON_NAME picks one.
+      - path: ../../icons/AppIcon.icon
+      - path: ../../icons-dev/AppIcon-Dev.icon
       # Build artifacts (libapp.a) land here; without an explicit `none`,
       # regenerating after a build sweeps them into Copy Bundle Resources,
       # shipping the Rust static archive inside the app bundle.
@@ -60,6 +83,11 @@ targets:
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
+      # The capture-inbox producer, shared by path with the share extension
+      # (the same pattern the widget uses for the Live Activity sources): the
+      # quick-note intent (Plan 24) spools envelopes from the app process
+      # through the same atomic App Group writer the share sheet uses.
+      - path: ShareExtension/CaptureInbox.swift
     info:
       path: reflect-open_iOS/Info.plist
       properties:
@@ -79,6 +107,7 @@ targets:
         # xcodegen regens keep them in the committed generated Info.plist
         # instead of silently dropping them.
         NSMicrophoneUsageDescription: Reflect uses the microphone to record audio memos that are transcribed into your daily note.
+        NSCameraUsageDescription: Reflect uses the camera so you can take a photo and add it to a note. Photos are saved into your notes folder on this device.
         NSCalendarsFullAccessUsageDescription: Reflect reads your calendar to show the day's meetings beside your daily note. Access is read-only and stays on this device.
         NSCalendarsUsageDescription: Reflect reads your calendar to show the day's meetings beside your daily note. Access is read-only and stays on this device.
         # Audio memos keep recording through screen lock and backgrounding
@@ -106,6 +135,8 @@ targets:
             UIApplicationShortcutItemTitle: Record audio
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAudio
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
+        # Native Sentry DSN from the build environment; empty disables it.
+        ReflectSentryDSN: $(REFLECT_SENTRY_DSN)
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -148,15 +179,21 @@ targets:
       environmentVariables:
         RUST_BACKTRACE: full
         RUST_LOG: info
+      # Local StoreKit testing without App Store Connect: Xcode's Run action
+      # loads the subscription catalog from this file (path relative to this
+      # spec's directory). Only the Run action applies it; plain xcodebuild
+      # and `tauri ios dev` launches run without it, so the paywall shows
+      # "Could not load subscription options" there.
+      storeKitConfiguration: reflect-open-storekit.storekit
     settings:
       base:
         ENABLE_BITCODE: false
         ARCHS: [arm64]
-        VALID_ARCHS: arm64 
+        VALID_ARCHS: arm64
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
-        SWIFT_VERSION: "5.0"
+        SWIFT_VERSION: '5.0'
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
       groups: [app]
     dependencies:
@@ -168,6 +205,14 @@ targets:
       # + the recording Live Activity; embedded and signed with the app.
       - target: RecordingWidget
         embed: true
+      # Sentry-Dynamic, not Sentry: the default product is a prebuilt STATIC
+      # xcframework, and Xcode 26 links it correctly but then embeds a
+      # synthesized stub Sentry.framework (a 49KB symbol-less dylib whose
+      # install name is a swbuild temp path) into Frameworks/. App Store
+      # Connect rejects that stub with ITMS-90035 "Invalid Signature", killing
+      # every TestFlight upload. The dynamic product embeds the real dylib.
+      - package: Sentry
+        product: Sentry-Dynamic
       - framework: libapp.a
         embed: false
       # libgit2 (vendored into libapp.a) needs zlib and iconv at the final
@@ -177,6 +222,7 @@ targets:
       - sdk: libiconv.tbd
       # objc2-contacts' link directive doesn't reach xcodebuild either.
       - sdk: Contacts.framework
+      - sdk: LinkPresentation.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework
@@ -185,7 +231,9 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
     preBuildScripts:
-      - script: CI=true pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+      # The script body lives in xcode-scripts/build-rust-code.sh so it can
+      # locate node/cargo itself; Dock-launched Xcode has no usable PATH.
+      - script: '"${SRCROOT:?}/../../xcode-scripts/build-rust-code.sh"'
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:
@@ -239,7 +287,7 @@ targets:
         PRODUCT_NAME: ShareExtension
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 789ULN5MZB
-        SWIFT_VERSION: "5.0"
+        SWIFT_VERSION: '5.0'
         TARGETED_DEVICE_FAMILY: 1,2
       # An appex bundle id must be prefixed by its containing app's bundle
       # id, so the extension follows the app's flavor (see settingGroups).
@@ -261,12 +309,7 @@ targets:
       # fails with "Couldn't save" (tauri-cli mobile/ios/build.rs). Ad-hoc
       # signing the extension with its entitlements here keeps them through
       # export; properly signed builds never enter the branch.
-      - script: |
-          if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
-            /usr/bin/codesign --force --sign - \
-              --entitlements "${SRCROOT:?}/ShareExtension/ShareExtension.entitlements" \
-              "${CODESIGNING_FOLDER_PATH:?}"
-          fi
+      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh"'
         name: Preserve entitlements on skip-codesign builds
         basedOnDependencyAnalysis: false
 
@@ -279,7 +322,7 @@ targets:
   RecordingWidget:
     type: app-extension
     platform: iOS
-    deploymentTarget: "16.2"
+    deploymentTarget: '16.2'
     sources:
       - path: RecordingWidget/RecordingWidgetBundle.swift
       - path: RecordingWidget/RecordAudioWidget.swift
@@ -295,7 +338,7 @@ targets:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     # The widget needs no capability of its own, but the release pipeline
-    # asserts every appex carries the App Group (release-ios.mjs), and the
+    # asserts every appex carries the App Group (build-ios.ts), and the
     # skip-codesign ad-hoc phase below must have entitlements to preserve —
     # exactly like ShareExtension (including the hand-maintained per-config
     # entitlement files; see the main target's comment).
@@ -304,7 +347,7 @@ targets:
         PRODUCT_NAME: RecordingWidget
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 789ULN5MZB
-        SWIFT_VERSION: "5.0"
+        SWIFT_VERSION: '5.0'
         TARGETED_DEVICE_FAMILY: 1,2
       configs:
         debug:
@@ -319,11 +362,6 @@ targets:
       # Same skip-codesign entitlement preservation as ShareExtension: CI
       # TestFlight builds archive unsigned, and export re-signing only keeps
       # entitlements already present in a signature.
-      - script: |
-          if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
-            /usr/bin/codesign --force --sign - \
-              --entitlements "${SRCROOT:?}/RecordingWidget/RecordingWidget.entitlements" \
-              "${CODESIGNING_FOLDER_PATH:?}"
-          fi
+      - script: '"${SRCROOT:?}/../../xcode-scripts/preserve-entitlements.sh"'
         name: Preserve entitlements on skip-codesign builds
         basedOnDependencyAnalysis: false

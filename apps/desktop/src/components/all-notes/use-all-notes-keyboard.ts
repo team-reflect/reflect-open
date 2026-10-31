@@ -1,12 +1,14 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { type ListSelection } from '@/lib/selection/use-list-selection'
+import { isModEvent } from '@meowdown/core'
+import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
+import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 
 export interface AllNotesKeyboardOptions {
   selection: ListSelection
   /** The note paths in render order — the selection's keys resolve against these. */
   orderedPaths: readonly string[]
-  /** Open a note in the editor (Enter / ⌘Enter on the selection). */
-  onOpen: (path: string) => void
+  /** Open a note (Enter in place, ⌘Enter in a new window). */
+  onOpen: (path: string, event?: ModClickEvent) => void
   /** Ask to trash the selection (⌘⌫) — the screen opens its confirm dialog. */
   onRequestTrash: () => void
   /** The All Notes surface; shortcuts back off when focus is outside it. */
@@ -22,13 +24,13 @@ const OWNS_KEYS = '[role="menu"], [role="dialog"], [role="listbox"], input, text
  * The All Notes view's keyboard shortcuts (V1 parity), bound to a single
  * `document` keydown listener for the screen's life — so they work the moment
  * you're on the screen (which focuses its surface on mount), without first
- * clicking into the list. Mirrors {@link import('@/lib/tasks/use-task-keyboard').useTaskKeyboard},
+ * clicking into the list. Mirrors {@link import('@/lib/tasks/use-task-keyboard.ts').useTaskKeyboard},
  * with a smaller map: there's no inline editor and no add/complete here.
  *
  * The map: ↑/↓ move a single selection (Shift to extend the range), ⌘A select
- * all, Return / ⌘Return open the first selected note, ⌘⌫ trash the selection
- * (the screen confirms first — plain ⌫/Delete is deliberately *not* bound, so a
- * stray keypress can't bulk-trash), Esc clear.
+ * all, Return opens the first selected note (⌘Return in a new window), ⌘⌫
+ * trash the selection (the screen confirms first — plain ⌫/Delete is
+ * deliberately *not* bound, so a stray keypress can't bulk-trash), Esc clear.
  *
  * Scoping: the listener is on `document`, but backs off when focus sits outside
  * the surface (the sidebar or another panel keeps its own keys — only `body`/no
@@ -59,14 +61,19 @@ export function useAllNotesKeyboard({
       // Focus outside the surface keeps its own keys; `body`/no-focus and elements
       // inside the surface drive the shortcuts.
       const root = rootRef.current
-      if (root !== null && target !== null && target !== root.ownerDocument.body && !root.contains(target)) {
+      if (
+        root !== null &&
+        target !== null &&
+        target !== root.ownerDocument.body &&
+        !root.contains(target)
+      ) {
         return
       }
       // Back off for a focused control inside the surface that owns the key.
       if (target?.closest?.(OWNS_KEYS) != null) {
         return
       }
-      const mod = event.metaKey || event.ctrlKey
+      const mod = isModEvent(event)
       const scrollActiveIntoView = (): void => {
         const key = selection.activeKey()
         if (key !== null) {
@@ -101,11 +108,11 @@ export function useAllNotesKeyboard({
         if (target?.closest?.('button, a, [role="button"], [role="link"]') != null) {
           return
         }
-        // V1: Return / ⌘Return open the first selected note (render order).
+        // Return opens the first selected note (render order).
         const firstSelected = orderedPaths.find((path) => selection.isSelected(path))
         if (firstSelected !== undefined) {
           event.preventDefault()
-          onOpen(firstSelected)
+          onOpen(firstSelected, event)
         }
       } else if (mod && event.key === 'Backspace') {
         if (selection.selectedCount > 0) {

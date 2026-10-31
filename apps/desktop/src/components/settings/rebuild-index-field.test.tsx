@@ -1,63 +1,42 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { page, type Locator } from 'vitest/browser'
+import { describe, expect, it, vi } from 'vitest'
+import { createTestCoreServices } from '@reflect/core/testing'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { RebuildIndexField } from './rebuild-index-field.tsx'
 
-const rebuildIndexVisibly = vi.hoisted(() => vi.fn(async () => undefined))
-const graph = vi.hoisted(() => ({ indexGeneration: 7 as number | null }))
-vi.mock('@/lib/rebuild-index', () => ({ rebuildIndexVisibly }))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ indexGeneration: graph.indexGeneration }),
-}))
-
-const { RebuildIndexField } = await import('./rebuild-index-field')
-
-function rebuildButton(): HTMLButtonElement {
-  const element = screen.getByRole('button', { name: /rebuild/i })
-  if (!(element instanceof HTMLButtonElement)) {
-    throw new Error('expected a <button>')
-  }
-  return element
+function rebuildButton(): Locator {
+  return page.getByRole('button', { name: /rebuild/i })
 }
-
-beforeEach(() => {
-  graph.indexGeneration = 7
-  rebuildIndexVisibly.mockClear()
-})
-
-afterEach(() => {
-  cleanup()
-})
 
 describe('RebuildIndexField', () => {
   it('rebuilds at the open index generation', async () => {
-    render(<RebuildIndexField />)
+    const { core } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: 7 } })
 
-    fireEvent.click(rebuildButton())
+    await rebuildButton().click()
 
-    await waitFor(() => expect(rebuildIndexVisibly).toHaveBeenCalledWith(7))
+    await vi.waitFor(() => expect(core.indexLifecycle.rebuilds()).toEqual([7]))
   })
 
   it('disables the button while a rebuild is in flight, then re-enables it', async () => {
-    let finish: () => void = () => {}
-    rebuildIndexVisibly.mockImplementationOnce(
-      () => new Promise((resolve) => (finish = () => resolve(undefined))),
-    )
-    render(<RebuildIndexField />)
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const rebuild = Promise.withResolvers<void>()
+    vi.spyOn(core.indexLifecycle, 'rebuildVisibly').mockReturnValueOnce(rebuild.promise)
+    await renderInApp(<RebuildIndexField />, { core, graph: { indexGeneration: 7 } })
 
-    fireEvent.click(rebuildButton())
+    await rebuildButton().click()
 
-    const pending = await screen.findByRole('button', { name: /rebuilding/i })
-    expect(pending.hasAttribute('disabled')).toBe(true)
+    await expect.element(page.getByRole('button', { name: /rebuilding/i })).toBeDisabled()
 
-    finish()
-    await waitFor(() => expect(rebuildButton().hasAttribute('disabled')).toBe(false))
+    rebuild.resolve()
+    await expect.element(rebuildButton()).toBeEnabled()
   })
 
-  it('is disabled when no graph index is open', () => {
-    graph.indexGeneration = null
-    render(<RebuildIndexField />)
+  it('is disabled when no graph index is open', async () => {
+    const { core } = await renderInApp(<RebuildIndexField />, { graph: { indexGeneration: null } })
 
-    expect(rebuildButton().hasAttribute('disabled')).toBe(true)
-    fireEvent.click(rebuildButton())
-    expect(rebuildIndexVisibly).not.toHaveBeenCalled()
+    await expect.element(rebuildButton()).toBeDisabled()
+    await rebuildButton().click({ force: true })
+    expect(core.indexLifecycle.rebuilds()).toEqual([])
   })
 })

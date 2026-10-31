@@ -1,7 +1,8 @@
 import {
   createContext,
+  startTransition,
   useCallback,
-  useContext,
+  use,
   useEffect,
   useMemo,
   useRef,
@@ -9,24 +10,16 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { onNoteMoved } from '@/lib/note-moves'
-import { normalizeRoute, routesEqual, type Route } from './route'
+import type { NavigateOptions, Route } from '@reflect/app'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+
+export type RouterNavigate = (route: Route, options?: NavigateOptions) => void
 
 /**
- * The app router (Plan 06): a history stack over typed {@link Route}s — no URL,
- * no dependency. `navigate` pushes (truncating any forward entries, like a
- * browser), `back`/`forward` move the cursor. Mount it per graph (keyed by the
- * graph root) so switching graphs starts a fresh history.
- *
- * Each history entry can carry a **scroll offset** (Plan 06b): views report
- * theirs via `saveScrollState` (a ref write — safe from scroll handlers, never
- * re-renders) and read `savedScroll()` after a back/forward restores an entry.
- *
- * Long-lived surfaces (the daily stream, shared by the today/daily routes)
- * additionally keep a **surface offset** — the last reported position,
- * independent of any history entry — so a nav-tab return can resume the stream
- * where the user left it (`restoreSurfaceScroll`) even though it lands on a
- * fresh entry.
+ * The app router (Plan 06): the React face of core's `NavigationService`, a
+ * history stack over typed {@link Route}s — no URL, no dependency. Mount it
+ * per graph (keyed by the graph root) so switching graphs starts a fresh
+ * history.
  */
 
 interface RouterValue {
@@ -40,15 +33,6 @@ interface RouterValue {
    */
   arrivalSeq: number
   /**
-   * Read the synchronous, monotonic navigation-state revision. Unlike rendered
-   * route state, this advances before `navigate`, `back`, or `forward` enqueue
-   * an update (and before the current note follows a rename), so async link
-   * fallbacks can detect even a same-route arrival or a back/forward round trip
-   * that returned to the same history entry. A back/forward at a history
-   * boundary changes nothing and does not advance it.
-   */
-  navigationRevision: () => number
-  /**
    * True when the latest arrival asked the destination to focus its primary
    * input (`navigate(route, { focusEditor: true })`). Only explicit capture
    * gestures request it — the mobile Daily-, All-, Tasks-, and Chat-tab
@@ -59,7 +43,7 @@ interface RouterValue {
    * moves clear it, so it can never leak onto a later, unrelated arrival.
    */
   arrivalFocusEditor: boolean
-  navigate: (route: Route, options?: NavigateOptions) => void
+  navigate: RouterNavigate
   back: () => void
   forward: () => void
   canBack: boolean
@@ -85,263 +69,110 @@ interface RouterValue {
 
 const RouterContext = createContext<RouterValue | null>(null)
 
-export interface NavigateOptions {
-  /**
-   * Seed the new history entry with the last saved scroll position of the
-   * target route's surface. Primary nav tabs use this so switching away and
-   * back does not reset long-lived list surfaces. Only a genuine return
-   * honors it: when the current route already sits on the target's surface
-   * the arrival re-anchors like any other explicit navigation, and ordinary
-   * command arrivals omit it and re-anchor as before.
-   */
-  restoreSurfaceScroll?: boolean
-  /**
-   * Ask the destination to focus its primary input on arrival — see
-   * {@link RouterValue.arrivalFocusEditor}. Consumed by the daily surfaces —
-   * the mobile Daily-tab double-tap and desktop's stream (⌘D, the sidebar's
-   * Daily notes row), which land the caret at the end of the day's content
-   * (append-style capture) — and by the mobile All, Tasks, and Chat tabs,
-   * whose double-taps focus their primary inputs; desktop's note route
-   * autofocuses every arrival and ignores it.
-   */
-  focusEditor?: boolean
-}
-
-/**
- * The scroll-surface key for routes whose view outlives any single history
- * entry, or `null` for ordinary per-entry restoration. Today and dated daily
- * routes share one stream, hence one key.
- */
-function scrollSurfaceForRoute(route: Route): string | null {
-  switch (route.kind) {
-    case 'today':
-    case 'daily':
-      return 'daily'
-    default:
-      return null
-  }
-}
-
 interface RouterProviderProps {
   /** The launch route; defaults to today (the daily note is the spine). */
   initialRoute?: Route | undefined
   children: ReactNode
 }
 
-interface HistoryEntry {
-  /** Stable identity for scroll bookkeeping (indices shift on truncation). */
-  id: number
-  route: Route
-}
-
-interface HistoryState {
-  stack: HistoryEntry[]
-  index: number
-}
-
+/**
+ * Thin React shell over the app's `NavigationService`, which owns the history.
+ * Each mount starts a fresh history on `initialRoute`. Navigation runs inside
+ * a transition, so the screen on show stays up while the next one loads.
+ */
 export function RouterProvider({
   initialRoute = { kind: 'today' },
   children,
 }: RouterProviderProps): ReactElement {
-  const [history, setHistory] = useState<HistoryState>({
-    stack: [{ id: 0, route: normalizeRoute(initialRoute) }],
-    index: 0,
+  const { navigation: appNavigation } = useAppServices()
+  const { noteMove } = useCoreServices()
+  const [navigation] = useState(() => {
+    appNavigation.reset(initialRoute)
+    return appNavigation
   })
-  const [arrivalSeq, setArrivalSeq] = useState(0)
-  const [arrivalFocusEditor, setArrivalFocusEditor] = useState(false)
-  const nextId = useRef(1)
-  const navigationRevisionRef = useRef(0)
-  /** Scroll offsets by entry id — a ref so scroll reporting never re-renders. */
-  const scrollById = useRef(new Map<number, number>())
-  /** Last offset per long-lived surface, independent of history entries. */
-  const scrollBySurface = useRef(new Map<string, number>())
-  /** The active entry id, readable without depending on render order. */
-  const currentId = useRef(0)
-  /** The active route, readable from scroll handlers without re-rendering. */
-  const currentRoute = useRef<Route>(history.stack[history.index]!.route)
+  // React state rather than `useSyncExternalStore`: a store read through that
+  // hook always updates synchronously, which would drop the transition and
+  // flash the loading fallback of every lazily loaded screen.
+  const [state, setState] = useState(() => navigation.getState())
+  /**
+   * The state on screen, readable from scroll handlers without re-rendering.
+   */
+  const renderedRef = useRef(state)
   // Written during render, not in an effect: descendant scroll-restoration
-  // effects read this id (through saveScrollState/savedScroll) on the same
+  // effects read this (through saveScrollState/savedScroll) on the same
   // commit, and React runs effects child-before-parent — so updating it in an
   // effect here would lag a frame and restore or save the wrong entry's offset.
-  // eslint-disable-next-line react-hooks/refs
-  currentId.current = history.stack[history.index]!.id
-  // eslint-disable-next-line react-hooks/refs
-  currentRoute.current = history.stack[history.index]!.route
-  /**
-   * History position, readable from the stable back/forward callbacks. A
-   * boundary press must be a true no-op — advancing the navigation revision
-   * for it would silently cancel an unrelated pending link fallback.
-   */
-  const historyPosition = useRef({ index: 0, length: 1 })
-  // eslint-disable-next-line react-hooks/refs
-  historyPosition.current = { index: history.index, length: history.stack.length }
+  renderedRef.current = state
 
-  const navigate = useCallback((route: Route, options?: NavigateOptions) => {
-    navigationRevisionRef.current += 1
-    const target = normalizeRoute(route)
-    const surface = scrollSurfaceForRoute(target)
-    // A surface restore only means something when coming from OFF the surface;
-    // the Daily tab clicked while already on the stream is an explicit
-    // re-anchor request, exactly like ⌘D.
-    const returning =
-      options?.restoreSurfaceScroll === true &&
-      surface !== null &&
-      scrollSurfaceForRoute(currentRoute.current) !== surface
-    const restored = returning ? scrollBySurface.current.get(surface) : undefined
-    if (surface !== null && restored === undefined) {
-      // An explicit arrival re-anchors the surface, making its saved offset
-      // stale — drop it so a later nav-tab return re-anchors too instead of
-      // resurrecting the pre-arrival position. Scrolling after the arrival
-      // repopulates it.
-      scrollBySurface.current.delete(surface)
-    }
-    setHistory((current) => {
-      const currentEntry = current.stack[current.index]!
-      if (routesEqual(currentEntry.route, target)) {
-        if (restored !== undefined) {
-          scrollById.current.set(currentEntry.id, restored)
-        } else {
-          // No stack growth — but this is still an explicit arrival: forget the
-          // entry's saved offset so the view re-anchors to its target instead of
-          // restoring the old scroll position.
-          scrollById.current.delete(currentEntry.id)
-        }
-        return current
-      }
-      const dropped = current.stack.slice(current.index + 1)
-      for (const entry of dropped) {
-        scrollById.current.delete(entry.id) // truncated branch — free its offsets
-      }
-      const id = nextId.current++
-      if (restored !== undefined) {
-        scrollById.current.set(id, restored) // seed the fresh entry with the surface offset
-      }
-      const stack = [...current.stack.slice(0, current.index + 1), { id, route: target }]
-      return { stack, index: stack.length - 1 }
-    })
-    setArrivalSeq((seq) => seq + 1)
-    setArrivalFocusEditor(options?.focusEditor === true)
-  }, [])
+  useEffect(() => {
+    const sync = (): void => setState(navigation.getState())
+    const unsubscribe = navigation.subscribe(sync)
+    // A descendant's effect may have navigated before this subscription.
+    startTransition(sync)
+    return unsubscribe
+  }, [navigation])
 
-  const back = useCallback(() => {
-    if (historyPosition.current.index === 0) {
-      return // nothing behind us — must not advance the navigation revision
-    }
-    navigationRevisionRef.current += 1
-    setArrivalFocusEditor(false) // history moves are never focus arrivals
-    setHistory((current) =>
-      current.index > 0 ? { ...current, index: current.index - 1 } : current,
-    )
-  }, [])
+  const navigate = useCallback(
+    (route: Route, options?: NavigateOptions): void => {
+      startTransition(() => navigation.navigate(route, options))
+    },
+    [navigation],
+  )
 
-  const forward = useCallback(() => {
-    if (historyPosition.current.index >= historyPosition.current.length - 1) {
-      return
-    }
-    navigationRevisionRef.current += 1
-    setArrivalFocusEditor(false)
-    setHistory((current) =>
-      current.index < current.stack.length - 1 ? { ...current, index: current.index + 1 } : current,
-    )
-  }, [])
+  const back = useCallback((): void => {
+    startTransition(() => navigation.back())
+  }, [navigation])
+
+  const forward = useCallback((): void => {
+    startTransition(() => navigation.forward())
+  }, [navigation])
 
   // A note file move (Plan 17) rewrites every history entry that points at
-  // the old path — the current route follows the file without an arrival
-  // (same entry ids, so scroll offsets and back/forward stay intact), and a
-  // back-nav can never land on a path that no longer exists.
+  // the old path, so the current route (and back/forward) follow the file.
   useEffect(
-    () =>
-      onNoteMoved((from, to) => {
-        if (currentRoute.current.kind === 'note' && currentRoute.current.path === from) {
-          navigationRevisionRef.current += 1
-        }
-        setHistory((current) => {
-          let changed = false
-          const stack = current.stack.map((entry) => {
-            if (entry.route.kind === 'note' && entry.route.path === from) {
-              changed = true
-              return { ...entry, route: { kind: 'note' as const, path: to } }
-            }
-            return entry
-          })
-          return changed ? { ...current, stack } : current
-        })
-      }),
-    [],
+    () => noteMove.onMoved((from, to) => navigation.noteMoved(from, to)),
+    [navigation, noteMove],
   )
 
-  const saveScrollState = useCallback((offset: number) => {
-    scrollById.current.set(currentId.current, offset)
-    const surface = scrollSurfaceForRoute(currentRoute.current)
-    if (surface !== null) {
-      scrollBySurface.current.set(surface, offset)
-    }
-  }, [])
-
-  const clearScrollState = useCallback(() => {
-    scrollById.current.delete(currentId.current)
-    const surface = scrollSurfaceForRoute(currentRoute.current)
-    if (surface !== null) {
-      scrollBySurface.current.delete(surface)
-    }
-  }, [])
-
-  const savedScroll = useCallback(
-    () => scrollById.current.get(currentId.current) ?? null,
-    [],
+  const saveScrollState = useCallback(
+    (offset: number) => navigation.saveScrollState(offset, renderedRef.current),
+    [navigation],
   )
-  const navigationRevision = useCallback(() => navigationRevisionRef.current, [])
+  const clearScrollState = useCallback(
+    () => navigation.clearScrollState(renderedRef.current),
+    [navigation],
+  )
+  const savedScroll = useCallback(() => navigation.savedScroll(renderedRef.current), [navigation])
 
-  const value = useMemo<RouterValue>(() => {
-    const entry = history.stack[history.index]!
-    return {
-      route: entry.route,
-      entryId: entry.id,
-      arrivalSeq,
-      navigationRevision,
-      arrivalFocusEditor,
+  const value = useMemo<RouterValue>(
+    () => ({
+      route: state.route,
+      entryId: state.entryId,
+      arrivalSeq: state.arrivalSeq,
+      arrivalFocusEditor: state.arrivalFocusEditor,
       navigate,
       back,
       forward,
-      canBack: history.index > 0,
-      canForward: history.index < history.stack.length - 1,
-      backRoute: history.index > 0 ? history.stack[history.index - 1]!.route : null,
+      canBack: state.canBack,
+      canForward: state.canForward,
+      backRoute: state.backRoute,
       saveScrollState,
       clearScrollState,
       savedScroll,
-    }
-  }, [
-    history,
-    arrivalSeq,
-    navigationRevision,
-    arrivalFocusEditor,
-    navigate,
-    back,
-    forward,
-    saveScrollState,
-    clearScrollState,
-    savedScroll,
-  ])
+    }),
+    [state, navigate, back, forward, saveScrollState, clearScrollState, savedScroll],
+  )
 
-  return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>
+  return <RouterContext value={value}>{children}</RouterContext>
 }
 
 /** Access the current route + navigation. Use within a RouterProvider. */
 export function useRouter(): RouterValue {
-  const context = useContext(RouterContext)
+  const context = use(RouterContext)
   if (!context) {
     throw new Error('useRouter must be used within a RouterProvider')
   }
   return context
-}
-
-/**
- * Read the router's synchronous navigation-revision getter when a provider is
- * present. Low-level rendered-link hooks use the nullable form so their
- * standalone component harnesses remain valid outside a full app router.
- */
-export function useNavigationRevision(): (() => number) | null {
-  return useContext(RouterContext)?.navigationRevision ?? null
 }
 
 interface RouterFreezeProps {
@@ -368,7 +199,5 @@ export function RouterFreeze({ frozen, children }: RouterFreezeProps): ReactElem
   if (!frozen && captured !== live) {
     setCaptured(live)
   }
-  return (
-    <RouterContext.Provider value={frozen ? captured : live}>{children}</RouterContext.Provider>
-  )
+  return <RouterContext value={frozen ? captured : live}>{children}</RouterContext>
 }

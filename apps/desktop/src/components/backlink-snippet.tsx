@@ -1,9 +1,13 @@
+import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
+import { useYouTubeVideoResolver } from '@/editor/youtube-video-resolver.ts'
 import type { ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import type { SnippetTask } from '@reflect/core'
-import { useOpenExternalLink } from '@/editor/open-external-link'
-import { useSnippetTaskToggle } from '@/hooks/use-snippet-task-toggle'
+import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
+import { useWikilinkResolver } from '@/editor/resolve-wikilink.ts'
+import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
+import { useSnippetTaskToggle } from '@/hooks/use-snippet-task-toggle.ts'
 
 interface BacklinkSnippetProps {
   /** The referencing block context's Markdown source (may span several lines). */
@@ -14,8 +18,6 @@ interface BacklinkSnippetProps {
   tasks: SnippetTask[]
   /** Navigate a clicked `[[wiki link]]` to its target. Pass a stable function. */
   onWikilinkClick: WikilinkClickHandler
-  /** Resolve `![…](…)` sources to displayable URLs. Pass a stable function. */
-  resolveImageUrl: (src: string) => string | undefined
 }
 
 /**
@@ -25,10 +27,13 @@ interface BacklinkSnippetProps {
  * source. The context is a whole block (old Reflect's rules — a paragraph, the
  * containing list item with its children, or a heading's section), so it
  * renders unclamped: truncating would cut the nested structure the context
- * exists to show. Round `+ [ ]` task checkboxes are live — a click writes the
+ * exists to show. The source's fold state must not hide it either:
+ * `expandCollapsed` renders `+` collapsed items expanded at every depth.
+ * Round `+ [ ]` task checkboxes are live — a click writes the
  * toggle through to the source note ({@link useSnippetTaskToggle}), old
  * Reflect's backlink-context behavior — while square GFM boxes stay read-only
- * (the `reflect-backlink-snippet` CSS keeps them inert-looking). The
+ * (the `reflect-backlink-snippet` CSS keeps them inert-looking). Images and
+ * `![[embeds]]` resolve from the source note's folder, as in its editor. The
  * `reflect-editor` class shares the editor's chip styling; the
  * `reflect-backlink-snippet` wrapper keeps it in the panel's compact line box.
  */
@@ -37,19 +42,28 @@ export function BacklinkSnippet({
   notePath,
   tasks,
   onWikilinkClick,
-  resolveImageUrl,
 }: BacklinkSnippetProps): ReactElement {
+  const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(notePath)
+  const resolveXPost = useXPostResolver()
+  const resolveYouTubeVideo = useYouTubeVideoResolver()
+  const resolveWikilink = useWikilinkResolver()
   const onTaskClick = useSnippetTaskToggle(notePath, tasks)
-  const openExternalLink = useOpenExternalLink()
+  const onLinkClick = useMarkdownLinkClick(notePath)
   return (
     <div className="reflect-backlink-snippet select-text text-xs text-text">
       <MarkdownView
+        resolveXPost={resolveXPost}
+        resolveYouTubeVideo={resolveYouTubeVideo}
+        mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
         className="reflect-editor"
         markdown={text}
+        expandCollapsed
+        resolveWikilink={resolveWikilink}
         onWikilinkClick={onWikilinkClick}
-        onLinkClick={openExternalLink}
+        onLinkClick={onLinkClick}
         {...(onTaskClick ? { onTaskClick } : {})}
         resolveImageUrl={resolveImageUrl}
+        resolveWikiEmbed={resolveWikiEmbed}
       />
     </div>
   )

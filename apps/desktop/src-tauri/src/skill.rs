@@ -13,12 +13,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use tauri::State;
 
 use crate::capture::atomic_write_to;
 use crate::error::{AppError, AppResult};
-use crate::fs::{current_root, root_for_generation, GraphState};
+use crate::fs::{GraphState, current_root, root_for_generation};
 
 /// The bundled template; placeholders are `{{SKILL_NAME}}`, `{{GRAPH_NAME}}`,
 /// `{{GRAPH_ROOT}}`, and `{{CLI_PATH}}`.
@@ -103,27 +102,20 @@ fn render_skill(skill_name: &str, graph_name: &str, graph_root: &str, cli_path: 
         .replace("{{CLI_PATH}}", cli_path)
 }
 
-/// Lowercase hex sha256 (same encoding as the CLI's `hash.rs`).
 fn content_hash(content: &str) -> String {
-    use std::fmt::Write;
-    let digest = Sha256::digest(content.as_bytes());
-    let mut hex = String::with_capacity(digest.len() * 2);
-    for byte in digest {
-        let _ = write!(hex, "{byte:02x}");
-    }
-    hex
+    reflect_graph_io::hash::sha256_hex(content.as_bytes())
 }
 
 /// Insert the managed marker after the YAML frontmatter (agent runtimes parse
 /// the frontmatter block first, so the marker must not sit above it).
 fn insert_marker(source: &str, hash: &str) -> String {
     let marker = format!("{MANAGED_PREFIX}{hash}{MANAGED_SUFFIX}");
-    if let Some(rest) = source.strip_prefix("---\n") {
-        if let Some(index) = rest.find("\n---\n") {
-            let split = "---\n".len() + index + "\n---\n".len();
-            let (frontmatter, body) = source.split_at(split);
-            return format!("{frontmatter}{marker}\n{body}");
-        }
+    if let Some(rest) = source.strip_prefix("---\n")
+        && let Some(index) = rest.find("\n---\n")
+    {
+        let split = "---\n".len() + index + "\n---\n".len();
+        let (frontmatter, body) = source.split_at(split);
+        return format!("{frontmatter}{marker}\n{body}");
     }
     format!("{marker}\n{source}")
 }
@@ -346,12 +338,16 @@ mod tests {
         );
         assert!(context.managed_content.contains("name: reflect-personal"));
         assert!(context.managed_content.contains("/graphs/Personal"));
-        assert!(context
-            .managed_content
-            .contains("/Applications/Reflect.app/Contents/MacOS/reflect"));
-        assert!(context
-            .managed_content
-            .contains("git -C \"/graphs/Personal\""));
+        assert!(
+            context
+                .managed_content
+                .contains("/Applications/Reflect.app/Contents/MacOS/reflect")
+        );
+        assert!(
+            context
+                .managed_content
+                .contains("git -C \"/graphs/Personal\"")
+        );
         assert!(!context.managed_content.contains("{{"));
     }
 

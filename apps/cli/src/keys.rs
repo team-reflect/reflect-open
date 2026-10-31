@@ -5,9 +5,14 @@
 //! classify query terms the same way the app's search does, or lookups
 //! silently miss and CLI/app result orders drift.
 
-/// Trim surrounding whitespace and case-fold `value` to its match key.
+use unicode_normalization::UnicodeNormalization;
+
+/// Trim surrounding whitespace and case-fold `value` to its match key. NFC
+/// first, exactly like `foldKey`: macOS hands back NFD filenames, and a
+/// stem-derived key must equal the same name typed by hand. The shared corpus
+/// `fixtures/fold-key-parity.json` pins the two implementations together.
 pub fn fold_key(value: &str) -> String {
-    value.trim().to_lowercase()
+    value.nfc().collect::<String>().trim().to_lowercase()
 }
 
 /// Scripts written without spaces between words (Han, kana, Hangul, Thai, …).
@@ -48,16 +53,32 @@ pub fn contains_unsegmented_script(value: &str) -> bool {
 mod tests {
     use super::{contains_unsegmented_script, fold_key};
 
-    /// Parity with `foldKey` (`keys.ts`): trim + Unicode lowercase. JS
+    /// Parity with `foldKey` (`keys.ts`): NFC + trim + Unicode lowercase. JS
     /// `toLowerCase` and Rust `to_lowercase` agree on all common inputs; known
     /// divergence is limited to locale-specific edge cases (e.g. Turkish
     /// dotless-i), accepted in the Plan 14 contract.
     #[test]
     fn folds_like_the_ts_indexer() {
         assert_eq!(fold_key("  MiXeD Case  "), "mixed case");
-        assert_eq!(fold_key("Café"), "café");
         assert_eq!(fold_key("ALPHA"), "alpha");
         assert_eq!(fold_key(""), "");
+    }
+
+    /// The shared corpus (`fixtures/fold-key-parity.json`) both sides fold;
+    /// `keys.test.ts` asserts the same rows against `foldKey`.
+    #[test]
+    fn folds_the_shared_parity_corpus_like_the_ts_indexer() {
+        #[derive(serde::Deserialize)]
+        struct Row {
+            input: String,
+            key: String,
+        }
+        let raw = include_str!("../../../fixtures/fold-key-parity.json");
+        let rows: Vec<Row> = serde_json::from_str(raw).expect("valid parity corpus");
+        assert!(!rows.is_empty());
+        for row in rows {
+            assert_eq!(fold_key(&row.input), row.key, "input {:?}", row.input);
+        }
     }
 
     /// Parity with `containsUnsegmentedScript` (`search-query.ts`): the same

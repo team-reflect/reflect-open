@@ -1,10 +1,10 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { type WeekStartDay } from '@reflect/core'
-import { formatDayLabel } from '@/lib/dates'
-import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid'
-import { cn } from '@/lib/utils'
-import { useSettings } from '@/providers/settings-provider'
+import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
+import { formatDayLabel } from '@reflect/core'
+import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
 
 interface TaskScheduleGridProps {
   /** Today's live ISO date — anchors the opening month and marks "today". */
@@ -13,11 +13,6 @@ interface TaskScheduleGridProps {
   selected: string | null
   /** Pick a day as the task's due date (an ISO `YYYY-MM-DD`). */
   onPick: (isoDate: string) => void
-}
-
-/** Maps the week-start setting to date-fns' numeric convention. */
-function toWeekStartsOn(weekStartDay: WeekStartDay): 0 | 1 {
-  return weekStartDay === 'sunday' ? 0 : 1
 }
 
 /**
@@ -29,21 +24,20 @@ function toWeekStartsOn(weekStartDay: WeekStartDay): 0 | 1 {
  */
 export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridProps): ReactElement {
   const { settings } = useSettings()
-  const weekStartsOn = toWeekStartsOn(settings.weekStartDay)
   // Open on the due date's month when there is one — that's the date being
   // rescheduled — else today's.
-  const [month, setMonth] = useState(() => monthOf(selected ?? today))
-  const grid = buildMonthGrid(month, weekStartsOn)
+  const [month, setMonth] = useState(() => getYearMonth(selected ?? today))
+  const grid = buildMonthGrid(month, settings.weekStartDay)
 
   return (
     <div aria-label="Pick a date">
       <header className="flex items-center justify-between px-1 pb-1">
-        <div className="text-sm font-semibold text-text">{monthLabel(month)}</div>
+        <div className="text-sm font-semibold text-text">{formatMonthLabel(month)}</div>
         <nav className="flex items-center gap-1 text-text-muted">
           <button
             type="button"
             aria-label="Previous month"
-            onClick={() => setMonth(addMonths(month, -1))}
+            onClick={() => setMonth(addMonthsToYearMonth(month, -1))}
             className="rounded-md p-2"
           >
             <ChevronLeft className="size-4" />
@@ -51,7 +45,7 @@ export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridPr
           <button
             type="button"
             aria-label="Next month"
-            onClick={() => setMonth(addMonths(month, 1))}
+            onClick={() => setMonth(addMonthsToYearMonth(month, 1))}
             className="rounded-md p-2"
           >
             <ChevronRight className="size-4" />
@@ -59,7 +53,7 @@ export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridPr
         </nav>
       </header>
       <div className="grid grid-cols-7 text-center">
-        {weekdayLabels(weekStartsOn).map((weekday) => (
+        {getWeekdayLabels(settings.weekStartDay).map((weekday) => (
           <div key={weekday} className="py-1 text-xs font-medium text-text-muted">
             {weekday}
           </div>

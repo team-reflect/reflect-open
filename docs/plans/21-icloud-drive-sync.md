@@ -5,12 +5,10 @@ the app's iCloud container, files flow between macOS and iOS with no Reflect
 infrastructure, and **conflicts never surface as mystery duplicates**. Reflect resolves
 what it can safely resolve itself (identical content, non-overlapping edits via
 three-way merge, append-union for daily notes, key-wise frontmatter); anything it
-can't, it materializes **inside the note as the same labeled conflict markers Git sync
-already uses** — one conflict surface, one `has_conflict` projection, one review UI,
-regardless of which backend produced the conflict.
+can't, it merges at the word level. The ladder always returns text, and the same
+ladder resolves git pulls and editor saves.
 
-**Depends on:** Plan 12 (conflict markers, `has_conflict`, protected open, the review
-notice), Plan 19 (iOS target), Plan 02/04 (storage + index). **Supersedes:** the
+**Depends on:** Plan 12 (the Git merge machinery), Plan 19 (iOS target), Plan 02/04 (storage + index). **Supersedes:** the
 "file-sync providers are unsupported for sync by design" decision in Plan 12 and the
 [overview guardrails](00-overview.md) — iCloud is promoted from non-goal to the main
 consumer sync path; Git remotes remain fully supported as the power-user/backup path.
@@ -39,35 +37,24 @@ iOS Phase 1 leg); on-device verification is the release gate. What exists:
   `watch.rs` (NSMetadataQuery: `index:changed` source on iOS,
   `icloud:conflicts` signal on both). `icloud-controller.ts` mounts per
   (graph, index session) from `SyncProvider` for `…/Mobile Documents/`
-  roots; the conflict notice is label-aware (`conflictMarkerLabels`).
+  roots.
 - **Phase 3**: `src-tauri/src/conflict/` — the deterministic ladder
   (identical/whitespace → diff3 → key-wise frontmatter → guarded
-  append-union → labeled markers), shadow store with the advance rule +
-  merge-pair loop breaker, conflict archive with age/count pruning.
+  append-union → word-level merge), shadow store with the advance rule +
+  merge-pair loop breaker.
   Convergence covered by argument-order-independence tests.
-- **Phase 4**: docs ([docs/icloud-sync.md](../icloud-sync.md)); archive
-  pruning shipped with the sweep. Remaining: spike 4 (above), the two-device
+- **Phase 4**: docs ([docs/icloud-sync.md](../icloud-sync.md)). Remaining: spike 4 (above), the two-device
   manual matrix, and the deferred status-line upload/download mapping.
 
 **Explicitly not in scope:** AI-assisted conflict resolution (deferred enhancement —
 the ladder below is designed to hand it a ready-made `base/local/remote`, see
-*Deferred*); a rich side-by-side diff viewer (markers + the existing notice are the V1
-surface); Dropbox/Google Drive adapters; Windows/Android; CloudKit record sync;
+*Deferred*); a rich side-by-side diff viewer; Dropbox/Google Drive adapters; Windows/Android; CloudKit record sync;
 collaboration/shared graphs.
 
 ## Where we stand
 
 **What already exists (and is reused unchanged):**
 
-- **The whole downstream conflict pipeline.** The Git merge materializes conflicts
-  into the note as standard markers with product labels
-  (`git/merge.rs` — `<<<<<<< this device` / `>>>>>>> other device`), the indexer
-  projects `has_conflict` via `detectConflictMarkers`
-  (`packages/core/src/markdown/conflict-markers.ts`), conflicted notes open
-  protected (markers don't survive the editor round-trip), and
-  `sync-conflict-notice.tsx` resolves via `resolveConflictMarkers`
-  (ours/theirs/both). iCloud plugs into the *front* of this; nothing downstream
-  changes shape.
 - **`.reflect/` is already local-only on macOS.** `fs/io.rs::bootstrap` sets
   `NSURLUbiquitousItemIsExcludedFromSyncKey` + `NSURLIsExcludedFromBackupKey` and
   provider-ignore xattrs on `.reflect/`. The SQLite-in-a-synced-folder hazard is
@@ -119,24 +106,23 @@ All unresolved conflicts become in-note marker blocks in the exact Plan 12 gramm
 (`<<<<<<< <label>` / `=======` / `>>>>>>> <label>`), so detection, protection, and
 resolution reuse verbatim. Two iCloud-specific refinements:
 
+> **Current state:** the marker grammar below is historical. The ladder ends in a
+> word-level merge that returns text. See [icloud-sync.md](../icloud-sync.md) and
+> [git-backup-safety.md](../git-backup-safety.md) S9.
+
 - **Truthful labels.** Labels are the versions' device names from
   `NSFileVersion.localizedNameOfSavingComputer` (fallback: `this device` /
-  `other device` when unavailable). `detectConflictMarkers` already accepts any
-  label; the notice gains a small label parser so buttons read "Keep *Alex's
-  MacBook Pro*" instead of assuming sides.
+  `other device` when unavailable).
 - **Deterministic side order.** Both devices may resolve the same conflict
   concurrently (each sees itself as current — a documented iCloud behavior). Sides
   are ordered by `(modificationDate, contentHash)`, **not** by local/remote, so two
   devices independently produce byte-identical output and the conflict converges
-  instead of ping-ponging. `resolveConflictMarkers`'s `ours`/`theirs` becomes
-  "first/second block", which the label-aware notice presents honestly.
+  instead of ping-ponging.
 
 ### 3. The resolution ladder
 
-Runs in Rust, per conflicted note, first match wins. Steps 1–4 auto-resolve
-silently; step 5 flags for review. **Before any resolution write, every losing
-version's full content is archived** to `.reflect/conflict-archive/<path>/<timestamp>-<device>.md`
-(local-only, pruned by age/count) — resolution must never be the only copy-holder.
+Runs in Rust, per conflicted note, first match wins. Every step resolves
+silently.
 
 1. **Identical / whitespace-only** → keep current, mark versions resolved.
 2. **Three-way merge with the shadow base** (contract 4) → clean merge auto-applies.
@@ -151,13 +137,11 @@ version's full content is archived** to `.reflect/conflict-archive/<path>/<times
      both appended block sets, deduplicated by exact block match, ordered by
      version timestamp. Also the rule for **creation collisions**: merge
      `2026-07-04 2.md` into the canonical file (union; both seeded from the same
-     template/bullet, so the common-prefix shape holds), archive, delete the
+     template/bullet, so the common-prefix shape holds), then delete the
      duplicate.
-4. **Binary assets** → keep-both using the existing `name (conflict).ext`
-   convention from `git/merge.rs::conflict_copy_path`.
-5. **Overlapping text edits** → marker block (contract 2), `has_conflict`, protected
-   open, "Needs review" — the user resolves in the existing notice, or by editing
-   the markers out. This is the floor: *never* silent last-writer-wins, *never* a
+4. **Binary assets** → keep-both using `name (conflict <UTC time> <hash8>).ext`
+   from `conflict/copy.rs`.
+5. **Overlapping text edits** → a word-level merge that returns text. This is the floor: *never* silent last-writer-wins, *never* a
    `note 2.md` left behind.
 
 Only after the resolved content is durably written: set `resolved = true` on the
@@ -196,6 +180,8 @@ rename seam; a miss is again just a degraded merge.
   histories pushing one remote would non-FF forever). Enabling iCloud sync
   disconnects a configured Git remote (with an explanatory prompt); local
   checkpoint commits remain allowed and useful for recovery.
+
+  A graph may still hold both, see [icloud-sync.md](../icloud-sync.md).
 - **`.reflect/` exclusion goes cross-platform.** `mark_reflect_dir_local_only`
   widens from `cfg(target_os = "macos")` to Apple targets; the
   `ubiquitousItemIsExcludedFromSync` resource key exists on iOS. Verified inside
@@ -230,7 +216,7 @@ metadata query needs a run-loop thread like the EventKit change observer):
   ladder. Foreground-only, matching the existing mobile sync lifecycle: initial
   gather on launch/foreground, live updates while active, stop on background.
 - **Status:** query state maps into the existing plain-language sync status
-  (Synced / Syncing / Offline / Needs review) through the same precedence rules the
+  (Synced / Syncing / Offline) through the same precedence rules the
   mobile status line already uses.
 
 ## Phases
@@ -287,7 +273,7 @@ contract, overview/guardrail updates, Plan 12/16 pointers, `libraries.md`).
 | Both devices resolve the same conflict concurrently | Deterministic ladder → byte-identical result on both; iCloud sees agreement (or a trivially-identical conflict → step 1). |
 | Conflict arrives while the note is open + dirty | Session parks it (existing `note-session` behavior); ladder skips and retries after flush. |
 | Both devices online, simultaneous save | Each sees its own version current + the other as a conflict version; ladder runs on each; determinism converges them. |
-| Merge ladder itself crashes mid-resolution | Archive was written first; versions still unresolved → retried next cycle. Worst case: user sees the conflict version notice later, loses nothing. |
+| Merge ladder itself crashes mid-resolution | The provider versions stay unresolved and the next sweep retries them. Nothing is lost. |
 | Evicted note opened / indexed | Download-on-demand + explicit loading state; timeout → error state, never a blank overwrite. |
 | iCloud signed out / container missing | Blocking "iCloud unavailable" state with the local-copy escape hatch; no writes routed anywhere surprising. |
 | Shadow base missing/stale | Degrades to two-way (markers) / slightly more conflicts — never data loss. |

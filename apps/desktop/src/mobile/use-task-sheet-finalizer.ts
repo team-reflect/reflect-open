@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import type { OpenTask } from '@reflect/core'
-import { resolveTaskEdit, taskContent, type TaskEditResult } from '@/lib/tasks/task-content'
+import { resolveTaskEdit, type OpenTask, type TaskDraftResolution } from '@reflect/core'
 
-/** The two writes the finalizer itself performs; {@link TaskActions} satisfies it. */
+/**
+ * The two writes the finalizer itself performs; {@link TaskActions} satisfies it.
+ */
 export interface TaskSheetWriteActions {
   edit: (task: OpenTask, content: string) => void
   remove: (tasks: OpenTask[]) => void
 }
 
 export interface TaskSheetFinalizerDeps {
-  /** The task's **live** row — writes relocate by its current raw. */
+  /**
+   * The task's **live** row; writes address it by its current locator.
+   */
   task: OpenTask
   open: boolean
   onOpenChange: (open: boolean) => void
   actions: TaskSheetWriteActions
-  /** Reset sheet-local presentation (collapse the calendar) on reopen. */
+  /**
+   * Reset sheet-local presentation (collapse the calendar) on reopen.
+   */
   onReseed: () => void
   /**
    * Read the caller's live draft mirror, or null when it has nothing for the
@@ -31,16 +36,26 @@ export interface TaskSheetFinalizerDeps {
 }
 
 export interface TaskSheetFinalizer {
-  /** The editable markdown draft (the task's content after the marker). */
+  /**
+   * The editable markdown draft (the task's content after the marker).
+   */
   draft: string
   setDraft: Dispatch<SetStateAction<string>>
-  /** Resolve the draft against the frozen baseline: commit / cancel / delete. */
-  resolve: () => TaskEditResult
-  /** vaul's onOpenChange — a user dismissal finishes the visit first. */
+  /**
+   * Resolve the draft against the frozen baseline: commit / cancel / delete.
+   */
+  resolve: () => TaskDraftResolution
+  /**
+   * The drawer's onOpenChange — a user dismissal finishes the visit first.
+   */
   handleOpenChange: (open: boolean) => void
-  /** Close after an action button took over the write (no dismissal commit). */
+  /**
+   * Close after an action button took over the write (no dismissal commit).
+   */
   closeHandled: () => void
-  /** Commit a change / delete an emptied draft, then close — "Open note"'s flush. */
+  /**
+   * Commit a change / delete an emptied draft, then close — "Open note"'s flush.
+   */
   closeNavigate: () => void
 }
 
@@ -55,7 +70,7 @@ export interface TaskSheetFinalizer {
  *   over the external change.
  * - The sheet stays mounted after closing (the exit animation needs content),
  *   so **reopening reseeds everything** — baseline and draft from the row's
- *   current raw (an action may have rewritten it), the handled flag, and the
+ *   current Markdown (an action may have rewritten it), the handled flag, and the
  *   caller's presentation via `onReseed` — else a visit after Complete/
  *   Convert/Open note would silently drop its edits on dismiss.
  * - **Abandoning** (dismissal gesture, or a route change unmounting the open
@@ -74,7 +89,7 @@ export function useTaskSheetFinalizer({
   onReseed,
   readDraft,
 }: TaskSheetFinalizerDeps): TaskSheetFinalizer {
-  const liveContent = taskContent(task.raw)
+  const liveContent = task.markdown
   const [initial, setInitial] = useState(liveContent)
   const [draft, setDraft] = useState(liveContent)
   // Set once an action button has already written/closed, so the dismissal
@@ -91,12 +106,16 @@ export function useTaskSheetFinalizer({
     }
   }
 
-  /** The freshest draft available: the caller's live mirror, else the state. */
+  /**
+   * The freshest draft available: the caller's live mirror, else the state.
+   */
   const currentDraft = (): string => readDraft?.() ?? draft
 
-  const resolve = (): TaskEditResult => resolveTaskEdit(initial, currentDraft())
+  const resolve = (): TaskDraftResolution => resolveTaskEdit(initial, currentDraft())
 
-  /** Persist the draft: a real change commits, an emptied draft deletes. */
+  /**
+   * Persist the draft: a real change commits, an emptied draft deletes.
+   */
   const commitDraft = (): void => {
     const result = resolve()
     if (result.type === 'commit') {

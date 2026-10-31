@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils.ts'
 
 /** Visual severity of an {@link InlineAlert}. */
 export type InlineAlertTone = 'warning' | 'error'
@@ -16,7 +16,7 @@ interface InlineAlertProps {
 }
 
 /**
- * The in-flow alert banner used across the app (save failures, conflicts, the
+ * The in-flow alert banner used across the app (save failures, the
  * read-only notice): one place for the tone palette and the `role="alert"`
  * semantics, so every surface announces consistently to assistive tech.
  */

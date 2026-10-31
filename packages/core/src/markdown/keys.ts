@@ -8,9 +8,17 @@
  * written to the index can never drift from the keys looked up against it.
  */
 
-/** Trim surrounding whitespace and case-fold `value` to its match key. */
+/**
+ * Trim surrounding whitespace and case-fold `value` to its match key. NFC
+ * first: macOS hands back NFD filenames, and a filename-derived key must
+ * equal the same name typed by hand. Full Unicode lowering, unlike
+ * `foldGraphPath`'s ASCII-only rule: name keys are compared between humans,
+ * path keys are compared against the filesystem via Rust's byte-wise fold.
+ * Mirrored by the CLI's `fold_key`; `fixtures/fold-key-parity.json` keeps the
+ * two implementations honest.
+ */
 export function foldKey(value: string): string {
-  return value.trim().toLowerCase()
+  return value.normalize('NFC').trim().toLowerCase()
 }
 
 /**
@@ -27,7 +35,7 @@ export function foldKey(value: string): string {
  * first loose match would be worse than leaving the link unresolved.
  */
 export function foldFallbackTitleKey(value: string): string {
-  const folded = value.normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ')
+  const folded = value.normalize('NFC').trim().toLowerCase().replaceAll(/\s+/gu, ' ')
   return folded.replace(LEADING_EMOJI_RE, '').trimStart()
 }
 
@@ -37,7 +45,7 @@ export function foldFallbackTitleKey(value: string): string {
 const PICTOGRAPH = String.raw`\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*`
 const FLAG = String.raw`\p{Regional_Indicator}{2}`
 const KEYCAP = String.raw`[#*0-9]\uFE0F?\u20E3`
-const LEADING_EMOJI_RE = new RegExp(`^(?:(?:${PICTOGRAPH})|(?:${FLAG})|(?:${KEYCAP}))+\\s*`, 'u')
+const LEADING_EMOJI_RE = new RegExp(String.raw`^(?:${PICTOGRAPH}|${FLAG}|${KEYCAP})+\s*`, 'u')
 
 /**
  * Case-fold a tag name to its match key (`#Book` ≡ `#book`). The one

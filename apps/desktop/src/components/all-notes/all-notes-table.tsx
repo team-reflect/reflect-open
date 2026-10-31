@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useRef, type MouseEvent, type ReactElement } from 'react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
 import type { NoteListEntry } from '@reflect/core'
-import { type ListSelection } from '@/lib/selection/use-list-selection'
-import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
-import { ALL_NOTES_GRID, AllNotesRow } from './all-notes-row'
+import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
+import { cn } from '@/lib/utils.ts'
+import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
+import { ALL_NOTES_GRID, AllNotesRow } from './all-notes-row.tsx'
 
 interface AllNotesTableProps {
   /** `undefined` while the index query settles (renders nothing, not "empty"). */
-  notes: NoteListEntry[] | undefined
+  notes: readonly NoteListEntry[] | undefined
   /** The active tag filter, for the empty state's wording. */
   tag: string | null
   /** The shared row selection (click/keyboard); rows read their selected state from it. */
   selection: ListSelection
-  onOpen: (path: string, event?: NewWindowClickEvent) => void
+  onOpen: (path: string, event?: ModClickEvent) => void
   /**
    * Hand the screen a way to scroll a row index into view — a virtualized
    * off-screen row isn't in the DOM, so the keyboard nav can't `scrollIntoView`
@@ -44,13 +44,14 @@ export function AllNotesTable({
   const { clickSelect, isSelected } = selection
   const virtualizerRef = useRef<VirtualizerHandle>(null)
   const handleToggle = useCallback(
-    (path: string, event: Pick<MouseEvent, 'shiftKey'>) =>
+    (path: string, event: Pick<MouseEvent, 'shiftKey'>) => {
       clickSelect(
         path,
         event.shiftKey
           ? { metaKey: false, ctrlKey: false, shiftKey: true }
-          : { metaKey: true, ctrlKey: false, shiftKey: false },
-      ),
+          : { metaKey: true, ctrlKey: true, shiftKey: false },
+      )
+    },
     [clickSelect],
   )
 

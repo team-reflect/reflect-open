@@ -1,61 +1,41 @@
 # Reflect V1: "All Notes" Behavior
 
-This document describes the **All Notes** view in Reflect V1, as a reference for the
-V2 rewrite. All file paths in this document refer to the **V1 codebase**
-(`~/repos/reflect`, a Next.js + MobX-Keystone app), not this repository.
-
-For the broader product context, see [Reflect V1 Overview](./reflect-v1-overview.md).
-This document zooms into one surface: the dense, table-style list of notes.
+The **All Notes** view in Reflect V1, as a reference for the V2 rewrite. All file paths refer to
+the **V1 codebase** (`~/repos/reflect`, a Next.js + MobX-Keystone app), not this repository.
+For broader context, see [Reflect V1 Overview](./reflect-v1-overview.md).
 
 ## What It Is
 
-All Notes is a virtualized, table-style list of the graph's notes — one row per note,
-showing subject, snippet, tags, and last-edited date. It serves two roles at once:
+A virtualized, table-style list with one row per note: subject, snippet, tags, last-edited
+date. It is both:
 
-- **Library** — the canonical browseable index of every regular note.
-- **Filtered result view** — clicking a tag (anywhere in the app) opens All Notes
-  scoped to that tag; the built-in **Trash** view is the same component with a
-  different query.
+- **Library**: the browseable index of every regular note.
+- **Filtered result view**: a tag click anywhere opens All Notes scoped to that tag, and
+  **Trash** is the same component with a different query.
 
-It is one of the main screens selected by `MainScreen.NoteList`, alongside Daily,
-Tasks, Map, and Search.
+It is one of the main screens (`MainScreen.NoteList`), with Daily, Tasks, Map, and Search.
 
 ## Routing and Entry Points
 
-The view is reached through the app's route-state layer
-(`client/core/router-view.ts`), which serializes app state to/from URLs:
+`client/core/router-view.ts` serializes app state to URLs: `/g/:graphId/list` or
+`/g/:graphId/list/:query`. The route carries `noteListQuery`, and applying a route calls
+`listView.setQuery` (`router-view.ts:60`, `:105-107`).
 
-- URL shape: `/g/:graphId/list` (no filter) or `/g/:graphId/list/:query` (filtered).
-- The route carries `noteListQuery`, derived from `noteStore.listView.query`
-  (`router-view.ts:60`). Applying a route calls `listView.setQuery(noteListQuery)`
-  to restore the filter (`router-view.ts:105-107`).
+In `client/models/main/main-view.ts`: `openListScreen()` clears the filter (`:280`),
+`setAndOpenSearchQuery(query)` sets one (`:567`), and `openNotesListForTag(tag)` calls it with
+`'#' + tag` (`:572`). Every tag click routes there.
 
-Navigation methods on the main view (`client/models/main/main-view.ts`):
-
-- `openListScreen()` — switch to the list and clear any filter (`main-view.ts:280`).
-- `setAndOpenSearchQuery(query)` — set a filter and switch to the list
-  (`main-view.ts:567`).
-- `openNotesListForTag(tag)` — convenience wrapper that calls
-  `setAndOpenSearchQuery('#' + tag)` (`main-view.ts:572`). This is what tag clicks
-  throughout the app route into.
-
-The view component itself is loaded client-side only via a Next.js dynamic import
-(`client/screens/main/notes-list/notes-list-dynamic.tsx`), because it depends on
-the browser-only virtualizer and local SQLite-backed model pool.
+The component loads client-side only (`notes-list-dynamic.tsx`, a Next.js dynamic import),
+because it needs the browser-only virtualizer and the SQLite-backed model pool.
 
 ## The Query Model
 
-All list behavior is driven by a single `query` string on the
-`NoteListView` model (`client/models/note/note-list-view.desktop.ts`). The model
-is a child of `NoteStore`, and its `query` field is a plain observable string
-(`note-list-view.desktop.ts:21`).
+One `query` string on `NoteListView` (`client/models/note/note-list-view.desktop.ts:21`) drives
+the list. Setting the **same** query again does not re-filter; it scrolls to the top
+(`:125-132`), so the toolbar buttons double as "scroll to top."
 
-`setQuery` has one notable behavior: re-setting the **same** query value does not
-re-filter; it scrolls the list back to the top instead (`note-list-view.desktop.ts:125-132`).
-This makes the toolbar buttons double as "scroll to top" when already active.
-
-The query is interpreted into one of three SQL queries by the `notesQuery` getter
-(`note-list-view.desktop.ts:70-81`):
+The `notesQuery` getter (`:70-81`) maps the query to one of three `NoteStore` queries
+(`client/models/note/note-store.ts`):
 
 | `query` value        | Resolves to                          | Meaning                                  |
 | -------------------- | ------------------------------------ | ---------------------------------------- |
@@ -63,96 +43,64 @@ The query is interpreted into one of three SQL queries by the `notesQuery` gette
 | starts with `'#'`    | `tagMatchNotesQuery`                 | Undeleted notes carrying that tag        |
 | anything else (incl. `''`) | `regularNotesEditedDescQuery` | All regular (non-daily) undeleted notes  |
 
-The three backing query builders live on `NoteStore`
-(`client/models/note/note-store.ts`):
-
-- `regularNotesEditedDescQuery` — `deletedAt IS NULL` **and `isDaily = 0`**, ordered
-  by `coalesce(editedAt, updatedAt)` descending (`note-store.ts:277-279`,
-  building on `regularNotesQuery` at `:269`).
-- `tagMatchNotesQuery` — `deletedAt IS NULL` filtered by a JSON-contains match on
-  the note's `tags` column, ordered by `coalesce(editedAt, updatedAt)` descending
-  (`note-list-view.desktop.ts:60-68`).
-- `deletedNotesDescQuery` — `deletedAt IS NOT NULL`, ordered by `deletedAt`
-  descending (`note-store.ts:293-298`).
+The default and tag queries order by `coalesce(editedAt, updatedAt)` descending. The tag query
+uses a JSON-contains match on the `tags` column. Trash orders by `deletedAt`.
 
 ### Two consequences worth carrying into V2
 
-1. **Daily notes are excluded from the default list.** The unfiltered All Notes view
-   filters `isDaily = 0`, so daily notes never appear there. The **tag** and **trash**
-   queries build on `undeletedNotesQuery` / the raw table instead, so a daily note
-   *can* surface in those views if it carries a matching tag or has been deleted.
-2. **Free-text queries do not filter the list.** Any query string that does not start
-   with `#` falls through to the unfiltered `regularNotesEditedDescQuery`. The list
-   view filters by **tag and trash only** — arbitrary full-text search is the separate
-   `Cmd/Ctrl+K` search modal, not this surface. The `<h2>` header simply echoes the
-   raw `query` (or `"Notes"` when empty) and is *not* an editable search box
-   (`notes-list.tsx:59-61`).
+1. **Daily notes are excluded from the default list** (`isDaily = 0`). The tag and trash
+   queries do not apply that filter, so a tagged or deleted daily note *can* appear there.
+2. **Free-text queries do not filter the list.** A query without `#` falls through to the
+   unfiltered list. Full-text search is the separate `Cmd/Ctrl+K` modal. The `<h2>` header
+   just echoes the raw query (or `"Notes"`), and is not an editable search box.
 
 ## Data Loading and Virtualization
 
-The list renders with `react-virtuoso` at a fixed row height of 48px
-(`notes-list.tsx:84-99`). Its `data` is `listView.notes.placeholders` — an array of
-lazy **model placeholders**, not hydrated note models.
+The list uses `react-virtuoso` with 48px rows (`notes-list.tsx:84-99`). Its data is
+`listView.notes.placeholders`: lazy **model placeholders**, not hydrated notes.
+`noteStore.adapter.query(...)` returns a `ModelAdapterQuery` with `resultIds`, `count`, and
+`placeholders`. A placeholder hydrates its `Note` into the in-memory pool only when its `value`
+is observed during render, inside a MobX `<Observer>`, so the row re-renders when the model
+resolves.
 
-- `listView.notes` is `noteStore.adapter.query(this.notesQuery)`
-  (`note-list-view.desktop.ts:83-86`), which returns a `ModelAdapterQuery` exposing
-  `resultIds`, `count`, and `placeholders`.
-- Each placeholder wraps a note ID. Only when a placeholder's `value` is **observed**
-  during render does it hydrate the real `Note` model into the in-memory pool. In the
-  `itemContent` renderer, the placeholder is read inside a MobX `<Observer>`, so the
-  row re-renders once the model resolves (`notes-list.tsx:93-97`).
+So SQLite returns matching IDs cheaply, and only the visible rows hydrate, which lets very large
+graphs list fast. The cost is complexity around placeholder resolution, scroll restoration, and
+keeping derived row fields current.
 
-This is what lets the view list very large graphs without loading every note: SQLite
-returns the matching IDs cheaply, and only the ~screenful of visible rows get
-hydrated. The tradeoff (called out in the V1 overview) is added complexity around
-placeholder resolution, scroll restoration, and keeping derived row fields current.
-
-Scroll position is tracked on the model via `scrollIndex` / `scrollIndexCounter`
-(`note-list-view.desktop.ts:22-23`). When the view has focus, an effect scrolls the
-target index into view — smoothly for small jumps, instantly for jumps over 20 rows
-(`notes-list.tsx:22-32`). Selecting a note also scrolls it into view
-(`note-list-view.desktop.ts:149-155`, `:261`).
+`scrollIndex` / `scrollIndexCounter` track scroll position. With focus, an effect scrolls the
+target into view: smoothly for small jumps, instantly for jumps over 20 rows
+(`notes-list.tsx:22-32`). Selecting a note also scrolls to it.
 
 ## Row Rendering (Columns)
 
-Each row is a `NotesListItem` (`client/screens/main/notes-list/notes-list-item.tsx`).
-The fixed header row labels four columns (`notes-list.tsx:73-81`):
+Each row is a `NotesListItem` (`notes-list-item.tsx`):
 
 | Column      | Source field          | Notes                                                                 |
 | ----------- | --------------------- | --------------------------------------------------------------------- |
 | **Subject** | `note.title`          | Unaliased subject, or `"Untitled"`; truncated (`note.ts:412-415`)     |
 | **Snippet** | `note.snippet`        | First content line, truncated to 70 chars (`note.ts:508-511`)         |
-| **Tags**    | `note.tags`           | Rendered as `#a, #b` (`notes-list-item.tsx:78-80`)                     |
+| **Tags**    | `note.tags`           | Rendered as `#a, #b`                                                  |
 | **Updated** | `note.editedAtFormatted` | Relative date using the user's date/time prefs (`note.ts:535-540`) |
 
-A circular selection indicator sits in a 48px gutter on the left, revealed on hover
-and filled when the row is selected (`notes-list-item.tsx:36-59`). Selected rows get an
-indigo background and border (`notes-list-item.tsx:26-34`).
+A circular selection indicator in a 48px left gutter shows on hover and fills when selected.
+Selected rows get an indigo background and border.
 
 ## Selection and Keyboard Navigation
 
-Selection is fully modeled on `NoteListView`, which tracks three pieces of state as
-note references (`note-list-view.desktop.ts:16-20`):
-
-- `selectedNoteRefs` — the current selection set.
-- `lastSelectedNoteRef` — the most recently selected row (the cursor for arrow nav).
-- `lastSelectedNotSpanNoteRef` — the anchor for shift-range selection; it stays put
-  while a span grows or shrinks (`note-list-view.desktop.ts:175-182`).
+`NoteListView` models selection as note references (`note-list-view.desktop.ts:16-20`):
+`selectedNoteRefs` (the set), `lastSelectedNoteRef` (the arrow-nav cursor), and
+`lastSelectedNotSpanNoteRef` (the shift-range anchor, fixed while a span grows or shrinks).
 
 ### Mouse
 
-- **Click a row** → `selectOperation` with `toggle = metaKey`, `span = shiftKey`
-  (`notes-list-item.tsx:18-24`). Plain click selects exclusively; ⌘/Ctrl-click
-  toggles one row; Shift-click selects a contiguous range from the anchor
-  (`note-list-view.desktop.ts:210-254`).
-- **Click the indicator gutter** → `checkOperation`: toggle, or Shift to range-select
-  (`notes-list-item.tsx:36-45`, `note-list-view.desktop.ts:228-234`).
-- **Click the subject / double-click a row** → open the note in the editor
-  (`notes-list-item.tsx:25`, `:62`; `note-list-view.desktop.ts:198-200`).
+- **Click a row**: plain click selects exclusively, ⌘/Ctrl-click toggles, Shift-click selects a
+  range from the anchor (`note-list-view.desktop.ts:210-254`).
+- **Click the gutter**: toggle, or Shift for a range.
+- **Click the subject, or double-click a row**: open the note.
 
 ### Keyboard
 
-Hotkeys are active only while the list screen has focus (`notes-list.tsx:34-53`):
+Active only while the list has focus (`notes-list.tsx:34-53`):
 
 | Keys                       | Action                                                    |
 | -------------------------- | --------------------------------------------------------- |
@@ -160,88 +108,56 @@ Hotkeys are active only while the list screen has focus (`notes-list.tsx:34-53`)
 | `Shift+↑` / `Shift+↓`      | Extend the range selection up/down                        |
 | `Enter` / `Cmd+Enter`      | Open the first selected note in the editor                |
 
-Arrow navigation is `selectDirection`, which resolves the next placeholder and either
-selects it exclusively or extends the span (`note-list-view.desktop.ts:316-335`).
-`Enter` maps to `editSelected`, which opens the first note in the selection
-(`note-list-view.desktop.ts:202-208`).
-
-Range selection (`selectSpan`) must resolve the placeholders inside the range to real
-models before it can build the selection (`note-list-view.desktop.ts:290-314`); a
-`TODO` there notes the intent to store IDs rather than `Ref<Note>`s to avoid that.
+Range selection (`selectSpan`, `:290-314`) must resolve the placeholders in the range to real
+models first. A `TODO` there wants to store IDs instead of `Ref<Note>`s to avoid that.
 
 ## Toolbar
 
-The header's right side holds three controls (`notes-list.tsx:64-68`):
-
 ### New Note button
 
-`NewNoteButton` calls `mainView.createAndEditNote()`
-(`new-note-button.tsx:18`), which creates a note and opens it in the editor. The note
-is added to the adapter immediately and force-saved
-(`note-store.ts:542-565`). The shown shortcut adapts to platform — `⌘N` on Electron,
-`⌃⌘N` on Apple web, `⌃⌥N` elsewhere (`new-note-button.tsx:22-24`).
+`NewNoteButton` calls `mainView.createAndEditNote()`, which adds the note to the adapter at once,
+force-saves it, and opens it (`note-store.ts:542-565`). The shortcut is `⌘N` on Electron, `⌃⌘N`
+on Apple web, and `⌃⌥N` elsewhere.
 
 ### Tags toggle (filter buttons)
 
-`TagsToggle` is a button group of fixed filters plus a custom-tag dropdown
-(`client/screens/main/notes-list/tags/tags-toggle.tsx`):
+`TagsToggle` (`notes-list/tags/tags-toggle.tsx`) holds fixed filters: **All** (`''`), **Books**
+(`#book`), **Links** (`#link`), **People** (`#person`), **Trash** (`#trash`), and a **Custom ▾**
+dropdown. Books, Links, and People are the "filterable" system tags
+(`client/models/tag/constants.ts`).
 
-- **All** → `setQuery('')` (`tags-toggle.tsx:34-40`)
-- **Books** → `#book`, **Links** → `#link`, **People** → `#person`
-  (`tags-toggle.tsx:42-61`). These three are the "filterable" system tags
-  (`tags/types.ts`, constants in `client/models/tag/constants.ts`).
-- **Trash** → `#trash` (`tags-toggle.tsx:63-68`)
-- **Custom ▾** → opens a dropdown of all other tags (`tags-toggle.tsx:70-84`)
-
-The **Custom** dropdown (`tags/tags-list-dropdown.tsx`) lists every graph tag except
-the three system tags, sorted alphabetically (`tags-list-dropdown.tsx:19-21`), with a
-"No custom tags" empty state (`tags-list-dropdown.tsx:42-44`). Each entry is a
-`TagListItem` showing the tag name and a live count of notes carrying it
-(`tags/tag-list-item-view.ts:21-33`). Clicking it sets the query to `#<tag>`
-(`tag-list-item-view.ts:46-48`); an inline ✕ deletes the tag from the graph after a
-confirm step (`tag-list-item-view.ts:40-53`, `tags/confirm-tag-delete.tsx`).
+The Custom dropdown (`tags-list-dropdown.tsx`) lists every other tag alphabetically, with a "No
+custom tags" empty state. Each entry shows a live note count. Clicking sets the query to
+`#<tag>`. An inline ✕ deletes the tag from the graph after a confirm step.
 
 ### Action menu (bulk operations)
 
-`ActionMenu` renders only when at least one note is selected
-(`action-menu/action-menu.tsx:11-15`). Its button shows the selection count —
-`Selected (N)` — and opens a single-item menu (`action-menu.tsx:26`, `:40-56`):
-
-- In a normal view, the item reads **"Trash selected notes"** and soft-deletes them.
-- In the Trash view, it reads **"Delete selected notes"** and permanently destroys them.
-
-The label flips on `selectedNotesAreTrashed`, i.e. whether every selected note is
-already deleted (`note-list-view.desktop.ts:100-103`, `action-menu.tsx:51-54`).
+`ActionMenu` shows only with a selection. Its button reads `Selected (N)` and opens one item:
+**"Trash selected notes"** (soft delete) in a normal view, or **"Delete selected notes"**
+(permanent) when every selected note is already deleted (`selectedNotesAreTrashed`).
 
 ## Delete, Trash, and Restore
 
-`deleteSelectedNotes` branches on the current query (`note-list-view.desktop.ts:184-196`):
+`deleteSelectedNotes` (`note-list-view.desktop.ts:184-196`) branches on the query:
 
-- **Outside Trash** → `noteStore.deleteNotes(selected)`: a **soft delete** that stamps
-  `deletedAt` on each note and unpublishes any public links, then syncs up
-  (`note-store.ts:523-532`). The notes leave All Notes and appear under Trash.
-- **Inside Trash** (`query === '#trash'`) → after a `confirm('Destroy selected notes
-  forever?')`, `noteStore.destroyNotes(selected)` **permanently deletes** them via
-  `syncUp.deleteMany` (`note-list-view.desktop.ts:189-192`, `note-store.ts:538-540`).
+- **Outside Trash**: `noteStore.deleteNotes` stamps `deletedAt`, unpublishes public links, and
+  syncs up (`note-store.ts:523-532`). The notes move to Trash.
+- **Inside Trash**: after `confirm('Destroy selected notes forever?')`, `destroyNotes` deletes
+  them permanently via `syncUp.deleteMany`.
 
-Note a V1 gap: the Trash view's only bulk action is permanent destruction. There is no
-**restore** affordance in this UI — recovering a trashed note would require clearing
-its `deletedAt` through another path.
+V1 gap: Trash has no **restore** in this UI. Recovering a note needs clearing `deletedAt`
+another way.
 
-> **V2 decision (supersedes the original "V2 should add restore" note here):** V2
-> deletes to the **OS-native trash** instead of a `deletedAt` soft-delete, so it ships
-> *no* in-app Trash view and *no* Restore action — the OS handles both, and a restored
-> `.md` re-indexes itself back into the list. See
+> **V2 decision (supersedes the original "V2 should add restore" note):** V2 deletes to the
+> **OS-native trash** instead of a `deletedAt` soft delete. It ships *no* in-app Trash view and
+> *no* Restore action: the OS handles both, and a restored `.md` re-indexes itself. See
 > [TDR 0004](./decisions/0004-all-notes-trash-and-tag-scope.md).
 
 ## Empty States and Counts
 
-- The header `<h2>` shows the raw query or `"Notes"`; it does not show a note count
-  (`notes-list.tsx:57-62`).
-- There is no dedicated empty-state component. When the query yields zero placeholders,
-  the virtualizer simply renders blank space below the column header.
-- A live count *does* exist per tag in the custom-tag dropdown
-  (`tag-list-item-view.ts:31-33`), but not for the list as a whole.
+The header shows the raw query or `"Notes"`, with no note count. There is no empty-state
+component: zero results render blank space under the column header. Only the custom-tag dropdown
+shows counts.
 
 ## Key Files
 
@@ -249,7 +165,6 @@ its `deletedAt` through another path.
 | ------------------------------- | ------------------------------------------------------------------- |
 | List screen + virtualization    | `client/screens/main/notes-list/notes-list.tsx`                     |
 | Row rendering                   | `client/screens/main/notes-list/notes-list-item.tsx`                |
-| Client-only dynamic import      | `client/screens/main/notes-list/notes-list-dynamic.tsx`             |
 | New-note button                 | `client/screens/main/notes-list/new-note-button.tsx`                |
 | Bulk action menu                | `client/screens/main/notes-list/action-menu/action-menu.tsx`        |
 | Tag filter toolbar + dropdown   | `client/screens/main/notes-list/tags/`                              |
@@ -258,21 +173,16 @@ its `deletedAt` through another path.
 | Derived row fields (title/snippet/date) | `client/models/note/note.ts`                                |
 | Route serialization             | `client/core/router-view.ts`                                        |
 | List navigation methods         | `client/models/main/main-view.ts`                                   |
-| System tag constants            | `client/models/tag/constants.ts`                                    |
 
 ## Notes for V2
 
-- The list filters by **tag and trash only**; treat free-text search as a separate
-  surface. If V2 wants a searchable library, design the query model to actually apply
-  text queries rather than silently dropping them.
-- The **daily-note exclusion** in the default view is deliberate — All Notes is the
-  index of *regular* notes. Decide explicitly whether V2's library includes dailies.
-- The placeholder/model-pool indirection exists to virtualize large graphs against a
-  local index. V2's projection should expose the same "IDs cheap, hydrate on demand"
-  shape so the list scales without loading every note.
-- ~~Add a real **restore from trash** action; V1 only supports permanent destruction
-  from the Trash view.~~ **Declined** — V2 deletes to the OS-native trash, which owns
-  browse + restore; see [TDR 0004](./decisions/0004-all-notes-trash-and-tag-scope.md).
-- The V1 "Custom" dropdown's inline **delete-a-tag** affordance is **not** ported:
-  tags are derived from note bodies, so removing a tag means editing it out of the
-  notes; see [TDR 0004](./decisions/0004-all-notes-trash-and-tag-scope.md).
+- The list filters by **tag and trash only**. If V2 wants a searchable library, its query model
+  must apply text queries instead of silently dropping them.
+- The **daily-note exclusion** is deliberate: All Notes indexes *regular* notes. Decide
+  explicitly whether V2's library includes dailies.
+- The placeholder/model-pool indirection virtualizes large graphs against a local index. V2's
+  projection should keep the same "IDs cheap, hydrate on demand" shape.
+- **Restore from trash: declined.** V2 deletes to the OS-native trash, which owns browse and
+  restore ([TDR 0004](./decisions/0004-all-notes-trash-and-tag-scope.md)).
+- The Custom dropdown's inline **delete-a-tag** is **not** ported: tags come from note bodies,
+  so removing a tag means editing it out of the notes (same TDR).

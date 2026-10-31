@@ -1,0 +1,88 @@
+name: Publish Linux
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag (v<version>) created by release-please
+        required: true
+        type: string
+      commit:
+        description: Immutable commit targeted by the release tag.
+        required: true
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+
+concurrency:
+  group: publish-linux
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  linux:
+    name: Build Linux ${{ matrix.name }}
+    if: github.repository == 'team-reflect/reflect-open'
+    environment: release_app
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each runner's host triple is the build target, so no extra rustup
+        # target and no cross-compilation. Ubuntu 24.04 is the oldest release
+        # that can link the prebuilt ONNX Runtime, which needs glibc 2.38 and
+        # the libstdc++ of GCC 14.
+        include:
+          - name: x64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - name: arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+
+      # Any master job can write the caches, so a release build starts cold.
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: false
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache: false
+
+      - name: Build Linux packages
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: pnpm build:linux --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/linux-artifacts"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reflect-linux-${{ matrix.name }}
+          path: ${{ runner.temp }}/linux-artifacts/*
+          if-no-files-found: error
+          # The AppImage and the `.deb` are already compressed; zipping them
+          # again wastes minutes for nothing.
+          compression-level: 0
+          retention-days: 30
+
+      # Uploads clobber, so a failed run can be retried.
+      - name: Upload the assets to the draft release
+        working-directory: ${{ runner.temp }}/linux-artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" ./* --clobber

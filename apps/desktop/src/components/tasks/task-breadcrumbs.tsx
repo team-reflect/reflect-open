@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils.ts'
 
 interface TaskBreadcrumbsProps {
   /** The context's display labels ({@link TaskContext.visibleBreadcrumbs}); empty renders nothing. */

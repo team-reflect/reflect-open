@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tabRootFor } from './mobile-tab-bar'
+import { tabRootFor } from './mobile-tab-bar.tsx'
 
 describe('tabRootFor', () => {
   it('maps tab roots and leaves stacked screens tabless', () => {

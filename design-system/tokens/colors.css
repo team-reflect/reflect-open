@@ -17,31 +17,31 @@
 
 :root {
   /* ---- Brand / Indigo ramp (the one accent) -------------- */
-  --indigo-50:  #eef2ff;
+  --indigo-50: #eef2ff;
   --indigo-100: #e0e7ff;
   --indigo-200: #c7d2fe;
   --indigo-300: #a5b4fc;
   --indigo-400: #818cf8;
-  --indigo-500: #6366f1;  /* dark-mode brand */
-  --indigo-600: #4f46e5;  /* PRIMARY brand — every solid button */
+  --indigo-500: #6366f1; /* dark-mode brand */
+  --indigo-600: #4f46e5; /* PRIMARY brand — every solid button */
   --indigo-700: #4338ca;
   --indigo-800: #3730a3;
   --indigo-900: #312e81;
 
-  --brand:          var(--indigo-600);
-  --brand-hover:    var(--indigo-500);
+  --brand: var(--indigo-600);
+  --brand-hover: var(--indigo-500);
   --brand-foreground: #ffffff;
 
   /* ---- Marketing purple (the "deep space" glow) ---------- */
-  --purple-glow:    #712fff;   /* core button / accent glow   */
-  --purple-light:   #9465ff;   /* radial hero light           */
-  --purple-haze:    #cfb8ff;   /* hairline glass borders      */
-  --purple-text:    #f4f0ff;   /* button label on dark        */
-  --space-black:    #030014;   /* site background base        */
-  --space-black-2:  #080808;   /* alt site background         */
+  --purple-glow: #712fff; /* core button / accent glow   */
+  --purple-light: #9465ff; /* radial hero light           */
+  --purple-haze: #cfb8ff; /* hairline glass borders      */
+  --purple-text: #f4f0ff; /* button label on dark        */
+  --space-black: #030014; /* site background base        */
+  --space-black-2: #080808; /* alt site background         */
 
   /* ---- Cool grey ramp (UI neutrals) ---------------------- */
-  --coolgray-50:  #f9fafb;
+  --coolgray-50: #f9fafb;
   --coolgray-100: #f3f4f6;
   --coolgray-200: #e5e7eb;
   --coolgray-300: #d1d5db;
@@ -53,59 +53,57 @@
   --coolgray-900: #111827;
 
   /* Bluish "cool" greys used for chrome & deep dark surfaces */
-  --bluegray-50:  #f8fafc;
+  --bluegray-50: #f8fafc;
   --bluegray-100: #f1f5f9;
   --bluegray-500: #64748b;
-  --near-white:   #e5e7eb;   /* dark-mode primary text        */
+  --near-white: #e5e7eb; /* dark-mode primary text        */
 
   /* ---- Functional / semantic ----------------------------- */
-  --red-500:      #ef4444;   /* destructive                   */
-  --green-500:    #22c55e;   /* success                       */
-  --amber-500:    #f59e0b;   /* warning                       */
+  --red-500: #ef4444; /* destructive                   */
+  --green-500: #22c55e; /* success                       */
+  --amber-500: #f59e0b; /* warning                       */
 
   /* ============================================================
      SEMANTIC ALIASES — light (default) app theme
      ============================================================ */
-  --surface:          #ffffff;            /* cards, editor canvas        */
-  --surface-sunken:   var(--coolgray-50); /* sidebar, rails              */
-  --surface-app:      #f8fafa;            /* whole-app background        */
-  --surface-hover:    rgba(229,231,235,.5);/* menu/list hover (gray-200/50)*/
-  --surface-active:   rgba(229,231,235,.5);/* today's calendar square     */
-  --surface-inverse:  hsl(222.2 47.4% 11.2%);/* selected calendar square  */
+  --surface: #ffffff; /* cards, editor canvas        */
+  --surface-sunken: var(--coolgray-50); /* sidebar, rails              */
+  --surface-app: #f8fafa; /* whole-app background        */
+  --surface-hover: rgba(229, 231, 235, 0.5); /* menu/list hover (gray-200/50)*/
+  --surface-active: rgba(229, 231, 235, 0.5); /* today's calendar square     */
+  --surface-inverse: hsl(222.2 47.4% 11.2%); /* selected calendar square  */
 
-  --text:             var(--coolgray-900);/* primary copy                */
-  --text-secondary:   var(--coolgray-500);/* note titles, meta           */
-  --text-muted:       var(--coolgray-400);/* placeholders, shortcuts     */
-  --text-on-brand:    #ffffff;
-  --text-on-inverse:  hsl(210 40% 98%);   /* number on selected square   */
+  --text: var(--coolgray-900); /* primary copy                */
+  --text-secondary: var(--coolgray-500); /* note titles, meta           */
+  --text-muted: var(--coolgray-400); /* placeholders, shortcuts     */
+  --text-on-brand: #ffffff;
+  --text-on-inverse: hsl(210 40% 98%); /* number on selected square   */
 
-  --border:           var(--coolgray-100);/* hairline dividers           */
-  --border-strong:    rgba(11,19,36,.15); /* input outlines              */
-  --input-bg:         #ffffff;
+  --border: var(--coolgray-100); /* hairline dividers           */
+  --border-strong: rgba(11, 19, 36, 0.15); /* input outlines              */
+  --input-bg: #ffffff;
 
-  --accent:           var(--brand);
-  --accent-hover:     var(--brand-hover);
-  --accent-soft:      var(--indigo-100);  /* secondary button bg         */
+  --accent: var(--brand);
+  --accent-hover: var(--brand-hover);
+  --accent-soft: var(--indigo-100); /* secondary button bg         */
   --accent-soft-text: var(--indigo-700);
 
-  --focus-ring:       var(--indigo-500);
-  --destructive:      var(--red-500);
+  --focus-ring: var(--indigo-500);
+  --destructive: var(--red-500);
 
-  --radius:           0.5rem;             /* 8px — the house radius      */
+  --radius: 0.5rem; /* 8px — the house radius      */
 
   /* Shadows */
-  --shadow-input: 0 1px 2px rgba(0,0,0,.05);
-  --shadow-sm:    0 1px 2px rgba(11,19,36,.06);
-  --shadow-md:    0 4px 12px rgba(11,19,36,.08);
-  --shadow-pop:   0 8px 28px rgba(11,19,36,.16);
-  --border-hairline: 0 1px 0 rgba(11,19,36,.05);  /* shadow-border-b */
+  --shadow-input: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px rgba(11, 19, 36, 0.06);
+  --shadow-md: 0 4px 12px rgba(11, 19, 36, 0.08);
+  --shadow-pop: 0 8px 28px rgba(11, 19, 36, 0.16);
+  --border-hairline: 0 1px 0 rgba(11, 19, 36, 0.05); /* shadow-border-b */
   /* V1's layered search-field shadow (boxShadow['app-input']) */
   --shadow-app-input:
-    0 1px 0 -1px rgba(0,0,0,.05),
-    0 1px 1px -1px rgba(0,0,0,.05),
-    0 1px 2px -1px rgba(0,0,0,.05),
-    0 2px 4px -2px rgba(0,0,0,.05),
-    0 3px 6px -3px rgba(0,0,0,.05);
+    0 1px 0 -1px rgba(0, 0, 0, 0.05), 0 1px 1px -1px rgba(0, 0, 0, 0.05),
+    0 1px 2px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05),
+    0 3px 6px -3px rgba(0, 0, 0, 0.05);
 }
 
 /* ============================================================
@@ -113,35 +111,33 @@
    Deep navy, indigo-500 brand, near-white text.
    ============================================================ */
 .dark {
-  --surface:          #0b1020;
-  --surface-sunken:   rgba(31,41,55,.3);
-  --surface-app:      #0a0f1e;            /* hsl(224 49% 8%)             */
-  --surface-hover:    rgba(255,255,255,.03);
-  --surface-active:   rgba(55,65,81,.5);  /* gray-700/50                 */
-  --surface-inverse:  var(--indigo-500);
+  --surface: #0b1020;
+  --surface-sunken: rgba(31, 41, 55, 0.3);
+  --surface-app: #0a0f1e; /* hsl(224 49% 8%)             */
+  --surface-hover: rgba(255, 255, 255, 0.03);
+  --surface-active: rgba(55, 65, 81, 0.5); /* gray-700/50                 */
+  --surface-inverse: var(--indigo-500);
 
-  --text:             var(--near-white);
-  --text-secondary:   var(--coolgray-400);
-  --text-muted:       var(--coolgray-500);
-  --text-on-inverse:  hsl(210 40% 98%);
+  --text: var(--near-white);
+  --text-secondary: var(--coolgray-400);
+  --text-muted: var(--coolgray-500);
+  --text-on-inverse: hsl(210 40% 98%);
 
-  --border:           rgba(255,255,255,.06);
-  --border-strong:    rgba(255,255,255,.05);
-  --input-bg:         rgba(255,255,255,.05);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.05);
+  --input-bg: rgba(255, 255, 255, 0.05);
 
-  --accent:           var(--indigo-500);
-  --accent-hover:     var(--indigo-400);
-  --accent-soft:      var(--indigo-900);
+  --accent: var(--indigo-500);
+  --accent-hover: var(--indigo-400);
+  --accent-soft: var(--indigo-900);
   --accent-soft-text: #ffffff;
 
-  --focus-ring:       var(--indigo-500);
-  --border-hairline:  0 1px 0 rgba(255,255,255,.05);
+  --focus-ring: var(--indigo-500);
+  --border-hairline: 0 1px 0 rgba(255, 255, 255, 0.05);
   --shadow-app-input:
-    0 1px 0 -1px rgba(0,0,0,.10),
-    0 1px 1px -1px rgba(0,0,0,.10),
-    0 1px 2px -1px rgba(0,0,0,.10),
-    0 2px 4px -2px rgba(0,0,0,.10),
-    0 3px 6px -3px rgba(0,0,0,.10);
+    0 1px 0 -1px rgba(0, 0, 0, 0.1), 0 1px 1px -1px rgba(0, 0, 0, 0.1),
+    0 1px 2px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1),
+    0 3px 6px -3px rgba(0, 0, 0, 0.1);
 }
 
 /* ============================================================
@@ -149,11 +145,11 @@
    Apply .reflect-space to a full-bleed wrapper.
    ============================================================ */
 .reflect-space {
-  --surface-app:    var(--space-black);
-  --text:           #ffffff;
-  --text-secondary: rgba(255,255,255,.62);
-  --text-muted:     rgba(255,255,255,.40);
-  --border:         rgba(255,255,255,.08);
-  --glass-bg:       rgba(255,255,255,.02);
-  --glass-border:   rgba(255,255,255,.08);
+  --surface-app: var(--space-black);
+  --text: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.62);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.02);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }

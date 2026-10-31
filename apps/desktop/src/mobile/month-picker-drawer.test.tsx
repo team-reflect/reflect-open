@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MonthPickerDrawer } from './month-picker-drawer'
+import { page, userEvent } from 'vitest/browser'
+import { describe, expect, it, vi } from 'vitest'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { MonthPickerDrawer } from './month-picker-drawer.tsx'
 
 /**
  * The month title's picker sheet: a year pager over a twelve-month grid.
@@ -10,21 +10,21 @@ import { MonthPickerDrawer } from './month-picker-drawer'
  * month, and the selection/today months carry the strip's markings.
  */
 
-// vaul needs browser APIs jsdom doesn't provide (matchMedia, pointer
+// The drawer needs browser APIs jsdom doesn't provide (matchMedia, pointer
 // capture); its drag/animation is verified on-device. This passthrough
 // honours `open` so open/close behavior stays testable.
-vi.mock('@/components/ui/drawer', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
-    open ? <div data-testid="drawer">{children}</div> : null,
+vi.mock('@/components/ui/drawer.tsx', () => ({
+  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) => {
+    return open ? <div data-testid="drawer">{children}</div> : null
+  },
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
-afterEach(cleanup)
-
-function mount(overrides: Partial<Parameters<typeof MonthPickerDrawer>[0]> = {}) {
+async function mount(overrides: Partial<Parameters<typeof MonthPickerDrawer>[0]> = {}) {
   const onPick = vi.fn()
-  const view = render(
+  const view = await renderInApp(
     <MonthPickerDrawer
       open
       onOpenChange={() => {}}
@@ -39,49 +39,46 @@ function mount(overrides: Partial<Parameters<typeof MonthPickerDrawer>[0]> = {})
 }
 
 describe('MonthPickerDrawer', () => {
-  it('opens on the header month’s year with the selection and today marked', () => {
-    mount()
+  it('opens on the header month’s year with the selection and today marked', async () => {
+    await mount()
 
-    expect(screen.getByText('2026')).toBeTruthy()
-    const months = screen.getAllByRole('button', { name: /2026$/ })
+    await expect.element(page.getByText('2026')).toBeVisible()
+    const months = page.getByRole('button', { name: /2026$/ }).elements()
     expect(months).toHaveLength(12)
-    expect(
-      screen.getByRole('button', { name: 'June 2026' }).getAttribute('aria-pressed'),
-    ).toBe('true')
-    expect(
-      screen.getByRole('button', { name: 'July 2026' }).getAttribute('aria-current'),
-    ).toBe('date')
+    await expect
+      .element(page.getByRole('button', { name: 'June 2026' }))
+      .toHaveAttribute('aria-pressed', 'true')
+    await expect
+      .element(page.getByRole('button', { name: 'July 2026' }))
+      .toHaveAttribute('aria-current', 'date')
   })
 
   it('picks a month of the shown year', async () => {
-    const user = userEvent.setup()
-    const { onPick } = mount()
+    const { onPick } = await mount()
 
-    await user.click(screen.getByRole('button', { name: 'September 2026' }))
+    await userEvent.click(page.getByRole('button', { name: 'September 2026' }))
     expect(onPick).toHaveBeenCalledWith('2026-09')
   })
 
   it('pages years without navigating, then picks in the browsed year', async () => {
-    const user = userEvent.setup()
-    const { onPick } = mount()
+    const { onPick } = await mount()
 
-    await user.click(screen.getByRole('button', { name: 'Previous year' }))
-    await user.click(screen.getByRole('button', { name: 'Previous year' }))
-    expect(screen.getByText('2024')).toBeTruthy()
+    await userEvent.click(page.getByRole('button', { name: 'Previous year' }))
+    await userEvent.click(page.getByRole('button', { name: 'Previous year' }))
+    await expect.element(page.getByText('2024')).toBeVisible()
     expect(onPick).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'March 2024' }))
+    await userEvent.click(page.getByRole('button', { name: 'March 2024' }))
     expect(onPick).toHaveBeenCalledWith('2024-03')
   })
 
   it('reopens on the header month’s year, not the last browsed one', async () => {
-    const user = userEvent.setup()
-    const { view } = mount()
+    const { view } = await mount()
 
-    await user.click(screen.getByRole('button', { name: 'Next year' }))
-    expect(screen.getByText('2027')).toBeTruthy()
+    await userEvent.click(page.getByRole('button', { name: 'Next year' }))
+    await expect.element(page.getByText('2027')).toBeVisible()
 
-    view.rerender(
+    await view.rerender(
       <MonthPickerDrawer
         open={false}
         onOpenChange={() => {}}
@@ -91,9 +88,9 @@ describe('MonthPickerDrawer', () => {
         onPick={() => {}}
       />,
     )
-    expect(screen.queryByTestId('drawer')).toBeNull()
+    await expect.element(page.getByTestId('drawer')).not.toBeInTheDocument()
 
-    view.rerender(
+    await view.rerender(
       <MonthPickerDrawer
         open
         onOpenChange={() => {}}
@@ -103,6 +100,6 @@ describe('MonthPickerDrawer', () => {
         onPick={() => {}}
       />,
     )
-    expect(screen.getByText('2026')).toBeTruthy()
+    await expect.element(page.getByText('2026')).toBeVisible()
   })
 })

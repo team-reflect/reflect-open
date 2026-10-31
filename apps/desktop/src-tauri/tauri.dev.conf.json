@@ -5,6 +5,7 @@
   "app": {
     "windows": [
       {
+        "create": false,
         "title": "Reflect Dev",
         "width": 1300,
         "height": 650,
@@ -21,10 +22,14 @@
       "icons-dev/128x128.png",
       "icons-dev/128x128@2x.png",
       "icons-dev/icon.icns",
-      "icons-dev/icon.ico"
+      "icons-dev/icon.ico",
+      "icons-dev/Assets.car"
     ],
     "macOS": {
-      "entitlements": "Entitlements.dev.plist"
+      "entitlements": "Entitlements.dev.plist",
+      "files": {
+        "embedded.provisionprofile": null
+      }
     }
   },
   "plugins": {

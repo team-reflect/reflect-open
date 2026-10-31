@@ -1,56 +1,49 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  calendarAuthorizationStatus,
-  dayRange,
   displayEvents,
-  hasBridge,
-  listCalendarEvents,
-  listCalendars,
-  subscribeCalendarChanged,
   type CalendarEvent,
   type CalendarInfo,
   type CalendarAuthorizationStatus,
-  type Unlisten,
 } from '@reflect/core'
-import { isMacosDesktop } from '@/lib/platform'
-import { useSettings } from '@/providers/settings-provider'
+import { showsDayEvents } from '@reflect/app'
+import { queryKeys } from '@/lib/query-client.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
+import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
- * TanStack Query hooks over the calendar bindings
+ * TanStack Query hooks over `CalendarEventsService`
  * (docs/porting/calendar-meetings-integration.md). Events are fetched live —
  * nothing is cached beyond the query layer, and nothing is indexed.
  */
 
-/** Prefix key for every calendar query — the change-event invalidation target. */
-export const CALENDAR_QUERY_PREFIX = ['calendar'] as const
-
-export const CALENDAR_AUTH_QUERY_KEY = ['calendar', 'authorization'] as const
-
-export const CALENDAR_LIST_QUERY_KEY = ['calendar', 'calendars'] as const
-
-/** Whether calendar queries can run at all in this environment. */
-export function calendarAvailable(): boolean {
-  return hasBridge() && isMacosDesktop
+/**
+ * Whether calendar queries can run at all in this environment.
+ */
+function useCalendarAvailable(): boolean {
+  const { calendarEvents } = useAppServices()
+  return calendarEvents.isAvailable()
 }
 
 /**
- * The macOS calendar permission state (never prompts). The state changes
- * behind Reflect's back in System Settings, so this query opts out of the
- * app-wide defaults (`staleTime: Infinity`, no focus refetch — right for
- * invalidation-driven index reads, wrong here) and re-checks every time the
- * window regains focus: exactly the "flip it in System Settings and come
- * back" path.
+ * The macOS calendar permission state (never prompts). While `enabled`, the
+ * service re-checks it every time the window turns visible: exactly the
+ * "flip it in System Settings and come back" path.
  */
-export function useCalendarAuthorization(enabled: boolean): CalendarAuthorizationStatus | undefined {
-  const query = useQuery({
-    queryKey: CALENDAR_AUTH_QUERY_KEY,
-    queryFn: calendarAuthorizationStatus,
-    enabled: enabled && calendarAvailable(),
-    staleTime: 0,
-    refetchOnWindowFocus: 'always',
-  })
-  return query.data
+export function useCalendarAuthorization(
+  enabled: boolean,
+): CalendarAuthorizationStatus | undefined {
+  const { calendarEvents } = useAppServices()
+  const available = useCalendarAvailable()
+  const { authorization } = useServiceState(calendarEvents, calendarEvents.getState)
+  useEffect(() => {
+    if (!enabled || !available) {
+      return
+    }
+    return calendarEvents.watchAuthorization()
+  }, [available, calendarEvents, enabled])
+  return authorization ?? undefined
 }
 
 export interface CalendarsResult {
@@ -62,12 +55,16 @@ export interface CalendarsResult {
   isLoaded: boolean
 }
 
-/** Every calendar on the Mac, for the Settings section's checkbox list. */
+/**
+ * Every calendar on the Mac, for the Settings section's checkbox list.
+ */
 export function useCalendars(enabled: boolean): CalendarsResult {
+  const { calendarEvents } = useAppServices()
+  const available = useCalendarAvailable()
   const query = useQuery({
-    queryKey: CALENDAR_LIST_QUERY_KEY,
-    queryFn: listCalendars,
-    enabled: enabled && calendarAvailable(),
+    queryKey: queryKeys.calendar.calendars,
+    queryFn: () => calendarEvents.listCalendars(),
+    enabled: enabled && available,
   })
   return useMemo(
     () => ({ calendars: query.data ?? [], isLoaded: query.isSuccess }),
@@ -83,24 +80,19 @@ export function useCalendars(enabled: boolean): CalendarsResult {
  */
 export function useDayEvents(date: string): CalendarEvent[] {
   const { settings } = useSettings()
-  const enabled =
-    settings.calendarEnabled && settings.calendarIds.length > 0 && calendarAvailable()
+  const { calendarEvents } = useAppServices()
+  const available = useCalendarAvailable()
+  const enabled = showsDayEvents(settings) && available
   const query = useQuery({
-    queryKey: ['calendar', 'events', date, settings.calendarIds],
-    queryFn: () => {
-      const range = dayRange(date)
-      return listCalendarEvents(range.start, range.end, settings.calendarIds)
-    },
+    queryKey: queryKeys.calendar.events(date, settings.calendarIds),
+    queryFn: () => calendarEvents.listDayEvents(date, settings.calendarIds),
     enabled,
     staleTime: 60_000,
   })
   // Gate on `enabled`, not just the cache: the query keeps its last payload
   // after the integration is switched off, and stale meetings must not
   // linger in the sidebar.
-  return useMemo(
-    () => (enabled ? displayEvents(query.data ?? []) : []),
-    [enabled, query.data],
-  )
+  return useMemo(() => (enabled ? displayEvents(query.data ?? []) : []), [enabled, query.data])
 }
 
 /**
@@ -110,24 +102,14 @@ export function useDayEvents(date: string): CalendarEvent[] {
  */
 export function useCalendarChangeInvalidation(enabled: boolean): void {
   const queryClient = useQueryClient()
+  const { calendarEvents } = useAppServices()
+  const available = useCalendarAvailable()
   useEffect(() => {
-    if (!enabled || !calendarAvailable()) {
+    if (!enabled || !available) {
       return
     }
-    let unlisten: Unlisten | null = null
-    let disposed = false
-    void subscribeCalendarChanged(() => {
-      void queryClient.invalidateQueries({ queryKey: CALENDAR_QUERY_PREFIX })
-    }).then((stop) => {
-      if (disposed) {
-        stop()
-      } else {
-        unlisten = stop
-      }
+    return calendarEvents.subscribeChanged(() => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all })
     })
-    return () => {
-      disposed = true
-      unlisten?.()
-    }
-  }, [enabled, queryClient])
+  }, [available, calendarEvents, enabled, queryClient])
 }

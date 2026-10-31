@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_BULLET_SEED, editorBodyWithDefaultBullet } from './default-bullet'
+import { EMPTY_BULLET_SEED, editorBodyWithDefaultBullet } from './default-bullet.ts'
 
 describe('editorBodyWithDefaultBullet', () => {
   it('seeds an empty body with a bullet when the setting is on', () => {

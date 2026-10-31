@@ -1,13 +1,16 @@
 /**
  * Pure ranking for `[[` autocomplete (Plan 07): merges title and alias matches
- * from the index into one ordered candidate list. The SQL layer (`queries.ts`)
- * only guarantees "contains the query somewhere"; the ordering policy — exact
- * before prefix before substring, titles before aliases, recent before stale —
- * lives here where it can be unit-tested without a database.
+ * from the index into one ordered candidate list. The SQL layer
+ * (`suggestion-service.ts`) admits rows containing the query, plus titles the
+ * search index matches once accents are dropped; the ordering policy — exact
+ * before word start before mid-word, much-linked before rarely linked, titles
+ * before aliases, recent before stale — lives here where it can be unit-tested
+ * without a database.
  */
 
-import { foldKey } from '../markdown/keys'
-import type { DateSuggestion } from './date-suggestions'
+import { foldKey } from '../markdown/keys.ts'
+import { displayNoteTitle, wikiLinkTargetForTitle } from '../markdown/note-title.ts'
+import type { DateSuggestion } from './date-suggestion-types.ts'
 
 /**
  * Marks a suggestion the date generator synthesised from a fuzzy query and
@@ -21,20 +24,78 @@ export interface GeneratedDate {
   phrase: string
 }
 
-/** A `[[` autocomplete candidate. */
+/** A ranked note/date suggestion used by navigation and autocomplete surfaces. */
 export interface WikiSuggestion {
-  /** What `[[…]]` should contain when chosen (the canonical title, or an ISO date). */
+  /** Canonical resolution target (a linkable title form, or an ISO date). */
   target: string
   /** The note it resolves to — `null` for a daily whose file doesn't exist yet. */
   path: string | null
   /** Display title (for dailies this is the ISO date; hosts format it). */
   title: string
-  /** Set when the match came in via an alias (display as "alias → title"). */
+  /** Set for an alias hit; shown in the menu and preserved as the link's display text. */
   alias: string | null
   /** Set on daily-note suggestions. */
   date: string | null
   /** Set only on rows the date generator synthesised; see {@link GeneratedDate}. */
-  generated?: GeneratedDate
+  generated?: GeneratedDate | undefined
+}
+
+/**
+ * The alias worth naming beside a suggestion's displayed title: the matched
+ * alias unless it only repeats that title (a `//` title's first segment is
+ * also one of its aliases).
+ */
+export function aliasHint(suggestion: Pick<WikiSuggestion, 'alias' | 'title'>): string | null {
+  const { alias, title } = suggestion
+  return alias !== null && foldKey(alias) !== foldKey(displayNoteTitle(title)) ? alias : null
+}
+
+/**
+ * A selectable `[[` autocomplete suggestion. `insertText` is present only after
+ * the query layer has verified that clicking its parsed target opens `path`:
+ * the target has exactly one claimant in its winning resolution tier, so the
+ * read resolver and the ambiguity-refusing writable resolver agree on it.
+ * Consequently, a note with no safe, unambiguous textual address is not
+ * selectable.
+ */
+export interface WikiLinkSuggestion extends WikiSuggestion {
+  /** Validated text to place inside `[[…]]`. */
+  insertText: string
+}
+
+const WIKI_LINK_RESERVED_CHARACTERS = /[[\]|\\\r\n]/u
+
+/**
+ * Whether `text` survives being written inside `[[…]]`. Stricter than
+ * {@link wikiLinkSafe}, which strips the delimiters but leaves a backslash
+ * alone: text that `wikiLinkSafe` cleaned can still fail here, and a caller
+ * embedding a title in a link must fail closed rather than write it anyway.
+ */
+export function isWikiLinkSafeText(text: string): boolean {
+  return !WIKI_LINK_RESERVED_CHARACTERS.test(text)
+}
+
+/**
+ * Serialize one textual wiki-link address and optional display label.
+ *
+ * Wiki-link syntax has no way to preserve its delimiters, and Markdown consumes
+ * backslash escapes before extraction, so either makes the original address
+ * unrepresentable and returns `null`. In particular, callers must never clean a
+ * target and pretend it still identifies the same note: changing the target
+ * changes its folded resolution key.
+ */
+export function serializeWikiSuggestionAddress(
+  target: string,
+  display: string | null,
+): string | null {
+  if (
+    target.trim() === '' ||
+    !isWikiLinkSafeText(target) ||
+    (display !== null && !isWikiLinkSafeText(display))
+  ) {
+    return null
+  }
+  return display === null ? target : `${target}|${display}`
 }
 
 /** One `notes` row considered for suggestion (a title match or recency fill). */
@@ -44,6 +105,8 @@ export interface TitleCandidate {
   titleKey: string
   dailyDate: string | null
   mtime: number
+  /** How many wiki links in the graph name a spelling this note claims. */
+  linkCount: number
 }
 
 /** One `aliases ⋈ notes` row (an alias match). */
@@ -52,28 +115,83 @@ export interface AliasCandidate extends TitleCandidate {
   aliasKey: string
 }
 
-/** Lower ranks first: exact (0) < prefix (1) < substring (2); 3 = recency fill. */
+const WORD_CHARACTER_AT_END = /[\p{L}\p{N}]$/u
+
+/** Whether `key` occurs in `candidateKey` at the start of a word. */
+function matchesWordStart(key: string, candidateKey: string): boolean {
+  let index = candidateKey.indexOf(key)
+  while (index !== -1) {
+    if (!WORD_CHARACTER_AT_END.test(candidateKey.slice(0, index))) {
+      return true
+    }
+    index = candidateKey.indexOf(key, index + 1)
+  }
+  return false
+}
+
+/**
+ * Lower ranks first: exact (0) < word start (2) < mid-word (3) < not in the
+ * title as typed, e.g. an accent-insensitive search-index hit (4); 5 = empty
+ * query. Rank 1 is left for an exact alias hit.
+ */
 function matchRank(key: string, candidateKey: string): number {
   if (key === '') {
-    return 3
+    return 5
   }
   if (candidateKey === key) {
     return 0
   }
-  return candidateKey.startsWith(key) ? 1 : 2
+  if (matchesWordStart(key, candidateKey)) {
+    return 2
+  }
+  return candidateKey.includes(key) ? 3 : 4
+}
+
+/**
+ * Link counts on a log scale: 0, 1, 2-3, 4-7, 8-15, and so on. Counts in one
+ * bucket are treated as equally used, so recency decides between them.
+ */
+function computeUsageBucket(linkCount: number): number {
+  return 32 - Math.clz32(linkCount)
 }
 
 interface Scored {
   suggestion: WikiSuggestion
-  score: number
+  rank: number
+  usage: number
+  isAlias: boolean
   mtime: number
 }
 
 /**
- * Merge and order candidates for `key` (the case-folded query). Alias hits
- * rank just behind the equivalent title hit, ties break on file recency, and a
- * note appears once — its best-scoring entry wins (so a note whose title *and*
- * alias both match shows as the plain title row).
+ * One candidate scored for ranking. The target is the note's linkable form
+ * ({@link wikiLinkTargetForTitle}), not the raw title: for a rich title the
+ * two differ, and only the linkable form can live inside `[[…]]`. A matched
+ * alias byte-identical to the target is the derived linkable-form row
+ * matching itself (projection writes it with exactly this function's output),
+ * so it collapses to `null`; without that, address serialization would emit
+ * a self-referential `Meeting with Ada|Meeting with Ada`. The comparison is
+ * deliberately exact, not fold-based: an authored alias differing only by
+ * case is a real display preference and keeps its promised text.
+ */
+function toScored(row: TitleCandidate, matchedAlias: string | null, rank: number): Scored {
+  const target = row.dailyDate ?? wikiLinkTargetForTitle(row.title)
+  const alias = matchedAlias === target ? null : matchedAlias
+  return {
+    suggestion: { target, path: row.path, title: row.title, alias, date: row.dailyDate },
+    rank,
+    usage: computeUsageBucket(row.linkCount),
+    isAlias: matchedAlias !== null,
+    mtime: row.mtime,
+  }
+}
+
+/**
+ * Merge and order candidates for `key` (the case-folded query): match rank
+ * first, then the more-linked note, then a title hit before an alias hit, then
+ * file recency. Usage ranks inside a match rank, never across one, so a fully
+ * typed title keeps the top slot. A note appears once, as its best entry (so a
+ * note whose title *and* alias both match shows as the plain title row).
  */
 export function rankWikiSuggestions(
   key: string,
@@ -82,37 +200,21 @@ export function rankWikiSuggestions(
   limit: number,
 ): WikiSuggestion[] {
   const scored: Scored[] = [
-    ...titles.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: null,
-        date: row.dailyDate,
-      },
-      // ×2 leaves room for the alias penalty between match ranks.
-      score: matchRank(key, row.titleKey) * 2,
-      mtime: row.mtime,
-    })),
-    ...aliases.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: row.alias,
-        date: row.dailyDate,
-      },
-      score: matchRank(key, row.aliasKey) * 2 + 1,
-      mtime: row.mtime,
-    })),
+    ...titles.map((row) => toScored(row, null, matchRank(key, row.titleKey))),
+    // An exact title is a stronger claim on the query than an exact alias,
+    // whatever their usage.
+    ...aliases.map((row) => toScored(row, row.alias, matchRank(key, row.aliasKey) || 1)),
   ]
 
-  scored.sort(
-    (a, b) =>
-      a.score - b.score ||
+  scored.sort((a, b) => {
+    return (
+      a.rank - b.rank ||
+      b.usage - a.usage ||
+      Number(a.isAlias) - Number(b.isAlias) ||
       b.mtime - a.mtime ||
-      a.suggestion.title.localeCompare(b.suggestion.title),
-  )
+      a.suggestion.title.localeCompare(b.suggestion.title)
+    )
+  })
 
   const seen = new Set<string>()
   const result: WikiSuggestion[] = []
@@ -173,17 +275,19 @@ export function mergeDateSuggestions(
       title: date,
       alias: null,
       date,
-      ...(generated === undefined ? {} : { generated }),
+      generated,
     }
   })
 
   const rest = ranked.filter((suggestion) => !reused.has(suggestion))
-  const exactIndex = rest.findIndex(
-    (suggestion) =>
+  const exactIndex = rest.findIndex((suggestion) => {
+    return (
       foldKey(suggestion.target) === options.key ||
-      (suggestion.alias !== null && foldKey(suggestion.alias) === options.key),
-  )
-  const exact = exactIndex >= 0 ? rest[exactIndex] : undefined
+      foldKey(suggestion.title) === options.key ||
+      (suggestion.alias !== null && foldKey(suggestion.alias) === options.key)
+    )
+  })
+  const exact = rest[exactIndex]
   const ordered = exact
     ? [exact, ...dateRows, ...rest.filter((_, index) => index !== exactIndex)]
     : [...dateRows, ...rest]

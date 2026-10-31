@@ -1,5 +1,6 @@
-import { parseBody } from './grammar'
-import { parseInlineLink } from './link-syntax'
+import { parseBody } from './grammar.ts'
+import { parseInlineLink } from './link-syntax.ts'
+import { isWikiNodeName, wikiBracketStart } from './wiki-nodes.ts'
 
 /**
  * Inline scanning for the editor (Plan 05). The editor decorates `[[wiki
@@ -20,41 +21,6 @@ export interface InlineWikiLink {
   /** Span of the display text (the alias when present, else the target). */
   displayFrom: number
   displayTo: number
-}
-
-/** One `![alt](src)` image occurrence within a scanned text. */
-export interface InlineImage {
-  /** Span of the whole `![…](…)`, offsets relative to the scanned text. */
-  from: number
-  to: number
-  alt: string
-  src: string
-}
-
-/**
- * Find every inline image in a block's text content. Offsets are relative to
- * the input string; the caller maps them into document positions. Source
- * decomposition is shared with the indexer (`link-syntax.ts`), so the editor
- * renders exactly what the index records.
- */
-export function scanInlineImages(text: string): InlineImage[] {
-  if (!text.includes('![')) {
-    return []
-  }
-  const images: InlineImage[] = []
-  parseBody(text).iterate({
-    enter: (node) => {
-      if (node.name !== 'Image') {
-        return true
-      }
-      const parsed = parseInlineLink(text.slice(node.from, node.to))
-      if (parsed?.isImage) {
-        images.push({ from: node.from, to: node.to, alt: parsed.text, src: parsed.href })
-      }
-      return false
-    },
-  })
-  return images
 }
 
 /**
@@ -81,8 +47,9 @@ export function scanInlineSegments(text: string): InlineSegment[] {
   const found: Array<{ from: number; to: number; segment: InlineSegment }> = []
   parseBody(text).iterate({
     enter: (node) => {
-      const { name, from, to } = node
-      if (name === 'WikiLink') {
+      const { name, to } = node
+      if (isWikiNodeName(name)) {
+        const from = wikiBracketStart(node)
         const inner = text.slice(from + 2, to - 2)
         const pipe = inner.indexOf('|')
         const target = (pipe === -1 ? inner : inner.slice(0, pipe)).trim()
@@ -90,6 +57,7 @@ export function scanInlineSegments(text: string): InlineSegment[] {
         found.push({ from, to, segment: { kind: 'wikiLink', target, alias } })
         return false
       }
+      const { from } = node
       if (name === 'Link' || name === 'Image') {
         const parsed = parseInlineLink(text.slice(from, to))
         if (parsed === null) {
@@ -102,7 +70,7 @@ export function scanInlineSegments(text: string): InlineSegment[] {
       // autolinks as `Autolink`. (URLs *inside* a Link/Autolink are never reached
       // — we don't recurse into those.) Both render as their own link.
       if (name === 'URL' || name === 'Autolink') {
-        const href = text.slice(from, to).replace(/^<|>$/g, '')
+        const href = text.slice(from, to).replaceAll(/^<|>$/g, '')
         found.push({ from, to, segment: { kind: 'link', text: href, href } })
         return false
       }
@@ -137,10 +105,11 @@ export function scanInlineWikiLinks(text: string): InlineWikiLink[] {
   const links: InlineWikiLink[] = []
   parseBody(text).iterate({
     enter: (node) => {
-      if (node.name !== 'WikiLink') {
+      if (!isWikiNodeName(node.name)) {
         return true
       }
-      const { from, to } = node
+      const { to } = node
+      const from = wikiBracketStart(node)
       const inner = text.slice(from + 2, to - 2)
       const pipe = inner.indexOf('|')
       const target = (pipe === -1 ? inner : inner.slice(0, pipe)).trim()

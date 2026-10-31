@@ -1,9 +1,8 @@
+import { GraphChooser } from '@/components/graph-chooser.tsx'
+import { GraphWorkspace } from '@/components/graph-workspace.tsx'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
 import { useEffect, type ReactElement } from 'react'
-import { GraphChooser } from '@/components/graph-chooser'
-import { GraphWorkspace } from '@/components/graph-workspace'
-import { installQuitFlush } from '@/lib/quit-flush'
-import { isMainWindow } from '@/lib/windows/window-role'
-import { useGraph } from '@/providers/graph-provider'
 
 /**
  * Root component — the Plan 02 loading gate. Routes between the graph chooser
@@ -11,15 +10,15 @@ import { useGraph } from '@/providers/graph-provider'
  * (daily notes, search, AI) hang off the workspace in later plans.
  */
 export function App(): ReactElement {
-  const { status, graph, error } = useGraph()
+  const { quitPolicy, window } = useAppServices()
+  const { graph, status, error } = useGraph()
 
-  // Quit-time persistence: flush dirty note buffers before the webview dies
-  // (secondary-window close, ⌘Q, reload) or the macOS main window hides.
-  // Unmount effects don't run on those paths. installQuitFlush returns its
-  // teardown, which the effect returns as cleanup.
+  // Quit-time persistence: flush dirty note buffers when exiting, awaiting
+  // persistence before destruction but hiding the macOS main window first.
+  // Unmount effects don't run on those paths.
   useEffect(() => {
-    return installQuitFlush()
-  }, [])
+    return quitPolicy.installDesktopQuitPolicy()
+  }, [quitPolicy])
 
   if (status === 'ready' && graph) {
     return <GraphWorkspace graph={graph} />
@@ -29,7 +28,7 @@ export function App(): ReactElement {
     // A secondary note window never chooses: opening a graph from here would
     // re-root every other window. Landing in this state means its bootstrap
     // failed (e.g. it raced a graph switch) — say so and stop.
-    if (!isMainWindow()) {
+    if (!window.isMainWindow()) {
       return (
         <div className="flex h-screen w-screen flex-col items-center justify-center gap-1 px-8 text-center text-sm text-text-muted">
           <p>This window couldn’t open the graph. Close it and reopen from the main window.</p>

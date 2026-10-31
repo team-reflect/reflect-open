@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react'
 import { foldTag, type NoteTagFacet } from '@reflect/core'
-import { useSettings } from '@/providers/settings-provider'
-import { CustomFilterMenu } from './custom-filter-menu'
-import { FilterTab } from './filter-tab'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { CustomFilterMenu } from './custom-filter-menu.tsx'
+import { FilterTab } from './filter-tab.tsx'
 
 interface AllNotesFiltersProps {
   /** The active tag filter (`null` = the All tab). */

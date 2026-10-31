@@ -25,10 +25,10 @@ export function useArrivalFocus({
   target,
   selectText = false,
 }: ArrivalFocusOptions): void {
-  const seenSeq = useRef<number | null>(null)
+  const seenSeqRef = useRef<number | null>(null)
   useEffect(() => {
-    const newArrival = seenSeq.current !== arrivalSeq
-    seenSeq.current = arrivalSeq
+    const newArrival = seenSeqRef.current !== arrivalSeq
+    seenSeqRef.current = arrivalSeq
     if (newArrival && arrivalFocusEditor) {
       const element = target.current
       element?.focus()

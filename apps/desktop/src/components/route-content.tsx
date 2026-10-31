@@ -1,14 +1,26 @@
-import type { ReactElement } from 'react'
-import { AllNotesScreen } from '@/components/all-notes/all-notes-screen'
-import { ChatScreen } from '@/components/chat/chat-screen'
-import { DailyStream } from '@/components/daily-stream'
-import { SearchRoute } from '@/components/search-route'
-import { SingleNoteView } from '@/components/single-note-view'
-import { SettingsNavigator } from '@/components/settings/settings-navigator'
-import { SettingsScreen } from '@/components/settings-screen'
-import { TasksScreen } from '@/components/tasks/tasks-screen'
-import { useRouter } from '@/routing/router'
-import { ScrollRestored } from '@/routing/scroll-restore'
+import { lazy, Suspense, type ReactElement } from 'react'
+import { DailyStream } from '@/components/daily-stream.tsx'
+import { LoadingScreen } from '@/components/loading-screen.tsx'
+import { SearchRoute } from '@/components/search-route.tsx'
+import { SingleNoteView } from '@/components/single-note-view.tsx'
+import { useRouter } from '@/routing/router.tsx'
+
+const AllNotesScreen = lazy(async () => {
+  const { AllNotesScreen } = await import('@/components/all-notes/all-notes-screen.tsx')
+  return { default: AllNotesScreen }
+})
+const ChatScreen = lazy(async () => {
+  const { ChatScreen } = await import('@/components/chat/chat-screen.tsx')
+  return { default: ChatScreen }
+})
+const SettingsRoute = lazy(async () => {
+  const { SettingsRoute } = await import('@/components/settings/settings-route.tsx')
+  return { default: SettingsRoute }
+})
+const TasksScreen = lazy(async () => {
+  const { TasksScreen } = await import('@/components/tasks/tasks-screen.tsx')
+  return { default: TasksScreen }
+})
 
 /**
  * The route → view mapping (Plan 06): the single place a {@link Route} kind
@@ -20,7 +32,7 @@ import { ScrollRestored } from '@/routing/scroll-restore'
  * today tracking so route arrivals and the highlighted current day use the
  * same clock.
  */
-export function RouteContent(): ReactElement {
+function RouteContentBody(): ReactElement {
   const { route } = useRouter()
   switch (route.kind) {
     case 'today':
@@ -45,23 +57,20 @@ export function RouteContent(): ReactElement {
       // Owns its scroll container (the message list pins to the bottom while
       // streaming), so no ScrollRestored wrapper — same shape as All Notes.
       return <ChatScreen />
+    // The graph-switcher and licenses routes are mobile settings sub-screens.
+    // On desktop, graph switching lives in the sidebar footer and licenses
+    // open in a dialog, so both render as settings.
     case 'graphs':
-    // The graph-switcher route is a mobile settings sub-screen; on desktop
-    // graph switching lives in the sidebar footer, so it renders as settings.
+    case 'licenses':
     case 'settings':
-      // The section navigator floats in the left gutter — absolutely
-      // positioned off the centered column so the column never shifts — and
-      // only renders when the container query says the gutter can fit it:
-      // the 42rem column plus a 12rem rail either side, with a little slack.
-      return (
-        <ScrollRestored className="@container h-full overflow-auto px-6 py-8">
-          <div className="relative mx-auto w-full max-w-2xl">
-            <div className="absolute inset-y-0 right-full hidden w-48 pr-8 @min-[68rem]:block">
-              <SettingsNavigator className="sticky top-8" />
-            </div>
-            <SettingsScreen />
-          </div>
-        </ScrollRestored>
-      )
+      return <SettingsRoute />
   }
+}
+
+export function RouteContent(): ReactElement {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <RouteContentBody />
+    </Suspense>
+  )
 }

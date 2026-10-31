@@ -1,70 +1,49 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { GraphInfo } from '@reflect/core'
+import { describe, expect, it, vi } from 'vitest'
+import { createTestAppServices } from '@reflect/app/testing'
 import {
-  dispatchDeepLink,
-  resetDeepLinkIntakeForTests,
-} from '@/lib/deep-links/intake'
-
-const resolveNoteTarget = vi.hoisted(() => vi.fn())
-const captureInboxSpool = vi.hoisted(() => vi.fn(async () => {}))
-const navigate = vi.hoisted(() => vi.fn())
-const navigation = vi.hoisted(() => ({ revision: 0 }))
-const operationHandle = vi.hoisted(() => ({
-  progress: vi.fn(),
-  done: vi.fn(),
-  warn: vi.fn(),
-  fail: vi.fn(),
-  dismiss: vi.fn(),
-}))
-
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  resolveNoteTarget,
-  captureInboxSpool,
-}))
-vi.mock('@/lib/operations', () => ({
-  startOperation: vi.fn(() => operationHandle),
-}))
-vi.mock('@/routing/router', () => ({
-  useRouter: () => ({ navigate, navigationRevision: () => navigation.revision }),
-}))
-
-import { DeepLinkProvider } from './deep-link-provider'
-
-const GRAPH: GraphInfo = { root: '/g', name: 'g', generation: 7 }
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  resetDeepLinkIntakeForTests()
-  navigation.revision = 0
-})
-
-afterEach(() => {
-  cleanup()
-  resetDeepLinkIntakeForTests()
-})
+  createTestCoreServices,
+  createTestCaptureInboxService,
+  createTestDeepLinkIntakeService,
+  createTestGraphSessionService,
+} from '@reflect/core/testing'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { DeepLinkProvider } from './deep-link-provider.tsx'
 
 describe('DeepLinkProvider navigation intent integration', () => {
   it('keeps a deferred note resolution current when a capture arrives', async () => {
-    let finishResolution: (path: string) => void = () => {}
-    resolveNoteTarget.mockReturnValue(
-      new Promise((resolve) => {
-        finishResolution = resolve
+    const pendingResolution = Promise.withResolvers<string>()
+    const { indexQuery } = createTestCoreServices({ database: createWasmTestDatabaseService() })
+    const resolveNoteTarget = vi
+      .spyOn(indexQuery, 'resolveNoteTarget')
+      .mockImplementation(() => pendingResolution.promise)
+    const captureInbox = createTestCaptureInboxService()
+    const graphSession = createTestGraphSessionService()
+    const core = createTestCoreServices({
+      database: createWasmTestDatabaseService(),
+      captureInbox,
+      graphSession,
+      deepLinkIntake: createTestDeepLinkIntakeService({
+        indexQuery,
+        captureInbox,
+        graphSession,
       }),
-    )
-    render(<DeepLinkProvider graph={GRAPH}>{null}</DeepLinkProvider>)
+    })
+    const appServices = createTestAppServices(core)
+    await renderInApp(<DeepLinkProvider>{null}</DeepLinkProvider>, { core, appServices })
 
-    dispatchDeepLink('reflect://note/Project%20X')
+    appServices.deepLinkRouter.dispatch('reflect://note/Project%20X')
     expect(resolveNoteTarget).toHaveBeenCalledWith('Project X')
 
-    dispatchDeepLink('reflect://append?text=captured%20while%20resolving')
-    await waitFor(() => expect(captureInboxSpool).toHaveBeenCalledTimes(1))
+    appServices.deepLinkRouter.dispatch('reflect://append?text=captured%20while%20resolving')
+    await vi.waitFor(() => expect(core.captureInbox.spooled()).toHaveLength(1))
 
-    finishResolution('notes/project-x.md')
+    pendingResolution.resolve('notes/project-x.md')
 
-    await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith({ kind: 'note', path: 'notes/project-x.md' }),
-    )
+    await vi.waitFor(() => {
+      expect(appServices.navigation.navigations().map((call) => call.route)).toEqual([
+        { kind: 'note', path: 'notes/project-x.md' },
+      ])
+    })
   })
 })

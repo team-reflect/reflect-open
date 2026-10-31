@@ -40,7 +40,7 @@ Rust-side enforcement that meaningfully constrains that back down (see
 The index lives in Rust. The frontend reads it by compiling Kysely `SELECT`s to
 `{ sql, params }` and shipping them over `db_query`, which executes them against
 a `rusqlite::Connection` and rejects anything that isn't `Statement::readonly`
-([`apps/desktop/src-tauri/src/db/query.rs:49`](../../apps/desktop/src-tauri/src/db/query.rs),
+([`crates/index/src/query.rs:49`](../../crates/index/src/query.rs),
 test `db_query_rejects_mutating_statements`). The Kysely IPC dialect
 deliberately throws on `beginTransaction`/`commit`/`rollback`
 ([`packages/db/src/dialect.ts:59`](../../packages/db/src/dialect.ts)) — there is
@@ -54,15 +54,17 @@ Every write:
    lock so they swap atomically on graph open).
 2. **Generation-gates**: `if state.generation != generation { return Ok(()) }` —
    a write issued for a now-superseded graph silently no-ops.
-3. Runs its row logic (in [`write.rs`](../../apps/desktop/src-tauri/src/db/write.rs),
-   [`chat_write.rs`](../../apps/desktop/src-tauri/src/db/chat_write.rs),
-   [`embed_write.rs`](../../apps/desktop/src-tauri/src/db/embed_write.rs)) inside
+3. Runs its row logic (in [`write.rs`](../../crates/index/src/write.rs),
+   [`chat_write.rs`](../../crates/index/src/chat_write.rs),
+   [`embed_write.rs`](../../crates/index/src/embed_write.rs)) inside
    **one transaction**.
 
 The TS side calls these through typed wrappers
-([`packages/core/src/indexing/commands.ts`](../../packages/core/src/indexing/commands.ts),
-[`packages/core/src/ai/chat/store.ts`](../../packages/core/src/ai/chat/store.ts),
-[`packages/core/src/embeddings/commands.ts`](../../packages/core/src/embeddings/commands.ts)),
+(`packages/core/src/indexing/commands.ts`, `packages/core/src/ai/chat/store.ts`,
+`packages/core/src/embeddings/commands.ts`; today these are
+[`indexing/index-store-service.ts`](../../packages/core/src/indexing/index-store-service.ts),
+[`ai/chat/chat-history-service.ts`](../../packages/core/src/ai/chat/chat-history-service.ts) and
+[`embeddings/embedding-index-service.ts`](../../packages/core/src/embeddings/embedding-index-service.ts)),
 each passing a payload that a hand-written serde struct on the Rust side
 deserializes. The payload contract is mirrored by hand on both sides — the code
 says so explicitly:
@@ -187,7 +189,7 @@ read-then-write logic inside that transaction. Three commands need exactly that:
 - **`embed_apply` (`apply_chunks`)** — `SELECT` the note's existing chunk rows,
   then in a loop decide keep/insert/delete by content hash, calling
   `last_insert_rowid()` to wire each new vector to its chunk
-  ([`embed_write.rs:44`](../../apps/desktop/src-tauri/src/db/embed_write.rs)).
+  ([`embed_write.rs:44`](../../crates/index/src/embed_write.rs)).
   This is irreducibly read-then-write with control flow and rowid sequencing. It
   *cannot* be a static statement array. Could the diff move to TS? Only by
   reading existing chunks over `db_query`, computing the diff in TS, then sending

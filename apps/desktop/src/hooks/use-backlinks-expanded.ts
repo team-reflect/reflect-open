@@ -1,4 +1,4 @@
-import { useSessionFlag } from '@/lib/use-session-flag'
+import { useSessionFlag } from '@/lib/use-session-flag.ts'
 
 /** Session-wide (all notes) expanded state, old Reflect's `backlinks-expanded`. */
 const EXPANDED_STORAGE_KEY = 'reflect.backlinks-expanded'

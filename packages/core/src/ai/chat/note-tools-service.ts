@@ -1,0 +1,482 @@
+import type { MaybePromise } from '@reflect/utils'
+import type {
+  Tool,
+  ToolExecutionOptions,
+  TypedToolCall,
+  TypedToolResult,
+} from '@reflect/modules/ai'
+import { z } from 'zod'
+import type { RetrievalService, RetrieveOptions } from '../../embeddings/retrieval-service.ts'
+import type { AssetPrivacyService } from '../../assets/asset-privacy-service.ts'
+import type { NoteFileService } from '../../graph/note-file-service.ts'
+import type { AssetReferences } from '../../indexing/asset-refs.ts'
+import type { NoteListService, RecentNoteRow } from '../../indexing/note-list-service.ts'
+import type { DailyNoteRow, DailyNotesRange } from '../../daily/daily-note-service.ts'
+import { isTagName } from '../../markdown/extract.ts'
+import type {
+  CloudNoteListing,
+  CloudSearchHit,
+  CloudSendable,
+  PrivacyService,
+} from '../../privacy/privacy-service.ts'
+import type { CloudSafe } from '../../privacy/cloud-safe.ts'
+import type { XArchiveService } from '../../embeds/x-archive-service.ts'
+import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets.ts'
+import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes.ts'
+
+/**
+ * The read-only note tools the chat model can call (Plan 10, first wave),
+ * and — deliberately in the same module — everything else that knows their
+ * names: the {@link NoteToolCall}/{@link NoteToolResult} unions the engine
+ * streams and the UI renders, and the mappers from SDK stream parts onto
+ * them. Adding a tool means registering it here (batch executors live in
+ * sibling `read-*.ts` modules) and extending the chip that renders it;
+ * nothing else switches on tool names.
+ *
+ * Note content enters tool outputs only as {@link CloudSafe} values, minted
+ * by the injected `PrivacyService` — search drops private hits entirely, and
+ * reads re-check the live frontmatter before any content is minted.
+ */
+
+/**
+ * Default and ceiling for search hits per call (token budget, not recall).
+ */
+const DEFAULT_SEARCH_LIMIT = 8
+const MAX_SEARCH_LIMIT = 20
+
+/**
+ * Default and ceiling for recent-note listings per call.
+ */
+const DEFAULT_RECENT_LIMIT = 10
+const MAX_RECENT_LIMIT = 20
+
+/**
+ * Most days one daily-range call returns; past it the model narrows the range.
+ */
+export const MAX_DAILY_NOTE_DAYS = 31
+
+/**
+ * What {@link NoteToolsService.build} takes.
+ */
+export interface BuildNoteToolsOptions {
+  /**
+   * Whether note search can use embeddings for meaning-based recall. When
+   * false, `search_notes` stays lexical so disabled semantic search is honored.
+   */
+  semanticSearchEnabled: boolean
+  /**
+   * The file generation of the graph session the tools read from.
+   */
+  generation: number
+}
+
+export interface SearchNotesOutput {
+  hits: CloudSafe<CloudSearchHit>[]
+}
+
+/**
+ * A listing, or a corrective refusal for a `tag` the tag grammar can never
+ * produce. Without the refusal a junk filter (`*`, `all`, whitespace…) reads
+ * as a clean "0 notes" — indistinguishable from a real tag nothing carries —
+ * and a model hunting for an "all notes" sentinel just keeps guessing.
+ */
+export type ListRecentNotesOutput =
+  | { ok: true; notes: CloudSafe<CloudNoteListing>[] }
+  | { ok: false; tag: string; error: string }
+
+/**
+ * The refusal text — one string, read verbatim by both model and chip.
+ */
+export const INVALID_TAG_ERROR =
+  'Not a tag — omit the tag to list all recent notes. Tags are single words like "book" or "project/atlas".'
+
+export interface ListDailyNotesOutput {
+  days: CloudSafe<CloudNoteListing>[]
+  /**
+   * The range held more days than one call returns — narrow it to see the rest.
+   */
+  truncated: boolean
+}
+
+export const searchNotesInput = z.object({
+  query: z.string().min(1).describe('Full-text search query over the note graph'),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_SEARCH_LIMIT)
+    .optional()
+    .describe(`How many notes to return (default ${DEFAULT_SEARCH_LIMIT})`),
+})
+
+export const listRecentNotesInput = z.object({
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_RECENT_LIMIT)
+    .optional()
+    .describe(`How many notes to return (default ${DEFAULT_RECENT_LIMIT})`),
+  tag: z
+    .string()
+    .nullish()
+    .describe(
+      'Only notes carrying this tag (case-insensitive, without the #). ' +
+        'Omit, or pass null, to list all recent notes.',
+    ),
+})
+
+const isoDate = z.iso.date()
+
+export const listDailyNotesInput = z.object({
+  start: isoDate.describe('First day of the range, inclusive (YYYY-MM-DD)'),
+  end: isoDate.describe('Last day of the range, inclusive (YYYY-MM-DD)'),
+})
+
+/**
+ * Shape one query row for the listings gate (epoch mtime → ISO timestamp).
+ */
+function listingCandidate(
+  row: RecentNoteRow | DailyNoteRow,
+): CloudSendable & Omit<CloudNoteListing, 'path'> {
+  return {
+    path: row.path,
+    isPrivate: row.isPrivate,
+    title: row.title,
+    dailyDate: 'dailyDate' in row ? row.dailyDate : null,
+    snippet: row.preview,
+    modifiedAt: new Date(row.mtime).toISOString(),
+  }
+}
+
+/**
+ * The read-only tools the chat model can call, with the privacy gate inside.
+ */
+export interface NoteToolsService {
+  /**
+   * Build the tool set of one chat turn.
+   */
+  build(options: BuildNoteToolsOptions): NoteTools
+}
+
+/**
+ * The daily-note range query of `DailyNoteService`.
+ */
+export interface DailyNoteQueries {
+  listDailyNotes(range: DailyNotesRange): MaybePromise<DailyNoteRow[]>
+}
+
+export interface NoteToolsServiceDeps {
+  readonly retrieval: RetrievalService
+  readonly noteFile: NoteFileService
+  readonly noteList: NoteListService
+  readonly dailyNotes: DailyNoteQueries
+  readonly assetReferences: AssetReferences
+  readonly assetPrivacy: AssetPrivacyService
+  readonly xArchive: XArchiveService
+  readonly privacy: PrivacyService
+}
+
+class NoteToolsServiceImpl implements NoteToolsService {
+  readonly #deps: NoteToolsServiceDeps
+
+  constructor(deps: NoteToolsServiceDeps) {
+    this.#deps = deps
+  }
+
+  build(options: BuildNoteToolsOptions): NoteTools {
+    const {
+      retrieval,
+      noteList,
+      dailyNotes,
+      privacy,
+      noteFile,
+      assetReferences,
+      assetPrivacy,
+      xArchive,
+    } = this.#deps
+    const readNote = async (path: string): Promise<string> => {
+      return await noteFile.read(path, options.generation)
+    }
+    const readOneNote = buildReadOneNote({ readNote, privacy })
+    const readOneAsset = buildReadOneAsset({
+      readNote,
+      assetReferences,
+      assetPrivacy,
+      xArchive,
+      privacy,
+    })
+    const searchMode: RetrieveOptions['mode'] = options.semanticSearchEnabled ? 'hybrid' : 'lexical'
+
+    return {
+      search_notes: {
+        description: searchNotesDescription(options.semanticSearchEnabled),
+        inputSchema: searchNotesInput,
+        execute: async ({ query, limit }): Promise<SearchNotesOutput> => {
+          const hits = await retrieval.retrieve(query, {
+            limit: limit ?? DEFAULT_SEARCH_LIMIT,
+            mode: searchMode,
+            excludePrivateContent: true,
+          })
+          return { hits: await privacy.cloudSafeSearchHits(hits) }
+        },
+      },
+
+      list_recent_notes: {
+        description:
+          'List the most recently edited notes, newest first — call it with no tag to see ' +
+          'what the user wrote or worked on lately. Pass a tag only to narrow to notes ' +
+          'carrying it. Daily notes are not included — use list_daily_notes for those. ' +
+          'Private notes are excluded.',
+        inputSchema: listRecentNotesInput,
+        execute: async ({ limit, tag }): Promise<ListRecentNotesOutput> => {
+          if (tag != null && !isTagName(tag)) {
+            return { ok: false, tag, error: INVALID_TAG_ERROR }
+          }
+          const rows = await noteList.listRecentNotes({
+            limit: limit ?? DEFAULT_RECENT_LIMIT,
+            tag: tag ?? null,
+          })
+          return {
+            ok: true,
+            notes: await privacy.cloudSafeNoteListings(rows.map(listingCandidate)),
+          }
+        },
+      },
+
+      list_daily_notes: {
+        description:
+          'List the daily notes (the user’s journal, one note per day) in an inclusive date ' +
+          'range, most recent first. Only days the user wrote on appear. Returns at most ' +
+          `${MAX_DAILY_NOTE_DAYS} days — when truncated, narrow the range. ` +
+          'Private notes are excluded.',
+        inputSchema: listDailyNotesInput,
+        execute: async ({ start, end }): Promise<ListDailyNotesOutput> => {
+          const rows = await dailyNotes.listDailyNotes({
+            start,
+            end,
+            limit: MAX_DAILY_NOTE_DAYS + 1,
+          })
+          const truncated = rows.length > MAX_DAILY_NOTE_DAYS
+          const kept = truncated ? rows.slice(0, MAX_DAILY_NOTE_DAYS) : rows
+          return {
+            days: await privacy.cloudSafeNoteListings(kept.map(listingCandidate)),
+            truncated,
+          }
+        },
+      },
+
+      read_notes: {
+        description:
+          'Read the full markdown content of one or more notes by their graph-relative ' +
+          'paths (from search_notes results). Pass every note you need in a single call ' +
+          'rather than reading them one at a time. Private notes cannot be read.',
+        inputSchema: readNotesInput,
+        execute: async ({ paths }): Promise<ReadNotesOutput> => {
+          return { notes: await Promise.all(paths.map(readOneNote)) }
+        },
+      },
+
+      read_assets: {
+        description:
+          'Read the stored text description and OCR transcription of image or PDF ' +
+          'attachments that notes embed as assets/… markdown links, e.g. ' +
+          '![sketch](assets/sketch.png). Returns descriptive text about each file, not ' +
+          'the file itself. Pass every attachment you need in a single call. ' +
+          'Attachments of private notes cannot be read.',
+        inputSchema: readAssetsInput,
+        execute: async ({ paths }): Promise<ReadAssetsOutput> => {
+          return { assets: await Promise.all(paths.map(readOneAsset)) }
+        },
+      },
+    }
+  }
+}
+
+export function createNoteToolsService(deps: NoteToolsServiceDeps): NoteToolsService {
+  return new NoteToolsServiceImpl(deps)
+}
+
+/**
+ * Tool description for the active search mode.
+ */
+function searchNotesDescription(semanticSearchEnabled: boolean): string {
+  const suffix =
+    'Returns the best-matching notes with short snippets. Queries are plain language — there is no wildcard or operator syntax. Private notes are excluded.'
+  if (semanticSearchEnabled) {
+    return `Search the user’s notes by meaning and keywords. ${suffix}`
+  }
+  return `Search the user’s notes with lexical full-text search over titles and note bodies. ${suffix}`
+}
+
+/**
+ * A {@link Tool} whose `execute` always returns a promise, never a stream.
+ * The narrow signature comes first, so a call resolves to it.
+ */
+type PromiseTool<I, O> = {
+  execute: (input: I, options: ToolExecutionOptions<unknown>) => Promise<O>
+} & Tool<I, O>
+
+/**
+ * The tool set type, for typed stream parts in the chat engine. Written out
+ * (rather than inferred from {@link NoteToolsService.build}) so the declaration the
+ * composite build emits only names types this package can import.
+ */
+export type NoteTools = {
+  search_notes: PromiseTool<z.infer<typeof searchNotesInput>, SearchNotesOutput>
+  list_recent_notes: PromiseTool<z.infer<typeof listRecentNotesInput>, ListRecentNotesOutput>
+  list_daily_notes: PromiseTool<z.infer<typeof listDailyNotesInput>, ListDailyNotesOutput>
+  read_notes: PromiseTool<z.infer<typeof readNotesInput>, ReadNotesOutput>
+  read_assets: PromiseTool<z.infer<typeof readAssetsInput>, ReadAssetsOutput>
+}
+
+/**
+ * The hit slice tool-activity UI renders (full hits stay engine-side).
+ */
+export type NoteHitSummary = Pick<CloudSearchHit, 'path' | 'title'>
+
+/**
+ * One note's outcome in a read_notes call, for the tool-activity UI.
+ */
+export interface ReadNoteSummary {
+  path: string
+  title: string | null
+  /**
+   * The per-note refusal/miss text, or `null` when the read succeeded.
+   */
+  error: string | null
+}
+
+/**
+ * One asset's outcome in a read_assets call, for the tool-activity UI.
+ */
+export interface ReadAssetSummary {
+  path: string
+  /**
+   * The per-asset refusal/miss text, or `null` when the read succeeded.
+   */
+  error: string | null
+}
+
+/**
+ * One tool invocation, as the transcript sees it.
+ */
+export type NoteToolCall =
+  | { tool: 'search'; toolCallId: string; query: string }
+  | { tool: 'read'; toolCallId: string; paths: string[] }
+  | { tool: 'assets'; toolCallId: string; paths: string[] }
+  | { tool: 'recents'; toolCallId: string; tag: string | null }
+  | { tool: 'dailies'; toolCallId: string; start: string; end: string }
+
+/**
+ * One settled tool invocation. A failed read or listing keeps its refusal.
+ */
+export type NoteToolResult =
+  | { tool: 'search'; toolCallId: string; query: string; hits: NoteHitSummary[] }
+  | { tool: 'read'; toolCallId: string; notes: ReadNoteSummary[] }
+  | { tool: 'assets'; toolCallId: string; assets: ReadAssetSummary[] }
+  | {
+      tool: 'recents'
+      toolCallId: string
+      tag: string | null
+      notes: NoteHitSummary[]
+      error: string | null
+    }
+  | { tool: 'dailies'; toolCallId: string; start: string; end: string; days: NoteHitSummary[] }
+
+/**
+ * Map an SDK tool-call part onto {@link NoteToolCall} (null for dynamic).
+ */
+export function noteToolCall(part: TypedToolCall<NoteTools>): NoteToolCall | null {
+  if (part.dynamic) {
+    return null
+  }
+  switch (part.toolName) {
+    case 'search_notes':
+      return { tool: 'search', toolCallId: part.toolCallId, query: part.input.query }
+    case 'read_notes':
+      return { tool: 'read', toolCallId: part.toolCallId, paths: part.input.paths }
+    case 'read_assets':
+      return { tool: 'assets', toolCallId: part.toolCallId, paths: part.input.paths }
+    case 'list_recent_notes':
+      return { tool: 'recents', toolCallId: part.toolCallId, tag: part.input.tag ?? null }
+    case 'list_daily_notes':
+      return {
+        tool: 'dailies',
+        toolCallId: part.toolCallId,
+        start: part.input.start,
+        end: part.input.end,
+      }
+  }
+}
+
+/**
+ * The path+title slice of one listing, for the tool-activity UI.
+ */
+function listingSummary(entry: CloudNoteListing): NoteHitSummary {
+  return { path: entry.path, title: entry.title }
+}
+
+/**
+ * Map an SDK tool-result part onto {@link NoteToolResult} (null for dynamic).
+ */
+export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult | null {
+  if (part.dynamic) {
+    return null
+  }
+  switch (part.toolName) {
+    case 'search_notes':
+      return {
+        tool: 'search',
+        toolCallId: part.toolCallId,
+        query: part.input.query,
+        hits: part.output.hits.map((hit) => ({ path: hit.path, title: hit.title })),
+      }
+    case 'read_notes':
+      return {
+        tool: 'read',
+        toolCallId: part.toolCallId,
+        notes: part.output.notes.map((entry) => {
+          return entry.ok
+            ? { path: entry.note.path, title: entry.note.title, error: null }
+            : { path: entry.path, title: null, error: entry.error }
+        }),
+      }
+    case 'read_assets':
+      return {
+        tool: 'assets',
+        toolCallId: part.toolCallId,
+        assets: part.output.assets.map((entry) => {
+          return entry.ok
+            ? { path: entry.asset.path, error: null }
+            : { path: entry.path, error: entry.error }
+        }),
+      }
+    case 'list_recent_notes': {
+      const output = part.output
+      return output.ok
+        ? {
+            tool: 'recents',
+            toolCallId: part.toolCallId,
+            tag: part.input.tag ?? null,
+            notes: output.notes.map(listingSummary),
+            error: null,
+          }
+        : {
+            tool: 'recents',
+            toolCallId: part.toolCallId,
+            tag: output.tag,
+            notes: [],
+            error: output.error,
+          }
+    }
+    case 'list_daily_notes':
+      return {
+        tool: 'dailies',
+        toolCallId: part.toolCallId,
+        start: part.input.start,
+        end: part.input.end,
+        days: part.output.days.map(listingSummary),
+      }
+  }
+}

@@ -38,9 +38,11 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Reflect reads your calendar to show the day's meetings beside your daily note. Access is read-only and stays on this device.</string>
+	<string>Reflect reads your calendar to show the day&apos;s meetings beside your daily note. Access is read-only and stays on this device.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>Reflect reads your calendar to show the day's meetings beside your daily note. Access is read-only and stays on this device.</string>
+	<string>Reflect reads your calendar to show the day&apos;s meetings beside your daily note. Access is read-only and stays on this device.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Reflect uses the camera so you can take a photo and add it to a note. Photos are saved into your notes folder on this device.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Reflect reads your contacts to suggest details for person notes. Nothing is stored or sent anywhere.</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -59,6 +61,8 @@
 			<string>Any</string>
 		</dict>
 	</dict>
+	<key>ReflectSentryDSN</key>
+	<string>$(REFLECT_SENTRY_DSN)</string>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

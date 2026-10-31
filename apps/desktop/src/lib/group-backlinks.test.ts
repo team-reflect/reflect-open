@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { groupBacklinksBySource } from './group-backlinks'
+import { groupBacklinksBySource } from './group-backlinks.ts'
 
 describe('groupBacklinksBySource', () => {
   it('groups rows by source note, preserving order and per-link keys', () => {
     const groups = groupBacklinksBySource([
       { sourcePath: 'notes/a.md', sourceTitle: 'A', snippet: 'first [[t]]', posFrom: 4, tasks: [] },
-      { sourcePath: 'notes/a.md', sourceTitle: 'A', snippet: 'second [[t]]', posFrom: 40, tasks: [] },
+      {
+        sourcePath: 'notes/a.md',
+        sourceTitle: 'A',
+        snippet: 'second [[t]]',
+        posFrom: 40,
+        tasks: [],
+      },
       { sourcePath: 'notes/b.md', sourceTitle: 'B', snippet: 'only [[t]]', posFrom: 9, tasks: [] },
     ])
 

@@ -4,15 +4,15 @@
 //! `collect_markdown` (`apps/desktop/src-tauri/src/fs/io.rs`).
 
 use std::fs;
-use std::path::Path;
-use std::time::UNIX_EPOCH;
+use std::path::{Path, PathBuf};
 
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
+use reflect_graph_paths::{eviction_placeholder, normalize_line_endings};
 
 use crate::error::CliError;
-use crate::frontmatter::{parse_frontmatter, split_frontmatter, Frontmatter};
+use crate::frontmatter::{Frontmatter, parse_frontmatter, split_frontmatter};
 use crate::keys::fold_key;
-use crate::paths::{date_from_daily_path, NOTE_DIRS};
+use crate::paths::date_from_daily_path;
 
 /// A note's derived metadata, as the TS indexer would compute it.
 #[derive(Debug)]
@@ -36,6 +36,9 @@ pub struct DiskNote {
     pub rel_path: String,
     /// Last-modified time in epoch milliseconds (the `notes.mtime` unit).
     pub mtime_ms: u64,
+    /// The path exists only as an iCloud eviction placeholder, so its content
+    /// is unavailable on this device.
+    pub placeholder: bool,
 }
 
 /// Filename without directories or the `.md` extension (the TS `basename`).
@@ -48,22 +51,39 @@ fn basename(path: &str) -> &str {
     }
 }
 
+/// The TS `unescapeMarkdownText` (`plain-text.ts`): a backslash before ASCII
+/// punctuation resolves to that character; any other backslash stays literal.
+fn unescape_markdown_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\'
+            && let Some(next) = chars.clone().next()
+            && next.is_ascii_punctuation()
+        {
+            out.push(next);
+            chars.next();
+            continue;
+        }
+        out.push(ch);
+    }
+    out
+}
+
 /// The TS `cleanHeadingText`: setext headings keep their first line; ATX
-/// headings lose the leading hashes and any trailing closing hashes.
+/// headings lose the leading hashes and any trailing closing hashes; both
+/// resolve backslash escapes like the TS extractor.
 fn clean_heading_text(raw: &str) -> String {
-    let raw = raw
-        .strip_suffix('\n')
-        .map(|text| text.strip_suffix('\r').unwrap_or(text))
-        .unwrap_or(raw);
+    let raw = raw.strip_suffix('\n').unwrap_or(raw);
     if let Some(newline_at) = raw.find('\n') {
-        return raw[..newline_at].trim().to_string();
+        return unescape_markdown_text(raw[..newline_at].trim());
     }
     let text = raw.trim_start();
     let text = text.trim_start_matches('#');
     let text = text.trim_start_matches([' ', '\t']);
     let text = text.trim_end_matches([' ', '\t']);
     let text = text.trim_end_matches('#');
-    text.trim().to_string()
+    unescape_markdown_text(text.trim())
 }
 
 /// First level-1 heading with non-empty text, cleaned like the TS extractor
@@ -132,6 +152,110 @@ fn subject_aliases(title: &str) -> Vec<String> {
     aliases
 }
 
+/// The `//` half of the TS `displayNoteTitle` (`note-title.ts`): the
+/// reader-facing form of a `//` title, its first non-empty segment, or the
+/// title itself when nothing splits.
+pub fn subject_display_title(title: &str) -> &str {
+    let segments = split_subject_segments(title);
+    if segments.len() < 2 {
+        return title;
+    }
+    segments
+        .iter()
+        .map(|segment| segment.trim())
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(title)
+}
+
+/// End of a `[[…]]` inner span starting at `start`: the byte index of the
+/// closing `]]`, or `None` when a `[`, an unpaired `]`, or a newline
+/// intervenes — the same inner-character rule as the TS
+/// `EMBEDDED_WIKI_LINK_RE` (`note-title.ts`). The bytes checked are ASCII, so
+/// the indices are always UTF-8 char boundaries.
+fn find_wiki_inner_end(bytes: &[u8], start: usize) -> Option<usize> {
+    let mut index = start;
+    while index < bytes.len() {
+        match bytes[index] {
+            b']' => return (bytes.get(index + 1) == Some(&b']')).then_some(index),
+            b'[' | b'\n' => return None,
+            _ => index += 1,
+        }
+    }
+    None
+}
+
+/// The TS `renderEmbeddedWikiLinks` (`note-title.ts`): complete `[[x|y]]`
+/// links flatten to their display text (alias, else target); a whitespace-only
+/// target stays literal. `None` when nothing was replaced.
+fn render_embedded_wiki_links(title: &str) -> Option<String> {
+    let bytes = title.as_bytes();
+    let mut rendered = String::with_capacity(title.len());
+    let mut replaced = false;
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'['
+            && bytes.get(index + 1) == Some(&b'[')
+            && let Some(inner_end) = find_wiki_inner_end(bytes, index + 2)
+        {
+            let inner = &title[index + 2..inner_end];
+            let (target, alias) = match inner.find('|') {
+                Some(pipe) => (inner[..pipe].trim(), inner[pipe + 1..].trim()),
+                None => (inner.trim(), ""),
+            };
+            if !target.is_empty() {
+                replaced = true;
+                rendered.push_str(if alias.is_empty() { target } else { alias });
+                index = inner_end + 2;
+                continue;
+            }
+        }
+        let ch_len = title[index..].chars().next().map_or(1, char::len_utf8);
+        rendered.push_str(&title[index..index + ch_len]);
+        index += ch_len;
+    }
+    replaced.then_some(rendered)
+}
+
+/// The TS `wikiLinkSafe` (`edit.ts`): wiki-link delimiters and line breaks
+/// become spaces, whitespace runs collapse, ends trim.
+fn wiki_link_safe(text: &str) -> String {
+    let replaced: String = text
+        .chars()
+        .map(|ch| match ch {
+            '[' | ']' | '|' | '\r' | '\n' => ' ',
+            other => other,
+        })
+        .collect();
+    replaced.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The TS `wikiLinkTargetForTitle` (`note-title.ts`): the linkable form of a
+/// title. No embedded link keeps the title byte-for-byte; a derived form that
+/// collapses to nothing falls back to the raw title.
+fn wiki_link_target_for_title(title: &str) -> String {
+    match render_embedded_wiki_links(title) {
+        None => title.to_string(),
+        Some(rendered) => {
+            let safe = wiki_link_safe(&rendered);
+            if safe.is_empty() {
+                title.to_string()
+            } else {
+                safe
+            }
+        }
+    }
+}
+
+/// The target rule of the TS `serializeWikiSuggestionAddress` (`suggest.ts`):
+/// a blank target, or one carrying wiki-link delimiters, backslashes, or line
+/// breaks, cannot be written inside `[[…]]`.
+fn is_serializable_wiki_target(target: &str) -> bool {
+    !target.trim().is_empty()
+        && !target
+            .chars()
+            .any(|ch| matches!(ch, '[' | ']' | '|' | '\\' | '\r' | '\n'))
+}
+
 /// The TS `deriveTitle` chain: frontmatter `title` → first H1 → daily date →
 /// filename.
 fn derive_title(rel_path: &str, frontmatter: &Frontmatter, body: &str) -> String {
@@ -151,9 +275,10 @@ fn derive_title(rel_path: &str, frontmatter: &Frontmatter, body: &str) -> String
 }
 
 /// Derive a note's metadata from its source, as the TS indexer would:
-/// `aliases:` frontmatter verbatim, then the v1 subject aliases derived from
-/// the title, skipping segments a frontmatter alias already claims (the TS
-/// `noteAliases`, `indexed-note.ts`).
+/// `aliases:` frontmatter verbatim, then the linkable form of any rich title
+/// or rich frontmatter alias, then the v1 subject aliases derived from the
+/// title; later stages skip keys an earlier row already claims (the TS
+/// `projectNoteAliases`, `indexed-note.ts`).
 pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     let split = split_frontmatter(source);
     let frontmatter = parse_frontmatter(split.raw);
@@ -161,6 +286,21 @@ pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     let mut aliases = frontmatter.aliases;
     let mut claimed: std::collections::HashSet<String> =
         aliases.iter().map(|alias| fold_key(alias)).collect();
+    let rich_sources: Vec<String> = std::iter::once(title.clone())
+        .chain(aliases.iter().cloned())
+        .collect();
+    for rich_text in rich_sources {
+        let link_target = wiki_link_target_for_title(&rich_text);
+        let link_target_key = fold_key(&link_target);
+        if link_target_key == fold_key(&rich_text)
+            || claimed.contains(&link_target_key)
+            || !is_serializable_wiki_target(&link_target)
+        {
+            continue;
+        }
+        claimed.insert(link_target_key);
+        aliases.push(link_target);
+    }
     for alias in subject_aliases(&title) {
         if claimed.insert(fold_key(&alias)) {
             aliases.push(alias);
@@ -174,11 +314,16 @@ pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     }
 }
 
+/// Read a note's text with `\n` line endings, the form the desktop indexes.
+pub fn read_note_text(path: &Path) -> std::io::Result<String> {
+    fs::read_to_string(path).map(normalize_line_endings)
+}
+
 /// Read a note and enforce the privacy contract: a `private: true` note is
 /// refused (exit 3), based on the file's own frontmatter — never an index row.
 pub fn read_note(root: &Path, rel_path: &str) -> Result<Note, CliError> {
-    let absolute = root.join(rel_path);
-    let content = fs::read_to_string(&absolute)
+    let absolute = checked_note_path(root, rel_path)?;
+    let content = read_note_text(&absolute)
         .map_err(|err| CliError::Runtime(format!("could not read {rel_path}: {err}")))?;
     let meta = parse_note_meta(rel_path, &content);
     if meta.private {
@@ -190,8 +335,15 @@ pub fn read_note(root: &Path, rel_path: &str) -> Result<Note, CliError> {
 /// Enforce the privacy contract without returning content (used by `path`).
 /// A missing file has nothing to protect.
 pub fn ensure_not_private(root: &Path, rel_path: &str) -> Result<(), CliError> {
-    let Ok(content) = fs::read_to_string(root.join(rel_path)) else {
-        return Ok(());
+    let absolute = checked_note_path(root, rel_path)?;
+    let content = match read_note_text(&absolute) {
+        Ok(content) => content,
+        Err(_) if eviction_placeholder(&absolute).is_some_and(|path| path.is_file()) => {
+            return Err(CliError::Runtime(format!(
+                "note is unavailable until iCloud downloads it: {rel_path}"
+            )));
+        }
+        Err(_) => return Ok(()),
     };
     if parse_note_meta(rel_path, &content).private {
         return Err(CliError::Private(format!("note is private: {rel_path}")));
@@ -199,58 +351,132 @@ pub fn ensure_not_private(root: &Path, rel_path: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Every `.md` under `daily/` + `notes/`, recursively — same contract as the
-/// desktop's `collect_markdown`: symlinks are skipped, paths come back
-/// graph-relative and forward-slashed.
-pub fn walk_notes(root: &Path) -> Result<Vec<DiskNote>, CliError> {
-    let mut notes = Vec::new();
-    for dir in NOTE_DIRS {
-        let base = root.join(dir);
-        if !base.is_dir() {
-            continue;
-        }
-        let mut stack = vec![base];
-        while let Some(current) = stack.pop() {
-            for entry in fs::read_dir(&current)? {
-                let entry = entry?;
-                let file_type = entry.file_type()?;
-                if file_type.is_symlink() {
-                    continue;
-                }
-                let path = entry.path();
-                if file_type.is_dir() {
-                    stack.push(path);
-                    continue;
-                }
-                if !file_type.is_file()
-                    || path.extension().and_then(|ext| ext.to_str()) != Some("md")
-                {
-                    continue;
-                }
-                let Ok(rel) = path.strip_prefix(root) else {
-                    continue;
-                };
-                let mtime_ms = entry
-                    .metadata()?
-                    .modified()
-                    .ok()
-                    .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-                    .map(|duration| duration.as_millis() as u64)
-                    .unwrap_or(0);
-                notes.push(DiskNote {
-                    rel_path: rel.to_string_lossy().replace('\\', "/"),
-                    mtime_ms,
-                });
+/// Resolve one canonical graph-relative note path without following symlinks.
+/// The file itself may be absent (daily `path` output relies on that), but any
+/// component that exists must be an ordinary in-graph entry.
+pub(crate) fn checked_note_path(root: &Path, rel_path: &str) -> Result<PathBuf, CliError> {
+    if !reflect_graph_paths::is_note(rel_path) {
+        return Err(CliError::Runtime(format!(
+            "unsafe or ineligible note path: {rel_path}"
+        )));
+    }
+    let mut absolute = root.to_path_buf();
+    for component in Path::new(rel_path).components() {
+        absolute.push(component.as_os_str());
+        match fs::symlink_metadata(&absolute) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(CliError::Runtime(format!(
+                    "refusing symlinked note path: {rel_path}"
+                )));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(CliError::Runtime(format!(
+                    "could not inspect {rel_path}: {error}"
+                )));
             }
         }
     }
-    notes.sort_by(|left, right| left.rel_path.cmp(&right.rel_path));
-    Ok(notes)
+    Ok(absolute)
+}
+
+/// Every eligible `.md` in the graph, recursively — the shared vault walk
+/// (`reflect_graph_paths::walk_catalog`), same contract as the desktop
+/// listing: hidden, reserved, and ignored trees are pruned, symlinks are
+/// skipped, and paths come back graph-relative and forward-slashed. One
+/// unreadable directory costs itself, not the listing; everything the walk
+/// refused is reported once on stderr so results stay explainable without
+/// polluting stdout.
+pub fn walk_notes(root: &Path) -> Vec<DiskNote> {
+    let catalog = reflect_graph_paths::walk_catalog(root);
+    if catalog.skipped > 0 {
+        eprintln!(
+            "note: skipped {} entries (unreadable, symlinked, or excluded)",
+            catalog.skipped
+        );
+    }
+    catalog
+        .notes
+        .into_iter()
+        .map(|entry| DiskNote {
+            rel_path: entry.path,
+            mtime_ms: entry.modified_ms,
+            placeholder: entry.placeholder,
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn walk_finds_arbitrary_notes_and_prunes_ignored_trees() {
+        let root = tempfile::tempdir().expect("tempdir");
+        for (path, content) in [
+            ("README.md", "root"),
+            ("Projects/deep/plan.md", "nested"),
+            ("daily/2026-07-14.md", "daily"),
+            ("templates/meeting.md", "template"),
+            ("assets/caption.md", "reserved"),
+            ("audio-memos/transcript.md", "reserved"),
+            (".obsidian/plugin.md", "hidden"),
+            ("Projects/.private/secret.md", "hidden"),
+            ("Projects/upper.MD", "upper"),
+        ] {
+            let absolute = root.path().join(path);
+            fs::create_dir_all(absolute.parent().expect("parent")).expect("mkdir");
+            fs::write(absolute, content).expect("write");
+        }
+
+        let paths: Vec<String> = walk_notes(root.path())
+            .into_iter()
+            .map(|note| note.rel_path)
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "Projects/deep/plan.md",
+                "README.md",
+                "daily/2026-07-14.md",
+                "templates/meeting.md",
+            ]
+        );
+    }
+
+    #[test]
+    fn walk_keeps_icloud_placeholders_as_unavailable_notes() {
+        let root = tempfile::tempdir().expect("tempdir");
+        fs::create_dir_all(root.path().join("Projects")).expect("mkdir");
+        fs::write(root.path().join("Projects/.plan.md.icloud"), "stub").expect("write");
+
+        let notes = walk_notes(root.path());
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].rel_path, "Projects/plan.md");
+        assert!(notes[0].placeholder);
+        let error = ensure_not_private(root.path(), "Projects/plan.md").unwrap_err();
+        assert!(error.to_string().contains("unavailable"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn walk_does_not_follow_file_or_directory_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempfile::tempdir().expect("tempdir");
+        let outside = tempfile::tempdir().expect("outside");
+        fs::write(outside.path().join("outside.md"), "outside").expect("write");
+        fs::create_dir_all(root.path().join("Projects")).expect("mkdir");
+        symlink(
+            outside.path().join("outside.md"),
+            root.path().join("linked.md"),
+        )
+        .expect("file symlink");
+        symlink(outside.path(), root.path().join("Projects/linked")).expect("directory symlink");
+
+        assert!(walk_notes(root.path()).is_empty());
+    }
 
     /// Parity with `deriveTitle` (`extract.ts`): frontmatter `title` → first
     /// H1 → daily date → filename, with the same cleaning rules.
@@ -320,8 +546,35 @@ mod tests {
         );
     }
 
-    /// Parity with `noteAliases` (`indexed-note.ts`): frontmatter aliases stay
-    /// verbatim and first; derived segments they already claim are skipped.
+    /// Parity with the `//` half of `displayNoteTitle` (`note-title.ts`): the
+    /// first non-empty segment, else the whole title.
+    #[test]
+    fn subject_display_title_matches_the_ts_derivation() {
+        assert_eq!(
+            subject_display_title("Charlotte MacCaw // Mum"),
+            "Charlotte MacCaw"
+        );
+        assert_eq!(subject_display_title("AAA // BB // CCC CC"), "AAA");
+        assert_eq!(subject_display_title("// Mum"), "Mum");
+        assert_eq!(
+            subject_display_title("Charlotte MacCaw // "),
+            "Charlotte MacCaw"
+        );
+        assert_eq!(subject_display_title(" // "), " // ");
+        assert_eq!(
+            subject_display_title("Charlotte MacCaw"),
+            "Charlotte MacCaw"
+        );
+        assert_eq!(
+            subject_display_title("https://reflect.app"),
+            "https://reflect.app"
+        );
+        assert_eq!(subject_display_title("a///b"), "a///b");
+    }
+
+    /// Parity with `projectNoteAliases` (`indexed-note.ts`): frontmatter
+    /// aliases stay verbatim and first; derived segments they already claim
+    /// are skipped.
     #[test]
     fn subject_aliases_merge_after_frontmatter_aliases() {
         let meta = parse_note_meta(
@@ -329,5 +582,77 @@ mod tests {
             "---\naliases: [MUM]\n---\n# Charlotte MacCaw // Mum\n",
         );
         assert_eq!(meta.aliases, vec!["MUM", "Charlotte MacCaw"]);
+    }
+
+    /// Parity with `wikiLinkTargetForTitle` (`note-title.ts`).
+    #[test]
+    fn wiki_link_target_matches_the_ts_derivation() {
+        assert_eq!(
+            wiki_link_target_for_title("Meeting with [[Ada Lovelace|Ada]]"),
+            "Meeting with Ada"
+        );
+        assert_eq!(
+            wiki_link_target_for_title("Meeting with [[Ada Lovelace]]"),
+            "Meeting with Ada Lovelace"
+        );
+        // No embedded link: byte-for-byte, double spaces survive.
+        assert_eq!(wiki_link_target_for_title("Old  Title"), "Old  Title");
+        assert_eq!(wiki_link_target_for_title("[] |"), "[] |");
+        // Context-free flattening, code spans included.
+        assert_eq!(
+            wiki_link_target_for_title("Code `[[Ada Lovelace|Ada]]`"),
+            "Code `Ada`"
+        );
+        // Degenerate: nothing to replace falls back to the raw title.
+        assert_eq!(wiki_link_target_for_title("[[ [ ]]"), "[[ [ ]]");
+        assert_eq!(wiki_link_target_for_title("A [[ ]] B"), "A [[ ]] B");
+    }
+
+    /// Parity with the derived-alias stage of `projectNoteAliases`
+    /// (`indexed-note.ts`).
+    #[test]
+    fn rich_titles_derive_a_linkable_alias() {
+        let meta = parse_note_meta("notes/m.md", "# Meeting with [[Ada Lovelace|Ada]]\n");
+        assert_eq!(meta.title, "Meeting with [[Ada Lovelace|Ada]]");
+        assert_eq!(meta.aliases, vec!["Meeting with Ada"]);
+
+        // A frontmatter alias that owns the key suppresses the derived row.
+        let meta = parse_note_meta(
+            "notes/m.md",
+            "---\naliases: [\"Meeting with Ada\"]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n",
+        );
+        assert_eq!(meta.aliases, vec!["Meeting with Ada"]);
+
+        // A rich frontmatter alias derives too.
+        let meta = parse_note_meta(
+            "notes/m.md",
+            "---\naliases: [\"Meeting with [[Ada Lovelace|Ada]]\"]\n---\n# Plain Title\n",
+        );
+        assert_eq!(
+            meta.aliases,
+            vec!["Meeting with [[Ada Lovelace|Ada]]", "Meeting with Ada"]
+        );
+
+        // Degenerate: the derived form falls back to the raw title, so the
+        // keys match and no alias row appears.
+        let meta = parse_note_meta("notes/m.md", "# [[ [ ]]\n");
+        assert_eq!(meta.aliases, Vec::<String>::new());
+
+        // A derived form carrying a backslash cannot be a wiki-link address.
+        let meta = parse_note_meta("notes/m.md", "# C:\\notes [[Ada Lovelace|Ada]]\n");
+        assert_eq!(meta.aliases, Vec::<String>::new());
+    }
+
+    /// Parity with `cleanHeadingText`'s escape handling (`extract.ts`): the
+    /// escaped bracket resolves in the title, and the now-complete wiki link
+    /// derives a linkable alias.
+    #[test]
+    fn heading_escapes_resolve_like_the_ts_extractor() {
+        let meta = parse_note_meta("notes/m.md", "# Meeting \\[[Ada Lovelace|Ada]]\n");
+        assert_eq!(meta.title, "Meeting [[Ada Lovelace|Ada]]");
+        assert_eq!(meta.aliases, vec!["Meeting Ada"]);
+
+        let meta = parse_note_meta("notes/m.md", "Setext \\*Title\\*\n===\n");
+        assert_eq!(meta.title, "Setext *Title*");
     }
 }

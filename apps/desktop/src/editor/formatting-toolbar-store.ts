@@ -11,6 +11,12 @@ export interface FormattingToolbarCapabilities {
   canDedent: boolean
   canMoveUp: boolean
   canMoveDown: boolean
+  /**
+   * Whether this editor can persist files. Only a pane that was given a
+   * `saveFile` can (the inline task editor, for one, was not), and an attach
+   * button over an editor without one is a button that does nothing.
+   */
+  canAttachFiles: boolean
 }
 
 /** Autocomplete-trigger characters the toolbar can type into the editor. */
@@ -22,7 +28,8 @@ export type FormattingTriggerText = '/' | '[[' | '#'
  * editor's identity or path.
  */
 export interface FormattingToolbarCommands {
-  toggleBulletList: () => void
+  /** Cycle other content -> bullet -> ordered -> text */
+  cycleBulletOrderedList: () => void
   /** Cycle other content → square checklist → round task → square checklist. */
   cycleCheckableList: () => void
   indent: () => void
@@ -33,6 +40,13 @@ export interface FormattingToolbarCommands {
   insertTrigger: (text: FormattingTriggerText) => void
   /** Blur the editor, dropping the software keyboard (and this toolbar). */
   dismissKeyboard: () => void
+  /**
+   * Persist picked files into the graph's `assets/` and insert their markdown
+   * at the caret — `![](…)` for an image, a `[name](…)` link otherwise, the
+   * same markdown a paste or drop produces. A no-op without
+   * {@link FormattingToolbarCapabilities.canAttachFiles}.
+   */
+  attachFiles: (files: File[]) => Promise<void>
   /**
    * Scroll the caret back into view if it left the visible area; a no-op
    * while it is visible. Called by the keyboard reveal, not a toolbar button.
@@ -72,7 +86,8 @@ function capabilitiesEqual(
     left.canIndent === right.canIndent &&
     left.canDedent === right.canDedent &&
     left.canMoveUp === right.canMoveUp &&
-    left.canMoveDown === right.canMoveDown
+    left.canMoveDown === right.canMoveDown &&
+    left.canAttachFiles === right.canAttachFiles
   )
 }
 

@@ -23,7 +23,7 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.
-pub const LATEST_SCHEMA_VERSION: usize = 17;
+pub const LATEST_SCHEMA_VERSION: usize = 23;
 
 /// The `index_meta` key holding the TS-owned projection version (the rows'
 /// derivation version, distinct from the schema version above).
@@ -36,9 +36,9 @@ mod schema {
     use std::path::Path;
     use std::sync::{LazyLock, OnceLock};
 
-    use rusqlite::ffi::{sqlite3, sqlite3_api_routines};
     use rusqlite::Connection;
-    use rusqlite_migration::{Migrations, M};
+    use rusqlite::ffi::{sqlite3, sqlite3_api_routines};
+    use rusqlite_migration::{M, Migrations};
 
     /// Ordered schema migrations, loaded from `migrations/*.sql`.
     static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
@@ -60,6 +60,14 @@ mod schema {
             M::up(include_str!("../migrations/0015_note_kind_invariant.sql")),
             M::up(include_str!("../migrations/0016_note_emails.sql")),
             M::up(include_str!("../migrations/0017_task_breadcrumbs.sql")),
+            M::up(include_str!("../migrations/0018_note_key_precedence.sql")),
+            M::up(include_str!("../migrations/0019_note_claims.sql")),
+            M::up(include_str!(
+                "../migrations/0020_backlink_name_fallback.sql"
+            )),
+            M::up(include_str!("../migrations/0021_note_has_content.sql")),
+            M::up(include_str!("../migrations/0022_drop_note_text.sql")),
+            M::up(include_str!("../migrations/0023_task_ast_path.sql")),
         ])
     });
 
@@ -169,6 +177,24 @@ mod schema {
         Ok(conn)
     }
 
+    /// Open `<root>/.reflect/index.sqlite` **read-only** (no create, no
+    /// migrate) — a second connection for query traffic, so a long read never
+    /// holds the writer's lock. WAL readers see the last committed state, and
+    /// the writer connection (opened first via [`open_index_at`]) owns the
+    /// file's existence and schema.
+    pub fn open_index_read_only_at(root: &Path) -> Result<Connection, SchemaError> {
+        register_sqlite_vec()?;
+        let path = root.join(super::REFLECT_DIR).join(super::INDEX_FILE);
+        let conn = Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                | rusqlite::OpenFlags::SQLITE_OPEN_URI
+                | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        Ok(conn)
+    }
+
     /// Check the migration set itself (each `up` parses and applies in order).
     pub fn validate() -> Result<(), SchemaError> {
         // Validation replays the migrations on its own connection; vec0 must be
@@ -203,5 +229,6 @@ mod schema {
 
 #[cfg(feature = "vec")]
 pub use schema::{
-    migrate, migrate_to, open_in_memory, open_index_at, register_sqlite_vec, validate, SchemaError,
+    SchemaError, migrate, migrate_to, open_in_memory, open_index_at, open_index_read_only_at,
+    register_sqlite_vec, validate,
 };

@@ -1,13 +1,13 @@
 import { z } from 'zod'
-import { isAppError } from '../../errors'
-import { parseNote } from '../../markdown/extract'
-import { splitFrontmatter } from '../../markdown/frontmatter'
+import { isAppError } from '../../errors.ts'
+import { parseNote } from '../../markdown/extract.ts'
+import { splitFrontmatter } from '../../markdown/frontmatter.ts'
 import {
-  cloudSafeNoteContent,
   isPrivateNoteError,
   type CloudNoteContent,
-  type CloudSafe,
-} from '../checkers'
+  type PrivacyService,
+} from '../../privacy/privacy-service.ts'
+import type { CloudSafe } from '../../privacy/cloud-safe.ts'
 
 /**
  * The read_notes tool's executor (Plan 10): resolve a graph-relative note
@@ -47,9 +47,12 @@ export const readNotesInput = z.object({
     ),
 })
 
-/** The effects {@link buildReadOneNote} needs, already defaulted by the caller. */
+/**
+ * The effects {@link buildReadOneNote} needs.
+ */
 export interface ReadNoteDeps {
-  readNoteFn: (path: string) => Promise<string>
+  readNote: (path: string) => Promise<string>
+  privacy: PrivacyService
 }
 
 /**
@@ -61,7 +64,7 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
   return async function readOneNote(path: string): Promise<ReadNoteResult> {
     let source: string
     try {
-      source = await deps.readNoteFn(path)
+      source = await deps.readNote(path)
     } catch (cause) {
       if (isAppError(cause) && cause.kind === 'notFound') {
         return { ok: false, path, error: 'No note exists at this path.' }
@@ -74,7 +77,7 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
     try {
       return {
         ok: true,
-        note: cloudSafeNoteContent({
+        note: deps.privacy.cloudSafeNoteContent({
           path,
           isPrivate: parsed.frontmatter.private,
           title: parsed.title,

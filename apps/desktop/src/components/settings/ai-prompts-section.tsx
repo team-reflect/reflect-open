@@ -1,11 +1,11 @@
 import { useState, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import type { AiPrompt } from '@reflect/core'
-import { Button } from '@/components/ui/button'
-import { useAiPrompts, type AiPromptDraft } from '@/hooks/use-ai-prompts'
-import { AiPromptDialog } from './ai-prompt-dialog'
-import { AiPromptRow } from './ai-prompt-row'
-import { SettingsSection } from './section'
+import type { AiPrompt, AiPromptDraft } from '@reflect/core'
+import { Button } from '@/components/ui/button.tsx'
+import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
+import { AiPromptDialog } from './ai-prompt-dialog.tsx'
+import { AiPromptRow } from './ai-prompt-row.tsx'
+import { SettingsSection } from './section.tsx'
 
 /**
  * Settings → AI prompts: the user's saved selection prompts, shown in the
@@ -29,12 +29,17 @@ export function AiPromptsSection(): ReactElement {
     <SettingsSection id="ai-prompts">
       {prompts.length === 0 ? (
         <p className="px-4 py-3.5 text-xs text-text-muted">
-          No saved prompts. Select text in a note and press ⌘⇧J to run the built-in prompts;
-          prompts you save here appear after them.
+          No saved prompts. Select text in a note and press ⌘⇧J to run the built-in prompts; prompts
+          you save here appear after them.
         </p>
       ) : (
         prompts.map((prompt) => (
-          <AiPromptRow key={prompt.id} prompt={prompt} onEdit={setEditing} onRemove={removePrompt} />
+          <AiPromptRow
+            key={prompt.id}
+            prompt={prompt}
+            onEdit={setEditing}
+            onRemove={removePrompt}
+          />
         ))
       )}
       <div className="px-4 py-2.5">

@@ -1,32 +1,49 @@
 import { Fragment, type MutableRefObject, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import { groupTaskContexts, type OpenTask, type TaskGroup } from '@reflect/core'
-import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation'
-import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target'
-import { taskKey } from '@/lib/tasks/task-identity'
-import type { TaskSelection } from '@/lib/tasks/use-task-selection'
-import type { TaskRowEditHandlers } from '@/lib/tasks/use-task-row-handlers'
-import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
-import { TaskBreadcrumbs } from './task-breadcrumbs'
-import { TaskRow } from './task-row'
+import {
+  getTaskKey,
+  groupTaskContexts,
+  type InsertTaskTarget,
+  type OpenTask,
+  type TaskGroup,
+} from '@reflect/core'
+import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation.tsx'
+import type { TaskSelection } from '@/lib/tasks/use-task-selection.ts'
+import type { TaskRowEditHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
+import { cn } from '@/lib/utils.ts'
+import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
+import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
+import { TaskRow } from './task-row.tsx'
 
 interface TaskGroupSectionProps {
   group: TaskGroup
   selection: TaskSelection
-  /** The inline-editor callbacks for a row, built once by the screen. */
+  /**
+   * The inline-editor callbacks for a row, built once by the screen.
+   */
   editHandlers: (task: OpenTask) => TaskRowEditHandlers
-  /** Whether a Tasks-view write is already in flight. */
+  /**
+   * Whether a Tasks-view write is already in flight.
+   */
   taskActionPending: boolean
-  /** Complete/reopen the selected rows using the clicked task's next checkbox state. */
+  /**
+   * Complete/reopen the selected rows using the clicked task's next checkbox state.
+   */
+  onCheckboxToggle: (task: OpenTask) => void
   onSelectionCheckboxToggle: (task: OpenTask) => void
-  /** Today's ISO date — the Current group's "+ Add" targets today's daily. */
+  /**
+   * Today's ISO date — the Current group's "+ Add" targets today's daily.
+   */
   today: string
-  /** Add a task to this group and open its editor (the header's "+ Add", V1). */
+  /**
+   * Add a task to this group and open its editor (the header's "+ Add", V1).
+   */
   onAdd: (target: InsertTaskTarget) => void
-  /** Holds the editing row's flush-then-convert trigger for the toolbar button. */
+  /**
+   * Holds the editing row's flush-then-convert trigger for the toolbar button.
+   */
   convertControllerRef: MutableRefObject<(() => void) | null>
-  onOpen: (notePath: string, event?: NewWindowClickEvent) => void
+  onOpen: (notePath: string, event?: ModClickEvent) => void
 }
 
 /**
@@ -40,6 +57,7 @@ export function TaskGroupSection({
   selection,
   editHandlers,
   taskActionPending,
+  onCheckboxToggle,
   onSelectionCheckboxToggle,
   today,
   onAdd,
@@ -88,13 +106,13 @@ export function TaskGroupSection({
           contexts.map((context) => {
             const firstTask = context.tasks[0]!
             return (
-              <Fragment key={taskKey(firstTask)}>
+              <Fragment key={getTaskKey(firstTask)}>
                 <TaskBreadcrumbs
                   breadcrumbs={context.visibleBreadcrumbs}
-                  onSelect={() => selection.select(context.tasks.map(taskKey))}
+                  onSelect={() => selection.select(context.tasks.map(getTaskKey))}
                 />
                 {context.tasks.map((task) => {
-                  const key = taskKey(task)
+                  const key = getTaskKey(task)
                   const selected = selection.isSelected(key)
                   return (
                     <TaskRow
@@ -106,6 +124,7 @@ export function TaskGroupSection({
                       taskActionPending={taskActionPending}
                       togglesSelection={selected && selection.selectedCount > 1}
                       onSelect={(event) => selection.clickSelect(key, event)}
+                      onCheckboxToggle={() => onCheckboxToggle(task)}
                       onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
                       {...editHandlers(task)}
                       convertControllerRef={convertControllerRef}

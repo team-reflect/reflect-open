@@ -1,23 +1,25 @@
-import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import { useCallback, useId, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { hasBridge, icloudStatus } from '@reflect/core'
 import { Cloud, Folder, FolderPlus } from 'lucide-react'
-import { InlineAlert } from '@/components/inline-alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
-import { useGraphColors } from '@/hooks/use-graph-colors'
-import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
-import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
-import { graphColorCss } from '@/lib/graph-colors'
-import { cn } from '@/lib/utils'
-import { useGraph } from '@/providers/graph-provider'
-
-/** iCloud is a real option only in the macOS shell. */
-function isIcloudCapablePlatform(): boolean {
-  return import.meta.env.TAURI_ENV_PLATFORM === 'darwin'
-}
+import { getIsComposing } from '@meowdown/core'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { Badge } from '@/components/ui/badge.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useGraphColors } from '@/hooks/use-graph-colors.ts'
+import {
+  DEFAULT_GRAPH_NAME,
+  cleanGraphName,
+  graphNameFromRoot,
+  isGraphNameTaken,
+} from '@reflect/core'
+import { queryKeys } from '@/lib/query-client.ts'
+import { graphColorCss } from '@/lib/graph-colors.ts'
+import { cn } from '@/lib/utils.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * First-run / no-graph screen (Plan 21 UX pass). One decision, stated
@@ -33,14 +35,17 @@ function isIcloudCapablePlatform(): boolean {
 export function GraphChooser(): ReactElement {
   const { recents, error, pickAndOpen, openRecent, createAt, forget } = useGraph()
   const { colorFor } = useGraphColors()
-  const icloudCapable = isIcloudCapablePlatform()
+  const { platform } = useCoreServices()
+  // iCloud is a real option only in the macOS shell.
+  const icloudCapable = platform.buildPlatform === 'darwin'
 
   return (
     <ChooserShell>
       <div className="space-y-1.5 text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-text">Welcome to Reflect</h1>
         <p className="text-sm text-text-secondary">
-          Your notes are plain markdown files. Choose where to keep them.
+          Your notes are plain Markdown files. Open an existing folder or choose where new notes
+          live.
         </p>
       </div>
 
@@ -58,7 +63,8 @@ export function GraphChooser(): ReactElement {
             icon={<Folder aria-hidden className="size-4" strokeWidth={1.75} />}
             title="A folder you choose"
           >
-            Keep notes in any folder on this {icloudCapable ? 'Mac' : 'computer'}.
+            Open an existing Markdown folder on this {icloudCapable ? 'Mac' : 'computer'}. Reflect
+            keeps its files where they are.
           </CardHeader>
           <Button
             type="button"
@@ -87,7 +93,7 @@ export function GraphChooser(): ReactElement {
               return (
                 <li
                   key={recent.root}
-                  className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors duration-100 hover:bg-surface-hover"
+                  className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-surface-hover"
                 >
                   <button
                     type="button"
@@ -180,7 +186,7 @@ function CardHeader({
 /** What the iCloud card is busy doing: opening one listed graph (its root) or
  * creating a new one — so only the pressed control shows the spinner. Roots
  * are absolute paths, so `'create'` can never collide with one. */
-type IcloudBusy = string | 'create' | null
+type IcloudBusy = string | null
 
 /**
  * The recommended path. Lists every graph already in the container (a user
@@ -196,43 +202,57 @@ function IcloudCard({
   createAt: (root: string) => Promise<boolean>
 }): ReactElement {
   const [typedName, setTypedName] = useState<string | null>(null)
-  const [busy, setBusy] = useState<IcloudBusy>(null)
+  const [target, setTarget] = useState<IcloudBusy>(null)
+  const action = useAsyncAction()
   const nameId = useId()
+  const { icloudNative } = useCoreServices()
   const { data: status } = useQuery({
-    queryKey: ICLOUD_STATUS_QUERY_KEY,
-    queryFn: icloudStatus,
-    enabled: hasBridge(),
+    queryKey: queryKeys.icloud.status,
+    queryFn: () => icloudNative.status(),
   })
 
-  const pending = busy !== null
+  const pending = action.pending
+  const busy: IcloudBusy = pending ? target : null
   const available = status?.available === true
   const existing = status?.existingGraphRoots ?? []
   // "Notes" pre-fills only the fresh-container form. Next to an existing
   // list the row starts empty — a prefilled default would collide with the
   // usual first graph ("Notes") and paint the screen invalid before the
   // user touched it.
-  const name = typedName ?? (existing.length > 0 ? '' : 'Notes')
+  const name = typedName ?? (existing.length > 0 ? '' : DEFAULT_GRAPH_NAME)
   const cleanName = cleanGraphName(name)
   // macOS folder names are case-insensitive — a same-named create would
   // land inside the existing graph instead of next to it.
   const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, existing)
 
-  async function create(): Promise<void> {
-    if (status?.documentsRoot == null || cleanName === null || nameTaken) {
+  const { run } = action
+  const start = useCallback(
+    (nextTarget: string, work: () => Promise<boolean>): void => {
+      // setTarget runs inside the action, so a call the guard drops never
+      // moves the spinner off the control that is actually running.
+      void run(async () => {
+        setTarget(nextTarget)
+        await work()
+      })
+    },
+    [run],
+  )
+
+  const documentsRoot = status?.documentsRoot ?? null
+  const create = useCallback((): void => {
+    if (documentsRoot === null || cleanName === null || nameTaken) {
       return
     }
-    setBusy('create')
-    try {
-      await createAt(`${status.documentsRoot}/${cleanName}`)
-    } finally {
-      setBusy(null)
-    }
-  }
+    const root = `${documentsRoot}/${cleanName}`
+    start('create', () => createAt(root))
+  }, [documentsRoot, cleanName, nameTaken, start, createAt])
 
-  function open(root: string): void {
-    setBusy(root)
-    void openRecent(root).finally(() => setBusy(null))
-  }
+  const open = useCallback(
+    (root: string): void => {
+      start(root, () => openRecent(root))
+    },
+    [start, openRecent],
+  )
 
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
@@ -261,11 +281,7 @@ function IcloudCard({
                 disabled={pending}
                 onClick={() => open(root)}
               >
-                {busy === root ? (
-                  <Spinner />
-                ) : (
-                  <Cloud aria-hidden strokeWidth={1.75} />
-                )}
+                {busy === root ? <Spinner /> : <Cloud aria-hidden strokeWidth={1.75} />}
                 <span className="truncate">{graphNameFromRoot(root, 'your notes')}</span>
               </Button>
             </li>
@@ -286,8 +302,11 @@ function IcloudCard({
               aria-invalid={nameTaken}
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
+                if (getIsComposing()) {
+                  return
+                }
                 if (event.key === 'Enter') {
-                  void create()
+                  create()
                 }
               }}
             />
@@ -296,7 +315,7 @@ function IcloudCard({
               variant="outline"
               className="shrink-0"
               disabled={pending || cleanName === null || nameTaken}
-              onClick={() => void create()}
+              onClick={() => create()}
             >
               {busy === 'create' ? <Spinner /> : null}
               Create
@@ -318,8 +337,11 @@ function IcloudCard({
               disabled={!available || pending}
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
+                if (getIsComposing()) {
+                  return
+                }
                 if (event.key === 'Enter') {
-                  void create()
+                  create()
                 }
               }}
             />
@@ -328,13 +350,14 @@ function IcloudCard({
             type="button"
             className="w-full"
             disabled={!available || pending || cleanName === null}
-            onClick={() => void create()}
+            onClick={() => create()}
           >
             {busy === 'create' ? <Spinner /> : <Cloud aria-hidden strokeWidth={1.75} />}
             {busy === 'create' ? 'Setting up…' : 'Create'}
           </Button>
         </div>
       )}
+      {action.error !== null ? <InlineAlert tone="error">{action.error}</InlineAlert> : null}
     </section>
   )
 }

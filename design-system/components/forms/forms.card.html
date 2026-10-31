@@ -1,59 +1,116 @@
 <!-- @dsCard group="Components" viewport="700x300" name="Forms" subtitle="Input, search trigger, checkbox, toggle" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../../styles.css" />
-<style>
-  body { margin: 0; font-family: var(--font-sans); background: var(--surface); padding: 24px; }
-  .label { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 12px; }
-  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 24px; }
-  .col { display: flex; flex-direction: column; gap: 10px; min-width: 240px; }
-</style>
-</head>
-<body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-  <script src="../../_ds_bundle.js"></script>
-  <script type="text/babel">
-    const NS = 'ReflectDesignSystem_06b075'
-    function Demo() {
-      const { Input, SearchField, Checkbox, Toggle } = window[NS]
-      const [c1, setC1] = React.useState(true)
-      const [c2, setC2] = React.useState(false)
-      const [on, setOn] = React.useState(true)
-      return (
-        <React.Fragment>
-          <p className="label">Search &amp; input</p>
-          <div className="row">
-            <div style={{ width: 240 }}><SearchField /></div>
-            <div style={{ width: 240 }}><Input placeholder="Name your graph" defaultValue="My Graph" /></div>
-          </div>
-          <p className="label">Checkbox &amp; toggle</p>
-          <div className="row">
-            <div className="col">
-              <Checkbox checked={c1} label="Ship the design system" onChange={setC1} />
-              <Checkbox checked={c2} label="Write release notes" onChange={setC2} />
-            </div>
-            <div className="col" style={{ minWidth: 160 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--text)' }}>
-                <Toggle checked={on} onChange={setOn} /> Spell check
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--font-sans);
+        background: var(--surface);
+        padding: 24px;
+      }
+      .label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin: 0 0 12px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 240px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+    <script src="../../_ds_bundle.js"></script>
+    <script type="text/babel">
+      const NS = 'ReflectDesignSystem_06b075'
+      function Demo() {
+        const { Input, SearchField, Checkbox, Toggle } = window[NS]
+        const [c1, setC1] = React.useState(true)
+        const [c2, setC2] = React.useState(false)
+        const [on, setOn] = React.useState(true)
+        return (
+          <React.Fragment>
+            <p className="label">Search &amp; input</p>
+            <div className="row">
+              <div style={{ width: 240 }}>
+                <SearchField />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--text)' }}>
-                <Toggle checked={false} onChange={() => {}} /> Vim mode
+              <div style={{ width: 240 }}>
+                <Input placeholder="Name your graph" defaultValue="My Graph" />
               </div>
             </div>
-          </div>
-        </React.Fragment>
-      )
-    }
-    ;(function boot(n) {
-      if (window[NS] && window[NS].Input) {
-        ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
-      } else if (n < 120) { setTimeout(() => boot(n + 1), 50) }
-    })(0)
-  </script>
-</body>
+            <p className="label">Checkbox &amp; toggle</p>
+            <div className="row">
+              <div className="col">
+                <Checkbox checked={c1} label="Ship the design system" onChange={setC1} />
+                <Checkbox checked={c2} label="Write release notes" onChange={setC2} />
+              </div>
+              <div className="col" style={{ minWidth: 160 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontSize: 14,
+                    color: 'var(--text)',
+                  }}
+                >
+                  <Toggle checked={on} onChange={setOn} /> Spell check
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontSize: 14,
+                    color: 'var(--text)',
+                  }}
+                >
+                  <Toggle checked={false} onChange={() => {}} /> Vim mode
+                </div>
+              </div>
+            </div>
+          </React.Fragment>
+        )
+      }
+      ;(function boot(n) {
+        if (window[NS] && window[NS].Input) {
+          ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
+        } else if (n < 120) {
+          setTimeout(() => boot(n + 1), 50)
+        }
+      })(0)
+    </script>
+  </body>
 </html>

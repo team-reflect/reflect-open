@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
-import { resolveTaskEdit } from '@/lib/tasks/task-content'
+import { resolveTaskEdit } from '@reflect/core'
 
 /** The finalizer commands a task editor's keymap binds to its keys. */
 export interface TaskEditorApi {
@@ -174,9 +174,7 @@ export function useTaskEditorFinalizer({
         // to persist first — the new text, `''` for an emptied row, or `null` when
         // unchanged (don't rewrite) — so the insert can sequence after the save.
         const result = resolveTaskEdit(initial, currentRef.current)
-        onContinue(
-          result.type === 'commit' ? result.content : result.type === 'delete' ? '' : null,
-        )
+        onContinue(result.type === 'commit' ? result.content : result.type === 'delete' ? '' : null)
       },
       cancel: () => {
         if (!claim()) {

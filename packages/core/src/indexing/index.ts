@@ -1,44 +1,14 @@
-/**
- * `@reflect/core` indexing layer (Plan 04) — the TS pipeline that turns parsed
- * notes into the SQLite projection, plus the typed read getters over it.
- */
-export {
-  openIndex,
-  applyIndexedNote,
-  applyIndexedNotes,
-  removeFromIndex,
-  moveNoteIndexed,
-  clearIndex,
-  setIndexMeta,
-  watchStart,
-  watchStop,
-} from './commands'
 export {
   FILE_CHANGES_EVENT,
-  subscribeFileChanges,
-  emitFileChanges,
+  RECONCILE_EVENT,
   type FileChange,
-} from './file-changes'
-export { setLocalWriteEcho, subscribeOwnWrites } from './local-write-echo'
-export { subscribeIcloudConflicts, subscribeIcloudWatchFailed } from './icloud-conflicts'
-export { subscribeIndexApplied, type IndexAppliedListener } from './index-applied'
-export { INDEX_WRITTEN_EVENT, subscribeIndexWritten } from './index-written'
-export { NOTE_MOVED_EVENT, subscribeNoteMoved } from './note-moved'
-export {
-  subscribeIndexChanges,
-  applyIndexChanges,
-  type ApplyErrorHandler,
-  type MovedHandler,
-} from './live'
-export { hashContent } from './hash'
-export {
-  availableTemplatePath,
-  slugPathForTitle,
-  templateSlugPathForTitle,
-} from './note-paths'
-export { listTemplates, type TemplateEntry } from './template-list'
+  type FileChangeSource,
+} from './file-change-service.ts'
+export type { ApplyErrorHandler, MovedHandler } from './live.ts'
+export { type TemplateEntry } from './index-query-service.ts'
 export {
   buildIndexedNote,
+  CLAIM_TIER,
   decodeTaskBreadcrumbs,
   encodeTaskBreadcrumbs,
   indexedNoteSchema,
@@ -50,107 +20,56 @@ export {
   type IndexedLink,
   type IndexedTag,
   type IndexedAlias,
-} from './indexed-note'
+} from './indexed-note.ts'
+export { PROJECTION_VERSION_KEY, type IndexPassOptions } from './indexer.ts'
 export {
-  indexNote,
-  reindexNotesReferencing,
-  rebuildIndex,
-  reconcileIndex,
-  syncIndex,
-  PROJECTION_VERSION_KEY,
-  type IndexPassOptions,
-} from './indexer'
-export {
-  dailyDatesInRange,
-  getBacklinks,
-  getBacklinksWithContext,
-  getConflictedNotes,
-  getDuplicateNoteIds,
-  getIndexMeta,
-  getLinkSources,
-  getNote,
-  getNotesByTag,
-  getOpenTasks,
-  getCompletedTasks,
-  getPinnedNotes,
-  suggestWikiTargets,
-  suggestTags,
-  getIndexedFileFacts,
-  getIndexedFileFactsByPath,
-  listDailyNotes,
-  resolveWikiTarget,
   type Backlink,
   type BacklinkContext,
   type BacklinkContextPage,
   type BacklinkContextPageOptions,
   type BacklinkSourceCursor,
-  type ConflictedNote,
-  type DailyNoteRow,
-  type DailyNotesRange,
-  type DuplicateIdGroup,
-  type NoteRow,
-  type OpenTask,
-  type PinnedNote,
-  type TagSuggestion,
-} from './queries'
-export { resolveNoteTarget } from './resolve-target'
+} from './backlink-service.ts'
+export { type DuplicateIdGroup, type NoteRow, type PinnedNote } from './index-query-service.ts'
+export { type DailyNoteRow, type DailyNotesRange } from '../daily/daily-note-service.ts'
+export { type TagSuggestion } from './suggestion-service.ts'
+export { type WikiLinkSuggestionResult } from './queries-shared.ts'
+
 export {
-  groupTaskContexts,
-  groupTasks,
-  taskDateBucket,
-  type TaskContext,
-  type TaskGroup,
-  type TaskGroupKind,
-} from './group-tasks'
-export {
-  listNotes,
-  listNoteTags,
-  listRecentNotes,
   type NoteListEntry,
   type NoteListOptions,
   type NoteTagFacet,
   type RecentNoteRow,
   type RecentNotesOptions,
-} from './note-list'
+} from './note-list-service.ts'
 export {
+  aliasHint,
   rankWikiSuggestions,
   mergeDateSuggestions,
+  serializeWikiSuggestionAddress,
+  type WikiLinkSuggestion,
   type WikiSuggestion,
   type GeneratedDate,
-} from './suggest'
-export {
-  generateDateSuggestions,
-  type DateSuggestion,
-  type DateSuggestionContext,
-} from './date-suggestions'
-export {
-  parseHighlights,
-  randomNotePath,
-  HIGHLIGHT_START,
-  HIGHLIGHT_END,
-  type HighlightSegment,
-} from './search'
-export { lineAt, lineSnippet, previewSnippet } from './snippet'
+} from './suggest.ts'
+export type { DateSuggestion, DateSuggestionContext } from './date-suggestion-types.ts'
+export { generateDateSuggestions } from './date-suggestions.ts'
+export { parseHighlights, HIGHLIGHT_START, HIGHLIGHT_END, type HighlightSegment } from './search.ts'
+export { previewSnippet } from './snippet.ts'
 export {
   blockContextAt,
   blockContextLinesAt,
   prepareBlockContext,
   type BlockContextLines,
   type BlockContextSource,
-} from './block-context'
-export { extractSnippetTasks, type SnippetTask } from './snippet-tasks'
-export { parseSearchQuery, type ParsedSearchQuery, type SearchFilters } from './filter-query'
-export {
-  searchNotes,
-  searchWithFilters,
-  type FilteredSearchHit,
-  type FilteredSearchOptions,
-  type SearchHit,
-} from './filtered-search'
+} from './block-context.ts'
+export { extractSnippetTasks, type SnippetTask } from './snippet-tasks.ts'
+export { parseSearchQuery, type ParsedSearchQuery, type SearchFilters } from './filter-query.ts'
+export { type FilteredSearchHit, type FilteredSearchOptions } from './search-service.ts'
 export {
   rewriteLinksForTitleChange,
+  rewritePathLinksForMove,
   nextAliases,
+  type RenameBacklink,
   type RenameIo,
   type TitleRenameRewriteOptions,
   type TitleRenameRewriteResult,
-} from './rename'
+} from './rename.ts'

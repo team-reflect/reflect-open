@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { ChevronDown, Settings } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { addDaysIso } from '@/lib/dates'
-import { monthOf } from '@/lib/month-grid'
-import { cn } from '@/lib/utils'
-import { monthPickTarget, weekAtIndex, weekStartOf } from '@/mobile/calendar'
-import { hapticImpactLight } from '@/mobile/haptics'
-import { MonthPickerDrawer } from '@/mobile/month-picker-drawer'
-import { MonthTitle } from '@/mobile/month-title'
-import { useWeekStrip } from '@/mobile/use-week-strip'
-import { WeekRow } from '@/mobile/week-row'
-import { useSettings } from '@/providers/settings-provider'
-import { useRouter } from '@/routing/router'
+import { Button } from '@/components/ui/button.tsx'
+import { addDaysToIsoDate, getYearMonth } from '@reflect/utils'
+import { getUserWeekStart } from '@reflect/core'
+import { monthPickTarget, weekAtIndex } from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
+import { MonthPickerDrawer } from '@/mobile/month-picker-drawer.tsx'
+import { MonthTitle } from '@/mobile/month-title.tsx'
+import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
+import { useWeekStrip } from '@/mobile/use-week-strip.ts'
+import { WeekRow } from '@/mobile/week-row.tsx'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useRouter } from '@/routing/router.tsx'
 
 interface CalendarStripProps {
   /**
@@ -44,23 +46,33 @@ interface CalendarStripProps {
  * jump across months, and a **Today** affordance appears in the header when
  * the selection has wandered off today.
  */
-export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStripProps): ReactElement {
+export function CalendarStrip({
+  date,
+  today,
+  resetSeq,
+  onSelect,
+}: CalendarStripProps): ReactElement {
+  const { haptics } = useMobileServices()
   const { settings } = useSettings()
   const { navigate } = useRouter()
   const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(
     date,
     settings.weekStartDay,
   )
+  const dailyNoteDates = useDailyNoteDates(
+    weekWindow.start,
+    addDaysToIsoDate(weekAtIndex(weekWindow, weekWindow.count - 1), 6),
+  )
 
   // Header month: the selection's own month while its week is on screen;
   // while browsing, the visible week's dominant (middle-day) month.
-  const selectionWeekStart = weekStartOf(date, settings.weekStartDay)
+  const selectionWeekStart = getUserWeekStart(date, settings.weekStartDay)
   const headerDate =
-    displayedWeekStart === selectionWeekStart ? date : addDaysIso(displayedWeekStart, 3)
+    displayedWeekStart === selectionWeekStart ? date : addDaysToIsoDate(displayedWeekStart, 3)
   const showToday = date !== today
 
   const jumpToToday = (): void => {
-    hapticImpactLight()
+    hapticImpactLight(haptics)
     onSelect(today)
     // Selecting today only moves the strip when `date` changes — re-center
     // explicitly so a browse-away strip snaps back even when already on today.
@@ -68,13 +80,13 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
   }
 
   const openSettings = (): void => {
-    hapticImpactLight()
+    hapticImpactLight(haptics)
     navigate({ kind: 'settings' })
   }
 
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const openMonthPicker = (): void => {
-    hapticImpactLight()
+    hapticImpactLight(haptics)
     setMonthPickerOpen(true)
   }
   const pickMonth = (picked: string): void => {
@@ -88,20 +100,17 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
 
   // An explicit re-arrival doesn't change `date`, so the follow effect won't
   // move a browsed-away strip — re-center it here.
-  const lastResetSeq = useRef(resetSeq)
+  const lastResetSeqRef = useRef(resetSeq)
   useEffect(() => {
-    if (resetSeq === lastResetSeq.current) {
+    if (resetSeq === lastResetSeqRef.current) {
       return
     }
-    lastResetSeq.current = resetSeq
+    lastResetSeqRef.current = resetSeq
     showWeekOf(date)
   }, [resetSeq, date, showWeekOf])
 
   return (
-    <header
-      className="shrink-0 border-b border-border px-2 pb-1"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
+    <header className="shrink-0 border-b border-border px-safe-offset-2 pt-safe pb-1">
       {/* Three equal-flanked columns so the month sits at the screen's center
           regardless of the gear (left) and the fading Today button (right). */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1">
@@ -123,7 +132,7 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
             className="flex min-w-0 items-center gap-1"
             onClick={openMonthPicker}
           >
-            <MonthTitle month={monthOf(headerDate)} />
+            <MonthTitle month={getYearMonth(headerDate)} />
             <ChevronDown aria-hidden className="size-4 shrink-0 text-text-muted" />
           </button>
         </h1>
@@ -149,7 +158,7 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
         <div className="flex">
           {Array.from({ length: weekWindow.count }, (_, index) => {
             const weekStart = weekAtIndex(weekWindow, index)
-            const weekEnd = addDaysIso(weekStart, 6)
+            const weekEnd = addDaysToIsoDate(weekStart, 6)
             const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
             return (
               <WeekRow
@@ -157,6 +166,7 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
                 weekStart={weekStart}
                 selectedDay={contains(date) ? date : null}
                 todayDay={contains(today) ? today : null}
+                dailyNoteDates={dailyNoteDates}
                 onSelect={onSelect}
               />
             )
@@ -166,9 +176,9 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
       <MonthPickerDrawer
         open={monthPickerOpen}
         onOpenChange={setMonthPickerOpen}
-        month={monthOf(headerDate)}
-        selected={monthOf(date)}
-        today={monthOf(today)}
+        month={getYearMonth(headerDate)}
+        selected={getYearMonth(date)}
+        today={getYearMonth(today)}
         onPick={pickMonth}
       />
     </header>

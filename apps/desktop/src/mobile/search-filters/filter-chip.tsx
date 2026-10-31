@@ -1,6 +1,6 @@
-import { type ReactElement, type ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils.ts'
 
 interface FilterChipProps {
   /** The chip's label (active chips usually show their value). */

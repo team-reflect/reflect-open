@@ -1,4 +1,6 @@
+import { getWeekStart, type Weekday } from '@reflect/utils'
 import { z } from 'zod'
+import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 
 /**
  * The user-settings schema — the policy half of the settings store. Rust
@@ -55,6 +57,12 @@ export const editorDefaultBulletSchema = z.boolean().catch(true)
  * separate keys so each can be turned off on its own.
  */
 export const editorBulletAfterHeadingSchema = z.boolean().catch(true)
+
+/**
+ * Whether the caret animates smoothly between positions while editing. On by
+ * default. Display-only; it never changes the document or stored Markdown.
+ */
+export const editorSmoothCaretAnimationSchema = z.boolean().catch(true)
 
 /**
  * The editor's reading text size. `small` (the default) is one design-system
@@ -138,14 +146,20 @@ export const themePreferenceSchema = z.enum(['system', 'light', 'dark']).catch('
 
 export type ThemePreference = z.infer<typeof themePreferenceSchema>
 
+/** The time-format setting's choices. */
+export const TIME_FORMATS = ['12h', '24h'] as const
+
 /**
  * How times of day are displayed throughout the app. `12h` (the default)
  * renders `8:22pm`; `24h` renders `20:22`. Display-only — stored timestamps
  * and daily-note keys are unaffected.
  */
-export const timeFormatSchema = z.enum(['12h', '24h']).catch('12h')
+export const timeFormatSchema = z.enum(TIME_FORMATS).catch('12h')
 
 export type TimeFormat = z.infer<typeof timeFormatSchema>
+
+/** The date-format setting's choices. */
+export const DATE_FORMATS = ['mdy', 'dmy', 'iso'] as const
 
 /**
  * How calendar dates are displayed throughout the app: `mdy` (the default)
@@ -153,17 +167,30 @@ export type TimeFormat = z.infer<typeof timeFormatSchema>
  * renders `2026-06-10`. Display-only — daily-note filenames and stored dates
  * stay ISO `YYYY-MM-DD` regardless.
  */
-export const dateFormatSchema = z.enum(['mdy', 'dmy', 'iso']).catch('mdy')
+export const dateFormatSchema = z.enum(DATE_FORMATS).catch('mdy')
 
 export type DateFormat = z.infer<typeof dateFormatSchema>
 
 /**
  * Which day opens the calendar week. `monday` (the default) follows ISO 8601;
- * `sunday` matches the North-American convention.
+ * `sunday` matches the North-American convention; `saturday` matches the
+ * convention of most Middle-East and North-Africa locales.
  */
-export const weekStartDaySchema = z.enum(['monday', 'sunday']).catch('monday')
+export const weekStartDaySchema = z.enum(['monday', 'sunday', 'saturday']).catch('monday')
 
 export type WeekStartDay = z.infer<typeof weekStartDaySchema>
+
+const WEEK_START_WEEKDAYS: Record<WeekStartDay, Weekday> = { sunday: 0, monday: 1, saturday: 6 }
+
+/** The week-start day as a {@link Weekday} (0 = Sunday, 6 = Saturday). */
+export function getWeekStartWeekday(weekStartDay: WeekStartDay): Weekday {
+  return WEEK_START_WEEKDAYS[weekStartDay]
+}
+
+/** The first day of `date`'s week, honoring the week-start setting. */
+export function getUserWeekStart(date: string, weekStartDay: WeekStartDay): string {
+  return getWeekStart(date, getWeekStartWeekday(weekStartDay))
+}
 
 /**
  * Tags pinned as one-click filters on the All Notes screen, in display order.
@@ -192,6 +219,37 @@ export const semanticSearchEnabledSchema = z.boolean().catch(false)
  * entirely.
  */
 export const describeAssetsSchema = z.boolean().catch(true)
+
+/**
+ * Whether audio-memo transcripts receive a best-effort AI formatting pass
+ * before they are written as Markdown. On by default, matching the original
+ * Reflect preference. Turning it off keeps the transcription provider's raw
+ * body; transcript-derived title generation remains enabled.
+ */
+export const transcriptionFormatSchema = z.boolean().catch(true)
+
+/**
+ * Maximum stored transcription hint. `whisper-1` (the OpenAI fallback model)
+ * reads only the last 224 prompt tokens, so a longer hint would be cut from
+ * the front.
+ */
+export const TRANSCRIPTION_PROMPT_MAX_LENGTH = 500
+
+/** Canonicalize the user's transcription hint before storing or sending it. */
+export function normalizeTranscriptionPrompt(value: string): string {
+  return value.trim().slice(0, TRANSCRIPTION_PROMPT_MAX_LENGTH)
+}
+
+/**
+ * Free-text context for audio-memo transcription (for example names the
+ * provider tends to misspell). Sent verbatim with every segment as the
+ * provider's prompt (OpenAI) or appended to the instruction (Gemini). Empty
+ * (the default) sends nothing.
+ */
+export const transcriptionPromptSchema = z
+  .string()
+  .catch('')
+  .transform(normalizeTranscriptionPrompt)
 
 /**
  * Whether the user has finished the mobile onboarding choice (Plan 19, step
@@ -296,12 +354,28 @@ export const graphColorsSchema = z
   })
 
 /**
- * The cloud AI providers Reflect can call directly (BYOK — the user's own
- * keys, no Reflect-hosted proxy).
+ * The AI providers Reflect can call directly (BYOK — the user's own keys, no
+ * Reflect-hosted proxy). `openai-compatible` stores its user-supplied base URL
+ * per configured entry.
  */
-export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google', 'openrouter'])
+export const aiProviderIdSchema = z.enum([
+  'openai',
+  'anthropic',
+  'google',
+  'openrouter',
+  'openai-compatible',
+])
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
+
+export type HostedAiProviderId = Exclude<AiProviderId, 'openai-compatible'>
+
+export const openAiCompatibleBaseUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(isHttpBaseUrl)
+  .transform(normalizeOpenAICompatibleBaseUrl)
 
 /**
  * One configured AI provider: the provider, its default model id, and a key
@@ -310,15 +384,49 @@ export type AiProviderId = z.infer<typeof aiProviderIdSchema>
  * key's trailing characters so the settings UI can identify it. Which entry
  * is the app-wide default is a sibling scalar (`defaultAiProviderId`), not a
  * per-entry flag, so "at most one default" holds by construction.
+ * OpenAI-compatible entries additionally carry their API base URL, because it
+ * is user configuration rather than a fixed catalog endpoint.
  */
-export const aiProviderConfigSchema = z.object({
+const aiProviderConfigBaseSchema = z.object({
   id: z.string().min(1),
-  provider: aiProviderIdSchema,
   model: z.string().min(1),
   keyHint: z.string().catch(''),
 })
 
+const openAiProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('openai'),
+})
+
+const anthropicProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('anthropic'),
+})
+
+const googleProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('google'),
+})
+
+const openRouterProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('openrouter'),
+})
+
+const openAiCompatibleProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('openai-compatible'),
+  baseUrl: openAiCompatibleBaseUrlSchema,
+})
+
+export type OpenAiCompatibleProviderConfig = z.infer<typeof openAiCompatibleProviderConfigSchema>
+
+export const aiProviderConfigSchema = z.discriminatedUnion('provider', [
+  openAiProviderConfigSchema,
+  anthropicProviderConfigSchema,
+  googleProviderConfigSchema,
+  openRouterProviderConfigSchema,
+  openAiCompatibleProviderConfigSchema,
+])
+
 export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
+
+export type HostedAiProviderConfig = Exclude<AiProviderConfig, { provider: 'openai-compatible' }>
 
 /**
  * The `aiProviders` entry AI features use by default. A dangling or null id
@@ -374,12 +482,12 @@ export const chatSystemPromptSchema = z.string().catch('').transform(normalizeCh
 export const aiProvidersSchema = z
   .array(z.unknown())
   .catch([])
-  .transform((entries) =>
-    entries.flatMap((entry) => {
+  .transform((entries) => {
+    return entries.flatMap((entry) => {
       const parsed = aiProviderConfigSchema.safeParse(entry)
       return parsed.success ? [parsed.data] : []
-    }),
-  )
+    })
+  })
 
 /**
  * Where an AI selection prompt's accepted result lands: `replace` swaps the
@@ -415,43 +523,45 @@ export type AiPrompt = z.infer<typeof aiPromptSchema>
 export const aiPromptsSchema = z
   .array(z.unknown())
   .catch([])
-  .transform((entries) =>
-    entries.flatMap((entry) => {
+  .transform((entries) => {
+    return entries.flatMap((entry) => {
       const parsed = aiPromptSchema.safeParse(entry)
       return parsed.success ? [parsed.data] : []
-    }),
-  )
-
-export const settingsSchema = z
-  .looseObject({
-    editorMarkdownSyntax: editorMarkdownSyntaxSchema,
-    editorSpellCheck: editorSpellCheckSchema,
-    editorDefaultBullet: editorDefaultBulletSchema,
-    editorBulletAfterHeading: editorBulletAfterHeadingSchema,
-    editorTextSize: editorTextSizeSchema,
-    editorFullWidth: editorFullWidthSchema,
-    sidebarWidth: sidebarWidthSchema,
-    contextSidebarWidth: contextSidebarWidthSchema,
-    semanticSearchEnabled: semanticSearchEnabledSchema,
-    describeAssets: describeAssetsSchema,
-    contactsEnabled: contactsEnabledSchema,
-    mobileOnboarded: mobileOnboardedSchema,
-    mobileStorage: mobileStorageKindSchema,
-    mobileGraphName: mobileGraphNameSchema,
-    theme: themePreferenceSchema,
-    timeFormat: timeFormatSchema,
-    dateFormat: dateFormatSchema,
-    weekStartDay: weekStartDaySchema,
-    allNotesFilterTags: allNotesFilterTagsSchema,
-    calendarEnabled: calendarEnabledSchema,
-    calendarIds: calendarIdsSchema,
-    graphColors: graphColorsSchema,
-    aiProviders: aiProvidersSchema,
-    defaultAiProviderId: defaultAiProviderIdSchema,
-    chatModelSelection: chatModelSelectionSchema,
-    chatSystemPrompt: chatSystemPromptSchema,
-    aiPrompts: aiPromptsSchema,
+    })
   })
+
+export const settingsSchema = z.looseObject({
+  editorMarkdownSyntax: editorMarkdownSyntaxSchema,
+  editorSpellCheck: editorSpellCheckSchema,
+  editorDefaultBullet: editorDefaultBulletSchema,
+  editorBulletAfterHeading: editorBulletAfterHeadingSchema,
+  editorSmoothCaretAnimation: editorSmoothCaretAnimationSchema,
+  editorTextSize: editorTextSizeSchema,
+  editorFullWidth: editorFullWidthSchema,
+  sidebarWidth: sidebarWidthSchema,
+  contextSidebarWidth: contextSidebarWidthSchema,
+  semanticSearchEnabled: semanticSearchEnabledSchema,
+  describeAssets: describeAssetsSchema,
+  transcriptionFormat: transcriptionFormatSchema,
+  transcriptionPrompt: transcriptionPromptSchema,
+  contactsEnabled: contactsEnabledSchema,
+  mobileOnboarded: mobileOnboardedSchema,
+  mobileStorage: mobileStorageKindSchema,
+  mobileGraphName: mobileGraphNameSchema,
+  theme: themePreferenceSchema,
+  timeFormat: timeFormatSchema,
+  dateFormat: dateFormatSchema,
+  weekStartDay: weekStartDaySchema,
+  allNotesFilterTags: allNotesFilterTagsSchema,
+  calendarEnabled: calendarEnabledSchema,
+  calendarIds: calendarIdsSchema,
+  graphColors: graphColorsSchema,
+  aiProviders: aiProvidersSchema,
+  defaultAiProviderId: defaultAiProviderIdSchema,
+  chatModelSelection: chatModelSelectionSchema,
+  chatSystemPrompt: chatSystemPromptSchema,
+  aiPrompts: aiPromptsSchema,
+})
 
 export type Settings = z.infer<typeof settingsSchema>
 

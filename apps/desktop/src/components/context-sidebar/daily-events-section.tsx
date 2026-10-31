@@ -1,11 +1,10 @@
 import { useState, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import type { CalendarEvent } from '@reflect/core'
-import { formatTimeOfDay } from '@/lib/dates'
-import { useCalendarChangeInvalidation, useDayEvents } from '@/lib/use-calendar'
-import { useSettings } from '@/providers/settings-provider'
-import { AddMeetingDialog } from './add-meeting-dialog'
-import { SidebarSection } from './sidebar-section'
+import { type CalendarEvent, formatTimeOfDay } from '@reflect/core'
+import { useCalendarChangeInvalidation, useDayEvents } from '@/lib/use-calendar.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { AddMeetingDialog } from './add-meeting-dialog.tsx'
+import { SidebarSection } from './sidebar-section.tsx'
 
 interface DailyEventsSectionProps {
   /** The day whose events to show — a validated ISO date. */
@@ -39,7 +38,7 @@ export function DailyEventsSection({ date }: DailyEventsSectionProps): ReactElem
               type="button"
               onClick={() => setPendingEvent(event)}
               title="Add to daily note"
-              className="group flex w-full items-center gap-2 rounded-md px-3 py-1 leading-5 text-text-secondary transition-colors duration-100 hover:bg-surface-hover hover:text-text"
+              className="group flex w-full items-center gap-2 rounded-md px-3 py-1 leading-5 text-text-secondary hover:bg-surface-hover hover:text-text"
             >
               <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
                 {event.title}
@@ -58,11 +57,7 @@ export function DailyEventsSection({ date }: DailyEventsSectionProps): ReactElem
         ))}
       </ul>
       {pendingEvent !== null && (
-        <AddMeetingDialog
-          date={date}
-          event={pendingEvent}
-          onClose={() => setPendingEvent(null)}
-        />
+        <AddMeetingDialog date={date} event={pendingEvent} onClose={() => setPendingEvent(null)} />
       )}
     </SidebarSection>
   )

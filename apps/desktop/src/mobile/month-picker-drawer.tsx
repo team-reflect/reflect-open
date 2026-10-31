@@ -1,10 +1,12 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { monthLabel, monthShortLabel } from '@/lib/month-grid'
-import { cn } from '@/lib/utils'
-import { hapticImpactLight } from '@/mobile/haptics'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { getYearMonthsOfYear, getYear } from '@reflect/utils'
+import { formatMonthLabel, formatShortMonthLabel } from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 
 interface MonthPickerDrawerProps {
   open: boolean
@@ -17,10 +19,6 @@ interface MonthPickerDrawerProps {
   today: string
   /** Pick a `YYYY-MM` month — the strip navigates and closes the sheet. */
   onPick: (month: string) => void
-}
-
-function yearOf(month: string): number {
-  return Number(month.slice(0, 4))
 }
 
 /**
@@ -37,27 +35,25 @@ export function MonthPickerDrawer({
   today,
   onPick,
 }: MonthPickerDrawerProps): ReactElement {
-  const [year, setYear] = useState(() => yearOf(month))
+  const { haptics } = useMobileServices()
+  const [year, setYear] = useState(() => getYear(month))
   // Each open starts from the currently displayed month's year, not wherever
   // the previous visit browsed to. Adjust-on-render, mirroring MonthTitle.
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
     if (open) {
-      setYear(yearOf(month))
+      setYear(getYear(month))
     }
   }
 
-  const months = Array.from(
-    { length: 12 },
-    (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`,
-  )
+  const months = getYearMonthsOfYear(year)
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Change month">
         <DrawerTitle className="sr-only">Change month</DrawerTitle>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between p-4">
           <Button
             variant="ghost"
             size="icon"
@@ -86,11 +82,11 @@ export function MonthPickerDrawer({
               <button
                 key={candidate}
                 type="button"
-                aria-label={monthLabel(candidate)}
+                aria-label={formatMonthLabel(candidate)}
                 aria-pressed={isSelected}
                 aria-current={isThisMonth ? 'date' : undefined}
                 onClick={() => {
-                  hapticImpactLight()
+                  hapticImpactLight(haptics)
                   onPick(candidate)
                 }}
                 className={cn(
@@ -100,7 +96,7 @@ export function MonthPickerDrawer({
                   !isSelected && !isThisMonth && 'text-text',
                 )}
               >
-                {monthShortLabel(candidate)}
+                {formatShortMonthLabel(candidate)}
               </button>
             )
           })}

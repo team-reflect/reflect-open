@@ -1,12 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '../ipc/bridge'
-import type { ContactMatch } from './commands'
-import {
-  contactLinkSuggestions,
-  contactNamesEqual,
-  matchContactForTitle,
-  suggestContactForTitle,
-} from './match'
+import { describe, expect, it } from 'vitest'
+import type { ContactMatch } from './commands.ts'
+import { contactNamesEqual, matchContactForTitle, pickContactLinkSuggestions } from './match.ts'
 
 function contact(overrides: Partial<ContactMatch>): ContactMatch {
   return {
@@ -18,10 +12,6 @@ function contact(overrides: Partial<ContactMatch>): ContactMatch {
     ...overrides,
   }
 }
-
-afterEach(() => {
-  setBridge(null)
-})
 
 describe('matchContactForTitle', () => {
   it('matches a title that exactly equals a full name', () => {
@@ -79,7 +69,7 @@ describe('contactNamesEqual', () => {
   })
 })
 
-describe('contactLinkSuggestions', () => {
+describe('pickContactLinkSuggestions', () => {
   const ada = {
     fullName: 'Ada Lovelace',
     givenName: 'Ada',
@@ -88,26 +78,20 @@ describe('contactLinkSuggestions', () => {
     phones: [],
   }
 
-  it('answers empty for short queries without touching the bridge', async () => {
-    const invoke = vi.fn()
-    setBridge({ invoke, listen: async () => () => {} })
-    await expect(contactLinkSuggestions('a')).resolves.toEqual([])
-    expect(invoke).not.toHaveBeenCalled()
+  it('drops nameless and detail-less contacts', () => {
+    expect(
+      pickContactLinkSuggestions(
+        [
+          ada,
+          { fullName: '', givenName: 'Ada', familyName: '', emails: ['x@example.com'], phones: [] },
+          { fullName: 'Ada Byron', givenName: 'Ada', familyName: 'Byron', emails: [], phones: [] },
+        ],
+        4,
+      ),
+    ).toEqual([ada])
   })
 
-  it('keeps word-prefix matches, dropping nameless and detail-less contacts', async () => {
-    const invoke = vi.fn().mockResolvedValue([
-      ada,
-      { fullName: '', givenName: '', familyName: '', emails: ['x@example.com'], phones: [] },
-      { fullName: 'Ada Byron', givenName: 'Ada', familyName: 'Byron', emails: [], phones: [] },
-    ])
-    setBridge({ invoke, listen: async () => () => {} })
-
-    await expect(contactLinkSuggestions('Ada')).resolves.toEqual([ada])
-    expect(invoke).toHaveBeenCalledWith('contacts_lookup_by_name', { name: 'Ada' })
-  })
-
-  it('dedupes same-named entries and honors the limit', async () => {
+  it('dedupes same-named entries and honors the limit', () => {
     const named = (index: number) => ({
       fullName: `Person ${index}`,
       givenName: 'Person',
@@ -115,44 +99,22 @@ describe('contactLinkSuggestions', () => {
       emails: [`p${index}@example.com`],
       phones: [],
     })
-    setBridge({
-      invoke: async () => [named(1), { ...named(1), emails: ['dupe@example.com'] }, named(2), named(3), named(4), named(5)],
-      listen: async () => () => {},
-    })
-
-    const suggestions = await contactLinkSuggestions('Person')
+    const suggestions = pickContactLinkSuggestions(
+      [
+        named(1),
+        { ...named(1), emails: ['dupe@example.com'] },
+        named(2),
+        named(3),
+        named(4),
+        named(5),
+      ],
+      4,
+    )
     expect(suggestions.map((entry) => entry.fullName)).toEqual([
       'Person 1',
       'Person 2',
       'Person 3',
       'Person 4',
     ])
-  })
-})
-
-describe('suggestContactForTitle', () => {
-  it('short-circuits blank titles without touching the bridge', async () => {
-    const invoke = vi.fn()
-    setBridge({ invoke, listen: async () => () => {} })
-    await expect(suggestContactForTitle('  ')).resolves.toBeNull()
-    expect(invoke).not.toHaveBeenCalled()
-  })
-
-  it('looks up the trimmed title and applies the exact-match rule', async () => {
-    const invoke = vi.fn().mockResolvedValue([
-      {
-        fullName: 'Ada Lovelace',
-        givenName: 'Ada',
-        familyName: 'Lovelace',
-        emails: ['ada@example.com'],
-        phones: [],
-      },
-      { fullName: 'Ada Byron', givenName: 'Ada', familyName: 'Byron', emails: [], phones: [] },
-    ])
-    setBridge({ invoke, listen: async () => () => {} })
-
-    const match = await suggestContactForTitle(' Ada Lovelace ')
-    expect(match?.emails).toEqual(['ada@example.com'])
-    expect(invoke).toHaveBeenCalledWith('contacts_lookup_by_name', { name: 'Ada Lovelace' })
   })
 })

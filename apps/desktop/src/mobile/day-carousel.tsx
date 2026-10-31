@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
-import { dateAtIndex } from '@/lib/day-window'
-import { DaySlide } from '@/mobile/day-slide'
-import { useDayCarousel } from '@/mobile/use-day-carousel'
+import { dateAtIndex } from '@reflect/app'
+import { DaySlide } from '@/mobile/day-slide.tsx'
+import { useDayCarousel } from '@/mobile/use-day-carousel.ts'
 
 interface DayCarouselProps {
   /** The selected day (from the route). Drives the carousel position. */

@@ -1,28 +1,77 @@
 <!-- @dsCard group="Type" viewport="700x250" name="UI & editor scale" subtitle="Dense chrome (12–14px) vs. roomy prose (16px)" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 22px; background: var(--surface); font-family: var(--font-sans); color: var(--text); }
-  .stack { display: flex; flex-direction: column; gap: 14px; }
-  .line { display: flex; align-items: baseline; gap: 14px; }
-  .tag { width: 130px; flex: none; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-  .h1 { font-size: var(--text-2xl); font-weight: 600; letter-spacing: var(--tracking-tight); }
-  .h2 { font-size: var(--text-xl); font-weight: 600; }
-  .body { font-size: var(--text-base); line-height: var(--leading-relaxed); }
-  .ui { font-size: var(--text-sm); font-weight: 500; }
-  .meta { font-size: var(--text-2xs); font-weight: 500; color: var(--text-secondary); }
-</style>
-</head>
-<body>
-  <div class="stack">
-    <div class="line"><span class="tag">2xl · 24/600</span><span class="h1">Tuesday, June 8</span></div>
-    <div class="line"><span class="tag">xl · 20/600</span><span class="h2">A note heading</span></div>
-    <div class="line"><span class="tag">base · 16/400</span><span class="body">Editor prose — the user's writing is the largest thing on screen.</span></div>
-    <div class="line"><span class="tag">sm · 14/500</span><span class="ui">All notes · Daily notes · Tasks</span></div>
-    <div class="line"><span class="tag">2xs · 12/500</span><span class="meta">Pinned notes · Search anything…</span></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 22px;
+        background: var(--surface);
+        font-family: var(--font-sans);
+        color: var(--text);
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .line {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+      }
+      .tag {
+        width: 130px;
+        flex: none;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .h1 {
+        font-size: var(--text-2xl);
+        font-weight: 600;
+        letter-spacing: var(--tracking-tight);
+      }
+      .h2 {
+        font-size: var(--text-xl);
+        font-weight: 600;
+      }
+      .body {
+        font-size: var(--text-base);
+        line-height: var(--leading-relaxed);
+      }
+      .ui {
+        font-size: var(--text-sm);
+        font-weight: 500;
+      }
+      .meta {
+        font-size: var(--text-2xs);
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stack">
+      <div class="line">
+        <span class="tag">2xl · 24/600</span><span class="h1">Tuesday, June 8</span>
+      </div>
+      <div class="line">
+        <span class="tag">xl · 20/600</span><span class="h2">A note heading</span>
+      </div>
+      <div class="line">
+        <span class="tag">base · 16/400</span
+        ><span class="body">Editor prose — the user's writing is the largest thing on screen.</span>
+      </div>
+      <div class="line">
+        <span class="tag">sm · 14/500</span><span class="ui">All notes · Daily notes · Tasks</span>
+      </div>
+      <div class="line">
+        <span class="tag">2xs · 12/500</span
+        ><span class="meta">Pinned notes · Search anything…</span>
+      </div>
+    </div>
+  </body>
 </html>

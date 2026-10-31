@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
-import { ShortcutKeys } from '@/components/shortcut-keys'
-import { cn } from '@/lib/utils'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
+import { cn } from '@/lib/utils.ts'
 
 interface SidebarItemProps {
   /** A 24px icon node — the V1 custom glyphs, or a Lucide icon in a 24px box. */
@@ -32,7 +32,6 @@ export function SidebarItem({
       aria-current={active ? 'page' : undefined}
       className={cn(
         'group flex w-full items-center space-x-3 rounded-md px-2.5 py-1.5 text-sm font-medium',
-        'transition-colors duration-100',
         active
           ? 'bg-surface-hover text-text dark:bg-transparent dark:text-accent'
           : 'text-text hover:bg-surface-hover',

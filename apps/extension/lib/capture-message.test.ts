@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { captureWireMessageSchema } from '@reflect/core/capture-envelope'
-import { buildWireMessage, dataUrlToBase64, isCapturableUrl } from './capture-message'
+import { buildWireMessage, dataUrlToBase64, isCapturableUrl } from './capture-message.ts'
 
 const ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
 const CAPTURED_AT = new Date('2026-06-12T15:30:22.845Z')

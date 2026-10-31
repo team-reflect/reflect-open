@@ -8,9 +8,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { cn } from '@/lib/utils'
+} from '@/components/ui/command.tsx'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
+import { cn } from '@/lib/utils.ts'
 
 interface CustomFilterMenuProps {
   /** Tags not pinned as their own tab, with non-daily note counts. */
@@ -79,11 +79,7 @@ export function CustomFilterMenu({
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={6} className="w-56 p-0">
         <Command label="Filter by another tag">
-          <CommandInput
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Filter by any tag…"
-          />
+          <CommandInput value={query} onValueChange={setQuery} placeholder="Filter by any tag…" />
           <CommandList>
             {/* A force-mounted item never counts as a match, so cmdk would
                 show the empty state right above it — render one or the other. */}

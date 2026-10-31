@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pairMovesById } from './move-detection'
+import { pairMovesById } from './move-detection.ts'
 
 function entries(pairs: Array<[string, string | null]>): Map<string, string | null> {
   return new Map(pairs)
@@ -8,10 +8,7 @@ function entries(pairs: Array<[string, string | null]>): Map<string, string | nu
 describe('pairMovesById', () => {
   it('pairs a vanished row with an appeared file sharing its id', () => {
     expect(
-      pairMovesById(
-        entries([['notes/old.md', 'id-1']]),
-        entries([['notes/new.md', 'id-1']]),
-      ),
+      pairMovesById(entries([['notes/old.md', 'id-1']]), entries([['notes/new.md', 'id-1']])),
     ).toEqual([{ from: 'notes/old.md', to: 'notes/new.md' }])
   })
 
@@ -63,10 +60,7 @@ describe('pairMovesById', () => {
 
   it('unmatched sides simply do not pair', () => {
     expect(
-      pairMovesById(
-        entries([['notes/old.md', 'id-1']]),
-        entries([['notes/new.md', 'id-2']]),
-      ),
+      pairMovesById(entries([['notes/old.md', 'id-1']]), entries([['notes/new.md', 'id-2']])),
     ).toEqual([])
   })
 })

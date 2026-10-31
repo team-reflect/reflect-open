@@ -1,0 +1,37 @@
+diff --git a/lib/index.js b/lib/index.js
+index c5ca771c24dd914e342f791716a822431ee32b3a..5378202694efb5acf03510a4ca57f8bcc34a3c65 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -126,13 +126,31 @@ function exitLiteralAutolink(token) {
+   this.exit(token)
+ }
+ 
++// Regex lookbehind is a syntax error on Safari before 16.4, so build the email
++// regex at runtime and fall back to the 2.0.0 regex where it is unsupported.
++const supportsLookbehind = (function () {
++  try {
++    new RegExp('(?<=a)b')
++    return true
++  } catch {
++    return false
++  }
++})()
++
++/** @returns {RegExp} */
++function createEmailRegex() {
++  return supportsLookbehind
++    ? new RegExp(String.raw`(?<=^|\s|\p{P}|\p{S})([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)`, 'gu')
++    : /([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)/g
++}
++
+ /** @type {FromMarkdownTransform} */
+ function transformGfmAutolinkLiterals(tree) {
+   findAndReplace(
+     tree,
+     [
+       [/(https?:\/\/|www(?=\.))([-.\w]+)([^ \t\r\n]*)/gi, findUrl],
+-      [/(?<=^|\s|\p{P}|\p{S})([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)/gu, findEmail]
++      [createEmailRegex(), findEmail]
+     ],
+     {ignore: ['link', 'linkReference']}
+   )

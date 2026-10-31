@@ -1,37 +1,28 @@
 import { useMemo, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { dailyDatesInRange, hasBridge, type WeekStartDay } from '@reflect/core'
-import { CalendarIcon } from '@/components/icons/calendar-icon'
-import { ChevronLeftIcon } from '@/components/icons/chevron-left-icon'
-import { ChevronRightIcon } from '@/components/icons/chevron-right-icon'
-import { ShortcutKeys } from '@/components/shortcut-keys'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import { keybindingFor } from '@/lib/commands/app-commands'
-import { formatDayLabel } from '@/lib/dates'
-import {
-  addMonths,
-  buildMonthGrid,
-  monthLabel,
-  monthOf,
-  weekdayLabels,
-} from '@/lib/month-grid'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { cn } from '@/lib/utils'
-import { useGraph } from '@/providers/graph-provider'
-import { useSettings } from '@/providers/settings-provider'
-import { useRouter } from '@/routing/router'
+import { CalendarIcon } from '@/components/icons/calendar-icon.tsx'
+import { ChevronLeftIcon } from '@/components/icons/chevron-left-icon.tsx'
+import { ChevronRightIcon } from '@/components/icons/chevron-right-icon.tsx'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
+import { keybindingFor } from '@/lib/commands/app-commands.ts'
+import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
+import { formatDayLabel } from '@reflect/core'
+import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
+import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
+import { cn } from '@/lib/utils.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { useRouter } from '@/routing/router.tsx'
+import { isModEvent } from '@meowdown/core'
 
 interface DayCalendarProps {
   /** The day the sidebar describes (highlighted as selected). */
   selectedDate: string
   /** Today's live ISO date. */
   today: string
-}
-
-/** Maps the persisted `WeekStartDay` value to date-fns' numeric convention. */
-function toWeekStartsOn(weekStartDay: WeekStartDay): 0 | 1 {
-  return weekStartDay === 'sunday' ? 0 : 1
 }
 
 const TODAY_BINDING = keybindingFor('nav.today')
@@ -53,23 +44,22 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   const { navigate } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation(selectedDate)
   const { graph } = useGraph()
+  const { dailyNotes } = useCoreServices()
   const { settings } = useSettings()
-  const weekStartsOn = toWeekStartsOn(settings.weekStartDay)
 
-  const [month, setMonth] = useState(() => monthOf(selectedDate))
+  const [month, setMonth] = useState(() => getYearMonth(selectedDate))
   // Render-time state adjustment (not an effect): navigating to another day
   // re-anchors the visible month before the stale grid can paint.
   const [lastSelected, setLastSelected] = useState(selectedDate)
   if (selectedDate !== lastSelected) {
     setLastSelected(selectedDate)
-    setMonth(monthOf(selectedDate))
+    setMonth(getYearMonth(selectedDate))
   }
 
-  const grid = buildMonthGrid(month, weekStartsOn)
+  const grid = buildMonthGrid(month, settings.weekStartDay)
   const { data: notedDates } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'dailyDates', grid.start, grid.end],
-    queryFn: () => dailyDatesInRange(grid.start, grid.end),
-    enabled: hasBridge() && graph !== null,
+    ...createDailyDatesQueryOptions(dailyNotes, graph?.root, grid.start, grid.end),
+    enabled: graph !== null,
   })
   // The sidebar re-renders as the focused day scrolls through the stream; with
   // the query result reference-stable (structural sharing), rebuild the lookup
@@ -80,7 +70,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
     <div aria-label="Calendar" className="group min-w-36">
       <header className="flex items-center justify-between px-4 py-4">
         <div className="cursor-default text-sm font-semibold text-text">
-          {monthLabel(month)}
+          {formatMonthLabel(month)}
         </div>
         {/* window-drag-control lifts the buttons above the WindowDragRegion strip
             overlaying the title-bar band (see NavigateArrows for the contract). */}
@@ -88,22 +78,24 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
           <button
             type="button"
             aria-label="Previous month"
-            onClick={() => setMonth(addMonths(month, -1))}
+            onClick={() => setMonth(addMonthsToYearMonth(month, -1))}
             className={HEADER_BUTTON_CLASS}
           >
             <ChevronLeftIcon />
           </button>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="Jump to today"
-                onClick={() => navigate({ kind: 'today' })}
-                className={HEADER_BUTTON_CLASS}
-              >
-                <CalendarIcon />
-              </button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Jump to today"
+                  onClick={() => navigate({ kind: 'today' })}
+                  className={HEADER_BUTTON_CLASS}
+                >
+                  <CalendarIcon />
+                </button>
+              }
+            />
             <TooltipContent>
               Jump to Today {TODAY_BINDING && <ShortcutKeys binding={TODAY_BINDING} />}
             </TooltipContent>
@@ -111,7 +103,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
           <button
             type="button"
             aria-label="Next month"
-            onClick={() => setMonth(addMonths(month, 1))}
+            onClick={() => setMonth(addMonthsToYearMonth(month, 1))}
             className={HEADER_BUTTON_CLASS}
           >
             <ChevronRightIcon />
@@ -121,7 +113,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
 
       <div>
         <div className="grid grid-cols-7 border-b border-black/5 px-4 text-center dark:border-white/10">
-          {weekdayLabels(weekStartsOn).map((weekday) => (
+          {getWeekdayLabels(settings.weekStartDay).map((weekday) => (
             <div key={weekday} className="py-2 text-xs font-medium text-text">
               {weekday}
             </div>
@@ -141,9 +133,12 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                     aria-label={formatDayLabel(cell.date, settings.dateFormat)}
                     aria-current={isToday ? 'date' : undefined}
                     aria-pressed={isSelected}
-                    onClick={(event) =>
-                      navigateNoteLink({ kind: 'daily', date: cell.date }, event)
-                    }
+                    onClick={(event) => {
+                      navigateNoteLink({
+                        target: { kind: 'daily', date: cell.date },
+                        openInNewWindow: isModEvent(event),
+                      })
+                    }}
                     className={cn(
                       'relative cursor-default py-1.5 text-xs',
                       // Today stays fully visible even as an adjacent-month

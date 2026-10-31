@@ -1,15 +1,20 @@
-import { useEffect, useState, type MouseEvent, type ReactElement } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useTransition,
+  type MouseEvent,
+  type ReactElement,
+} from 'react'
 import { Check, Copy, RefreshCw } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useNoteRow } from '@/hooks/use-note-row'
-import { runGistPublish } from '@/lib/note-gist'
-import { startOperation } from '@/lib/operations'
-import { cn } from '@/lib/utils'
-import { useGraph } from '@/providers/graph-provider'
-import { SidebarSection } from './sidebar-section'
+import { Button } from '@/components/ui/button.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
+import { useNoteRow } from '@/hooks/use-note-row.ts'
+import { publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
+import { cn } from '@/lib/utils.ts'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { SidebarSection } from './sidebar-section.tsx'
 
 interface PublishedUrlSectionProps {
   /** Graph-relative path of the note whose published URL should be shown. */
@@ -25,11 +30,14 @@ const COPY_RESET_MS = 1400
  * plus a compact copy affordance for sharing it again.
  */
 export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactElement | null {
-  const { graph } = useGraph()
+  const services = useCoreServices()
+  const app = useAppServices()
+  const { clipboard, opener, operations } = app
   const row = useNoteRow(path)
   const url = row?.gistUrl ?? null
   const [copyState, setCopyState] = useState<CopyState>('idle')
-  const [isUpdating, setIsUpdating] = useState(false)
+  // The gist service never rejects, so the transition only drives the spinner.
+  const [isUpdating, startUpdate] = useTransition()
 
   // Reset the transient "copied" badge whenever the published URL changes.
   const [appliedUrl, setAppliedUrl] = useState(url)
@@ -46,37 +54,30 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
     return () => window.clearTimeout(timeout)
   }, [copyState])
 
+  const updateGist = useCallback((): void => {
+    startUpdate(async () => {
+      await publishGistAndCopyLink(services, app, path)
+    })
+  }, [services, app, path])
+
   if (url === null) {
     return null
   }
 
   const copyUrl = async (): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(url)
+      await clipboard.writeText(url)
       setCopyState('copied')
-      startOperation('Published URL copied').done()
+      operations.start('Published URL copied').done()
     } catch (cause) {
-      startOperation('Copying the published URL').fail(errorMessage(cause))
+      operations.start('Copying the published URL').fail(errorMessage(cause))
     }
   }
 
   const openPublishedUrl = (event: MouseEvent<HTMLAnchorElement>): void => {
     event.preventDefault()
     if (url.startsWith('https://') || url.startsWith('http://')) {
-      void openUrl(url)
-    }
-  }
-
-  const updateGist = async (): Promise<void> => {
-    const generation = graph?.generation
-    if (generation === undefined) {
-      return
-    }
-    setIsUpdating(true)
-    try {
-      await runGistPublish(path, generation)
-    } finally {
-      setIsUpdating(false)
+      opener.openUrlSync(url)
     }
   }
 
@@ -94,34 +95,43 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
           {url}
         </a>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Copy published URL"
-              onClick={() => void copyUrl()}
-              className="text-text-muted hover:text-text"
-            >
-              <Icon aria-hidden className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{copyState === 'copied' ? 'Copied' : 'Copy published URL'}</TooltipContent>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Copy published URL"
+                onClick={() => void copyUrl()}
+                className="text-text-muted hover:text-text"
+              >
+                <Icon aria-hidden className="size-3.5" />
+              </Button>
+            }
+          />
+          <TooltipContent>
+            {copyState === 'copied' ? 'Copied' : 'Copy published URL'}
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Update published gist"
-              onClick={() => void updateGist()}
-              disabled={isUpdating}
-              className={cn('text-text-muted hover:text-text', row?.gistStale === true && 'text-accent')}
-            >
-              <RefreshCw aria-hidden className={cn('size-3.5', isUpdating && 'animate-spin')} />
-            </Button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Update published gist"
+                onClick={updateGist}
+                disabled={isUpdating}
+                className={cn(
+                  'text-text-muted hover:text-text',
+                  row?.gistStale === true && 'text-accent',
+                )}
+              >
+                <RefreshCw aria-hidden className={cn('size-3.5', isUpdating && 'animate-spin')} />
+              </Button>
+            }
+          />
           <TooltipContent>
             {row?.gistStale === true ? 'Update gist with latest note' : 'Update published gist'}
           </TooltipContent>

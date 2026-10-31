@@ -40,8 +40,9 @@ hard delete and not an app-managed trash folder. This is already how the code
 works: `deleteNote` calls the `note_delete` command, which uses the `trash`
 crate to move the file to the platform trash (recoverable, and ignored by sync).
 See [`apps/desktop/src-tauri/src/fs/mod.rs`](../../apps/desktop/src-tauri/src/fs/mod.rs)
-(`note_delete`) and [`packages/core/src/graph/commands.ts`](../../packages/core/src/graph/commands.ts)
-(`deleteNote`).
+(`note_delete`) and `packages/core/src/graph/commands.ts` (`deleteNote`; today
+`NoteFileService.delete` in
+[`packages/core/src/graph/note-file-service.ts`](../../packages/core/src/graph/note-file-service.ts)).
 
 **Why no in-app Trash view + Restore:**
 
@@ -103,8 +104,8 @@ tag-rename UI either.
 
 ## Follow-ups
 
-- The frontend comment in
-  [`apps/desktop/src/lib/note-delete.ts`](../../apps/desktop/src/lib/note-delete.ts)
+- The frontend comment in `apps/desktop/src/lib/note-delete.ts` (since removed; the
+  comment now lives on `NoteActionsService.trash` and names both destinations)
   still describes the delete as moving into `.reflect/trash/`. That is the
   *mobile* behavior; on desktop it is the OS trash. The comment (and the
   "graph trash" wording in the trash-confirm dialog) should be corrected to match.

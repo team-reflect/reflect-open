@@ -1,60 +1,46 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RetrievalService } from '@reflect/core'
+import { createTestCoreServices, createTestRetrievalService } from '@reflect/core/testing'
 import type { ReactNode } from 'react'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { RouterProvider, useRouter } from '@/routing/router'
-import { NoteContextSidebar } from './note-context-sidebar'
+import { useRouter } from '@/routing/router.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { NoteContextSidebar } from './note-context-sidebar.tsx'
 
-const relatedNotes = vi.hoisted(() => vi.fn())
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  hasBridge: () => true,
-  relatedNotes,
-}))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
-}))
-vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({
-    settings: { semanticSearchEnabled: true },
-    updateSettings: () => {},
-  }),
-}))
+const relatedNotes = vi.fn<RetrievalService['relatedNotes']>()
 
 function RouteProbe(): ReactNode {
   const { route } = useRouter()
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
-function renderSidebar(path: string) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <TooltipProvider>
-      <QueryClientProvider client={client}>
-        <RouterProvider>
-          <NoteContextSidebar path={path} />
-          <RouteProbe />
-        </RouterProvider>
-      </QueryClientProvider>
-    </TooltipProvider>,
+async function renderSidebar(path: string) {
+  return await renderInApp(
+    <>
+      <NoteContextSidebar path={path} />
+      <RouteProbe />
+    </>,
+    {
+      core: createTestCoreServices({
+        database: createWasmTestDatabaseService(),
+        retrieval: createTestRetrievalService({ relatedNotes }),
+      }),
+      graph: { root: '/g', name: 'g' },
+      settings: { semanticSearchEnabled: true },
+    },
   )
 }
 
 beforeEach(() => {
-  window.sessionStorage.clear()
   relatedNotes.mockReset().mockResolvedValue([])
 })
 
-afterEach(cleanup)
-
 describe('NoteContextSidebar', () => {
   it('queries the note path for similar notes and shows no section without results', async () => {
-    const view = renderSidebar('notes/rust.md')
-    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('notes/rust.md', 6))
-    expect(view.queryByText('Similar notes')).toBeNull()
-    view.unmount()
+    const view = await renderSidebar('notes/rust.md')
+    await vi.waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('notes/rust.md', 6))
+    expect(view.getByText('Similar notes').query()).toBeNull()
   })
 
   it('lists similar notes under their own section and navigates on click', async () => {
@@ -68,11 +54,10 @@ describe('NoteContextSidebar', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSidebar('notes/rust.md')
-    await view.findByText('Similar notes')
+    const view = await renderSidebar('notes/rust.md')
+    await expect.element(view.getByText('Similar notes')).toBeInTheDocument()
     await userEvent.click(view.getByText('Zig'))
-    expect(view.getByTestId('route').textContent).toContain('"kind":"note"')
-    expect(view.getByTestId('route').textContent).toContain('notes/zig.md')
-    view.unmount()
+    await expect.element(view.getByTestId('route')).toMatchTextContent('"kind":"note"')
+    await expect.element(view.getByTestId('route')).toMatchTextContent('notes/zig.md')
   })
 })

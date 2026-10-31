@@ -1,15 +1,15 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { isUntitledNotePath } from '@reflect/core'
-import { NotePane } from '@/components/note-pane'
-import { IncomingBacklinks } from '@/mobile/incoming-backlinks'
-import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter'
-import { MobileScreenHeader } from '@/mobile/screen-header'
-import { NoteActionsMenu } from '@/mobile/note-actions-menu'
-import { cn } from '@/lib/utils'
-import { useRouter } from '@/routing/router'
+import { NotePane } from '@/components/note-pane.tsx'
+import { IncomingBacklinks } from '@/mobile/incoming-backlinks.tsx'
+import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'
+import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
+import { NoteActionsMenu } from '@/mobile/note-actions-menu.tsx'
+import { cn } from '@/lib/utils.ts'
+import { useRouter } from '@/routing/router.tsx'
 
 /**
- * One note, opened from a wiki link, the new-note button, or (later) search
+ * One note, opened from a wiki link, the new-note action, or (later) search
  * (Plan 19). Lazy like the desktop note route, so a link to a not-yet-created
  * note opens an empty editor and the file is born on the first keystroke; a
  * fresh untitled note (`+`, V1 parity) autofocuses so the keyboard is up and
@@ -24,7 +24,7 @@ export function MobileNote({ path }: { path: string }): ReactElement {
   const untitled = isUntitledNotePath(path)
 
   return (
-    <div className="flex h-full w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="flex h-full w-screen flex-col pt-safe">
       <MobileScreenHeader
         title={untitled ? 'New note' : 'Edit note'}
         onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
@@ -36,28 +36,36 @@ export function MobileNote({ path }: { path: string }): ReactElement {
         }
       />
       <main
-        className="min-h-0 flex-1 overflow-y-auto"
         // Keyboard avoidance is the shell root's job (it ends at the
-        // keyboard's top); this only clears the home indicator when the
+        // keyboard's top); `pb-safe` only clears the home indicator when the
         // keyboard is down.
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="min-h-0 flex-1 overflow-y-auto pb-safe"
       >
-        <NotePane
-          path={path}
-          lazy
-          autoFocus={untitled}
-          showBacklinks={false}
-          // The daily surface gets its top inset from the date header; a
-          // plain note has no chrome between the header bar and the body,
-          // so the pane carries the vertical breathing room itself.
-          className="pt-4"
-          gutterClassName={MOBILE_CONTENT_GUTTER}
-          editorClassName="min-h-[60dvh]"
-        />
-        {/* The mobile section (touch chrome) replaces NotePane's built-in
-            desktop panel; a daily-note backlink opens the Daily surface at
-            that date rather than pushing another note screen. */}
-        <IncomingBacklinks path={path} className={cn(MOBILE_CONTENT_GUTTER, 'pb-4')} />
+        {/* A column at least as tall as the scroll area, with the editor
+            taking the slack: the backlinks sit right below the note's own
+            content, so a short note keeps them on screen instead of pushing
+            them past the fold, while the reserved space stays
+            click-to-focus. */}
+        <div className="flex min-h-full flex-col">
+          <NotePane
+            path={path}
+            lazy
+            autoFocus={untitled}
+            showBacklinks={false}
+            // The daily surface gets its top inset from the date header; a
+            // plain note has no chrome between the header bar and the body,
+            // so the pane carries the vertical breathing room itself.
+            className="flex grow flex-col pt-4"
+            gutterClassName={MOBILE_CONTENT_GUTTER}
+            // A floor for the note with no content and many backlinks, where
+            // the stretch leaves only a line of editor to tap.
+            editorClassName="grow min-h-24"
+          />
+          {/* The mobile section (touch chrome) replaces NotePane's built-in
+              desktop panel; a daily-note backlink opens the Daily surface at
+              that date rather than pushing another note screen. */}
+          <IncomingBacklinks path={path} className={cn(MOBILE_CONTENT_GUTTER, 'pb-4')} />
+        </div>
       </main>
     </div>
   )

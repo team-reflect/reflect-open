@@ -70,7 +70,7 @@
       "aliases": [],
       "aliasKeys": [],
       "private": false,
-      "fileHash": "3b5cda541ec39c2c23eb4c8dc4632abce5da3815f9d5656b905f77336cd60937"
+      "fileHash": "1300e70a0ad05b40864232bb3d140bc87ceae4ffe8211d5424cb10942bb408df"
     },
     "notes/empty-frontmatter.md": {
       "id": null,
@@ -112,14 +112,8 @@
       "id": null,
       "title": "FM Title",
       "titleKey": "fm title",
-      "aliases": [
-        "PX",
-        "B Café"
-      ],
-      "aliasKeys": [
-        "px",
-        "b café"
-      ],
+      "aliases": ["PX", "B Café"],
+      "aliasKeys": ["px", "b café"],
       "private": false,
       "fileHash": "0682cdb53f7fb3cd5cdc9df0ff653301fabed8ed82e200a6331237ba53f137af"
     },
@@ -136,14 +130,28 @@
       "id": "01hzy3v9k2m4n6p8q0r2s4t6vw",
       "title": "Carries An Id",
       "titleKey": "carries an id",
-      "aliases": [
-        "With Id"
-      ],
-      "aliasKeys": [
-        "with id"
-      ],
+      "aliases": ["With Id"],
+      "aliasKeys": ["with id"],
       "private": false,
       "fileHash": "3cf0d98e4c2d173ba03df92f4b9183b11627f917dc97dc409b3fed7de916bce0"
+    },
+    "notes/h1-degenerate-wikilink.md": {
+      "id": null,
+      "title": "[[ [ ]]",
+      "titleKey": "[[ [ ]]",
+      "aliases": [],
+      "aliasKeys": [],
+      "private": false,
+      "fileHash": "77ef0f643a298768d92f69674111c96205c7e68ecbd51224489c1706081b3aee"
+    },
+    "notes/h1-escaped-wikilink.md": {
+      "id": null,
+      "title": "Meeting [[Ada Lovelace|Ada]]",
+      "titleKey": "meeting [[ada lovelace|ada]]",
+      "aliases": ["Meeting Ada"],
+      "aliasKeys": ["meeting ada"],
+      "private": false,
+      "fileHash": "ef9bdb34dde926318ed7c5fed9536d4a485f5e87bf822a448b87271b23b0b1b8"
     },
     "notes/h1-in-code-fence.md": {
       "id": null,
@@ -158,8 +166,8 @@
       "id": null,
       "title": "The *Heading* [[Link]]",
       "titleKey": "the *heading* [[link]]",
-      "aliases": [],
-      "aliasKeys": [],
+      "aliases": ["The *Heading* Link"],
+      "aliasKeys": ["the *heading* link"],
       "private": false,
       "fileHash": "b6b9e67480f08bd54378318c1e8b39999cc4027cec24dcaf7b68a19afaf2c4a9"
     },
@@ -284,16 +292,8 @@
       "id": null,
       "title": "Charlotte MacCaw // Mum",
       "titleKey": "charlotte maccaw // mum",
-      "aliases": [
-        "MUM",
-        "Mummy",
-        "Charlotte MacCaw"
-      ],
-      "aliasKeys": [
-        "mum",
-        "mummy",
-        "charlotte maccaw"
-      ],
+      "aliases": ["MUM", "Mummy", "Charlotte MacCaw"],
+      "aliasKeys": ["mum", "mummy", "charlotte maccaw"],
       "private": false,
       "fileHash": "6e89dc425f9d10e8dd246644303d81d90124859c5d8d3d8dfea8fe6ddd1ac8e6"
     },
@@ -310,14 +310,8 @@
       "id": null,
       "title": "Charlotte MacCaw // Mum",
       "titleKey": "charlotte maccaw // mum",
-      "aliases": [
-        "Charlotte MacCaw",
-        "Mum"
-      ],
-      "aliasKeys": [
-        "charlotte maccaw",
-        "mum"
-      ],
+      "aliases": ["Charlotte MacCaw", "Mum"],
+      "aliasKeys": ["charlotte maccaw", "mum"],
       "private": false,
       "fileHash": "67a57675ef27537774388b78f2b2df8a9cdc404db8fb59e03a25ddb440d6547e"
     },
@@ -352,9 +346,19 @@
   "ftsMatch": {
     "": null,
     "   \t \n ": null,
-    "hello": "\"hello\"",
-    "cats AND (dogs*)": "\"cats\" \"AND\" \"(dogs*)\"",
-    "say \"hi\"": "\"say\" \"\"\"hi\"\"\"",
-    "  alpha   beta ": "\"alpha\" \"beta\""
+    "hello": "(title : \"hello\"* OR body : \"hello\"*)",
+    "cats AND (dogs*)": "(title : \"cats\"* OR body : \"cats\"*) AND (title : \"AND\"* OR body : \"AND\"*) AND (title : \"(dogs*)\"* OR body : \"(dogs*)\"*)",
+    "say \"hi\"": "(title : \"say\"* OR body : \"say\"*) AND (title : \"\"\"hi\"\"\"* OR body : \"\"\"hi\"\"\"*)",
+    "  alpha   beta ": "(title : \"alpha\"* OR body : \"alpha\"*) AND (title : \"beta\"* OR body : \"beta\"*)",
+    "meeting - notes": "(title : \"meeting\"* OR body : \"meeting\"*) AND (title : \"notes\"* OR body : \"notes\"*)",
+    "-": "\"-\"",
+    ". -": "\".\" \"-\"",
+    "c++ +": "(title : \"c++\"* OR body : \"c++\"*)",
+    "東京 メモ": "(title : \"東京\"* OR body : \"東京\"*) AND (title : \"メモ\"* OR body : \"メモ\"*)",
+    "中文": "(title : \"中文\"* OR body : \"中文\"*)",
+    "hello ͅ": "(title : \"hello\"* OR body : \"hello\"*)",
+    "apple ": "(title : \"apple\"* OR body : \"apple\"*) AND (title : \"\"* OR body : \"\"*)",
+    "": "(title : \"\"* OR body : \"\"*)",
+    "hello Ⓐ": "(title : \"hello\"* OR body : \"hello\"*)"
   }
 }

@@ -1,56 +1,65 @@
 import { describe, expect, it } from 'vitest'
-import { errorMessage, isAppError, ReflectError, toAppError } from './errors'
+import { AppError, errorMessage, isAppError, toAppError } from './errors.ts'
 
 describe('isAppError', () => {
-  it('accepts every contract kind', () => {
-    for (const kind of ['io', 'notFound', 'traversal', 'noGraph', 'parse', 'auth', 'network', 'unknown']) {
-      expect(isAppError({ kind, message: 'm' })).toBe(true)
-    }
+  it('accepts AppError instances and their subclasses', () => {
+    class OversizeError extends AppError {}
+    expect(isAppError(new AppError('network', 'unreachable'))).toBe(true)
+    expect(isAppError(new OversizeError('parse', 'too big'))).toBe(true)
   })
 
-  it('rejects shapes outside the contract', () => {
-    expect(isAppError({ kind: 'bogus', message: 'm' })).toBe(false)
-    expect(isAppError({ kind: 'io' })).toBe(false) // missing message
-    expect(isAppError({ message: 'm' })).toBe(false)
+  it('rejects everything that is not an AppError instance', () => {
+    expect(isAppError({ kind: 'io', message: 'm' })).toBe(false)
+    expect(isAppError(new Error('m'))).toBe(false)
     expect(isAppError('io error')).toBe(false)
     expect(isAppError(null)).toBe(false)
     expect(isAppError(undefined)).toBe(false)
   })
-
-  it('accepts thrown ReflectError instances (load-bearing for sync state mapping)', () => {
-    // The engine's statusForError branches on isAppError to map a thrown
-    // ReflectError('network') to the `offline` state (and 'auth' to the
-    // reconnect affordance). zod's object parser reads the declared shape
-    // keys by direct property access, so the Error subclass's own `kind`
-    // field and `message` satisfy the union — pinned here because the whole
-    // offline/auth UX rests on it.
-    const error = new ReflectError('network', 'unreachable')
-    expect(isAppError(error)).toBe(true)
-    expect(toAppError(error)).toEqual({ kind: 'network', message: 'unreachable' })
-    expect(isAppError(new ReflectError('auth', 'rejected'))).toBe(true)
-  })
 })
 
 describe('toAppError', () => {
-  it('passes a well-formed command error through unchanged', () => {
-    const rustError = { kind: 'notFound', message: 'no such note' }
-    expect(toAppError(rustError)).toEqual(rustError)
+  it('passes an AppError through unchanged', () => {
+    const error = new AppError('auth', 'rejected')
+    expect(toAppError(error)).toBe(error)
   })
 
-  it('coerces an Error to unknown with its message', () => {
-    expect(toAppError(new Error('boom'))).toEqual({ kind: 'unknown', message: 'boom' })
+  it('keeps the kind of a serialized Rust error', () => {
+    for (const kind of [
+      'io',
+      'notFound',
+      'traversal',
+      'noGraph',
+      'parse',
+      'auth',
+      'network',
+      'unknown',
+    ] as const) {
+      expect(toAppError({ kind, message: 'm' })).toEqual(new AppError(kind, 'm'))
+    }
+  })
+
+  it('treats shapes outside the Rust contract as unknown', () => {
+    expect(toAppError({ kind: 'bogus', message: 'm' }).kind).toBe('unknown')
+    expect(toAppError({ kind: 'io' }).kind).toBe('unknown')
+  })
+
+  it('coerces an Error to unknown with its message and cause', () => {
+    const cause = new Error('boom')
+    const error = toAppError(cause)
+    expect(error).toEqual(new AppError('unknown', 'boom'))
+    expect(error.cause).toBe(cause)
   })
 
   it('coerces a plain string', () => {
-    expect(toAppError('plain failure')).toEqual({ kind: 'unknown', message: 'plain failure' })
+    expect(toAppError('plain failure')).toEqual(new AppError('unknown', 'plain failure'))
   })
 
   it('serializes arbitrary objects as JSON', () => {
-    expect(toAppError({ code: 7 })).toEqual({ kind: 'unknown', message: '{"code":7}' })
+    expect(toAppError({ code: 7 })).toEqual(new AppError('unknown', '{"code":7}'))
   })
 
   it('never throws on values JSON.stringify rejects', () => {
-    expect(toAppError(BigInt(1)).kind).toBe('unknown')
+    expect(toAppError(1n).kind).toBe('unknown')
 
     const circular: Record<string, unknown> = {}
     circular['self'] = circular
@@ -58,7 +67,7 @@ describe('toAppError', () => {
   })
 
   it('coerces null and undefined without throwing', () => {
-    expect(toAppError(null)).toEqual({ kind: 'unknown', message: 'null' })
+    expect(toAppError(null)).toEqual(new AppError('unknown', 'null'))
     expect(toAppError(undefined).kind).toBe('unknown')
   })
 })

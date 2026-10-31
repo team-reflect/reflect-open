@@ -1,62 +1,77 @@
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { type MaybePromise, getYearMonth } from '@reflect/utils'
+import {
+  type DailyNoteService,
+  type NoteRow,
+  type RetrievalService,
+  formatDayLabel,
+} from '@reflect/core'
+import { deepLinkForRoute, formatMonthLabel } from '@reflect/app'
+import { createTestWindowService } from '@reflect/app/testing'
+import { page, userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { NoteRow } from '@reflect/core'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { formatDayLabel } from '@/lib/dates'
-import { monthLabel, monthOf } from '@/lib/month-grid'
-import type { NoteRoute } from '@/routing/route'
-import { RouterProvider, useRouter } from '@/routing/router'
-import { DailyContextSidebar } from './daily-context-sidebar'
+import { act } from '@/test-utils/act.ts'
+import {
+  createTestCoreServices,
+  createTestNoteFileService,
+  createTestRetrievalService,
+  createTestStorageService,
+  type TestNoteFileService,
+  type TestStorageService,
+} from '@reflect/core/testing'
+import { useRouter } from '@/routing/router.tsx'
+import { fireEvent } from '@/test-utils/fire-event.ts'
+import '@/test-utils/locator.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { DailyContextSidebar } from './daily-context-sidebar.tsx'
 
-const dailyDatesInRange = vi.hoisted(() => vi.fn())
-const relatedNotes = vi.hoisted(() => vi.fn())
-const readNote = vi.hoisted(() => vi.fn())
-const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
-const openRouteInNewWindow = vi.hoisted(() =>
-  vi.fn<(route: NoteRoute) => Promise<boolean>>(),
-)
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  hasBridge: () => true,
-  dailyDatesInRange,
-  readNote,
-  relatedNotes,
-}))
-vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
-vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
-  openRouteInNewWindow,
-}))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
-}))
-vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({
-    settings: { semanticSearchEnabled: true, dateFormat: 'mdy', weekStartDay: 'monday' },
-    updateSettings: () => {},
-  }),
-}))
+// What the app's fakes answer; each test sets them before `renderSidebar`.
+const dailyDatesInRange = vi.fn<DailyNoteService['dailyDatesInRange']>()
+const relatedNotes = vi.fn<RetrievalService['relatedNotes']>()
+const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
+let noteRowAnswer: NoteRow | null
+let dailySource: string
+
+// The note files of the rendered app; set by `createCore`.
+let noteFile: TestNoteFileService
 
 function RouteProbe(): ReactNode {
   const { route } = useRouter()
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
-function renderSidebar(date: string) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <TooltipProvider>
-      <QueryClientProvider client={client}>
-        <RouterProvider>
-          <DailyContextSidebar date={date} />
-          <RouteProbe />
-        </RouterProvider>
-      </QueryClientProvider>
-    </TooltipProvider>,
+function sidebar(date: string): ReactNode {
+  return (
+    <>
+      <DailyContextSidebar date={date} />
+      <RouteProbe />
+    </>
   )
+}
+
+function createCore(storage: TestStorageService = createTestStorageService()) {
+  noteFile = createTestNoteFileService({ files: { 'daily/2026-06-09.md': dailySource } })
+  const core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    noteFile,
+    storage,
+    retrieval: createTestRetrievalService({ relatedNotes }),
+  })
+  vi.spyOn(core.dailyNotes, 'dailyDatesInRange').mockImplementation(dailyDatesInRange)
+  vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => {
+    return Promise.resolve(noteRowAnswer ?? undefined)
+  })
+  return core
+}
+
+async function renderSidebar(date: string, core = createCore()) {
+  return await renderInApp(sidebar(date), {
+    core,
+    appServices: { window: createTestWindowService({ openNoteWindow }) },
+    graph: { root: '/g', name: 'g' },
+    settings: { semanticSearchEnabled: true, dateFormat: 'mdy', weekStartDay: 'monday' },
+  })
 }
 
 function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
@@ -65,7 +80,6 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
     title: '2026-06-09',
     dailyDate: '2026-06-09',
     isPrivate: false,
-    hasConflict: false,
     gistUrl: null,
     gistStale: false,
     ...overrides,
@@ -73,136 +87,107 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 }
 
 beforeEach(() => {
-  window.sessionStorage.clear()
   dailyDatesInRange.mockReset().mockResolvedValue([])
-  readNote.mockReset().mockResolvedValue('- daily entry\n')
   relatedNotes.mockReset().mockResolvedValue([])
-  useNoteRow.mockReset().mockReturnValue(null)
-  openRouteInNewWindow.mockReset().mockResolvedValue(true)
+  openNoteWindow.mockReset().mockResolvedValue(true)
+  noteRowAnswer = null
+  dailySource = '- daily entry\n'
 })
-
-afterEach(cleanup)
 
 describe('DailyContextSidebar calendar header', () => {
   it('jumps to today from the calendar-icon button', async () => {
-    const view = renderSidebar('2026-06-09')
-    await userEvent.click(view.getByRole('button', { name: 'Jump to today' }))
-    expect(view.getByTestId('route').textContent).toContain('"kind":"today"')
-    view.unmount()
+    await renderSidebar('2026-06-09')
+    await userEvent.click(page.getByRole('button', { name: 'Jump to today' }))
+    await expect.element(page.getByTestId('route')).toMatchTextContent('"kind":"today"')
   })
 })
 
 describe('DailyContextSidebar calendar', () => {
   it('marks days that have a daily note and navigates on day click', async () => {
     dailyDatesInRange.mockResolvedValue(['2026-06-05'])
-    const view = renderSidebar('2026-06-09')
+    await renderSidebar('2026-06-09')
 
-    await view.findByTestId('note-dot-2026-06-05')
+    await expect.element(page.getByTestId('note-dot-2026-06-05')).toBeVisible()
     expect(dailyDatesInRange).toHaveBeenCalledWith('2026-06-01', '2026-07-05')
-    expect(view.queryByTestId('note-dot-2026-06-04')).toBeNull()
+    await expect.element(page.getByTestId('note-dot-2026-06-04')).not.toBeInTheDocument()
 
-    await userEvent.click(view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') }))
-    expect(view.getByTestId('route').textContent).toContain('2026-06-18')
-    view.unmount()
+    await userEvent.click(page.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') }))
+    await expect.element(page.getByTestId('route')).toMatchTextContent('2026-06-18')
   })
 
   it('modifier-click opens a day in a new window without moving the current window', async () => {
-    const view = renderSidebar('2026-06-09')
-    const day = view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
+    await renderSidebar('2026-06-09')
+    const day = page.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
 
-    fireEvent.click(day, { metaKey: true })
+    fireEvent.click(day, { metaKey: true, ctrlKey: true })
 
-    await waitFor(() =>
-      expect(openRouteInNewWindow).toHaveBeenCalledWith({
-        kind: 'daily',
-        date: '2026-06-18',
-      }),
-    )
-    expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
-    expect(view.getByTestId('route').textContent).toBe(JSON.stringify({ kind: 'today' }))
-    view.unmount()
+    await vi.waitFor(() => {
+      expect(openNoteWindow).toHaveBeenCalledWith(
+        deepLinkForRoute({
+          kind: 'daily',
+          date: '2026-06-18',
+        }),
+      )
+    })
+    expect(openNoteWindow).toHaveBeenCalledTimes(1)
+    await expect
+      .element(page.getByTestId('route'))
+      .toMatchTextContent(JSON.stringify({ kind: 'today' }))
   })
 
   it('does not fall back after the calendar scope moves to another selected day', async () => {
-    let finishOpen: (opened: boolean) => void = () => {}
-    openRouteInNewWindow.mockReturnValue(
-      new Promise((resolve) => {
-        finishOpen = resolve
-      }),
-    )
-    const view = renderSidebar('2026-06-09')
-    const day = view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
+    const pendingOpen = Promise.withResolvers<boolean>()
+    openNoteWindow.mockReturnValue(pendingOpen.promise)
+    const view = await renderSidebar('2026-06-09')
+    const day = page.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
 
-    fireEvent.click(day, { metaKey: true })
-    await waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
-    view.rerender(
-      <TooltipProvider>
-        <QueryClientProvider
-          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-        >
-          <RouterProvider>
-            <DailyContextSidebar date="2026-06-10" />
-            <RouteProbe />
-          </RouterProvider>
-        </QueryClientProvider>
-      </TooltipProvider>,
-    )
+    fireEvent.click(day, { metaKey: true, ctrlKey: true })
+    await vi.waitFor(() => expect(openNoteWindow).toHaveBeenCalledTimes(1))
+    await view.rerender(sidebar('2026-06-10'))
 
-    await act(async () => {
-      finishOpen(false)
+    await act(() => {
+      pendingOpen.resolve(false)
     })
 
-    expect(view.getByTestId('route').textContent).toBe(JSON.stringify({ kind: 'today' }))
-    view.unmount()
+    await expect
+      .element(page.getByTestId('route'))
+      .toMatchTextContent(JSON.stringify({ kind: 'today' }))
   })
 
   it('pages between months across year boundaries', async () => {
-    const view = renderSidebar('2026-01-15')
-    expect(view.getByText(monthLabel('2026-01'))).toBeDefined()
-    await userEvent.click(view.getByRole('button', { name: 'Previous month' }))
-    expect(view.getByText(monthLabel('2025-12'))).toBeDefined()
-    await userEvent.click(view.getByRole('button', { name: 'Next month' }))
-    await userEvent.click(view.getByRole('button', { name: 'Next month' }))
-    expect(view.getByText(monthLabel('2026-02'))).toBeDefined()
-    view.unmount()
+    await renderSidebar('2026-01-15')
+    await expect.element(page.getByText(formatMonthLabel('2026-01'))).toBeVisible()
+    await userEvent.click(page.getByRole('button', { name: 'Previous month' }))
+    await expect.element(page.getByText(formatMonthLabel('2025-12'))).toBeVisible()
+    await userEvent.click(page.getByRole('button', { name: 'Next month' }))
+    await userEvent.click(page.getByRole('button', { name: 'Next month' }))
+    await expect.element(page.getByText(formatMonthLabel('2026-02'))).toBeVisible()
   })
 
-  it('re-anchors the visible month when the selected day changes', () => {
-    const view = renderSidebar('2026-06-09')
-    expect(view.getByText(monthLabel('2026-06'))).toBeDefined()
-    view.rerender(
-      <TooltipProvider>
-        <QueryClientProvider
-          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-        >
-          <RouterProvider>
-            <DailyContextSidebar date="2026-09-01" />
-            <RouteProbe />
-          </RouterProvider>
-        </QueryClientProvider>
-      </TooltipProvider>,
-    )
-    expect(view.getByText(monthLabel('2026-09'))).toBeDefined()
-    view.unmount()
+  it('re-anchors the visible month when the selected day changes', async () => {
+    const view = await renderSidebar('2026-06-09')
+    await expect.element(page.getByText(formatMonthLabel('2026-06'))).toBeVisible()
+    await view.rerender(sidebar('2026-09-01'))
+    await expect.element(page.getByText(formatMonthLabel('2026-09'))).toBeVisible()
   })
 })
 
 describe('DailyContextSidebar related notes', () => {
   it('renders no Similar notes section without results', async () => {
-    const view = renderSidebar('2026-06-09')
-    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6))
-    expect(view.queryByText('Similar notes')).toBeNull()
-    view.unmount()
+    await renderSidebar('2026-06-09')
+    await vi.waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6))
+    await expect.element(page.getByText('Similar notes')).not.toBeInTheDocument()
   })
 
   it('does not calculate Similar notes for an empty-bullet daily note', async () => {
-    readNote.mockResolvedValue('- \n')
-    const view = renderSidebar('2026-06-09')
-    await waitFor(() => expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md'))
+    dailySource = '- \n'
+    await renderSidebar('2026-06-09')
+    await vi.waitFor(() => {
+      expect(noteFile.getReads().map((read) => read.path)).toContain('daily/2026-06-09.md')
+    })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(relatedNotes).not.toHaveBeenCalled()
-    expect(view.queryByText('Similar notes')).toBeNull()
-    view.unmount()
+    await expect.element(page.getByText('Similar notes')).not.toBeInTheDocument()
   })
 
   it('lists semantic neighbors when they exist', async () => {
@@ -216,57 +201,54 @@ describe('DailyContextSidebar related notes', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSidebar('2026-06-09')
-    await view.findByText('Rust')
+    await renderSidebar('2026-06-09')
+    await expect.element(page.getByText('Rust')).toBeVisible()
     // The daily sidebar wires SimilarNotesSection (note-context-sidebar's
     // tests pin the same title).
-    expect(view.getByText('Similar notes')).toBeDefined()
-    await userEvent.click(view.getByText('Rust'))
-    expect(view.getByTestId('route').textContent).toContain('notes/rust.md')
-    view.unmount()
+    await expect.element(page.getByText('Similar notes')).toBeVisible()
+    await userEvent.click(page.getByText('Rust'))
+    await expect.element(page.getByTestId('route')).toMatchTextContent('notes/rust.md')
   })
 })
 
 describe('DailyContextSidebar sections', () => {
   it('collapses a section and persists the state for the session', async () => {
-    const view = renderSidebar('2026-06-09')
-    const header = view.getByRole('button', { name: /Note actions/ })
-    expect(header.getAttribute('aria-expanded')).toBe('true')
-    expect(view.getByText('Pin this note')).toBeDefined()
+    // One session: both mounts read the same storage.
+    const storage = createTestStorageService()
+    const view = await renderSidebar('2026-06-09', createCore(storage))
+    const header = page.getByRole('button', { name: /Note actions/ })
+    await expect.element(header).toHaveAttribute('aria-expanded', 'true')
+    await expect.element(page.getByText('Pin this note')).toBeVisible()
 
     await userEvent.click(header)
-    expect(header.getAttribute('aria-expanded')).toBe('false')
-    expect(view.queryByText('Pin this note')).toBeNull()
-    view.unmount()
+    await expect.element(header).toHaveAttribute('aria-expanded', 'false')
+    await expect.element(page.getByText('Pin this note')).not.toBeInTheDocument()
+    await view.unmount()
 
-    const reopened = renderSidebar('2026-06-09')
-    expect(
-      reopened.getByRole('button', { name: /Note actions/ }).getAttribute('aria-expanded'),
-    ).toBe('false')
-    reopened.unmount()
+    await renderSidebar('2026-06-09', createCore(storage))
+    await expect
+      .element(page.getByRole('button', { name: /Note actions/ }))
+      .toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('the calendar is not collapsible', () => {
-    const view = renderSidebar('2026-06-09')
-    expect(view.getByText(monthLabel(monthOf('2026-06-09')))).toBeDefined()
-    expect(view.queryByRole('button', { name: /^Calendar$/ })).toBeNull()
-    view.unmount()
+  it('the calendar is not collapsible', async () => {
+    await renderSidebar('2026-06-09')
+    await expect.element(page.getByText(formatMonthLabel(getYearMonth('2026-06-09')))).toBeVisible()
+    await expect.element(page.getByRole('button', { name: /^Calendar$/ })).not.toBeInTheDocument()
   })
 })
 
 describe('DailyContextSidebar published link', () => {
-  it('shows the Published URL section once the daily note is published', () => {
+  it('shows the Published URL section once the daily note is published', async () => {
     const url = 'https://gist.github.com/alex/daily1'
-    useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
-    const view = renderSidebar('2026-06-09')
-    expect(view.getByText('Published URL')).toBeDefined()
-    expect(view.getByRole('link', { name: url }).getAttribute('href')).toBe(url)
-    view.unmount()
+    noteRowAnswer = noteRow({ gistUrl: url })
+    await renderSidebar('2026-06-09')
+    await expect.element(page.getByText('Published URL')).toBeVisible()
+    await expect.element(page.getByRole('link', { name: url })).toHaveAttribute('href', url)
   })
 
-  it('omits the Published URL section for an unpublished daily note', () => {
-    const view = renderSidebar('2026-06-09')
-    expect(view.queryByText('Published URL')).toBeNull()
-    view.unmount()
+  it('omits the Published URL section for an unpublished daily note', async () => {
+    await renderSidebar('2026-06-09')
+    await expect.element(page.getByText('Published URL')).not.toBeInTheDocument()
   })
 })

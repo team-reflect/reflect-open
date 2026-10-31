@@ -1,26 +1,33 @@
-import {
-  useCallback,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  type ReactElement,
-  type ReactNode,
-  type Ref,
-} from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
-import { errorMessage, type TimeFormat } from '@reflect/core'
-import {
-  type AcceptPendingReplacementOptions,
-  type ExitBoundaryHandler,
-  type FileClickHandler,
-  type FileInfoResolver,
-  type FileLinkResolver,
-  type MarkMode,
-  type StartPendingReplacementOptions,
-  type WikilinkHoverHit,
+import type { MaybePromise } from '@reflect/utils'
+import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge.tsx'
+import { MediaLightbox } from '@/editor/media-lightbox.tsx'
+import { MenuBoundaryContext } from '@/editor/menu-boundary.ts'
+import { useWikilinkResolver } from '@/editor/resolve-wikilink.ts'
+import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
+import { lightboxItemFromXPostMedia } from '@/editor/x-post-media-lightbox-item.ts'
+import { useYouTubeVideoResolver } from '@/editor/youtube-video-resolver.ts'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { cn } from '@/lib/utils.ts'
+import type {
+  AcceptPendingReplacementOptions,
+  ExitBoundaryHandler,
+  FileInfoResolver,
+  FileLinkResolver,
+  ImageClickHandler,
+  ImageUrlResolver,
+  LinkClickHandler,
+  LinkPreviewResolver,
+  MarkMode,
+  SearchStatus,
+  StartPendingReplacementOptions,
+  WikiEmbedResolver,
+  WikilinkHoverHit,
+  XPostMediaClickHandler,
+  YouTubeVideoClickHandler,
 } from '@meowdown/core'
 import {
-  MeowdownEditor,
+  MarkdownEditor,
+  useLightbox,
   WikilinkHoverCard,
   type EditorHandle,
   type PendingReplacementResolveHandler,
@@ -29,25 +36,27 @@ import {
   type TagSearchHandler,
   type WikilinkSearchHandler,
 } from '@meowdown/react'
-import { EditorInputTraits } from '@/editor/editor-input-traits'
-import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
+import { errorMessage, type TimeFormat } from '@reflect/core'
 import {
-  IMAGE_LIGHTBOX_TRANSITION_NAME,
-  ImageLightbox,
-  type LightboxImage,
-} from '@/editor/image-lightbox'
-import { isOpenableExternalUrl } from '@/editor/open-external-link'
-import { isTouchEditorSurface } from '@/lib/platform-surface'
-import { useLightboxTransition } from '@/editor/use-lightbox-transition'
-import { isDeepLinkUrl } from '@/lib/deep-links/parse'
-import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
-import { cn } from '@/lib/utils'
+  use,
+  useCallback,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+} from 'react'
 
-type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => ReactNode | Promise<ReactNode>
+type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => MaybePromise<ReactNode>
+
+// See apps/youtube-relay/README.md.
+const YOUTUBE_RELAY_URL = 'https://youtube-relay-reflect.vercel.app/'
 
 /**
  * Reflect's note editor: a thin wrapper over `@meowdown/react`'s
- * `<MeowdownEditor>`. meowdown owns the editing surface (wiki-link clicks,
+ * `<MarkdownEditor>`. meowdown owns the editing surface (wiki-link clicks,
  * image rendering/persistence, headings, placeholder, the `[[` menu); this
  * wrapper only adapts Reflect's prop shapes and exposes the imperative handle
  * the document pipeline binds to.
@@ -66,7 +75,7 @@ export interface NoteEditorHandle {
    * Markdown. If reconciliation changes the document, `onChange` may run
    * synchronously before this method returns.
    */
-  getMarkdown(): string
+  getMarkdown(this: void): string
   /** Replace the document (note switch / external reload). */
   setMarkdown(markdown: string): void
   /**
@@ -77,8 +86,8 @@ export interface NoteEditorHandle {
    * this fires `onChange`, so the insertion flows into the save pipeline like
    * typing. Empty/whitespace-only markdown is a no-op.
    */
-  insertMarkdown(markdown: string): void
-  focus(): void
+  insertMarkdown(this: void, markdown: string): void
+  focus(this: void): void
   /**
    * Move the caret to a document edge and scroll it into view. Used for
    * cross-note arrow navigation in the daily stream (jump to the end of the
@@ -97,6 +106,10 @@ export interface NoteEditorHandle {
   acceptPendingReplacement(options?: AcceptPendingReplacementOptions): void
   /** Clear the staged replacement without touching the document. */
   discardPendingReplacement(): void
+  /** Select the next find match, wrapping at the document end. */
+  findNext(this: void): void
+  /** Select the previous find match, wrapping at the document start. */
+  findPrevious(this: void): void
 }
 
 interface NoteEditorProps {
@@ -104,10 +117,19 @@ interface NoteEditorProps {
   initialContent: string
   /** Called with the current markdown whenever the user edits the document. */
   onChange?: (markdown: string) => void
+  /**
+   * Edit one paragraph of inline Markdown (the task editors). A typed block
+   * prefix (`+ [ ] `, `# `, `- `, a fence) stays text, pasted blocks flatten
+   * into the paragraph, and `onChange` reports paragraph Markdown. Off by
+   * default: a note is a whole document.
+   */
+  singleParagraph?: boolean
   /** How markdown syntax characters are shown. */
   markMode?: MarkMode
   /** Whether the browser underlines misspelled words (default on). */
   spellCheck?: boolean
+  /** Whether the caret animates between positions (default on). */
+  smoothCaretAnimation?: boolean
   /**
    * Clock format for the time the `/now` slash command inserts (the
    * `timeFormat` setting). Defaults to `12h`.
@@ -119,6 +141,13 @@ interface NoteEditorProps {
    */
   bulletAfterHeading?: boolean
   /**
+   * Whether Backspace in an empty first paragraph deletes that paragraph, so
+   * the rest of the note moves up one line. Off by default. Daily notes opt
+   * in on every surface: the day's heading sits outside the editor, so nothing
+   * else can remove a leading empty line.
+   */
+  backspaceDeletesEmptyFirstBlock?: boolean
+  /**
    * Whether to show meowdown's per-block gutter handle: a grip to drag-reorder
    * blocks and a "+" to insert a paragraph below. Off by default. The main note
    * editor opts in; one-line surfaces like the inline task editor leave it off so
@@ -126,21 +155,29 @@ interface NoteEditorProps {
    * has no hover to reveal the grip.
    */
   blockHandle?: boolean
-  /** Resolve an image `![…](…)` source to a displayable URL; unresolved images are skipped. */
-  resolveImageUrl?: (src: string) => string | null
   /**
-   * Vet a source (an image `src` or a link `href`) as a graph-relative asset
-   * path for {@link openAsset}. Returns null for remote or unsafe sources.
+   * Resolve an image `![…](…)` source to a displayable URL, possibly later;
+   * unresolved images are skipped.
+   */
+  resolveImageUrl?: ImageUrlResolver
+  /**
+   * Classify Obsidian `![[target]]` embeds as images, file pills, or note
+   * chips; `undefined` leaves the source literal.
+   */
+  resolveWikiEmbed?: WikiEmbedResolver
+  /**
+   * Vet an image `src` as a graph-relative asset path for {@link openAsset}.
+   * Returns null for remote or unsafe sources.
    */
   resolveAssetOpenPath?: (src: string) => string | null
   /** Open a vetted graph-relative asset path in the OS default application. */
-  openAsset?: (path: string) => Promise<void> | void
+  openAsset?: (path: string) => MaybePromise<void>
   /**
    * Persist a pasted/dropped file (any kind) and return its markdown
    * destination, or null to decline. meowdown inserts `![](dest)` for images
    * and `[name](dest)` for everything else.
    */
-  saveFile?: (file: File) => Promise<string | null>
+  saveFile?: ((file: File) => Promise<string | null>) | undefined
   /**
    * Claim a `[label](url)` link as a file attachment, rendered as an inline
    * file pill instead of a plain link. Clicking a pill routes through the
@@ -155,14 +192,21 @@ interface NoteEditorProps {
    * Mod-Enter key press that followed the link) — handlers read its
    * modifiers, e.g. ⌘-click opens the target in a new window.
    */
-  onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
+  onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
+  /**
+   * Click or Mod-Enter on a rendered Markdown link or file pill. Omitted,
+   * links do nothing.
+   */
+  onLinkClick?: LinkClickHandler
+  /** Resolve privacy-gated metadata for an HTTP(S) link popup. */
+  readonly resolveLinkPreview?: LinkPreviewResolver | undefined
   /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)
    * renders no card. Must be a stable function: a new identity re-runs the
    * resolution for the currently hovered link.
    */
-  renderWikilinkHoverCard?: WikilinkHoverRenderer
+  renderWikilinkHoverCard?: WikilinkHoverRenderer | undefined
   /** Click on an inline `#tag`. The tag name arrives without the leading `#`. */
   onTagClick?: (tag: string) => void
   /** Search notes for the `[[` autocomplete menu. */
@@ -173,7 +217,7 @@ interface NoteEditorProps {
    * Search prompts for the selection AI menu. Omitting it disables the menu
    * and its selection affordance entirely (e.g. for `private: true` notes).
    */
-  onSelectionMenuSearch?: SelectionMenuSearchHandler
+  onSelectionMenuSearch?: SelectionMenuSearchHandler | undefined
   /** Extra controls in the pending-replacement preview footer (e.g. Retry). */
   pendingReplacementActions?: ReactNode
   /** Called when a staged replacement is accepted or discarded. */
@@ -193,6 +237,14 @@ interface NoteEditorProps {
    * click-to-focus (the daily stream uses this for per-day sizing).
    */
   className?: string
+  /**
+   * Text to find in this note. Every match is highlighted and the first one at
+   * or after the caret is selected; an empty string (the default) clears the
+   * highlights and leaves the caret alone.
+   */
+  searchQuery?: string
+  /** Called when this note's match count or selected match changes. */
+  onSearchChange?: (status: SearchStatus) => void
   /** Imperative handle (React 19 ref-as-prop). */
   handleRef?: Ref<NoteEditorHandle>
   /**
@@ -205,19 +257,25 @@ interface NoteEditorProps {
 
 export function NoteEditor({
   initialContent,
+  singleParagraph = false,
   onChange,
   markMode = 'hide',
   spellCheck = true,
+  smoothCaretAnimation = true,
   timeFormat = '12h',
   bulletAfterHeading = false,
+  backspaceDeletesEmptyFirstBlock = false,
   blockHandle = false,
   resolveImageUrl,
+  resolveWikiEmbed,
   resolveAssetOpenPath,
   openAsset,
   saveFile,
   resolveFileLink,
   resolveFileInfo,
   onWikiLinkClick,
+  onLinkClick,
+  resolveLinkPreview,
   renderWikilinkHoverCard,
   onTagClick,
   onWikilinkSearch,
@@ -230,10 +288,16 @@ export function NoteEditor({
   children,
   titlePlaceholder,
   className,
+  searchQuery,
+  onSearchChange,
   handleRef,
 }: NoteEditorProps): ReactElement {
+  const { platform, logger } = useCoreServices()
+  const touchEditor = platform.surface.touchEditor
+  const menuBoundary = use(MenuBoundaryContext)
+  const resolveXPost = useXPostResolver()
+  const resolveWikilink = useWikilinkResolver()
   const innerRef = useRef<EditorHandle>(null)
-  const followDeepLink = useFollowDeepLink()
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
@@ -242,6 +306,7 @@ export function NoteEditor({
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
   const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
+  const resolveWikiEmbedRef = useRef(resolveWikiEmbed)
   const resolveAssetOpenPathRef = useRef(resolveAssetOpenPath)
   const openAssetRef = useRef(openAsset)
   const saveFileRef = useRef(saveFile)
@@ -252,6 +317,7 @@ export function NoteEditor({
     onWikiLinkClickRef.current = onWikiLinkClick
     onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
+    resolveWikiEmbedRef.current = resolveWikiEmbed
     resolveAssetOpenPathRef.current = resolveAssetOpenPath
     openAssetRef.current = openAsset
     saveFileRef.current = saveFile
@@ -259,11 +325,11 @@ export function NoteEditor({
     onExitBoundaryRef.current = onExitBoundary
   })
 
-  const {
-    item: lightboxImage,
-    open: openLightbox,
-    close: closeLightbox,
-  } = useLightboxTransition<HTMLImageElement, LightboxImage>()
+  const resolveYouTubeVideo = useYouTubeVideoResolver()
+  const lightbox = useLightbox()
+  const openLightbox = lightbox.open
+  // Captured when the lightbox opens, so a later graph switch cannot retarget it.
+  const [openLightboxImage, setOpenLightboxImage] = useState<(() => void) | null>(null)
 
   useImperativeHandle(
     handleRef,
@@ -277,12 +343,14 @@ export function NoteEditor({
       setSelection: (position) => innerRef.current?.setSelection(position),
       getSelectedText: () => innerRef.current?.getSelectedText() ?? '',
       openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
-      startPendingReplacement: (options) =>
-        innerRef.current?.startPendingReplacement(options) ?? false,
-      appendPendingReplacementText: (text) =>
-        innerRef.current?.appendPendingReplacementText(text),
+      startPendingReplacement: (options) => {
+        return innerRef.current?.startPendingReplacement(options) ?? false
+      },
+      appendPendingReplacementText: (text) => innerRef.current?.appendPendingReplacementText(text),
       acceptPendingReplacement: (options) => innerRef.current?.acceptPendingReplacement(options),
       discardPendingReplacement: () => innerRef.current?.discardPendingReplacement(),
+      findNext: () => innerRef.current?.findNext(),
+      findPrevious: () => innerRef.current?.findPrevious(),
     }),
     [],
   )
@@ -297,155 +365,156 @@ export function NoteEditor({
   )
 
   const handleWikilinkClick = useCallback(
-    (payload: { target: string; event: MouseEvent | KeyboardEvent }) =>
-      onWikiLinkClickRef.current?.(payload.target, payload.event),
+    (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
+      return onWikiLinkClickRef.current?.({ target: payload.target, openInNewWindow: payload.mod })
+    },
     [],
   )
   const handleTagClick = useCallback(
     (payload: { tag: string }) => onTagClickRef.current?.(payload.tag),
     [],
   )
-  const handleResolveImageUrl = useCallback(
-    (src: string) => resolveImageUrlRef.current?.(src) ?? undefined,
+  const handleResolveImageUrl: ImageUrlResolver = useCallback(
+    (src) => resolveImageUrlRef.current?.(src),
+    [],
+  )
+  const handleResolveWikiEmbed: WikiEmbedResolver = useCallback(
+    (embed) => resolveWikiEmbedRef.current?.(embed),
     [],
   )
   const handleFilePaste = useCallback(
     async (file: File) => (await saveFileRef.current?.(file)) ?? undefined,
     [],
   )
-  const handleLinkClick = useCallback(
-    // The event may also be the Mod-Enter key press that followed the link
-    // (meowdown ≥0.33).
-    ({ href, event }: { href: string; event: MouseEvent | KeyboardEvent }) => {
-      // A graph-relative `assets/…` href (an attachment link) opens through
-      // the generation-pinned asset command, never the URL opener — which
-      // would receive a meaningless relative string.
-      const assetPath = resolveAssetOpenPathRef.current?.(href) ?? null
-      if (assetPath !== null) {
-        void Promise.resolve(openAssetRef.current?.(assetPath)).catch((cause) => {
-          console.error('open asset failed:', errorMessage(cause))
-        })
-        return
-      }
-      // A `reflect://` link routes through the in-app deep-link pipeline —
-      // the OS opener would deny the scheme (and a round-trip could land on
-      // another installed flavor). ⌘-click sends an *addressing* link to a
-      // new window instead; a declined open (capture link, browser dev)
-      // degrades to the normal dispatch.
-      if (isDeepLinkUrl(href)) {
-        followDeepLink(href, event)
-        return
-      }
-      if (!isOpenableExternalUrl(href)) {
-        return
-      }
-      void openUrl(href).catch((cause) => {
-        console.error('open link failed:', errorMessage(cause))
-      })
-    },
-    [followDeepLink],
-  )
-  // A file pill is a claimed link, so a click on it routes exactly like a
-  // link click: `assets/…` through the asset opener, anything else through
-  // the deep-link/URL path.
-  const handleFileClick: FileClickHandler = useCallback(
-    ({ href, event }) => handleLinkClick({ href, event }),
-    [handleLinkClick],
-  )
   const handleResolveFileInfo: FileInfoResolver = useCallback(
     (href) => resolveFileInfoRef.current?.(href),
     [],
   )
-  const handleImageClick = useCallback(
+  const handleImageClick: ImageClickHandler = useCallback(
     // Touch surfaces deliver the tap's `touchend` instead of a click —
     // meowdown cancels it so iOS WebKit can't focus the editor (and raise
     // the keyboard) under the opening lightbox.
-    ({ src, alt, event }: { src: string; alt: string; event: MouseEvent | TouchEvent }) => {
-      const displayUrl = resolveImageUrlRef.current?.(src) ?? null
-      if (displayUrl === null) {
-        return
-      }
-      // The clicked target is the `<img>` or its meowdown image wrapper;
-      // the source element drives the View Transition zoom.
-      const sourceImage =
-        event.target instanceof HTMLElement
-          ? event.target
-              .closest('.md-image-view-preview, .md-image-preview')
-              ?.querySelector('img') ?? null
-          : null
-      openLightbox(sourceImage, {
-        src: displayUrl,
-        alt,
-        openPath: resolveAssetOpenPathRef.current?.(src) ?? null,
-        openImage: openAssetRef.current ?? null,
-        transitionName: IMAGE_LIGHTBOX_TRANSITION_NAME,
+    ({ src, alt, element }) => {
+      void Promise.resolve(resolveImageUrlRef.current?.(src)).then((displayUrl) => {
+        if (displayUrl === undefined) {
+          return
+        }
+        const openPath = resolveAssetOpenPathRef.current?.(src) ?? null
+        const openImage = openAssetRef.current ?? null
+        setOpenLightboxImage(() => {
+          return openPath !== null && openImage !== null
+            ? () => {
+                void Promise.resolve(openImage(openPath)).catch((cause) => {
+                  logger.error('open image failed:', errorMessage(cause))
+                })
+              }
+            : null
+        })
+        openLightbox({ type: 'image', src: displayUrl, alt }, element)
       })
+    },
+    [logger, openLightbox],
+  )
+
+  const handleXPostMediaClick: XPostMediaClickHandler = useCallback(
+    (event) => {
+      // Without this the card opens the photo URL or plays the video in place.
+      event.preventDefault()
+      setOpenLightboxImage(null)
+      openLightbox(lightboxItemFromXPostMedia(event.detail.media), event.detail.element)
     },
     [openLightbox],
   )
-  const handleOpenLightboxImage = useCallback((image: LightboxImage) => {
-    if (image.openPath !== null && image.openImage !== null) {
-      void Promise.resolve(image.openImage(image.openPath)).catch((cause) => {
-        console.error('open image failed:', errorMessage(cause))
-      })
-    }
-  }, [])
+
+  const handleYouTubeVideoClick: YouTubeVideoClickHandler = useCallback(
+    (event) => {
+      // Without this the card plays the video in place.
+      event.preventDefault()
+      setOpenLightboxImage(null)
+      const { video, short, videoId, element } = event.detail
+      openLightbox(
+        {
+          type: 'frame',
+          src: `${YOUTUBE_RELAY_URL}#v=${videoId}`,
+          title: video.title || 'YouTube video',
+          poster: video.thumbnail_url,
+          width: short ? 9 : 16,
+          height: short ? 16 : 9,
+        },
+        element,
+      )
+    },
+    [openLightbox],
+  )
 
   return (
     <>
-      <MeowdownEditor
+      <MarkdownEditor
+        resolveXPost={resolveXPost}
+        resolveYouTubeVideo={resolveYouTubeVideo}
+        mediaUrlProtocols={X_MEDIA_URL_PROTOCOLS}
         handleRef={innerRef}
         mode={markMode}
         initialMarkdown={initialContent}
+        singleParagraph={singleParagraph}
         // On the touch surface spellcheck is pinned off regardless of the
         // setting: iOS derives the keyboard's smart-quotes/smart-dashes traits
         // from it at focus time, and smart punctuation corrupts markdown
         // syntax ([[ wiki links, code spans, --- fences) — Plan 19 gate.
-        // Autocorrect is independent and stays on (EditorInputTraits).
-        spellCheck={isTouchEditorSurface() ? false : spellCheck}
+        // Autocorrect is independent and stays on.
+        spellCheck={touchEditor ? false : spellCheck}
+        autoCorrect={touchEditor ? true : undefined}
+        autoCapitalize={touchEditor ? 'sentences' : undefined}
+        // Hides system writing suggestions such as the macOS "Write with Siri" prompt.
+        writingSuggestions={false}
+        searchQuery={searchQuery ?? ''}
+        onSearchChange={onSearchChange}
         // Reflect's implementation-neutral `12h`/`24h` maps to meowdown's
         // `12`/`24` here at the boundary, like `markModeFromSyntax`.
         timeFormat={timeFormat === '24h' ? '24' : '12'}
+        caretGlide={smoothCaretAnimation}
         bulletAfterHeading={bulletAfterHeading}
+        backspaceDeletesEmptyFirstBlock={backspaceDeletesEmptyFirstBlock}
         // Pinned off on the touch surface regardless of the caller: the grip is
         // revealed on hover and drag-reorders blocks with a pointer, neither of
         // which a touch webview can express. Turning it off also drops the drop
         // indicator, which meowdown gates on the same prop.
-        blockHandle={isTouchEditorSurface() ? false : blockHandle}
+        blockHandle={touchEditor ? false : blockHandle}
         editorClassName={cn('reflect-editor', className)}
-        {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
+        placeholder={titlePlaceholder}
         onDocChange={handleDocChange}
         onWikilinkClick={handleWikilinkClick}
         onTagClick={handleTagClick}
-        onLinkClick={handleLinkClick}
+        onLinkClick={onLinkClick}
+        onFileClick={onLinkClick}
+        resolveLinkPreview={resolveLinkPreview}
         onImageClick={handleImageClick}
-        {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
-        {...(onTagSearch !== undefined ? { onTagSearch } : {})}
-        {...(onSelectionMenuSearch !== undefined ? { onSelectionMenuSearch } : {})}
-        {...(pendingReplacementActions !== undefined ? { pendingReplacementActions } : {})}
-        {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
-        {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
+        onXPostMediaClick={handleXPostMediaClick}
+        onYouTubeVideoClick={handleYouTubeVideoClick}
+        onWikilinkSearch={onWikilinkSearch}
+        onTagSearch={onTagSearch}
+        onSelectionMenuSearch={onSelectionMenuSearch}
+        collisionBoundary={menuBoundary}
+        pendingReplacementActions={pendingReplacementActions}
+        onPendingReplacementResolve={onPendingReplacementResolve}
+        onSlashMenuSearch={onSlashMenuSearch}
         resolveImageUrl={handleResolveImageUrl}
+        resolveWikiEmbed={handleResolveWikiEmbed}
+        resolveWikilink={resolveWikilink}
         onFilePaste={handleFilePaste}
-        {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
+        resolveFileLink={resolveFileLink}
         resolveFileInfo={handleResolveFileInfo}
-        onFileClick={handleFileClick}
         onExitBoundary={handleExitBoundary}
       >
-        <EditorInputTraits />
-        <FormattingToolbarBridge />
+        {/* Only a pane that persists files gets the toolbar's attach button;
+            `handleFilePaste` is the same handler meowdown pastes through. */}
+        <FormattingToolbarBridge saveFile={saveFile !== undefined ? handleFilePaste : undefined} />
         {renderWikilinkHoverCard !== undefined ? (
-          <WikilinkHoverCard className="reflect-hover-card">
-            {renderWikilinkHoverCard}
-          </WikilinkHoverCard>
+          <WikilinkHoverCard>{renderWikilinkHoverCard}</WikilinkHoverCard>
         ) : null}
         {children}
-      </MeowdownEditor>
-      <ImageLightbox
-        image={lightboxImage}
-        onClose={closeLightbox}
-        onOpenImage={handleOpenLightboxImage}
-      />
+      </MarkdownEditor>
+      <MediaLightbox lightbox={lightbox} onOpenImage={openLightboxImage} />
     </>
   )
 }

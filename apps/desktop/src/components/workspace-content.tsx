@@ -1,20 +1,21 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { AppShell } from '@/components/app-shell'
-import { CommandPalette } from '@/components/command-palette/command-palette'
-import { DailyContextSidebar } from '@/components/context-sidebar/daily-context-sidebar'
-import { NoteContextSidebar } from '@/components/context-sidebar/note-context-sidebar'
-import { type ContextSidebarTarget } from '@/components/context-sidebar/sidebar-route'
-import { EmbeddingsSync } from '@/components/embeddings-sync'
-import { RouteContent } from '@/components/route-content'
-import { ShortcutsDialog } from '@/components/shortcuts-dialog'
-import { Sidebar } from '@/components/sidebar/sidebar'
-import { SidebarResizeHandle } from '@/components/sidebar-resize-handle'
-import { TemplateCreateDialog } from '@/components/templates/template-create-dialog'
-import { TemplatePicker } from '@/components/templates/template-picker'
-import { useDailyContextTarget } from '@/providers/focused-daily-provider'
-import { useSidebar } from '@/providers/sidebar-provider'
-import { useAppShortcuts } from '@/routing/app-shortcuts'
+import { AppShell } from '@/components/app-shell.tsx'
+import { CommandPalette } from '@/components/command-palette/command-palette.tsx'
+import { DailyContextSidebar } from '@/components/context-sidebar/daily-context-sidebar.tsx'
+import { NoteContextSidebar } from '@/components/context-sidebar/note-context-sidebar.tsx'
+import type { ContextSidebarTarget } from '@/components/context-sidebar/sidebar-route.ts'
+import { EmbeddingsSync } from '@/components/embeddings-sync.tsx'
+import { NoteFindBar } from '@/components/note-find-bar.tsx'
+import { RouteContent } from '@/components/route-content.tsx'
+import { ShortcutsDialog } from '@/components/shortcuts-dialog.tsx'
+import { Sidebar } from '@/components/sidebar/sidebar.tsx'
+import { SidebarResizeHandle } from '@/components/sidebar-resize-handle.tsx'
+import { TemplateCreateDialog } from '@/components/templates/template-create-dialog.tsx'
+import { TemplatePicker } from '@/components/templates/template-picker.tsx'
+import { useDailyContextTarget } from '@/providers/focused-daily-provider.tsx'
+import { useSidebar } from '@/providers/sidebar-provider.tsx'
+import { useAppShortcuts } from '@/routing/app-shortcuts.ts'
 
 interface WorkspaceContentProps {
   graph: GraphInfo
@@ -61,6 +62,7 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
           <RouteContent />
         </div>
 
+        <NoteFindBar />
         <CommandPalette context={commandContext} />
         <ShortcutsDialog />
         <TemplatePicker context={commandContext} />

@@ -12,7 +12,8 @@ import {
   SIDEBAR_WIDTH_RANGE,
   type SidebarWidthRange,
 } from '@reflect/core'
-import { useSettings } from '@/providers/settings-provider'
+import { getIsComposing } from '@meowdown/core'
+import { useSettings } from '@/providers/settings-provider.tsx'
 
 /** How far one arrow-key press moves the divider, in CSS pixels. */
 const KEYBOARD_STEP_PX = 16
@@ -227,7 +228,7 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
   const gestureCap = useCallback(
     (handle: HTMLElement): number => {
       const shell = handle.parentElement?.parentElement
-      const other = shell?.querySelector(`aside[aria-label="${otherAsideLabel}"]`)
+      const other = shell?.querySelector(`aside[aria-label="${CSS.escape(otherAsideLabel)}"]`)
       const otherWidth = other?.getBoundingClientRect().width ?? 0
       const available = Math.floor(window.innerWidth - EDITOR_MIN_WIDTH_PX - otherWidth)
       return Math.min(range.max, Math.max(range.min, available))
@@ -322,6 +323,9 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
 
   const onKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): void => {
+      if (getIsComposing()) {
+        return
+      }
       if (dragRef.current !== null) {
         return
       }

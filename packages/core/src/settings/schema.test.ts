@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHAT_SYSTEM_PROMPT_MAX_LENGTH, DEFAULT_SETTINGS, settingsSchema } from './schema'
+import { CHAT_SYSTEM_PROMPT_MAX_LENGTH, DEFAULT_SETTINGS, settingsSchema } from './schema.ts'
 
 describe('settingsSchema', () => {
   it('defaults every key on an empty document (fresh install)', () => {
@@ -8,12 +8,15 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
+      editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,
       semanticSearchEnabled: false,
       describeAssets: true,
+      transcriptionFormat: true,
+      transcriptionPrompt: '',
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',
@@ -36,12 +39,15 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
     expect(DEFAULT_SETTINGS.editorDefaultBullet).toBe(true)
     expect(DEFAULT_SETTINGS.editorBulletAfterHeading).toBe(true)
+    expect(DEFAULT_SETTINGS.editorSmoothCaretAnimation).toBe(true)
     expect(DEFAULT_SETTINGS.editorTextSize).toBe('small')
     expect(DEFAULT_SETTINGS.editorFullWidth).toBe(false)
     expect(DEFAULT_SETTINGS.sidebarWidth).toBe(260)
     expect(DEFAULT_SETTINGS.contextSidebarWidth).toBe(320)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.describeAssets).toBe(true)
+    expect(DEFAULT_SETTINGS.transcriptionFormat).toBe(true)
+    expect(DEFAULT_SETTINGS.transcriptionPrompt).toBe('')
     expect(DEFAULT_SETTINGS.contactsEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.mobileOnboarded).toBe(false)
     expect(DEFAULT_SETTINGS.mobileStorage).toBe('local')
@@ -63,16 +69,24 @@ describe('settingsSchema', () => {
   it('accepts valid values', () => {
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'show' }).editorMarkdownSyntax).toBe('show')
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'hide' }).editorMarkdownSyntax).toBe('hide')
-    expect(settingsSchema.parse({ editorMarkdownSyntax: 'hybrid' }).editorMarkdownSyntax).toBe('hybrid')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 'hybrid' }).editorMarkdownSyntax).toBe(
+      'hybrid',
+    )
     expect(settingsSchema.parse({ editorSpellCheck: false }).editorSpellCheck).toBe(false)
     expect(settingsSchema.parse({ editorSpellCheck: true }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: false }).editorDefaultBullet).toBe(false)
     expect(settingsSchema.parse({ editorDefaultBullet: true }).editorDefaultBullet).toBe(true)
+    expect(settingsSchema.parse({ editorBulletAfterHeading: false }).editorBulletAfterHeading).toBe(
+      false,
+    )
+    expect(settingsSchema.parse({ editorBulletAfterHeading: true }).editorBulletAfterHeading).toBe(
+      true,
+    )
     expect(
-      settingsSchema.parse({ editorBulletAfterHeading: false }).editorBulletAfterHeading,
+      settingsSchema.parse({ editorSmoothCaretAnimation: false }).editorSmoothCaretAnimation,
     ).toBe(false)
     expect(
-      settingsSchema.parse({ editorBulletAfterHeading: true }).editorBulletAfterHeading,
+      settingsSchema.parse({ editorSmoothCaretAnimation: true }).editorSmoothCaretAnimation,
     ).toBe(true)
     expect(settingsSchema.parse({ editorTextSize: 'small' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 'medium' }).editorTextSize).toBe('medium')
@@ -94,15 +108,30 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ dateFormat: 'mdy' }).dateFormat).toBe('mdy')
     expect(settingsSchema.parse({ weekStartDay: 'monday' }).weekStartDay).toBe('monday')
     expect(settingsSchema.parse({ weekStartDay: 'sunday' }).weekStartDay).toBe('sunday')
+    expect(settingsSchema.parse({ weekStartDay: 'saturday' }).weekStartDay).toBe('saturday')
     expect(settingsSchema.parse({ semanticSearchEnabled: true }).semanticSearchEnabled).toBe(true)
     expect(settingsSchema.parse({ semanticSearchEnabled: false }).semanticSearchEnabled).toBe(false)
     expect(settingsSchema.parse({ describeAssets: true }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ describeAssets: false }).describeAssets).toBe(false)
+    expect(settingsSchema.parse({ transcriptionFormat: true }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: false }).transcriptionFormat).toBe(false)
+    expect(settingsSchema.parse({ transcriptionPrompt: 'Ocavue' }).transcriptionPrompt).toBe(
+      'Ocavue',
+    )
+    expect(settingsSchema.parse({ transcriptionPrompt: '  Ocavue\n' }).transcriptionPrompt).toBe(
+      'Ocavue',
+    )
+    expect(
+      settingsSchema.parse({ transcriptionPrompt: 'Names:\nOcavue' }).transcriptionPrompt,
+    ).toBe('Names:\nOcavue')
+    expect(
+      settingsSchema.parse({ transcriptionPrompt: 'x'.repeat(600) }).transcriptionPrompt,
+    ).toHaveLength(500)
     expect(settingsSchema.parse({ contactsEnabled: true }).contactsEnabled).toBe(true)
     expect(settingsSchema.parse({ contactsEnabled: false }).contactsEnabled).toBe(false)
-    expect(
-      settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags,
-    ).toEqual(['meeting'])
+    expect(settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags).toEqual([
+      'meeting',
+    ])
     expect(settingsSchema.parse({ allNotesFilterTags: [] }).allNotesFilterTags).toEqual([])
     expect(settingsSchema.parse({ calendarEnabled: true }).calendarEnabled).toBe(true)
     expect(settingsSchema.parse({ calendarEnabled: false }).calendarEnabled).toBe(false)
@@ -127,16 +156,26 @@ describe('settingsSchema', () => {
   })
 
   it('degrades an invalid value to its default instead of failing the load', () => {
-    expect(settingsSchema.parse({ editorMarkdownSyntax: 'sideways' }).editorMarkdownSyntax).toBe('hide')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 'sideways' }).editorMarkdownSyntax).toBe(
+      'hide',
+    )
     expect(settingsSchema.parse({ editorMarkdownSyntax: 42 }).editorMarkdownSyntax).toBe('hide')
     expect(settingsSchema.parse({ editorSpellCheck: 'off' }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorSpellCheck: 0 }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: 'on' }).editorDefaultBullet).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: 0 }).editorDefaultBullet).toBe(true)
+    expect(settingsSchema.parse({ editorBulletAfterHeading: 'on' }).editorBulletAfterHeading).toBe(
+      true,
+    )
+    expect(settingsSchema.parse({ editorBulletAfterHeading: 0 }).editorBulletAfterHeading).toBe(
+      true,
+    )
     expect(
-      settingsSchema.parse({ editorBulletAfterHeading: 'on' }).editorBulletAfterHeading,
+      settingsSchema.parse({ editorSmoothCaretAnimation: 'on' }).editorSmoothCaretAnimation,
     ).toBe(true)
-    expect(settingsSchema.parse({ editorBulletAfterHeading: 0 }).editorBulletAfterHeading).toBe(true)
+    expect(settingsSchema.parse({ editorSmoothCaretAnimation: 0 }).editorSmoothCaretAnimation).toBe(
+      true,
+    )
     expect(settingsSchema.parse({ editorTextSize: 'huge' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 3 }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorFullWidth: 'yes' }).editorFullWidth).toBe(false)
@@ -156,7 +195,7 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ timeFormat: 24 }).timeFormat).toBe('12h')
     expect(settingsSchema.parse({ dateFormat: 'ymd' }).dateFormat).toBe('mdy')
     expect(settingsSchema.parse({ dateFormat: 10 }).dateFormat).toBe('mdy')
-    expect(settingsSchema.parse({ weekStartDay: 'saturday' }).weekStartDay).toBe('monday')
+    expect(settingsSchema.parse({ weekStartDay: 'friday' }).weekStartDay).toBe('monday')
     expect(settingsSchema.parse({ weekStartDay: 42 }).weekStartDay).toBe('monday')
     expect(settingsSchema.parse({ semanticSearchEnabled: 'yes' }).semanticSearchEnabled).toBe(false)
     expect(settingsSchema.parse({ semanticSearchEnabled: 1 }).semanticSearchEnabled).toBe(false)
@@ -164,6 +203,10 @@ describe('settingsSchema', () => {
     // back to the default rather than failing the whole settings load.
     expect(settingsSchema.parse({ describeAssets: 'yes' }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ describeAssets: 0 }).describeAssets).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: 'yes' }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: 0 }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionPrompt: 42 }).transcriptionPrompt).toBe('')
+    expect(settingsSchema.parse({ transcriptionPrompt: null }).transcriptionPrompt).toBe('')
     expect(settingsSchema.parse({ contactsEnabled: 'yes' }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ contactsEnabled: 1 }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ allNotesFilterTags: 'book' }).allNotesFilterTags).toEqual([
@@ -192,12 +235,15 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
+      editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,
       semanticSearchEnabled: false,
       describeAssets: true,
+      transcriptionFormat: true,
+      transcriptionPrompt: '',
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',
@@ -260,6 +306,19 @@ describe('settingsSchema', () => {
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
     })
 
+    it('accepts OpenAI-compatible entries with an http base URL', () => {
+      const entry = {
+        id: 'local',
+        provider: 'openai-compatible',
+        model: 'llama-local',
+        baseUrl: 'http://localhost:1234/v1/',
+        keyHint: '',
+      }
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
+        { ...entry, baseUrl: 'http://localhost:1234/v1' },
+      ])
+    })
+
     it('defaults the per-entry display fields', () => {
       const entry = { id: 'abc', provider: 'openai', model: 'gpt-5.1' }
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
@@ -270,6 +329,30 @@ describe('settingsSchema', () => {
     it('drops a corrupt entry without losing the rest', () => {
       const parsed = settingsSchema.parse({
         aiProviders: [valid, { provider: 'aliens' }, 42],
+      })
+      expect(parsed.aiProviders).toEqual([valid])
+    })
+
+    it('drops OpenAI-compatible entries without a safe base URL', () => {
+      const parsed = settingsSchema.parse({
+        aiProviders: [
+          valid,
+          { id: 'local', provider: 'openai-compatible', model: 'llama-local', keyHint: '' },
+          {
+            id: 'socket',
+            provider: 'openai-compatible',
+            model: 'llama-local',
+            baseUrl: 'file:///tmp/model.sock',
+            keyHint: '',
+          },
+          {
+            id: 'query',
+            provider: 'openai-compatible',
+            model: 'llama-local',
+            baseUrl: 'http://localhost:1234/v1?token=abc',
+            keyHint: '',
+          },
+        ],
       })
       expect(parsed.aiProviders).toEqual([valid])
     })

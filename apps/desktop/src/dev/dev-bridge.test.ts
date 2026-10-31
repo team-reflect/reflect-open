@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { IndexedNote } from '@reflect/core'
-import { createDevBridge } from '@/dev/dev-bridge'
-import { createDevFileStore } from '@/dev/dev-file-store'
-import { createDevIndexDb } from '@/dev/dev-index-db'
+import {
+  createAssetStoreService,
+  createIpcBridgeService,
+  foldGraphPath,
+  type IndexedNote,
+} from '@reflect/core'
+import {
+  createTestClockService,
+  createTestFileChangeService,
+  createTestLoggerService,
+} from '@reflect/core/testing'
+import { createDevAssetStore } from '@/dev/dev-asset-store.ts'
+import { createDevBridge } from '@/dev/dev-bridge.ts'
+import { createDevFileStore } from '@/dev/dev-file-store.ts'
+import { createDevIndexDb } from '@/dev/dev-index-db.ts'
 
 /**
  * The dev bridge's `index_reconcile_scan` mirrors the native scan in
@@ -16,12 +27,13 @@ function projection(path: string, mtime: number, fileHash: string): IndexedNote 
     id: null,
     title: path,
     titleKey: path,
+    pathKey: foldGraphPath(path),
     kind: 'note',
     dailyDate: null,
     isPrivate: false,
     isPinned: false,
     pinnedOrder: null,
-    hasConflict: false,
+    hasContent: true,
     gistUrl: null,
     gistStale: false,
     fileHash,
@@ -32,6 +44,7 @@ function projection(path: string, mtime: number, fileHash: string): IndexedNote 
     links: [],
     tags: [],
     aliases: [],
+    claims: [],
     emails: [],
     assets: [],
     tasks: [],
@@ -42,7 +55,7 @@ describe('dev bridge index_reconcile_scan', () => {
   it('classifies candidates and orphans like the native scan', async () => {
     const files = createDevFileStore({ 'notes/settled.md': '# Settled' })
     const index = await createDevIndexDb()
-    const bridge = createDevBridge({ platform: 'ios', files, index })
+    const bridge = createDevBridge({ files, index, assets: createDevAssetStore() })
 
     // The seeded file's row matches its listed mtime and has settled.
     const settledMtime = files.list()[0]!.modifiedMs
@@ -68,12 +81,44 @@ describe('dev bridge index_reconcile_scan', () => {
   })
 })
 
+describe('dev bridge desktop boot surface', () => {
+  it('answers the desktop chooser and workspace queries with honest stand-ins', async () => {
+    const files = createDevFileStore({
+      'notes/one.md': '# One',
+      'notes/two.md': '# Two',
+    })
+    const bridge = createDevBridge({
+      files,
+      index: await createDevIndexDb(),
+      assets: createDevAssetStore(),
+    })
+
+    const recents = (await bridge.invoke('recent_graphs', {})) as Array<Record<string, unknown>>
+    expect(recents).toHaveLength(1)
+    expect(recents[0]).toMatchObject({ root: '/dev-graph', name: 'Dev Graph' })
+    expect(recents[0]!['openedMs']).toEqual(expect.any(Number))
+
+    await expect(bridge.invoke('icloud_status', {})).resolves.toEqual({
+      available: false,
+      documentsRoot: null,
+      existingGraphRoots: [],
+    })
+    await expect(bridge.invoke('embed_status', {})).resolves.toEqual({ status: 'unsupported' })
+    await expect(bridge.invoke('vault_scan_stats', { generation: 1 })).resolves.toEqual({
+      notes: 2,
+      attachments: 0,
+      skipped: 0,
+    })
+    await expect(bridge.invoke('list_attachments', { generation: 1 })).resolves.toEqual([])
+  })
+})
+
 describe('dev bridge background task parity', () => {
   it('reports native background assertions as unavailable and accepts cleanup', async () => {
     const bridge = createDevBridge({
-      platform: 'ios',
       files: createDevFileStore({}),
       index: await createDevIndexDb(),
+      assets: createDevAssetStore(),
     })
 
     await expect(bridge.invoke('background_task_begin', {})).resolves.toBeNull()
@@ -89,9 +134,9 @@ describe('dev bridge note_create parity', () => {
     try {
       const files = createDevFileStore({})
       const bridge = createDevBridge({
-        platform: 'ios',
         files,
         index: await createDevIndexDb(),
+        assets: createDevAssetStore(),
       })
 
       await expect(
@@ -108,15 +153,42 @@ describe('dev bridge note_create parity', () => {
     }
   })
 
+  it('refuses a checked write when the note changed on disk', async () => {
+    const files = createDevFileStore({ 'notes/a.md': '# Disk\n' })
+    const bridge = createDevBridge({
+      files,
+      index: await createDevIndexDb(),
+      assets: createDevAssetStore(),
+    })
+
+    await expect(
+      bridge.invoke('note_write', {
+        path: 'notes/a.md',
+        contents: '# Mine\n',
+        checkContents: true,
+        expectedContents: '# Old\n',
+      }),
+    ).rejects.toThrow('Note changed on disk')
+    expect(files.read('notes/a.md')).toBe('# Disk\n')
+
+    await bridge.invoke('note_write', {
+      path: 'notes/a.md',
+      contents: '# Mine\n',
+      checkContents: true,
+      expectedContents: '# Disk\n',
+    })
+    expect(files.read('notes/a.md')).toBe('# Mine\n')
+  })
+
   it('reports a collision without replacing the existing file', async () => {
     const files = createDevFileStore({
       'notes/business-ideas.md': '# Original\n',
     })
     const originalModifiedMs = files.list()[0]!.modifiedMs
     const bridge = createDevBridge({
-      platform: 'ios',
       files,
       index: await createDevIndexDb(),
+      assets: createDevAssetStore(),
     })
 
     await expect(
@@ -135,9 +207,9 @@ describe('dev bridge note_create parity', () => {
       'notes/existing.md': '# Existing\n',
     })
     const bridge = createDevBridge({
-      platform: 'ios',
       files,
       index: await createDevIndexDb(),
+      assets: createDevAssetStore(),
     })
 
     await expect(
@@ -152,5 +224,44 @@ describe('dev bridge note_create parity', () => {
     })
     expect(files.read('notes/new.md')).toBeNull()
     expect(files.read('notes/existing.md')).toBe('# Existing\n')
+  })
+})
+
+describe('dev bridge assets', () => {
+  it('serves the asset store end to end', async () => {
+    const assets = createDevAssetStore()
+    const bridge = createDevBridge({
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+      assets,
+    })
+    const assetStore = createAssetStoreService({
+      ipc: createIpcBridgeService({ transport: bridge, logger: createTestLoggerService() }),
+      clock: createTestClockService(),
+      fileChanges: createTestFileChangeService(),
+    })
+    const image = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' })
+
+    await expect(assetStore.uploadBlob('cat.png', image, 1)).resolves.toBe('assets/cat.png')
+    await expect(assetStore.uploadBlob('cat.png', image, 1)).resolves.toBe('assets/cat-2.png')
+    await assetStore.uploadToPath('assets/dog.png', image, 1)
+    await expect(assetStore.uploadToPath('assets/dog.png', image, 1)).rejects.toThrow(
+      'target already exists',
+    )
+    await expect(assetStore.uploadBlob('cat.png', image, 0)).rejects.toThrow('graph changed')
+
+    await expect(assetStore.readBytes('assets/cat-2.png', 1)).resolves.toEqual(
+      new Uint8Array([1, 2, 3]),
+    )
+    await expect(assetStore.readBase64('assets/dog.png', 1)).resolves.toBe('AQID')
+    const listed = (await bridge.invoke('list_attachments', { generation: 1 })) as Array<{
+      path: string
+    }>
+    expect(listed.map((file) => file.path)).toEqual([
+      'assets/cat.png',
+      'assets/cat-2.png',
+      'assets/dog.png',
+    ])
+    expect(assets.convertFileSrc('1/assets/cat.png', 'reflect-asset')).toMatch(/^blob:/)
   })
 })

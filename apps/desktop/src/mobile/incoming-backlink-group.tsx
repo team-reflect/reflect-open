@@ -1,9 +1,10 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { WikilinkClickHandler } from '@meowdown/core'
-import { BacklinkSnippet } from '@/components/backlink-snippet'
-import type { BacklinkSource } from '@/lib/group-backlinks'
-import { cn } from '@/lib/utils'
+import { BacklinkSnippet } from '@/components/backlink-snippet.tsx'
+import type { BacklinkSource } from '@/lib/group-backlinks.ts'
+import { cn } from '@/lib/utils.ts'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface IncomingBacklinkGroupProps {
   source: BacklinkSource
@@ -18,8 +19,6 @@ interface IncomingBacklinkGroupProps {
   onOpen: (path: string) => void
   /** Navigate a clicked `[[wiki link]]` inside a snippet to its target. */
   onWikilinkClick: WikilinkClickHandler
-  /** Resolve `![…](…)` sources inside a snippet to displayable URLs. */
-  resolveImageUrl: (src: string) => string | undefined
 }
 
 /**
@@ -39,8 +38,8 @@ export function IncomingBacklinkGroup({
   expanded: expandedOverride,
   onOpen,
   onWikilinkClick,
-  resolveImageUrl,
 }: IncomingBacklinkGroupProps): ReactElement {
+  const label = useNoteLabel()(source)
   const [expanded, setExpanded] = useState(expandedOverride)
 
   // Reset to the section-level toggle whenever it changes; the group chevron
@@ -63,14 +62,14 @@ export function IncomingBacklinkGroup({
           onClick={() => onOpen(source.path)}
           className="flex min-h-11 min-w-0 flex-1 items-center text-left text-sm text-accent"
         >
-          <span className="truncate">{source.title}</span>
+          <span className="truncate">{label}</span>
         </button>
 
         {source.snippets.length > 0 ? (
           <button
             type="button"
             aria-expanded={expanded}
-            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${source.title}`}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${label}`}
             onClick={() => setExpanded(!expanded)}
             className="flex size-11 shrink-0 items-center justify-center text-text-muted"
           >
@@ -91,7 +90,6 @@ export function IncomingBacklinkGroup({
               notePath={source.path}
               tasks={snippet.tasks}
               onWikilinkClick={onWikilinkClick}
-              resolveImageUrl={resolveImageUrl}
             />
           ))}
         </div>

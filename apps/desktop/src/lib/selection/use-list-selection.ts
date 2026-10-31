@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { isModEvent } from '@meowdown/core'
 
 /**
  * Multi-select over a flat, ordered list of string keys — the rows as they
@@ -65,11 +66,11 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     // returns the same Set when nothing vanished, so steady-state renders never
     // cascade.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelected((current) =>
-      [...current].every((key) => valid.has(key))
+    setSelected((current) => {
+      return [...current].every((key) => valid.has(key))
         ? current
-        : new Set([...current].filter((key) => valid.has(key))),
-    )
+        : new Set([...current].filter((key) => valid.has(key)))
+    })
     if (anchorRef.current !== null && !valid.has(anchorRef.current)) {
       anchorRef.current = null
     }
@@ -85,13 +86,14 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     if (firstIndex === -1 || secondIndex === -1) {
       return [secondKey]
     }
-    const [lo, hi] = firstIndex <= secondIndex ? [firstIndex, secondIndex] : [secondIndex, firstIndex]
+    const [lo, hi] =
+      firstIndex <= secondIndex ? [firstIndex, secondIndex] : [secondIndex, firstIndex]
     return order.slice(lo, hi + 1)
   }, [])
 
   const clickSelect = useCallback<ListSelection['clickSelect']>(
     (key, event) => {
-      if (event.metaKey || event.ctrlKey) {
+      if (isModEvent(event)) {
         setSelected((current) => {
           const next = new Set(current)
           if (next.has(key)) {
@@ -149,7 +151,11 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     const from = cursorRef.current ?? anchorRef.current
     const index = from === null ? -1 : order.indexOf(from)
     const next =
-      index === -1 ? (direction === 1 ? 0 : order.length - 1) : clamp(index + direction, order.length)
+      index === -1
+        ? direction === 1
+          ? 0
+          : order.length - 1
+        : clamp(index + direction, order.length)
     const key = order[next]!
     setSelected(new Set([key]))
     anchorRef.current = key

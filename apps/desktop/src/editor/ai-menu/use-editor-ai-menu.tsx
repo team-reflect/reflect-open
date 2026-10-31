@@ -7,7 +7,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { toast } from 'sonner'
+import { toast } from '@/components/ui/toast.tsx'
 import type {
   PendingReplacementResolveHandler,
   SelectionMenuContext,
@@ -15,25 +15,19 @@ import type {
   SelectionMenuSearchHandler,
 } from '@meowdown/react'
 import {
-  aiKeySecretName,
   chatModelOptions,
-  cloudSafeSelection,
   filterAiPrompts,
-  getSecret,
-  isPrivateNoteError,
-  transformSelection,
   type AiPrompt,
   type AiPromptMode,
   type ChatModelOption,
-  type CloudSafe,
 } from '@reflect/core'
-import { AiPreviewActions } from '@/editor/ai-menu/ai-preview-actions'
-import type { NoteEditorHandle } from '@/editor/note-editor'
-import { useAiPrompts } from '@/hooks/use-ai-prompts'
-import { useAiProviders } from '@/hooks/use-ai-providers'
-import { useNoteRow } from '@/hooks/use-note-row'
-import { providerFetch } from '@/lib/provider-fetch'
-import { useRouter } from '@/routing/router'
+import { AiPreviewActions } from '@/editor/ai-menu/ai-preview-actions.tsx'
+import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
+import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
+import { useAiProviders } from '@/hooks/use-ai-providers.ts'
+import { useNoteRow } from '@/hooks/use-note-row.ts'
+import { useRouter } from '@/routing/router.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The editor AI menu (the "run a prompt on the selection" flow): meowdown owns
@@ -107,7 +101,8 @@ export function useEditorAiMenu({
   const isPrivate =
     noteRow?.isPrivate ??
     (resolvedPrivacy?.epoch === sessionEpoch ? resolvedPrivacy.isPrivate : true)
-  const { providers, defaultProvider } = useAiProviders()
+  const { providers } = useAiProviders()
+  const { selectionTransform } = useCoreServices()
   const { prompts } = useAiPrompts()
   const { navigate } = useRouter()
 
@@ -150,45 +145,17 @@ export function useEditorAiMenu({
           setRunMode(null)
         }
         editorRef.current?.discardPendingReplacement()
-        toast.error(message)
+        toast.add({ type: 'error', title: message })
       }
 
-      const base =
-        modelOverride === null
-          ? defaultProvider
-          : providers.find((entry) => entry.id === modelOverride.configId) ?? null
-      if (base === null) {
-        fail('Add an AI provider in Settings to use AI prompts.')
-        return
-      }
-      const config = modelOverride === null ? base : { ...base, model: modelOverride.modelId }
-
-      // The privacy gate: the selection is note content, so it only leaves the
-      // device as a CloudSafe value minted against the note's privacy flag.
-      let selection: CloudSafe<string>
-      try {
-        selection = cloudSafeSelection({ path, isPrivate }, context.selectedText)
-      } catch (cause) {
-        if (isPrivateNoteError(cause)) {
-          fail('This note is marked private, so its content is never sent to an AI provider.')
-          return
-        }
-        throw cause
-      }
-
-      const apiKey = await getSecret(aiKeySecretName(config.id)).catch(() => null)
-      if (runRef.current !== run) return
-      if (apiKey === null) {
-        fail('No API key found for this provider — re-add it in Settings → AI providers.')
-        return
-      }
-
-      const events = transformSelection({
-        config,
-        apiKey,
-        fetchFn: providerFetch,
+      // The service picks the provider, gates the selection against the
+      // note's privacy flag, and reads the key; each refusal arrives as an
+      // `error` event before any provider call.
+      const events = selectionTransform.transform({
+        note: { path, isPrivate },
+        selectedText: context.selectedText,
         promptBody: prompt.body,
-        selection,
+        model: modelOverride,
         signal: run.controller.signal,
       })
       for await (const event of events) {
@@ -203,7 +170,7 @@ export function useEditorAiMenu({
         // and the user decides with Accept/Discard.
       }
     },
-    [providers, defaultProvider, path, isPrivate, editorRef],
+    [selectionTransform, path, isPrivate, editorRef],
   )
 
   const runPrompt = useCallback(
@@ -223,7 +190,7 @@ export function useEditorAiMenu({
   )
 
   const onSelectionMenuSearch = useMemo<SelectionMenuSearchHandler | undefined>(() => {
-    if (isPrivate) return undefined
+    if (isPrivate) return
     return (query: string): SelectionMenuItem[] => {
       if (providers.length === 0) {
         return [
@@ -247,8 +214,9 @@ export function useEditorAiMenu({
           id: 'ad-hoc-query',
           label: adHoc,
           detail: 'Run as a prompt',
-          onSelect: (context) =>
-            runPrompt({ id: 'ad-hoc-query', label: adHoc, body: adHoc, mode: 'replace' }, context),
+          onSelect: (context) => {
+            runPrompt({ id: 'ad-hoc-query', label: adHoc, body: adHoc, mode: 'replace' }, context)
+          },
         })
       }
       return items
@@ -263,7 +231,9 @@ export function useEditorAiMenu({
       // Restaging the same range resets the accumulated text without ending
       // the stage, so the preview stays up while the new attempt streams.
       const { prompt, context } = run
-      if (!editor.startPendingReplacement({ from: context.from, to: context.to, mode: prompt.mode })) {
+      if (
+        !editor.startPendingReplacement({ from: context.from, to: context.to, mode: prompt.mode })
+      ) {
         return
       }
       void streamRun(prompt, context, option)

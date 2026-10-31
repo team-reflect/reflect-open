@@ -1,47 +1,7 @@
-import { useEffect, useSyncExternalStore } from 'react'
-import { addPluginListener, invoke } from '@tauri-apps/api/core'
-import { z } from 'zod'
-import { focusedEditorCommands } from '@/editor/formatting-toolbar-store'
-
-const keyboardStateSchema = z.object({ height: z.number(), duration: z.number() })
-
-let currentKeyboardHeight = 0
-const keyboardListeners = new Set<() => void>()
-
-/**
- * The last published keyboard overlap in px — `0` when the keyboard is closed.
- * A plain getter (not a hook) so imperative call sites — Embla's `watchDrag`
- * predicate fires at drag start, outside React — can read the live value.
- */
-export function getKeyboardHeight(): number {
-  return currentKeyboardHeight
-}
-
-/**
- * Record the keyboard overlap height. Called by {@link useKeyboardHeightVar}
- * as the plugin's events arrive; exported so tests can drive keyboard state
- * without the Tauri bridge.
- */
-export function publishKeyboardHeight(height: number): void {
-  if (height === currentKeyboardHeight) {
-    return
-  }
-  currentKeyboardHeight = height
-  for (const listener of keyboardListeners) {
-    listener()
-  }
-}
-
-function subscribeKeyboard(listener: () => void): () => void {
-  keyboardListeners.add(listener)
-  return () => {
-    keyboardListeners.delete(listener)
-  }
-}
-
-function keyboardVisibleSnapshot(): boolean {
-  return currentKeyboardHeight > 0
-}
+import { useEffect, useLayoutEffect } from 'react'
+import { focusedEditorCommands } from '@/editor/formatting-toolbar-store.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
+import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
  * Whether the software keyboard is up, as reactive state. The tab bar hides
@@ -50,62 +10,151 @@ function keyboardVisibleSnapshot(): boolean {
  * keyboard cover it instead.
  */
 export function useKeyboardVisible(): boolean {
-  return useSyncExternalStore(subscribeKeyboard, keyboardVisibleSnapshot, keyboardVisibleSnapshot)
+  const { keyboard } = useAppServices()
+  return useServiceState(keyboard, keyboard.isVisible)
+}
+
+/**
+ * The smallest visual-viewport shrink treated as the software keyboard;
+ * anything under it is browser-chrome noise. Same threshold as Base UI:
+ * https://github.com/mui/base-ui/blob/v1.7.0/packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx#L25
+ */
+const KEYBOARD_MIN_OVERLAP = 60
+
+/** How long after a blur a lingering overlap is treated as stale (iOS 26.0). */
+const KEYBOARD_STALE_DELAY_MS = 1750
+
+/**
+ * The keyboard overlap per `visualViewport`. `KeyboardPlugin.swift` pins the
+ * webview (frame and scroll offset), so the layout viewport always matches
+ * the screen and the visual-viewport shortfall is exactly the keyboard
+ * overlap (decision 0003).
+ */
+function readKeyboardOverlap(): number {
+  const viewport = window.visualViewport
+  if (!viewport || viewport.scale !== 1) {
+    return 0
+  }
+  const overlap = window.innerHeight - viewport.height - viewport.offsetTop
+  return overlap > KEYBOARD_MIN_OVERLAP ? Math.round(overlap) : 0
 }
 
 /**
  * Mirrors the software keyboard's overlap height into `--keyboard-height` on
- * the document root (Plan 19, decision 8). The Swift half of
- * `tauri-plugin-keyboard` keeps the webview at its full-screen frame and
- * disables the system's scroll nudging, so layout owns keyboard avoidance:
- * the mobile shell root sizes itself to `calc(100dvh - var(--keyboard-height))`,
- * ending the layout — and floating-ui's positioning boundary (`body`) — at
- * the keyboard's top. Only viewport-anchored (`position: fixed`) elements
- * still read the variable directly. The height is also published to
- * {@link getKeyboardHeight} / {@link useKeyboardVisible} for non-layout
- * consumers (the carousel's swipe guard, the tab bar hiding).
+ * the document root (Plan 19, decision 8). With the webview pinned by the
+ * Swift half of `tauri-plugin-keyboard`, `visualViewport` is the honest
+ * keyboard signal and no native event bridge is needed. The mobile shell root
+ * sizes itself to `calc(100dvh - var(--keyboard-height))`, and `DrawerContent`
+ * pads its bottom past it so drawers end above the keyboard.
+ * The height is also published to the `KeyboardService` for non-layout
+ * consumers (`KeyboardService.getHeight` for the carousel's swipe guard,
+ * {@link useKeyboardVisible} for the tab bar hiding).
  */
 export function useKeyboardHeightVar(): void {
+  const { keyboard } = useAppServices()
+
+  // Viewport reader: feeds the service, which drops no-op publishes.
   useEffect(() => {
-    const root = document.documentElement
-    const apply = (height: number): void => {
-      root.style.setProperty('--keyboard-height', `${Math.round(height)}px`)
-      publishKeyboardHeight(height)
+    const viewport = window.visualViewport
+    if (!viewport) {
+      return
     }
-    let disposed = false
-    let unlisten: (() => void) | null = null
-    void (async () => {
-      try {
-        const initial = keyboardStateSchema.parse(await invoke('plugin:keyboard|current_height'))
-        if (!disposed) {
-          apply(initial.height)
+    const apply = (): void => {
+      keyboard.publish(readKeyboardOverlap())
+    }
+    // iOS 26.0 leaves the visual viewport stale after the keyboard closes
+    // (https://developer.apple.com/forums/thread/800125, fixed in 26.1). If
+    // focus has left every editable element and an overlap still reads,
+    // clear it; on healthy systems the overlap is already 0 by then and the
+    // timer is a no-op.
+    let watchdog: ReturnType<typeof setTimeout> | undefined
+    const onFocusOut = (): void => {
+      clearTimeout(watchdog)
+      watchdog = setTimeout(() => {
+        const el = document.activeElement
+        const editing =
+          (el instanceof HTMLElement && el.isContentEditable) || focusedKeyboardField() !== null
+        if (!editing && readKeyboardOverlap() > 0) {
+          keyboard.publish(0)
         }
-        const listener = await addPluginListener('keyboard', 'keyboardChange', (raw: unknown) => {
-          const parsed = keyboardStateSchema.safeParse(raw)
-          if (parsed.success) {
-            apply(parsed.data.height)
-          }
-        })
-        if (disposed) {
-          void listener.unregister()
-        } else {
-          unlisten = () => {
-            void listener.unregister()
-          }
-        }
-      } catch (err) {
-        // Fail loud in the log, soft in layout: without the bridge the
-        // variable stays 0 and the screen behaves like Tauri's default.
-        console.error('keyboard bridge unavailable:', err)
-      }
-    })()
+      }, KEYBOARD_STALE_DELAY_MS)
+    }
+    apply()
+    viewport.addEventListener('resize', apply)
+    document.addEventListener('focusout', onFocusOut)
     return () => {
-      disposed = true
-      unlisten?.()
-      root.style.removeProperty('--keyboard-height')
-      publishKeyboardHeight(0)
+      viewport.removeEventListener('resize', apply)
+      document.removeEventListener('focusout', onFocusOut)
+      clearTimeout(watchdog)
+      keyboard.publish(0)
     }
-  }, [])
+  }, [keyboard])
+
+  // Service subscriber: touches the CSS variable only when the value changed,
+  // in a layout effect so the shell resizes in the same paint.
+  const height = useServiceState(keyboard, keyboard.getHeight)
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--keyboard-height', `${height}px`)
+    return () => {
+      document.documentElement.style.removeProperty('--keyboard-height')
+    }
+  }, [height])
+}
+
+/**
+ * Input types that raise the software keyboard; `input.type` normalizes a
+ * missing attribute to `'text'`. Same allowlist as Base UI:
+ * https://github.com/mui/base-ui/blob/v1.7.0/packages/react/src/drawer/virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx#L42
+ */
+const KEYBOARD_INPUT_TYPES = new Set([
+  'email',
+  'number',
+  'password',
+  'search',
+  'tel',
+  'text',
+  'url',
+])
+
+function focusedKeyboardField(): HTMLElement | null {
+  const el = document.activeElement
+  if (el instanceof HTMLTextAreaElement) {
+    return el
+  }
+  if (el instanceof HTMLInputElement && KEYBOARD_INPUT_TYPES.has(el.type)) {
+    return el
+  }
+  // contenteditable (the editor) is useKeyboardCaretReveal's job; everything
+  // else does not raise the keyboard.
+  return null
+}
+
+/**
+ * Scrolls the focused form field above the keyboard, whenever the keyboard
+ * height changes or focus moves. `DrawerContent`'s keyboard padding keeps the
+ * scroller above the keyboard; the native scroll pin already blocks WebKit's
+ * own reveal, so one plain `scrollIntoView` is enough.
+ */
+export function useKeyboardFieldReveal(): void {
+  const { keyboard } = useAppServices()
+  const height = useServiceState(keyboard, keyboard.getHeight)
+
+  useEffect(() => {
+    if (height <= 0) {
+      return
+    }
+    const reveal = (): void => {
+      focusedKeyboardField()?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+    // One frame late, so the drawer's keyboard padding is laid out before we
+    // measure.
+    const frame = requestAnimationFrame(reveal)
+    document.addEventListener('focusin', reveal)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('focusin', reveal)
+    }
+  }, [height])
 }
 
 /**
@@ -119,7 +168,8 @@ export function useKeyboardHeightVar(): void {
  * the caret is already visible.
  */
 export function useKeyboardCaretReveal(): void {
-  const height = useSyncExternalStore(subscribeKeyboard, getKeyboardHeight, getKeyboardHeight)
+  const { keyboard } = useAppServices()
+  const height = useServiceState(keyboard, keyboard.getHeight)
 
   useEffect(() => {
     if (height <= 0) {

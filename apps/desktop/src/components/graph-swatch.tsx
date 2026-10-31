@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { GraphColor } from '@reflect/core'
-import { graphColorCss } from '@/lib/graph-colors'
-import { cn } from '@/lib/utils'
+import { graphColorCss } from '@/lib/graph-colors.ts'
+import { cn } from '@/lib/utils.ts'
 
 interface GraphSwatchProps {
   /** The graph's chosen color; `undefined` renders the default (app accent). */

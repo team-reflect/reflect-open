@@ -106,12 +106,11 @@ skeleton, a Tauri shell sanity check.
    - **SQLite extensions load in the bundled Rust SQLite** (FTS5 now, `sqlite-vec` later).
    Capture findings in the relevant plan. If a gate fails, surface it before Plan 02/05.
 
-9. **Testing + lint.** Add `vitest` + `@testing-library/react` + `jsdom` for unit/UI logic.
-   **Editor tests need a real browser** (ProseMirror/contenteditable doesn't work under
-   jsdom) — add **browser-mode vitest** (`@vitest/browser` + playwright), the same setup
-   meowdown itself uses. Wire `pnpm test`, `pnpm typecheck` (already `tsc`), and the repo's
-   `oxlint` adherence config from `design-system/_adherence.oxlintrc.json` where
-   applicable. CI runs lint; locally we run typecheck + targeted tests.
+9. [x] **Testing + lint.** Desktop `.test.tsx` suites run in real browsers through
+   Vitest browser mode, `vitest-browser-react`, and Playwright. Pure `.test.ts` suites
+   run in the node project. CI runs Chromium and WebKit for every PR, plus the node
+   project and lint checks. `pnpm test` and `pnpm typecheck` remain the local entry
+   points.
 
 10. **Scripts & housekeeping.** Ensure `pnpm dev`, `pnpm tauri dev`, `pnpm build`,
    `pnpm test`, `pnpm typecheck` all work. Add an MIT `LICENSE` placeholder (finalized in

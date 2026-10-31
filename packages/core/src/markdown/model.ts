@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ParsedTask } from './task-model.ts'
 
 /**
  * The markdown document model (Plan 03) — the canonical, parser-agnostic shape
@@ -27,7 +28,9 @@ function coercePrivate(value: unknown): boolean {
   if (typeof value === 'number') return value === 1
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase()
-    return normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    return (
+      normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    )
   }
   return false
 }
@@ -42,7 +45,9 @@ function coercePinned(value: unknown): boolean | number {
   if (typeof value === 'number') return Number.isFinite(value) ? value : false
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase()
-    return normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    return (
+      normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    )
   }
   return false
 }
@@ -71,10 +76,9 @@ export const gistFrontmatterSchema = z.object({
    * (file://, javascript:, etc.) are rejected so a crafted frontmatter
    * cannot open arbitrary resources.
    */
-  url: z.string().refine(
-    (value) => value.startsWith('https://') || value.startsWith('http://'),
-    { message: 'gist url must be an http(s) url' },
-  ),
+  url: z.string().refine((value) => value.startsWith('https://') || value.startsWith('http://'), {
+    message: 'gist url must be an http(s) url',
+  }),
   /** The gist filename the body was last published under. */
   file: z.string(),
   /** {@link gistBodyHash} of the body as last published (coerced like `id`). */
@@ -87,35 +91,34 @@ export type GistFrontmatter = z.infer<typeof gistFrontmatterSchema>
  * Built to tolerate external edits — bad known fields fall back via `.catch`
  * rather than failing the whole parse and making a note unreadable.
  */
-export const frontmatterSchema = z
-  .looseObject({
-    /** Reserved stable id. Not auto-written in the first wave (identity = path). */
-    id: z.string().optional().catch(undefined),
-    aliases: z.array(z.string()).catch([]).default([]),
-    /** Hard privacy flag: such notes must never be sent to any external service. */
-    private: z.preprocess(coercePrivate, z.boolean()).default(false),
-    /**
-     * Pinned to the sidebar's Pinned section: `true`, or a number for an
-     * explicit order. Unpinned notes omit the key. Read through
-     * {@link isPinned}/{@link pinnedOrder} — `pinned: 0` is a pinned note.
-     */
-    pinned: z.preprocess(coercePinned, z.union([z.boolean(), z.number()])).default(false),
-    /**
-     * The published GitHub Gist block. A hand-mangled block degrades to
-     * "never published" (`.catch`) rather than an unreadable note; the next
-     * publish then creates a fresh gist and rewrites it whole.
-     */
-    gist: gistFrontmatterSchema.optional().catch(undefined),
-    /**
-     * Contact names whose suggested-contact card was dismissed on this note
-     * (v1's `ignoredContactNames`). Per contact, not per note: ignoring "Ada"
-     * must not suppress a later "Grace" suggestion after a retitle. An added
-     * contact needs no mark — the details it writes into the body suppress
-     * the card by content. A mangled value degrades to the empty list; the
-     * card reappears, nothing breaks.
-     */
-    ignoredContacts: z.array(z.string()).catch([]).default([]),
-  })
+export const frontmatterSchema = z.looseObject({
+  /** Reserved stable id. Not auto-written in the first wave (identity = path). */
+  id: z.string().optional().catch(undefined),
+  aliases: z.array(z.string()).catch([]).default([]),
+  /** Hard privacy flag: such notes must never be sent to any external service. */
+  private: z.preprocess(coercePrivate, z.boolean()).default(false),
+  /**
+   * Pinned to the sidebar's Pinned section: `true`, or a number for an
+   * explicit order. Unpinned notes omit the key. Read through
+   * {@link isPinned}/{@link pinnedOrder} — `pinned: 0` is a pinned note.
+   */
+  pinned: z.preprocess(coercePinned, z.union([z.boolean(), z.number()])).default(false),
+  /**
+   * The published GitHub Gist block. A hand-mangled block degrades to
+   * "never published" (`.catch`) rather than an unreadable note; the next
+   * publish then creates a fresh gist and rewrites it whole.
+   */
+  gist: gistFrontmatterSchema.optional().catch(undefined),
+  /**
+   * Contact names whose suggested-contact card was dismissed on this note
+   * (v1's `ignoredContactNames`). Per contact, not per note: ignoring "Ada"
+   * must not suppress a later "Grace" suggestion after a retitle. An added
+   * contact needs no mark — the details it writes into the body suppress
+   * the card by content. A mangled value degrades to the empty list; the
+   * card reappears, nothing breaks.
+   */
+  ignoredContacts: z.array(z.string()).catch([]).default([]),
+})
 export type Frontmatter = z.infer<typeof frontmatterSchema>
 
 /** Is the note pinned at all? Never truthiness — `pinned: 0` is order 0, pinned. */
@@ -150,6 +153,13 @@ export interface Heading extends Span {
   text: string
   /** GitHub-style slug for anchors + section chunking (Plan 09). */
   slug: string
+  /**
+   * Whether the heading is a direct block of the document rather than one
+   * nested inside a blockquote or list item. Only a top-level heading opens a
+   * section: `> ## Meetings` is quoted prose, and automatic daily-note writes
+   * must neither target it nor let it bound a real section.
+   */
+  topLevel: boolean
 }
 
 /** A relative reference into the graph's `assets/` directory. */
@@ -157,56 +167,6 @@ export interface AssetRef extends Span {
   /** The path as written in the link (e.g. `assets/img.png`). */
   path: string
 }
-
-/**
- * The write-back coordinates of one task's checkbox: where its marker sits and
- * what its line looked like. Carried from the index to the toggle ({@link
- * toggleTaskMarker}); `raw` is the staleness guard that lets the toggle relocate
- * the marker — or refuse — when the file drifted under it. {@link ParsedTask}
- * extends this with the rendered text and checked state.
- */
-export interface TaskMarker {
-  /**
-   * Character offset of the marker's `[` in the **original** file (UTF-16 code
-   * units, the unit Lezer reports — never UTF-8 bytes). The toggle splices the
-   * three marker characters here after re-confirming {@link raw}.
-   */
-  markerOffset: number
-  /**
-   * Exact source of the marker's physical line — the write-back staleness guard.
-   * Begins with the three-character marker, so `raw.slice(0, 3)` is `[ ]`/`[x]`.
-   */
-  raw: string
-}
-
-/**
- * A Reflect task item (`+ [ ] text` / `+ [x] text`) — the unit the Tasks view
- * (Plan 18) projects across the graph. Square checklist checkboxes stay in the
- * note only and are intentionally excluded from the aggregate Tasks view.
- */
-export interface ParsedTask extends TaskMarker {
-  /** Inline text of the item's marker line, markdown stripped, for display + search. */
-  text: string
-  /** Parent outline/list item text, top-down, for the Tasks view breadcrumb. */
-  breadcrumbs: readonly string[]
-  /** `[x]`/`[X]` → true, `[ ]` → false. */
-  checked: boolean
-  /**
-   * The task's explicit due date: the first calendar-valid `[[YYYY-MM-DD]]` link
-   * inside the item, or null. This is V1's "scheduling is association" mechanism —
-   * a date link *in the task* is its due date, distinct from (and overriding) the
-   * source note's own daily date. The Tasks view buckets Overdue strictly off this
-   * (a bare task in a past daily note is Current, not Overdue — Plan 18 / V1).
-   */
-  dueDate: string | null
-}
-
-/** Version of the extraction contract; bump on breaking shape changes.
- * 1 — Plan 03 baseline · 2 — `tasks: ParsedTask[]` (with `dueDate`) added (Plan 18) ·
- * 3 — tasks limited to round Meowdown `+ [ ]` / `+ [x]` syntax; square checklist
- * checkboxes are excluded.
- * 4 — task rows carry parent outline/list breadcrumbs. */
-export const PARSED_NOTE_VERSION = 4
 
 /** The full parse of one note — the stable contract downstream plans depend on. */
 export interface ParsedNote {
@@ -227,6 +187,9 @@ export interface ParsedNote {
   assets: AssetRef[]
   /** Reflect task items in document order — the Tasks projection (Plan 18). */
   tasks: ParsedTask[]
-  /** Plain-text rendering of the body for FTS (Plan 08) + AI context (Plan 10). */
-  text: string
+  /**
+   * One-line plain text of the body, for UI slots that render a plain string
+   * rather than Markdown (the All Notes row preview, task rows).
+   */
+  displayText: string
 }

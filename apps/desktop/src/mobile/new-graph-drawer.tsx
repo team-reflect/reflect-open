@@ -1,10 +1,16 @@
 import { useId, useState, type ReactElement } from 'react'
-import { errorMessage } from '@reflect/core'
-import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
-import { cleanGraphName, graphRootForName, isGraphNameTaken } from '@/lib/graph-names'
+import {
+  errorMessage,
+  DEFAULT_GRAPH_NAME,
+  cleanGraphName,
+  graphRootForName,
+  isGraphNameTaken,
+} from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
 
 interface NewGraphDrawerProps {
   open: boolean
@@ -40,7 +46,7 @@ export function NewGraphDrawer({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const name = typedName ?? (existingRoots.length > 0 ? '' : 'Notes')
+  const name = typedName ?? (existingRoots.length > 0 ? '' : DEFAULT_GRAPH_NAME)
   const cleanName = cleanGraphName(name)
   const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, existingRoots)
   const canCreate = cleanName !== null && !nameTaken && !busy
@@ -72,7 +78,7 @@ export function NewGraphDrawer({
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent aria-label="New iCloud graph">
         <DrawerTitle>New iCloud graph</DrawerTitle>
-        <div className="flex flex-col gap-3 pt-3">
+        <DrawerBody>
           <div className="flex flex-col gap-1.5">
             <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
               Name
@@ -84,6 +90,9 @@ export function NewGraphDrawer({
               enterKeyHint="go"
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
+                if (getIsComposing()) {
+                  return
+                }
                 if (event.key === 'Enter') {
                   create()
                 }
@@ -100,7 +109,7 @@ export function NewGraphDrawer({
             {busy ? <Spinner /> : null}
             {busy ? 'Setting up…' : 'Create'}
           </Button>
-        </div>
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )

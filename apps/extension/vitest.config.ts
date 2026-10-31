@@ -1,0 +1,8 @@
+import { defineProject } from 'vitest/config'
+
+export default defineProject({
+  test: {
+    name: { label: 'extension', color: 'magenta' },
+    setupFiles: ['./vitest.setup.ts'],
+  },
+})

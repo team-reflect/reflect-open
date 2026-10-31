@@ -11,45 +11,48 @@
 //! [`skill`] (per-graph agent-skill install under `~/.agents/skills/`),
 //! [`calendar`] (read-only Apple Calendar access),
 //! [`contacts`] (live Apple Contacts lookups),
+//! [`menu`] (the macOS app menu, incl. Paste and Match Style),
 //! [`error`] (the shared error contract).
 
 mod background_task;
+mod blocking;
 mod calendar;
 mod capture;
-mod conflict;
 mod contacts;
 mod db;
 mod devtools;
+mod editor_link_preview;
 mod error;
 mod fs;
 mod git;
-mod graph_gitignore;
 mod icloud;
+mod link_preview;
+mod logging;
+mod menu;
 mod quit;
 mod recents;
 mod secrets;
 mod settings;
 mod skill;
+#[cfg(target_os = "macos")]
+mod wake;
+mod web_fetch;
 mod windows;
 
-// The watcher and the embedding runtime are desktop capabilities (Plan 19):
-// mobile swaps in stand-ins with the identical command surface, so the
-// `invoke_handler` list below needs no platform branches.
-#[cfg(desktop)]
+// The watcher and the embedding runtime are desktop capabilities (Plan 19),
+// and Intel macOS has no embedding runtime either: other platforms swap in
+// stand-ins with the identical command surface, so
+// the `invoke_handler` list below needs no platform branches.
+#[cfg(all(desktop, not(all(target_os = "macos", target_arch = "x86_64"))))]
 mod embed;
-#[cfg(mobile)]
-#[path = "embed_mobile.rs"]
+#[cfg(any(mobile, all(target_os = "macos", target_arch = "x86_64")))]
+#[path = "embed_unsupported.rs"]
 mod embed;
 #[cfg(desktop)]
 mod watcher;
 #[cfg(mobile)]
 #[path = "watcher_mobile.rs"]
 mod watcher;
-
-// TEMPORARY (Plan 19 spike A): on-device capability probes; delete with the
-// spike once the runtime gate verdict is recorded in the plan.
-#[cfg(mobile)]
-mod spike_mobile;
 
 use tauri::{Emitter, Manager};
 
@@ -95,36 +98,16 @@ mod capability_tests {
             .as_array()
             .expect("capability permissions");
 
-        assert!(permissions
-            .iter()
-            .any(|permission| permission.as_str() == Some("core:window:allow-hide")));
+        assert!(
+            permissions
+                .iter()
+                .any(|permission| permission.as_str() == Some("core:window:allow-hide"))
+        );
     }
-}
-
-/// Which UI family this build serves. The frontend's root gate (Plan 19)
-/// switches between the desktop and mobile surface trees on this answer.
-#[tauri::command]
-fn app_platform() -> &'static str {
-    if cfg!(target_os = "ios") {
-        "ios"
-    } else if cfg!(target_os = "android") {
-        "android"
-    } else {
-        "desktop"
-    }
-}
-
-/// Route `tracing` output to stderr, honoring `RUST_LOG` (default `info`).
-fn init_tracing() {
-    use tracing_subscriber::EnvFilter;
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    // `try_init` so a second call (tests, mobile re-entry) is a no-op, not a panic.
-    let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    init_tracing();
     let builder = tauri::Builder::default();
 
     // Single-instance must be the first plugin so a second launch is caught
@@ -152,12 +135,25 @@ pub fn run() {
     // desktop entries, and Windows dev builds (the installer writes the
     // registry keys in production; macOS reads CFBundleURLTypes). Best-effort
     // — a headless Linux box without xdg-mime must not fail the launch.
-    #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
+    //
+    // The main window is `create: false` in the config and built here, so it
+    // can carry a new-window handler. It starts hidden (`visible: false`);
+    // desktop reveals it from the page-load hook below after restoring
+    // geometry, but mobile has no window-state plugin, so show it here or the
+    // UI would never appear.
     let builder = builder.setup(|app| {
-        use tauri_plugin_deep_link::DeepLinkExt;
-        if let Err(err) = app.deep_link().register_all() {
-            tracing::warn!(error = %err, "deep-link scheme registration failed");
+        logging::init(app.handle());
+        #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
+        {
+            use tauri_plugin_deep_link::DeepLinkExt;
+            if let Err(err) = app.deep_link().register_all() {
+                tracing::warn!(error = %err, "deep-link scheme registration failed");
+            }
         }
+        #[cfg(desktop)]
+        windows::build_main_window(app.handle())?;
+        #[cfg(mobile)]
+        windows::build_main_window(app.handle())?.show()?;
         Ok(())
     });
 
@@ -170,7 +166,10 @@ pub fn run() {
     // geometry before first paint — avoiding a visible jump. Visibility is
     // deliberately not persistent: shutdown and updater relaunches can observe
     // a transiently hidden window, which must not suppress every later launch.
-    // The Ready event reveals the restored window below.
+    // The page-load hook below reveals it once the webview paints its first
+    // frame, so `theme-init.js` has applied the OS-preferred `.dark` scope
+    // before the window becomes visible — otherwise WKWebView flashes its
+    // default white backing between show() and the first HTML paint.
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -185,12 +184,47 @@ pub fn run() {
                 .build(),
         );
 
+    // Reveal the main window on `PageLoadEvent::Finished`, not on
+    // `RunEvent::Ready`. Ready only guarantees plugin init + window-state
+    // geometry restore have finished — it does not wait for the webview to
+    // load the frontend, so on warm launches WKWebView is still on its
+    // default white backing when show() runs, producing the intermittent
+    // startup flash. Note windows already gate on Finished the same way
+    // (see `open_note_window` in windows.rs). `Once` fires exactly on the
+    // first Finished so reloads (⌘R, dev HMR, webview crash recovery)
+    // never re-steal focus. `on_page_load` also fires for note windows;
+    // filter by label so this handler only reveals the main one. Ready still
+    // matters as the point where the fallback reveal is armed, below.
+    #[cfg(desktop)]
+    let revealed_main = std::sync::Arc::new(std::sync::Once::new());
+
+    #[cfg(desktop)]
+    let builder = {
+        let revealed = std::sync::Arc::clone(&revealed_main);
+        builder.on_page_load(move |webview, payload| {
+            if webview.label() != windows::MAIN_WINDOW_LABEL {
+                return;
+            }
+            if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                return;
+            }
+            revealed.call_once(|| {
+                windows::surface_main_window(webview.app_handle());
+            });
+        })
+    };
+
     // The keyboard bridge (Plan 19, decision 8) is mobile-only: desktop has
     // no software keyboard to track. (Sharing uses the webview's Web Share
-    // API, so it needs no native plugin; haptics ride this plugin's
-    // `impact_light` command.)
+    // API, so it needs no native plugin.)
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_keyboard::init());
+
+    // Haptics are mobile-only too: WKWebView has no `navigator.vibrate`, so
+    // taps reach `UIImpactFeedbackGenerator` through this plugin's
+    // `impact_light` command.
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_mobile_haptics::init());
 
     // The native audio-memo recorder is mobile-only too: desktop records
     // through the webview's MediaRecorder (`use-audio-recorder.ts`), while
@@ -199,20 +233,18 @@ pub fn run() {
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_recording::init());
 
-    // The main window starts hidden (`visible: false`); desktop reveals it on
-    // Ready after restoring geometry, but mobile has no window-state plugin,
-    // so show it here or the UI would never appear.
-    //
-    // (Also runs the TEMPORARY Plan 19 spike-A capability probe — delete that
-    // line with the spike, but keep the window show.)
-    #[cfg(mobile)]
-    let builder = builder.setup(|app| {
-        if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
-            window.show()?;
-        }
-        spike_mobile::run_self_check(app.handle());
-        Ok(())
-    });
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_iap::init());
+
+    // TestFlight and the App Store install the same binary, so only a
+    // runtime probe (StoreKit 2's `AppTransaction.environment`) can tell
+    // the channels apart, e.g. for the paywall gate.
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_app_store::init());
+
+    // OAuth-style sign-in in an in-app browser sheet (ASWebAuthenticationSession).
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_web_auth::init());
 
     builder
         // Serves note images (`assets/…`) to the webview. Registered as an
@@ -235,14 +267,18 @@ pub fn run() {
         .manage(windows::WindowInit::default())
         .manage(embed::EmbedState::default())
         .invoke_handler(tauri::generate_handler![
+            fs::x_archive::x_archive_write,
+            fs::x_archive::x_archive_resolve,
+            fs::x_archive::x_archive_owners,
+            fs::x_syndication::x_syndication_fetch,
             app_version,
-            app_platform,
             background_task::background_task_begin,
             background_task::background_task_end,
             icloud::storage::mobile_storage,
             icloud::storage::mobile_storage_local,
             icloud::storage::icloud_download_pending,
             icloud::storage::icloud_pending_count,
+            icloud::storage::icloud_request_downloads,
             icloud::storage::icloud_status,
             icloud::storage::icloud_adopt_graph,
             icloud::sweep::icloud_conflicts_scan,
@@ -254,20 +290,30 @@ pub fn run() {
             fs::graph_import_reflect_v1_zip,
             fs::graph_import_cancel,
             fs::note_read,
+            fs::note_read_local,
             fs::note_create,
             fs::note_write,
             fs::asset_write,
             fs::asset_read,
+            fs::asset_read_binary,
+            fs::audio_memo_delete,
+            fs::transcript_cache_read,
+            fs::transcript_cache_write,
             fs::asset_open,
+            fs::asset_reveal,
             fs::assets::asset_upload_begin,
             fs::assets::asset_upload_append,
             fs::assets::asset_upload_commit,
+            fs::assets::asset_upload_commit_path,
             fs::assets::asset_upload_abort,
             fs::assets::asset_import,
+            fs::assets::audio_memo_import,
             fs::dir_list,
             fs::note_exists,
             fs::note_delete,
             fs::list_files,
+            fs::list_attachments,
+            fs::vault_scan_stats,
             recents::recent_graphs,
             recents::forget_recent,
             settings::settings_load,
@@ -298,6 +344,7 @@ pub fn run() {
             embed::embed_texts,
             watcher::watch_start,
             watcher::watch_stop,
+            menu::menu_install_paste_and_match_style,
             calendar::calendar_authorization_status,
             calendar::calendar_request_access,
             calendar::calendar_list_calendars,
@@ -314,14 +361,19 @@ pub fn run() {
             capture::capture_inbox_reject,
             capture::capture_shared_inbox_relay,
             capture::capture_screenshot_promote,
+            capture::capture_link_preview,
             capture::capture_meta_fetch,
+            capture::capture_oembed_fetch,
+            editor_link_preview::link_preview_fetch_html,
+            editor_link_preview::link_preview_fetch_icon,
             git::git_status,
             git::git_setup,
             git::git_disconnect,
             git::git_clone,
             git::git_commit_all,
             git::git_fetch,
-            git::git_merge_remote,
+            git::git_remote_head,
+            git::git_pull,
             git::git_push,
             quit::quit_confirm,
             windows::open_note_window,
@@ -331,14 +383,29 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| match &event {
-            // Config windows are built before Ready, including the synchronous
-            // window-state restore. Reveal the main window only after that
-            // geometry is settled, regardless of any stale persisted
-            // visibility from an older build.
+        .run(move |app, event| match &event {
+            // Ready no longer reveals the main window — the page-load hook
+            // above does, once the webview has painted. It is still the first
+            // point where the window and an app handle both exist, so arm the
+            // fallback that reveals it anyway if that load never finishes.
+            // (Arming from `.setup()` would silently replace the deep-link
+            // registration hook, which Tauri stores as a single callback.)
             #[cfg(desktop)]
             tauri::RunEvent::Ready => {
-                windows::surface_main_window(app);
+                // Wake-from-sleep is the one moment external iCloud writes
+                // can land without the FSEvents watcher seeing them; the
+                // observer asks the frontend for one full reconcile per wake
+                // (wake.rs).
+                #[cfg(target_os = "macos")]
+                wake::install(app);
+                let app = app.clone();
+                windows::arm_reveal_fallback(
+                    &revealed_main,
+                    windows::MAIN_WINDOW_LABEL,
+                    move || {
+                        windows::surface_main_window(&app);
+                    },
+                );
             }
             // Clicking the Dock icon is macOS's recovery path when an app has
             // no visible windows. Surface the hidden/minimized main window,

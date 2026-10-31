@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Square, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { useMobileAudioMemo } from '@/mobile/audio-memo-provider'
-import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform'
-import { useRouter } from '@/routing/router'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { formatElapsed } from '@reflect/utils'
+import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
+import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform.tsx'
+import { useRouter } from '@/routing/router.tsx'
 
 /**
  * The recording sheet (V1's recording modal as a bottom drawer): waveform +
@@ -15,8 +16,8 @@ import { useRouter } from '@/routing/router'
  * stop/discard semantics behind `onDrawerOpenChange`.
  *
  * Without an OpenAI/Gemini model the sheet shows key-setup guidance instead
- * of recording controls: the mic FAB stays discoverable, but recording never
- * starts until transcription has a key to run on.
+ * of recording controls: the capture menu's mic action stays discoverable,
+ * but recording never starts until transcription has a key to run on.
  */
 export function RecordingDrawer(): ReactElement {
   const memo = useMobileAudioMemo()
@@ -61,8 +62,8 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
   return (
     <div className="flex flex-col items-center gap-4 px-4 pb-2 text-center">
       <p className="text-sm text-text-muted">
-        Audio memos are transcribed into your notes with your own OpenAI or Gemini API key. Add
-        one in Settings to start recording.
+        Audio memos send the recording to OpenAI or Google Gemini for transcription into your notes,
+        using your own API key. Add one in Settings to start recording.
       </p>
       <Button
         onClick={() => {
@@ -78,19 +79,19 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
 
 function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {
   const [discardArmed, setDiscardArmed] = useState(false)
-  const discardResetTimer = useRef<number | null>(null)
+  const discardResetTimerRef = useRef<number | null>(null)
 
   const clearDiscardReset = (): void => {
-    if (discardResetTimer.current !== null) {
-      window.clearTimeout(discardResetTimer.current)
-      discardResetTimer.current = null
+    if (discardResetTimerRef.current !== null) {
+      window.clearTimeout(discardResetTimerRef.current)
+      discardResetTimerRef.current = null
     }
   }
 
   useEffect(
     () => () => {
-      if (discardResetTimer.current !== null) {
-        window.clearTimeout(discardResetTimer.current)
+      if (discardResetTimerRef.current !== null) {
+        window.clearTimeout(discardResetTimerRef.current)
       }
     },
     [],
@@ -100,14 +101,14 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
     if (!discardArmed) {
       setDiscardArmed(true)
       clearDiscardReset()
-      discardResetTimer.current = window.setTimeout(() => {
+      discardResetTimerRef.current = window.setTimeout(() => {
         setDiscardArmed(false)
-        discardResetTimer.current = null
+        discardResetTimerRef.current = null
       }, 3000)
       return
     }
     clearDiscardReset()
-    memo.cancelRecording()
+    void memo.cancelRecording()
   }
 
   return (
@@ -144,11 +145,4 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
       </div>
     </div>
   )
-}
-
-function formatElapsed(elapsedMs: number): string {
-  const totalSeconds = Math.floor(elapsedMs / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }

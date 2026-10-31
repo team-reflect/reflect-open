@@ -1,12 +1,12 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { formatDistanceToNow } from 'date-fns'
-import { hasBridge, listChatConversations } from '@reflect/core'
+import { formatTimeAgo } from '@reflect/utils'
 import { Check, Trash2 } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { CHAT_QUERY_SCOPE } from '@/lib/query-client'
-import { useChatSession } from '@/providers/chat-provider'
-import { useGraph } from '@/providers/graph-provider'
+import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { createChatConversationsQueryOptions } from '@/lib/query-options.ts'
+import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface ChatHistoryDrawerProps {
   open: boolean
@@ -22,21 +22,21 @@ interface ChatHistoryDrawerProps {
  */
 export function ChatHistoryDrawer({ open, onOpenChange }: ChatHistoryDrawerProps): ReactElement {
   const { graph, indexGeneration } = useGraph()
+  const { chatHistory } = useCoreServices()
   const { activeConversationId, openConversation, deleteConversation } = useChatSession()
 
-  const enabled = hasBridge() && indexGeneration !== null
+  const enabled = indexGeneration !== null
   const { data: conversations } = useQuery({
     // The graph root is part of the key: conversations belong to one graph,
     // and a graph switch must never serve the previous graph's cached list.
-    queryKey: [CHAT_QUERY_SCOPE, 'conversations', graph?.root],
-    queryFn: () => listChatConversations(),
+    ...createChatConversationsQueryOptions(chatHistory, graph?.root),
     enabled: enabled && open,
   })
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Chat history">
-        <DrawerTitle className="px-4 pt-1">History</DrawerTitle>
+        <DrawerTitle>History</DrawerTitle>
         <div className="max-h-[60dvh] overflow-y-auto px-4 pb-8 pt-4">
           {conversations === undefined || conversations.length === 0 ? (
             <p className="py-6 text-center text-sm text-text-muted">No past chats</p>
@@ -61,7 +61,7 @@ export function ChatHistoryDrawer({ open, onOpenChange }: ChatHistoryDrawerProps
                     >
                       <span className="min-w-0 flex-1 truncate text-sm">{conversation.title}</span>
                       <span className="shrink-0 text-xs text-text-muted">
-                        {formatDistanceToNow(conversation.updatedMs, { addSuffix: true })}
+                        {formatTimeAgo(conversation.updatedMs)}
                       </span>
                     </button>
                     {current ? (

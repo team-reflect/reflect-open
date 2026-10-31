@@ -39,6 +39,6 @@ function fnv1a32(bytes: Uint8Array, seed: number): string {
  * dashes — and an empty or whitespace title falls back to `Untitled`.
  */
 export function gistFilename(title: string): string {
-  const safe = title.replace(/[/\\]/g, '-').trim()
+  const safe = title.replaceAll(/[/\\]/g, '-').trim()
   return `${safe === '' ? 'Untitled' : safe}.md`
 }

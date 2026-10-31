@@ -1,61 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-interface MenuItemOptionsForTest {
-  readonly id?: string
-  readonly text?: string
-  readonly accelerator?: string
-  readonly action?: (commandId: string) => void
-}
-
-interface SubmenuOptionsForTest {
-  readonly text: string
-  readonly items: readonly MenuItemOptionsForTest[]
-}
-
-const isTauri = vi.hoisted(() => vi.fn(() => true))
-const isMainWindow = vi.hoisted(() => vi.fn(() => true))
-const setAsAppMenu = vi.hoisted(() => vi.fn(async () => null))
-const setAsWindowsMenuForNSApp = vi.hoisted(() => vi.fn(async () => {}))
-const setAsHelpMenuForNSApp = vi.hoisted(() => vi.fn(async () => {}))
-const submenuNew = vi.hoisted(() =>
-  vi.fn(async (_options: SubmenuOptionsForTest) => ({
-    setAsWindowsMenuForNSApp,
-    setAsHelpMenuForNSApp,
-  })),
-)
-const menuNew = vi.hoisted(() => vi.fn(async () => ({ setAsAppMenu })))
-
-vi.mock('@tauri-apps/api/core', () => ({ isTauri }))
-vi.mock('@tauri-apps/api/menu', () => ({
-  Menu: { new: menuNew },
-  Submenu: { new: submenuNew },
-}))
-vi.mock('@/lib/windows/window-role', () => ({ isMainWindow }))
-
-const { APP_COMMANDS, keybindingFor } = await import('@/lib/commands/app-commands')
-const { setMenuCommandDispatch } = await import('./dispatch')
-const { appMenuLayout, installNativeMenu, isNativeMenuInstalled } = await import('./menu')
-
-beforeEach(() => {
-  vi.stubGlobal('navigator', { userAgent: 'Macintosh', maxTouchPoints: 0 })
-  isTauri.mockReset().mockReturnValue(true)
-  isMainWindow.mockReset().mockReturnValue(true)
-  submenuNew.mockClear()
-  menuNew.mockClear()
-  setAsAppMenu.mockClear()
-  setAsWindowsMenuForNSApp.mockClear()
-  setAsHelpMenuForNSApp.mockClear()
-})
-
-afterEach(() => {
-  setMenuCommandDispatch(null)
-  vi.unstubAllGlobals()
-})
+import { isNotNullish } from '@ocavue/utils'
+import { describe, expect, it } from 'vitest'
+import { APP_COMMANDS, keybindingFor } from '@/lib/commands/app-commands.ts'
+import { appMenuLayout } from './menu.ts'
 
 function referencedCommandIds(): string[] {
-  return appMenuLayout().flatMap((submenu) =>
-    submenu.entries.flatMap((entry) => (entry.kind === 'command' ? [entry.commandId] : [])),
-  )
+  return appMenuLayout().flatMap((submenu) => {
+    return submenu.entries
+      .map((entry) => (entry.kind === 'command' ? entry.commandId : null))
+      .filter(isNotNullish)
+  })
 }
 
 describe('appMenuLayout', () => {
@@ -102,40 +55,17 @@ describe('appMenuLayout', () => {
     })
     expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
   })
-})
-
-describe('installNativeMenu', () => {
-  it('installs sidebar.toggle as a native Command+\\ menu accelerator', async () => {
-    const dispatch = vi.fn()
-    setMenuCommandDispatch(dispatch)
-
-    await installNativeMenu()
-
-    const viewMenu = submenuNew.mock.calls
-      .map(([options]) => options)
-      .find((options) => options.text === 'View')
-    const sidebarToggle = viewMenu?.items.find((item) => item.id === 'sidebar.toggle')
-
-    expect(sidebarToggle).toMatchObject({
-      id: 'sidebar.toggle',
-      text: 'Toggle sidebar',
-      accelerator: 'CmdOrCtrl+\\',
-    })
-    expect(sidebarToggle?.action).toBeTypeOf('function')
-    sidebarToggle?.action?.('sidebar.toggle')
-    expect(dispatch).toHaveBeenCalledWith('sidebar.toggle')
-    expect(menuNew).toHaveBeenCalledTimes(1)
-    expect(setAsAppMenu).toHaveBeenCalledTimes(1)
-    expect(isNativeMenuInstalled()).toBe(true)
-  })
-
-  it('leaves the main window’s app-wide menu intact when a note window boots', async () => {
-    isMainWindow.mockReturnValue(false)
-
-    await installNativeMenu()
-
-    expect(isMainWindow).toHaveBeenCalledTimes(1)
-    expect(submenuNew).not.toHaveBeenCalled()
-    expect(menuNew).not.toHaveBeenCalled()
+  it('puts note Find commands and their browser-standard shortcuts in Edit', () => {
+    const editMenu = appMenuLayout().find((submenu) => submenu.text === 'Edit')
+    expect(editMenu?.entries).toEqual(
+      expect.arrayContaining([
+        { kind: 'command', commandId: 'note.find', text: undefined },
+        { kind: 'command', commandId: 'note.findNext', text: undefined },
+        { kind: 'command', commandId: 'note.findPrevious', text: undefined },
+      ]),
+    )
+    expect(keybindingFor('note.find')).toBe('Mod-f')
+    expect(keybindingFor('note.findNext')).toBe('Mod-g')
+    expect(keybindingFor('note.findPrevious')).toBe('Mod-Shift-g')
   })
 })

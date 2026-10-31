@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'wxt'
-import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands'
+import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands.ts'
 
 /**
  * Pins the extension ID (`dlbliojklpickgimjdmjjdnbjdiomjik`) for **unpacked**
@@ -27,8 +27,14 @@ const isStoreBuild = process.env['WXT_STORE_BUILD'] === 'true'
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({ plugins: [tailwindcss()] }),
-  // A stable, human-readable store artifact: `reflect-capture-<version>-chrome.zip`.
-  zip: { name: 'reflect-capture' },
+  // Store artifact: `reflect-capture-<version>-chrome.zip`. The keyed build is
+  // `reflect-capture-<version>-chrome-unpacked.zip` so the two never collide.
+  zip: {
+    name: 'reflect-capture',
+    ...(isStoreBuild
+      ? {}
+      : { artifactTemplate: '{{name}}-{{packageVersion}}-{{browser}}-unpacked{{modeSuffix}}.zip' }),
+  },
   manifest: {
     name: 'Reflect Capture',
     description: 'Save the page you are reading into Reflect.',
@@ -36,7 +42,8 @@ export default defineConfig({
     // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it there.
     ...(isStoreBuild ? {} : { key: PUBLIC_KEY }),
     // `activeTab` (granted by the action click / shortcut) covers the
-    // screenshot and the selection grab — no broad host permissions.
+    // screenshot and the selection grab; `webRequest` on x.com only observes
+    // bookmark and like requests.
     permissions: [
       'activeTab',
       'scripting',
@@ -44,7 +51,9 @@ export default defineConfig({
       'storage',
       'unlimitedStorage',
       'alarms',
+      'webRequest',
     ],
+    host_permissions: ['https://x.com/*'],
     commands: {
       [SAVE_CURRENT_PAGE_COMMAND]: {
         suggested_key: { default: 'Ctrl+Shift+K', mac: 'Command+Shift+K' },

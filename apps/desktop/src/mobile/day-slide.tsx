@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
-import { dailyPath } from '@reflect/core'
-import { NotePane } from '@/components/note-pane'
-import { formatDayLabel } from '@/lib/dates'
-import { cn } from '@/lib/utils'
-import { IncomingBacklinks } from '@/mobile/incoming-backlinks'
-import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter'
-import { useScrollRestore } from '@/mobile/use-scroll-restore'
-import { useSettings } from '@/providers/settings-provider'
+import { NotePane } from '@/components/note-pane.tsx'
+import { dailyPath, formatDayLabel } from '@reflect/core'
+import { cn } from '@/lib/utils.ts'
+import { IncomingBacklinks } from '@/mobile/incoming-backlinks.tsx'
+import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'
+import { useScrollRestore } from '@/mobile/use-scroll-restore.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
 
 interface DaySlideProps {
   /** The slide's ISO day — its daily note path and scroll-memory key. */
@@ -78,12 +77,12 @@ export function DaySlide({
     onFocusConsumed()
   }, [cancelRestore, onFocusConsumed])
 
-  const lastResetSeq = useRef(scrollResetSeq)
+  const lastResetSeqRef = useRef(scrollResetSeq)
   useEffect(() => {
-    if (scrollResetSeq === lastResetSeq.current) {
+    if (scrollResetSeq === lastResetSeqRef.current) {
       return
     }
-    lastResetSeq.current = scrollResetSeq
+    lastResetSeqRef.current = scrollResetSeq
     if (!selected) {
       return
     }
@@ -102,13 +101,16 @@ export function DaySlide({
   return (
     <div
       ref={containerRef}
-      className="h-full overflow-y-auto"
       // Keyboard avoidance is the shell root's job (it ends at the keyboard's
-      // top); this only clears the home indicator when the keyboard is down.
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      // top); `pb-safe` only clears the home indicator when the keyboard is down.
+      className="h-full overflow-y-auto pb-safe"
       onScroll={handleScroll}
     >
-      <div ref={contentRef}>
+      {/* A column at least as tall as the slide, with the editor taking the
+          slack: the backlinks sit right below the note's own content, so a
+          short day keeps them on screen instead of pushing them past the
+          fold, while the reserved space stays click-to-focus. */}
+      <div ref={contentRef} className="flex min-h-full flex-col">
         {/* The date is the daily note's subject (V1 / desktop parity) —
             chrome above the editor, formatted per the user's setting,
             tinted on today. Shares the note body's gutter. */}
@@ -130,8 +132,11 @@ export function DaySlide({
           autoFocusSelection="end"
           onAutoFocused={handleAutoFocused}
           showBacklinks={false}
+          className="flex grow flex-col"
           gutterClassName={MOBILE_CONTENT_GUTTER}
-          editorClassName="min-h-[60dvh]"
+          // A floor for the day with no content and many backlinks, where the
+          // stretch leaves only a line of editor to tap.
+          editorClassName="grow min-h-24"
         />
         {/* The mobile section (touch chrome) replaces NotePane's built-in
             desktop panel; a daily-note backlink swipes the carousel to that

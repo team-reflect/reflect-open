@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gistBodyHash, gistFilename } from './gist'
+import { gistBodyHash, gistFilename } from './gist.ts'
 
 describe('gistBodyHash', () => {
   it('is deterministic and 16 hex chars', () => {
@@ -25,7 +25,7 @@ describe('gistFilename', () => {
   })
 
   it('folds path separators to dashes', () => {
-    expect(gistFilename('a/b\\c')).toBe('a-b-c.md')
+    expect(gistFilename(String.raw`a/b\c`)).toBe('a-b-c.md')
   })
 
   it('falls back to Untitled for an empty or whitespace title', () => {

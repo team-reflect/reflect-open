@@ -1,5 +1,18 @@
-import sqlite3InitModule, { type Database, type SqlValue } from '@sqlite.org/sqlite-wasm'
-import { encodeTaskBreadcrumbs, ReflectError, type IndexedNote } from '@reflect/core'
+import sqlite3InitModule, {
+  type Database,
+  type Sqlite3Static,
+  type SqlValue,
+} from '@sqlite.org/sqlite-wasm'
+import {
+  CLAIM_TIER,
+  dateFromDailyPath,
+  encodeTaskBreadcrumbs,
+  foldGraphPath,
+  noteBasenameKey,
+  AppError,
+  type IndexedNote,
+} from '@reflect/core'
+import { isIsoDate } from '@reflect/utils'
 
 /**
  * The dev bridge's SQLite index: the real `crates/index-schema` migrations
@@ -26,6 +39,10 @@ export interface DevIndexDb {
   saveChatMessage: (conversation: DevChatConversation, message: DevChatMessageRow) => void
   /** Delete a conversation; its messages cascade (`chat_conversation_delete`). */
   deleteChatConversation: (id: string) => void
+  /**
+   * Release the database.
+   */
+  close: () => void
 }
 
 /** Mirrors `chat_write.rs`'s `ChatConversation` (camelCased over IPC). */
@@ -61,7 +78,7 @@ const migrationSources = import.meta.glob<string>(
  * and 0003's copy-and-drop migration dance — valid without the module.
  */
 function stubVectorTables(sql: string): string {
-  return sql.replace(
+  return sql.replaceAll(
     /CREATE VIRTUAL TABLE (\S+) USING vec0\([^)]*\)/g,
     'CREATE TABLE $1 (embedding BLOB)',
   )
@@ -88,9 +105,13 @@ function run(db: Database, sql: string, params: readonly unknown[] = []): void {
   db.exec({ sql, bind: params.map(bindValue) })
 }
 
-/** Open an in-memory index database and apply every migration in order. */
+/** Load SQLite wasm and open an index database over it. */
 export async function createDevIndexDb(): Promise<DevIndexDb> {
-  const sqlite3 = await sqlite3InitModule()
+  return openDevIndexDb(await sqlite3InitModule())
+}
+
+/** Open an in-memory index database over `sqlite3` and apply every migration in order. */
+export function openDevIndexDb(sqlite3: Sqlite3Static): DevIndexDb {
   const db = new sqlite3.oo1.DB()
   // The schema relies on ON DELETE CASCADE (removing a `notes` row clears its
   // child tables); SQLite ships with foreign keys off per connection.
@@ -111,34 +132,43 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       removeNote(db, note.path)
       run(
         db,
-        `INSERT INTO notes(path, id, title, title_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, gist_url, gist_stale, file_hash, mtime, updated_at, preview, has_content)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.path,
           note.id,
           note.title,
           note.titleKey,
+          note.pathKey,
           note.kind,
           note.dailyDate,
           note.isPrivate,
           note.isPinned,
           note.pinnedOrder,
-          note.hasConflict,
           note.gistUrl,
           note.gistStale,
           note.fileHash,
           note.mtime,
           note.mtime,
           note.preview,
+          note.hasContent,
         ],
       )
-      run(db, 'INSERT INTO note_text(note_path, text) VALUES(?, ?)', [note.path, note.text])
       for (const link of note.links) {
         run(
           db,
-          `INSERT INTO links(source_path, kind, target_raw, target_key, alias, pos_from, pos_to)
-           VALUES(?, ?, ?, ?, ?, ?, ?)`,
-          [note.path, link.kind, link.targetRaw, link.targetKey, link.alias, link.posFrom, link.posTo],
+          `INSERT INTO links(source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to)
+           VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            note.path,
+            link.kind,
+            link.targetRaw,
+            link.targetKey,
+            link.targetPathKey,
+            link.alias,
+            link.posFrom,
+            link.posTo,
+          ],
         )
       }
       for (const tag of note.tags) {
@@ -155,6 +185,13 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           alias.aliasKey,
         ])
       }
+      for (const claim of note.claims) {
+        run(db, 'INSERT INTO note_claims(note_path, key, tier) VALUES(?, ?, ?)', [
+          note.path,
+          claim.key,
+          claim.tier,
+        ])
+      }
       for (const email of note.emails) {
         run(db, 'INSERT INTO note_emails(note_path, email, email_key) VALUES(?, ?, ?)', [
           note.path,
@@ -168,13 +205,12 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       for (const task of note.tasks) {
         run(
           db,
-          'INSERT INTO tasks(note_path, marker_offset, text, breadcrumbs, raw, checked, due_date) VALUES(?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO tasks(note_path, ast_path, markdown, breadcrumbs, checked, due_date) VALUES(?, ?, ?, ?, ?, ?)',
           [
             note.path,
-            task.markerOffset,
-            task.text,
+            task.astPath,
+            task.markdown,
             encodeTaskBreadcrumbs(task.breadcrumbs),
-            task.raw,
             task.checked,
             task.dueDate,
           ],
@@ -193,7 +229,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
     moveNote: (from, to) => {
       const occupied = db.selectValue('SELECT 1 FROM notes WHERE path = ?', [to])
       if (occupied !== undefined) {
-        throw new ReflectError('io', `cannot move note: ${to} is already indexed`)
+        throw new AppError('io', `cannot move note: ${to} is already indexed`)
       }
       // Mirrors the Rust caller: the child tables reference `notes(path)`, so
       // the parent-key update needs deferred FK checks — which only apply
@@ -201,8 +237,39 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       db.exec('BEGIN')
       try {
         db.exec('PRAGMA defer_foreign_keys = ON')
-        run(db, 'UPDATE notes SET path = ? WHERE path = ?', [to, from])
-        run(db, 'UPDATE note_text SET note_path = ? WHERE note_path = ?', [to, from])
+        run(db, 'UPDATE notes SET path = ?, path_key = ? WHERE path = ?', [
+          to,
+          foldGraphPath(to),
+          from,
+        ])
+        const movedRows = db.changes()
+        // Mirrors `write.rs`: carried claims follow the row; the path-derived
+        // tiers are re-stated for the destination. A missing source row moves
+        // nothing and must not mint claims for a note that does not exist.
+        run(db, 'UPDATE note_claims SET note_path = ? WHERE note_path = ?', [to, from])
+        if (movedRows > 0) {
+          run(db, 'DELETE FROM note_claims WHERE note_path = ? AND tier IN (?, ?)', [
+            to,
+            CLAIM_TIER.dailyDate,
+            CLAIM_TIER.basename,
+          ])
+          const date = dateFromDailyPath(to)
+          const restated = [
+            ...(date !== null && isIsoDate(date)
+              ? [{ key: date, tier: CLAIM_TIER.dailyDate }]
+              : []),
+            { key: noteBasenameKey(to), tier: CLAIM_TIER.basename },
+          ]
+          for (const claim of restated) {
+            run(
+              db,
+              `INSERT INTO note_claims(note_path, key, tier)
+               SELECT ?, ?, ?
+               WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ? AND key = ?)`,
+              [to, claim.key, claim.tier, to, claim.key],
+            )
+          }
+        }
         run(db, 'UPDATE links SET source_path = ? WHERE source_path = ?', [to, from])
         run(db, 'UPDATE tags SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE aliases SET note_path = ? WHERE note_path = ?', [to, from])
@@ -277,6 +344,10 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
 
     deleteChatConversation: (id) => {
       run(db, 'DELETE FROM chat_conversations WHERE id = ?', [id])
+    },
+
+    close: () => {
+      db.close()
     },
   }
 }

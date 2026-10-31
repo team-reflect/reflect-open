@@ -1,31 +1,58 @@
 {
   "name": "@reflect/monorepo",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
-    "lint": "oxlint apps packages && pnpm --filter @reflect/desktop lint:react",
-    "lint:fix": "oxlint --fix apps packages",
+    "build:ios": "pnpm --filter @reflect/desktop build:ios",
+    "build:linux": "pnpm --filter @reflect/desktop build:linux",
+    "build:macos": "pnpm --filter @reflect/desktop build:macos",
+    "build:windows": "pnpm --filter @reflect/desktop build:windows",
+    "typecheck": "tsc -b",
+    "test": "vitest",
+    "test:browser": "vitest run --project '*browser*'",
+    "test:node": "vitest run --project '!*browser*'",
+    "lint": "pnpm run lint:oxfmt && pnpm run lint:oxlint && pnpm run lint:eslint && pnpm run lint:knip",
+    "lint:oxfmt": "oxfmt --check",
+    "lint:oxlint": "oxlint --max-warnings 0 apps packages",
+    "lint:eslint": "eslint --cache --max-warnings 0",
+    "lint:knip": "knip",
+    "fix": "pnpm run fix:oxfmt && pnpm run fix:oxlint && pnpm run fix:eslint",
+    "fix:oxfmt": "oxfmt",
+    "fix:oxlint": "oxlint --max-warnings 0 --fix apps packages",
+    "fix:eslint": "eslint --cache --max-warnings 0 --fix",
     "check": "pnpm typecheck && pnpm lint",
+    "gen:licenses": "pnpm --filter @reflect/desktop gen:licenses",
     "tauri": "pnpm --filter @reflect/desktop tauri",
-    "release:ios": "pnpm --filter @reflect/desktop release:ios",
-    "release:macos": "pnpm --filter @reflect/desktop release:macos",
-    "release:testflight": "pnpm --filter @reflect/desktop release:ios testflight",
+    "upload:testflight": "pnpm --filter @reflect/desktop upload:testflight",
     "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
     "tauri:ios:dev": "pnpm --filter @reflect/desktop tauri:ios:dev",
+    "tauri:ios:dev:sim": "pnpm --filter @reflect/desktop tauri:ios:dev:sim",
     "tauri:build:dev": "pnpm --filter @reflect/desktop tauri:build:dev",
-    "tauri:build:beta": "pnpm --filter @reflect/desktop tauri:build:beta"
+    "tauri:build:beta": "pnpm --filter @reflect/desktop tauri:build:beta",
+    "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
+    "@ocavue/eslint-config": "^4.22.0",
+    "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
-    "oxlint": "^1.71.0",
-    "release-please": "17.6.0",
-    "turbo": "^2.10.0",
-    "typescript": "~6.0.3"
-  }
+    "eslint": "^10.13.0",
+    "knip": "^6.43.0",
+    "nano-staged": "^1.0.2",
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.88.0",
+    "simple-git-hooks": "^2.14.0",
+    "turbo": "^2.11.9",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "./node_modules/.bin/nano-staged --allow-empty"
+  },
+  "nano-staged": {
+    "*": "oxfmt --no-error-on-unmatched-pattern"
+  },
+  "packageManager": "pnpm@11.28.8"
 }

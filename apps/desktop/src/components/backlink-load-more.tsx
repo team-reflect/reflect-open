@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
+import { cn } from '@/lib/utils.ts'
 
 const PRELOAD_MARGIN = '600px 0px'
 

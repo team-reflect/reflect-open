@@ -3,8 +3,8 @@ import {
   SIDEBAR_PANEL_IDS,
   useSidebarResize,
   type ResizableSidebarPanel,
-} from '@/hooks/use-sidebar-resize'
-import { cn } from '@/lib/utils'
+} from '@/hooks/use-sidebar-resize.ts'
+import { cn } from '@/lib/utils.ts'
 
 const PANEL_LABELS: Record<ResizableSidebarPanel, string> = {
   workspace: 'Resize sidebar',

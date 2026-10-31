@@ -1,47 +1,50 @@
-import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
 import {
-  getCompletedTasks,
-  getOpenTasks,
-  hasBridge,
+  composeVisibleTaskGroups,
+  getTaskKey,
+  todaysDailyTarget,
+  type InsertTaskTarget,
   type OpenTask,
 } from '@reflect/core'
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
-import { taskKey } from '@/lib/tasks/task-identity'
-import { useTaskFilters } from '@/lib/tasks/task-filters'
-import { type InsertTaskTarget } from '@/lib/tasks/task-insert-target'
-import { todaysDailyTarget } from '@/lib/tasks/task-navigation'
-import { composeVisibleTaskGroups } from '@/lib/tasks/task-visibility'
-import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
-import { useTaskActions } from '@/lib/tasks/use-task-actions'
-import { useToday } from '@/lib/use-today'
-import { hapticImpactLight } from '@/mobile/haptics'
-import { SearchInput } from '@/mobile/search-input'
-import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet'
-import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer'
-import { MobileTaskGroup } from '@/mobile/task-group'
-import { useArrivalFocus } from '@/mobile/use-arrival-focus'
-import { useGraph } from '@/providers/graph-provider'
-import { routeForPath } from '@/routing/route'
-import { useRouter } from '@/routing/router'
+import { Button } from '@/components/ui/button.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
+import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
+import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
+import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
+import { useToday } from '@/lib/use-today.ts'
+import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
+import { SearchInput } from '@/mobile/search-input.tsx'
+import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
+import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
+import { MobileTaskGroup } from '@/mobile/task-group.tsx'
+import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
+import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { routeForPath } from '@reflect/app'
+import { useRouter } from '@/routing/router.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
  * open task across the graph in desktop's exact groups — Current / Overdue /
- * Upcoming, then per-note — via the same queries, grouping
- * ({@link composeVisibleTaskGroups}) and optimistic mutations
+ * Upcoming, then per-note — via the same task rows, grouping
+ * ({@link composeVisibleTaskGroups}) and optimistic writes
  * ({@link useTaskActions}) the desktop view uses; this screen adds only the
  * touch surface. Task taps, toggles, adds, filters, scheduling, and archival
  * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
  * complete / convert / open note) instead of desktop's multi-select; the filter
- * sheet carries desktop's bucket toggles and "Show archived". Completing keeps
- * the row struck (V1's middle state) until Archive hides this session's completed
- * tasks.
+ * sheet carries desktop's bucket toggles and "Show archived". Swiping a row
+ * left reveals the note list's two actions, open the source note and delete the
+ * task; one row's actions show at a time and scrolling closes them. Completing
+ * keeps the row struck (V1's middle state) until Archive hides this session's
+ * completed tasks.
  */
 export function MobileTasks(): ReactElement {
+  const { haptics } = useMobileServices()
+  const { tasks: taskService } = useCoreServices()
   const { graph } = useGraph()
   const { navigate, arrivalSeq, arrivalFocusEditor } = useRouter()
   const today = useToday()
@@ -49,6 +52,8 @@ export function MobileTasks(): ReactElement {
   const [query, setQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // The one row whose swipe actions are showing (its getTaskKey), across all groups.
+  const [revealedTaskKey, setRevealedTaskKey] = useState<string | null>(null)
   // The sheet's task sticks around after close so the exit animation has
   // content; `sheetOpen` alone drives visibility.
   const [editingTask, setEditingTask] = useState<OpenTask | null>(null)
@@ -56,7 +61,7 @@ export function MobileTasks(): ReactElement {
   // Whether the current sheet visit should open with the editor focused
   // (keyboard up) — set per visit: true for "+"-added tasks, false for row taps.
   const [autoFocusEditor, setAutoFocusEditor] = useState(false)
-  const enabled = hasBridge() && graph !== null
+  const enabled = graph !== null
 
   // The Tasks-tab double-tap lands in the tab's capture surface: its live
   // search filter, selected so a replacement query can start immediately.
@@ -67,16 +72,14 @@ export function MobileTasks(): ReactElement {
     selectText: true,
   })
 
-  const { data: open, isError: openFailed } = useQuery({
-    queryKey: tasksQueryKey(graph?.root),
-    queryFn: () => getOpenTasks(),
-    enabled,
-  })
-  const { data: completed, isError: completedFailed } = useQuery({
-    queryKey: completedTasksQueryKey(graph?.root),
-    queryFn: () => getCompletedTasks(),
-    enabled: enabled && filters.archived,
-  })
+  const { open, completed, openFailed, completedFailed } = useServiceState(
+    taskService,
+    taskService.getState,
+  )
+  useEffect(
+    () => (filters.archived ? taskService.includeCompleted() : undefined),
+    [taskService, filters.archived],
+  )
   const isError = openFailed || (filters.archived && completedFailed)
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
 
@@ -90,8 +93,7 @@ export function MobileTasks(): ReactElement {
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
   const groups = useMemo(
-    () =>
-      composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
+    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
     [open, completed, recentlyCompleted, filters, needle, today],
   )
 
@@ -105,15 +107,15 @@ export function MobileTasks(): ReactElement {
     if (editingTask === null) {
       return null
     }
-    const key = taskKey(editingTask)
+    const key = getTaskKey(editingTask)
     return (
-      groups.flatMap((group) => group.tasks).find((row) => taskKey(row) === key) ?? editingTask
+      groups.flatMap((group) => group.tasks).find((row) => getTaskKey(row) === key) ?? editingTask
     )
   }, [groups, editingTask])
 
   const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
     if (options?.haptic !== false) {
-      hapticImpactLight()
+      hapticImpactLight(haptics)
     }
     setAutoFocusEditor(options?.autoFocus === true)
     setEditingTask(task)
@@ -124,7 +126,7 @@ export function MobileTasks(): ReactElement {
   // visible, write it, then open its quick-edit sheet with the editor focused
   // so typing starts immediately.
   const onAdd = (target: InsertTaskTarget): void => {
-    hapticImpactLight()
+    hapticImpactLight(haptics)
     setQuery('')
     void actions.insert(target).then((created) => {
       if (created !== null) {
@@ -134,47 +136,41 @@ export function MobileTasks(): ReactElement {
   }
 
   const archiveCompleted = (): void => {
-    hapticImpactLight()
+    hapticImpactLight(haptics)
     actions.archive()
   }
 
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
-      <header className="flex shrink-0 items-center gap-1 border-b border-border px-4 pb-2 pt-1">
-        <SearchInput
-          ref={searchInputRef}
-          placeholder="Search tasks…"
-          aria-label="Search tasks"
-          value={query}
-          onValueChange={setQuery}
-        />
-        {recentlyCompleted.length > 0 ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-10 shrink-0"
-            aria-label={`Archive ${recentlyCompleted.length} completed`}
-            onClick={archiveCompleted}
+    <div className="flex h-full w-screen flex-col pt-safe">
+      <MobileTopBar>
+        <MobileTopBarRow>
+          <SearchInput
+            ref={searchInputRef}
+            placeholder="Search tasks…"
+            aria-label="Search tasks"
+            value={query}
+            onValueChange={setQuery}
+          />
+          {recentlyCompleted.length > 0 ? (
+            <MobileTopBarIconButton
+              aria-label={`Archive ${recentlyCompleted.length} completed`}
+              onClick={archiveCompleted}
+            >
+              <Archive />
+            </MobileTopBarIconButton>
+          ) : null}
+          <MobileTopBarIconButton
+            edge="trailing"
+            aria-label="Task filters"
+            onClick={() => {
+              hapticImpactLight(haptics)
+              setFiltersOpen(true)
+            }}
           >
-            <Archive />
-          </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10 shrink-0"
-          aria-label="Task filters"
-          onClick={() => {
-            hapticImpactLight()
-            setFiltersOpen(true)
-          }}
-        >
-          <SlidersHorizontal />
-        </Button>
-      </header>
+            <SlidersHorizontal />
+          </MobileTopBarIconButton>
+        </MobileTopBarRow>
+      </MobileTopBar>
       {isError ? (
         <p role="alert" className="px-4 py-6 text-sm text-text-muted">
           Couldn’t load tasks.
@@ -197,7 +193,10 @@ export function MobileTasks(): ReactElement {
           ) : null}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto pb-24">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto px-safe pb-24"
+          onScroll={() => setRevealedTaskKey(null)}
+        >
           {groups.map((group) => (
             <MobileTaskGroup
               key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
@@ -205,7 +204,12 @@ export function MobileTasks(): ReactElement {
               today={today}
               onAdd={onAdd}
               onEdit={editTask}
+              onToggle={actions.checkboxToggle}
+              togglePending={actions.isPending}
               onOpen={(path) => navigate(routeForPath(path))}
+              onDelete={(task) => actions.remove([task])}
+              revealedTaskKey={revealedTaskKey}
+              setRevealedTaskKey={setRevealedTaskKey}
             />
           ))}
         </div>
@@ -213,15 +217,14 @@ export function MobileTasks(): ReactElement {
       <Button
         size="icon"
         aria-label="New task"
-        className="fixed right-4 z-40 size-12 rounded-full shadow-lg"
-        style={{ bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)' }}
+        className="fixed right-safe-offset-4 bottom-above-keyboard-offset-17 z-40 size-12 rounded-full shadow-lg"
         onClick={() => onAdd(todaysDailyTarget(today))}
       >
         <Plus className="size-6" />
       </Button>
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet
-          key={taskKey(liveEditingTask)}
+          key={getTaskKey(liveEditingTask)}
           task={liveEditingTask}
           open={sheetOpen}
           onOpenChange={setSheetOpen}

@@ -1,17 +1,18 @@
 //! `<note>` argument resolution for `show`/`path`. The order mirrors
 //! `resolveWikiLink` (`packages/core/src/markdown/resolve.ts`) with a path
 //! convenience first-class for a CLI: calendar-valid `YYYY-MM-DD` → explicit
-//! graph path → title fold-key → alias fold-key. Index-backed when the index
-//! is open; otherwise a file scan derives the same titles/aliases.
+//! graph path → title fold-key → alias fold-key → filename-stem fold-key.
+//! Index-backed when the index is open; otherwise a file scan derives the
+//! same keys.
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 use crate::error::CliError;
 use crate::keys::fold_key;
-use crate::note_file::{parse_note_meta, walk_notes};
-use crate::paths::{daily_path, parse_calendar_date, NOTE_DIRS};
+use crate::note_file::{checked_note_path, parse_note_meta, read_note_text, walk_notes};
+use crate::paths::{daily_path, parse_calendar_date};
 
 /// What a `<note>` argument resolved to.
 pub enum ResolvedNote {
@@ -30,46 +31,63 @@ impl ResolvedNote {
 }
 
 /// Interpret `arg` as an explicit note path (graph-relative, or absolute
-/// inside the graph). Only existing `.md` files under `daily/`/`notes/`
-/// qualify; anything else falls through to title/alias matching.
+/// inside the graph). Only existing eligible Markdown files qualify; anything
+/// else falls through to title/alias matching. Symlinked path components are
+/// refused even when their target happens to remain inside the graph.
 fn as_graph_path(arg: &str, root: &Path) -> Option<String> {
     let candidate = Path::new(arg);
-    let absolute = if candidate.is_absolute() {
-        candidate.to_path_buf()
+    let canonical_root = root.canonicalize().ok()?;
+    let relative = if candidate.is_absolute() {
+        absolute_graph_relative(candidate, &canonical_root)?
     } else {
-        root.join(candidate)
+        candidate.to_path_buf()
     };
-    let canonical = absolute.canonicalize().ok()?;
-    if !canonical.is_file() {
+    let rel_path = relative.to_str()?.replace(std::path::MAIN_SEPARATOR, "/");
+    // User-typed arguments deserve shell-style tolerance (`./notes/a.md`,
+    // `notes//a.md`); the wire form stays strict, so normalize before the
+    // classifier sees it.
+    let rel_path = rel_path
+        .split('/')
+        .filter(|component| !component.is_empty() && *component != ".")
+        .collect::<Vec<_>>()
+        .join("/");
+    let current = checked_note_path(&canonical_root, &rel_path).ok()?;
+    if !current.is_file() || !current.canonicalize().ok()?.starts_with(&canonical_root) {
         return None;
     }
-    let rel = canonical.strip_prefix(root).ok()?;
-    let rel_path = rel.to_string_lossy().replace('\\', "/");
-    let under_note_dir = NOTE_DIRS
-        .iter()
-        .any(|dir| rel_path.starts_with(&format!("{dir}/")));
-    (under_note_dir && rel_path.ends_with(".md")).then_some(rel_path)
+    Some(rel_path)
 }
 
-/// Title matches first, alias matches only when no title matched — the
-/// `byTitle ?? byAlias` precedence — each tier ordered by path so collisions
-/// resolve deterministically (same rule as the desktop's `resolveWikiTarget`).
-fn index_lookup(conn: &Connection, key: &str) -> Result<Vec<String>, CliError> {
-    // Templates never resolve by title/alias (the desktop rule) — only an
-    // explicit `templates/...` path argument reaches one.
-    let by_title = collect_paths(
-        conn,
-        "SELECT path FROM notes WHERE title_key = ?1 AND kind != 'template' ORDER BY path",
-        key,
-    )?;
-    if !by_title.is_empty() {
-        return Ok(by_title);
+/// Find the lexical graph boundary for an absolute path by canonicalizing its
+/// ancestors. This accepts aliases of the graph root (for example macOS's
+/// `/var` → `/private/var`) without canonicalizing away symlinks below it;
+/// [`checked_note_path`] still inspects every component of the returned suffix.
+fn absolute_graph_relative(candidate: &Path, canonical_root: &Path) -> Option<PathBuf> {
+    if candidate
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return None;
     }
+    candidate.ancestors().find_map(|ancestor| {
+        if ancestor.canonicalize().ok()?.as_path() != canonical_root {
+            return None;
+        }
+        candidate.strip_prefix(ancestor).ok().map(Path::to_path_buf)
+    })
+}
+
+/// The winning tier's claimants for a folded key. `note_claims` encodes the
+/// desktop's precedence (date, authored title, alias, filename stem) and
+/// templates claim nothing, so the CLI reads the same ranking instead of
+/// restating it tier by tier.
+fn index_lookup(conn: &Connection, key: &str) -> Result<Vec<String>, CliError> {
     collect_paths(
         conn,
-        "SELECT note_path FROM aliases
-         JOIN notes ON notes.path = aliases.note_path AND notes.kind != 'template'
-         WHERE alias_key = ?1 ORDER BY note_path",
+        "SELECT note_path FROM note_claims
+          WHERE key = ?1
+            AND tier = (SELECT min(tier) FROM note_claims WHERE key = ?1)
+          ORDER BY note_path",
         key,
     )
 }
@@ -90,11 +108,13 @@ fn collect_paths(conn: &Connection, sql: &str, key: &str) -> Result<Vec<String>,
 fn scan_lookup(root: &Path, key: &str) -> Result<Vec<String>, CliError> {
     let mut by_title = Vec::new();
     let mut by_alias = Vec::new();
-    for note in walk_notes(root)? {
+    let mut by_stem = Vec::new();
+    for note in walk_notes(root) {
         if note.rel_path.starts_with("templates/") {
             continue; // templates never resolve by title/alias
         }
-        let Ok(content) = std::fs::read_to_string(root.join(&note.rel_path)) else {
+        let Ok(content) = read_note_text(&root.join(&note.rel_path)) else {
+            // An unreadable or evicted note hides itself, not the whole lookup.
             continue;
         };
         let meta = parse_note_meta(&note.rel_path, &content);
@@ -102,13 +122,24 @@ fn scan_lookup(root: &Path, key: &str) -> Result<Vec<String>, CliError> {
             by_title.push(note.rel_path);
         } else if meta.aliases.iter().any(|alias| fold_key(alias) == key) {
             by_alias.push(note.rel_path);
+        } else if fold_key(note_stem(&note.rel_path)) == key {
+            by_stem.push(note.rel_path);
         }
     }
-    Ok(if by_title.is_empty() {
+    Ok(if !by_title.is_empty() {
+        by_title
+    } else if !by_alias.is_empty() {
         by_alias
     } else {
-        by_title
+        by_stem
     })
+}
+
+/// The filename stem a note answers to as its weakest address (the desktop's
+/// `noteBasenameKey`, before folding).
+fn note_stem(rel_path: &str) -> &str {
+    let filename = rel_path.rsplit('/').next().unwrap_or(rel_path);
+    filename.strip_suffix(".md").unwrap_or(filename)
 }
 
 /// Resolve a `<note>` argument. Ambiguous matches resolve to the first path
@@ -152,5 +183,117 @@ pub fn resolve_note(
                 rel_path: first.clone(),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::as_graph_path;
+
+    #[test]
+    fn explicit_paths_accept_root_and_nested_notes_only() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(temp.path().join("README.md"), "root").expect("write");
+        std::fs::create_dir_all(temp.path().join("Projects/.hidden")).expect("mkdir");
+        std::fs::write(temp.path().join("Projects/plan.md"), "plan").expect("write");
+        std::fs::write(temp.path().join("Projects/.hidden/secret.md"), "secret").expect("write");
+        std::fs::create_dir_all(temp.path().join("assets")).expect("mkdir");
+        std::fs::write(temp.path().join("assets/caption.md"), "caption").expect("write");
+        let root = temp.path().canonicalize().expect("canonical root");
+
+        assert_eq!(
+            as_graph_path("README.md", &root).as_deref(),
+            Some("README.md")
+        );
+        assert_eq!(
+            as_graph_path("Projects/plan.md", &root).as_deref(),
+            Some("Projects/plan.md")
+        );
+        assert_eq!(as_graph_path("Projects/.hidden/secret.md", &root), None);
+        assert_eq!(as_graph_path("assets/caption.md", &root), None);
+    }
+
+    #[test]
+    fn normalizes_dot_and_doubled_separators_in_explicit_arguments() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("notes")).expect("mkdir");
+        std::fs::write(dir.path().join("notes/idea.md"), "# Idea\n").expect("write");
+        assert_eq!(
+            as_graph_path("./notes/idea.md", dir.path()).as_deref(),
+            Some("notes/idea.md")
+        );
+        assert_eq!(
+            as_graph_path("notes//idea.md", dir.path()).as_deref(),
+            Some("notes/idea.md")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn explicit_paths_refuse_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(temp.path().join("real.md"), "real").expect("write");
+        symlink(temp.path().join("real.md"), temp.path().join("linked.md")).expect("symlink");
+        let root = temp.path().canonicalize().expect("canonical root");
+
+        assert_eq!(as_graph_path("linked.md", &root), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn absolute_paths_accept_different_aliases_of_the_graph_root() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let real_root = temp.path().join("real-vault");
+        let alias_root = temp.path().join("vault-alias");
+        std::fs::create_dir(&real_root).expect("mkdir");
+        std::fs::write(real_root.join("README.md"), "root").expect("write");
+        symlink(&real_root, &alias_root).expect("symlink");
+
+        assert_eq!(
+            as_graph_path(
+                real_root.join("README.md").to_str().expect("UTF-8 path"),
+                &alias_root,
+            )
+            .as_deref(),
+            Some("README.md")
+        );
+        assert_eq!(
+            as_graph_path(
+                alias_root.join("README.md").to_str().expect("UTF-8 path"),
+                &real_root,
+            )
+            .as_deref(),
+            Some("README.md")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn absolute_paths_still_refuse_symlinks_below_the_graph_root() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(temp.path().join("Projects")).expect("mkdir");
+        std::fs::write(temp.path().join("Projects/plan.md"), "plan").expect("write");
+        symlink(
+            temp.path().join("Projects"),
+            temp.path().join("linked-projects"),
+        )
+        .expect("symlink");
+
+        assert_eq!(
+            as_graph_path(
+                temp.path()
+                    .join("linked-projects/plan.md")
+                    .to_str()
+                    .expect("UTF-8 path"),
+                temp.path(),
+            ),
+            None
+        );
     }
 }

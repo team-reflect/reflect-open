@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react'
-import { ShortcutList } from '@/components/shortcut-list'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { APP_SHORTCUTS, EDITOR_SHORTCUTS } from '@/lib/shortcuts'
-import { useShortcuts } from '@/providers/shortcuts-provider'
+import { ShortcutList } from '@/components/shortcut-list.tsx'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.tsx'
+import { APP_SHORTCUTS, EDITOR_SHORTCUTS } from '@/lib/shortcuts.ts'
+import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 
 /**
  * The ⌘/ cheat-sheet (Plan 15): every registered binding from both keymap

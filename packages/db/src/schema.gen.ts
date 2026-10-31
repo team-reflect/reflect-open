@@ -71,7 +71,14 @@ export interface Links {
   posTo: number;
   sourcePath: string;
   targetKey: string;
+  targetPathKey: string | null;
   targetRaw: string;
+}
+
+export interface NoteClaims {
+  key: string;
+  notePath: string;
+  tier: number;
 }
 
 export interface NoteEmails {
@@ -81,6 +88,7 @@ export interface NoteEmails {
 }
 
 export interface NoteKeys {
+  claimCount: string | null;
   key: string | null;
   notePath: string | null;
 }
@@ -91,22 +99,19 @@ export interface Notes {
   gistStale: Generated<number>;
   gistUrl: string | null;
   hasConflict: Generated<number>;
+  hasContent: Generated<number>;
   id: string | null;
   isPinned: Generated<number>;
   isPrivate: Generated<number>;
   kind: Generated<string>;
   mtime: Generated<number>;
   path: string;
+  pathKey: Generated<string>;
   pinnedOrder: number | null;
   preview: Generated<string>;
   title: string;
   titleKey: string;
   updatedAt: Generated<number>;
-}
-
-export interface NoteText {
-  notePath: string;
-  text: string;
 }
 
 export interface SearchFts {
@@ -122,13 +127,12 @@ export interface Tags {
 }
 
 export interface Tasks {
+  astPath: string;
   breadcrumbs: Generated<string>;
   checked: number;
   dueDate: string | null;
-  markerOffset: number;
+  markdown: string;
   notePath: string;
-  raw: string;
-  text: string;
 }
 
 export interface DB {
@@ -140,10 +144,10 @@ export interface DB {
   embeddingChunks: EmbeddingChunks;
   indexMeta: IndexMeta;
   links: Links;
+  noteClaims: NoteClaims;
   noteEmails: NoteEmails;
   noteKeys: NoteKeys;
   notes: Notes;
-  noteText: NoteText;
   searchFts: SearchFts;
   tags: Tags;
   tasks: Tasks;

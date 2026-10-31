@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, type ReactElement } from 'react'
 import { CircleCheck, Files, MessageSquare, SquarePen } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { hapticImpactLight } from '@/mobile/haptics'
-import type { Route } from '@/routing/route'
+import { cn } from '@/lib/utils.ts'
+import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
+import type { Route } from '@reflect/app'
 
 export type MobileTab = 'daily' | 'all' | 'tasks' | 'chat'
 
@@ -68,8 +69,7 @@ export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement
     <nav
       ref={navRef}
       aria-label="Sections"
-      className="flex shrink-0 border-t border-border"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="flex shrink-0 border-t border-border px-safe pb-safe"
     >
       <TabButton
         label="Daily"
@@ -110,6 +110,7 @@ function TabButton({
   active: boolean
   onClick: () => void
 }): ReactElement {
+  const { haptics } = useMobileServices()
   return (
     <button
       type="button"
@@ -118,7 +119,7 @@ function TabButton({
       // V1 parity: a light haptic on every tab press, including the two taps
       // that make Daily's double-tap-to-today gesture.
       onClick={() => {
-        hapticImpactLight()
+        hapticImpactLight(haptics)
         onClick()
       }}
       className={cn(

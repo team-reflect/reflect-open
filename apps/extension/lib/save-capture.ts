@@ -1,6 +1,7 @@
-import { buildWireMessage, type BuildWireMessageInput } from './capture-message'
-import { enqueueCapture, readQueue } from './flush'
-import { flushResultSchema, type FlushResult } from './messages'
+import type { ExtensionCaptureWire } from '@reflect/core/capture-envelope'
+import { buildWireMessage, type BuildWireMessageInput } from './capture-message.ts'
+import { enqueueCapture, readQueue } from './flush.ts'
+import { flushResultSchema, type FlushResult } from './messages.ts'
 
 /**
  * The fate of one just-enqueued capture after its immediate flush attempt.
@@ -18,9 +19,10 @@ export type SaveOutcome =
 export async function saveCapture(
   page: BuildWireMessageInput,
   flush: () => Promise<unknown>,
+  enqueue: (wire: ExtensionCaptureWire) => Promise<void> = enqueueCapture,
 ): Promise<SaveOutcome> {
   const wire = buildWireMessage(page)
-  await enqueueCapture(wire)
+  await enqueue(wire)
   const result = flushResultSchema.parse(await flush())
   if (result.rejectedIds.includes(wire.envelope.id)) {
     return { fate: 'rejected' }

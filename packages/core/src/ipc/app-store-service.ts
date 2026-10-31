@@ -1,0 +1,83 @@
+import type { MaybePromise } from '@reflect/utils'
+import { z } from 'zod'
+import type { IpcBridgeService } from './ipc-service.ts'
+import { definePluginCommand, ignoredResult } from './plugin.ts'
+
+/**
+ * Typed bindings for `plugins/tauri-plugin-app-store`, the install-channel
+ * probe.
+ */
+
+const appStoreEnvironmentSchema = z.object({ environment: z.string() })
+
+const getEnvironmentCommand = definePluginCommand<Record<string, never>, { environment: string }>(
+  'app-store',
+  'get_environment',
+  appStoreEnvironmentSchema,
+)
+
+const syncCommand = definePluginCommand<Record<string, never>, unknown>(
+  'app-store',
+  'sync',
+  ignoredResult,
+)
+
+const presentOfferCodeRedeemSheetCommand = definePluginCommand<Record<string, never>, unknown>(
+  'app-store',
+  'present_offer_code_redeem_sheet',
+  ignoredResult,
+)
+
+/**
+ * The App Store install channel and its restore and redeem flows.
+ */
+export interface AppStoreService {
+  /**
+   * Which channel installed this build, per StoreKit 2's
+   * `AppTransaction.environment`: `'Production'` (App Store), `'Sandbox'`
+   * (TestFlight or a development install), or `'Xcode'` (a
+   * StoreKit-configuration run). Rejects when the probe cannot answer, so an
+   * unanswered probe stays distinguishable from a named channel.
+   */
+  environment(): MaybePromise<string>
+  /**
+   * Force StoreKit to refetch transactions from the App Store
+   * (`AppStore.sync()`). Apple may show a sign-in prompt, so call it only
+   * from an explicit user action such as Restore Purchases.
+   */
+  sync(): MaybePromise<void>
+  /**
+   * Show Apple's in-app offer-code redemption sheet. A redeemed code arrives
+   * through the iap plugin's `purchaseUpdated` event, not through this call's
+   * result, which resolves as soon as the sheet is presented.
+   */
+  presentOfferCodeRedeemSheet(): MaybePromise<void>
+}
+
+export interface AppStoreServiceDeps {
+  readonly ipc: IpcBridgeService
+}
+
+class AppStoreServiceImpl implements AppStoreService {
+  readonly #deps: AppStoreServiceDeps
+
+  constructor(deps: AppStoreServiceDeps) {
+    this.#deps = deps
+  }
+
+  async environment(): Promise<string> {
+    return (await getEnvironmentCommand(this.#deps.ipc, {})).environment
+  }
+
+  async sync(): Promise<void> {
+    await syncCommand(this.#deps.ipc, {})
+  }
+
+  async presentOfferCodeRedeemSheet(): Promise<void> {
+    await presentOfferCodeRedeemSheetCommand(this.#deps.ipc, {})
+  }
+}
+
+export function createAppStoreService(deps: AppStoreServiceDeps): AppStoreService {
+  return new AppStoreServiceImpl(deps)
+}

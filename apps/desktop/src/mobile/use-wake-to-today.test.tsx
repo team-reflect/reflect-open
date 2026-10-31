@@ -1,24 +1,15 @@
-import { act, cleanup, render } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
-import { RouterProvider, useRouter } from '@/routing/router'
-import { useWakeToToday } from './use-wake-to-today'
+import { useRouter } from '@/routing/router.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { useWakeToToday } from './use-wake-to-today.ts'
 
 /**
  * V1's wake-to-today: foregrounding the app on a later calendar date than it
  * was backgrounded on navigates to today; a same-day foreground stays put.
- * Visibility is simulated by overriding `document.visibilityState` and
- * dispatching `visibilitychange`; the clock via fake timers.
+ * Visibility comes from the test lifecycle service and the date from the test
+ * clock.
  */
-
-let visibility: DocumentVisibilityState = 'visible'
-
-function setVisibility(state: DocumentVisibilityState): void {
-  visibility = state
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'))
-  })
-}
 
 function Probe(): ReactElement {
   useWakeToToday()
@@ -26,48 +17,32 @@ function Probe(): ReactElement {
   return <output>{route.kind === 'daily' ? `daily:${route.date}` : route.kind}</output>
 }
 
-beforeEach(() => {
-  vi.useFakeTimers()
-  vi.setSystemTime(new Date(2026, 5, 12, 22, 0, 0)) // 2026-06-12, late evening
-  Object.defineProperty(document, 'visibilityState', {
-    configurable: true,
-    get: () => visibility,
-  })
-  visibility = 'visible'
-})
-
-afterEach(() => {
-  cleanup()
-  vi.useRealTimers()
-})
-
-function mountOn(date: string): ReturnType<typeof render> {
-  return render(
-    <RouterProvider initialRoute={{ kind: 'daily', date }}>
-      <Probe />
-    </RouterProvider>,
-  )
+async function mountOn(date: string) {
+  const view = await renderInApp(<Probe />, { route: { kind: 'daily', date } })
+  view.core.clock.setNow(new Date(2026, 5, 12, 22, 0, 0).getTime()) // 2026-06-12, late evening
+  return view
 }
 
 describe('useWakeToToday', () => {
-  it('navigates to today when the app foregrounds on a new date', () => {
-    const view = mountOn('2026-06-10')
-    expect(view.getByRole('status').textContent).toBe('daily:2026-06-10')
+  it('navigates to today when the app foregrounds on a new date', async () => {
+    const view = await mountOn('2026-06-10')
+    await expect.element(view.getByRole('status')).toMatchTextContent('daily:2026-06-10')
 
-    setVisibility('hidden')
-    vi.setSystemTime(new Date(2026, 5, 13, 8, 0, 0)) // overnight in the background
-    setVisibility('visible')
+    view.core.activity.emitHidden()
+    view.core.clock.setNow(new Date(2026, 5, 13, 8, 0, 0).getTime()) // overnight in the background
+    view.core.activity.emitVisible()
 
-    expect(view.getByRole('status').textContent).toBe('today')
+    await expect.element(view.getByRole('status')).toMatchTextContent('today')
   })
 
-  it('stays put when the app foregrounds on the same date', () => {
-    const view = mountOn('2026-06-10')
+  it('stays put when the app foregrounds on the same date', async () => {
+    const view = await mountOn('2026-06-10')
 
-    setVisibility('hidden')
-    vi.setSystemTime(new Date(2026, 5, 12, 23, 30, 0)) // later the same evening
-    setVisibility('visible')
+    view.core.activity.emitHidden()
+    view.core.clock.setNow(new Date(2026, 5, 12, 23, 30, 0).getTime()) // later the same evening
+    view.core.activity.emitVisible()
 
-    expect(view.getByRole('status').textContent).toBe('daily:2026-06-10')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await expect.element(view.getByRole('status')).toMatchTextContent('daily:2026-06-10')
   })
 })

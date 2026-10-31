@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import { settingsSectionDomId, settingsSectionTitle, type SettingsSectionId } from './sections'
+import { settingsSectionDomId, settingsSectionTitle, type SettingsSectionId } from './sections.ts'
 
 interface SettingsSectionProps {
   /**

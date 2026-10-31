@@ -1,67 +1,139 @@
 <!-- @dsCard group="Components" viewport="700x340" name="Data display" subtitle="Card, badge, avatar, menu item" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../../styles.css" />
-<style>
-  body { margin: 0; font-family: var(--font-sans); background: var(--surface-app); padding: 24px; }
-  .label { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 12px; }
-  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 22px; }
-</style>
-</head>
-<body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-  <script src="../../_ds_bundle.js"></script>
-  <script type="text/babel">
-    const NS = 'ReflectDesignSystem_06b075'
-    const I = (d) => (p) => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...p}>{d}</svg>)
-    const Pencil = I(<path d="M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>)
-    const ListI = I(<React.Fragment><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></React.Fragment>)
-    const CheckI = I(<polyline points="20 6 9 17 4 12"/>)
-
-    function Demo() {
-      const { Card, Badge, Avatar, MenuItem, ShortcutKey } = window[NS]
-      return (
-        <React.Fragment>
-          <p className="label">Badges</p>
-          <div className="row">
-            <Badge variant="tag">ideas</Badge>
-            <Badge variant="accent">New</Badge>
-            <Badge variant="success">Synced</Badge>
-            <Badge variant="warning">Trial</Badge>
-            <Badge variant="neutral">Draft</Badge>
-          </div>
-          <p className="label">Avatars</p>
-          <div className="row">
-            <Avatar name="Alex MacCaw" />
-            <Avatar name="Sean Rose" size={40} />
-            <Avatar graphColor="#4F46E5" size={36} />
-            <Avatar graphColor="#22c55e" size={36} />
-          </div>
-          <p className="label">Card &amp; menu</p>
-          <div className="row" style={{ alignItems: 'stretch' }}>
-            <Card elevated style={{ width: 220, padding: 6 }}>
-              <MenuItem icon={<Pencil />} shortcut={<ShortcutKey shortcut="mod+shift+d" />}>Daily notes</MenuItem>
-              <MenuItem icon={<ListI />} selected>All notes</MenuItem>
-              <MenuItem icon={<CheckI />} shortcut={<ShortcutKey shortcut="mod+shift+t" />}>Tasks</MenuItem>
-            </Card>
-            <Card style={{ width: 260 }}>
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>On networked thought</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>Backlink your notes to make everything easily searchable.</div>
-            </Card>
-          </div>
-        </React.Fragment>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--font-sans);
+        background: var(--surface-app);
+        padding: 24px;
+      }
+      .label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin: 0 0 12px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+    <script src="../../_ds_bundle.js"></script>
+    <script type="text/babel">
+      const NS = 'ReflectDesignSystem_06b075'
+      const I = (d) => (p) => (
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...p}
+        >
+          {d}
+        </svg>
       )
-    }
-    ;(function boot(n) {
-      if (window[NS] && window[NS].Card) {
-        ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
-      } else if (n < 120) { setTimeout(() => boot(n + 1), 50) }
-    })(0)
-  </script>
-</body>
+      const Pencil = I(<path d="M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />)
+      const ListI = I(
+        <React.Fragment>
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </React.Fragment>,
+      )
+      const CheckI = I(<polyline points="20 6 9 17 4 12" />)
+
+      function Demo() {
+        const { Card, Badge, Avatar, MenuItem, ShortcutKey } = window[NS]
+        return (
+          <React.Fragment>
+            <p className="label">Badges</p>
+            <div className="row">
+              <Badge variant="tag">ideas</Badge>
+              <Badge variant="accent">New</Badge>
+              <Badge variant="success">Synced</Badge>
+              <Badge variant="warning">Trial</Badge>
+              <Badge variant="neutral">Draft</Badge>
+            </div>
+            <p className="label">Avatars</p>
+            <div className="row">
+              <Avatar name="Alex MacCaw" />
+              <Avatar name="Sean Rose" size={40} />
+              <Avatar graphColor="#4F46E5" size={36} />
+              <Avatar graphColor="#22c55e" size={36} />
+            </div>
+            <p className="label">Card &amp; menu</p>
+            <div className="row" style={{ alignItems: 'stretch' }}>
+              <Card elevated style={{ width: 220, padding: 6 }}>
+                <MenuItem icon={<Pencil />} shortcut={<ShortcutKey shortcut="mod+shift+d" />}>
+                  Daily notes
+                </MenuItem>
+                <MenuItem icon={<ListI />} selected>
+                  All notes
+                </MenuItem>
+                <MenuItem icon={<CheckI />} shortcut={<ShortcutKey shortcut="mod+shift+t" />}>
+                  Tasks
+                </MenuItem>
+              </Card>
+              <Card style={{ width: 260 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  On networked thought
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-muted)',
+                    marginTop: 6,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Backlink your notes to make everything easily searchable.
+                </div>
+              </Card>
+            </div>
+          </React.Fragment>
+        )
+      }
+      ;(function boot(n) {
+        if (window[NS] && window[NS].Card) {
+          ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
+        } else if (n < 120) {
+          setTimeout(() => boot(n + 1), 50)
+        }
+      })(0)
+    </script>
+  </body>
 </html>

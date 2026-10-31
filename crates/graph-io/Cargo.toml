@@ -1,0 +1,46 @@
+[package]
+name = "reflect-graph-io"
+version = "0.0.0"
+description = "Graph file IO with no Tauri in it: the open graph session, atomic note writes, the traversal guard, the per-graph lock, the Reflect V1 import, the X archive store and the conflict ladder."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Test-only helpers that bypass the revision check and the graph lock.
+test-support = []
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+tracing = { workspace = true }
+infer = { workspace = true }
+reconcile-text = { workspace = true }
+jiff = { workspace = true }
+# The own-writes record and the conflict shadow store hash content as git
+# blobs; the merge ladder's diff3 is libgit2's.
+git2 = { workspace = true }
+# Reflect V1 exports are zip archives of the graph-folder layout; their
+# remote assets are downloaded with reqwest on tokio.
+zip = { workspace = true, features = ["deflate-flate2-zlib-rs"] }
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync", "fs", "io-util"] }
+reflect-graph-paths = { workspace = true }
+reflect-types = { workspace = true, features = ["git2"] }
+reflect-index-schema = { workspace = true }
+
+# Sync-exclusion marking on `.reflect/` and `.git/` (iCloud and backup resource
+# keys, plus the file-provider and Dropbox ignore xattrs on macOS), and the
+# dataless-materialization policy around note reads.
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+core-foundation = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+xattr = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros"] }

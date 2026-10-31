@@ -43,7 +43,7 @@ export function RecordingLevelWaveform({ level }: RecordingLevelWaveformProps): 
 
     context.clearRect(0, 0, CSS_WIDTH, CSS_HEIGHT)
     context.fillStyle = color
-    bars.forEach((amplitude, index) => {
+    for (const [index, amplitude] of bars.entries()) {
       const height = Math.max(BAR_WIDTH, amplitude * CSS_HEIGHT)
       const left = index * (BAR_WIDTH + BAR_GAP)
       const top = (CSS_HEIGHT - height) / 2
@@ -56,7 +56,7 @@ export function RecordingLevelWaveform({ level }: RecordingLevelWaveformProps): 
       } else {
         context.fillRect(left, top, BAR_WIDTH, height)
       }
-    })
+    }
   }, [level])
 
   return (

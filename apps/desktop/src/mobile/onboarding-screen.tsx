@@ -1,17 +1,17 @@
 import { useState, type ReactElement } from 'react'
 import { Cloud, HardDrive } from 'lucide-react'
-import { InlineAlert } from '@/components/inline-alert'
-import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
-import { useAsyncAction } from '@/hooks/use-async-action'
-import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header'
-import { OnboardingIcloudSection } from '@/mobile/onboarding-icloud-section'
-import { useGraph } from '@/providers/graph-provider'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header.tsx'
+import { OnboardingIcloudSection } from '@/mobile/onboarding-icloud-section.tsx'
+import { useGraph } from '@/providers/graph-provider.tsx'
 
 /** Which control kicked off the in-flight choice, so only that one shows the
  * spinner/pending label (every button still disables). Container graph roots
  * are absolute paths, so the fixed tags can never collide with one. */
-type PendingChoice = string | 'icloud-create' | 'local' | null
+type PendingChoice = string | null
 
 /**
  * The mobile first-run screen (Plans 19/21) — shown until the user picks
@@ -44,18 +44,22 @@ export function MobileOnboardingScreen(): ReactElement {
   const icloudGraphs = mobileStorageInfo?.icloudGraphRoots ?? []
 
   function runChoice(choice: Exclude<PendingChoice, null>, task: () => Promise<void>): void {
-    setPendingChoice(choice)
-    void action.run(task).finally(() => setPendingChoice(null))
+    void action
+      .run(async () => {
+        // Only a run that actually starts marks its button.
+        setPendingChoice(choice)
+        await task()
+      })
+      .then((ran) => {
+        // `run` never rejects, so this covers failure too.
+        if (ran) {
+          setPendingChoice(null)
+        }
+      })
   }
 
   return (
-    <div
-      className="flex min-h-dvh w-screen overflow-auto bg-surface-app px-5 text-text"
-      style={{
-        paddingTop: 'max(env(safe-area-inset-top), 1.5rem)',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)',
-      }}
-    >
+    <div className="flex min-h-dvh w-screen overflow-auto bg-surface-app px-safe-offset-5 pt-safe-or-6 pb-safe-or-4 text-text">
       <div className="mx-auto flex w-full max-w-md flex-col gap-7 py-6">
         <header className="flex flex-col gap-4 pt-2">
           <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -80,9 +84,9 @@ export function MobileOnboardingScreen(): ReactElement {
               busy={action.pending}
               pendingChoice={pendingChoice}
               onOpen={(root) => runChoice(root, () => completeOnboarding('icloud', root))}
-              onCreate={(root) =>
+              onCreate={(root) => {
                 runChoice('icloud-create', () => completeOnboarding('icloud', root))
-              }
+              }}
             />
           ) : (
             <IcloudUnavailableSection />

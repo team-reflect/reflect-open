@@ -1,20 +1,28 @@
+import { isIsoDate } from '@reflect/utils'
 import { z } from 'zod'
-import { dateFromDailyPath, isDaily, isTemplatePath } from '../graph/paths'
 import {
-  detectConflictMarkers,
+  markdownNoteReference,
+  noteBasenameKey,
+  wikiNoteReference,
+} from '../graph/note-reference.ts'
+import { dateFromDailyPath, foldGraphPath, isDaily, isTemplatePath } from '../graph/paths.ts'
+import { hasSearchableChar } from '../lib/searchable-char.ts'
+import {
+  canonicalEmail,
+  encodeTaskPath,
   extractEmailFields,
-  foldEmail,
   foldKey,
   foldTag,
   gistBodyHash,
   isPinned,
-  normalizeWikiTarget,
   pinnedOrder,
   splitFrontmatter,
   subjectAliases,
+  wikiLinkTargetForTitle,
   type ParsedNote,
-} from '../markdown'
-import { previewSnippet } from './snippet'
+} from '../markdown/index.ts'
+import { previewSnippet } from './snippet.ts'
+import { serializeWikiSuggestionAddress } from './suggest.ts'
 
 /**
  * The index write payload (Plan 04): a {@link ParsedNote} (Plan 03) flattened into
@@ -31,7 +39,7 @@ import { previewSnippet } from './snippet'
 /**
  * Version of the projection {@link buildIndexedNote} produces. Bump it whenever
  * the rows derived from an *unchanged* file change — a new column, a changed
- * derivation — so `syncIndex` rebuilds graphs whose rows predate it. The
+ * derivation — so `NoteIndexer.sync` rebuilds graphs whose rows predate it. The
  * hash-based reconcile alone would never re-index an unchanged file, leaving
  * new columns at their migration defaults forever.
  *
@@ -39,7 +47,7 @@ import { previewSnippet } from './snippet'
  * first stamped version; v2 rows also carry the 0004 pinned columns) ·
  * 3 — repairs `notes.mtime` 0 rows written by the watcher path before it
  * carried `modifiedMs` (hash-reconcile can never refresh them) ·
- * 4 — `notes.has_conflict` (sync conflict markers, Plan 12) ·
+ * 4 — retained `notes.has_conflict` column, no longer written or read ·
  * 5 — `notes.gist_url` + `notes.gist_stale` (gist publishing) ·
  * 6 — rendered Markdown escapes in titles, wiki-link targets, and previews ·
  * 7 — `tasks` projection (GFM checkboxes, Plan 18): existing notes carry no task
@@ -65,14 +73,66 @@ import { previewSnippet } from './snippet'
  * until reprojected, so the bump backfills them.
  * 15 — task parent outline/list breadcrumbs: existing task rows carry empty
  * breadcrumbs until reprojected.
+ * 16 - meowdown-aligned wiki-link parsing (the editor's own `gfmParser`) and
+ * derived linkable aliases for rich titles and rich frontmatter aliases:
+ * existing notes must reproject for both the recovery-semantics convergence
+ * and the backfilled alias rows.
+ * 17 - legacy nested `Email` / `Emails` contact fields and canonical email
+ * identities: unchanged V1 person notes need their `note_emails` rows rebuilt.
+ * 18 - path addressing (`notes.path_key`, `links.target_path_key`) and the
+ * `note_claims` projection that replaces the tiered `note_keys` derivation:
+ * existing rows carry no claims and no path keys, so vault-path links and
+ * filename-stem links stay unresolved until reprojected. Name keys also gain
+ * NFC folding (`foldKey`), so NFD-spelled titles need their keys rebuilt.
+ * 19 - wiki `links.target_key` becomes the classifier's name key (fragment
+ * and `.md` stripped; '' for strict-path, self, and refused targets), so the
+ * backlinks view's name join matches navigation. Existing rows carry the raw
+ * fold and must reproject.
+ * 20 - `notes.has_content` records whether a note would render blank, and
+ * `search_fts.body` now carries the raw Markdown body, so every note must
+ * reproject.
+ * 21 - tasks are keyed by AST path (`tasks.ast_path`) and store Markdown instead
+ * of plain text, so every note's tasks must reproject.
+ * 22 - task breadcrumbs start with the chain of headings above the task (the
+ * `Tasks` heading included), so every note's tasks must reproject.
  */
-export const PROJECTION_VERSION = 15
+export const PROJECTION_VERSION = 22
+
+/**
+ * Precedence of the spellings a note answers to (`note_claims.tier`): the
+ * lowest tier claiming a key wins it. The numbers are the storage encoding —
+ * migration 0019 and the CLI read the same values.
+ */
+export const CLAIM_TIER = {
+  /** Calendar-valid daily date (`daily/2026-07-26.md` answering to `2026-07-26`). */
+  dailyDate: 1,
+  /** Authored title (frontmatter or first heading; filename when untitled). */
+  title: 2,
+  /** Frontmatter or derived alias. */
+  alias: 3,
+  /** Filename stem — the weakest address, how Obsidian names every note. */
+  basename: 4,
+} as const
+
+export const indexedClaimSchema = z.object({
+  /** Folded spelling this note answers to. */
+  key: z.string(),
+  /** One of {@link CLAIM_TIER}. */
+  tier: z.number().int().min(CLAIM_TIER.dailyDate).max(CLAIM_TIER.basename),
+})
+export type IndexedClaim = z.infer<typeof indexedClaimSchema>
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
   targetRaw: z.string(),
-  /** Normalized match key: case-folded wiki target, or the lowercased href for md links. */
+  /**
+   * Name key the link answers to: for wiki links, `wikiNoteReference`'s
+   * folded key ('' when the target has no name reading, i.e. a rooted path,
+   * `#self`, or a refused URI); for md links, the lowercased href.
+   */
   targetKey: z.string(),
+  /** Folded vault path when the link names a file; null when it names a note. */
+  targetPathKey: z.string().nullable(),
   alias: z.string().nullable(),
   posFrom: z.number(),
   posTo: z.number(),
@@ -96,7 +156,7 @@ export type IndexedAlias = z.infer<typeof indexedAliasSchema>
 export const indexedEmailSchema = z.object({
   /** Display casing (as written in the field bullet). */
   email: z.string(),
-  /** Case-folded match key ({@link foldEmail}) — what resolution compares against. */
+  /** Case-folded match key ({@link canonicalEmail}) — what resolution compares against. */
   emailKey: z.string(),
 })
 export type IndexedEmail = z.infer<typeof indexedEmailSchema>
@@ -117,14 +177,12 @@ export function decodeTaskBreadcrumbs(column: string): readonly string[] {
 }
 
 export const indexedTaskSchema = z.object({
-  /** Character offset of the marker's `[` in the file (UTF-16 units) — the row PK with `path`. */
-  markerOffset: z.number(),
-  /** Display/search text of the task's marker line, markdown stripped. */
-  text: z.string(),
-  /** Parent outline/list item text, top-down, displayed in the Tasks view. */
+  /** The task's address in the note body's AST (`encodeTaskPath`) — the row PK with `path`. */
+  astPath: z.string(),
+  /** The task's first paragraph as Markdown, marker excluded. */
+  markdown: z.string(),
+  /** The headings above the task, then its ancestor list items' first paragraphs, as Markdown, outermost first. */
   breadcrumbs: taskBreadcrumbsSchema,
-  /** The marker line verbatim — the surgical write-back's staleness guard. */
-  raw: z.string(),
   checked: z.boolean(),
   /** Explicit due date (first `[[YYYY-MM-DD]]` in the item), or null — drives Overdue. */
   dueDate: z.string().nullable(),
@@ -140,6 +198,8 @@ export const indexedNoteSchema = z.object({
   id: z.string().nullable(),
   title: z.string(),
   titleKey: z.string(),
+  /** ASCII-folded graph path: what a path-qualified link joins against. */
+  pathKey: z.string(),
   /** Derived from the path; templates are excluded from note surfaces. */
   kind: noteKindSchema,
   dailyDate: z.string().nullable(),
@@ -147,8 +207,8 @@ export const indexedNoteSchema = z.object({
   isPinned: z.boolean(),
   /** Explicit pin order (`pinned: <n>`); null for bare `pinned: true`. */
   pinnedOrder: z.number().nullable(),
-  /** The file carries Git conflict markers from a sync merge (Plan 12). */
-  hasConflict: z.boolean(),
+  /** The note is not blank: it has display text, or a body the FTS can match. */
+  hasContent: z.boolean(),
   /** The published gist's html url, or null when the note has none. */
   gistUrl: z.string().nullable(),
   /** The body changed since it was last published to the gist. */
@@ -168,6 +228,8 @@ export const indexedNoteSchema = z.object({
   links: z.array(indexedLinkSchema),
   tags: z.array(indexedTagSchema),
   aliases: z.array(indexedAliasSchema),
+  /** Every folded spelling this note answers to (see `note_claims`). */
+  claims: z.array(indexedClaimSchema),
   /** Emails the note owns via `- Email:` contact-field bullets. */
   emails: z.array(indexedEmailSchema),
   assets: z.array(z.string()),
@@ -177,17 +239,35 @@ export const indexedNoteSchema = z.object({
 export type IndexedNote = z.infer<typeof indexedNoteSchema>
 
 /**
- * The `aliases` projection: `aliases:` frontmatter verbatim, then the v1
- * subject aliases derived from the title (`Charlotte MacCaw // Mum`), skipping
- * segments a frontmatter alias already claims. The derived rows are index-only
- * compatibility — the file's frontmatter is never rewritten to hold them.
+ * The `aliases` projection: `aliases:` frontmatter verbatim, then the linkable
+ * form of any rich title or rich frontmatter alias ({@link wikiLinkTargetForTitle}),
+ * then the v1 subject aliases derived from the title (`Charlotte MacCaw // Mum`);
+ * later stages skip keys an earlier row already claims. The derived rows are
+ * index-only — the file's frontmatter is never rewritten to hold them. A
+ * linkable-form row is only projected when it is an address `note_keys` can
+ * actually serve: distinct from its source's key and serializable as wiki-link
+ * text ({@link serializeWikiSuggestionAddress}). Shared with the disk-fallback
+ * resolver so index and disk derive one truth (exported as `projectNoteAliases`).
  */
-function noteAliases(parsed: ParsedNote): IndexedAlias[] {
+export function projectNoteAliases(parsed: ParsedNote): IndexedAlias[] {
   const aliases: IndexedAlias[] = parsed.frontmatter.aliases.map((alias) => ({
     alias,
     aliasKey: foldKey(alias),
   }))
   const claimed = new Set(aliases.map((row) => row.aliasKey))
+  for (const richText of [parsed.title, ...parsed.frontmatter.aliases]) {
+    const linkTarget = wikiLinkTargetForTitle(richText)
+    const linkTargetKey = foldKey(linkTarget)
+    if (
+      linkTargetKey === foldKey(richText) ||
+      claimed.has(linkTargetKey) ||
+      serializeWikiSuggestionAddress(linkTarget, null) === null
+    ) {
+      continue
+    }
+    claimed.add(linkTargetKey)
+    aliases.push({ alias: linkTarget, aliasKey: linkTargetKey })
+  }
   for (const alias of subjectAliases(parsed.title)) {
     const aliasKey = foldKey(alias)
     if (claimed.has(aliasKey)) {
@@ -200,30 +280,84 @@ function noteAliases(parsed: ParsedNote): IndexedAlias[] {
 }
 
 /**
+ * Every folded spelling this note answers to, with the tier that settles a
+ * contest against another note. Templates claim nothing: they are reachable
+ * only through an explicit `templates/…` path.
+ *
+ * A note with no authored title already carries its filename as its title
+ * (`deriveTitle`), so the filename tier only adds an address for a note
+ * whose H1 or frontmatter title differs from its filename. A key a stronger
+ * tier already claims is skipped, so `claim_count` counts notes, not
+ * spellings.
+ */
+export function projectNoteClaims(
+  parsed: ParsedNote,
+  aliases: readonly IndexedAlias[],
+): IndexedClaim[] {
+  if (isTemplatePath(parsed.path)) {
+    return []
+  }
+  const claims: IndexedClaim[] = []
+  const seen = new Set<string>()
+  const claim = (key: string, tier: number): void => {
+    if (key !== '' && !seen.has(key)) {
+      seen.add(key)
+      claims.push({ key, tier })
+    }
+  }
+  const date = isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null
+  if (date !== null && isIsoDate(date)) {
+    claim(date, CLAIM_TIER.dailyDate)
+  }
+  claim(foldKey(parsed.title), CLAIM_TIER.title)
+  for (const alias of aliases) {
+    claim(alias.aliasKey, CLAIM_TIER.alias)
+  }
+  claim(noteBasenameKey(parsed.path), CLAIM_TIER.basename)
+  return claims
+}
+
+/**
  * Flatten a parsed note into the index payload. `meta.source` is the raw
- * markdown the note was parsed from — conflict markers are detected on it
- * (not on the extracted plain text, which may reshape marker lines).
+ * markdown the note was parsed from.
  */
 export function buildIndexedNote(
   parsed: ParsedNote,
   meta: { fileHash: string; mtime: number; source: string; assetText?: string },
 ): IndexedNote {
-  const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => ({
-    kind: 'wiki',
-    targetRaw: link.target,
-    targetKey: normalizeWikiTarget(link.target).key,
-    alias: link.alias ?? null,
-    posFrom: link.from,
-    posTo: link.to,
-  }))
-  const mdLinks: IndexedLink[] = parsed.links.map((link) => ({
-    kind: 'md',
-    targetRaw: link.href,
-    targetKey: link.href.toLowerCase(),
-    alias: null,
-    posFrom: link.from,
-    posTo: link.to,
-  }))
+  const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => {
+    const reference = wikiNoteReference(link.target)
+    const hasNameReading = reference?.kind === 'key' || reference?.kind === 'pathOrKey'
+    return {
+      kind: 'wiki' as const,
+      targetRaw: link.target,
+      // The classifier's own name key (fragment and `.md` stripped), so the
+      // backlinks view joins exactly what navigation resolves. Empty when the
+      // target has no name reading (a rooted path, `#self`, a refused URI):
+      // no claim is ever '', so those rows can never name-join.
+      targetKey: hasNameReading ? reference.key : '',
+      targetPathKey:
+        reference?.kind === 'path' || reference?.kind === 'pathOrKey'
+          ? foldGraphPath(reference.path)
+          : null,
+      alias: link.alias ?? null,
+      posFrom: link.from,
+      posTo: link.to,
+    }
+  })
+  const mdLinks: IndexedLink[] = parsed.links.map((link) => {
+    const reference = markdownNoteReference(parsed.path, link.href)
+    return {
+      kind: 'md' as const,
+      targetRaw: link.href,
+      targetKey: link.href.toLowerCase(),
+      targetPathKey: reference?.kind === 'path' ? foldGraphPath(reference.path) : null,
+      alias: null,
+      posFrom: link.from,
+      posTo: link.to,
+    }
+  })
+  const aliases = projectNoteAliases(parsed)
   const body = splitFrontmatter(meta.source).body
 
   return {
@@ -231,12 +365,12 @@ export function buildIndexedNote(
     id: parsed.id ?? null,
     title: parsed.title,
     titleKey: foldKey(parsed.title),
+    pathKey: foldGraphPath(parsed.path),
     kind: isDaily(parsed.path) ? 'daily' : isTemplatePath(parsed.path) ? 'template' : 'note',
     dailyDate: isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null,
     isPrivate: parsed.frontmatter.private,
     isPinned: isPinned(parsed.frontmatter),
     pinnedOrder: pinnedOrder(parsed.frontmatter),
-    hasConflict: detectConflictMarkers(meta.source),
     gistUrl: parsed.frontmatter.gist?.url ?? null,
     // Staleness is a body-hash comparison (frontmatter excluded): publishing
     // writes the `gist` block itself, and a pin/private toggle is not an edit
@@ -245,19 +379,22 @@ export function buildIndexedNote(
       parsed.frontmatter.gist !== undefined && gistBodyHash(body) !== parsed.frontmatter.gist.hash,
     fileHash: meta.fileHash,
     mtime: meta.mtime,
-    text: parsed.text,
+    text: body,
     assetText: meta.assetText ?? '',
-    preview: previewSnippet(parsed.text, parsed.title),
+    preview: previewSnippet(parsed.displayText, parsed.title),
+    hasContent: parsed.displayText !== '' || hasSearchableChar(body),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
-    aliases: noteAliases(parsed),
-    emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
-    assets: parsed.assets.map((asset) => asset.path),
+    aliases,
+    claims: projectNoteClaims(parsed, aliases),
+    emails: extractEmailFields(body).map((email) => ({ email, emailKey: canonicalEmail(email) })),
+    // One reference can contribute several candidate spellings; the
+    // projection stores each path once.
+    assets: [...new Set(parsed.assets.map((asset) => asset.path))],
     tasks: parsed.tasks.map((task) => ({
-      markerOffset: task.markerOffset,
-      text: task.text,
+      astPath: encodeTaskPath(task.astPath),
+      markdown: task.markdown,
       breadcrumbs: task.breadcrumbs,
-      raw: task.raw,
       checked: task.checked,
       dueDate: task.dueDate,
     })),

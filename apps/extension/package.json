@@ -1,32 +1,38 @@
 {
   "name": "@reflect/extension",
-  "version": "0.1.0",
+  "version": "0.4.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wxt",
     "build": "wxt build",
     "zip": "WXT_STORE_BUILD=true wxt zip",
-    "typecheck": "wxt prepare && tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "zip:unpacked": "wxt zip",
+    "typecheck": "wxt prepare && tsc -b",
+    "test": "vitest run",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@post-embed/exporter": "^0.5.0",
+    "@post-embed/schema": "^0.5.2",
     "@reflect/core": "workspace:*",
     "@reflect/design-system": "workspace:*",
-    "defuddle": "^0.19.1",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "zod": "^4.4.3"
+    "defuddle": "^0.19.6",
+    "lucide-react": "^1.61.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.1",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@wxt-dev/module-react": "^1.2.2",
-    "tailwindcss": "^4.3.1",
+    "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.9",
-    "wxt": "^0.20.27"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "vitest-fail-on-console": "^0.10.1",
+    "wxt": "^0.21.4"
   }
 }

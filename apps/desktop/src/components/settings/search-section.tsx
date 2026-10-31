@@ -1,14 +1,14 @@
 import type { ReactElement, ReactNode } from 'react'
 import { Sparkles } from 'lucide-react'
-import { InlineAlert } from '@/components/inline-alert'
-import { ensureEmbeddingsVisibly, retryFailedEmbeddings } from '@/lib/semantic'
-import { useEmbedStatus } from '@/lib/use-embed-status'
-import { useSettings } from '@/providers/settings-provider'
-import { DescribeAssetsField } from './describe-assets-field'
-import { SettingsField } from './field'
-import { ModelDownloadProgress } from './model-download-progress'
-import { RebuildIndexField } from './rebuild-index-field'
-import { SettingsSection } from './section'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { useEmbedStatus } from '@/lib/use-embed-status.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { DescribeAssetsField } from './describe-assets-field.tsx'
+import { SettingsField } from './field.tsx'
+import { ModelDownloadProgress } from './model-download-progress.tsx'
+import { RebuildIndexField } from './rebuild-index-field.tsx'
+import { SettingsSection } from './section.tsx'
 
 /**
  * The search settings: the semantic-search opt-in (Plan 09) and the index
@@ -20,9 +20,14 @@ import { SettingsSection } from './section'
 export function SearchSection(): ReactElement {
   const { settings, updateSettings } = useSettings()
   const status = useEmbedStatus()
+  const { semanticSearch } = useCoreServices()
 
   let control: ReactNode
-  if (!settings.semanticSearchEnabled) {
+  if (status.status === 'unsupported') {
+    control = (
+      <p className="text-xs text-text-muted">Semantic search is not available on this device.</p>
+    )
+  } else if (!settings.semanticSearchEnabled) {
     // Disabling takes effect immediately — every semantic consumer gates on
     // the setting, so the still-loaded model just idles. No caveat needed.
     control = (
@@ -32,7 +37,7 @@ export function SearchSection(): ReactElement {
           updateSettings({ semanticSearchEnabled: true })
           // EmbeddingsSync loads an untouched runtime; a `failed` one only
           // retries on an explicit action like this.
-          void retryFailedEmbeddings()
+          void semanticSearch.retryFailedModel()
         }}
         className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-text-on-brand shadow-sm transition-colors duration-100 hover:bg-accent-hover"
       >
@@ -63,7 +68,7 @@ export function SearchSection(): ReactElement {
         <div className="mt-2 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => void ensureEmbeddingsVisibly()}
+            onClick={() => void semanticSearch.ensureModel()}
             className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-100 hover:bg-surface-hover"
           >
             Try again

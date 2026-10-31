@@ -7,6 +7,9 @@ export function clipAtWordBoundary(text: string, max: number): string {
   if (text.length <= max) {
     return text
   }
-  const clipped = text.slice(0, max).replace(/\s+\S*$/, '').trim()
+  const clipped = text
+    .slice(0, max)
+    .replace(/\s+\S*$/, '')
+    .trim()
   return clipped === '' ? text.slice(0, max).trim() : clipped
 }

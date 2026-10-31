@@ -1,14 +1,14 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { sha256Hex } from '@reflect/utils'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { foldKey, parseNote } from '../markdown'
-import { hashContent } from './hash'
-import { buildIndexedNote } from './indexed-note'
-import { buildFtsMatch } from './search-query'
+import { isNotePath, mayContainNotes } from '../graph/paths.ts'
+import { foldKey, parseNote } from '../markdown/index.ts'
+import { buildIndexedNote } from './indexed-note.ts'
+import { buildFtsMatch } from './search-query.ts'
 
 /**
- * The TS side of the TS↔Rust parity contract (see `fixtures/parity/README.md`).
+ * The TS side of the TS↔Rust parity contract (see `fixtures/parity/README.txt`).
  *
  * The `reflect` CLI (`apps/cli`) re-implements this package's read-side
  * contract in Rust. This test derives `fixtures/parity/expected.json` from the
@@ -19,15 +19,7 @@ import { buildFtsMatch } from './search-query'
  * regenerated file forces the Rust mirror to follow in the same PR.
  */
 
-const corpusDir = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..',
-  '..',
-  'fixtures',
-  'parity',
-)
+const corpusDir = join(import.meta.dirname, '..', '..', '..', '..', 'fixtures', 'parity')
 const expectedFile = join(corpusDir, 'expected.json')
 
 /** Expectations for one fixture note — the derivations both sides must agree on. */
@@ -53,23 +45,25 @@ interface ScalarInputs {
   ftsMatch: string[]
 }
 
-/** Graph-relative paths of every fixture `.md`, mirroring the CLI's walk. */
+/** Graph-relative paths of every eligible fixture note, mirroring the CLI's
+ * full-vault walk: any depth, gated by the shared classifier. */
 function walkCorpusNotes(): string[] {
   const paths: string[] = []
-  for (const dir of ['daily', 'notes']) {
-    const stack = [join(corpusDir, dir)]
-    while (stack.length > 0) {
-      const current = stack.pop()
-      if (current === undefined) {
-        break
-      }
-      for (const entry of readdirSync(current)) {
-        const full = join(current, entry)
-        if (statSync(full).isDirectory()) {
+  const stack = [corpusDir]
+  while (stack.length > 0) {
+    const current = stack.pop()
+    if (current === undefined) {
+      break
+    }
+    for (const entry of readdirSync(current)) {
+      const full = join(current, entry)
+      const rel = full.slice(corpusDir.length + 1).replaceAll('\\', '/')
+      if (statSync(full).isDirectory()) {
+        if (mayContainNotes(rel)) {
           stack.push(full)
-        } else if (entry.endsWith('.md')) {
-          paths.push(full.slice(corpusDir.length + 1).replaceAll('\\', '/'))
         }
+      } else if (isNotePath(rel)) {
+        paths.push(rel)
       }
     }
   }
@@ -79,9 +73,9 @@ function walkCorpusNotes(): string[] {
 async function deriveExpectations(): Promise<ExpectedParity> {
   const notes: Record<string, ExpectedNote> = {}
   for (const relPath of walkCorpusNotes()) {
-    const source = readFileSync(join(corpusDir, relPath), 'utf8')
+    const source = readFileSync(join(corpusDir, relPath), 'utf8').replaceAll(/\r\n?/g, '\n')
     const indexed = buildIndexedNote(parseNote({ path: relPath, source }), {
-      fileHash: await hashContent(source),
+      fileHash: await sha256Hex(source),
       mtime: 0,
       source,
     })
@@ -96,7 +90,7 @@ async function deriveExpectations(): Promise<ExpectedParity> {
     }
   }
 
-  const scalars: ScalarInputs = JSON.parse(readFileSync(join(corpusDir, 'scalars.json'), 'utf8'))
+  const scalars = JSON.parse(readFileSync(join(corpusDir, 'scalars.json'), 'utf8')) as ScalarInputs
   return {
     notes,
     foldKey: Object.fromEntries(scalars.foldKey.map((input) => [input, foldKey(input)])),
@@ -110,7 +104,7 @@ describe('TS↔Rust parity corpus', () => {
     if (process.env['UPDATE_PARITY']) {
       writeFileSync(expectedFile, `${JSON.stringify(derived, null, 2)}\n`)
     }
-    const committed: ExpectedParity = JSON.parse(readFileSync(expectedFile, 'utf8'))
+    const committed = JSON.parse(readFileSync(expectedFile, 'utf8')) as ExpectedParity
     expect(committed).toEqual(derived)
   })
 })

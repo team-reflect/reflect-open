@@ -1,13 +1,13 @@
 import type { ReactElement } from 'react'
 import { ChevronDownIcon, RotateCcwIcon } from 'lucide-react'
 import type { AiPromptMode, ChatModelOption } from '@reflect/core'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu.tsx'
 
 interface AiPreviewActionsProps {
   /** The staged placement of the current run, or null while nothing runs. */
@@ -41,16 +41,18 @@ export function AiPreviewActions({
       </Button>
       {modelOptions.length > 0 ? (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" aria-label="Retry with another model">
-              <ChevronDownIcon />
-            </Button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="ghost" size="sm" aria-label="Retry with another model">
+                <ChevronDownIcon />
+              </Button>
+            }
+          />
           <DropdownMenuContent align="start">
             {modelOptions.map((option) => (
               <DropdownMenuItem
                 key={`${option.configId}:${option.modelId}`}
-                onSelect={() => onRetry(option)}
+                onClick={() => onRetry(option)}
               >
                 {option.label}
               </DropdownMenuItem>

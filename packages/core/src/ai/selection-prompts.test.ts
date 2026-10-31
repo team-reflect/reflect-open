@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AiPrompt } from '../settings/schema'
-import { BUILT_IN_AI_PROMPTS, filterAiPrompts, renderSelectionPrompt } from './selection-prompts'
+import type { AiPrompt } from '../settings/schema.ts'
+import { BUILT_IN_AI_PROMPTS, filterAiPrompts, renderSelectionPrompt } from './selection-prompts.ts'
 
 describe('renderSelectionPrompt', () => {
   it('substitutes the {{selectedText}} placeholder', () => {

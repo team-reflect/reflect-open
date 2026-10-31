@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { hapticImpactLight } from '@/mobile/haptics'
+import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 
 /**
  * A light haptic tick when a task checkbox is toggled in the editor (V1 mobile
@@ -10,6 +11,7 @@ import { hapticImpactLight } from '@/mobile/haptics'
  * count — toggle-fold chevrons and read-only protected views stay silent.
  */
 export function useTaskCheckboxHaptics(): void {
+  const { haptics } = useMobileServices()
   useEffect(() => {
     const onMouseDown = (event: MouseEvent): void => {
       const target = event.target
@@ -22,9 +24,9 @@ export function useTaskCheckboxHaptics(): void {
       if (marker === null || marker.closest('[contenteditable="true"]') === null) {
         return
       }
-      hapticImpactLight()
+      hapticImpactLight(haptics)
     }
-    document.addEventListener('mousedown', onMouseDown, true)
+    document.addEventListener('mousedown', onMouseDown, { capture: true })
     return () => document.removeEventListener('mousedown', onMouseDown, true)
-  }, [])
+  }, [haptics])
 }

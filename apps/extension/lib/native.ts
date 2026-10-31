@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser'
-import { captureAckSchema, type CaptureWireMessage } from '@reflect/core/capture-envelope'
-import type { HoldReason } from './messages'
+import { captureAckSchema, type ExtensionCaptureWire } from '@reflect/core/capture-envelope'
+import type { HoldReason } from './messages.ts'
 
 /**
  * The native-messaging hop: one `sendNativeMessage` per capture to the
@@ -27,7 +27,7 @@ export type SendOutcome =
  */
 const NO_HOST_PATTERN = /not found|forbidden|not installed/i
 
-export async function sendToHost(wire: CaptureWireMessage): Promise<SendOutcome> {
+export async function sendToHost(wire: ExtensionCaptureWire): Promise<SendOutcome> {
   let raw: unknown
   try {
     raw = await browser.runtime.sendNativeMessage(HOST_NAME, wire)
@@ -48,9 +48,15 @@ export async function sendToHost(wire: CaptureWireMessage): Promise<SendOutcome>
   }
   switch (ack.data.code) {
     case 'invalid-payload':
+      // A host older than like capture answers this for an `x-like` envelope it cannot route.
+      if (wire.envelope.kind === 'x-like') {
+        return { kind: 'held', reason: 'unsupported-version', message: ack.data.message }
+      }
       return { kind: 'rejected', message: ack.data.message }
     case 'no-graph':
       return { kind: 'held', reason: 'no-graph', message: ack.data.message }
+    case 'unsupported-version':
+      return { kind: 'held', reason: 'unsupported-version', message: ack.data.message }
     case 'io':
       return { kind: 'held', reason: 'io', message: ack.data.message }
   }

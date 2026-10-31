@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { tryExtractPageText } from './extract-page-text'
+import { tryExtractPageText } from './extract-page-text.ts'
 
 const browserMocks = vi.hoisted(() => ({
   executeScript: vi.fn(),

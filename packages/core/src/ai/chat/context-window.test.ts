@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ModelMessage } from 'ai'
-import { estimateTokens, fitToContextWindow } from './context-window'
+import type { ModelMessage } from '@reflect/modules/ai'
+import { estimateTokens, fitToContextWindow } from './context-window.ts'
 
 /**
  * Budget math under test (empty system prompt): the usable budget is
@@ -24,7 +24,12 @@ function toolExchange(callId: string, outputChars: number): ModelMessage[] {
     {
       role: 'assistant',
       content: [
-        { type: 'tool-call', toolCallId: callId, toolName: 'read_notes', input: { paths: ['notes/a.md'] } },
+        {
+          type: 'tool-call',
+          toolCallId: callId,
+          toolName: 'read_notes',
+          input: { paths: ['notes/a.md'] },
+        },
       ],
     },
     {
@@ -50,7 +55,11 @@ describe('estimateTokens', () => {
     const photo: ModelMessage = {
       role: 'user',
       content: [
-        { type: 'image', image: `data:image/png;base64,${'a'.repeat(400_000)}`, mediaType: 'image/png' },
+        {
+          type: 'file',
+          data: `data:image/png;base64,${'a'.repeat(400_000)}`,
+          mediaType: 'image/png',
+        },
       ],
     }
     expect(estimateTokens(photo)).toBe(1_604)
@@ -67,9 +76,9 @@ describe('estimateTokens', () => {
 describe('fitToContextWindow', () => {
   it('passes an under-budget history through untouched', () => {
     const messages = [...turn(400, 400), ...turn(400, 400)]
-    expect(
-      fitToContextWindow(messages, { contextWindow: 1_000_000, systemPrompt: '' }),
-    ).toBe(messages)
+    expect(fitToContextWindow(messages, { contextWindow: 1_000_000, systemPrompt: '' })).toBe(
+      messages,
+    )
   })
 
   it('drops the oldest turns whole, at user-message boundaries', () => {
@@ -119,12 +128,13 @@ describe('fitToContextWindow', () => {
       output: { type: 'json' },
     })
     // The pairing survives elision: the call part is still there.
-    const calls = fitted.filter(
-      (message) =>
+    const calls = fitted.filter((message) => {
+      return (
         message.role === 'assistant' &&
         typeof message.content !== 'string' &&
-        message.content.some((part) => part.type === 'tool-call'),
-    )
+        message.content.some((part) => part.type === 'tool-call')
+      )
+    })
     expect(calls).toHaveLength(2)
   })
 

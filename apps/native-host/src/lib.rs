@@ -8,12 +8,13 @@
 //!
 //! Protocol discipline: stdout carries nothing but length-prefixed JSON acks;
 //! all logging goes to stderr. The wire shapes mirror the zod schemas in
-//! `@reflect/core` (`actions/capture-envelope.ts`) — that TS file is the
+//! `@reflect/core` (`capture/capture-envelope.ts`) — that TS file is the
 //! source of truth.
 
 pub mod envelope;
 pub mod protocol;
 pub mod spool;
+pub mod x_archive;
 
 use std::io::{Read, Write};
 use std::path::Path;
@@ -27,6 +28,8 @@ use spool::{inbox_dir, spool_capture};
 pub enum HostError {
     /// No pointer file — the app has never opened a graph on this machine.
     NoGraph,
+    /// The desktop app that owns the pointed graph cannot read this envelope version yet.
+    UnsupportedVersion,
     /// The wire message failed validation.
     InvalidPayload(String),
     /// The spool write (or pointer read) failed.
@@ -37,6 +40,7 @@ impl HostError {
     fn code(&self) -> &'static str {
         match self {
             HostError::NoGraph => "no-graph",
+            HostError::UnsupportedVersion => "unsupported-version",
             HostError::InvalidPayload(_) => "invalid-payload",
             HostError::Io(_) => "io",
         }
@@ -44,6 +48,9 @@ impl HostError {
 
     fn message(&self) -> String {
         match self {
+            HostError::UnsupportedVersion => {
+                "Update and open Reflect before saving X posts.".into()
+            }
             HostError::NoGraph => "Open Reflect and pick a graph first.".to_string(),
             HostError::InvalidPayload(message) | HostError::Io(message) => message.clone(),
         }
@@ -67,6 +74,15 @@ fn ack_json(outcome: &Result<(), HostError>) -> Vec<u8> {
 
 /// Handle one wire message: validate, locate the inbox, spool.
 fn handle_message(payload: &[u8], pointer_path: &Path) -> Result<(), HostError> {
+    let value: serde_json::Value = serde_json::from_slice(payload)
+        .map_err(|_| HostError::InvalidPayload("Invalid capture JSON".into()))?;
+    match value["envelope"].get("kind") {
+        Some(kind) if kind == "x-bookmark" || kind == "x-like" => {
+            return x_archive::spool(&value["envelope"], pointer_path);
+        }
+        Some(_) => return Err(HostError::InvalidPayload("Unexpected capture kind".into())),
+        None => {}
+    }
     let capture = ValidatedCapture::parse(payload)?;
     let inbox = inbox_dir(pointer_path)?;
     spool_capture(&inbox, &capture)
@@ -161,6 +177,79 @@ mod tests {
     }
 
     #[test]
+    fn spools_post_data_without_downloading_media() {
+        let dir = tempfile::tempdir().unwrap();
+        let graph = dir.path().join("graph");
+        std::fs::create_dir_all(&graph).unwrap();
+        let pointer = dir.path().join("capture-pointer.json");
+        std::fs::write(
+            &pointer,
+            serde_json::json!({"version": 1, "graphRoot": graph}).to_string(),
+        )
+        .unwrap();
+        let envelope = serde_json::json!({
+            "version": 2, "kind": "x-bookmark", "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "source": "extension", "capturedAt": "2026-09-14T00:00:00Z",
+            "data": { "id": "123", "body": [{"type":"text", "text":"Saved post"}],
+                "author": { "avatar": "https://pbs.twimg.com/avatar.png" } }
+        });
+        let mut output = Vec::new();
+        run(
+            &mut Cursor::new(framed(&wire(envelope.clone(), None))),
+            &mut output,
+            &pointer,
+        )
+        .unwrap();
+        assert_eq!(
+            read_ack(&output),
+            serde_json::json!({"ok":true,"status":"queued"})
+        );
+        let saved: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(graph.join(".reflect/inbox/7c9e6679-7425-40de-944b-e07fc1f90ae7.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved, envelope);
+        assert!(!graph.join("assets").exists());
+    }
+
+    #[test]
+    fn spools_url_only_bookmark_when_page_lookup_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let graph = dir.path().join("graph");
+        std::fs::create_dir_all(&graph).unwrap();
+        let pointer = dir.path().join("capture-pointer.json");
+        std::fs::write(
+            &pointer,
+            serde_json::json!({"version": 1, "graphRoot": graph}).to_string(),
+        )
+        .unwrap();
+        let envelope = serde_json::json!({
+            "version": 2, "kind": "x-bookmark", "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "source": "extension", "capturedAt": "2026-09-14T00:00:00Z",
+            "postId": "123"
+        });
+        let mut output = Vec::new();
+        run(
+            &mut Cursor::new(framed(&wire(envelope.clone(), None))),
+            &mut output,
+            &pointer,
+        )
+        .unwrap();
+        assert_eq!(
+            read_ack(&output),
+            serde_json::json!({"ok":true,"status":"queued"})
+        );
+        let saved: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(graph.join(".reflect/inbox/7c9e6679-7425-40de-944b-e07fc1f90ae7.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved, envelope);
+        assert!(!graph.join("assets").exists());
+    }
+
+    #[test]
     fn missing_pointer_acks_no_graph() {
         let dir = tempfile::tempdir().unwrap();
         let pointer = dir.path().join("does-not-exist.json");
@@ -187,5 +276,38 @@ mod tests {
         let ack = read_ack(&output);
         assert_eq!(ack["ok"], false);
         assert_eq!(ack["code"], "invalid-payload");
+    }
+    #[test]
+    fn wire_dispatch_spools_like_only_for_capable_reader() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pointer.json");
+        let payload = wire(
+            serde_json::json!({
+                "version": 2, "kind": "x-like", "postId": "20",
+                "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                "capturedAt": "2026-09-09T04:00:00Z", "source": "extension",
+            }),
+            None,
+        );
+        for supported in [false, true] {
+            std::fs::write(
+                &path,
+                serde_json::json!({
+                    "version": 1, "graphRoot": directory.path(), "bookmarkVersion": 2,
+                    "xLikeVersion": if supported { Some(2) } else { None },
+                })
+                .to_string(),
+            )
+            .unwrap();
+            let mut output = Vec::new();
+            run(&mut Cursor::new(framed(&payload)), &mut output, &path).unwrap();
+            let ack = read_ack(&output);
+            if supported {
+                assert_eq!(ack["status"], "queued");
+            } else {
+                assert_eq!(ack["code"], "unsupported-version");
+                assert!(!directory.path().join(".reflect/inbox").exists());
+            }
+        }
     }
 }

@@ -1,0 +1,20 @@
+[package]
+name = "reflect-git"
+version = "0.0.0"
+description = "Git backup and sync primitives over libgit2: init and adopt, commit, fetch, merge, push, with the merge decision table and the stale-lock recovery. No Tauri in it."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+tracing = { workspace = true }
+git2 = { workspace = true }
+reflect-graph-io = { workspace = true }
+reflect-graph-paths = { workspace = true }
+reflect-types = { workspace = true, features = ["git2"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+reflect-graph-io = { workspace = true, features = ["test-support"] }

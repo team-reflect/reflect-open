@@ -1,30 +1,30 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NoteRow } from '@reflect/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { PublishedUrlSection } from './published-url-section'
+import { userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { MIN_VISIBLE_MS } from '@reflect/app'
+import type { GistPublishService, NoteRow } from '@reflect/core'
+import {
+  createTestAppServices,
+  createTestOperationsService,
+  type TestClipboardService,
+  type TestOpenerService,
+  type TestOperationsService,
+} from '@reflect/app/testing'
+import { createTestCoreServices } from '@reflect/core/testing'
+import { queryKeys } from '@/lib/query-client.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { PublishedUrlSection } from './published-url-section.tsx'
 
-const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
-const operationDone = vi.hoisted(() => vi.fn())
-const operationFail = vi.hoisted(() => vi.fn())
-const startOperation = vi.hoisted(() =>
-  vi.fn(() => ({ progress: vi.fn(), done: operationDone, fail: operationFail })),
-)
-const runGistPublish = vi.hoisted(() =>
-  vi.fn<(path: string, generation: number) => Promise<string | null>>(
-    async () => 'https://gist.github.com/alex/g1',
-  ),
-)
+// What the index answers for the note; each test sets it before `renderSection`.
+let row: NoteRow | null
 
-vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
-vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
-vi.mock('@/lib/note-gist', () => ({ runGistPublish }))
-vi.mock('@/lib/operations', () => ({ startOperation }))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
-}))
+// The services of the rendered app; set by `renderSection`.
+let clipboard: TestClipboardService
+let opener: TestOpenerService
+let operations: TestOperationsService
+let publish: MockInstance<GistPublishService['publish']>
+// Scripts the clipboard of the next `renderSection`.
+let clipboardFailure: Error | null
 
 function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
   return {
@@ -32,110 +32,115 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
     title: 'A',
     dailyDate: null,
     isPrivate: false,
-    hasConflict: false,
     gistUrl: null,
     gistStale: false,
     ...overrides,
   }
 }
 
-function renderSection(path = 'notes/a.md') {
-  return render(
-    <TooltipProvider>
-      <PublishedUrlSection path={path} />
-    </TooltipProvider>,
-  )
-}
-
-function stubClipboard(writeText: (text: string) => Promise<void>): void {
-  Object.defineProperty(navigator, 'clipboard', {
-    value: { writeText },
-    configurable: true,
+async function renderSection(path = 'notes/a.md') {
+  operations = createTestOperationsService()
+  const core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    progress: operations,
+  })
+  vi.spyOn(core.indexQuery, 'getNote').mockImplementation(() => Promise.resolve(row ?? undefined))
+  publish = vi
+    .spyOn(core.gistPublish, 'publish')
+    .mockResolvedValue({ url: 'https://gist.github.com/alex/g1', stale: false })
+  const appLayer = createTestAppServices(core)
+  ;({ clipboard, opener } = appLayer)
+  if (clipboardFailure !== null) {
+    clipboard.failWith(clipboardFailure)
+  }
+  return await renderInApp(<PublishedUrlSection path={path} />, {
+    core,
+    appServices: appLayer,
+    graph: { root: '/g', name: 'g', generation: 7 },
   })
 }
 
 beforeEach(() => {
-  window.sessionStorage.clear()
-  useNoteRow.mockReset().mockReturnValue(null)
-  vi.mocked(openUrl).mockClear()
-  startOperation.mockClear()
-  runGistPublish.mockReset().mockResolvedValue('https://gist.github.com/alex/g1')
-  operationDone.mockClear()
-  operationFail.mockClear()
-  Reflect.deleteProperty(navigator, 'clipboard')
-})
-
-afterEach(() => {
-  cleanup()
+  row = null
+  clipboardFailure = null
 })
 
 describe('PublishedUrlSection', () => {
-  it('renders nothing for an unpublished note', () => {
-    const view = renderSection()
-    expect(view.queryByText('Published URL')).toBeNull()
+  it('renders nothing for an unpublished note', async () => {
+    const view = await renderSection()
+    await vi.waitFor(() => {
+      expect(view.queryClient.getQueryData(queryKeys.index.note('/g', 'notes/a.md'))).toBeNull()
+    })
+    expect(view.getByText('Published URL').query()).toBeNull()
   })
 
-  it('shows the published gist URL for a published note', () => {
+  it('shows the published gist URL for a published note', async () => {
     const url = 'https://gist.github.com/alex/g1'
-    useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
+    row = noteRow({ gistUrl: url })
 
-    const view = renderSection()
-    expect(view.getByText('Published URL')).toBeTruthy()
-    expect(view.getByRole('link', { name: url }).getAttribute('href')).toBe(url)
+    const view = await renderSection()
+    await expect.element(view.getByText('Published URL')).toBeInTheDocument()
+    await expect.element(view.getByRole('link', { name: url })).toHaveAttribute('href', url)
   })
 
   it('opens the published URL through the native opener', async () => {
     const url = 'https://gist.github.com/alex/g1'
-    useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
+    row = noteRow({ gistUrl: url })
 
-    const view = renderSection()
+    const view = await renderSection()
     await userEvent.click(view.getByRole('link', { name: url }))
-    expect(openUrl).toHaveBeenCalledWith(url)
+    await vi.waitFor(() => expect(opener.openedUrls()).toEqual([url]))
   })
 
   it('copies the published URL', async () => {
     const url = 'https://gist.github.com/alex/g1'
-    const writeText = vi.fn(async () => {})
-    stubClipboard(writeText)
-    useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
+    row = noteRow({ gistUrl: url })
 
-    const view = renderSection()
+    const view = await renderSection()
     await userEvent.click(view.getByRole('button', { name: 'Copy published URL' }))
 
-    expect(writeText).toHaveBeenCalledWith(url)
-    expect(startOperation).toHaveBeenCalledWith('Published URL copied')
-    expect(operationDone).toHaveBeenCalled()
+    await vi.waitFor(() => expect(clipboard.writes()).toEqual([url]))
+    await vi.waitFor(() => expect(operations.findByLabel('Published URL copied')).toBeDefined())
+    await operations.clock.advance(MIN_VISIBLE_MS)
+    expect(operations.getAll()).toEqual([])
   })
 
   it('updates the published gist from the URL section icon', async () => {
     const url = 'https://gist.github.com/alex/g1'
-    useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
+    row = noteRow({ gistUrl: url })
 
-    const view = renderSection()
+    const view = await renderSection()
     await userEvent.click(view.getByRole('button', { name: 'Update published gist' }))
 
-    expect(runGistPublish).toHaveBeenCalledWith('notes/a.md', 7)
+    expect(publish).toHaveBeenCalledWith('notes/a.md')
   })
 
-  it('shows the stale update affordance beside the copy button', () => {
+  it('shows the stale update affordance beside the copy button', async () => {
     const url = 'https://gist.github.com/alex/g1'
-    useNoteRow.mockReturnValue(noteRow({ gistUrl: url, gistStale: true }))
+    row = noteRow({ gistUrl: url, gistStale: true })
 
-    const view = renderSection()
-    expect(view.getByRole('button', { name: 'Copy published URL' })).toBeTruthy()
-    expect(view.getByRole('button', { name: 'Update published gist' })).toBeTruthy()
-    expect(view.getByRole('button', { name: 'Update published gist' }).className).toContain('text-accent')
+    const view = await renderSection()
+    await expect
+      .element(view.getByRole('button', { name: 'Copy published URL' }))
+      .toBeInTheDocument()
+    await expect
+      .element(view.getByRole('button', { name: 'Update published gist' }))
+      .toBeInTheDocument()
+    expect(
+      view.getByRole('button', { name: 'Update published gist' }).element().className,
+    ).toContain('text-accent')
   })
 
   it('surfaces copy failures through the operations status', async () => {
     const url = 'https://gist.github.com/alex/g1'
-    stubClipboard(vi.fn(async () => Promise.reject(new Error('Document is not focused'))))
-    useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
+    clipboardFailure = new Error('Document is not focused')
+    row = noteRow({ gistUrl: url })
 
-    const view = renderSection()
+    const view = await renderSection()
     await userEvent.click(view.getByRole('button', { name: 'Copy published URL' }))
 
-    await waitFor(() => expect(startOperation).toHaveBeenCalledWith('Copying the published URL'))
-    expect(operationFail).toHaveBeenCalled()
+    await vi.waitFor(() => {
+      expect(operations.findByLabel('Copying the published URL')?.status).toBe('failed')
+    })
   })
 })

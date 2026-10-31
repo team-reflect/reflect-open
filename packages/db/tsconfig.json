@@ -1,7 +1,11 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@ocavue/tsconfig/es/app.json",
   "compilerOptions": {
-    "lib": ["ES2022"]
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
   },
-  "include": ["src"]
+  "include": ["src", "./scripts/**/*.mjs", "./*.ts"]
 }

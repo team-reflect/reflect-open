@@ -1,9 +1,9 @@
 import { useState, type ReactElement } from 'react'
 import { foldTag, isTagName } from '@reflect/core'
 import { X } from 'lucide-react'
-import { useSettings } from '@/providers/settings-provider'
-import { SettingsField } from './field'
-import { SettingsSection } from './section'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { SettingsField } from './field.tsx'
+import { SettingsSection } from './section.tsx'
 
 /**
  * Normalize a typed tag to its stored form: `#`-prefix stripped, trimmed,

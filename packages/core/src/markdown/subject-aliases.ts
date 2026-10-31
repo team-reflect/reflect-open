@@ -7,19 +7,35 @@
  * derived compatibility layer for imported or v1-style-authored titles. The
  * segments are computed at index time and land in the same `aliases`
  * projection — nothing is migrated into frontmatter, and the title itself
- * stays the literal `//` string.
+ * stays the literal `//` string. Reader-facing surfaces show only its first
+ * segment (`displayNoteTitle` in `note-title.ts`); the literal string stays
+ * the canonical title, key, and link target.
  *
  * Mirrored by `subject_aliases` in the CLI (`apps/cli/src/note_file.rs`);
  * the parity corpus (`fixtures/parity/`) keeps the two in lockstep.
  */
 
-import { foldKey } from './keys'
+import { foldKey } from './keys.ts'
 
 /**
  * A `//` separator: exactly two slashes, not preceded by `:` or `/` and not
  * followed by `/`, so URL schemes (`https://…`) and slash runs never split.
+ * Group 1 is the preceding character, matched instead of a lookbehind so the
+ * pattern parses on Safari before 16.4.
  */
-const SUBJECT_ALIAS_SEPARATOR = /(?<![:/])\/\/(?!\/)/
+const SUBJECT_ALIAS_SEPARATOR = /(^|[^:/])\/\/(?!\/)/g
+
+function splitSubject(title: string): string[] {
+  const segments: string[] = []
+  let start = 0
+  for (const match of title.matchAll(SUBJECT_ALIAS_SEPARATOR)) {
+    const index = match.index + (match[1] ?? '').length
+    segments.push(title.slice(start, index))
+    start = index + 2
+  }
+  segments.push(title.slice(start))
+  return segments
+}
 
 /**
  * The v1 subject aliases derived from `title`, in title order: each `//`
@@ -28,7 +44,7 @@ const SUBJECT_ALIAS_SEPARATOR = /(?<![:/])\/\/(?!\/)/
  * `[[Charlotte MacCaw]]` must resolve to `Charlotte MacCaw // Mum` too.
  */
 export function subjectAliases(title: string): string[] {
-  const segments = title.split(SUBJECT_ALIAS_SEPARATOR)
+  const segments = splitSubject(title)
   if (segments.length < 2) {
     return []
   }

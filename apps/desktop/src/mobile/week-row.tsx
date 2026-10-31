@@ -1,8 +1,10 @@
 import { memo, type ReactElement } from 'react'
-import { format } from 'date-fns'
-import { addDaysIso, parseIsoDate } from '@/lib/dates'
-import { cn } from '@/lib/utils'
-import { hapticImpactLight } from '@/mobile/haptics'
+import { addDaysToIsoDate, formatDate } from '@reflect/utils'
+import { formatDayLabel } from '@reflect/core'
+import { cn } from '@/lib/utils.ts'
+import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
+import { useDateFormat } from '@/hooks/use-date-format.ts'
 
 interface WeekRowProps {
   /** The ISO date of this week's first day (per the week-start setting). */
@@ -11,6 +13,8 @@ interface WeekRowProps {
   selectedDay: string | null
   /** Today when it falls in this week, else `null`. */
   todayDay: string | null
+  /** Dates backed by an indexed daily note. */
+  dailyNoteDates: ReadonlySet<string>
   /** Select a day — drives the carousel and the route. */
   onSelect: (date: string) => void
 }
@@ -27,9 +31,12 @@ function WeekRowComponent({
   weekStart,
   selectedDay,
   todayDay,
+  dailyNoteDates,
   onSelect,
 }: WeekRowProps): ReactElement {
-  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(weekStart, index))
+  const { haptics } = useMobileServices()
+  const dateFormat = useDateFormat()
+  const days = Array.from({ length: 7 }, (_, index) => addDaysToIsoDate(weekStart, index))
   const selectedIndex = selectedDay ? days.indexOf(selectedDay) : -1
   return (
     <div className="relative flex min-w-0 flex-[0_0_100%]">
@@ -57,20 +64,21 @@ function WeekRowComponent({
       {days.map((day) => {
         const selected = day === selectedDay
         const isToday = day === todayDay
+        const hasDailyNote = dailyNoteDates.has(day)
         return (
           <button
             key={day}
             type="button"
-            aria-label={format(parseIsoDate(day), 'EEEE, MMMM do')}
+            aria-label={`${formatDayLabel(day, dateFormat)}${hasDailyNote ? ', has daily note' : ''}`}
             aria-current={selected ? 'date' : undefined}
             onClick={() => {
-              hapticImpactLight()
+              hapticImpactLight(haptics)
               onSelect(day)
             }}
             className="relative flex flex-1 flex-col items-center gap-0.5 py-1"
           >
             <span className="text-[11px] font-medium text-text-muted">
-              {format(parseIsoDate(day), 'EEEEE')}
+              {formatDate(day, 'EEEEE')}
             </span>
             <span
               className={cn(
@@ -80,15 +88,20 @@ function WeekRowComponent({
                 !selected && !isToday && 'text-text',
               )}
             >
-              {format(parseIsoDate(day), 'd')}
+              {formatDate(day, 'd')}
             </span>
-            {/* Today dot (V1) — a fixed-height slot so cells stay aligned;
-                shown only when today isn't the selected (circled) day. */}
+            {/* A daily note takes the strip's marker slot. Otherwise it keeps
+                V1's Today dot when today is not selected. */}
             <span
               aria-hidden
+              data-testid={hasDailyNote ? `note-dot-${day}` : undefined}
               className={cn(
                 'size-1 rounded-full',
-                !selected && isToday ? 'bg-primary' : 'bg-transparent',
+                hasDailyNote
+                  ? 'bg-text-muted opacity-50'
+                  : !selected && isToday
+                    ? 'bg-primary'
+                    : 'bg-transparent',
               )}
             />
           </button>

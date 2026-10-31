@@ -1,23 +1,56 @@
 <!-- @dsCard group="Type" viewport="700x150" name="Weights" subtitle="Inter Variable — 400 body, 500 the workhorse" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 22px; background: var(--surface); font-family: var(--font-sans); color: var(--text); }
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
-  .cell { display: flex; flex-direction: column; gap: 4px; }
-  .word { font-size: 30px; letter-spacing: var(--tracking-snug); }
-  .lbl { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-</style>
-</head>
-<body>
-  <div class="grid">
-    <div class="cell"><span class="word" style="font-weight:400">Reflect</span><span class="lbl">400 · Normal</span></div>
-    <div class="cell"><span class="word" style="font-weight:500">Reflect</span><span class="lbl">500 · Medium ★</span></div>
-    <div class="cell"><span class="word" style="font-weight:600">Reflect</span><span class="lbl">600 · Semibold</span></div>
-    <div class="cell"><span class="word" style="font-weight:700">Reflect</span><span class="lbl">700 · Bold</span></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 22px;
+        background: var(--surface);
+        font-family: var(--font-sans);
+        color: var(--text);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .word {
+        font-size: 30px;
+        letter-spacing: var(--tracking-snug);
+      }
+      .lbl {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div class="cell">
+        <span class="word" style="font-weight: 400">Reflect</span
+        ><span class="lbl">400 · Normal</span>
+      </div>
+      <div class="cell">
+        <span class="word" style="font-weight: 500">Reflect</span
+        ><span class="lbl">500 · Medium ★</span>
+      </div>
+      <div class="cell">
+        <span class="word" style="font-weight: 600">Reflect</span
+        ><span class="lbl">600 · Semibold</span>
+      </div>
+      <div class="cell">
+        <span class="word" style="font-weight: 700">Reflect</span
+        ><span class="lbl">700 · Bold</span>
+      </div>
+    </div>
+  </body>
 </html>

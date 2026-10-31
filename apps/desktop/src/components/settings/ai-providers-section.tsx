@@ -1,10 +1,10 @@
 import { useState, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import { useAiProviders } from '@/hooks/use-ai-providers'
-import { Button } from '@/components/ui/button'
-import { AddAiProviderDialog } from './add-ai-provider-dialog'
-import { AiProviderRow } from './ai-provider-row'
-import { SettingsSection } from './section'
+import { useAiProviders } from '@/hooks/use-ai-providers.ts'
+import { Button } from '@/components/ui/button.tsx'
+import { AddAiProviderDialog } from './add-ai-provider-dialog.tsx'
+import { AiProviderRow } from './ai-provider-row.tsx'
+import { SettingsSection } from './section.tsx'
 
 /**
  * Settings → AI providers (Plan 10): the configured BYOK providers. Each
@@ -13,22 +13,16 @@ import { SettingsSection } from './section'
  * which is the app-wide default and only the key's trailing characters.
  */
 export function AiProvidersSection(): ReactElement {
-  const {
-    providers,
-    defaultProvider,
-    addProvider,
-    removeProvider,
-    makeDefault,
-    setDefaultModel,
-  } = useAiProviders()
+  const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
+    useAiProviders()
   const [adding, setAdding] = useState(false)
 
   return (
     <SettingsSection id="ai-providers">
       {providers.length === 0 ? (
         <p className="px-4 py-3.5 text-xs text-text-muted">
-          No AI providers configured. Add a provider API key to use AI features — keys
-          are stored in your OS keychain and calls go directly to the provider.
+          No AI providers configured. Add a provider API key to use AI features — keys are stored in
+          your OS keychain and calls go directly to the provider.
         </p>
       ) : (
         providers.map((config) => (

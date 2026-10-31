@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
-import { NoteActionsSection } from './note-actions-section'
-import { PublishedUrlSection } from './published-url-section'
-import { SimilarNotesSection } from './similar-notes-section'
+import { NoteActionsSection } from './note-actions-section.tsx'
+import { PublishedUrlSection } from './published-url-section.tsx'
+import { SimilarNotesSection } from './similar-notes-section.tsx'
 
 interface NoteContextSidebarProps {
   /** Graph-relative path of the open note the sidebar describes. */
@@ -16,7 +16,7 @@ interface NoteContextSidebarProps {
  */
 export function NoteContextSidebar({ path }: NoteContextSidebarProps): ReactElement {
   return (
-    <div className="flex flex-col py-2 text-text">
+    <div className="flex flex-col py-2 text-text" data-testid="note-context-sidebar">
       <div className="my-4 space-y-4 pb-4">
         <NoteActionsSection path={path} showTrash />
         <PublishedUrlSection path={path} />

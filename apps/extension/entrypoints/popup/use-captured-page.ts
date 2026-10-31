@@ -10,9 +10,7 @@ import {
  * when Chrome allows them.
  */
 
-export type CapturedPageState =
-  | { status: 'loading' }
-  | SnapshotCapturedPageState
+export type CapturedPageState = { status: 'loading' } | SnapshotCapturedPageState
 
 export function useCapturedPage(): CapturedPageState {
   const [state, setState] = useState<CapturedPageState>({ status: 'loading' })

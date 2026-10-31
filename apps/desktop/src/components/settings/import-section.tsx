@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react'
-import { open } from '@tauri-apps/plugin-dialog'
 import { FileArchive } from 'lucide-react'
-import { SettingsField } from '@/components/settings/field'
-import { SettingsSection } from '@/components/settings/section'
-import { Button } from '@/components/ui/button'
-import { useV1Import } from '@/providers/v1-import-provider'
+import { SettingsField } from '@/components/settings/field.tsx'
+import { SettingsSection } from '@/components/settings/section.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { useV1Import } from '@/providers/v1-import-provider.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
  * Settings -> Import: pick a Reflect V1 export zip and hand it to the
@@ -14,17 +14,17 @@ import { useV1Import } from '@/providers/v1-import-provider'
  */
 export function ImportSection(): ReactElement {
   const { state, startImport } = useV1Import()
+  const { dialog } = useAppServices()
   const running = state.phase === 'running'
 
   async function chooseAndImport(): Promise<void> {
-    const result = await open({
+    const picked = await dialog.pickFiles({
       multiple: false,
-      directory: false,
       title: 'Import Reflect V1 export',
       filters: [{ name: 'Zip archives', extensions: ['zip'] }],
     })
-    const path = typeof result === 'string' ? result : null
-    if (path === null) {
+    const path = picked?.[0]
+    if (path === undefined) {
       return
     }
     startImport(path)

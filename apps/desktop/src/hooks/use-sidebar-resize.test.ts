@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { effectiveSidebarWidths } from './use-sidebar-resize'
+import { effectiveSidebarWidths } from './use-sidebar-resize.ts'
 
 describe('effectiveSidebarWidths', () => {
   it('honors both preferences when the viewport has room', () => {

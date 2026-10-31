@@ -21,7 +21,12 @@ export function Avatar({ src, name = '', size = 32, graphColor, style = {} }) {
       />
     )
   }
-  const initials = name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
   return (
     <span
       style={{

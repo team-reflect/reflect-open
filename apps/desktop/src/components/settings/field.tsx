@@ -15,11 +15,7 @@ interface SettingsFieldProps {
  * renders its controls through this so the row rhythm stays uniform — see
  * docs/contributing/adding-a-setting.md.
  */
-export function SettingsField({
-  legend,
-  description,
-  children,
-}: SettingsFieldProps): ReactElement {
+export function SettingsField({ legend, description, children }: SettingsFieldProps): ReactElement {
   return (
     <fieldset className="px-4 py-3.5">
       <legend className="float-left text-sm font-medium text-text">{legend}</legend>

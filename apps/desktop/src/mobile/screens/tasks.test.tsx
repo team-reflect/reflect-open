@@ -1,79 +1,44 @@
-import { type ReactNode } from 'react'
-import { cleanup, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { OpenTask } from '@reflect/core'
-import { makeOpenTask as task } from '@/lib/tasks/open-task-fixture'
-import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
-import { RouterProvider, useRouter } from '@/routing/router'
-import { MobileTasks } from './tasks'
+import type { ReactNode } from 'react'
+import { page, userEvent, type Locator } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import {
+  createTestCoreServices,
+  createTestPlatformService,
+  makeOpenTask as task,
+  type TestCoreServices,
+  type TestHapticsService,
+  type TestStorageService,
+} from '@reflect/core/testing'
+import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
+import { useRouter } from '@/routing/router.tsx'
+import '@/test-utils/locator.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { swipe, translateX } from '@/test-utils/swipe.ts'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { MobileTasks } from './tasks.tsx'
+
+let haptics: TestHapticsService
 
 /**
  * The mobile Tasks tab (V1 mobile's third tab over Plan 18 data): desktop's
  * groups and guarded write-backs with a touch surface — checkbox toggles,
  * the quick-edit sheet (edit / schedule / complete / convert / open note /
- * delete), the filter sheet, and "+" add. The core getters and the note-task
- * write layer are mocked, like the desktop screen's tests; the sheet's markdown
- * editor is a textarea stand-in (jsdom can't mount ProseKit); grouping/merge
+ * delete), the filter sheet, and "+" add. The task service's reads and writes
+ * are spied, like the desktop screen's tests; the sheet's markdown
+ * editor is a textarea stand-in; grouping/merge
  * rules are unit-tested in task-visibility.test.ts.
  */
-
-const getOpenTasks = vi.hoisted(() => vi.fn())
-const getCompletedTasks = vi.hoisted(() => vi.fn())
-const resolveOrCreateNoteWithTitle = vi.hoisted(() => vi.fn())
-const hapticImpactLight = vi.hoisted(() => vi.fn())
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  hasBridge: () => true,
-  getOpenTasks,
-  getCompletedTasks,
-  resolveOrCreateNoteWithTitle,
-}))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
-}))
-vi.mock('@/lib/use-today', () => ({ useToday: () => '2026-06-14' }))
-vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({
-    settings: {
-      dateFormat: 'mdy',
-      weekStartDay: 'monday',
-      editorMarkdownSyntax: 'hide',
-      editorSpellCheck: false,
-    },
-  }),
-}))
-// TaskText renders through meowdown's MarkdownView, which jsdom can't mount.
-vi.mock('@/editor/markdown-preview', () => ({
-  MarkdownPreview: ({ content, className }: { content: string; className?: string }) => (
-    <span data-testid="markdown-preview" className={className}>
-      {content}
-    </span>
-  ),
-}))
-// The autocomplete hook reads the contacts authorization over IPC; the menus
-// themselves live inside meowdown, which is stubbed out below anyway.
-vi.mock('@/editor/use-editor-autocomplete', () => ({
-  useEditorAutocomplete: () => ({
-    onWikilinkSearch: async () => [],
-    onTagSearch: async () => [],
-  }),
-}))
-vi.mock('@/mobile/haptics', () => ({
-  hapticImpactLight,
-}))
 
 const editorProbe = vi.hoisted(() => ({ focusCalls: 0 }))
 
 // The sheet hosts the real markdown editor (desktop's inline task-editor
-// surface), which mounts ProseKit — jsdom can't render it. This stand-in is a
+// surface), which is covered separately. This stand-in is a
 // textarea over the same NoteEditor contract: uncontrolled seed from
 // `initialContent`, `onChange` with the markdown, a **silent** `setMarkdown`
 // (no onChange echo, matching meowdown), plus probes for focus and wiki-link
 // clicks. Children (the Enter keymap) need the ProseKit context, so they are
 // not rendered.
-vi.mock('@/editor/note-editor', async () => {
+vi.mock('@/editor/note-editor.tsx', async () => {
   const { useEffect, useRef } = await import('react')
   return {
     NoteEditor: ({
@@ -84,8 +49,8 @@ vi.mock('@/editor/note-editor', async () => {
     }: {
       initialContent: string
       onChange?: (markdown: string) => void
-      onWikiLinkClick?: (target: string) => void
-      handleRef?: (handle: import('@/editor/note-editor').NoteEditorHandle | null) => void
+      onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
+      handleRef?: (handle: import('@/editor/note-editor.tsx').NoteEditorHandle | null) => void
     }) => {
       const areaRef = useRef<HTMLTextAreaElement | null>(null)
       useEffect(() => {
@@ -107,6 +72,8 @@ vi.mock('@/editor/note-editor', async () => {
           appendPendingReplacementText: () => {},
           acceptPendingReplacement: () => {},
           discardPendingReplacement: () => {},
+          findNext: () => {},
+          findPrevious: () => {},
         })
         return () => handleRef?.(null)
       }, [handleRef])
@@ -119,7 +86,10 @@ vi.mock('@/editor/note-editor', async () => {
             onChange={(event) => onChange?.(event.target.value)}
           />
           {onWikiLinkClick !== undefined ? (
-            <button type="button" onClick={() => onWikiLinkClick('Other Note')}>
+            <button
+              type="button"
+              onClick={() => onWikiLinkClick({ target: 'Other Note', openInNewWindow: false })}
+            >
               fake-wikilink
             </button>
           ) : null}
@@ -129,32 +99,34 @@ vi.mock('@/editor/note-editor', async () => {
   }
 })
 
-const toggleTask = vi.hoisted(() => vi.fn())
-const deleteTask = vi.hoisted(() => vi.fn())
-const editTask = vi.hoisted(() => vi.fn())
-const insertTask = vi.hoisted(() => vi.fn())
-const continueTaskInContext = vi.hoisted(() => vi.fn())
-const convertTaskToBullet = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/note-task', () => ({
-  toggleTask,
-  deleteTask,
-  editTask,
-  insertTask,
-  continueTaskInContext,
-  convertTaskToBullet,
-}))
+// The screen runs on the real `TaskService` of the test app services; each
+// test steers its reads and writes through these spies.
+let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
+let getCompletedTasks: MockInstance<TaskService['getCompletedTasks']>
+let writeTask: MockInstance<TaskService['writeTask']>
+let insertTask: MockInstance<TaskService['insertTask']>
 
-const fail = vi.hoisted(() => vi.fn())
-const startOperation = vi.hoisted(() => vi.fn(() => ({ fail })))
-vi.mock('@/lib/operations', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/operations')>()),
-  startOperation,
-}))
+/**
+ * The result of a write that changed nothing the cache needs to re-address.
+ */
+const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
 
-// vaul needs browser APIs jsdom doesn't provide (matchMedia, pointer capture);
-// its drag/animation is verified on-device. This passthrough honours `open` and
+type TaskActionKind = TaskAction['kind']
+
+function isWrite(actions: readonly TaskAction[], kinds: readonly TaskActionKind[]): boolean {
+  return actions.length === kinds.length && actions.every((action, i) => action.kind === kinds[i])
+}
+
+/**
+ * The `writeTask` calls whose actions are exactly `kinds`, e.g. `('setMarkdown', 'toggle')`.
+ */
+function writesOf(...kinds: TaskActionKind[]): unknown[][] {
+  return writeTask.mock.calls.filter((call) => isWrite(call[1], kinds))
+}
+
+// Vaul's drag/animation is verified on-device. This passthrough honours `open` and
 // exposes the dismissal path as a button, so commit-on-dismiss is testable.
-vi.mock('@/components/ui/drawer', () => ({
+vi.mock('@/components/ui/drawer.tsx', () => ({
   Drawer: ({
     open,
     onOpenChange,
@@ -163,23 +135,27 @@ vi.mock('@/components/ui/drawer', () => ({
     open?: boolean
     onOpenChange?: (open: boolean) => void
     children?: ReactNode
-  }) =>
-    open ? (
+  }) => {
+    return open ? (
       <div data-testid="drawer">
         {children}
         <button type="button" onClick={() => onOpenChange?.(false)}>
           dismiss-drawer
         </button>
       </div>
-    ) : null,
+    ) : null
+  },
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
-/** Narrow a queried element to the editor stub's textarea so `.value` typechecks. */
-function asTextArea(element: HTMLElement): HTMLTextAreaElement {
+/**
+ * Narrow a queried element to the editor stub's textarea so `.value` typechecks.
+ */
+function asTextArea(element: Element): HTMLTextAreaElement {
   if (!(element instanceof HTMLTextAreaElement)) {
-    throw new Error('expected a textarea')
+    throw new TypeError('expected a textarea')
   }
   return element
 }
@@ -190,58 +166,118 @@ function RouteProbe(): ReactNode {
 }
 
 function renderScreen() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={client}>
-      <RouterProvider>
-        <MobileTasks />
-        <RouteProbe />
-      </RouterProvider>
-    </QueryClientProvider>,
-  )
+  return renderInApp(
+    <>
+      <MobileTasks />
+      <RouteProbe />
+    </>,
+    {
+      core,
+      graph: { root: '/g', name: 'g', generation: 1 },
+      settings: {
+        dateFormat: 'mdy',
+        weekStartDay: 'monday',
+        editorMarkdownSyntax: 'hide',
+        editorSpellCheck: false,
+      },
+    },
+  ).then((view) => {
+    const find = async (locator: Locator): Promise<Element> => {
+      await expect.element(locator).toBeInTheDocument()
+      return locator.element()
+    }
+    return Object.assign(view, {
+      findAllByText: async (...args: Parameters<typeof view.getByText>) => {
+        const locator = view.getByText(...args)
+        await expect.poll(() => locator.elements().length).toBeGreaterThan(0)
+        return locator.elements()
+      },
+      findByRole: (...args: Parameters<typeof view.getByRole>) => find(view.getByRole(...args)),
+      findByText: (...args: Parameters<typeof view.getByText>) => find(view.getByText(...args)),
+      getAllByText: (...args: Parameters<typeof view.getByText>) => {
+        return view.getByText(...args).elements()
+      },
+      queryByLabelText: (...args: Parameters<typeof view.getByLabelText>) => {
+        return view.getByLabelText(...args).query()
+      },
+      queryByRole: (...args: Parameters<typeof view.getByRole>) => view.getByRole(...args).query(),
+      queryByText: (...args: Parameters<typeof view.getByText>) => view.getByText(...args).query(),
+    })
+  })
 }
 
-beforeEach(() => {
-  window.sessionStorage.clear()
-  getOpenTasks.mockReset()
-  getCompletedTasks.mockReset()
-  getCompletedTasks.mockResolvedValue([])
-  toggleTask.mockReset()
-  deleteTask.mockReset()
-  editTask.mockReset()
-  insertTask.mockReset()
-  insertTask.mockResolvedValue(0)
-  continueTaskInContext.mockReset()
-  continueTaskInContext.mockResolvedValue({
-    created: { markerOffset: 0, raw: '[ ] ' },
-    offsetChanges: [],
+const waitFor = vi.waitFor
+
+/**
+ * Swipe a row far enough left that its release settles open, and return its moving surface.
+ */
+async function revealSwipeActions(
+  view: Awaited<ReturnType<typeof renderScreen>>,
+  label: string,
+): Promise<HTMLElement> {
+  const body = await view.findByRole('button', { name: `Edit: ${label}` })
+  const surface = body.parentElement!
+  const rect = surface.getBoundingClientRect()
+  await swipe(
+    surface,
+    { x: rect.right - 20, y: rect.top + 16 },
+    { x: rect.right - 160, y: rect.top + 16 },
+  )
+  return surface
+}
+
+let storage: TestStorageService
+
+let core: Omit<TestCoreServices, 'tasks'> & { tasks: TaskService }
+
+beforeEach(async () => {
+  await page.viewport(375, 700)
+  // A fresh service per test, so its recently-completed set starts empty.
+  core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    // Reduced motion: an instant settle, so row transforms can be asserted synchronously.
+    platform: createTestPlatformService({ reducedMotion: true }),
   })
-  convertTaskToBullet.mockReset()
-  convertTaskToBullet.mockResolvedValue(undefined)
-  startOperation.mockClear()
-  fail.mockReset()
-  resolveOrCreateNoteWithTitle.mockReset()
-  resolveOrCreateNoteWithTitle.mockResolvedValue({
+  const { tasks } = core
+  getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])
+  getCompletedTasks = vi.spyOn(tasks, 'getCompletedTasks').mockResolvedValue([])
+  writeTask = vi.spyOn(tasks, 'writeTask').mockResolvedValue(WRITTEN)
+  insertTask = vi.spyOn(tasks, 'insertTask').mockResolvedValue({
+    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+    moved: [],
+    updatedAt: 0,
+  })
+  storage = core.storage
+  haptics = core.mobile.haptics
+  // Today is 2026-06-14.
+  core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
+  // A wiki-link tap resolves to this note.
+  vi.spyOn(core.noteCreation, 'resolveOrCreateNoteWithTitle').mockResolvedValue({
     kind: 'resolved',
     path: 'notes/other.md',
   })
-  hapticImpactLight.mockClear()
   editorProbe.focusCalls = 0
-  resetRecentlyCompleted()
-})
-
-afterEach(() => {
-  cleanup()
 })
 
 describe('MobileTasks', () => {
   it('renders desktop’s groups with counts and source dates', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md', markerOffset: 0 }),
-      task({ text: 'late', dueDate: '2026-06-01', dailyDate: '2026-06-01', notePath: 'daily/2026-06-01.md', markerOffset: 0 }),
-      task({ text: 'undated', markerOffset: 0 }),
+      task({
+        text: 'jotted today',
+        dailyDate: '2026-06-14',
+        notePath: 'daily/2026-06-14.md',
+        astPath: [0],
+      }),
+      task({
+        text: 'late',
+        dueDate: '2026-06-01',
+        dailyDate: '2026-06-01',
+        notePath: 'daily/2026-06-01.md',
+        astPath: [0],
+      }),
+      task({ text: 'undated', astPath: [0] }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('Current')
     view.getByText('Overdue')
@@ -249,373 +285,415 @@ describe('MobileTasks', () => {
     view.getByRole('button', { name: 'N' })
     // Date buckets show the source note's compact date on the row.
     view.getByText('6/1/2026')
-    view.unmount()
+    await view.unmount()
   })
 
   it('renders one read-only breadcrumb per consecutive task context', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ markerOffset: 2, text: 'first', breadcrumbs: ['Project', 'Release'] }),
-      task({ markerOffset: 20, text: 'second', breadcrumbs: ['Project', 'Release'] }),
-      task({ markerOffset: 40, text: 'third', breadcrumbs: ['Project', 'Later'] }),
-      task({ markerOffset: 60, text: 'fourth', breadcrumbs: ['Project', 'Release'] }),
+      task({ astPath: [2], text: 'first', breadcrumbs: ['Project', 'Release'] }),
+      task({ astPath: [20], text: 'second', breadcrumbs: ['Project', 'Release'] }),
+      task({ astPath: [40], text: 'third', breadcrumbs: ['Project', 'Later'] }),
+      task({ astPath: [60], text: 'fourth', breadcrumbs: ['Project', 'Release'] }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     expect(await view.findAllByText('Project → Release')).toHaveLength(2)
     expect(view.getAllByText('Project → Later')).toHaveLength(1)
     expect(view.queryByRole('button', { name: 'Project → Release' })).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
-  it('hides a lone generic task breadcrumb', async () => {
+  it('shows the full heading chain and hides only a lone Tasks parent', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ markerOffset: 2, text: 'project task', breadcrumbs: ['Tasks:'] }),
+      task({ astPath: [2], text: 'chore task', breadcrumbs: ['Home', 'House chore'] }),
+      task({ astPath: [5], text: 'project task', breadcrumbs: ['Tasks', 'Kitchen'] }),
+      task({ astPath: [8], text: 'lone task', breadcrumbs: ['Tasks'] }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
-    await view.findByText('project task')
-    expect(view.queryByText('Tasks:')).toBeNull()
-    view.unmount()
+    await view.findByText('Home → House chore')
+    await view.findByText('Tasks → Kitchen')
+    await view.findByText('lone task')
+    expect(view.getAllByText('Tasks', { exact: true })).toHaveLength(0)
+    await view.unmount()
+  })
+
+  it('keeps matching heading contexts separate across source notes in date buckets', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/a.md',
+        astPath: [1],
+        text: 'tidy desk',
+        dailyDate: '2026-06-14',
+        breadcrumbs: ['House chore'],
+      }),
+      task({
+        notePath: 'notes/b.md',
+        astPath: [1],
+        text: 'water plants',
+        dailyDate: '2026-06-14',
+        breadcrumbs: ['House chore'],
+      }),
+    ])
+    const view = await renderScreen()
+
+    await view.findByText('water plants')
+    expect(view.getAllByText('House chore')).toHaveLength(2)
+    await view.unmount()
   })
 
   it('toggles a task from its checkbox and keeps it struck until archived', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Complete: buy milk' }))
 
-    expect(hapticImpactLight).toHaveBeenCalledTimes(1)
-    expect(toggleTask).toHaveBeenCalledTimes(1)
+    expect(haptics.impacts()).toBe(1)
+    expect(writesOf('toggle')).toHaveLength(1)
     // V1's middle state: the completed row stays visible, struck, reopenable.
     await view.findByRole('button', { name: 'Reopen: buy milk' })
 
     // Archive hides this session's completed rows.
     await user.click(view.getByRole('button', { name: 'Archive 1 completed' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(2)
+    expect(haptics.impacts()).toBe(2)
     await waitFor(() => expect(view.queryByText('buy milk')).toBeNull())
-    view.unmount()
+    await view.unmount()
   })
 
   it('fires light haptics for task list controls', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(1)
+    expect(haptics.impacts()).toBe(1)
 
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
     await user.click(view.getByRole('button', { name: 'Task filters' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(2)
+    expect(haptics.impacts()).toBe(2)
 
     await user.click(view.getByRole('checkbox', { name: 'Current' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(3)
+    expect(haptics.impacts()).toBe(3)
 
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
     await user.click(view.getByRole('button', { name: 'New task' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(4)
-    view.unmount()
+    expect(haptics.impacts()).toBe(4)
+    await view.unmount()
   })
 
   it('commits an edited draft when the quick-edit sheet is dismissed', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
-    const input = asTextArea(view.getByRole('textbox', { name: 'Task text' }))
+    const input = asTextArea(view.getByRole('textbox', { name: 'Task text' }).element())
     expect(input.value).toBe('buy milk')
 
     await user.clear(input)
     await user.type(input, 'buy oat milk')
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
-    view.unmount()
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      { kind: 'setMarkdown', markdown: 'buy oat milk' },
+    ])
+    await view.unmount()
   })
 
   it('does not write when the sheet closes with an untouched draft', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(editTask).not.toHaveBeenCalled()
-    expect(deleteTask).not.toHaveBeenCalled()
-    view.unmount()
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    expect(writesOf('remove')).toHaveLength(0)
+    await view.unmount()
   })
 
   it('deletes the task when the sheet is dismissed with an emptied draft', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(deleteTask).toHaveBeenCalledTimes(1)
-    expect(editTask).not.toHaveBeenCalled()
-    view.unmount()
+    expect(writesOf('remove')).toHaveLength(1)
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    await view.unmount()
   })
 
   it('schedules by editing the draft’s date link, committing one write', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'Tomorrow' }))
-    expect(asTextArea(view.getByRole('textbox', { name: 'Task text' })).value).toBe(
+    expect(asTextArea(view.getByRole('textbox', { name: 'Task text' }).element()).value).toBe(
       'buy milk [[2026-06-15]]',
     )
 
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy milk [[2026-06-15]]')
-    view.unmount()
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      { kind: 'setMarkdown', markdown: 'buy milk [[2026-06-15]]' },
+    ])
+    await view.unmount()
   })
 
   it('fires light haptics for task sheet scheduling and actions', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
-    hapticImpactLight.mockClear()
+    haptics.reset()
 
     await user.click(view.getByRole('button', { name: 'Pick date' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(1)
+    expect(haptics.impacts()).toBe(1)
 
     await user.click(view.getByRole('button', { name: 'Tomorrow' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(2)
+    expect(haptics.impacts()).toBe(2)
 
     await user.click(view.getByRole('button', { name: 'Clear' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(3)
+    expect(haptics.impacts()).toBe(3)
 
     await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
-    expect(hapticImpactLight).toHaveBeenCalledTimes(4)
-    await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(1))
-    view.unmount()
+    expect(haptics.impacts()).toBe(4)
+    await waitFor(() => expect(writesOf('toBullet')).toHaveLength(1))
+    await view.unmount()
   })
 
   it('clears the due date from the schedule row', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ text: 'late [[2026-06-01]]', raw: '[ ] late [[2026-06-01]]', dueDate: '2026-06-01' }),
+      task({ text: 'late [[2026-06-01]]', markdown: 'late [[2026-06-01]]', dueDate: '2026-06-01' }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: /^Edit: late/ }))
     await user.click(view.getByRole('button', { name: 'Clear' }))
-    expect(asTextArea(view.getByRole('textbox', { name: 'Task text' })).value).toBe('late')
-    view.unmount()
+    expect(asTextArea(view.getByRole('textbox', { name: 'Task text' }).element()).value).toBe(
+      'late',
+    )
+    await view.unmount()
   })
 
   it('completes from the sheet, saving a changed draft first', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     const input = view.getByRole('textbox', { name: 'Task text' })
     await user.clear(input)
     await user.type(input, 'buy oat milk')
-    await user.click(view.getByRole('button', { name: 'Complete' }))
+    await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
 
-    await waitFor(() => expect(editTask).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    // One write path: dismissal must not commit again after the action closed
-    // the sheet.
-    expect(editTask).toHaveBeenCalledTimes(1)
-    view.unmount()
+    await waitFor(() => expect(writesOf('setMarkdown', 'toggle')).toHaveLength(1))
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      { kind: 'setMarkdown', markdown: 'buy oat milk' },
+      { kind: 'toggle' },
+    ])
+    // One write: dismissal must not commit again after the action closed the
+    // sheet, and the draft is not saved separately.
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    expect(writesOf('toggle')).toHaveLength(0)
+    await view.unmount()
   })
 
   it('commits edits from a sheet re-opened after an action closed it', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     // First visit ends through an action button (Complete), which skips the
     // dismissal commit. The sheet stays mounted for the same task afterwards.
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
-    await user.click(view.getByRole('button', { name: 'Complete' }))
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
+    await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
+    await waitFor(() => expect(writesOf('toggle')).toHaveLength(1))
 
     // Second visit (the struck row): its edits must still commit on dismiss.
     await user.click(view.getByRole('button', { name: 'Edit: buy milk' }))
-    const input = asTextArea(view.getByRole('textbox', { name: 'Task text' }))
+    const input = asTextArea(view.getByRole('textbox', { name: 'Task text' }).element())
     await user.clear(input)
     await user.type(input, 'buy oat milk')
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
-    view.unmount()
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      { kind: 'setMarkdown', markdown: 'buy oat milk' },
+    ])
+    await view.unmount()
   })
 
   it('converts to a bullet from the sheet', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
 
-    await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(1))
-    view.unmount()
+    await waitFor(() => expect(writesOf('toBullet')).toHaveLength(1))
+    await view.unmount()
   })
 
   it('deletes an emptied draft on Complete instead of resurrecting the text', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
-    await user.click(view.getByRole('button', { name: 'Complete' }))
+    await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(toggleTask).not.toHaveBeenCalled()
-    view.unmount()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('toggle')).toHaveLength(0)
+    await view.unmount()
   })
 
   it('deletes an emptied draft on Convert instead of resurrecting the text', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
     await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(convertTaskToBullet).not.toHaveBeenCalled()
-    view.unmount()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('toBullet')).toHaveLength(0)
+    await view.unmount()
   })
 
   it('keeps open tasks visible while the archived history is still loading', async () => {
-    window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
+    storage.session.set('reflect.tasks.filter.archived', 'true')
     getOpenTasks.mockResolvedValue([task({ text: 'still open' })])
     getCompletedTasks.mockReturnValue(new Promise<OpenTask[]>(() => {}))
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // The open groups render; the pending completed query must not blank them.
     await view.findByText('still open')
     expect(view.queryByLabelText('Loading tasks')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('opens the source note from the sheet', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'Open note' }))
 
-    expect(view.getByTestId('route').textContent).toContain('notes/n.md')
-    view.unmount()
+    expect(view.getByTestId('route').element().textContent).toContain('notes/n.md')
+    await view.unmount()
   })
 
   it('opens the source note of an untouched empty task without deleting it', async () => {
-    getOpenTasks.mockResolvedValue([task({ text: '', raw: '[ ] ' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    getOpenTasks.mockResolvedValue([task({ text: '', markdown: '' })])
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: Empty task' }))
     await user.click(view.getByRole('button', { name: 'Open note' }))
 
     // Navigates to the line's note — deleting it out from under the visit
     // would be wrong; only dismissal treats an abandoned empty row as delete.
-    expect(view.getByTestId('route').textContent).toContain('notes/n.md')
-    expect(deleteTask).not.toHaveBeenCalled()
-    view.unmount()
+    expect(view.getByTestId('route').element().textContent).toContain('notes/n.md')
+    expect(writesOf('remove')).toHaveLength(0)
+    await view.unmount()
   })
 
   it('deletes from the sheet', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.click(view.getByRole('button', { name: 'Delete' }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    view.unmount()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    await view.unmount()
   })
 
   it('adds a task to today’s daily from the Current group and opens its sheet', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
 
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md', 1))
+    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
     // The new (empty) task's quick-edit sheet opens to type into.
     const input = asTextArea(await view.findByRole('textbox', { name: 'Task text' }))
     expect(input.value).toBe('')
 
     await user.type(input, 'new thing')
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('new thing')
-    view.unmount()
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      { kind: 'setMarkdown', markdown: 'new thing' },
+    ])
+    await view.unmount()
   })
 
   it('adds a task to today’s daily from the floating plus button', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await view.findByText('buy milk')
     await user.click(view.getByRole('button', { name: 'New task' }))
 
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md', 1))
+    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
     const input = asTextArea(await view.findByRole('textbox', { name: 'Task text' }))
     expect(input.value).toBe('')
-    view.unmount()
+    await view.unmount()
   })
 
   it('focuses the editor when "+" adds a new task', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
     await view.findByRole('textbox', { name: 'Task text' })
 
     // The new task is empty — typing is the next step, so the keyboard rises.
     await waitFor(() => expect(editorProbe.focusCalls).toBeGreaterThan(0))
-    view.unmount()
+    await view.unmount()
   })
 
   it('leaves focus alone when a row tap opens the sheet', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     view.getByRole('textbox', { name: 'Task text' })
 
     // A row tap is usually after an action button — the keyboard would bury them.
     expect(editorProbe.focusCalls).toBe(0)
-    view.unmount()
+    await view.unmount()
   })
 
   it('commits the draft before a wiki link inside it navigates', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     const input = view.getByRole('textbox', { name: 'Task text' })
@@ -625,34 +703,36 @@ describe('MobileTasks', () => {
 
     // Commit-then-navigate, like "Open note": the edit lands exactly once, and
     // the resolved target opens.
-    expect(editTask).toHaveBeenCalledTimes(1)
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
-    await waitFor(() =>
-      expect(view.getByTestId('route').textContent).toContain('notes/other.md'),
-    )
-    view.unmount()
+    expect(writesOf('setMarkdown')).toHaveLength(1)
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      { kind: 'setMarkdown', markdown: 'buy oat milk' },
+    ])
+    await waitFor(() => {
+      expect(view.getByTestId('route').element().textContent).toContain('notes/other.md')
+    })
+    await view.unmount()
   })
 
   it('abandoning a "+"-added task deletes it instead of ghosting an empty row', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
     await view.findByRole('textbox', { name: 'Task text' })
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(editTask).not.toHaveBeenCalled()
-    view.unmount()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('setMarkdown')).toHaveLength(0)
+    await view.unmount()
   })
 
   it('flushes an edited draft when the screen unmounts under an open sheet', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     const input = view.getByRole('textbox', { name: 'Task text' })
@@ -660,25 +740,27 @@ describe('MobileTasks', () => {
     await user.type(input, 'buy oat milk')
 
     // A tab switch unmounts the whole screen — no dismissal callback fires.
-    view.unmount()
+    await view.unmount()
 
-    await waitFor(() => expect(editTask).toHaveBeenCalledTimes(1))
-    expect(editTask.mock.calls[0]?.[1]).toBe('buy oat milk')
+    await waitFor(() => expect(writesOf('setMarkdown')).toHaveLength(1))
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [
+      { kind: 'setMarkdown', markdown: 'buy oat milk' },
+    ])
   })
 
   it('deletes an abandoned "+"-added task when the screen unmounts', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await user.click(await view.findByRole('button', { name: 'Add a task to today' }))
     await view.findByRole('textbox', { name: 'Task text' })
-    view.unmount()
+    await view.unmount()
 
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(editTask).not.toHaveBeenCalled()
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    expect(writesOf('setMarkdown')).toHaveLength(0)
   })
 
   it('hides buckets through the filter sheet', async () => {
@@ -686,8 +768,8 @@ describe('MobileTasks', () => {
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),
       task({ text: 'undated' }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await view.findByText('Current')
     await user.click(view.getByRole('button', { name: 'Task filters' }))
@@ -695,16 +777,16 @@ describe('MobileTasks', () => {
 
     await waitFor(() => expect(view.queryByText('jotted today')).toBeNull())
     view.getByText('undated')
-    view.unmount()
+    await view.unmount()
   })
 
   it('reveals the completed history behind “Show archived”', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'still open' })])
     getCompletedTasks.mockResolvedValue([
-      task({ text: 'long done', markerOffset: 40, checked: true, raw: '[x] long done' }),
+      task({ text: 'long done', astPath: [40], checked: true, markdown: 'long done' }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await view.findByText('still open')
     expect(view.queryByText('long done')).toBeNull()
@@ -713,16 +795,16 @@ describe('MobileTasks', () => {
     await user.click(view.getByRole('checkbox', { name: 'Show archived' }))
 
     await view.findByText('long done')
-    view.unmount()
+    await view.unmount()
   })
 
   it('filters rows by the search text', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ text: 'buy milk', markerOffset: 0 }),
-      task({ text: 'call mum', markerOffset: 10 }),
+      task({ text: 'buy milk', astPath: [0] }),
+      task({ text: 'call mum', astPath: [10] }),
     ])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await view.findByText('buy milk')
     const search = view.getByRole('searchbox', { name: 'Search tasks' })
@@ -733,29 +815,100 @@ describe('MobileTasks', () => {
 
     await user.click(view.getByRole('button', { name: 'Clear search' }))
 
-    expect((search as HTMLInputElement).value).toBe('')
-    expect(document.activeElement).toBe(search)
+    expect((search.element() as HTMLInputElement).value).toBe('')
+    expect(document.activeElement).toBe(search.element())
     await view.findByText('call mum')
-    view.unmount()
+    await view.unmount()
   })
 
   it('shows an empty state whose button adds to today’s daily', async () => {
     getOpenTasks.mockResolvedValue([])
-    const user = userEvent.setup()
-    const view = renderScreen()
+    const user = userEvent
+    const view = await renderScreen()
 
     await view.findByText('No tasks to show')
     await user.click(view.getByRole('button', { name: 'Add a task' }))
 
-    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md', 1))
-    view.unmount()
+    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
+    await view.unmount()
   })
 
   it('surfaces a failed open-tasks read', async () => {
     getOpenTasks.mockRejectedValue(new Error('no index'))
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('alert')
-    view.unmount()
+    await view.unmount()
+  })
+
+  it('reveals note and delete actions with a leftward swipe', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    const surface = await revealSwipeActions(view, 'buy milk')
+
+    await expect
+      .element(view.getByRole('button', { name: 'Open note: buy milk' }))
+      .toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Delete: buy milk' })).toBeInTheDocument()
+    expect(translateX(surface)).toBe(-136)
+    // The drag's synthetic click was swallowed; the sheet did not open.
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('deletes a task from its swipe action without a dialog', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await view.getByRole('button', { name: 'Delete: buy milk' }).click()
+
+    await waitFor(() => expect(writesOf('remove')).toHaveLength(1))
+    // Optimistic removal: the row leaves the list before the reindex.
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Edit: buy milk' })).toBeNull())
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('opens the source note from its swipe action', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await view.getByRole('button', { name: 'Open note: buy milk' }).click()
+
+    await waitFor(() => {
+      expect(view.getByTestId('route').element().textContent).toContain('notes/n.md')
+    })
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('closes a revealed row on tap instead of opening the sheet', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await view.getByRole('button', { name: 'Edit: buy milk' }).click()
+
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: buy milk' })).toBeNull())
+    expect(view.queryByText('dismiss-drawer')).toBeNull()
+    await view.unmount()
+  })
+
+  it('reveals one row at a time across groups', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ text: 'buy milk' }),
+      task({ text: 'walk dog', notePath: 'notes/dog.md' }),
+    ])
+    const view = await renderScreen()
+
+    await revealSwipeActions(view, 'buy milk')
+    await revealSwipeActions(view, 'walk dog')
+
+    await expect.element(view.getByRole('button', { name: 'Delete: walk dog' })).toBeInTheDocument()
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Delete: buy milk' })).toBeNull())
+    await view.unmount()
   })
 })

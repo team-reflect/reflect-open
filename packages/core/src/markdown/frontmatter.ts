@@ -1,5 +1,5 @@
-import { Document, isMap, parse as parseYaml, parseDocument } from 'yaml'
-import { frontmatterSchema, type Frontmatter } from './model'
+import { isMap, parse as parseYaml, parseDocument, type Document } from 'yaml'
+import { frontmatterSchema, type Frontmatter } from './model.ts'
 
 /**
  * YAML frontmatter handling (Plan 03). Markdown is the source of truth and files
@@ -12,15 +12,19 @@ import { frontmatterSchema, type Frontmatter } from './model'
 export interface FrontmatterSplit {
   /** YAML text between the fences, or `null` when there's no frontmatter block. */
   raw: string | null
-  /** Everything after the closing fence (the markdown body). */
+  /** Everything after the block: its closing fence and the one blank line that may follow it. */
   body: string
   /** Character offset of `body` within the original source. */
   bodyOffset: number
 }
 
-const OPEN_FENCE = /^---[ \t]*\r?\n/
-/** A closing `---` line: at the block start (empty frontmatter) or after a newline. */
-const CLOSE_FENCE = /(?:^|\r?\n)---[ \t]*(?:\r?\n|$)/
+const OPEN_FENCE = /^---[ \t]*\n/
+/**
+ * A closing `---` line, at the block start (empty frontmatter) or after a
+ * newline, plus the blank line separating the block from the body. That line
+ * belongs to the block: read as body it would be an empty first paragraph.
+ */
+const CLOSE_FENCE = /(?:^|\n)---[ \t]*(?:\n(?:[ \t]*\n)?|$)/
 
 /** Carve a leading YAML frontmatter block off `source`, preserving offsets. */
 export function splitFrontmatter(source: string): FrontmatterSplit {
@@ -83,7 +87,9 @@ export function parseFrontmatter(raw: string | null): ParsedFrontmatter {
  * unknown keys. A `undefined` value deletes the key. Creates a block if none
  * exists (and the patch sets something), and removes the block entirely when
  * deleting its last key — a note whose only metadata was a toggled flag returns
- * to having no frontmatter at all, not an empty `---` husk.
+ * to having no frontmatter at all, not an empty `---` husk. A written block
+ * always ends with its blank separator line, so a body that opens with a blank
+ * line keeps it.
  */
 export function upsertFrontmatter(source: string, patch: Record<string, unknown>): string {
   // An empty patch is a no-op — never re-serialize (which could disturb comments,
@@ -93,20 +99,7 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
   }
 
   const { raw, body } = splitFrontmatter(source)
-
-  if (raw === null) {
-    // Deletions of keys that were never there can't create a block.
-    const defined = Object.fromEntries(
-      Object.entries(patch).filter(([, value]) => value !== undefined),
-    )
-    if (Object.keys(defined).length === 0) {
-      return source
-    }
-    const doc = new Document(defined)
-    return `---\n${ensureTrailingNewline(String(doc))}---\n${source}`
-  }
-
-  const doc = parseDocument(raw)
+  const doc = parseDocument(raw ?? '')
   // Reading tolerates malformed YAML (it degrades to a warning), but *writing*
   // must not: re-serializing a partial parse would drop the bytes the parser
   // couldn't model. Refuse rather than silently corrupt the note's frontmatter.
@@ -114,16 +107,16 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
     throw new Error(`refusing to update invalid YAML frontmatter: ${doc.errors[0]!.message}`)
   }
   for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) {
-      doc.delete(key)
-    } else {
+    if (value !== undefined) {
       doc.set(key, value)
+    } else if (doc.has(key)) {
+      doc.delete(key)
     }
   }
   if (isEmptyDocument(doc)) {
     return body
   }
-  return `---\n${ensureTrailingNewline(String(doc))}---\n${body}`
+  return `---\n${ensureTrailingNewline(String(doc))}---\n\n${body}`
 }
 
 /**

@@ -1,0 +1,95 @@
+// Builds the installers of the target platform: the NSIS installer for
+// Windows, the AppImage and `.deb` for Linux. None of them is code-signed. With
+// TAURI_SIGNING_PRIVATE_KEY set, Tauri also writes the updater signature
+// (`.sig`) of each one. See docs/distribution.md.
+//
+//   pnpm build:windows [--target=<triple>] [--artifact-dir=<path>]
+//   pnpm build:linux [--target=<triple>] [--artifact-dir=<path>]
+
+import { readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { parseArgs } from 'node:util'
+import {
+  exportArtifacts,
+  getFlavorConfigArgs,
+  getHostTriple,
+  log,
+  runTauri,
+  runWithTempDir,
+  TARGET_DIR,
+} from './helpers.ts'
+
+interface BundleKind {
+  readonly name: string
+  readonly suffix: string
+}
+
+/** The Tauri bundles of a target triple. */
+function resolveBundleKinds(target: string): BundleKind[] {
+  if (target.includes('-windows-')) {
+    // NSIS only: WiX rejects prerelease versions such as 0.11.0-beta.
+    return [{ name: 'nsis', suffix: '-setup.exe' }]
+  }
+  if (target.includes('-linux-')) {
+    return [
+      { name: 'appimage', suffix: '.AppImage' },
+      { name: 'deb', suffix: '.deb' },
+    ]
+  }
+  throw new Error(`unsupported target "${target}"`)
+}
+
+/** Builds the installers and returns their paths. */
+async function buildInstallers(target: string, tempDir: string): Promise<string[]> {
+  const kinds = resolveBundleKinds(target)
+  const bundleNames = kinds.map((kind) => kind.name).join(',')
+  const args = ['build', '--target', target, '--bundles', bundleNames, ...getFlavorConfigArgs()]
+  const env: NodeJS.ProcessEnv = {}
+  if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
+    // A config file avoids quoting inline JSON through the `tauri.cmd` shim.
+    const updaterConfig = join(tempDir, 'tauri.updater.conf.json')
+    writeFileSync(updaterConfig, JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
+    args.push('--config', updaterConfig)
+    // Without a password variable, Tauri asks for the password on stdin.
+    env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
+  }
+  const bundles = kinds.map(({ name, suffix }) => ({
+    dir: join(TARGET_DIR, target, 'release', 'bundle', name),
+    suffix,
+  }))
+  // Tauri keeps the installers of earlier versions in the bundle directories.
+  for (const { dir } of bundles) {
+    rmSync(dir, { recursive: true, force: true })
+  }
+  await runTauri(args, env)
+
+  return bundles.map(({ dir, suffix }) => {
+    const found = readdirSync(dir).filter((name) => name.endsWith(suffix))
+    const [installer] = found
+    if (!installer || found.length > 1) {
+      throw new Error(`expected one *${suffix} in ${dir}, found ${found.length}`)
+    }
+    return join(dir, installer)
+  })
+}
+
+async function main(): Promise<void> {
+  const { values } = parseArgs({
+    options: {
+      target: { type: 'string' },
+      'artifact-dir': { type: 'string' },
+    },
+  })
+  const target = values.target ?? (await getHostTriple())
+  const installers = await runWithTempDir((tempDir) => buildInstallers(target, tempDir))
+  for (const path of installers) {
+    log(`installer: ${path}`)
+  }
+
+  const artifactDir = values['artifact-dir']
+  if (artifactDir) {
+    exportArtifacts(installers, artifactDir)
+  }
+}
+
+await main()

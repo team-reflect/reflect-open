@@ -1,5 +1,1076 @@
 # Changelog
 
+## [0.17.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.3...v0.17.0-beta.4) (2026-10-30)
+
+
+### Bug Fixes
+
+* **desktop:** close superseded updates ([#1775](https://github.com/team-reflect/reflect-open/issues/1775)) ([d946e3b](https://github.com/team-reflect/reflect-open/commit/d946e3bb147717c0d17c650d5d80b67fcb366065))
+* **desktop:** embed one text per ONNX Runtime run ([#1780](https://github.com/team-reflect/reflect-open/issues/1780)) ([199302c](https://github.com/team-reflect/reflect-open/commit/199302c2a6f5a061c75579199dd1347b8774d5ac))
+* **desktop:** open daily notes older than five years ([#1767](https://github.com/team-reflect/reflect-open/issues/1767)) ([3718baa](https://github.com/team-reflect/reflect-open/commit/3718baa26cbe8ddb7a6b91136eaabe293e74b36a))
+* **desktop:** wrap Objective-C calls in an autorelease pool ([#1781](https://github.com/team-reflect/reflect-open/issues/1781)) ([2c6d35e](https://github.com/team-reflect/reflect-open/commit/2c6d35ec78c53a151a7f3e6195abe3e83be43759))
+* **mobile:** drag the image lightbox without re-rendering per move ([#1785](https://github.com/team-reflect/reflect-open/issues/1785)) ([df93c54](https://github.com/team-reflect/reflect-open/commit/df93c54f76fe36148d55322144fdfb7f9d941392))
+
+## [0.17.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.2...v0.17.0-beta.3) (2026-10-29)
+
+
+### Bug Fixes
+
+* **desktop:** align list markers ([#1765](https://github.com/team-reflect/reflect-open/issues/1765)) ([66e32aa](https://github.com/team-reflect/reflect-open/commit/66e32aa08818784940c84c4422b7b8a538bbd454))
+
+## [0.17.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.1...v0.17.0-beta.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* **core:** find titles typed without their accents in [[ suggestions ([#1757](https://github.com/team-reflect/reflect-open/issues/1757)) ([40d3580](https://github.com/team-reflect/reflect-open/commit/40d35804223cefdde3ecc7f4f8c60162a537ca0d))
+* **mobile:** pass Sentry DSN for iOS ([#1747](https://github.com/team-reflect/reflect-open/issues/1747)) ([af50d4b](https://github.com/team-reflect/reflect-open/commit/af50d4b7a9be79749ee1929292589bb5c6a3928c))
+
+## [0.17.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.16.0...v0.17.0-beta.1) (2026-10-26)
+
+
+### Features
+
+* update AI model ids ([#1737](https://github.com/team-reflect/reflect-open/issues/1737)) ([7c43a47](https://github.com/team-reflect/reflect-open/commit/7c43a47f7bcac089d1e1c6b04e92b19414f5adbb))
+
+
+### Bug Fixes
+
+* **desktop:** hide system writing suggestions in the editor ([#1733](https://github.com/team-reflect/reflect-open/issues/1733)) ([34b1cbc](https://github.com/team-reflect/reflect-open/commit/34b1cbce1c72f19064d6de0c78c3f875c3415d8f))
+* **desktop:** stop the Linux file watcher looping and leaking ([#1742](https://github.com/team-reflect/reflect-open/issues/1742)) ([d7bef90](https://github.com/team-reflect/reflect-open/commit/d7bef90aeaf4b0b65e2ba3a56668df147ff0756c))
+* name the username and access token in the sign-in error ([#1730](https://github.com/team-reflect/reflect-open/issues/1730)) ([6d2bac0](https://github.com/team-reflect/reflect-open/commit/6d2bac0099a7f17a7c214429aa559d13aa0b2f13))
+* send a stored sign-in only to the origin it belongs to ([#1728](https://github.com/team-reflect/reflect-open/issues/1728)) ([5b7c006](https://github.com/team-reflect/reflect-open/commit/5b7c006a5e769097692bfef0acb906c0e3fc6483))
+* stop iCloud conflicts duplicating an extended line ([#1736](https://github.com/team-reflect/reflect-open/issues/1736)) ([a5cbe48](https://github.com/team-reflect/reflect-open/commit/a5cbe48392ef8aab65cbafe1c419c741891c60f8))
+
+## [0.16.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.14...v0.16.0-beta.15) (2026-10-24)
+
+
+### Bug Fixes
+
+* update meowdown ([#1721](https://github.com/team-reflect/reflect-open/issues/1721)) ([db3cd0b](https://github.com/team-reflect/reflect-open/commit/db3cd0ba4e173e4d996c802f7d6ed8fd523c82bd))
+
+## [0.16.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.13...v0.16.0-beta.14) (2026-10-24)
+
+
+### Features
+
+* **mobile:** show the prerelease version on TestFlight builds ([#1711](https://github.com/team-reflect/reflect-open/issues/1711)) ([f55c692](https://github.com/team-reflect/reflect-open/commit/f55c692cf7d93baded86eb5c5218734e3d2eda68))
+
+
+### Bug Fixes
+
+* align leftover copy with the sync wording ([#1709](https://github.com/team-reflect/reflect-open/issues/1709)) ([cd3a093](https://github.com/team-reflect/reflect-open/commit/cd3a0936583494a80e723e366f0027ac6412fe43))
+* **desktop:** drop unhelpful Settings text ([#1713](https://github.com/team-reflect/reflect-open/issues/1713)) ([9877ae1](https://github.com/team-reflect/reflect-open/commit/9877ae1358afaf5044a279b07ea27f92bb49245a))
+
+## [0.16.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.12...v0.16.0-beta.13) (2026-10-24)
+
+
+### Features
+
+* connect a repository on any git host ([#1702](https://github.com/team-reflect/reflect-open/issues/1702)) ([636a2d5](https://github.com/team-reflect/reflect-open/commit/636a2d551179d3ba2016f0edfbef461008bcaeef))
+* **mobile:** support iPhone Duo safe areas ([#1704](https://github.com/team-reflect/reflect-open/issues/1704)) ([727552a](https://github.com/team-reflect/reflect-open/commit/727552a3b6393fa3ff6346cd2f8e6ec368a6f41e))
+
+## [0.16.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.11...v0.16.0-beta.12) (2026-10-23)
+
+
+### Features
+
+* classify remotes and resolve a sign-in per remote ([#1690](https://github.com/team-reflect/reflect-open/issues/1690)) ([25f07d3](https://github.com/team-reflect/reflect-open/commit/25f07d37e80f5839bfbe63d5190a01da63206bb6))
+* **desktop:** rebuild app icons as layered artwork ([#1699](https://github.com/team-reflect/reflect-open/issues/1699)) ([eb1e5ea](https://github.com/team-reflect/reflect-open/commit/eb1e5eaac0aa4c7f9aef99dc85a88b274113213f))
+
+
+### Bug Fixes
+
+* bind a stored sign-in to scheme, host and port ([#1691](https://github.com/team-reflect/reflect-open/issues/1691)) ([f28b9ef](https://github.com/team-reflect/reflect-open/commit/f28b9efe71eb02bbe1d762dd054dcaf31ad3c5c0))
+
+## [0.16.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.10...v0.16.0-beta.11) (2026-10-20)
+
+
+### Features
+
+* **desktop:** warn when the system web engine is too old ([#1682](https://github.com/team-reflect/reflect-open/issues/1682)) ([6a634f6](https://github.com/team-reflect/reflect-open/commit/6a634f6f87ba576ad844ba7e81888d9ea21ddf68))
+* probe a remote url and keep a sign-in on its own host ([#1688](https://github.com/team-reflect/reflect-open/issues/1688)) ([da542f2](https://github.com/team-reflect/reflect-open/commit/da542f27c9ba8f18210e09e2630e18fcc1975565))
+
+
+### Bug Fixes
+
+* **ios:** keep editor menus clear of the status bar ([#1686](https://github.com/team-reflect/reflect-open/issues/1686)) ([63ac7b1](https://github.com/team-reflect/reflect-open/commit/63ac7b1f9a19d6c5265eae2b8a555b1414f34054))
+* load on Safari before 16.4 ([#1681](https://github.com/team-reflect/reflect-open/issues/1681)) ([3281339](https://github.com/team-reflect/reflect-open/commit/3281339366e31a482276ee4d13df6f6046e5af34))
+* show the note title on fallback `[[` link addresses ([#1673](https://github.com/team-reflect/reflect-open/issues/1673)) ([0c787cc](https://github.com/team-reflect/reflect-open/commit/0c787ccfc63f02285d45f2389f88eb40bdc199e7))
+
+## [0.16.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.9...v0.16.0-beta.10) (2026-10-19)
+
+
+### Bug Fixes
+
+* trigger a release ([#1666](https://github.com/team-reflect/reflect-open/issues/1666)) ([f4d4b66](https://github.com/team-reflect/reflect-open/commit/f4d4b663fc2241d061202582439ee6305f46fdd5))
+
+## [0.16.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.8...v0.16.0-beta.9) (2026-10-19)
+
+
+### Bug Fixes
+
+* trigger a release ([#1655](https://github.com/team-reflect/reflect-open/issues/1655)) ([048b6d7](https://github.com/team-reflect/reflect-open/commit/048b6d7e2fcc553c3e039fda2520699e4c862ffb))
+
+## [0.16.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.7...v0.16.0-beta.8) (2026-10-18)
+
+
+### Features
+
+* **desktop:** add Liquid Glass app icons for iOS and macOS ([#1647](https://github.com/team-reflect/reflect-open/issues/1647)) ([2e14657](https://github.com/team-reflect/reflect-open/commit/2e14657ac3fd9bce3bf987ebd4d91f9128331a07))
+
+
+### Bug Fixes
+
+* **desktop:** drop the global reduced-motion override ([#1644](https://github.com/team-reflect/reflect-open/issues/1644)) ([f0d1216](https://github.com/team-reflect/reflect-open/commit/f0d121644af9b2a4affc6157f24910856a2aca94))
+
+## [0.16.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.6...v0.16.0-beta.7) (2026-10-18)
+
+
+### Features
+
+* show open source licenses in settings ([#1637](https://github.com/team-reflect/reflect-open/issues/1637)) ([7978f99](https://github.com/team-reflect/reflect-open/commit/7978f9945332d81fc44bd5c2897ab5a348ca3cae))
+
+
+### Bug Fixes
+
+* **core:** harden email field regexes ([#1617](https://github.com/team-reflect/reflect-open/issues/1617)) ([509b418](https://github.com/team-reflect/reflect-open/commit/509b418ac5e1541443e00699864f4cf31cf09c1e))
+* index headings with long runs of spaces without stalling ([#1580](https://github.com/team-reflect/reflect-open/issues/1580)) ([d6b39a1](https://github.com/team-reflect/reflect-open/commit/d6b39a12a0ed21f339e4ad1dbaecf299b92fa543))
+* show keyboard shortcut labels correctly when a key name matches a built-in object property ([#1573](https://github.com/team-reflect/reflect-open/issues/1573)) ([2412fd9](https://github.com/team-reflect/reflect-open/commit/2412fd9bda8576036164a241757765f1b1365bcc))
+
+## [0.16.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.5...v0.16.0-beta.6) (2026-10-17)
+
+
+### Bug Fixes
+
+* update meowdown ([#1564](https://github.com/team-reflect/reflect-open/issues/1564)) ([58e2854](https://github.com/team-reflect/reflect-open/commit/58e2854118686c1d1d8588b37bbfcc1a35f225e4))
+
+## [0.16.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.4...v0.16.0-beta.5) (2026-10-16)
+
+
+### Features
+
+* add experimental Linux support ([#1559](https://github.com/team-reflect/reflect-open/issues/1559)) ([ad827f7](https://github.com/team-reflect/reflect-open/commit/ad827f7f91e941f96602d95b6202f5528e3bb607))
+
+## [0.16.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.3...v0.16.0-beta.4) (2026-10-16)
+
+
+### Features
+
+* add automatic conflict resolution ([#1552](https://github.com/team-reflect/reflect-open/issues/1552)) ([16b0e06](https://github.com/team-reflect/reflect-open/commit/16b0e06e1b50f55cf95ab49302dd7223ef524c2c))
+* write logs to a file ([#1555](https://github.com/team-reflect/reflect-open/issues/1555)) ([cfa07c1](https://github.com/team-reflect/reflect-open/commit/cfa07c1b1dd6d64300e1073d5a8d68641426c244))
+
+
+### Bug Fixes
+
+* **capture:** repair placeholder capture link text in daily notes ([#1551](https://github.com/team-reflect/reflect-open/issues/1551)) ([e256c7b](https://github.com/team-reflect/reflect-open/commit/e256c7ba7eeba188c1a6b325dcac9f3c46e1516a))
+
+## [0.16.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.16.0-beta.2...v0.16.0-beta.3) (2026-10-16)
+
+
+### Bug Fixes
+
+* trigger a new release ([#1547](https://github.com/team-reflect/reflect-open/issues/1547)) ([b741d6d](https://github.com/team-reflect/reflect-open/commit/b741d6d073a85d3871c8f12801e71534d4b5f4a0))
+* trigger a release ([#1549](https://github.com/team-reflect/reflect-open/issues/1549)) ([b4237d2](https://github.com/team-reflect/reflect-open/commit/b4237d22c33e2b97b1da4142f65dce9329176625))
+
+## [0.16.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.15.0...v0.16.0-beta) (2026-10-13)
+
+
+### Features
+
+* renumber ordered lists ([#1542](https://github.com/team-reflect/reflect-open/issues/1542)) ([9243977](https://github.com/team-reflect/reflect-open/commit/9243977f42f3b183038ba6d6d8dd3437f9c460b8))
+
+## [0.15.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.8...v0.15.0-beta.9) (2026-10-12)
+
+
+### Features
+
+* **mobile:** add the date format setting ([#1532](https://github.com/team-reflect/reflect-open/issues/1532)) ([e1351f1](https://github.com/team-reflect/reflect-open/commit/e1351f1dc0a78195fc0e26594779dd150cd73050))
+* **mobile:** add the week start and time format settings ([#1533](https://github.com/team-reflect/reflect-open/issues/1533)) ([eb12782](https://github.com/team-reflect/reflect-open/commit/eb12782688b8bcec08125d27566b0616831f67fe))
+
+
+### Bug Fixes
+
+* follow the date format setting wherever a date is shown ([#1531](https://github.com/team-reflect/reflect-open/issues/1531)) ([5b2283a](https://github.com/team-reflect/reflect-open/commit/5b2283afaae59037450a3b262f46944b8e51063a))
+
+## [0.15.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.7...v0.15.0-beta.8) (2026-10-12)
+
+
+### Features
+
+* ship a universal macOS app ([#1529](https://github.com/team-reflect/reflect-open/issues/1529)) ([043fdcc](https://github.com/team-reflect/reflect-open/commit/043fdcc02a66a86d4f938895e224ef00c02923b1))
+
+
+### Bug Fixes
+
+* **embed:** run ONNX Runtime on two intra-op threads ([#1521](https://github.com/team-reflect/reflect-open/issues/1521)) ([50ead1b](https://github.com/team-reflect/reflect-open/commit/50ead1bd3a058ed73706580efe0746668b6c9d0a))
+* hide the Mac window before flushing changes ([#1425](https://github.com/team-reflect/reflect-open/issues/1425)) ([8443923](https://github.com/team-reflect/reflect-open/commit/8443923662ae52bd43c22f8a66ab8d78412e7123))
+* open relative Markdown links in backlink snippets and previews ([#1518](https://github.com/team-reflect/reflect-open/issues/1518)) ([01c9039](https://github.com/team-reflect/reflect-open/commit/01c90390f405f8a59ebb54b8f2b4f8ce73553f4b))
+* turn semantic search off on Intel Macs and update `fastembed` to 7.1.1 ([#1520](https://github.com/team-reflect/reflect-open/issues/1520)) ([adb4c4b](https://github.com/team-reflect/reflect-open/commit/adb4c4b52684edeb857413ed5060c909e2cf1a5d))
+* update meowdown ([#1510](https://github.com/team-reflect/reflect-open/issues/1510)) ([712e7e8](https://github.com/team-reflect/reflect-open/commit/712e7e8487dc45e191edd9cb9bd3c22848ac081d))
+
+## [0.15.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.6...v0.15.0-beta.7) (2026-10-09)
+
+
+### Bug Fixes
+
+* **tasks:** add a new `## Tasks` section above trailing blank lines ([#1512](https://github.com/team-reflect/reflect-open/issues/1512)) ([c87fee5](https://github.com/team-reflect/reflect-open/commit/c87fee59e832b1fe3b7f7ec9290369ff09711e66))
+
+## [0.15.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.5...v0.15.0-beta.6) (2026-10-09)
+
+
+### Features
+
+* **core:** expose a three-way text merge command ([#1453](https://github.com/team-reflect/reflect-open/issues/1453)) ([2d26cc5](https://github.com/team-reflect/reflect-open/commit/2d26cc5aaacc2a1643f219ee9053e27a8872690b))
+* **core:** store per-host git credentials in the keychain ([#1466](https://github.com/team-reflect/reflect-open/issues/1466)) ([43e13ba](https://github.com/team-reflect/reflect-open/commit/43e13ba3ca8a601fa87b4124114bbe1b5b3e4c28))
+* **editor:** delete a leading empty paragraph with Backspace in daily notes ([#1496](https://github.com/team-reflect/reflect-open/issues/1496)) ([26dcf39](https://github.com/team-reflect/reflect-open/commit/26dcf3932499c8556e6bd2ed17c8fc91ed8e56ae))
+* **tasks:** add new tasks under the note's Tasks heading ([#1494](https://github.com/team-reflect/reflect-open/issues/1494)) ([09bdec7](https://github.com/team-reflect/reflect-open/commit/09bdec7b6deca7af90402efca40ab9dcffdc6410))
+* **tasks:** show the headings above a task as its breadcrumb ([#1493](https://github.com/team-reflect/reflect-open/issues/1493)) ([aa4b8e0](https://github.com/team-reflect/reflect-open/commit/aa4b8e0c8a9b8c9437bd32a6497abfd9668c91cf))
+
+
+### Bug Fixes
+
+* **core:** route the quit-time commit through the sync engine ([#1467](https://github.com/team-reflect/reflect-open/issues/1467)) ([58c87ce](https://github.com/team-reflect/reflect-open/commit/58c87ce19a5251ddfbe2a770de43f4ca8033ea4b))
+* **core:** stop retrying the network per edit after an auth failure ([#1456](https://github.com/team-reflect/reflect-open/issues/1456)) ([5c97f0c](https://github.com/team-reflect/reflect-open/commit/5c97f0ce4398d00d7c41892ccc55f08e24a7adec))
+* **desktop:** tell a 403 from a bad token before asking to reconnect ([#1452](https://github.com/team-reflect/reflect-open/issues/1452)) ([1178359](https://github.com/team-reflect/reflect-open/commit/117835930eed09d3a48d1fbeca8398c237367441))
+* **git:** check out the tree before moving the branch on fast-forward ([#1468](https://github.com/team-reflect/reflect-open/issues/1468)) ([f95e4c2](https://github.com/team-reflect/reflect-open/commit/f95e4c2765186b5b9d2456f8110bb18c448f17e7))
+* **git:** untrack .reflect and withhold pre-staged oversized files ([#1470](https://github.com/team-reflect/reflect-open/issues/1470)) ([89c38e6](https://github.com/team-reflect/reflect-open/commit/89c38e6f537c3314f87425f7d1cf4b6384a8d9ff))
+* **tasks:** render and edit task text as one paragraph ([#1509](https://github.com/team-reflect/reflect-open/issues/1509)) ([99c9f2c](https://github.com/team-reflect/reflect-open/commit/99c9f2c6ddd473570562149468bd523985de0fde))
+* update meowdown ([#1491](https://github.com/team-reflect/reflect-open/issues/1491)) ([a678916](https://github.com/team-reflect/reflect-open/commit/a6789160fbcaebbe2ac3e130804bc64c432d1662))
+* update meowdown ([#1497](https://github.com/team-reflect/reflect-open/issues/1497)) ([6603556](https://github.com/team-reflect/reflect-open/commit/66035562beeff77084700d92e68a72b3f3ef767f))
+
+## [0.15.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.4...v0.15.0-beta.5) (2026-10-07)
+
+
+### Bug Fixes
+
+* **tasks:** keep a task edit when ⌘D opens its note before the write lands ([#1446](https://github.com/team-reflect/reflect-open/issues/1446)) ([cb50175](https://github.com/team-reflect/reflect-open/commit/cb501750026c6a42d98f9f0b9ec77a4dee42d30c))
+
+## [0.15.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.3...v0.15.0-beta.4) (2026-10-05)
+
+
+### Features
+
+* add experimental Windows arm64 support ([#1441](https://github.com/team-reflect/reflect-open/issues/1441)) ([d05acd9](https://github.com/team-reflect/reflect-open/commit/d05acd9cc22681ebc52b4b2456cddc2026480569))
+
+## [0.15.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.2...v0.15.0-beta.3) (2026-10-05)
+
+
+### Bug Fixes
+
+* **ios:** mention iPad in the paywall copy ([#1436](https://github.com/team-reflect/reflect-open/issues/1436)) ([3bb44e6](https://github.com/team-reflect/reflect-open/commit/3bb44e6ec34b59653f9c803d21a0781c835d98bf))
+
+## [0.15.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta.1...v0.15.0-beta.2) (2026-10-05)
+
+
+### Bug Fixes
+
+* update meowdown ([#1417](https://github.com/team-reflect/reflect-open/issues/1417)) ([b27f4b5](https://github.com/team-reflect/reflect-open/commit/b27f4b56f3deecbf4cc5150c0e602945ae94825c))
+
+## [0.15.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.15.0-beta...v0.15.0-beta.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* open the highlighted palette note in a new window with ⌘Enter ([#1420](https://github.com/team-reflect/reflect-open/issues/1420)) ([9355096](https://github.com/team-reflect/reflect-open/commit/935509666cab06d138a94235d6b52ad8ee490824))
+* open the selected All Notes row in a new window with ⌘Return ([#1421](https://github.com/team-reflect/reflect-open/issues/1421)) ([c1e1b2d](https://github.com/team-reflect/reflect-open/commit/c1e1b2d791ce83b6c25e5cf49ea3bf357c4820d9))
+* update meowdown ([#1415](https://github.com/team-reflect/reflect-open/issues/1415)) ([b8bb394](https://github.com/team-reflect/reflect-open/commit/b8bb394b3cd7682fb2a6d797f9ca1d661a44f524))
+
+## [0.15.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.14.0...v0.15.0-beta) (2026-10-01)
+
+
+### Features
+
+* support Claude Sonnet 5.5 and GPT-6.1 Sol ([#1403](https://github.com/team-reflect/reflect-open/issues/1403)) ([7e2e43d](https://github.com/team-reflect/reflect-open/commit/7e2e43d2e9659a0b9578185d4e54b1372d729677))
+
+
+### Bug Fixes
+
+* update meowdown ([#1383](https://github.com/team-reflect/reflect-open/issues/1383)) ([c828508](https://github.com/team-reflect/reflect-open/commit/c8285084d56880ee320e483ace62d419be559ba8))
+
+## [0.14.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta.2...v0.14.0-beta.3) (2026-09-29)
+
+
+### Features
+
+* **ios:** verify a Reflect Classic subscription to unlock the app ([#1395](https://github.com/team-reflect/reflect-open/issues/1395)) ([e66f8e0](https://github.com/team-reflect/reflect-open/commit/e66f8e07a1050cf8416d2931198a062da74931dc))
+
+
+### Bug Fixes
+
+* fix native menu item actions ([#1392](https://github.com/team-reflect/reflect-open/issues/1392)) ([fcbbb44](https://github.com/team-reflect/reflect-open/commit/fcbbb44535ca76d4b9a2a379a258d2344382f2f3))
+* make `Mod` mean ⌘ on Apple and Ctrl elsewhere ([#1385](https://github.com/team-reflect/reflect-open/issues/1385)) ([daf1fc1](https://github.com/team-reflect/reflect-open/commit/daf1fc1088115f02f771fd50a1064499fb8198de))
+* stop Tasks rows with links from growing taller than the editor ([#1384](https://github.com/team-reflect/reflect-open/issues/1384)) ([bf852a5](https://github.com/team-reflect/reflect-open/commit/bf852a5b2d35879638069ed8dfddea14ee2cb439))
+* switch graphs with ⌘1–⌘6 while a note is focused ([#1387](https://github.com/team-reflect/reflect-open/issues/1387)) ([e8254f0](https://github.com/team-reflect/reflect-open/commit/e8254f0a0c081d11a36d6e697c86a003ff4cabfa))
+
+## [0.14.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta.1...v0.14.0-beta.2) (2026-09-27)
+
+
+### Features
+
+* render images and Obsidian embeds ([#1370](https://github.com/team-reflect/reflect-open/issues/1370)) ([3c7b01f](https://github.com/team-reflect/reflect-open/commit/3c7b01faae0e03cc6742624c91c146df8a83da5f))
+* support Claude Opus 5.5 ([#1377](https://github.com/team-reflect/reflect-open/issues/1377)) ([f9371bf](https://github.com/team-reflect/reflect-open/commit/f9371bfaa9f3f38d0f545736f6b50a5e512c0d29))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.75.1 ([#1380](https://github.com/team-reflect/reflect-open/issues/1380)) ([63ab081](https://github.com/team-reflect/reflect-open/commit/63ab081be21439eeabfc0fd5258f1b5db60958ec))
+
+## [0.14.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.14.0-beta...v0.14.0-beta.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* play YouTube videos through our relay to avoid Error 153 ([#1358](https://github.com/team-reflect/reflect-open/issues/1358)) ([35f8a05](https://github.com/team-reflect/reflect-open/commit/35f8a052a77df7fd6cddfc63e18593606511cb5c))
+* tell apart same-title notes in the `[[` menu by their path ([#1367](https://github.com/team-reflect/reflect-open/issues/1367)) ([84e749b](https://github.com/team-reflect/reflect-open/commit/84e749b03c692ed0f870d85cc362c1a4a17d8a15))
+
+## [0.14.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.13.0...v0.14.0-beta) (2026-09-23)
+
+
+### Features
+
+* add GPT-6 Sol and Luna to the AI model catalog ([#1345](https://github.com/team-reflect/reflect-open/issues/1345)) ([a202263](https://github.com/team-reflect/reflect-open/commit/a2022636ed809c7287dfd1c95600913f9f2d4731))
+
+## [0.13.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.4...v0.13.0-beta.5) (2026-09-21)
+
+
+### Bug Fixes
+
+* **desktop:** open new-window requests in the browser ([#1342](https://github.com/team-reflect/reflect-open/issues/1342)) ([54446cd](https://github.com/team-reflect/reflect-open/commit/54446cd711aff306a01bf7e38cab34a554abce7d))
+
+## [0.13.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.3...v0.13.0-beta.4) (2026-09-21)
+
+
+### Bug Fixes
+
+* **desktop:** move the video lightbox close button to the right ([#1340](https://github.com/team-reflect/reflect-open/issues/1340)) ([cedca81](https://github.com/team-reflect/reflect-open/commit/cedca813a9d6a71d6bae9e194b2f18588fac0148))
+* load YouTube video cards through Rust ([#1339](https://github.com/team-reflect/reflect-open/issues/1339)) ([604b62a](https://github.com/team-reflect/reflect-open/commit/604b62a90cd33368b06dc5b4e10e760542dda931))
+
+## [0.13.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.2...v0.13.0-beta.3) (2026-09-21)
+
+
+### Features
+
+* **desktop:** open YouTube videos in the lightbox ([#1336](https://github.com/team-reflect/reflect-open/issues/1336)) ([cba57a9](https://github.com/team-reflect/reflect-open/commit/cba57a983d1f3e8c43a111c977f851707bf03814))
+
+
+### Bug Fixes
+
+* load a pasted X post that has no saved archive ([#1335](https://github.com/team-reflect/reflect-open/issues/1335)) ([8af56c4](https://github.com/team-reflect/reflect-open/commit/8af56c40e07db19471c46f40c2b33700c1d7f2a1))
+
+## [0.13.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta.1...v0.13.0-beta.2) (2026-09-21)
+
+
+### Features
+
+* **desktop:** open X post photos and videos in the lightbox ([#1323](https://github.com/team-reflect/reflect-open/issues/1323)) ([b2dd673](https://github.com/team-reflect/reflect-open/commit/b2dd673da5571cfa2a9cc4057f7de73f89b0d153))
+
+
+### Bug Fixes
+
+* rank backlink suggestions by link count ([#1317](https://github.com/team-reflect/reflect-open/issues/1317)) ([6dc575f](https://github.com/team-reflect/reflect-open/commit/6dc575f23558a5d9160851c0b2c9cf4723b6f576))
+* rank word-start matches higher for autocomplete ([#1318](https://github.com/team-reflect/reflect-open/issues/1318)) ([0bc1969](https://github.com/team-reflect/reflect-open/commit/0bc1969b1b722919c047f6527e9d609fab83bcaf))
+
+## [0.13.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.13.0-beta...v0.13.0-beta.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* keep open-in-new-window from navigating other note windows ([#1311](https://github.com/team-reflect/reflect-open/issues/1311)) ([d564d80](https://github.com/team-reflect/reflect-open/commit/d564d80f121885db16c13376bd78cf1de633e65a))
+* keep the blank line after frontmatter out of the note body ([#1303](https://github.com/team-reflect/reflect-open/issues/1303)) ([442bac0](https://github.com/team-reflect/reflect-open/commit/442bac09737b7863376fa3a75d7c610d66bea6cc))
+* **mobile:** keep incoming backlinks on screen below a short note ([#1312](https://github.com/team-reflect/reflect-open/issues/1312)) ([e0ea126](https://github.com/team-reflect/reflect-open/commit/e0ea126839ea53808412d75d1be8ecba3c6b36a6))
+* update meowdown ([#1298](https://github.com/team-reflect/reflect-open/issues/1298)) ([a585000](https://github.com/team-reflect/reflect-open/commit/a5850002797c647b100bc96562141dba29f6e1fd))
+
+## [0.13.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.12.0...v0.13.0-beta) (2026-09-17)
+
+
+### Features
+
+* preload X posts before mounting the note editor ([#1297](https://github.com/team-reflect/reflect-open/issues/1297)) ([2fdac9a](https://github.com/team-reflect/reflect-open/commit/2fdac9a87d9bfdb9c2e2da564f10caa28dc4594b))
+* save liked X posts to daily notes ([#1288](https://github.com/team-reflect/reflect-open/issues/1288)) ([0bcf272](https://github.com/team-reflect/reflect-open/commit/0bcf2724b9239b9e2a21df5e09116999fc12de00))
+
+## [0.12.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.7...v0.12.0-beta.8) (2026-09-16)
+
+
+### Features
+
+* **mobile:** add in-app offer code redemption ([#1294](https://github.com/team-reflect/reflect-open/issues/1294)) ([26c8732](https://github.com/team-reflect/reflect-open/commit/26c87322fe9d0772cd2b86822008eff21f256465))
+
+## [0.12.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.6...v0.12.0-beta.7) (2026-09-16)
+
+
+### Bug Fixes
+
+* **mobile:** give StoreKit entitlement lookups 15 s and one retry ([#1293](https://github.com/team-reflect/reflect-open/issues/1293)) ([ae04441](https://github.com/team-reflect/reflect-open/commit/ae044410f720fd44a951c8499fc3e32c07b33fc9))
+* **mobile:** sync with the App Store before reading entitlements on restore ([#1292](https://github.com/team-reflect/reflect-open/issues/1292)) ([33db791](https://github.com/team-reflect/reflect-open/commit/33db791ab389f698fa4cb73c52e35d254f43e7e6))
+* update meowdown to ^0.71.2 ([#1275](https://github.com/team-reflect/reflect-open/issues/1275)) ([b00a870](https://github.com/team-reflect/reflect-open/commit/b00a8703a3260015ed6e733e343e4f72df0b63e4))
+* update post-embed and meowdown ([#1289](https://github.com/team-reflect/reflect-open/issues/1289)) ([5e7b4cc](https://github.com/team-reflect/reflect-open/commit/5e7b4ccf9422cfc2ddc523eeb72ec13550a4ae7b))
+
+## [0.12.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.5...v0.12.0-beta.6) (2026-09-14)
+
+
+### Features
+
+* **extension:** move the X bookmark switch to an options page ([#1285](https://github.com/team-reflect/reflect-open/issues/1285)) ([f19b134](https://github.com/team-reflect/reflect-open/commit/f19b1341c6b6d15d5b08611eea8b9327eb7fb006))
+* save X posts and media for offline reading ([#1284](https://github.com/team-reflect/reflect-open/issues/1284)) ([b72a93c](https://github.com/team-reflect/reflect-open/commit/b72a93cb153ed00362f0efe9f811ee9147da1e43))
+
+
+### Bug Fixes
+
+* **mobile:** avoid loading flashes on first tab switch ([#1271](https://github.com/team-reflect/reflect-open/issues/1271)) ([0dfe0b1](https://github.com/team-reflect/reflect-open/commit/0dfe0b15899c033e801b883c5c782b464d6703f4))
+* update meowdown to ^0.70.0 ([#1273](https://github.com/team-reflect/reflect-open/issues/1273)) ([11ffb9d](https://github.com/team-reflect/reflect-open/commit/11ffb9d8f627a6f42d04a4aefa83c1cb92908c79))
+
+## [0.12.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.4...v0.12.0-beta.5) (2026-09-12)
+
+
+### Features
+
+* add transcription helper text for audio memos ([#1264](https://github.com/team-reflect/reflect-open/issues/1264)) ([d2d8cd5](https://github.com/team-reflect/reflect-open/commit/d2d8cd53e28880fa1a5500c0817d091afd7afe76))
+* save X bookmark links directly to daily notes ([#1253](https://github.com/team-reflect/reflect-open/issues/1253)) ([4cf833c](https://github.com/team-reflect/reflect-open/commit/4cf833cbbd88507d667ee4ba665df718e3c7677c))
+
+
+### Bug Fixes
+
+* render chat replies as markdown while streaming ([#1259](https://github.com/team-reflect/reflect-open/issues/1259)) ([1181f0e](https://github.com/team-reflect/reflect-open/commit/1181f0eb38c916d2c86d6184402bbb46d59393e9))
+* update meowdown to ^0.68.3 ([#1262](https://github.com/team-reflect/reflect-open/issues/1262)) ([27b45fe](https://github.com/team-reflect/reflect-open/commit/27b45fef4735bb7e80f3aa775f9a77bf3d03b2f3))
+* update meowdown to ^0.69.0 ([#1267](https://github.com/team-reflect/reflect-open/issues/1267)) ([c054879](https://github.com/team-reflect/reflect-open/commit/c05487918d7941c860fa1dcd3adb3faef4210282))
+
+## [0.12.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.3...v0.12.0-beta.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* show preferences shortcut in graph menu ([#1257](https://github.com/team-reflect/reflect-open/issues/1257)) ([49da07d](https://github.com/team-reflect/reflect-open/commit/49da07da284747b577b4e8b9540defc73e3607e3))
+* update mobile search header styles ([#1261](https://github.com/team-reflect/reflect-open/issues/1261)) ([fbc4862](https://github.com/team-reflect/reflect-open/commit/fbc48621192c6c6c21a1806ad7542bff0051a311))
+
+## [0.12.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.2...v0.12.0-beta.3) (2026-09-09)
+
+
+### Bug Fixes
+
+* **mobile:** align the All and Tasks search bars ([#1254](https://github.com/team-reflect/reflect-open/issues/1254)) ([a52848d](https://github.com/team-reflect/reflect-open/commit/a52848d219c4ca5b719fc93a0e88a33043c99afd))
+* number pinned notes with gaps ([#1247](https://github.com/team-reflect/reflect-open/issues/1247)) ([d6aefc6](https://github.com/team-reflect/reflect-open/commit/d6aefc6f81df848d35eb59c59e9de25f19d9f83c))
+
+## [0.12.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta.1...v0.12.0-beta.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* **mobile:** recognize a sandbox install when the app transaction is unavailable ([#1249](https://github.com/team-reflect/reflect-open/issues/1249)) ([2e584d0](https://github.com/team-reflect/reflect-open/commit/2e584d0d6b7c88853cb0fa52e50f55183c33d1e7))
+* **mobile:** stop a failed StoreKit probe from reading as an App Store install ([#1248](https://github.com/team-reflect/reflect-open/issues/1248)) ([ee4eff5](https://github.com/team-reflect/reflect-open/commit/ee4eff58e396a066b6904384a1a0df91fa12c205))
+
+## [0.12.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.12.0-beta...v0.12.0-beta.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* load desktop and mobile secondary screens on demand ([#1235](https://github.com/team-reflect/reflect-open/issues/1235)) ([4a8ec26](https://github.com/team-reflect/reflect-open/commit/4a8ec2616db0e6daff366bb34228bc27d2e87a0d))
+* show pin and privacy changes immediately ([#1245](https://github.com/team-reflect/reflect-open/issues/1245)) ([4bb745c](https://github.com/team-reflect/reflect-open/commit/4bb745c7534284502def2bfe8bd955b0fd06430f))
+
+## [0.12.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.11.0...v0.12.0-beta) (2026-09-07)
+
+
+### Features
+
+* change graph colors from each graph menu row ([#1234](https://github.com/team-reflect/reflect-open/issues/1234)) ([8cbc3bb](https://github.com/team-reflect/reflect-open/commit/8cbc3bbd8e21b5f86a2f1db5d6b7988d980d5695))
+
+
+### Bug Fixes
+
+* load the AI SDK and provider packages on demand ([#1230](https://github.com/team-reflect/reflect-open/issues/1230)) ([7013ce0](https://github.com/team-reflect/reflect-open/commit/7013ce0d1bffa2dd15c0a658ac512549a337b702))
+
+## [0.11.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.16...v0.11.0-beta.17) (2026-09-07)
+
+
+### Features
+
+* **mobile:** remove the paywall snooze ([#1226](https://github.com/team-reflect/reflect-open/issues/1226)) ([bff2474](https://github.com/team-reflect/reflect-open/commit/bff2474bfc6b3aacd5bf5613e139e2a89f439aa9))
+
+
+### Bug Fixes
+
+* make graph menu rows consistent and separate Preferences ([#1224](https://github.com/team-reflect/reflect-open/issues/1224)) ([740b5d6](https://github.com/team-reflect/reflect-open/commit/740b5d6393a572fbc6bbe61f10d8644c91346355))
+* track whether a note has content ([#1227](https://github.com/team-reflect/reflect-open/issues/1227)) ([d358f91](https://github.com/team-reflect/reflect-open/commit/d358f9142c98a1dd0170e383d79542a2cc7010d1))
+
+## [0.11.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.15...v0.11.0-beta.16) (2026-09-06)
+
+
+### Features
+
+* discover Reflect apps from the graph menu ([#1221](https://github.com/team-reflect/reflect-open/issues/1221)) ([c67bb29](https://github.com/team-reflect/reflect-open/commit/c67bb299ebd1290551f9fd8e71ccbabfa48f54aa))
+* open Reflect Academy from the graph menu ([#1222](https://github.com/team-reflect/reflect-open/issues/1222)) ([0997d4e](https://github.com/team-reflect/reflect-open/commit/0997d4edda8cfdfd439eb5dbf0874a8c6addba19))
+
+## [0.11.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.14...v0.11.0-beta.15) (2026-09-06)
+
+
+### Features
+
+* add `gemini-pro-latest` and `gemini-flash-latest` models ([#1219](https://github.com/team-reflect/reflect-open/issues/1219)) ([827f489](https://github.com/team-reflect/reflect-open/commit/827f489ce024da77d40ab7760a69b3e4c4c5f108))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.68.1 ([#1197](https://github.com/team-reflect/reflect-open/issues/1197)) ([81b6f04](https://github.com/team-reflect/reflect-open/commit/81b6f04c0b15dc1380539de5b065412c64d9bfff))
+
+## [0.11.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.13...v0.11.0-beta.14) (2026-09-04)
+
+
+### Features
+
+* add GPT-6 Astra support ([#1213](https://github.com/team-reflect/reflect-open/issues/1213)) ([e051828](https://github.com/team-reflect/reflect-open/commit/e0518283d2c48166c788b80a72efad76865279d1))
+
+
+### Bug Fixes
+
+* make list hover feedback instant ([#1211](https://github.com/team-reflect/reflect-open/issues/1211)) ([87e01ba](https://github.com/team-reflect/reflect-open/commit/87e01bacde6a4178e9aa5e6ed747790f0429a7d0))
+
+## [0.11.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.12...v0.11.0-beta.13) (2026-09-03)
+
+
+### Bug Fixes
+
+* improve iOS note deletion ([#1192](https://github.com/team-reflect/reflect-open/issues/1192)) ([0c9d2eb](https://github.com/team-reflect/reflect-open/commit/0c9d2eb173ec8522bf8e9b2a9b4263c2fbad6436))
+* **mobile:** load notes before subscription checks finish ([#1199](https://github.com/team-reflect/reflect-open/issues/1199)) ([113e171](https://github.com/team-reflect/reflect-open/commit/113e171d7456dfe82ce4d5d2c559fbbce4fd7da2))
+* stop the iCloud metadata query from pinning fileproviderd on macOS ([#1208](https://github.com/team-reflect/reflect-open/issues/1208)) ([1fcc0b3](https://github.com/team-reflect/reflect-open/commit/1fcc0b3df9bbd83f9afe578db6aec629e84674ba))
+
+## [0.11.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.11...v0.11.0-beta.12) (2026-09-02)
+
+
+### Features
+
+* add Gemini 3.8 Flash support ([#1203](https://github.com/team-reflect/reflect-open/issues/1203)) ([5dd39d3](https://github.com/team-reflect/reflect-open/commit/5dd39d333a2980a99c0948183774bf91ffc39a8a))
+
+## [0.11.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.10...v0.11.0-beta.11) (2026-09-02)
+
+
+### Bug Fixes
+
+* build the macOS DMG as a writable image before compressing it ([#1201](https://github.com/team-reflect/reflect-open/issues/1201)) ([e5710a2](https://github.com/team-reflect/reflect-open/commit/e5710a2fb1657eea778e07a2ac4b893e51b9ff51))
+
+## [0.11.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.9...v0.11.0-beta.10) (2026-09-02)
+
+
+### Features
+
+* add Claude Fable 5.1 support ([#1193](https://github.com/team-reflect/reflect-open/issues/1193)) ([9710a1d](https://github.com/team-reflect/reflect-open/commit/9710a1d23709645876a8649a40c474b6d588cb29))
+* show `//` subject titles by their first segment ([#1196](https://github.com/team-reflect/reflect-open/issues/1196)) ([c3fc643](https://github.com/team-reflect/reflect-open/commit/c3fc6431bce7d410ba94a006cb0278390a03f8cb))
+
+## [0.11.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.8...v0.11.0-beta.9) (2026-08-31)
+
+
+### Features
+
+* add collapsible iOS capture menu ([#1190](https://github.com/team-reflect/reflect-open/issues/1190)) ([b7247bd](https://github.com/team-reflect/reflect-open/commit/b7247bd0c9ab21547683d8975a3ef2f0488f7bc5))
+
+## [0.11.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.7...v0.11.0-beta.8) (2026-08-30)
+
+
+### Bug Fixes
+
+* update meowdown to ^0.67.2 ([#1186](https://github.com/team-reflect/reflect-open/issues/1186)) ([38d379d](https://github.com/team-reflect/reflect-open/commit/38d379dd16d28d630e400c9fe94b29ea754c2394))
+
+## [0.11.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.6...v0.11.0-beta.7) (2026-08-30)
+
+
+### Features
+
+* preview and edit web links in notes ([#1165](https://github.com/team-reflect/reflect-open/issues/1165)) ([d1f8bd8](https://github.com/team-reflect/reflect-open/commit/d1f8bd88b7b1033b9cd13939f532f6a3b3537c33))
+
+
+### Bug Fixes
+
+* align the selected item with its trigger ([#1178](https://github.com/team-reflect/reflect-open/issues/1178)) ([5e8e9ec](https://github.com/team-reflect/reflect-open/commit/5e8e9ec9b55a4cb0d589f98cb5a01ff47a7e7a00))
+* update meowdown to ^0.67.0 ([#1181](https://github.com/team-reflect/reflect-open/issues/1181)) ([4593576](https://github.com/team-reflect/reflect-open/commit/45935761859c343f810647f61d9f9160732e6c3e))
+* update meowdown to ^0.67.1 ([#1183](https://github.com/team-reflect/reflect-open/issues/1183)) ([8cf562e](https://github.com/team-reflect/reflect-open/commit/8cf562e12d5fd0e9c83bfb932e64c2d361c65ed1))
+
+## [0.11.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.5...v0.11.0-beta.6) (2026-08-26)
+
+
+### Features
+
+* record audio memos without a duration cap ([#1167](https://github.com/team-reflect/reflect-open/issues/1167)) ([ddabded](https://github.com/team-reflect/reflect-open/commit/ddabded1713b08199d9b0472cde5cc2d5feeccc9))
+
+
+### Bug Fixes
+
+* reset the "New template" dialog when it closes ([#1168](https://github.com/team-reflect/reflect-open/issues/1168)) ([11103ee](https://github.com/team-reflect/reflect-open/commit/11103ee949578a3e388eae63c1becc316a7c508e))
+
+## [0.11.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.4...v0.11.0-beta.5) (2026-08-22)
+
+
+### Bug Fixes
+
+* show active pinned notes in dark mode ([#1162](https://github.com/team-reflect/reflect-open/issues/1162)) ([cf10cd5](https://github.com/team-reflect/reflect-open/commit/cf10cd56ef95d443f984ab2ba50974784f722f9b))
+
+## [0.11.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.3...v0.11.0-beta.4) (2026-08-21)
+
+
+### Bug Fixes
+
+* update meowdown to ^0.66.0 ([#1159](https://github.com/team-reflect/reflect-open/issues/1159)) ([0841eb4](https://github.com/team-reflect/reflect-open/commit/0841eb45147610dd02a914b2e32a1664975ca9b0))
+
+## [0.11.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.2...v0.11.0-beta.3) (2026-08-20)
+
+
+### Features
+
+* **mobile:** show the paywall only on App Store installs ([#1147](https://github.com/team-reflect/reflect-open/issues/1147)) ([a705ddc](https://github.com/team-reflect/reflect-open/commit/a705ddc430ce99ed4b1f5e7574e87f4aec6bc518))
+
+
+### Bug Fixes
+
+* **desktop:** add a minimum size to the main window ([#1153](https://github.com/team-reflect/reflect-open/issues/1153)) ([d8cd866](https://github.com/team-reflect/reflect-open/commit/d8cd8664d95dba162f07a7c02e267c8f09488975))
+
+## [0.11.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta.1...v0.11.0-beta.2) (2026-08-20)
+
+
+### Bug Fixes
+
+* fix TestFlight CI build ([#1144](https://github.com/team-reflect/reflect-open/issues/1144)) ([1fa7391](https://github.com/team-reflect/reflect-open/commit/1fa73918710b07093e6e19415dee80fafebcf172))
+
+## [0.11.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.11.0-beta...v0.11.0-beta.1) (2026-08-19)
+
+
+### Features
+
+* **mobile:** display App Store environment ([#1111](https://github.com/team-reflect/reflect-open/issues/1111)) ([c682e64](https://github.com/team-reflect/reflect-open/commit/c682e64385234c9bf674c8e17aef8124487e5e0d))
+* show a recovery screen when the UI crashes ([#1134](https://github.com/team-reflect/reflect-open/issues/1134)) ([8d76323](https://github.com/team-reflect/reflect-open/commit/8d76323f063d3b1edccf1123ffa7ec227150ee58))
+
+
+### Bug Fixes
+
+* fix `Insert template…` crash ([#1133](https://github.com/team-reflect/reflect-open/issues/1133)) ([3f88a5a](https://github.com/team-reflect/reflect-open/commit/3f88a5a5ad993d648f79af9839d70586c7079a90))
+* reload open note sessions after each index reconcile ([#1141](https://github.com/team-reflect/reflect-open/issues/1141)) ([8e7ada8](https://github.com/team-reflect/reflect-open/commit/8e7ada8ee2e10e52f69bb3ef81614f646e9b4717))
+
+## [0.11.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.10.0...v0.11.0-beta) (2026-08-19)
+
+
+### Features
+
+* add swipe actions to iOS task list ([#1129](https://github.com/team-reflect/reflect-open/issues/1129)) ([7c7415e](https://github.com/team-reflect/reflect-open/commit/7c7415e3521196d83c80763f8c95891d3d94222f))
+
+## [0.10.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.4...v0.10.0-beta.5) (2026-08-17)
+
+
+### Features
+
+* add lock note to the iOS note actions drawer ([#1125](https://github.com/team-reflect/reflect-open/issues/1125)) ([1c73011](https://github.com/team-reflect/reflect-open/commit/1c730115fa8118e86323fe5c248ec8ee8afc3131))
+* add swipe actions to iOS note list ([#1117](https://github.com/team-reflect/reflect-open/issues/1117)) ([dceda15](https://github.com/team-reflect/reflect-open/commit/dceda15376d1abd05cf091a00f62bcd702811df6))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.65.6 ([#1127](https://github.com/team-reflect/reflect-open/issues/1127)) ([862e853](https://github.com/team-reflect/reflect-open/commit/862e85322f261a4d4b39ec20041aadd32dbfa8cb))
+
+## [0.10.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.3...v0.10.0-beta.4) (2026-08-16)
+
+
+### Bug Fixes
+
+* **mobile:** keep drawer fields above the software keyboard ([#1122](https://github.com/team-reflect/reflect-open/issues/1122)) ([17f6cd5](https://github.com/team-reflect/reflect-open/commit/17f6cd5caacbeaeda9007d54d943e6e73c8d9269))
+
+## [0.10.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.10.0-beta.2...v0.10.0-beta.3) (2026-08-16)
+
+
+### Features
+
+* refresh the AI model catalog ([#1121](https://github.com/team-reflect/reflect-open/issues/1121)) ([f090b67](https://github.com/team-reflect/reflect-open/commit/f090b67329edcc8627bdc3270a510b4a714cefc4))
+
+## [0.10.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.2...v0.10.0-beta.2) (2026-08-16)
+
+
+### Features
+
+* quick notes from Siri and Shortcuts on iOS ([#1096](https://github.com/team-reflect/reflect-open/issues/1096)) ([bb73c12](https://github.com/team-reflect/reflect-open/commit/bb73c1250d62ea777663fdffa591d46d363b2705))
+
+
+### Bug Fixes
+
+* allow Saturday as the first day of the week ([#1118](https://github.com/team-reflect/reflect-open/issues/1118)) ([b35bdc9](https://github.com/team-reflect/reflect-open/commit/b35bdc9311499703cffdbb08be0c790463c0c092))
+* update meowdown to ^0.65.5 ([#1120](https://github.com/team-reflect/reflect-open/issues/1120)) ([0f72613](https://github.com/team-reflect/reflect-open/commit/0f72613bb201baa1aac32cb0618296d07f5c3252))
+
+## [0.9.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta.1...v0.9.1-beta.2) (2026-08-16)
+
+
+### Bug Fixes
+
+* match partial queries across note titles and content ([#1093](https://github.com/team-reflect/reflect-open/issues/1093)) ([7716e75](https://github.com/team-reflect/reflect-open/commit/7716e7505ce9456d6b6659ce4364d9ec6452dfc1))
+* update meowdown to ^0.65.4 ([#1107](https://github.com/team-reflect/reflect-open/issues/1107)) ([692dc81](https://github.com/team-reflect/reflect-open/commit/692dc8170cc839c5a92464af288271f722fd0af0))
+
+## [0.9.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.9.1-beta...v0.9.1-beta.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* keep conflicted notes protected ([#1108](https://github.com/team-reflect/reflect-open/issues/1108)) ([92118b7](https://github.com/team-reflect/reflect-open/commit/92118b7163f440bb67c8c19974b90b4538aa6534))
+* make the `sk-demo` review key cover AI chat and prompts ([#1109](https://github.com/team-reflect/reflect-open/issues/1109)) ([baa7a93](https://github.com/team-reflect/reflect-open/commit/baa7a93f978af185f90deeae5dc6407afa3465d9))
+* **mobile:** raise the minimum iOS version to 16 ([#1110](https://github.com/team-reflect/reflect-open/issues/1110)) ([7dd695a](https://github.com/team-reflect/reflect-open/commit/7dd695a5ec8e96c904cade27ff20ab97ce4f20ff))
+* update meowdown to ^0.65.2 ([#1102](https://github.com/team-reflect/reflect-open/issues/1102)) ([4f495e2](https://github.com/team-reflect/reflect-open/commit/4f495e264c553e87f5fb3e11ea62b711faf6fe3b))
+
+## [0.9.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.9.0...v0.9.1-beta) (2026-08-12)
+
+
+### Bug Fixes
+
+* **mobile:** add member paywall button ([#1097](https://github.com/team-reflect/reflect-open/issues/1097)) ([f7aa0a6](https://github.com/team-reflect/reflect-open/commit/f7aa0a67d59375cd52b822ee62f73d60fc6399e8))
+
+## [0.9.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.7...v0.9.0-beta.8) (2026-08-10)
+
+
+### Bug Fixes
+
+* pick up iCloud note changes that arrive while the Mac sleeps ([#1076](https://github.com/team-reflect/reflect-open/issues/1076)) ([0bc7f6a](https://github.com/team-reflect/reflect-open/commit/0bc7f6a38cc2564def66b8d5e6adba97045634fa))
+* pick up Mac note edits after the iOS app returns from background ([#1084](https://github.com/team-reflect/reflect-open/issues/1084)) ([a3d4b5a](https://github.com/team-reflect/reflect-open/commit/a3d4b5a761819164cc8d4c0e18865bb1049e8b84))
+* update meowdown to ^0.65.1 ([#1078](https://github.com/team-reflect/reflect-open/issues/1078)) ([d09409b](https://github.com/team-reflect/reflect-open/commit/d09409b6eed14a793ddcaacf0312c7821f02590d))
+
+## [0.9.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.6...v0.9.0-beta.7) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ios:** fix TestFlight archive re-signing ([#1090](https://github.com/team-reflect/reflect-open/issues/1090)) ([e04046f](https://github.com/team-reflect/reflect-open/commit/e04046feab47663e06646a865a675a066e44b050))
+
+## [0.9.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.5...v0.9.0-beta.6) (2026-08-10)
+
+
+### Features
+
+* **mobile:** add iOS subscription ([#1086](https://github.com/team-reflect/reflect-open/issues/1086)) ([3e8a8df](https://github.com/team-reflect/reflect-open/commit/3e8a8dfabe4190d8856631dbb0125e08774ab3c4))
+
+
+### Bug Fixes
+
+* capture titles and descriptions from oversized pages ([#1081](https://github.com/team-reflect/reflect-open/issues/1081)) ([1d48916](https://github.com/team-reflect/reflect-open/commit/1d48916fd9279bf69ee5f13450d89707ffb4cba5))
+* capture YouTube video titles via oEmbed ([#1087](https://github.com/team-reflect/reflect-open/issues/1087)) ([c0031ae](https://github.com/team-reflect/reflect-open/commit/c0031aebb65854a8e2c14f3c0da281b4ad51e10b))
+* stop AI enrichment from inventing titles for captured links ([#1085](https://github.com/team-reflect/reflect-open/issues/1085)) ([5fb921e](https://github.com/team-reflect/reflect-open/commit/5fb921ed0d03e26d74dd4b6a9a18a41c8786d371))
+
+## [0.9.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.9.0-beta.4...v0.9.0-beta.5) (2026-08-09)
+
+
+### Bug Fixes
+
+* press `Mod-Enter` on a selected backlink opens it in a new window ([#1071](https://github.com/team-reflect/reflect-open/issues/1071)) ([42e4cf6](https://github.com/team-reflect/reflect-open/commit/42e4cf641ff7c8be5918c853da959ba61961d559))
+
+## [0.9.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.4...v0.9.0-beta.4) (2026-08-09)
+
+
+### Features
+
+* add "Copy note path" keyboard shortcut ([#1069](https://github.com/team-reflect/reflect-open/issues/1069)) ([fec1851](https://github.com/team-reflect/reflect-open/commit/fec18517886d735ebdf81a7a26265e4674d6fb2d))
+
+## [0.8.1-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.3...v0.8.1-beta.4) (2026-08-07)
+
+
+### Bug Fixes
+
+* reveal chat copy action on response hover ([#1061](https://github.com/team-reflect/reflect-open/issues/1061)) ([b00d23d](https://github.com/team-reflect/reflect-open/commit/b00d23d8bf9bc9648ca1a23e4f5320d9ce9c2938))
+
+## [0.8.1-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.2...v0.8.1-beta.3) (2026-08-06)
+
+
+### Bug Fixes
+
+* **ios:** stop `nm` dSYM output from overflowing `execFileSync` maxBuffer ([#1053](https://github.com/team-reflect/reflect-open/issues/1053)) ([b6905f3](https://github.com/team-reflect/reflect-open/commit/b6905f35a686f01314882f11e70091cef4e6f685))
+* resolve wiki links whose titles contain `:` or `/` ([#1039](https://github.com/team-reflect/reflect-open/issues/1039)) ([db7d843](https://github.com/team-reflect/reflect-open/commit/db7d843dc9cd0394f1306f70683ee73b85feaeda))
+
+## [0.8.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.1...v0.8.1-beta.2) (2026-08-06)
+
+
+### Bug Fixes
+
+* **ios:** check the native diagnostics entry point in the dSYM ([#1045](https://github.com/team-reflect/reflect-open/issues/1045)) ([8ddb4b0](https://github.com/team-reflect/reflect-open/commit/8ddb4b04fcbaab12f184c1761431851f5dc02d30))
+
+## [0.8.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta...v0.8.1-beta.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **mobile:** create and edit AI prompts in Settings ([#1035](https://github.com/team-reflect/reflect-open/issues/1035)) ([f273114](https://github.com/team-reflect/reflect-open/commit/f273114e2ae0660c0fe9f88079f076d2768434b8))
+* open any attachment file type from its pill ([#1040](https://github.com/team-reflect/reflect-open/issues/1040)) ([dcafc0c](https://github.com/team-reflect/reflect-open/commit/dcafc0cbbf57d3d22b4757d06c738b008dfab83b))
+* update meowdown to ^0.64.2 ([#1037](https://github.com/team-reflect/reflect-open/issues/1037)) ([6b0949c](https://github.com/team-reflect/reflect-open/commit/6b0949c1f0530e9d7dad69632d2f4bf0068495a4))
+* update meowdown to ^0.64.3 ([#1042](https://github.com/team-reflect/reflect-open/issues/1042)) ([91fd16e](https://github.com/team-reflect/reflect-open/commit/91fd16edd50e6150155095a54daea262d8c3cd8f))
+
+## [0.8.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.8.0...v0.8.1-beta) (2026-08-05)
+
+
+### Bug Fixes
+
+* **desktop:** resync today's date after system sleep ([#1032](https://github.com/team-reflect/reflect-open/issues/1032)) ([366b4cd](https://github.com/team-reflect/reflect-open/commit/366b4cd17e1fa9ac200757caf371ba326fa57419))
+
+## [0.8.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.7...v0.8.0-beta.8) (2026-08-04)
+
+
+### Bug Fixes
+
+* update meowdown to ^0.64.1 ([#1030](https://github.com/team-reflect/reflect-open/issues/1030)) ([4f9af9a](https://github.com/team-reflect/reflect-open/commit/4f9af9a6bb1ee81f37486610089568a5b83a9205))
+
+## [0.8.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.6...v0.8.0-beta.7) (2026-08-03)
+
+
+### Features
+
+* copy an AI chat reply to the clipboard ([#1016](https://github.com/team-reflect/reflect-open/issues/1016)) ([83c4d84](https://github.com/team-reflect/reflect-open/commit/83c4d84a08bb27c0ee3958ec6dd56977a54fa7e3))
+
+
+### Bug Fixes
+
+* **desktop:** eliminate white flash on window startup ([#882](https://github.com/team-reflect/reflect-open/issues/882)) ([e83cd86](https://github.com/team-reflect/reflect-open/commit/e83cd86a62179212dc2c30a1c5f210e8131c00f7))
+* update meowdown to ^0.64.0 ([#1027](https://github.com/team-reflect/reflect-open/issues/1027)) ([45a3b39](https://github.com/team-reflect/reflect-open/commit/45a3b39203dc6e99c22da186d294c804909d3f9e))
+
+## [0.8.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.5...v0.8.0-beta.6) (2026-08-01)
+
+
+### Bug Fixes
+
+* **ios:** switch Sentry to the dynamic SPM product so TestFlight uploads pass ([#1018](https://github.com/team-reflect/reflect-open/issues/1018)) ([4658424](https://github.com/team-reflect/reflect-open/commit/4658424437255750df9dff34d4d8bd564851fa31))
+
+## [0.8.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.4...v0.8.0-beta.5) (2026-08-01)
+
+
+### Bug Fixes
+
+* compute "Similar notes" once per note per session instead of on every index change ([#1017](https://github.com/team-reflect/reflect-open/issues/1017)) ([a433408](https://github.com/team-reflect/reflect-open/commit/a4334089c4cc00e6d4217e882d87d6bfe04ab73c))
+* cut iCloud sync's battery cost on large graphs ([#963](https://github.com/team-reflect/reflect-open/issues/963)) ([a81deef](https://github.com/team-reflect/reflect-open/commit/a81deefc47f25b8e9a330002f33701929b8fef0f))
+* **ios:** remove redundant whole-graph work on every iCloud open ([#1010](https://github.com/team-reflect/reflect-open/issues/1010)) ([81ebd9a](https://github.com/team-reflect/reflect-open/commit/81ebd9ac97a0da53040c30671a5979693fbd51b5))
+* **ios:** stop the brief input freeze right after the app opens ([#1009](https://github.com/team-reflect/reflect-open/issues/1009)) ([93f7a5f](https://github.com/team-reflect/reflect-open/commit/93f7a5f76ecf3790d8d687402c9d99d60423a5eb))
+* reduce battery drain from mobile scrolling and idle polling ([#962](https://github.com/team-reflect/reflect-open/issues/962)) ([cc5e3eb](https://github.com/team-reflect/reflect-open/commit/cc5e3ebaaeaa0d0fd68adc3e93a74cd340de96e2))
+* reduce CPU usage at app startup ([#1008](https://github.com/team-reflect/reflect-open/issues/1008)) ([eac6258](https://github.com/team-reflect/reflect-open/commit/eac6258adad850a40abaf29a13a83f3302cbbaec))
+
+## [0.8.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.3...v0.8.0-beta.4) (2026-08-01)
+
+
+### Bug Fixes
+
+* symbolicate native iOS crashes from TestFlight builds ([#1012](https://github.com/team-reflect/reflect-open/issues/1012)) ([08b1ca1](https://github.com/team-reflect/reflect-open/commit/08b1ca1f6deb84dbe5bb91b34bb0274c39f0c46b))
+
+## [0.8.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.2...v0.8.0-beta.3) (2026-07-31)
+
+
+### Features
+
+* **mobile:** add an image button to the keyboard toolbar ([#1001](https://github.com/team-reflect/reflect-open/issues/1001)) ([afceb0b](https://github.com/team-reflect/reflect-open/commit/afceb0be58bb61e51431bcb52e3f7f4df54edd6b))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.63.1 ([#1005](https://github.com/team-reflect/reflect-open/issues/1005)) ([0491123](https://github.com/team-reflect/reflect-open/commit/0491123f21596fbda50be71f5803c41a9f7d5feb))
+
+## [0.8.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.1...v0.8.0-beta.2) (2026-07-30)
+
+
+### Features
+
+* support OpenAI-compatible AI providers ([#996](https://github.com/team-reflect/reflect-open/issues/996)) ([2ff6ce3](https://github.com/team-reflect/reflect-open/commit/2ff6ce3f6e1825819492772d6c1f1593d501fc87))
+
+## [0.8.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta...v0.8.0-beta.1) (2026-07-30)
+
+
+### Features
+
+* cycle mobile editor list style ([#990](https://github.com/team-reflect/reflect-open/issues/990)) ([185a021](https://github.com/team-reflect/reflect-open/commit/185a021d74989ccffe4778aad318b389e9ddaa4d))
+
+## [0.8.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.7.0...v0.8.0-beta) (2026-07-29)
+
+
+### Features
+
+* add a checkbox text-capture kind and drain task as a round task ([#982](https://github.com/team-reflect/reflect-open/issues/982)) ([4aa6c0b](https://github.com/team-reflect/reflect-open/commit/4aa6c0b7d0d4acc9541fb2a2ed988e95f604ceb0))
+
+
+### Bug Fixes
+
+* **desktop:** keep daily notes around mounted ([#986](https://github.com/team-reflect/reflect-open/issues/986)) ([7e6efb5](https://github.com/team-reflect/reflect-open/commit/7e6efb5a0ae025d04002f4ab31d7158dc9d11851))
+* update meowdown to ^0.60.0 ([#979](https://github.com/team-reflect/reflect-open/issues/979)) ([0abd282](https://github.com/team-reflect/reflect-open/commit/0abd282a44725ed0568cb6ddec73ee17f2105390))
+
+## [0.7.0-beta.22](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.21...v0.7.0-beta.22) (2026-07-27)
+
+
+### Features
+
+* support meeting-length audio memos via segmented recording ([#971](https://github.com/team-reflect/reflect-open/issues/971)) ([eabed7b](https://github.com/team-reflect/reflect-open/commit/eabed7b40858929de61f863aef460122c2a5a1f9))
+
+## [0.7.0-beta.21](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.20...v0.7.0-beta.21) (2026-07-27)
+
+
+### Bug Fixes
+
+* shrink the day carousel's slide belt ([#964](https://github.com/team-reflect/reflect-open/issues/964)) ([37de1d0](https://github.com/team-reflect/reflect-open/commit/37de1d094715c68963598e2cd3691df2c6b164e8))
+* update meowdown to ^0.59.1 ([#974](https://github.com/team-reflect/reflect-open/issues/974)) ([b0b8cb1](https://github.com/team-reflect/reflect-open/commit/b0b8cb1be1ee15e5d91838f175542336c3c1ac1a))
+
+## [0.7.0-beta.20](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.19...v0.7.0-beta.20) (2026-07-27)
+
+
+### Features
+
+* resolve vault links and attachments ([#956](https://github.com/team-reflect/reflect-open/issues/956)) ([37978c5](https://github.com/team-reflect/reflect-open/commit/37978c597057c7c4448d0db86890a6f850bd3156))
+
+
+### Bug Fixes
+
+* prevent Enter from sending during IME composition ([#965](https://github.com/team-reflect/reflect-open/issues/965)) ([0e4658b](https://github.com/team-reflect/reflect-open/commit/0e4658b87c9f3d7b957441973ebb1b3083f73afb))
+
+## [0.7.0-beta.19](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.18...v0.7.0-beta.19) (2026-07-26)
+
+
+### Features
+
+* find text within notes ([#955](https://github.com/team-reflect/reflect-open/issues/955)) ([22fda1b](https://github.com/team-reflect/reflect-open/commit/22fda1bf5b85d045bc286de55f45a1f883a7a0cd))
+
+
+### Bug Fixes
+
+* keep automatic daily entries in their lists ([#940](https://github.com/team-reflect/reflect-open/issues/940)) ([48ba8c2](https://github.com/team-reflect/reflect-open/commit/48ba8c2ae7a9d15bbb7d83d7929dddb4a351edfb))
+* keep note history when a graph's GitHub backup is signed out ([#950](https://github.com/team-reflect/reflect-open/issues/950)) ([8f1e475](https://github.com/team-reflect/reflect-open/commit/8f1e4758b72cf18268697a217ec18f12b8d10d7a))
+* reduce mobile week-row note dot to 50% opacity ([#951](https://github.com/team-reflect/reflect-open/issues/951)) ([4c359b6](https://github.com/team-reflect/reflect-open/commit/4c359b6f405590e9347d581e66031b2da2a18e88))
+* update meowdown to ^0.58.3 ([#948](https://github.com/team-reflect/reflect-open/issues/948)) ([97c50d6](https://github.com/team-reflect/reflect-open/commit/97c50d6f4a84c9871fd2442667a13eefa8d52dfe))
+
+## [0.7.0-beta.18](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.17...v0.7.0-beta.18) (2026-07-24)
+
+
+### Bug Fixes
+
+* sync stable backlink labels when notes are retitled ([#943](https://github.com/team-reflect/reflect-open/issues/943)) ([4e04603](https://github.com/team-reflect/reflect-open/commit/4e04603a645bfba1d8a4f96e087aaad79667b684))
+
+## [0.7.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.16...v0.7.0-beta.17) (2026-07-24)
+
+
+### Features
+
+* allow GitHub sign-out with no connected graph ([#945](https://github.com/team-reflect/reflect-open/issues/945)) ([d0638e9](https://github.com/team-reflect/reflect-open/commit/d0638e9fa7fdeed350730e2a2d995d9edd9174c3))
+
+
+### Bug Fixes
+
+* reuse person notes by contact email ([#931](https://github.com/team-reflect/reflect-open/issues/931)) ([75c26ee](https://github.com/team-reflect/reflect-open/commit/75c26ee56bbbddbe1c814916445ea0a695ea260b))
+* soften iOS calendar note markers ([#941](https://github.com/team-reflect/reflect-open/issues/941)) ([ed2e6c4](https://github.com/team-reflect/reflect-open/commit/ed2e6c46c64127f68a3ca78083a6602bede8cf8b))
+* update meowdown to ^0.58.0 ([#934](https://github.com/team-reflect/reflect-open/issues/934)) ([a23f257](https://github.com/team-reflect/reflect-open/commit/a23f2572a75449c866620ab776e83234f50ad001))
+* update meowdown to ^0.58.1 ([#935](https://github.com/team-reflect/reflect-open/issues/935)) ([fdf422e](https://github.com/team-reflect/reflect-open/commit/fdf422ec2079552473d4d71d8010d4d7938de9d4))
+
+## [0.7.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.15...v0.7.0-beta.16) (2026-07-23)
+
+
+### Features
+
+* attach Apple link previews to URL-only captures ([#929](https://github.com/team-reflect/reflect-open/issues/929)) ([3eb6113](https://github.com/team-reflect/reflect-open/commit/3eb6113b615948e506120fa2b6abbd69d11674d4))
+
+## [0.7.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.14...v0.7.0-beta.15) (2026-07-23)
+
+
+### Features
+
+* adopt existing Markdown vaults in place ([#920](https://github.com/team-reflect/reflect-open/issues/920)) ([50962f3](https://github.com/team-reflect/reflect-open/commit/50962f3598b29a184ec2077ae1149a9e875704d1))
+* show daily note markers in iOS calendar ([#928](https://github.com/team-reflect/reflect-open/issues/928)) ([16ce9a3](https://github.com/team-reflect/reflect-open/commit/16ce9a3dbae539f93ae731f0a046c6b70f215379))
+
+
+### Bug Fixes
+
+* add Paste and Match Style (Cmd+Shift+V) to the macOS Edit menu ([#905](https://github.com/team-reflect/reflect-open/issues/905)) ([8be94e0](https://github.com/team-reflect/reflect-open/commit/8be94e0d332482419738c2203a70796cb4d8cc0e))
+* handle iCloud dataless files ([#896](https://github.com/team-reflect/reflect-open/issues/896)) ([695ed24](https://github.com/team-reflect/reflect-open/commit/695ed24d144170b146823ec5f84b56fa86826ffc))
+* keep long AI prompts within the dialog ([#930](https://github.com/team-reflect/reflect-open/issues/930)) ([645d0e2](https://github.com/team-reflect/reflect-open/commit/645d0e20b5fe67c958066d099d010d052ea2ce62))
+* update meowdown to ^0.57.0 ([#907](https://github.com/team-reflect/reflect-open/issues/907)) ([cedba83](https://github.com/team-reflect/reflect-open/commit/cedba83c5dbc5ce89134f4b39967430a170878ad))
+* update meowdown to ^0.57.1 ([#921](https://github.com/team-reflect/reflect-open/issues/921)) ([5d8323f](https://github.com/team-reflect/reflect-open/commit/5d8323fda418724803de01f1c7e64559e584588a))
+* update meowdown to ^0.57.2 ([#925](https://github.com/team-reflect/reflect-open/issues/925)) ([7c5bed8](https://github.com/team-reflect/reflect-open/commit/7c5bed8aa3189bae849147975ad65ad3f0d9dbdd))
+
+## [0.7.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.13...v0.7.0-beta.14) (2026-07-21)
+
+
+### Bug Fixes
+
+* expand collapsed list items in backlink snippets ([#906](https://github.com/team-reflect/reflect-open/issues/906)) ([c397551](https://github.com/team-reflect/reflect-open/commit/c3975518ab6d4e92d9d88716be51ac2b993b1132))
+
+## [0.7.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.12...v0.7.0-beta.13) (2026-07-21)
+
+
+### Bug Fixes
+
+* accept Anthropic API keys from orgs that disallow browser CORS requests ([#879](https://github.com/team-reflect/reflect-open/issues/879)) ([15b6f13](https://github.com/team-reflect/reflect-open/commit/15b6f13a21d9bb2e097db57138c31b0e766448db))
+* clicking a daily note's date heading focuses the note ([#904](https://github.com/team-reflect/reflect-open/issues/904)) ([2cbe463](https://github.com/team-reflect/reflect-open/commit/2cbe463e5302e9eca8282947eade40f7de5ab7df))
+* make page breaks visible in the editor ([#850](https://github.com/team-reflect/reflect-open/issues/850)) ([2a48e03](https://github.com/team-reflect/reflect-open/commit/2a48e033ca5adfc4ef66126e559fe87f1ff46304))
+* preserve safe editor transform diagnostics ([#851](https://github.com/team-reflect/reflect-open/issues/851)) ([628c2c7](https://github.com/team-reflect/reflect-open/commit/628c2c7077cefe0dcf08add03dd955b915e06533))
+* show tagged daily notes in all notes ([#897](https://github.com/team-reflect/reflect-open/issues/897)) ([0fa6db0](https://github.com/team-reflect/reflect-open/commit/0fa6db01261c836f6d5c932e0407e52a1c9515fc))
+
+## [0.7.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.11...v0.7.0-beta.12) (2026-07-19)
+
+
+### Features
+
+* **mobile:** add AI provider consent block ([#891](https://github.com/team-reflect/reflect-open/issues/891)) ([595a215](https://github.com/team-reflect/reflect-open/commit/595a2157d920cba258a93180c2bc44e22188efe4))
+
+
+### Bug Fixes
+
+* fetch link previews like a normal browser request ([#886](https://github.com/team-reflect/reflect-open/issues/886)) ([cab03fb](https://github.com/team-reflect/reflect-open/commit/cab03fb324984d88dfb72a553e767a8db615e5ee))
+* update meowdown to ^0.55.1 ([#865](https://github.com/team-reflect/reflect-open/issues/865)) ([71e2fe9](https://github.com/team-reflect/reflect-open/commit/71e2fe90f29db3372020dfec317b2c9d384b0d6e))
+
+## [0.7.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.10...v0.7.0-beta.11) (2026-07-18)
+
+
+### Bug Fixes
+
+* retry rate-limited link previews and clean up share-sheet titles ([#884](https://github.com/team-reflect/reflect-open/issues/884)) ([dfb6d29](https://github.com/team-reflect/reflect-open/commit/dfb6d29d3d76a1de088016f290cc8966da69bdfc))
+
+## [0.7.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.9...v0.7.0-beta.10) (2026-07-17)
+
+
+### Bug Fixes
+
+* enrich shared links before AI finishes ([#877](https://github.com/team-reflect/reflect-open/issues/877)) ([74a137b](https://github.com/team-reflect/reflect-open/commit/74a137b90e23c9d56b24aa6ee4caf9ca8acd24a9))
+
+## [0.7.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.8...v0.7.0-beta.9) (2026-07-17)
+
+
+### Features
+
+* format audio transcriptions automatically ([#873](https://github.com/team-reflect/reflect-open/issues/873)) ([c994a2e](https://github.com/team-reflect/reflect-open/commit/c994a2ee2d803a1b751303c67aacac6e2dfb6a4e))
+
+
+### Bug Fixes
+
+* enrich URL-only mobile link captures ([#872](https://github.com/team-reflect/reflect-open/issues/872)) ([88f163b](https://github.com/team-reflect/reflect-open/commit/88f163bb679d84d267c0005d2ad04323034e61a4))
+
+## [0.7.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.7...v0.7.0-beta.8) (2026-07-17)
+
+
+### Bug Fixes
+
+* allow linking notes whose titles contain wikilinks ([#864](https://github.com/team-reflect/reflect-open/issues/864)) ([8332444](https://github.com/team-reflect/reflect-open/commit/8332444f3242f6c68ee42cbbcdb11740378d41f2))
+* preserve note aliases in links and backlinks ([#861](https://github.com/team-reflect/reflect-open/issues/861)) ([cb1a3dc](https://github.com/team-reflect/reflect-open/commit/cb1a3dc48945c486042b28555579b11ded5a2d4f))
+
+## [0.7.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.6...v0.7.0-beta.7) (2026-07-16)
+
+
+### Bug Fixes
+
+* update meowdown to ^0.52.2 ([#853](https://github.com/team-reflect/reflect-open/issues/853)) ([49546ee](https://github.com/team-reflect/reflect-open/commit/49546ee1bb7bb636e0cbcdf70863bdeb325600f9))
+
+## [0.7.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.5...v0.7.0-beta.6) (2026-07-16)
+
+
+### Bug Fixes
+
+* prevent macOS iCloud launch crashes ([#846](https://github.com/team-reflect/reflect-open/issues/846)) ([df42bd8](https://github.com/team-reflect/reflect-open/commit/df42bd80c3759fac526fe729a0a59f3eaae9f4bc))
+* update meowdown to ^0.52.1 ([#847](https://github.com/team-reflect/reflect-open/issues/847)) ([aee87be](https://github.com/team-reflect/reflect-open/commit/aee87bebbe91a5495949e900644958e8fad6335c))
+
+## [0.7.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.4...v0.7.0-beta.5) (2026-07-16)
+
+
+### Features
+
+* add a smooth caret animation setting ([#840](https://github.com/team-reflect/reflect-open/issues/840)) ([bc1f201](https://github.com/team-reflect/reflect-open/commit/bc1f2012476cd82f7f2ef6d4294bcccca968af28))
+* render Mermaid code blocks ([#841](https://github.com/team-reflect/reflect-open/issues/841)) ([a7b7c8d](https://github.com/team-reflect/reflect-open/commit/a7b7c8dd3d320d87d7c48ed2e905be08aee6030c))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.51.0 ([#837](https://github.com/team-reflect/reflect-open/issues/837)) ([41b6a85](https://github.com/team-reflect/reflect-open/commit/41b6a8507fcc7e03496fbeb7afd75e5eec546c74))
+
+## [0.7.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.3...v0.7.0-beta.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* rename GitHub backup to GitHub sync in settings ([#830](https://github.com/team-reflect/reflect-open/issues/830)) ([69a3a29](https://github.com/team-reflect/reflect-open/commit/69a3a29817668275261b7b967b62576571b26955))
+
 ## [0.7.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.2...v0.7.0-beta.3) (2026-07-15)
 
 

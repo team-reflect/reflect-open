@@ -1,0 +1,91 @@
+name: Set up Rust
+description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
+
+inputs:
+  cache:
+    description: Whether to restore and save the cargo build cache.
+    required: false
+    default: 'true'
+  cache-key:
+    description: An extra key for the cargo build cache, for jobs that must not share one.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    # Cargo registry fetches can intermittently fail on GitHub runners with
+    # curl HTTP/2 framing errors. HTTP/1.1 is slower but steadier.
+    - name: Disable HTTP/2 multiplexing in cargo
+      shell: bash
+      run: echo "CARGO_HTTP_MULTIPLEXING=false" >> "$GITHUB_ENV"
+
+    # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
+    - name: Install Tauri system dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        PACKAGES="\
+          libwebkit2gtk-4.1-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          libxdo-dev \
+          libssl-dev \
+          build-essential \
+          curl \
+          wget \
+          file \
+          patchelf"
+        echo "Installing Tauri system dependencies..."
+        if sudo apt-get install -y $PACKAGES; then
+          echo "Tauri system dependencies installed successfully without apt-get update."
+        else
+          echo "Initial installation failed. Running apt-get update and retrying..."
+          sudo apt-get update
+          sudo apt-get install -y $PACKAGES
+        fi
+
+    - name: Install Rust toolchain
+      shell: bash
+      run: rustup toolchain install --no-self-update
+
+    - name: Print rustc version
+      shell: bash
+      run: rustc --version --verbose
+
+    # Build scripts (ort-sys, swift-rs) write the path of Xcode's clang runtime
+    # into their cached output, and cargo does not rerun them when Xcode
+    # changes. rust-cache hashes RUST_* variables into its key, so a new Xcode
+    # starts from a cold cache instead of failing at link time.
+    - name: Scope the cargo cache to Xcode
+      if: runner.os == 'macOS'
+      shell: bash
+      # Ensures the setup-xcode action has run before setup-rust, so that xcrun clang points to the selected Xcode version.
+      run: echo "RUST_CACHE_CLANG_DIR=$(xcrun clang --print-resource-dir)" >> "$GITHUB_ENV"
+
+    # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
+    # build time into $ORT_CACHE_DIR/dfbin/<target>/<hash> and writes that
+    # absolute path into its build script output in target/. Cargo does not
+    # rerun the build script when the directory is missing, so the binaries
+    # must live in the same cache entry as target/, or a restored target/ fails
+    # to link with "could not find native static library onnxruntime".
+    # ORT_CACHE_DIR is documented in the v2.0.0-rc.11 release notes:
+    # https://github.com/pykeio/ort/releases/tag/v2.0.0-rc.11
+    - name: Set the ONNX Runtime cache dir
+      shell: bash
+      run: echo "ORT_CACHE_DIR=$RUNNER_TEMP/ort_cache" >> "$GITHUB_ENV"
+
+    # `env-vars` puts ORT_CACHE_DIR into the cache key, so changing the path
+    # starts from a cold cache instead of a target/ that points to the old one.
+    - name: Cache cargo build
+      if: inputs.cache == 'true'
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      with:
+        key: ${{ inputs.cache-key }}
+        env-vars: ORT_CACHE_DIR
+        cache-directories: ${{ env.ORT_CACHE_DIR }}
+
+    # Fails if Cargo.lock is out of date.
+    - name: Check Cargo.lock
+      shell: bash
+      run: cargo update --workspace --locked

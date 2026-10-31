@@ -1,6 +1,7 @@
-import { appendBlock } from '../markdown/edit'
-import { splitFrontmatter } from '../markdown/frontmatter'
-import type { ContactMatch } from './commands'
+import { appendBlock } from '../markdown/append-section.ts'
+import { canonicalEmails } from '../markdown/email-fields.ts'
+import { splitFrontmatter } from '../markdown/frontmatter.ts'
+import type { ContactMatch } from './commands.ts'
 
 /**
  * What the suggested-contact card's **Add** writes: the contact's details as
@@ -46,7 +47,7 @@ const TYPE_LINE_PATTERN = /^[ \t]*[-+*][ \t]+type:/im
  * stack a second line.
  */
 export function contactDetailsMarkdown(contact: ContactMatch, existingBody = ''): string {
-  const emails = uniqueValues(contact.emails)
+  const emails = canonicalEmails(contact.emails)
   const phones = uniqueValues(contact.phones)
   if (emails.length === 0 && phones.length === 0) {
     return ''

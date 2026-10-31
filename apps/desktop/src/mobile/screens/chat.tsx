@@ -1,11 +1,12 @@
 import { useState, type ReactElement } from 'react'
 import { History, MessageSquare, Plus } from 'lucide-react'
-import { ChatTurnList } from '@/components/chat/chat-turn-list'
-import { Button } from '@/components/ui/button'
-import { MobileChatComposer } from '@/mobile/chat-composer'
-import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer'
-import { useChatSession } from '@/providers/chat-provider'
-import { useRouter } from '@/routing/router'
+import { ChatTurnList } from '@/components/chat/chat-turn-list.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
+import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
+import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
+import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useRouter } from '@/routing/router.tsx'
 
 /**
  * The Chat tab (Plan 23): desktop's dedicated chat view as a root tab —
@@ -23,30 +24,28 @@ export function MobileChat(): ReactElement {
   const hasProvider = providers.length > 0
 
   return (
-    <div
-      className="flex h-full w-screen flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
-      <header className="flex h-11 shrink-0 items-center gap-1 border-b border-border pl-4 pr-1">
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>
-        {hasProvider ? (
-          <>
-            {turns.length > 0 ? (
-              <Button variant="ghost" size="icon" aria-label="New chat" onClick={newChat}>
-                <Plus aria-hidden />
-              </Button>
-            ) : null}
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Chat history"
-              onClick={() => setHistoryOpen(true)}
-            >
-              <History aria-hidden />
-            </Button>
-          </>
-        ) : null}
-      </header>
+    <div className="flex h-full w-screen flex-col pt-safe">
+      <MobileTopBar>
+        <MobileTopBarRow>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>
+          {hasProvider ? (
+            <>
+              {turns.length > 0 ? (
+                <MobileTopBarIconButton aria-label="New chat" onClick={newChat}>
+                  <Plus aria-hidden />
+                </MobileTopBarIconButton>
+              ) : null}
+              <MobileTopBarIconButton
+                edge="trailing"
+                aria-label="Chat history"
+                onClick={() => setHistoryOpen(true)}
+              >
+                <History aria-hidden />
+              </MobileTopBarIconButton>
+            </>
+          ) : null}
+        </MobileTopBarRow>
+      </MobileTopBar>
       {hasProvider ? (
         <>
           <ChatTurnList />

@@ -1,550 +1,434 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge, type EmbedStatus, type GraphInfo } from '@reflect/core'
-import { formatFullDate } from '@/lib/dates'
-import { resetOperations } from '@/lib/operations'
-import { NoteTemplatesProvider } from '@/providers/note-templates-provider'
-import { ShortcutsProvider } from '@/providers/shortcuts-provider'
-import { SettingsProvider } from '@/providers/settings-provider'
-import { UpdateProvider } from '@/providers/update-provider'
-import { RouterProvider } from '@/routing/router'
-import { ShortcutsDialog } from './shortcuts-dialog'
-import { SettingsScreen } from './settings-screen'
+import { QueryClient } from '@tanstack/react-query'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import type { Locator } from 'vitest/browser'
+import {
+  createTestCoreServices,
+  createTestEmbeddingRuntimeService,
+  createTestPlatformService,
+  createTestGitSyncService,
+  type TestEmbeddingRuntimeService,
+  type TestOpenGraph,
+} from '@reflect/core/testing'
+import {
+  DEFAULT_SETTINGS,
+  type GraphSessionService,
+  type Settings,
+  formatFullDate,
+} from '@reflect/core'
+import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
+import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
+import { UpdateProvider } from '@/providers/update-provider.tsx'
+import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
+import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { ShortcutsDialog } from './shortcuts-dialog.tsx'
+import { SettingsScreen } from './settings-screen.tsx'
 
-// The rebuild-index field reads the open index generation — and the Backup
-// section the open graph + sync state — from per-graph providers the screen
-// tests don't mount, so stub both hooks (backup disconnected).
-const graph = vi.hoisted(() => ({
-  current: null as GraphInfo | null,
-  indexGeneration: 7 as number | null,
-  forget: vi.fn<(root: string) => Promise<void>>(async () => {}),
-  deleteGraph: vi.fn<() => Promise<void>>(async () => {}),
-}))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({
-    graph: graph.current,
-    indexGeneration: graph.indexGeneration,
-    forget: graph.forget,
-    deleteGraph: graph.deleteGraph,
-  }),
-}))
-vi.mock('@/providers/sync-provider', () => ({
-  useSync: () => ({
-    backup: { phase: 'disconnected' },
-    connectNewRepo: async () => {},
-    connectExistingRepo: async () => 'connected',
-    disconnectGraph: async () => {},
-    signOut: async () => {},
-    backUpNow: async () => {},
-  }),
-}))
-// The Import section only hands the picked zip to the workspace-level V1
-// import controller, which these screen tests don't mount.
-vi.mock('@/providers/v1-import-provider', () => ({
-  useV1Import: () => ({
-    state: { phase: 'idle' },
-    startImport: () => {},
-    cancelImport: () => {},
-    dismiss: () => {},
-  }),
-}))
+// What the app starts from; each test sets them before `renderScreen`.
+let stored: Partial<Settings>
+let openGraph: TestOpenGraph
+let embedRuntime: TestEmbeddingRuntimeService
 
-// jsdom doesn't implement this; Radix Select scrolls the selected option into
-// view when the listbox opens.
-Element.prototype.scrollIntoView ??= () => {}
+// The services of the rendered app; set by `renderScreen`.
+let core: ReturnType<typeof createCore>
+let forget: MockInstance<GraphSessionService['forgetRecent']>
+let deleteGraph: MockInstance<GraphSessionService['deleteGraph']>
 
-let stored: Record<string, unknown>
-let saved: unknown[]
-let invoked: string[]
-let embedStatus: EmbedStatus
+/**
+ * Every settings document the app persisted, oldest first.
+ */
+function saved(): Settings[] {
+  return core.settings.saves()
+}
 
-function installFakeBridge(): void {
-  saved = []
-  invoked = []
-  setBridge({
-    invoke: async (command, args) => {
-      invoked.push(command)
-      switch (command) {
-        case 'settings_load':
-          return stored
-        case 'settings_save':
-          saved.push(args['settings'])
-          return null
-        case 'embed_status':
-        case 'embed_ensure':
-          return embedStatus
-        case 'list_files':
-          return []
-        case 'db_query':
-          return [] // the Note templates section lists `kind = 'template'` rows
-        default:
-          return null
-      }
-    },
-    listen: async () => () => {},
+// The screen runs off macOS desktop (no Agents, iCloud or Calendar rows), with
+// a graph open and its git sync disconnected.
+function createCore() {
+  return createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    embeddingRuntime: embedRuntime,
+    platform: createTestPlatformService({ isMacosDesktop: false, hasMacosTitleBarOverlay: false }),
+    gitSync: createTestGitSyncService({ state: { phase: 'disconnected' } }),
   })
 }
 
-let queryClient: QueryClient
-
-function renderScreen(): void {
-  render(
-    <QueryClientProvider client={queryClient}>
-      <SettingsProvider>
+async function renderScreen(): Promise<void> {
+  core = createCore()
+  forget = vi.spyOn(core.graphSession, 'forgetRecent').mockResolvedValue()
+  deleteGraph = vi.spyOn(core.graphSession, 'deleteGraph').mockResolvedValue()
+  await renderInApp(
+    <>
+      <SettingsScreen />
+      <ShortcutsDialog />
+    </>,
+    {
+      core,
+      graph: openGraph,
+      settings: stored,
+      queryClient: new QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+      }),
+      // The Note templates section shares the "New template" dialog state
+      // (templates provider). The Import section hands the picked zip to the
+      // workspace's V1 import.
+      wrapper: (children) => (
         <UpdateProvider autoCheck={false}>
-          {/* The Note templates section opens files (router) and shares the
-              "New template" dialog state (templates provider). */}
-          <RouterProvider>
-            <ShortcutsProvider>
-              <NoteTemplatesProvider>
-                <SettingsScreen />
-                <ShortcutsDialog />
-              </NoteTemplatesProvider>
-            </ShortcutsProvider>
-          </RouterProvider>
+          <ShortcutsProvider>
+            <NoteTemplatesProvider>
+              <V1ImportProvider>{children}</V1ImportProvider>
+            </NoteTemplatesProvider>
+          </ShortcutsProvider>
         </UpdateProvider>
-      </SettingsProvider>
-    </QueryClientProvider>,
+      ),
+    },
   )
 }
 
-function radio(name: RegExp): HTMLInputElement {
-  const element = screen.getByRole('radio', { name })
-  if (!(element instanceof HTMLInputElement)) {
-    throw new Error('expected an <input type="radio">')
+function radio(name: RegExp): Locator {
+  return page.getByRole('radio', { name })
+}
+
+/**
+ * Clicks a radio's option card — the `<input>` itself is `sr-only`.
+ */
+async function pickRadio(name: RegExp): Promise<void> {
+  const label = radio(name).element().closest('label')
+  if (!(label instanceof HTMLLabelElement)) {
+    throw new TypeError('expected the radio to sit inside its option card')
   }
-  return element
+  await userEvent.click(label)
 }
 
 beforeEach(() => {
   stored = {}
-  embedStatus = { status: 'uninitialized' }
-  graph.current = null
-  graph.indexGeneration = 7
-  graph.forget.mockClear()
-  graph.deleteGraph.mockClear()
-  queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
-  })
-  installFakeBridge()
+  openGraph = { root: '/graphs/work', name: 'Work', generation: 1, indexGeneration: 7 }
+  embedRuntime = createTestEmbeddingRuntimeService({ status: { status: 'uninitialized' } })
 })
 
 afterEach(() => {
-  cleanup() // `globals: false` disables testing-library's automatic cleanup
   vi.useRealTimers()
-  setBridge(null)
-  queryClient.clear()
 })
 
 describe('SettingsScreen', () => {
-  it('shows update controls when the native bridge is available', () => {
-    renderScreen()
-    expect(screen.getByRole('button', { name: /check for updates/i })).toBeTruthy()
+  it('shows update controls when the native bridge is available', async () => {
+    await renderScreen()
+    await expect
+      .element(page.getByRole('button', { name: /check for updates/i }))
+      .toBeInTheDocument()
+  })
+
+  it('persists the default-on transcription auto-format preference', async () => {
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /transcription auto-format/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'true')
+    const descriptionId = toggle.element().getAttribute('aria-describedby')
+    expect(descriptionId).not.toBeNull()
+    expect(document.getElementById(descriptionId ?? '')?.textContent).toContain(
+      'Use AI to add punctuation, paragraphs, and light Markdown',
+    )
+
+    await toggle.click()
+
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
+    await vi.waitFor(() => expect(saved().at(-1)).toMatchObject({ transcriptionFormat: false }))
+  })
+
+  it('reflects a persisted transcription auto-format opt-out', async () => {
+    stored = { transcriptionFormat: false }
+    await renderScreen()
+
+    const toggle = page.getByRole('switch', { name: /transcription auto-format/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('reflects and persists the transcription helper text', async () => {
+    stored = { transcriptionPrompt: 'Ocavue' }
+    await renderScreen()
+    const textarea = page.getByRole('textbox', { name: 'Transcription helper text' })
+    await expect.element(textarea).toHaveValue('Ocavue')
+
+    await textarea.fill('  Names:\nOcavue  ')
+    await userEvent.tab()
+
+    await vi.waitFor(() => {
+      expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'Names:\nOcavue' })
+    })
+  })
+
+  it('clears the transcription helper text', async () => {
+    stored = { transcriptionPrompt: 'Ocavue' }
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'Audio memos' })
+
+    await section.getByRole('button', { name: 'Clear' }).click()
+
+    await vi.waitFor(() => expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: '' }))
+  })
+
+  it('warns when the transcription helper text is over the limit and truncates on save', async () => {
+    await renderScreen()
+    const textarea = page.getByRole('textbox', { name: 'Transcription helper text' })
+
+    await textarea.fill('x'.repeat(510))
+
+    await expect.element(textarea).toHaveAttribute('aria-invalid', 'true')
+    await expect
+      .element(page.getByRole('alert'))
+      .toMatchTextContent('10 characters over the 500-character limit')
+
+    await userEvent.tab()
+
+    await vi.waitFor(() => {
+      expect(saved().at(-1)).toMatchObject({ transcriptionPrompt: 'x'.repeat(500) })
+    })
   })
 
   it('confirms before forgetting the open graph from saved graphs', async () => {
-    graph.current = { root: '/graphs/work', name: 'Work', generation: 1 }
-    renderScreen()
+    await renderScreen()
 
-    const section = screen.getByRole('region', { name: 'Danger zone' })
-    fireEvent.click(within(section).getByRole('button', { name: /forget graph/i }))
+    const section = page.getByRole('region', { name: 'Danger zone' })
+    await section.getByRole('button', { name: /forget graph/i }).click()
 
-    const dialog = screen.getByRole('dialog', { name: /forget graph/i })
-    expect(within(dialog).getByText('/graphs/work')).toBeTruthy()
-    expect(graph.forget).not.toHaveBeenCalled()
+    const dialog = page.getByRole('dialog', { name: /forget graph/i })
+    await expect.element(dialog.getByText('/graphs/work')).toBeInTheDocument()
+    expect(forget).not.toHaveBeenCalled()
 
-    fireEvent.click(within(dialog).getByRole('button', { name: /forget graph/i }))
+    await dialog.getByRole('button', { name: /forget graph/i }).click()
 
-    await waitFor(() => expect(graph.forget).toHaveBeenCalledWith('/graphs/work'))
+    await vi.waitFor(() => expect(forget).toHaveBeenCalledWith('/graphs/work'))
   })
 
   it('requires typing the graph name before deleting the graph', async () => {
-    graph.current = { root: '/graphs/work', name: 'Work', generation: 1 }
-    renderScreen()
+    await renderScreen()
 
-    const section = screen.getByRole('region', { name: 'Danger zone' })
-    fireEvent.click(within(section).getByRole('button', { name: /delete graph/i }))
+    const section = page.getByRole('region', { name: 'Danger zone' })
+    await section.getByRole('button', { name: /delete graph/i }).click()
 
-    const dialog = screen.getByRole('dialog', { name: /delete graph/i })
-    expect(within(dialog).getByText('/graphs/work')).toBeTruthy()
-    const confirm = within(dialog).getByRole('button', { name: /delete graph/i })
-    expect(confirm.hasAttribute('disabled')).toBe(true)
+    const dialog = page.getByRole('dialog', { name: /delete graph/i })
+    await expect.element(dialog.getByText('/graphs/work')).toBeInTheDocument()
+    // Deleting an adopted vault trashes the user's own folder — the dialog
+    // must say so in as many words.
+    await expect.element(dialog.getByText(/everything inside it to Trash/)).toBeInTheDocument()
+    const confirm = dialog.getByRole('button', { name: /delete graph/i })
+    await expect.element(confirm).toBeDisabled()
 
-    const nameInput = within(dialog).getByLabelText('Graph name')
-    fireEvent.change(nameInput, { target: { value: 'Wor' } })
-    expect(confirm.hasAttribute('disabled')).toBe(true)
+    const nameInput = dialog.getByLabelText('Graph name')
+    await nameInput.fill('Wor')
+    await expect.element(confirm).toBeDisabled()
     // Enter with a mismatched name must not delete either.
-    fireEvent.keyDown(nameInput, { key: 'Enter' })
-    expect(graph.deleteGraph).not.toHaveBeenCalled()
+    await userEvent.keyboard('{Enter}')
+    expect(deleteGraph).not.toHaveBeenCalled()
 
-    fireEvent.change(nameInput, { target: { value: 'Work' } })
-    expect(confirm.hasAttribute('disabled')).toBe(false)
-    fireEvent.click(confirm)
+    await nameInput.fill('Work')
+    await expect.element(confirm).not.toBeDisabled()
+    await confirm.click()
 
-    await waitFor(() => expect(graph.deleteGraph).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(deleteGraph).toHaveBeenCalledTimes(1))
   })
 
   it('reflects the persisted markdown syntax mode', async () => {
     stored = { editorMarkdownSyntax: 'show' }
-    renderScreen()
-    await waitFor(() => expect(radio(/^show/i).checked).toBe(true))
-    expect(radio(/^hide/i).checked).toBe(false)
+    await renderScreen()
+    await expect.element(radio(/^show/i)).toBeChecked()
+    await expect.element(radio(/^hide/i)).not.toBeChecked()
   })
 
   it('selecting Show applies instantly and persists', async () => {
-    renderScreen()
-    await waitFor(() => expect(radio(/^hide/i).checked).toBe(true))
+    await renderScreen()
+    await expect.element(radio(/^hide/i)).toBeChecked()
 
-    fireEvent.click(radio(/^show/i))
+    await pickRadio(/^show/i)
 
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
+          ...DEFAULT_SETTINGS,
           editorMarkdownSyntax: 'show',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
-    expect(radio(/^show/i).checked).toBe(true)
-    expect(radio(/^hide/i).checked).toBe(false)
+      ])
+    })
+    await expect.element(radio(/^show/i)).toBeChecked()
+    await expect.element(radio(/^hide/i)).not.toBeChecked()
   })
 
   it('reflects the persisted text size', async () => {
     stored = { editorTextSize: 'large' }
-    renderScreen()
-    await waitFor(() => expect(radio(/^large/i).checked).toBe(true))
-    expect(radio(/^medium/i).checked).toBe(false)
+    await renderScreen()
+    await expect.element(radio(/^large/i)).toBeChecked()
+    await expect.element(radio(/^medium/i)).not.toBeChecked()
   })
 
   it('selecting Large applies instantly and persists the text size', async () => {
-    renderScreen()
-    await waitFor(() => expect(radio(/^small/i).checked).toBe(true))
+    await renderScreen()
+    await expect.element(radio(/^small/i)).toBeChecked()
 
-    fireEvent.click(radio(/^large/i))
+    await pickRadio(/^large/i)
 
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
+          ...DEFAULT_SETTINGS,
           editorTextSize: 'large',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
-    expect(radio(/^large/i).checked).toBe(true)
-    expect(radio(/^medium/i).checked).toBe(false)
+      ])
+    })
+    await expect.element(radio(/^large/i)).toBeChecked()
+    await expect.element(radio(/^medium/i)).not.toBeChecked()
   })
 
   it('enables full-width notes instantly and persists the preference', async () => {
-    renderScreen()
-    const toggle = screen.getByRole('switch', { name: /full-width notes/i })
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /full-width notes/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
 
-    fireEvent.click(toggle)
+    await toggle.click()
 
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
-    await waitFor(() => expect(saved.at(-1)).toMatchObject({ editorFullWidth: true }))
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'true')
+    await vi.waitFor(() => expect(saved().at(-1)).toMatchObject({ editorFullWidth: true }))
   })
 
   it('reflects a persisted spell check opt-out', async () => {
     stored = { editorSpellCheck: false }
-    renderScreen()
-    const toggle = screen.getByRole('switch', { name: /spell check/i })
-    await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('false'))
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /spell check/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
   })
 
   it('toggling spell check off applies instantly and persists', async () => {
-    renderScreen()
-    const toggle = screen.getByRole('switch', { name: /spell check/i })
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /spell check/i })
     // On by default.
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'true')
 
-    fireEvent.click(toggle)
+    await toggle.click()
 
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
+          ...DEFAULT_SETTINGS,
           editorSpellCheck: false,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
+  })
+
+  it('reflects a persisted smooth caret animation opt-out', async () => {
+    stored = { editorSmoothCaretAnimation: false }
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /smooth caret animation/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('disables smooth caret animation instantly and persists the preference', async () => {
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /smooth caret animation/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'true')
+
+    await toggle.click()
+
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
+    await vi.waitFor(() => {
+      expect(saved().at(-1)).toMatchObject({ editorSmoothCaretAnimation: false })
+    })
   })
 
   it('reflects a persisted default-bullet opt-out', async () => {
     stored = { editorDefaultBullet: false }
-    renderScreen()
-    const toggle = screen.getByRole('switch', { name: /start with a bullet/i })
-    await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('false'))
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /start with a bullet/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
   })
 
   it('toggling the default bullet off applies instantly and persists', async () => {
-    renderScreen()
-    const toggle = screen.getByRole('switch', { name: /start with a bullet/i })
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /start with a bullet/i })
     // On by default.
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'true')
 
-    fireEvent.click(toggle)
+    await toggle.click()
 
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
+          ...DEFAULT_SETTINGS,
           editorDefaultBullet: false,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('reflects a persisted bullet-after-heading opt-out', async () => {
     stored = { editorBulletAfterHeading: false }
-    renderScreen()
-    const toggle = screen.getByRole('switch', { name: /bullet after a heading/i })
-    await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('false'))
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /bullet after a heading/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
   })
 
   it('toggling bullet-after-heading off persists independently of the seed bullet', async () => {
-    renderScreen()
-    const toggle = screen.getByRole('switch', { name: /bullet after a heading/i })
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await renderScreen()
+    const toggle = page.getByRole('switch', { name: /bullet after a heading/i })
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'true')
 
-    fireEvent.click(toggle)
+    await toggle.click()
 
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(toggle).toHaveAttribute('aria-checked', 'false')
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
+          ...DEFAULT_SETTINGS,
           editorBulletAfterHeading: false,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('reflects the persisted theme and persists a new choice', async () => {
     stored = { theme: 'dark' }
-    renderScreen()
-    await waitFor(() => expect(radio(/^dark/i).checked).toBe(true))
+    await renderScreen()
+    await expect.element(radio(/^dark/i)).toBeChecked()
 
-    fireEvent.click(radio(/^light/i))
+    await pickRadio(/^light/i)
 
-    expect(radio(/^light/i).checked).toBe(true)
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(radio(/^light/i)).toBeChecked()
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
+          ...DEFAULT_SETTINGS,
           theme: 'light',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('reflects the persisted date format', async () => {
     stored = { dateFormat: 'dmy' }
-    renderScreen()
-    const trigger = screen.getByRole('combobox', { name: 'Date format' })
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Date format' })
     // The options label themselves with today's date in each order.
-    await waitFor(() => expect(trigger.textContent).toContain(formatFullDate(new Date(), 'dmy')))
+    await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'dmy'))
   })
 
   it('selecting day-month-year persists the date format', async () => {
-    renderScreen()
-    const trigger = screen.getByRole('combobox', { name: 'Date format' })
-    await waitFor(() => expect(trigger.textContent).toContain(formatFullDate(new Date(), 'mdy')))
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Date format' })
+    await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'mdy'))
 
-    // Keyboard-driven (the pointer path needs capture APIs jsdom lacks).
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    fireEvent.keyDown(
-      await screen.findByRole('option', { name: formatFullDate(new Date(), 'dmy') }),
-      { key: 'Enter' },
-    )
+    await trigger.click()
+    await page.getByRole('option', { name: formatFullDate(new Date(), 'dmy') }).click()
 
-    expect(trigger.textContent).toContain(formatFullDate(new Date(), 'dmy'))
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(trigger).toMatchTextContent(formatFullDate(new Date(), 'dmy'))
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
+          ...DEFAULT_SETTINGS,
           dateFormat: 'dmy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('selecting ISO persists the date format', async () => {
@@ -552,454 +436,386 @@ describe('SettingsScreen', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.setSystemTime(now)
 
-    renderScreen()
-    const trigger = screen.getByRole('combobox', { name: 'Date format' })
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Date format' })
     const isoLabel = formatFullDate(now, 'iso')
-    await waitFor(() => expect(trigger.textContent).toContain(formatFullDate(now, 'mdy')))
+    await expect.element(trigger).toMatchTextContent(formatFullDate(now, 'mdy'))
 
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    fireEvent.keyDown(await screen.findByRole('option', { name: isoLabel }), { key: 'Enter' })
+    await trigger.click()
+    await page.getByRole('option', { name: isoLabel }).click()
 
-    expect(trigger.textContent).toContain(isoLabel)
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(trigger).toMatchTextContent(isoLabel)
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
+          ...DEFAULT_SETTINGS,
           dateFormat: 'iso',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('shows the week start setting in Date & time', async () => {
-    renderScreen()
-    const dateTime = screen.getByRole('region', { name: 'Date & time' })
-    const appearance = screen.getByRole('region', { name: 'Appearance' })
+    await renderScreen()
+    const dateTime = page.getByRole('region', { name: 'Date & time' })
+    const appearance = page.getByRole('region', { name: 'Appearance' })
 
-    await waitFor(() =>
-      expect(within(dateTime).getByRole('combobox', { name: 'Start week on' })).toBeTruthy(),
-    )
-    expect(within(appearance).queryByRole('combobox', { name: 'Start week on' })).toBeNull()
+    await expect
+      .element(dateTime.getByRole('combobox', { name: 'Start week on' }))
+      .toBeInTheDocument()
+    expect(appearance.getByRole('combobox', { name: 'Start week on' }).query()).toBeNull()
   })
 
   it('selecting Sunday persists the week start day', async () => {
-    renderScreen()
-    const trigger = screen.getByRole('combobox', { name: 'Start week on' })
-    await waitFor(() => expect(trigger.textContent).toContain('Monday'))
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Start week on' })
+    await expect.element(trigger).toMatchTextContent('Monday')
 
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    fireEvent.keyDown(await screen.findByRole('option', { name: 'Sunday' }), { key: 'Enter' })
+    await trigger.click()
+    await page.getByRole('option', { name: 'Sunday' }).click()
 
-    expect(trigger.textContent).toContain('Sunday')
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(trigger).toMatchTextContent('Sunday')
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
+          ...DEFAULT_SETTINGS,
           weekStartDay: 'sunday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
+  })
+
+  it('selecting Saturday persists the week start day', async () => {
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Start week on' })
+    await trigger.click()
+    await page.getByRole('option', { name: 'Saturday' }).click()
+
+    await expect.element(trigger).toMatchTextContent('Saturday')
+    await vi.waitFor(() => expect(saved().at(-1)).toMatchObject({ weekStartDay: 'saturday' }))
   })
 
   it('reflects the persisted time format', async () => {
     stored = { timeFormat: '24h' }
-    renderScreen()
-    const trigger = screen.getByRole('combobox', { name: 'Time format' })
-    await waitFor(() => expect(trigger.textContent).toContain('24-hour'))
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Time format' })
+    await expect.element(trigger).toMatchTextContent('24-hour')
   })
 
   it('selecting 24-hour persists the time format', async () => {
-    renderScreen()
-    const trigger = screen.getByRole('combobox', { name: 'Time format' })
-    await waitFor(() => expect(trigger.textContent).toContain('12-hour'))
+    await renderScreen()
+    const trigger = page.getByRole('combobox', { name: 'Time format' })
+    await expect.element(trigger).toMatchTextContent('12-hour')
 
-    // Keyboard-driven (the pointer path needs capture APIs jsdom lacks).
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    fireEvent.keyDown(await screen.findByRole('option', { name: '24-hour' }), { key: 'Enter' })
+    await trigger.click()
+    await page.getByRole('option', { name: '24-hour' }).click()
 
-    expect(trigger.textContent).toContain('24-hour')
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(trigger).toMatchTextContent('24-hour')
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
+          ...DEFAULT_SETTINGS,
           timeFormat: '24h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
-          allNotesFilterTags: ['book', 'link', 'person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('adds an All Notes filter tag, normalized, and persists it', async () => {
-    renderScreen()
-    const input = screen.getByLabelText('Add filter tag')
+    await renderScreen()
+    const input = page.getByLabelText('Add filter tag')
 
-    fireEvent.change(input, { target: { value: ' #Meeting ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await input.fill(' #Meeting ')
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
 
-    expect(screen.getByText('#meeting')).toBeTruthy()
-    await waitFor(() =>
-      expect(saved).toEqual([
+    await expect.element(page.getByText('#meeting')).toBeInTheDocument()
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
+          ...DEFAULT_SETTINGS,
           allNotesFilterTags: ['book', 'link', 'person', 'meeting'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('rejects a tag name outside the #tag grammar with an inline error', async () => {
-    renderScreen()
-    const input = screen.getByLabelText('Add filter tag')
-    if (!(input instanceof HTMLInputElement)) {
-      throw new Error('expected an <input>')
-    }
+    await renderScreen()
+    const input = page.getByLabelText('Add filter tag')
 
-    fireEvent.change(input, { target: { value: 'my tag' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await input.fill('my tag')
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
 
-    expect(screen.getByRole('alert').textContent).toContain(`"my tag" can't be a tag`)
+    await expect.element(page.getByRole('alert')).toMatchTextContent(`"my tag" can't be a tag`)
     // The draft stays put for fixing, and nothing reaches the store.
-    expect(input.value).toBe('my tag')
-    await waitFor(() => expect(saved).toEqual([]))
+    await expect.element(input).toHaveValue('my tag')
+    await vi.waitFor(() => expect(saved()).toEqual([]))
   })
 
   it('ignores adding a duplicate filter tag', async () => {
     stored = { allNotesFilterTags: ['book'] }
-    renderScreen()
+    await renderScreen()
     // Defaults render before the disk document lands — wait for hydration
     // (the stored list has no `person`) so the click edits the loaded list.
-    await waitFor(() => expect(screen.queryByText('#person')).toBeNull())
-    expect(screen.getByText('#book')).toBeTruthy()
+    await expectLocatorToHaveCount(page.getByText('#person'), 0)
+    await expect.element(page.getByText('#book')).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Add filter tag'), { target: { value: 'BOOK' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await page.getByLabelText('Add filter tag').fill('BOOK')
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
 
-    await waitFor(() => expect(saved).toEqual([]))
+    await vi.waitFor(() => expect(saved()).toEqual([]))
   })
 
   it('removes a filter tag and persists the rest', async () => {
     stored = { allNotesFilterTags: ['book', 'person'] }
-    renderScreen()
+    await renderScreen()
     // Wait for hydration (the stored list has no `link`), not just defaults.
-    await waitFor(() => expect(screen.queryByText('#link')).toBeNull())
-    expect(screen.getByText('#book')).toBeTruthy()
+    await expectLocatorToHaveCount(page.getByText('#link'), 0)
+    await expect.element(page.getByText('#book')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove book' }))
+    await page.getByRole('button', { name: 'Remove book' }).click()
 
-    expect(screen.queryByText('#book')).toBeNull()
-    await waitFor(() =>
-      expect(saved).toEqual([
+    expect(page.getByText('#book').query()).toBeNull()
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
         {
-          editorMarkdownSyntax: 'hide',
-          editorSpellCheck: true,
-          editorDefaultBullet: true,
-          editorBulletAfterHeading: true,
-          editorTextSize: 'small',
-          editorFullWidth: false,
-          sidebarWidth: 260,
-          contextSidebarWidth: 320,
-          semanticSearchEnabled: false,
-          describeAssets: true,
-          contactsEnabled: false,
-          mobileOnboarded: false,
-          mobileStorage: 'local',
-          mobileGraphName: '',
-          theme: 'system',
-          timeFormat: '12h',
-          dateFormat: 'mdy',
-          weekStartDay: 'monday',
+          ...DEFAULT_SETTINGS,
           allNotesFilterTags: ['person'],
-          calendarEnabled: false,
-          calendarIds: [],
-          graphColors: {},
-          aiProviders: [],
-          defaultAiProviderId: null,
-          chatModelSelection: null,
-          chatSystemPrompt: '',
-          aiPrompts: [],
         },
-      ]),
-    )
+      ])
+    })
   })
 
   it('enabling semantic search persists the opt-in', async () => {
-    renderScreen()
-    const enable = await screen.findByRole('button', { name: /enable semantic search/i })
+    await renderScreen()
+    const enable = page.getByRole('button', { name: /enable semantic search/i })
 
-    fireEvent.click(enable)
+    await enable.click()
 
-    await waitFor(() =>
-      expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: true, describeAssets: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
-      ]),
-    )
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
+        {
+          ...DEFAULT_SETTINGS,
+          semanticSearchEnabled: true,
+        },
+      ])
+    })
     // The control flips to the loading state (EmbeddingsSync owns the actual
     // download; the runtime here still reports `uninitialized`).
-    expect(screen.getByRole('progressbar', { name: /model download/i })).toBeTruthy()
+    await expect
+      .element(page.getByRole('progressbar', { name: /model download/i }))
+      .toBeInTheDocument()
   })
 
   it('shows byte-level progress while the model downloads', async () => {
     stored = { semanticSearchEnabled: true }
-    embedStatus = { status: 'loading', progress: { downloaded: 45_000_000, total: 90_000_000 } }
-    renderScreen()
+    embedRuntime.setStatus({
+      status: 'loading',
+      progress: { downloaded: 45_000_000, total: 90_000_000 },
+    })
+    await renderScreen()
 
-    const bar = await screen.findByRole('progressbar', { name: /model download/i })
-    await waitFor(() => expect(bar.getAttribute('aria-valuenow')).toBe('50'))
-    expect(screen.getByText('Downloading the model — 45 MB of 90 MB')).toBeTruthy()
+    const bar = page.getByRole('progressbar', { name: /model download/i })
+    await expect.element(bar).toHaveAttribute('aria-valuenow', '50')
+    await expect
+      .element(page.getByText('Downloading the model — 45 MB of 90 MB'))
+      .toBeInTheDocument()
   })
 
   it('shows the downloaded model once ready and persists a disable', async () => {
     stored = { semanticSearchEnabled: true }
-    embedStatus = { status: 'ready', model: 'all-MiniLM-L6-v2' }
-    renderScreen()
+    embedRuntime.setStatus({ status: 'ready', model: 'all-MiniLM-L6-v2' })
+    await renderScreen()
 
-    expect(await screen.findByText(/model downloaded \(all-MiniLM-L6-v2\)/i)).toBeTruthy()
+    await expect
+      .element(page.getByText(/model downloaded \(all-MiniLM-L6-v2\)/i))
+      .toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /disable/i }))
+    await page.getByRole('button', { name: /disable/i }).click()
 
-    await waitFor(() =>
-      expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
-      ]),
-    )
-    expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
+        {
+          ...DEFAULT_SETTINGS,
+        },
+      ])
+    })
+    await expect
+      .element(page.getByRole('button', { name: /enable semantic search/i }))
+      .toBeInTheDocument()
     // Disabling is immediate — every semantic consumer gates on the setting,
     // so there is no "takes effect on the next launch" caveat to show even
     // while the runtime still reports `ready`.
-    expect(screen.queryByText(/next launch/i)).toBeNull()
+    expect(page.getByText(/next launch/i).query()).toBeNull()
+  })
+
+  it('offers no semantic search control without an embedding runtime', async () => {
+    stored = { semanticSearchEnabled: true }
+    embedRuntime.setStatus({ status: 'unsupported' })
+    await renderScreen()
+
+    await expect
+      .element(page.getByText('Semantic search is not available on this device.'))
+      .toBeInTheDocument()
+    expect(page.getByRole('button', { name: /enable semantic search/i }).query()).toBeNull()
+    expect(page.getByRole('progressbar', { name: /model download/i }).query()).toBeNull()
   })
 
   it('re-enabling after a failed load retries the download', async () => {
-    embedStatus = { status: 'failed', message: 'offline' }
-    renderScreen()
-    const enable = await screen.findByRole('button', { name: /enable semantic search/i })
+    embedRuntime.setStatus({ status: 'failed', message: 'offline' })
+    await renderScreen()
+    const enable = page.getByRole('button', { name: /enable semantic search/i })
 
-    fireEvent.click(enable)
+    await enable.click()
 
     // The opt-in persists AND the broken runtime gets a fresh embed_ensure —
     // EmbeddingsSync only loads `uninitialized` runtimes, so the explicit
     // action carries the retry.
-    await waitFor(() => expect(invoked).toContain('embed_ensure'))
-    await waitFor(() =>
-      expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: true, describeAssets: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
-      ]),
-    )
+    await vi.waitFor(() => expect(embedRuntime.ensureCalls()).toBeGreaterThan(0))
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
+        {
+          ...DEFAULT_SETTINGS,
+          semanticSearchEnabled: true,
+        },
+      ])
+    })
   })
 
   it('surfaces a failed load with retry and disable affordances', async () => {
     stored = { semanticSearchEnabled: true }
-    embedStatus = { status: 'failed', message: 'no disk space' }
-    renderScreen()
+    embedRuntime.setStatus({ status: 'failed', message: 'no disk space' })
+    await renderScreen()
 
-    expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByText(/no disk space/i)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /try again/i })).toBeTruthy()
+    await expect.element(page.getByRole('alert')).toBeInTheDocument()
+    await expect.element(page.getByText(/no disk space/i)).toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: /try again/i })).toBeInTheDocument()
 
     // Backing out after a failure must work too — the opt-in isn't a trap.
-    fireEvent.click(screen.getByRole('button', { name: /disable/i }))
+    await page.getByRole('button', { name: /disable/i }).click()
 
-    await waitFor(() =>
-      expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
-      ]),
-    )
-    expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
+        {
+          ...DEFAULT_SETTINGS,
+        },
+      ])
+    })
+    await expect
+      .element(page.getByRole('button', { name: /enable semantic search/i }))
+      .toBeInTheDocument()
   })
 
   it('rebuilding the index wipes and re-applies the projection through the bridge', async () => {
-    try {
-      renderScreen()
+    await renderScreen()
 
-      fireEvent.click(screen.getByRole('button', { name: /rebuild index/i }))
+    await page.getByRole('button', { name: /rebuild index/i }).click()
 
-      // The whole chain: button → rebuildIndexVisibly → wipe, then the
-      // projection-version stamp that marks a completed rebuild. (The graph is
-      // empty here, so there is no apply batch in between.)
-      await waitFor(() => expect(invoked).toContain('index_clear'))
-      await waitFor(() => expect(invoked).toContain('index_meta_set'))
-    } finally {
-      resetOperations()
-    }
+    // The whole chain: button → the index lifecycle's visible rebuild → wipe,
+    // then the projection-version stamp that marks a completed rebuild. (The
+    // graph is empty here, so there is no apply batch in between.)
+    const indexCalls = (): string[] => core.indexStore.calls().map((call) => call.method)
+    await vi.waitFor(() => expect(indexCalls()).toContain('clear'))
+    await vi.waitFor(() => expect(indexCalls()).toContain('setMeta'))
   })
 
-  it('disables the index rebuild until a graph index is open', () => {
-    graph.indexGeneration = null
-    renderScreen()
-    const button = screen.getByRole('button', { name: /rebuild index/i })
-    expect(button.hasAttribute('disabled')).toBe(true)
+  it('disables the index rebuild until a graph index is open', async () => {
+    openGraph = { ...openGraph, indexGeneration: null }
+    await renderScreen()
+    const button = page.getByRole('button', { name: /rebuild index/i })
+    await expect.element(button).toBeDisabled()
   })
 
   it('opens the global shortcuts dialog from the editor settings row', async () => {
-    renderScreen()
-    const section = screen.getByRole('region', { name: 'Editor' })
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'Editor' })
 
-    fireEvent.click(within(section).getByRole('button', { name: /show all/i }))
+    await section.getByRole('button', { name: /show all/i }).click()
 
-    const dialog = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })
+    const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
     // App scope (command titles) and editor scope (binding descriptions) still
     // come from the global cheat-sheet, not from a duplicated settings list.
-    expect(within(dialog).getByText('Toggle sidebar')).toBeTruthy()
-    expect(within(dialog).getByText('Go to today')).toBeTruthy()
-    expect(within(dialog).getByText('Bold')).toBeTruthy()
-    expect(within(dialog).getByText('Heading 1')).toBeTruthy()
-    expect(within(dialog).getByText('Open the AI menu on the selection')).toBeTruthy()
+    await expect.element(dialog.getByText('Toggle sidebar')).toBeInTheDocument()
+    await expect.element(dialog.getByText('Go to today')).toBeInTheDocument()
+    await expect.element(dialog.getByText('Bold')).toBeInTheDocument()
+    await expect.element(dialog.getByText('Heading 1')).toBeInTheDocument()
+    await expect.element(dialog.getByText('Open the AI menu on the selection')).toBeInTheDocument()
   })
 
   it('reflects and persists the AI chat system prompt', async () => {
     stored = { chatSystemPrompt: 'Answer as a careful research partner.' }
-    renderScreen()
-    const textarea = screen.getByRole('textbox', { name: 'System prompt' })
-    await waitFor(() =>
-      expect((textarea as HTMLTextAreaElement).value).toBe(stored['chatSystemPrompt']),
-    )
+    await renderScreen()
+    const textarea = page.getByRole('textbox', { name: 'System prompt' })
+    await expect.element(textarea).toHaveValue('Answer as a careful research partner.')
 
-    fireEvent.change(textarea, {
-      target: { value: '  Challenge my assumptions.\nKeep the recommendation short.  ' },
-    })
-    fireEvent.blur(textarea)
+    await textarea.fill('  Challenge my assumptions.\nKeep the recommendation short.  ')
+    await userEvent.tab()
 
-    await waitFor(() =>
-      expect(saved.at(-1)).toMatchObject({
+    await vi.waitFor(() => {
+      expect(saved().at(-1)).toMatchObject({
         chatSystemPrompt: 'Challenge my assumptions.\nKeep the recommendation short.',
-      }),
-    )
+      })
+    })
   })
 
-  it('restores the default AI chat prompt', async () => {
+  it('clears the AI chat prompt', async () => {
     stored = { chatSystemPrompt: 'Always answer in haiku.' }
-    renderScreen()
-    const section = screen.getByRole('region', { name: 'AI chat' })
-    await waitFor(() =>
-      expect((within(section).getByRole('textbox') as HTMLTextAreaElement).value).toBe(
-        'Always answer in haiku.',
-      ),
-    )
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'AI chat' })
+    await expect.element(section.getByRole('textbox')).toHaveValue('Always answer in haiku.')
 
-    fireEvent.click(within(section).getByRole('button', { name: 'Use default' }))
+    await section.getByRole('button', { name: 'Clear' }).click()
 
-    await waitFor(() => expect(saved.at(-1)).toMatchObject({ chatSystemPrompt: '' }))
+    await vi.waitFor(() => expect(saved().at(-1)).toMatchObject({ chatSystemPrompt: '' }))
+  })
+
+  it('keeps long AI prompts scrollable within the viewport', async () => {
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'AI prompts' })
+
+    await section.getByRole('button', { name: /add prompt/i }).click()
+    const dialog = page.getByRole('dialog', { name: /add prompt/i })
+    const promptBody = dialog.getByPlaceholder(/Translate the following/)
+    await expect.element(promptBody).toBeInTheDocument()
+
+    expect(dialog.element().className).toContain('max-h-[calc(100dvh-2rem)]')
+    expect(dialog.element().className).toContain('overflow-y-auto')
+    expect(promptBody.element().className).toContain('field-sizing-fixed')
+    expect(promptBody.element().className).toContain('max-h-[50dvh]')
+    expect(promptBody.element().className).toContain('resize-y')
+    expect(promptBody.element().className).toContain('overflow-y-auto')
   })
 
   it('adding an AI prompt persists the full document', async () => {
-    renderScreen()
-    const section = screen.getByRole('region', { name: 'AI prompts' })
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'AI prompts' })
 
-    fireEvent.click(within(section).getByRole('button', { name: /add prompt/i }))
-    const dialog = screen.getByRole('dialog', { name: /add prompt/i })
-    fireEvent.change(within(dialog).getByPlaceholderText('Translate to French'), {
-      target: { value: 'Translate to French' },
-    })
-    fireEvent.change(within(dialog).getByPlaceholderText(/Translate the following/), {
-      target: { value: 'Translate to French.\n\n{{selectedText}}' },
-    })
-    fireEvent.submit(within(dialog).getByRole('button', { name: /add prompt/i }))
+    await section.getByRole('button', { name: /add prompt/i }).click()
+    const dialog = page.getByRole('dialog', { name: /add prompt/i })
+    await dialog.getByPlaceholder('Translate to French').fill('Translate to French')
+    await dialog
+      .getByPlaceholder(/Translate the following/)
+      .fill('Translate to French.\n\n{{selectedText}}')
+    await dialog.getByRole('button', { name: /add prompt/i }).click()
 
-    await waitFor(() =>
-      expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [{ id: expect.any(String), label: 'Translate to French', body: 'Translate to French.\n\n{{selectedText}}', mode: 'replace' }] },
-      ]),
-    )
-    expect(within(section).getByText('Translate to French')).toBeTruthy()
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
+        {
+          ...DEFAULT_SETTINGS,
+          aiPrompts: [
+            {
+              id: expect.any(String) as string,
+              label: 'Translate to French',
+              body: 'Translate to French.\n\n{{selectedText}}',
+              mode: 'replace',
+            },
+          ],
+        },
+      ])
+    })
+    await expect
+      .element(section.getByText('Translate to French', { exact: true }))
+      .toBeInTheDocument()
   })
 
   it('removing a saved AI prompt persists the emptied list', async () => {
@@ -1008,19 +824,21 @@ describe('SettingsScreen', () => {
         { id: 'p1', label: 'Translate to French', body: '{{selectedText}}', mode: 'replace' },
       ],
     }
-    renderScreen()
-    const section = screen.getByRole('region', { name: 'AI prompts' })
-    const remove = await within(section).findByRole('button', {
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'AI prompts' })
+    const remove = section.getByRole('button', {
       name: /remove translate to french/i,
     })
 
-    fireEvent.click(remove)
+    await remove.click()
 
-    await waitFor(() =>
-      expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
-      ]),
-    )
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
+        {
+          ...DEFAULT_SETTINGS,
+        },
+      ])
+    })
   })
 
   it('editing a saved AI prompt persists the change', async () => {
@@ -1029,21 +847,24 @@ describe('SettingsScreen', () => {
         { id: 'p1', label: 'Translate to French', body: '{{selectedText}}', mode: 'replace' },
       ],
     }
-    renderScreen()
-    const section = screen.getByRole('region', { name: 'AI prompts' })
-    const edit = await within(section).findByRole('button', { name: /edit translate to french/i })
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'AI prompts' })
+    const edit = section.getByRole('button', { name: /edit translate to french/i })
 
-    fireEvent.click(edit)
-    const dialog = screen.getByRole('dialog', { name: /edit prompt/i })
-    fireEvent.change(within(dialog).getByPlaceholderText('Translate to French'), {
-      target: { value: 'Translate to German' },
+    await edit.click()
+    const dialog = page.getByRole('dialog', { name: /edit prompt/i })
+    await dialog.getByPlaceholder('Translate to French').fill('Translate to German')
+    await dialog.getByRole('button', { name: /^save$/i }).click()
+
+    await vi.waitFor(() => {
+      expect(saved()).toEqual([
+        {
+          ...DEFAULT_SETTINGS,
+          aiPrompts: [
+            { id: 'p1', label: 'Translate to German', body: '{{selectedText}}', mode: 'replace' },
+          ],
+        },
+      ])
     })
-    fireEvent.submit(within(dialog).getByRole('button', { name: /^save$/i }))
-
-    await waitFor(() =>
-      expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [{ id: 'p1', label: 'Translate to German', body: '{{selectedText}}', mode: 'replace' }] },
-      ]),
-    )
   })
 })

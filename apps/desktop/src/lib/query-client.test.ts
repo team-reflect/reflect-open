@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { queryClient, throttledInvalidateIndexQueries } from './query-client'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { queryClient, queryKeys, throttledInvalidateIndexQueries } from './query-client.ts'
 
-const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+let invalidateSpy: MockInstance<typeof queryClient.invalidateQueries>
 
 /** Grows per test: the throttle keeps module-level state, so each case must
  * start well past the previous one's window to begin on a cold leading edge. */
@@ -11,8 +11,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   clockOffsetMs += 120_000
   vi.setSystemTime(Date.now() + clockOffsetMs)
-  invalidateSpy.mockClear()
-  invalidateSpy.mockResolvedValue(undefined)
+  invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -62,5 +61,36 @@ describe('throttledInvalidateIndexQueries', () => {
 
     throttledInvalidateIndexQueries()
     expect(invalidateSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('query defaults', () => {
+  it('keeps external sources stale and disables browser network pausing', () => {
+    const defaults = queryClient.defaultQueryOptions({ queryKey: queryKeys.calendar.all })
+
+    expect(defaults).toMatchObject({
+      staleTime: 0,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      networkMode: 'always',
+    })
+  })
+
+  it.each([
+    [queryKeys.index.note('/graph', 'notes/example.md')],
+    [queryKeys.chat.conversations('/graph')],
+  ])('keeps explicitly invalidated data fresh for %j', (queryKey) => {
+    expect(queryClient.defaultQueryOptions({ queryKey }).staleTime).toBe(Infinity)
+  })
+
+  it('does not apply projection freshness to similar notes', () => {
+    expect(
+      queryClient.defaultQueryOptions({ queryKey: queryKeys.similar.note('/graph', 'note.md') })
+        .staleTime,
+    ).toBe(0)
+  })
+
+  it('runs mutations while the browser reports offline', () => {
+    expect(queryClient.getDefaultOptions().mutations?.networkMode).toBe('always')
   })
 })

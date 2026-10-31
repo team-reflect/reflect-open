@@ -1,102 +1,73 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
-import { setBridge } from '@reflect/core'
+import { page } from 'vitest/browser'
+import { describe, expect, it, vi } from 'vitest'
 import {
-  FocusedDailyProvider,
-  useFocusedDailyDate,
-} from '@/providers/focused-daily-provider'
-import { RouterProvider, useRouter } from '@/routing/router'
-import { todayIso } from '@/lib/dates'
-import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window'
-import { installVirtuaTestEnv } from '@/test-utils/virtua-jsdom'
-import { DailyStream, ESTIMATED_DAY_HEIGHT } from './daily-stream'
+  createRef,
+  useEffect,
+  useLayoutEffect,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from 'react'
+import { act } from '@/test-utils/act.ts'
+import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
+import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
+import { useRouter } from '@/routing/router.tsx'
+import { getIsoToday } from '@reflect/utils'
+import { createSystemClock, type ClockService, formatDayLabel } from '@reflect/core'
+import {
+  createDayWindow,
+  dateAtIndex,
+  extendDayWindowBack,
+  indexOfDate,
+  PAST_DAYS,
+} from '@reflect/app'
+import { fireEvent } from '@/test-utils/fire-event.ts'
+import '@/test-utils/locator.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { DailyStream, ESTIMATED_DAY_HEIGHT } from './daily-stream.tsx'
 
 /**
  * The stream's first-paint anchor: virtua must put the scroll element at the
  * target day (or a back/forward entry's saved offset) before paint, so opening
  * the app never shows the top of the five-year window and then lurches down to
  * today. virtua applies an imperative scroll by assigning `scrollTop` in a
- * microtask, so these tests flush that and pin the *first* offset it writes. The
- * jsdom environment never resolves a note read, so they also cover the
- * loading-placeholder contract (reserved editor space, delayed hint).
+ * microtask. These tests assert the resulting real browser layout and also
+ * cover the loading-placeholder contract (reserved editor space, delayed hint).
  */
 
-vi.mock('@/editor/note-editor', () => ({
+vi.mock('@/editor/note-editor.tsx', () => ({
   NoteEditor: () => <div data-testid="fake-editor" />,
 }))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({
-    graph: { root: '/g', name: 'g', generation: 1 },
-    indexing: false,
-  }),
-}))
-vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({
-    settings: {
-      dateFormat: 'mdy',
-      editorMarkdownSyntax: 'hide',
-      editorSpellCheck: true,
-      aiProviders: [],
-      defaultAiProviderId: null,
-      chatSystemPrompt: '',
-      aiPrompts: [],
-    },
-    updateSettings: async () => {},
-    updateSettingsWith: () => {},
-  }),
-}))
-
-// jsdom computes no layout; installVirtuaTestEnv lets virtua measure the scroll
-// container (a tall viewport) and each row (exactly the estimate), so the range
-// around the anchor renders without any size-correction churn.
-installVirtuaTestEnv((element) =>
-  element.dataset['testid'] === 'daily-stream' ? 800 : ESTIMATED_DAY_HEIGHT,
-)
-Element.prototype.scrollTo ??= () => {}
-
-// virtua anchors by assigning `scrollTop` (not `scrollTo`); record the offsets it
-// writes so a test can pin the first one.
-const scrollTops: number[] = []
-let scrollTop = 0
-Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
-  configurable: true,
-  get() {
-    return scrollTop
-  },
-  set(value: number) {
-    scrollTop = Number(value)
-    scrollTops.push(scrollTop)
-  },
-})
-
-setBridge({
-  // Reads never resolve: every day stays a loading placeholder.
-  invoke: () => new Promise(() => {}),
-  listen: async () => () => {},
-})
-
-beforeEach(() => {
-  scrollTops.length = 0
-})
-
-afterEach(() => {
-  vi.useRealTimers()
-})
-
-function StreamProviders({ children }: { children: ReactNode }): ReactElement {
-  const [client] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-  )
-  return (
-    <QueryClientProvider client={client}>
-      <RouterProvider initialRoute={{ kind: 'today' }}>{children}</RouterProvider>
-    </QueryClientProvider>
-  )
+/**
+ * A test clock at 23:59 on 2026-06-27, for the app of {@link renderStream}.
+ */
+function clockBeforeMidnight(): ReturnType<typeof createTestClockService> {
+  return createTestClockService({ now: new Date(2026, 5, 27, 23, 59, 0).getTime() })
 }
 
-/** Records `offset` on the current history entry, as a view's scroll would. */
+function Stream({ children }: { children: ReactNode }): ReactElement {
+  return <div style={{ height: 800 }}>{children}</div>
+}
+
+/**
+ * Render `children` in a stream-sized box; the app runs on `clock` (the system clock by default).
+ */
+async function renderStream(children: ReactNode, clock: ClockService = createSystemClock()) {
+  const core = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
+  // Reads never resolve: every day stays a loading placeholder.
+  vi.spyOn(core.noteFile, 'read').mockReturnValue(new Promise(() => {}))
+  return await renderInApp(<Stream>{children}</Stream>, {
+    core,
+    graph: { root: '/g', name: 'g', generation: 1 },
+    settings: { dateFormat: 'mdy', editorMarkdownSyntax: 'hide', editorSpellCheck: true },
+    route: { kind: 'today' },
+  })
+}
+
+/**
+ * Records `offset` on the current history entry, as a view's scroll would.
+ */
 function SaveScrollProbe({ offset }: { offset: number }): ReactElement | null {
   const { saveScrollState } = useRouter()
   useEffect(() => {
@@ -105,11 +76,7 @@ function SaveScrollProbe({ offset }: { offset: number }): ReactElement | null {
   return null
 }
 
-function NavigateTodayProbe({
-  onReady,
-}: {
-  onReady: (navigateToday: () => void) => void
-}): null {
+function NavigateTodayProbe({ onReady }: { onReady: (navigateToday: () => void) => void }): null {
   const { navigate } = useRouter()
   useEffect(() => {
     onReady(() => navigate({ kind: 'today' }))
@@ -117,120 +84,221 @@ function NavigateTodayProbe({
   return null
 }
 
+/**
+ * The stream as the workspace routes it: the today and daily routes share one
+ * mounted instance.
+ */
+function RoutedStream(): ReactElement {
+  const { route } = useRouter()
+  return (
+    <DailyStream
+      target={route.kind === 'daily' ? { kind: 'date', date: route.date } : { kind: 'today' }}
+    />
+  )
+}
+
+/**
+ * Publishes the router so a test can navigate and go back.
+ */
+function RouterProbe({
+  routerRef,
+}: {
+  routerRef: RefObject<ReturnType<typeof useRouter> | null>
+}): null {
+  const router = useRouter()
+  useLayoutEffect(() => {
+    routerRef.current = router
+  })
+  return null
+}
+
 describe('DailyStream', () => {
   it('anchors its first scroll to today, with no top-of-window flicker', async () => {
-    const today = todayIso()
-    const view = render(
-      <StreamProviders>
-        <DailyStream target={{ kind: 'today' }} />
-      </StreamProviders>,
-    )
+    const today = getIsoToday()
+    const view = await renderStream(<DailyStream target={{ kind: 'today' }} />)
 
-    const expected = indexOfDate(createDayWindow(today), today) * ESTIMATED_DAY_HEIGHT
-    await waitFor(() => expect(scrollTops.length).toBeGreaterThan(0))
-    // The very first offset virtua applies is the anchor, not 0 (the top of the
-    // window): the stream never paints the top and then jumps down to today.
-    expect(scrollTops[0]).toBe(expected)
-    view.unmount()
+    const stream = page.getByTestId('daily-stream')
+    await vi.waitFor(() => expect(stream.element().scrollTop).toBeGreaterThan(0))
+    await expect.element(page.getByText(formatDayLabel(today, 'mdy'))).toBeVisible()
+    await view.unmount()
+  })
+
+  it('extends its window to show a day years before it', async () => {
+    const view = await renderStream(<DailyStream target={{ kind: 'date', date: '2003-05-01' }} />)
+
+    await expect.element(page.getByText(formatDayLabel('2003-05-01', 'mdy'))).toBeVisible()
+    await view.unmount()
+  })
+
+  it('restores an offset saved before its window grew back', async () => {
+    const view = await renderStream(<SaveScrollProbe offset={4321} />)
+    const routerRef: RefObject<ReturnType<typeof useRouter> | null> = createRef()
+    await view.rerender(
+      <Stream>
+        <SaveScrollProbe offset={4321} />
+        <RouterProbe routerRef={routerRef} />
+        <RoutedStream />
+      </Stream>,
+    )
+    const stream = page.getByTestId('daily-stream')
+    await vi.waitFor(() => expect(stream.element().scrollTop).toBeCloseTo(4321, -1))
+
+    await act(() => {
+      routerRef.current?.navigate({ kind: 'daily', date: '2003-05-01' })
+    })
+    await expect.element(page.getByText(formatDayLabel('2003-05-01', 'mdy'))).toBeVisible()
+    await act(() => {
+      routerRef.current?.back()
+    })
+
+    const extended = extendDayWindowBack(createDayWindow(getIsoToday()), '2003-05-01')
+    const addedPastHeight = (extended.anchorIndex - PAST_DAYS) * ESTIMATED_DAY_HEIGHT
+    await vi.waitFor(() => {
+      expect(stream.element().scrollTop).toBeCloseTo(4321 + addedPastHeight, -1)
+    })
+    await view.unmount()
   })
 
   it('re-anchors a today arrival to the stream-local day after midnight', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 5, 27, 23, 59, 0))
+    const clock = clockBeforeMidnight()
     let navigateToday: () => void = () => {
       throw new Error('navigate not ready')
     }
-    const view = render(
-      <StreamProviders>
+    const view = await renderStream(
+      <>
         <DailyStream target={{ kind: 'today' }} />
         <NavigateTodayProbe
           onReady={(run) => {
             navigateToday = run
           }}
         />
-      </StreamProviders>,
+      </>,
+      clock,
     )
 
     const dayWindow = createDayWindow('2026-06-27')
     await act(async () => {
-      vi.advanceTimersByTime(2 * 60 * 1000)
+      await clock.advance(2 * 60 * 1000)
     })
-    scrollTops.length = 0
-
-    await act(async () => {
+    await act(() => {
       navigateToday()
     })
 
     const expected = indexOfDate(dayWindow, '2026-06-28') * ESTIMATED_DAY_HEIGHT
-    expect(scrollTops.length).toBeGreaterThan(0)
-    expect(scrollTops[0]).toBe(expected)
-    view.unmount()
+    await vi.waitFor(() => {
+      expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
+        expected - ESTIMATED_DAY_HEIGHT,
+      )
+    })
+    await expect.element(page.getByText(formatDayLabel('2026-06-28', 'mdy'))).toBeVisible()
+    await view.unmount()
+  })
+
+  it('anchors a today arrival to the real day after a slept-through midnight', async () => {
+    const clock = clockBeforeMidnight()
+    let navigateToday: () => void = () => {
+      throw new Error('navigate not ready')
+    }
+    const view = await renderStream(
+      <>
+        <DailyStream target={{ kind: 'today' }} />
+        <NavigateTodayProbe
+          onReady={(run) => {
+            navigateToday = run
+          }}
+        />
+      </>,
+      clock,
+    )
+
+    // Simulated sleep: the wall clock jumps but no timer fires (DOM timers
+    // run on a monotonic clock that pauses while the machine sleeps).
+    await act(() => {
+      clock.setNow(new Date(2026, 5, 28, 9, 0, 0).getTime())
+    })
+    await act(() => {
+      navigateToday()
+    })
+
+    const dayWindow = createDayWindow('2026-06-27')
+    const expected = indexOfDate(dayWindow, '2026-06-28') * ESTIMATED_DAY_HEIGHT
+    await vi.waitFor(() => {
+      expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
+        expected - ESTIMATED_DAY_HEIGHT,
+      )
+    })
+    await expect.element(page.getByText(formatDayLabel('2026-06-28', 'mdy'))).toBeVisible()
+    await view.unmount()
   })
 
   it('mounts straight at a restored entry’s saved offset, not the anchor', async () => {
-    const view = render(
-      <StreamProviders>
-        <SaveScrollProbe offset={4321} />
-      </StreamProviders>,
-    )
-    scrollTops.length = 0
-
-    view.rerender(
-      <StreamProviders>
+    const view = await renderStream(<SaveScrollProbe offset={4321} />)
+    await view.rerender(
+      <Stream>
         <SaveScrollProbe offset={4321} />
         <DailyStream target={{ kind: 'today' }} />
-      </StreamProviders>,
+      </Stream>,
     )
 
-    await waitFor(() => expect(scrollTops.length).toBeGreaterThan(0))
-    expect(scrollTops[0]).toBe(4321)
-    view.unmount()
+    await vi.waitFor(() => {
+      expect(page.getByTestId('daily-stream').element().scrollTop).toBeCloseTo(4321, -1)
+    })
+    await view.unmount()
   })
 
   it('reports the focused day so the sidebar can follow it within the stream', async () => {
-    const today = todayIso()
+    const today = getIsoToday()
     const dayWindow = createDayWindow(today)
-    let focused: string | null = 'unset'
+    const focusedRef: RefObject<string | null> = createRef()
     function FocusProbe(): null {
-      focused = useFocusedDailyDate()
+      const focused = useFocusedDailyDate()
+
+      useLayoutEffect(() => {
+        focusedRef.current = focused
+        return () => {
+          focusedRef.current = null
+        }
+      }, [focused])
+
       return null
     }
-    const view = render(
-      <StreamProviders>
+    const view = await renderStream(
+      <>
         <FocusedDailyProvider>
           <DailyStream target={{ kind: 'date', date: today }} />
           <FocusProbe />
         </FocusedDailyProvider>
-      </StreamProviders>,
+      </>,
     )
 
     // Focus enters a stream row (the route is unchanged): the sidebar's day
     // must move to that row's date, not stay on the routed day.
-    const row = (await waitFor(() => {
+    const row = await vi.waitFor(() => {
       const el = view.container.querySelector('[data-index]')
       expect(el).not.toBeNull()
-      return el
-    })) as HTMLElement
+      return el as HTMLElement
+    })
     const date = dateAtIndex(dayWindow, Number(row.getAttribute('data-index')))
-    fireEvent.focusIn(row)
+    await act(() => {
+      fireEvent.focusIn(row)
+    })
 
-    expect(focused).toBe(date)
-    view.unmount()
+    expect(focusedRef.current).toBe(date)
+    await view.unmount()
   })
 
   it('reserves the editor’s space on loading placeholders, with the hint delayed', async () => {
-    const view = render(
-      <StreamProviders>
-        <DailyStream target={{ kind: 'today' }} />
-      </StreamProviders>,
-    )
+    const view = await renderStream(<DailyStream target={{ kind: 'today' }} />)
 
-    const placeholders = await view.findAllByText('Loading note…')
+    await vi.waitFor(() => {
+      expect(document.querySelectorAll('.reflect-note-loading').length).toBeGreaterThan(0)
+    })
+    const placeholders = document.querySelectorAll('.reflect-note-loading')
     expect(placeholders.length).toBeGreaterThan(0)
     for (const placeholder of placeholders) {
       expect(placeholder.className).toContain('reflect-note-loading')
       expect(placeholder.className).toMatch(/min-h-/)
     }
-    view.unmount()
+    await view.unmount()
   })
 })

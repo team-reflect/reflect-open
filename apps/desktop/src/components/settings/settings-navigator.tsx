@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
-import { cn } from '@/lib/utils'
-import { scrollToSettingsSection } from './section-scrolling'
-import { type SettingsSectionId } from './sections'
-import { useActiveSettingsSection } from './use-active-settings-section'
-import { useVisibleSettingsSections } from './use-visible-settings-sections'
+import { cn } from '@/lib/utils.ts'
+import { scrollToSettingsSection } from './section-scrolling.ts'
+import type { SettingsSectionId } from './sections.ts'
+import { useActiveSettingsSection } from './use-active-settings-section.ts'
+import { useVisibleSettingsSections } from './use-visible-settings-sections.ts'
 
 /** Where the sliding marker sits, in the rail's own coordinates. */
 interface MarkerPosition {
@@ -26,13 +26,13 @@ interface SettingsNavigatorProps {
  */
 export function SettingsNavigator({ className }: SettingsNavigatorProps): ReactElement {
   const navRef = useRef<HTMLElement | null>(null)
-  const itemRefs = useRef(new Map<SettingsSectionId, HTMLButtonElement>())
+  const itemsRef = useRef(new Map<SettingsSectionId, HTMLButtonElement>())
   const activeId = useActiveSettingsSection(navRef)
   const sections = useVisibleSettingsSections()
   const [marker, setMarker] = useState<MarkerPosition | null>(null)
 
   const measure = useCallback((): void => {
-    const item = itemRefs.current.get(activeId)
+    const item = itemsRef.current.get(activeId)
     if (!item || item.offsetHeight === 0) {
       setMarker(null)
       return
@@ -72,9 +72,9 @@ export function SettingsNavigator({ className }: SettingsNavigatorProps): ReactE
               type="button"
               ref={(node) => {
                 if (node) {
-                  itemRefs.current.set(section.id, node)
+                  itemsRef.current.set(section.id, node)
                 } else {
-                  itemRefs.current.delete(section.id)
+                  itemsRef.current.delete(section.id)
                 }
               }}
               aria-current={isActive ? 'location' : undefined}

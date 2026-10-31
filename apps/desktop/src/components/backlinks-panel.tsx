@@ -1,10 +1,10 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { BacklinkLoadMore } from '@/components/backlink-load-more'
-import { BacklinkSourceGroup } from '@/components/backlink-source-group'
-import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation'
-import { useBacklinkSources } from '@/hooks/use-backlink-sources'
-import { useBacklinksExpanded } from '@/hooks/use-backlinks-expanded'
+import { BacklinkLoadMore } from '@/components/backlink-load-more.tsx'
+import { BacklinkSourceGroup } from '@/components/backlink-source-group.tsx'
+import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation.ts'
+import { useBacklinkSources } from '@/hooks/use-backlink-sources.ts'
+import { useBacklinksExpanded } from '@/hooks/use-backlinks-expanded.ts'
 
 interface BacklinksPanelProps {
   /** Graph-relative path of the note whose inbound links to show. */
@@ -38,7 +38,7 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
     loadMore,
   } = useBacklinkSources(path)
   const [expanded, setExpanded] = useBacklinksExpanded()
-  const { openSource, onWikilinkClick, resolveImageUrl } = useBacklinkNavigation()
+  const { openSource, onWikilinkClick } = useBacklinkNavigation()
 
   if (isError) {
     return (
@@ -94,7 +94,6 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
             expanded={expanded}
             onOpen={openSource}
             onWikilinkClick={onWikilinkClick}
-            resolveImageUrl={resolveImageUrl}
           />
         ))}
         <BacklinkLoadMore

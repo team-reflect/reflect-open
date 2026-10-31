@@ -1,11 +1,13 @@
 import { useId, type ReactElement } from 'react'
-import { InlineAlert } from '@/components/inline-alert'
-import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step'
-import { GithubAuthStep } from '@/components/settings/github-auth-step'
-import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { Input } from '@/components/ui/input'
-import { useConnectGithubWizard, type ConnectWizardStep } from '@/hooks/use-connect-github-wizard'
+import { getIsComposing } from '@meowdown/core'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step.tsx'
+import { GithubAuthStep } from '@/components/settings/github-auth-step.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { useConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
+import type { ConnectWizardStep } from '@reflect/app'
 
 interface ConnectGithubDrawerProps {
   open: boolean
@@ -15,8 +17,8 @@ interface ConnectGithubDrawerProps {
 }
 
 const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
-  repo: 'Back up this graph to a private GitHub repository and sync it with Reflect on your other devices.',
-  auth: 'Sign in so Reflect can push your backups.',
+  repo: 'Sync this graph with Reflect on your other devices through a private GitHub repository.',
+  auth: 'Sign in so Reflect can sync with it.',
   finish: 'Connecting your repository…',
 }
 
@@ -43,10 +45,7 @@ export function ConnectGithubDrawer({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Connect GitHub">
         {open ? (
-          <ConnectWizardSheet
-            onClose={() => onOpenChange(false)}
-            {...(pollIntervalMs !== undefined ? { pollIntervalMs } : {})}
-          />
+          <ConnectWizardSheet onClose={() => onOpenChange(false)} pollIntervalMs={pollIntervalMs} />
         ) : null}
       </DrawerContent>
     </Drawer>
@@ -59,100 +58,110 @@ function ConnectWizardSheet({
   pollIntervalMs,
 }: {
   onClose: () => void
-  pollIntervalMs?: number
+  pollIntervalMs?: number | undefined
 }): ReactElement {
   // Never derived from the graph name: the local graph's display name is the
   // sandbox folder's basename — literally "Documents".
   const wizard = useConnectGithubWizard({
     suggestedRepoName: 'reflect-backup',
     onClose,
-    ...(pollIntervalMs !== undefined ? { pollIntervalMs } : {}),
+    pollIntervalMs,
   })
   const createNameId = useId()
   const existingRepoId = useId()
 
   return (
-    <div className="flex flex-col gap-3">
+    <>
       <DrawerTitle>Connect GitHub</DrawerTitle>
-      <p className="text-xs text-text-muted">{STEP_DESCRIPTIONS[wizard.step]}</p>
+      <DrawerBody>
+        <p className="text-xs text-text-muted">{STEP_DESCRIPTIONS[wizard.step]}</p>
 
-      {wizard.step === 'repo' ? (
-        <>
-          <div className="flex flex-col gap-2">
-            <label className="flex min-h-11 items-center gap-3 text-[15px] text-text">
-              <input
-                type="radio"
-                name="repo-mode"
-                checked={wizard.mode === 'create'}
-                onChange={() => wizard.setMode('create')}
-              />
-              Create a new private repository
-            </label>
-            {wizard.mode === 'create' ? (
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor={createNameId} className={FIELD_LABEL_CLASS}>
-                  Repository name
-                </label>
-                <Input
-                  id={createNameId}
-                  value={wizard.repoName}
-                  enterKeyHint="go"
-                  onChange={(event) => wizard.setRepoName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      wizard.continueFromRepo()
-                    }
-                  }}
+        {wizard.step === 'repo' ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <label className="flex min-h-11 items-center gap-3 text-[15px] text-text">
+                <input
+                  type="radio"
+                  name="repo-mode"
+                  checked={wizard.mode === 'create'}
+                  onChange={() => wizard.setMode('create')}
                 />
-              </div>
-            ) : null}
-            <label className="flex min-h-11 items-center gap-3 text-[15px] text-text">
-              <input
-                type="radio"
-                name="repo-mode"
-                checked={wizard.mode === 'existing'}
-                onChange={() => wizard.setMode('existing')}
-              />
-              Use an existing repository
-            </label>
-            {wizard.mode === 'existing' ? (
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor={existingRepoId} className={FIELD_LABEL_CLASS}>
-                  Repository
-                </label>
-                <Input
-                  id={existingRepoId}
-                  value={wizard.existingRepo}
-                  placeholder="owner/name"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  enterKeyHint="go"
-                  onChange={(event) => wizard.setExistingRepo(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      wizard.continueFromRepo()
-                    }
-                  }}
+                Create a new private repository
+              </label>
+              {wizard.mode === 'create' ? (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={createNameId} className={FIELD_LABEL_CLASS}>
+                    Repository name
+                  </label>
+                  <Input
+                    id={createNameId}
+                    value={wizard.repoName}
+                    enterKeyHint="go"
+                    onChange={(event) => wizard.setRepoName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (getIsComposing()) {
+                        return
+                      }
+                      if (event.key === 'Enter') {
+                        wizard.continueFromRepo()
+                      }
+                    }}
+                  />
+                </div>
+              ) : null}
+              <label className="flex min-h-11 items-center gap-3 text-[15px] text-text">
+                <input
+                  type="radio"
+                  name="repo-mode"
+                  checked={wizard.mode === 'existing'}
+                  onChange={() => wizard.setMode('existing')}
                 />
-              </div>
-            ) : null}
-          </div>
-          <Button onClick={wizard.continueFromRepo}>Continue</Button>
-        </>
-      ) : null}
+                Use an existing repository
+              </label>
+              {wizard.mode === 'existing' ? (
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={existingRepoId} className={FIELD_LABEL_CLASS}>
+                    Repository
+                  </label>
+                  <Input
+                    id={existingRepoId}
+                    value={wizard.existingRepo}
+                    placeholder="owner/name"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    enterKeyHint="go"
+                    onChange={(event) => wizard.setExistingRepo(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (getIsComposing()) {
+                        return
+                      }
+                      if (event.key === 'Enter') {
+                        wizard.continueFromRepo()
+                      }
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <Button onClick={wizard.continueFromRepo}>Continue</Button>
+          </>
+        ) : null}
 
-      {wizard.step === 'auth' ? (
-        <GithubAuthStep
-          onAuthed={wizard.onAuthed}
-          repoName={wizard.mode === 'create' ? wizard.repoName.trim() : undefined}
-        />
-      ) : null}
+        {wizard.step === 'auth' ? (
+          <GithubAuthStep
+            onAuthed={wizard.onAuthed}
+            repoName={wizard.mode === 'create' ? wizard.repoName.trim() : undefined}
+          />
+        ) : null}
 
-      {wizard.step === 'finish' ? <ConnectGithubFinishStep wizard={wizard} layout="stack" /> : null}
+        {wizard.step === 'finish' ? (
+          <ConnectGithubFinishStep wizard={wizard} layout="stack" />
+        ) : null}
 
-      {wizard.step !== 'finish' && wizard.error !== null ? (
-        <InlineAlert tone="error">{wizard.error}</InlineAlert>
-      ) : null}
-    </div>
+        {wizard.step !== 'finish' && wizard.error !== null ? (
+          <InlineAlert tone="error">{wizard.error}</InlineAlert>
+        ) : null}
+      </DrawerBody>
+    </>
   )
 }

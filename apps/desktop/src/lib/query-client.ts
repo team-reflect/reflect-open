@@ -1,31 +1,198 @@
 import { QueryClient } from '@tanstack/react-query'
 
+type GraphRoot = string | undefined
+type PaletteSearchMode = 'hybrid' | 'lexical'
+
+/**
+ * The single source of truth for every TanStack Query cache identity.
+ */
+export const queryKeys = {
+  index: {
+    all: ['index'] as const,
+    graph(root: GraphRoot) {
+      return [...this.all, root] as const
+    },
+    allNotes(root: GraphRoot) {
+      return [...this.graph(root), 'all-notes'] as const
+    },
+    allNotesWithTag(root: GraphRoot, foldedTag: string | null) {
+      return [...this.allNotes(root), 'tag', foldedTag] as const
+    },
+    allNotesTags(root: GraphRoot) {
+      return [...this.graph(root), 'all-notes-tags'] as const
+    },
+    paletteSuggestions(
+      root: GraphRoot,
+      options: { text: string; dateFormat: string; weekStartDay: string; today: string },
+    ) {
+      return [
+        ...this.graph(root),
+        'palette-suggest',
+        options.text,
+        options.dateFormat,
+        options.weekStartDay,
+        options.today,
+      ] as const
+    },
+    paletteSearch(root: GraphRoot, mode: PaletteSearchMode, text: string) {
+      return [...this.graph(root), 'palette-search', mode, text] as const
+    },
+    notePreview(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'note-preview', path] as const
+    },
+    attendeeSuggestions(root: GraphRoot, text: string, contacts: boolean) {
+      return [...this.graph(root), 'attendee-suggestions', text, contacts] as const
+    },
+    dailyDates(root: GraphRoot, start: string, end: string) {
+      return [...this.graph(root), 'daily-dates', start, end] as const
+    },
+    templates(root: GraphRoot) {
+      return [...this.graph(root), 'templates'] as const
+    },
+    backlinks(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'backlinks', path] as const
+    },
+    note(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'note', path] as const
+    },
+    pinnedNotes(root: GraphRoot) {
+      return [...this.graph(root), 'pinned-notes'] as const
+    },
+    suggestedContact(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'suggested-contact', path] as const
+    },
+    dailyEmpty(root: GraphRoot, path: string) {
+      return [...this.graph(root), 'daily-empty', path] as const
+    },
+    mobileAllNotes(root: GraphRoot) {
+      return [...this.graph(root), 'mobile-all-notes'] as const
+    },
+    mobileAllNotesWithSearch<TSearch>(root: GraphRoot, search: TSearch) {
+      return [...this.mobileAllNotes(root), search] as const
+    },
+    mobileNotePicker(root: GraphRoot, text: string) {
+      return [...this.graph(root), 'mobile-note-picker', text] as const
+    },
+    mobileNoteCount(root: GraphRoot) {
+      return [...this.graph(root), 'mobile-note-count'] as const
+    },
+  },
+  similar: {
+    all: ['similar'] as const,
+    note(root: GraphRoot, path: string) {
+      return [...this.all, root, path] as const
+    },
+  },
+  xPost: {
+    all: ['x-post'] as const,
+    archive(root: GraphRoot, postId: string) {
+      return [...this.all, root, postId] as const
+    },
+  },
+  chat: {
+    all: ['chat'] as const,
+    conversations(root: GraphRoot) {
+      return [...this.all, root, 'conversations'] as const
+    },
+  },
+  calendar: {
+    all: ['calendar'] as const,
+    calendars: ['calendar', 'calendars'] as const,
+    events(date: string, calendarIds: readonly string[]) {
+      return [...this.all, 'events', date, calendarIds] as const
+    },
+  },
+  icloud: {
+    all: ['icloud'] as const,
+    status: ['icloud', 'status'] as const,
+    pendingNotes(root: GraphRoot) {
+      return [...this.all, root, 'pending-notes'] as const
+    },
+  },
+  agentSkill: {
+    all: ['agent-skill'] as const,
+    status(root: GraphRoot) {
+      return [...this.all, root, 'status'] as const
+    },
+  },
+  iap: {
+    all: ['iap'] as const,
+    products: ['iap', 'products'] as const,
+  },
+  mobile: {
+    all: ['mobile'] as const,
+    storage: ['mobile', 'storage'] as const,
+  },
+} as const
+
+/**
+ * Stable identities for mutations that are observed outside their owning hook.
+ */
+export const mutationKeys = {
+  tasks: {
+    all: ['tasks'] as const,
+    graph(root: GraphRoot) {
+      return [...this.all, root] as const
+    },
+    snippetToggle(root: GraphRoot) {
+      return [...this.graph(root), 'snippet-toggle'] as const
+    },
+  },
+  agentSkill: {
+    all: ['agent-skill'] as const,
+    write(root: GraphRoot) {
+      return [...this.all, root, 'write'] as const
+    },
+  },
+  classic: {
+    all: ['classic'] as const,
+    signIn: ['classic', 'sign-in'] as const,
+    signOut: ['classic', 'sign-out'] as const,
+  },
+  iap: {
+    all: ['iap'] as const,
+    purchase: ['iap', 'purchase'] as const,
+    restore: ['iap', 'restore'] as const,
+    redeem: ['iap', 'redeem'] as const,
+  },
+} as const
+
+export const mutationScopeIds = {
+  agentSkillWrite: (root: GraphRoot) => `agent-skill:write:${root ?? 'none'}`,
+  iapAction: 'iap:action',
+} as const
+
 /**
  * The app's one TanStack Query client (adopted in Plan 07 per architecture
  * conventions §5): `queryFn`s are `@reflect/core` getters over the SQLite
- * projection, so freshness is event-driven, not poll-driven — the graph index
- * lifecycle calls {@link invalidateIndexQueries} after rows actually change
- * (initial reconcile, then each applied watcher batch).
+ * projection, so index freshness is event-driven, not poll-driven — the graph
+ * index lifecycle calls {@link invalidateIndexQueries} after rows actually
+ * change (initial reconcile, then each applied watcher batch).
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Index reads are local SQLite over IPC: cheap, and kept fresh by
-      // invalidation. Treat cached data as good until an invalidation says
-      // otherwise; never refetch just because a window regained focus.
-      staleTime: Infinity,
+      staleTime: 0,
       retry: 1,
       refetchOnWindowFocus: false,
+      networkMode: 'always',
+    },
+    mutations: {
+      networkMode: 'always',
     },
   },
 })
 
-/** Every index-backed query nests under this key (e.g. `['index', 'backlinks', path]`). */
-export const INDEX_QUERY_SCOPE = 'index'
+// SQLite projections and chat history are refreshed by explicit invalidation.
+// Settings load freshness lives with its shared query options.
+queryClient.setQueryDefaults(queryKeys.index.all, { staleTime: Infinity })
+queryClient.setQueryDefaults(queryKeys.chat.all, { staleTime: Infinity })
 
-/** Refetch all index-backed queries; called after index rows change. */
+/**
+ * Refetch all index-backed queries; called after index rows change.
+ */
 export function invalidateIndexQueries(): void {
-  void queryClient.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.index.all })
 }
 
 /**
@@ -65,8 +232,23 @@ export function throttledInvalidateIndexQueries(): void {
   }, INVALIDATE_THROTTLE_MS - elapsed)
 }
 
-/** The iCloud container listing (`icloud_status`) — read by the graph chooser and Settings → iCloud. */
-export const ICLOUD_STATUS_QUERY_KEY = ['icloud-status'] as const
+/**
+ * "Similar notes" results nest under this key — deliberately *outside*
+ * `queryKeys.index`. Every other index-backed read is one cheap SQLite
+ * query, so refetching the lot after any applied batch is fine; a neighbor
+ * lookup is up to seventeen vector KNN queries (one per seed chunk), and under
+ * the index scope it re-ran for changes it has nothing to do with — a remote
+ * sync batch, a Git commit, an asset description, your own keystrokes in an
+ * unrelated pane. With its own scope the panel computes once per note per
+ * session, which is what it's for.
+ *
+ * Forget these cached neighbors on a graph switch. The graph root is part of
+ * the key so stale rows could never be *read* after a switch, but these entries
+ * are kept for the whole session and would otherwise never be collected.
+ */
+export function dropSimilarNotesQueries(): void {
+  queryClient.removeQueries({ queryKey: queryKeys.similar.all })
+}
 
 /**
  * Forget the cached iCloud container listing after its contents change (a
@@ -75,13 +257,27 @@ export const ICLOUD_STATUS_QUERY_KEY = ['icloud-status'] as const
  * list — deleted graph included — while the refetch runs.
  */
 export function dropIcloudStatusQuery(): void {
-  queryClient.removeQueries({ queryKey: ICLOUD_STATUS_QUERY_KEY })
+  queryClient.removeQueries({ queryKey: queryKeys.icloud.status })
 }
 
-/** Chat-history queries nest under this key (e.g. `['chat', 'conversations', root]`). */
-export const CHAT_QUERY_SCOPE = 'chat'
-
-/** Refetch chat-history queries; called after a turn save or a delete. */
+/**
+ * Refetch chat-history queries; called after a turn save or a delete.
+ */
 export function invalidateChatQueries(): void {
-  void queryClient.invalidateQueries({ queryKey: [CHAT_QUERY_SCOPE] })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.chat.all })
+}
+
+/**
+ * Forget the archived X posts when their graph session ends: their media URLs
+ * name that session, so a reopen of the same graph must read them again.
+ */
+export function dropXPostQueries(): void {
+  queryClient.removeQueries({ queryKey: queryKeys.xPost.all })
+}
+
+/**
+ * Re-read archived X posts; called after a capture pass writes archive JSON.
+ */
+export function invalidateXPostQueries(): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.xPost.all })
 }

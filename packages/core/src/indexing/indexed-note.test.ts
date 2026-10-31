@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { gistBodyHash, parseNote } from '../markdown'
-import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
+import { gistBodyHash, parseNote } from '../markdown/index.ts'
+import {
+  buildIndexedNote,
+  CLAIM_TIER,
+  indexedNoteSchema,
+  PROJECTION_VERSION,
+} from './indexed-note.ts'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills task breadcrumbs', () => {
-    expect(PROJECTION_VERSION).toBe(15)
+  it('carries the projection version that rebuilds heading-chain task breadcrumbs', () => {
+    expect(PROJECTION_VERSION).toBe(22)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -35,15 +40,19 @@ describe('buildIndexedNote', () => {
 
     const wiki = indexed.links.filter((link) => link.kind === 'wiki')
     expect(
-      wiki.map((link) => ({ targetRaw: link.targetRaw, targetKey: link.targetKey, alias: link.alias })),
+      wiki.map((link) => ({
+        targetRaw: link.targetRaw,
+        targetKey: link.targetKey,
+        alias: link.alias,
+      })),
     ).toEqual([
       { targetRaw: 'Charlotte', targetKey: 'charlotte', alias: null },
       { targetRaw: 'Note', targetKey: 'note', alias: 'alias' },
     ])
-    expect(indexed.links.some((link) => link.kind === 'md' && link.targetRaw === 'https://x.com')).toBe(
-      true,
-    )
-    expect(indexed.assets).toEqual(['assets/p.png'])
+    expect(
+      indexed.links.some((link) => link.kind === 'md' && link.targetRaw === 'https://x.com'),
+    ).toBe(true)
+    expect(indexed.assets).toEqual(['notes/assets/p.png', 'assets/p.png'])
   })
 
   it('derives v1 subject aliases from a `//` title, after frontmatter aliases', () => {
@@ -96,6 +105,26 @@ describe('buildIndexedNote', () => {
     expect(indexed.emails).toEqual([{ email: 'ada@example.com', emailKey: 'ada@example.com' }])
   })
 
+  it('projects legacy nested email fields', () => {
+    const source = [
+      '# Ada',
+      '',
+      '- Type: #person',
+      '- Emails',
+      '  - <Ada@Example.com>',
+      '  - [work@example.com](mailto:work@example.com)',
+    ].join('\n')
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/ada.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.emails).toEqual([
+      { email: 'Ada@Example.com', emailKey: 'ada@example.com' },
+      { email: 'work@example.com', emailKey: 'work@example.com' },
+    ])
+  })
+
   it('derives the list preview and folded tag keys at index time', () => {
     const source = '# Plans\n\nFirst body line. #CAFÉ'
     const indexed = buildIndexedNote(parseNote({ path: 'notes/p.md', source }), {
@@ -128,6 +157,35 @@ describe('buildIndexedNote', () => {
     expect(withoutText.assetText).toBe('')
   })
 
+  it('flags a note as empty only when nothing would render', () => {
+    const hasContentOf = (source: string): boolean => {
+      return buildIndexedNote(parseNote({ path: 'daily/2026-06-09.md', source }), {
+        fileHash: 'h',
+        mtime: 0,
+        source,
+      }).hasContent
+    }
+
+    expect(hasContentOf('')).toBe(false)
+    expect(hasContentOf('\n  \n')).toBe(false)
+    expect(hasContentOf('---\nprivate: true\n---\n')).toBe(false)
+    // The Tasks screen's "+" writes this before anything is typed.
+    expect(hasContentOf('+ [ ] \n')).toBe(false)
+
+    expect(hasContentOf('Bought milk\n')).toBe(true)
+    expect(hasContentOf('+ [ ] buy milk\n')).toBe(true)
+    expect(hasContentOf('#gym\n')).toBe(true)
+    expect(hasContentOf('See [[Foo]]\n')).toBe(true)
+    // A body that is only a reference extracts to '', but it still carries
+    // tokens the FTS body can match.
+    expect(hasContentOf('![](assets/beach.png)\n')).toBe(true)
+    expect(hasContentOf('https://example.com/shop\n')).toBe(true)
+    expect(hasContentOf('<https://example.com/shop>\n')).toBe(true)
+    expect(hasContentOf('[](notes/foo.md)\n')).toBe(true)
+    // No token at all, but a reader still sees it.
+    expect(hasContentOf('🎉\n')).toBe(true)
+  })
+
   it('marks daily notes with their date and carries no id', () => {
     const indexed = buildIndexedNote(parseNote({ path: 'daily/2026-06-09.md', source: 'today' }), {
       fileHash: 'h',
@@ -142,12 +200,13 @@ describe('buildIndexedNote', () => {
   })
 
   it('derives the note kind from the path', () => {
-    const kindOf = (path: string): string =>
-      buildIndexedNote(parseNote({ path, source: 'body' }), {
+    const kindOf = (path: string): string => {
+      return buildIndexedNote(parseNote({ path, source: 'body' }), {
         fileHash: 'h',
         mtime: 0,
         source: 'body',
       }).kind
+    }
     expect(kindOf('daily/2026-06-09.md')).toBe('daily')
     expect(kindOf('notes/n.md')).toBe('note')
     expect(kindOf('templates/journal.md')).toBe('template')
@@ -177,8 +236,9 @@ describe('buildIndexedNote', () => {
 
   it('projects the gist url and computes staleness from the body hash', () => {
     const body = '# N\n\npublished body\n'
-    const block = (hash: string): string =>
-      `---\ngist:\n  id: g1\n  url: https://gist.github.com/alex/g1\n  file: N.md\n  hash: ${hash}\n---\n`
+    const block = (hash: string): string => {
+      return `---\ngist:\n  id: g1\n  url: https://gist.github.com/alex/g1\n  file: N.md\n  hash: ${hash}\n---\n`
+    }
 
     const fresh = block(gistBodyHash(body)) + body
     const indexedFresh = buildIndexedNote(parseNote({ path: 'notes/n.md', source: fresh }), {
@@ -220,21 +280,13 @@ describe('buildIndexedNote', () => {
     })
     expect(indexed.tasks).toEqual([
       {
-        markerOffset: source.indexOf('[ ]'),
-        text: 'buy milk',
-        breadcrumbs: [],
-        raw: '[ ] buy milk',
+        astPath: '[1]',
+        markdown: 'buy milk',
+        breadcrumbs: ['Todo'],
         checked: false,
         dueDate: null,
       },
-      {
-        markerOffset: source.indexOf('[x] call'),
-        text: 'call mum',
-        breadcrumbs: [],
-        raw: '[x] call mum',
-        checked: true,
-        dueDate: null,
-      },
+      { astPath: '[5]', markdown: 'call mum', breadcrumbs: ['Todo'], checked: true, dueDate: null },
     ])
   })
 
@@ -248,17 +300,6 @@ describe('buildIndexedNote', () => {
     expect(indexed.tasks[0]?.dueDate).toBe('2026-06-20')
   })
 
-  it('flags notes carrying sync conflict markers', () => {
-    const source =
-      '# Shared\n\n<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
-    const indexed = buildIndexedNote(parseNote({ path: 'notes/shared.md', source }), {
-      fileHash: 'h',
-      mtime: 0,
-      source,
-    })
-    expect(indexed.hasConflict).toBe(true)
-  })
-
   it('produces a payload that satisfies the cross-language contract schema', () => {
     // Guards the TS half of the TS↔Rust `IndexedNote` contract: if a field is
     // dropped or mistyped here, the schema parse fails before it can desync from
@@ -270,5 +311,144 @@ describe('buildIndexedNote', () => {
       source,
     })
     expect(() => indexedNoteSchema.parse(indexed)).not.toThrow()
+  })
+})
+
+describe('projectNoteAliases — derived linkable rich-title aliases', () => {
+  function aliasesOf(source: string, path = 'notes/rich.md') {
+    return buildIndexedNote(parseNote({ path, source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    }).aliases
+  }
+
+  it('derives a linkable alias from a rich title, keeping the raw title', () => {
+    const source = '# Meeting with [[Ada Lovelace|Ada]]\n\nHi.'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/rich.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.title).toBe('Meeting with [[Ada Lovelace|Ada]]')
+    expect(indexed.aliases).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
+  })
+
+  it('does not duplicate a frontmatter alias that owns the same key', () => {
+    expect(
+      aliasesOf('---\naliases: ["Meeting with Ada"]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n'),
+    ).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
+  })
+
+  it('derives from a rich frontmatter alias too', () => {
+    expect(
+      aliasesOf('---\naliases: ["Meeting with [[Ada Lovelace|Ada]]"]\n---\n# Plain Title\n'),
+    ).toEqual([
+      {
+        alias: 'Meeting with [[Ada Lovelace|Ada]]',
+        aliasKey: 'meeting with [[ada lovelace|ada]]',
+      },
+      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
+    ])
+  })
+
+  it('projects nothing for a degenerate rich title', () => {
+    expect(aliasesOf('# [[ [ ]]\n')).toEqual([])
+  })
+
+  it('skips a derived form the wiki-link syntax cannot address', () => {
+    expect(aliasesOf('# C:\\notes [[Ada Lovelace|Ada]]\n')).toEqual([])
+  })
+})
+
+describe('projectNoteClaims (via buildIndexedNote)', () => {
+  const meta = { fileHash: 'h', mtime: 1, source: '' }
+
+  it('claims the filename stem only when the authored title differs', () => {
+    const titled = buildIndexedNote(
+      parseNote({ path: 'Projects/Plan.md', source: '# Weekly Planning' }),
+      { ...meta, source: '# Weekly Planning' },
+    )
+    expect(titled.claims).toEqual([
+      { key: 'weekly planning', tier: CLAIM_TIER.title },
+      { key: 'plan', tier: CLAIM_TIER.basename },
+    ])
+
+    // An untitled note already carries its filename as its title.
+    const untitled = buildIndexedNote(
+      parseNote({ path: 'Projects/Plan.md', source: 'no heading here' }),
+      { ...meta, source: 'no heading here' },
+    )
+    expect(untitled.claims).toEqual([{ key: 'plan', tier: CLAIM_TIER.title }])
+  })
+
+  it('claims a calendar-valid daily date but not an impossible one', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'daily/2026-07-26.md', source: '' }), meta).claims,
+    ).toContainEqual({ key: '2026-07-26', tier: CLAIM_TIER.dailyDate })
+    expect(
+      buildIndexedNote(parseNote({ path: 'daily/2026-02-31.md', source: '' }), meta).claims,
+    ).not.toContainEqual({ key: '2026-02-31', tier: CLAIM_TIER.dailyDate })
+  })
+
+  it('claims aliases between the title and the stem', () => {
+    const source = '---\naliases: [Roadmap]\n---\n# Weekly Planning'
+    const indexed = buildIndexedNote(parseNote({ path: 'Projects/Plan.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(indexed.claims).toEqual([
+      { key: 'weekly planning', tier: CLAIM_TIER.title },
+      { key: 'roadmap', tier: CLAIM_TIER.alias },
+      { key: 'plan', tier: CLAIM_TIER.basename },
+    ])
+  })
+
+  it('claims nothing for a template', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'templates/meeting.md', source: '# Meeting' }), {
+        ...meta,
+        source: '# Meeting',
+      }).claims,
+    ).toEqual([])
+  })
+})
+
+describe('path addressing (via buildIndexedNote)', () => {
+  const meta = { fileHash: 'h', mtime: 1, source: '' }
+
+  it('folds the note path into pathKey', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'Projects/Plan.md', source: '' }), meta).pathKey,
+    ).toBe('projects/plan.md')
+  })
+
+  it('stamps targetPathKey for path-form links and null for name-form links', () => {
+    const source = 'See [[Projects/Plan]] and [[Plan]] and [rel](./Sibling.md).'
+    const indexed = buildIndexedNote(parseNote({ path: 'Journal/Today.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(
+      indexed.links.map((link) => ({ raw: link.targetRaw, pathKey: link.targetPathKey })),
+    ).toEqual([
+      { raw: 'Projects/Plan', pathKey: 'projects/plan.md' },
+      { raw: 'Plan', pathKey: null },
+      { raw: './Sibling.md', pathKey: 'journal/sibling.md' },
+    ])
+  })
+
+  it('stores the classifier name key, empty when the target has no name reading', () => {
+    const source = 'See [[Projects/Plan#Next]] and [[Plan.md]] and [[/Rooted]] and [[Plan]].'
+    const indexed = buildIndexedNote(parseNote({ path: 'Journal/Today.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(indexed.links.map((link) => ({ raw: link.targetRaw, key: link.targetKey }))).toEqual([
+      { raw: 'Projects/Plan#Next', key: 'projects/plan' },
+      { raw: 'Plan.md', key: 'plan' },
+      { raw: '/Rooted', key: '' },
+      { raw: 'Plan', key: 'plan' },
+    ])
   })
 })

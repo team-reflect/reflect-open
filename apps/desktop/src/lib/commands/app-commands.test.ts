@@ -1,55 +1,50 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { EmbedStatus, NoteRow, PinnedNote, RecentGraph } from '@reflect/core'
-import { notePathForRoute, type Route } from '@/routing/route'
-import type { NavigateOptions } from '@/routing/router'
-import { resetOperations } from '@/lib/operations'
-import type { CommandContext } from './types'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createTestAppServices,
+  createTestWindowService,
+  type TestWindowService,
+} from '@reflect/app/testing'
+import { buildIndexedNote, parseNote, type RecentGraph } from '@reflect/core'
+import {
+  createNodeTestDatabaseService,
+  createTestCoreServices,
+  createTestEmbeddingIndexService,
+  createTestEmbeddingRuntimeService,
+  createTestPlatformService,
+  type TestEmbeddingIndexService,
+  type TestEmbeddingRuntimeService,
+} from '@reflect/core/testing'
+import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } from '@reflect/app'
+import { APP_COMMANDS, keybindingFor, sortGraphsByName } from './app-commands.ts'
+import type { CommandContext } from './types.ts'
 
 const TODAY = '2026-06-09'
 
-const randomNotePath = vi.hoisted(() => vi.fn())
-const rebuildIndex = vi.hoisted(() => vi.fn())
-const embedStatus = vi.hoisted(() =>
-  vi.fn<() => Promise<EmbedStatus>>(async () => ({ status: 'uninitialized' })),
-)
-const backfillEmbeddingsVisibly = vi.hoisted(() => vi.fn(async () => 'completed'))
-const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
-const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
-const runCopyDeepLink = vi.hoisted(() => vi.fn(async () => undefined))
-const getNote = vi.hoisted(() => vi.fn<() => Promise<NoteRow | undefined>>(async () => undefined))
-const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
-const hasBridge = vi.hoisted(() => vi.fn(() => true))
-const toggleDevtools = vi.hoisted(() => vi.fn(async () => undefined))
-const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
-const operationFail = vi.hoisted(() => vi.fn())
-const startOperation = vi.hoisted(() =>
-  vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: operationFail })),
-)
-vi.mock('@/lib/semantic', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/semantic')>()),
-  backfillEmbeddingsVisibly,
-}))
-vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
-vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
-vi.mock('@/lib/note-deep-link', () => ({ runCopyDeepLink }))
-vi.mock('@/lib/windows/open-in-new-window', () => ({ openRouteInNewWindow }))
-vi.mock('@/lib/operations', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/operations')>()),
-  startOperation,
-}))
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  randomNotePath,
-  rebuildIndex,
-  embedStatus,
-  getNote,
-  getPinnedNotes,
-  hasBridge,
-  toggleDevtools,
-}))
+function createCore() {
+  const embeddingRuntime: TestEmbeddingRuntimeService = createTestEmbeddingRuntimeService({
+    status: { status: 'uninitialized' },
+  })
+  const embeddingIndex: TestEmbeddingIndexService = createTestEmbeddingIndexService({
+    backfill: () => Promise.resolve('completed'),
+  })
+  return createTestCoreServices({
+    database: createNodeTestDatabaseService(),
+    embeddingRuntime,
+    embeddingIndex,
+  })
+}
 
-// Importing registers the commands (module side effect, like production).
-const { APP_COMMANDS, keybindingFor, sortGraphsByName } = await import('./app-commands')
+let core: ReturnType<typeof createCore>
+let windows: TestWindowService
+
+beforeEach(() => {
+  core = createCore()
+  windows = createTestWindowService()
+})
+
+afterEach(() => {
+  core.database.close()
+})
 
 function command(id: string) {
   const found = APP_COMMANDS.find((entry) => entry.id === id)
@@ -63,7 +58,10 @@ function fakeContext(overrides?: Partial<CommandContext>) {
   const navigated: Route[] = []
   const navigateOptions: (NavigateOptions | undefined)[] = []
   const route: () => Route = overrides?.route ?? (() => ({ kind: 'today' }))
+  const appLayer = createTestAppServices(core, { window: windows })
   const context: CommandContext = {
+    services: core,
+    app: appLayer,
     navigate: (target, options) => {
       navigated.push(target)
       navigateOptions.push(options)
@@ -75,12 +73,16 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
+    togglePin: vi.fn(() => {}),
+    togglePrivate: vi.fn(() => {}),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    openNoteFind: vi.fn(),
+    findNextInNote: vi.fn(),
+    findPreviousInNote: vi.fn(),
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
-    generation: () => 7,
     openPalette: vi.fn(),
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),
@@ -88,19 +90,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     enableSemanticSearch: vi.fn(),
     ...overrides,
   }
-  return { context, navigated, navigateOptions }
-}
-
-function noteRow(isPrivate: boolean): NoteRow {
-  return {
-    path: 'notes/a.md',
-    title: 'A',
-    dailyDate: null,
-    isPrivate,
-    hasConflict: false,
-    gistUrl: null,
-    gistStale: false,
-  }
+  return { context, appLayer, navigated, navigateOptions }
 }
 
 function recentGraph(root: string, openedMs: number, name: string = root): RecentGraph {
@@ -112,14 +102,14 @@ describe('sortGraphsByName', () => {
     const banana = recentGraph('/graphs/2', 2, 'Banana')
     const apple = recentGraph('/graphs/1', 1, 'Apple')
 
-    expect(sortGraphsByName([banana, apple])).toEqual(['/graphs/1', '/graphs/2'])
+    expect(sortGraphsByName([banana, apple])).toEqual([apple, banana])
   })
 
   it('sorts case-insensitively and breaks ties by root path', () => {
     const lower = recentGraph('/graphs/z', 1, 'alpha')
     const upper = recentGraph('/graphs/a', 2, 'Alpha')
 
-    expect(sortGraphsByName([lower, upper])).toEqual(['/graphs/a', '/graphs/z'])
+    expect(sortGraphsByName([lower, upper])).toEqual([upper, lower])
   })
 })
 
@@ -147,13 +137,17 @@ describe('keybindingFor', () => {
     expect(keybindingFor('note.copyDeepLink')).toBe('Alt-Mod-l')
   })
 
+  it('note.copyPath uses the Finder copy-as-pathname chord', () => {
+    expect(keybindingFor('note.copyPath')).toBe('Alt-Mod-c')
+  })
+
   it('note.openInNewWindow uses the system-level open-window shortcut', () => {
     expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
   })
 
-  it('graph switch commands use macOS command-number bindings', () => {
-    expect(keybindingFor('graph.switch1')).toBe('Meta-1')
-    expect(keybindingFor('graph.switch9')).toBe('Meta-9')
+  it('graph switch commands use command-number bindings', () => {
+    expect(keybindingFor('graph.switch1')).toBe('Mod-1')
+    expect(keybindingFor('graph.switch9')).toBe('Mod-9')
   })
 })
 
@@ -183,6 +177,17 @@ describe('app commands', () => {
     const { context, navigated } = fakeContext()
     await command('settings.open').run(context)
     expect(navigated).toEqual([{ kind: 'settings' }])
+  })
+
+  it('note Find commands use the shared window-scoped capabilities', async () => {
+    const { context } = fakeContext()
+    await command('note.find').run(context)
+    await command('note.findNext').run(context)
+    await command('note.findPrevious').run(context)
+
+    expect(context.openNoteFind).toHaveBeenCalledTimes(1)
+    expect(context.findNextInNote).toHaveBeenCalledTimes(1)
+    expect(context.findPreviousInNote).toHaveBeenCalledTimes(1)
   })
 
   it('shortcuts.show opens the ⌘/ cheat-sheet through the context capability', async () => {
@@ -253,144 +258,215 @@ describe('app commands', () => {
   })
 
   it('note.openInNewWindow opens the selected note, including the focused daily note', async () => {
-    openRouteInNewWindow.mockReset().mockResolvedValue(true)
     const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
     await command('note.openInNewWindow').run(context)
-    expect(openRouteInNewWindow).toHaveBeenLastCalledWith({
-      kind: 'note',
-      path: 'notes/a.md',
-    })
+    expect(windows.openedNoteWindows()).toEqual([
+      deepLinkForRoute({ kind: 'note', path: 'notes/a.md' }),
+    ])
 
     const { context: focusedDaily } = fakeContext({
       notePath: () => 'daily/2026-06-18.md',
     })
     await command('note.openInNewWindow').run(focusedDaily)
-    expect(openRouteInNewWindow).toHaveBeenLastCalledWith({ kind: 'daily', date: '2026-06-18' })
+    expect(windows.openedNoteWindows().at(-1)).toBe(
+      deepLinkForRoute({ kind: 'daily', date: '2026-06-18' }),
+    )
   })
 
   it('note.openInNewWindow is inert on a screen with no selected note', async () => {
-    openRouteInNewWindow.mockReset().mockResolvedValue(true)
     const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
     await command('note.openInNewWindow').run(context)
-    expect(openRouteInNewWindow).not.toHaveBeenCalled()
+    expect(windows.openedNoteWindows()).toEqual([])
   })
 
   it('note.random navigates to the picked note and no-ops on an empty graph', async () => {
     const { context, navigated } = fakeContext()
-    randomNotePath.mockResolvedValueOnce('notes/lucky.md')
+    await command('note.random').run(context)
+    expect(navigated).toEqual([])
+
+    const source = '# Lucky\n'
+    core.database.applyProjection(
+      buildIndexedNote(parseNote({ path: 'notes/lucky.md', source }), {
+        fileHash: 'hash',
+        mtime: 1,
+        source,
+      }),
+    )
     await command('note.random').run(context)
     expect(navigated).toEqual([{ kind: 'note', path: 'notes/lucky.md' }])
-
-    randomNotePath.mockResolvedValueOnce(null)
-    await command('note.random').run(context)
-    expect(navigated).toHaveLength(1) // unchanged
   })
 
-  it('note.togglePin flips the pin of the note the route edits', async () => {
-    toggleNotePinned.mockClear()
-    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
+  it('note.togglePin delegates to the shared pin capability', async () => {
+    const { context } = fakeContext()
     await command('note.togglePin').run(context)
-    expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 7)
+    expect(context.togglePin).toHaveBeenCalledOnce()
   })
 
-  it('note.togglePin targets the daily file on daily/today routes', async () => {
-    toggleNotePinned.mockClear()
-    const { context } = fakeContext({ route: () => ({ kind: 'daily', date: '2026-06-09' }) })
-    await command('note.togglePin').run(context)
-    expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-06-09.md', 7)
-  })
-
-  it('note.togglePin reports a failed pin as "Pinning note", never an unhandled throw', async () => {
-    toggleNotePinned.mockClear()
-    startOperation.mockClear()
-    getPinnedNotes.mockResolvedValueOnce([])
-    toggleNotePinned.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
-    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
-    // runCommand has no error channel — the command must absorb and report.
-    await expect(command('note.togglePin').run(context)).resolves.toBeUndefined()
-    expect(startOperation).toHaveBeenCalledWith('Pinning note')
-  })
-
-  it('note.togglePin reports a failed unpin as "Unpinning note"', async () => {
-    startOperation.mockClear()
-    getPinnedNotes.mockResolvedValueOnce([{ path: 'notes/a.md', title: 'A', dailyDate: null }])
-    toggleNotePinned.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
-    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
-    await expect(command('note.togglePin').run(context)).resolves.toBeUndefined()
-    expect(startOperation).toHaveBeenCalledWith('Unpinning note')
-  })
-
-  it('note.togglePin no-ops on note-less routes and without a graph', async () => {
-    toggleNotePinned.mockClear()
-    const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
-    await command('note.togglePin').run(context)
-    const { context: noGraph } = fakeContext({ generation: () => null })
-    await command('note.togglePin').run(noGraph)
-    expect(toggleNotePinned).not.toHaveBeenCalled()
-  })
-
-  it('note.togglePrivate flips the flag of the route note without surfacing an operation', async () => {
-    toggleNotePrivate.mockClear()
-    startOperation.mockClear()
-    getNote.mockResolvedValueOnce(noteRow(false))
-    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
+  it('note.togglePrivate delegates to the shared privacy capability', async () => {
+    const { context } = fakeContext()
     await command('note.togglePrivate').run(context)
-    expect(toggleNotePrivate).toHaveBeenCalledWith('notes/a.md', 7)
-    expect(startOperation).not.toHaveBeenCalled()
+    expect(context.togglePrivate).toHaveBeenCalledOnce()
   })
 
-  it('note.togglePrivate reports a failed lock as "Locking note"', async () => {
-    startOperation.mockClear()
-    operationFail.mockClear()
-    getNote.mockResolvedValueOnce(noteRow(false))
-    toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
-    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
-    // runCommand has no error channel — the command must absorb and report.
-    await expect(command('note.togglePrivate').run(context)).resolves.toBeUndefined()
-    expect(startOperation).toHaveBeenCalledWith('Locking note')
-    expect(operationFail).toHaveBeenCalledTimes(1)
-  })
-
-  it('note.togglePrivate reports a failed unlock as "Unlocking note"', async () => {
-    startOperation.mockClear()
-    getNote.mockResolvedValueOnce(noteRow(true))
-    toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
-    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
-    await expect(command('note.togglePrivate').run(context)).resolves.toBeUndefined()
-    expect(startOperation).toHaveBeenCalledWith('Unlocking note')
-  })
-
-  it('note.copyDeepLink copies the route note through the keyboard command', async () => {
-    runCopyDeepLink.mockClear()
-    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
+  it('note.copyDeepLink copies the route note link and confirms through operations', async () => {
+    core.graphSession.setGraph({ generation: 1 })
+    const deepLinkFor = vi.spyOn(core.noteActions, 'deepLinkFor').mockResolvedValue('reflect://x')
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
     await command('note.copyDeepLink').run(context)
-    expect(runCopyDeepLink).toHaveBeenCalledWith('notes/a.md', 7)
+    expect(deepLinkFor).toHaveBeenCalledWith('notes/a.md')
+    expect(appLayer.clipboard.writes()).toEqual(['reflect://x'])
+    expect(core.progress.started()).toMatchObject([{ label: 'Deep link copied', ended: true }])
   })
 
-  it('note.copyDeepLink no-ops on note-less routes and without a graph', async () => {
-    runCopyDeepLink.mockClear()
+  it('note.copyDeepLink reports a failure to build the link', async () => {
+    core.graphSession.setGraph({ generation: 1 })
+    vi.spyOn(core.noteActions, 'deepLinkFor').mockRejectedValue(new Error('disk full'))
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    await command('note.copyDeepLink').run(context)
+    expect(appLayer.clipboard.writes()).toEqual([])
+    expect(core.progress.snapshot()).toMatchObject([
+      { label: 'Copying deep link', status: 'failed', message: 'disk full' },
+    ])
+  })
+
+  it('note.copyDeepLink reports a clipboard failure', async () => {
+    core.graphSession.setGraph({ generation: 1 })
+    vi.spyOn(core.noteActions, 'deepLinkFor').mockResolvedValue('reflect://x')
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    appLayer.clipboard.failWith(new Error('denied'))
+    await command('note.copyDeepLink').run(context)
+    expect(core.progress.snapshot()).toMatchObject([
+      { label: 'Copying deep link', status: 'failed', message: 'denied' },
+    ])
+  })
+
+  it('note.copyDeepLink does nothing without an open graph', async () => {
+    core.graphSession.setGraph(null)
+    const deepLinkFor = vi.spyOn(core.noteActions, 'deepLinkFor').mockResolvedValue('reflect://x')
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    await command('note.copyDeepLink').run(context)
+    expect(deepLinkFor).not.toHaveBeenCalled()
+    expect(appLayer.clipboard.writes()).toEqual([])
+    expect(core.progress.getAll()).toEqual([])
+  })
+
+  it('note.copyDeepLink no-ops on note-less routes', async () => {
+    const deepLinkFor = vi.spyOn(core.noteActions, 'deepLinkFor').mockResolvedValue('reflect://x')
+    const { context, appLayer } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    await command('note.copyDeepLink').run(context)
+    expect(deepLinkFor).not.toHaveBeenCalled()
+    expect(appLayer.clipboard.writes()).toEqual([])
+  })
+
+  it('note.copyPath copies the route note absolute path and confirms through operations', async () => {
+    core.graphSession.setGraph({ generation: 1 })
+    const absolutePathFor = vi
+      .spyOn(core.noteActions, 'absolutePathFor')
+      .mockResolvedValue('/g/notes/a.md')
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    await command('note.copyPath').run(context)
+    expect(absolutePathFor).toHaveBeenCalledWith('notes/a.md')
+    expect(appLayer.clipboard.writes()).toEqual(['/g/notes/a.md'])
+    expect(core.progress.started()).toMatchObject([{ label: 'Note path copied', ended: true }])
+  })
+
+  it('note.copyPath fails loudly when no graph is open', async () => {
+    core.graphSession.setGraph(null)
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    await command('note.copyPath').run(context)
+    expect(appLayer.clipboard.writes()).toEqual([])
+    expect(core.progress.snapshot()).toMatchObject([
+      { label: 'Copying note path', status: 'failed', message: 'No graph is open' },
+    ])
+  })
+
+  it('note.copyPath reports a clipboard failure', async () => {
+    core.graphSession.setGraph({ generation: 1 })
+    vi.spyOn(core.noteActions, 'absolutePathFor').mockResolvedValue('/g/notes/a.md')
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    appLayer.clipboard.failWith(new Error('denied'))
+    await command('note.copyPath').run(context)
+    expect(core.progress.snapshot()).toMatchObject([
+      { label: 'Copying note path', status: 'failed', message: 'denied' },
+    ])
+  })
+
+  it('note.copyPath no-ops on note-less routes', async () => {
+    const absolutePathFor = vi
+      .spyOn(core.noteActions, 'absolutePathFor')
+      .mockResolvedValue('/g/notes/a.md')
     const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
-    await command('note.copyDeepLink').run(context)
-    const { context: noGraph } = fakeContext({ generation: () => null })
-    await command('note.copyDeepLink').run(noGraph)
-    expect(runCopyDeepLink).not.toHaveBeenCalled()
+    await command('note.copyPath').run(context)
+    expect(absolutePathFor).not.toHaveBeenCalled()
+  })
+
+  it('note.publishGist publishes, copies the link, and confirms through operations', async () => {
+    core.graphSession.setGraph({ generation: 1 })
+    const publish = vi
+      .spyOn(core.gistPublish, 'publish')
+      .mockResolvedValue({ url: 'https://gist.github.com/g1', stale: false })
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    await command('note.publishGist').run(context)
+    expect(publish).toHaveBeenCalledWith('notes/a.md')
+    expect(appLayer.clipboard.writes()).toEqual(['https://gist.github.com/g1'])
+    expect(core.progress.started()).toMatchObject([{ label: 'Gist link copied', ended: true }])
+  })
+
+  it('note.publishGist reports a failed copy without reading as a failed publish', async () => {
+    vi.spyOn(core.gistPublish, 'publish').mockResolvedValue({
+      url: 'https://gist.github.com/g1',
+      stale: false,
+    })
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    appLayer.clipboard.failWith(new Error('Document is not focused'))
+    await command('note.publishGist').run(context)
+    expect(core.progress.snapshot()).toMatchObject([
+      { label: 'Copying the gist link', status: 'failed', message: 'Document is not focused' },
+    ])
+  })
+
+  it('note.publishGist copies nothing when the publish failed', async () => {
+    vi.spyOn(core.gistPublish, 'publish').mockResolvedValue(null)
+    const { context, appLayer } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+    })
+    await command('note.publishGist').run(context)
+    expect(appLayer.clipboard.writes()).toEqual([])
   })
 
   it('dev.toggleDevtools toggles the inspector through the native shell', async () => {
-    hasBridge.mockReturnValue(true)
-    toggleDevtools.mockClear()
     const { context } = fakeContext()
     await command('dev.toggleDevtools').run(context)
-    expect(toggleDevtools).toHaveBeenCalledTimes(1)
+    expect(windows.devtoolsToggles()).toBe(1)
   })
 
   it('dev.toggleDevtools no-ops without a native shell (plain-browser dev)', async () => {
-    hasBridge.mockReturnValue(false)
-    toggleDevtools.mockClear()
-    const { context } = fakeContext()
+    const browser = createTestCoreServices({
+      database: createNodeTestDatabaseService(),
+      platform: createTestPlatformService({ isNativeShell: false }),
+    })
+    const { context } = fakeContext({ services: browser })
     await expect(command('dev.toggleDevtools').run(context)).resolves.toBeUndefined()
-    expect(toggleDevtools).not.toHaveBeenCalled()
-    hasBridge.mockReturnValue(true)
+    expect(windows.devtoolsToggles()).toBe(0)
+    browser.database.close()
   })
 
   it('semantic.enable persists the opt-in through the context capability', async () => {
@@ -401,37 +477,28 @@ describe('app commands', () => {
   })
 
   it('index.rebuild runs at the open generation and reports as an operation', async () => {
-    try {
-      rebuildIndex.mockResolvedValueOnce(undefined)
-      const { context } = fakeContext()
-      await command('index.rebuild').run(context)
-      expect(rebuildIndex).toHaveBeenCalledWith(
-        expect.objectContaining({ generation: 7, onSkippedNote: expect.any(Function) }),
-      )
+    core.graphSession.setGraph({ indexGeneration: 7 })
+    const { context } = fakeContext()
+    await command('index.rebuild').run(context)
+    expect(core.indexLifecycle.rebuilds()).toEqual([7])
+    expect(core.progress.started()).toMatchObject([
+      { label: 'Rebuilding search index', ended: true },
+    ])
 
-      // No graph open → no rebuild.
-      rebuildIndex.mockClear()
-      const { context: noGraph } = fakeContext({ generation: () => null })
-      await command('index.rebuild').run(noGraph)
-      expect(rebuildIndex).not.toHaveBeenCalled()
-    } finally {
-      resetOperations()
-    }
+    // No graph open → no rebuild.
+    core.graphSession.setGraph(null)
+    await command('index.rebuild').run(context)
+    expect(core.indexLifecycle.rebuilds()).toEqual([7])
   })
 
   it('index.rebuild re-runs the embedding backfill when the model is ready', async () => {
-    try {
-      rebuildIndex.mockResolvedValueOnce(undefined)
-      embedStatus.mockResolvedValueOnce({ status: 'ready', model: 'all-MiniLM-L6-v2' })
-      const { context } = fakeContext()
-      await command('index.rebuild').run(context)
-      // index_clear wiped the embedding tables; rebuild must repopulate them.
-      expect(backfillEmbeddingsVisibly).toHaveBeenCalledWith({
-        generation: 7,
-        modelId: 'all-MiniLM-L6-v2',
-      })
-    } finally {
-      resetOperations()
-    }
+    core.graphSession.setGraph({ indexGeneration: 7 })
+    core.embeddingRuntime.setStatus({ status: 'ready', model: 'all-MiniLM-L6-v2' })
+    const { context } = fakeContext()
+    await command('index.rebuild').run(context)
+    // index_clear wiped the embedding tables; rebuild must repopulate them.
+    expect(core.embeddingIndex.backfills()).toEqual([
+      { generation: 7, modelId: 'all-MiniLM-L6-v2' },
+    ])
   })
 })

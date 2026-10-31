@@ -1,15 +1,26 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
-import { dailyPath } from '@reflect/core'
-import { NotePane } from '@/components/note-pane'
-import type { NoteEditorHandle } from '@/editor/note-editor'
-import { formatDayLabel, todayIso } from '@/lib/dates'
-import { cn } from '@/lib/utils'
-import { useSettings } from '@/providers/settings-provider'
-import { useToday } from '@/lib/use-today'
-import { createDayWindow, dateAtIndex, indexOfDate, neighborDate } from '@/lib/day-window'
-import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
-import { useRouter } from '@/routing/router'
+import { NotePane } from '@/components/note-pane.tsx'
+import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
+import { dailyPath, formatDayLabel } from '@reflect/core'
+import {
+  createDayWindow,
+  dateAtIndex,
+  extendDayWindowBack,
+  indexOfDate,
+  neighborDate,
+  PAST_DAYS,
+} from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useToday } from '@/lib/use-today.ts'
+import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
+import { useRouter } from '@/routing/router.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { clamp } from '@ocavue/utils'
+
+/** The size guess virtua uses for a row it has not measured yet. */
+export const ESTIMATED_DAY_HEIGHT = 220
 
 interface DailyStreamProps {
   /** The day to anchor/scroll to, or the live local day for the `today` route. */
@@ -31,27 +42,34 @@ interface DailyStreamProps {
  */
 const CONTENT_GUTTER = 'reflect-content-gutter'
 
-/** The size guess virtua uses for a row it has not measured yet. */
-export const ESTIMATED_DAY_HEIGHT = 220
-
 /**
  * The daily stream (Plan 06b): a virtualized chronological run of days — past
  * above, future below — where **every day is a virtual note**. Each visible row
  * mounts the Plan 05 editor lazily (`createIfMissing`), so a day only becomes a
  * real `daily/*.md` when edited. Offscreen rows unmount and flush through the
- * save pipeline's final-flush path. The window is a fixed ±range around today
- * (virtual rows are free), so there is no bidirectional infinite-scroll
- * bookkeeping; index↔date is pure offset math.
+ * save pipeline's final-flush path. The window is a ±range around today
+ * (virtual rows are free) that grows back only when an arrival lands before it,
+ * so scrolling needs no bidirectional infinite-scroll bookkeeping; index↔date
+ * is pure offset math.
  */
 export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const { arrivalSeq, arrivalFocusEditor, entryId, saveScrollState, savedScroll } = useRouter()
   const virtualizerRef = useRef<VirtualizerHandle>(null)
-  // The window anchors at today-on-mount and stays stable for the view's life.
-  // (`dayWindow`, not `window` — shadowing the DOM global here was a footgun.)
-  const [dayWindow] = useState(() => createDayWindow(todayIso()))
+  // The window anchors at today-on-mount and only grows back, when an arrival
+  // lands before it. (`dayWindow`, not `window` — shadowing the DOM global here was a
+  // footgun.)
+  const { dailyNotes } = useCoreServices()
+  const [dayWindow, setDayWindow] = useState(() => createDayWindow(dailyNotes.today()))
+  // Saved scroll offsets are measured against the default window. Days added
+  // before its start are unmeasured rows, which virtua sizes at exactly
+  // `itemSize` (a fixed `itemSize` turns off its auto-estimation), so
+  // subtracting them keeps offsets saved before the window grew valid after.
+  const addedPastHeight = (dayWindow.anchorIndex - PAST_DAYS) * ESTIMATED_DAY_HEIGHT
   // Per-row data is unused (the date is derived from the index); a stable array
   // of the window's length just tells virtua how many rows exist.
   const data = useMemo(() => Array.from({ length: dayWindow.count }), [dayWindow.count])
+  const [scrollIndex, setScrollIndex] = useState<number>(dayWindow.anchorIndex)
+  const [focusIndex, setFocusIndex] = useState<number>(dayWindow.anchorIndex)
   const today = useToday()
   const targetDate = target.kind === 'today' ? today : target.date
   const { settings } = useSettings()
@@ -82,9 +100,9 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // The slot is consumed when the editor actually mounts and focuses (not at
   // render time), so a virtualizer re-render before the lazy load completes
   // can't drop the focus.
-  const focusPending = useRef<{ date: string; selection: 'start' | 'end' } | null>(null)
+  const focusPendingRef = useRef<{ date: string; selection: 'start' | 'end' } | null>(null)
   const consumeFocus = useCallback(() => {
-    focusPending.current = null
+    focusPendingRef.current = null
   }, [])
 
   // Report the day the user is editing to the context sidebar: the route stays
@@ -97,7 +115,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // is virtualized, so the neighbor day's editor may not be mounted: we keep a
   // registry of mounted day handles plus a single pending-focus slot that
   // carries the target caret position, applied when the neighbor row mounts and
-  // registers. This is independent of the `⌘D` autofocus path (`focusPending`).
+  // registers. This is independent of the `⌘D` autofocus path (`focusPendingRef`).
   const dayHandlesRef = useRef(new Map<string, NoteEditorHandle>())
   const pendingFocusRef = useRef<{ date: string; position: 'start' | 'end' } | null>(null)
 
@@ -119,6 +137,30 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
         pendingFocusRef.current = null
         focusDay(handle, pending.position)
       }
+    },
+    [focusDay],
+  )
+
+  // The date heading is stream chrome outside the editor, so a click on it
+  // would otherwise land nowhere; make it focus that day's note at the top.
+  // The listener lives on the H2 itself rather than section-level hit-testing:
+  // every other part of the row already belongs to the editor's click-to-focus
+  // area via the full-width content gutter.
+  const handleSubjectClick = useCallback(
+    (date: string) => {
+      // No selection guard: the heading is unselectable chrome (the global
+      // `user-select: none`), so there is no copy gesture to protect — and
+      // mousedown on unselectable chrome leaves an editor selection standing,
+      // so gating on `getSelection()` would swallow exactly these clicks.
+      const mounted = dayHandlesRef.current.get(date)
+      if (mounted) {
+        focusDay(mounted, 'start')
+        return
+      }
+      // The row is on screen but its lazy editor hasn't mounted yet: queue the
+      // focus for `registerHandle`. Set after the container's pointerdown
+      // clear (click fires on pointerup), so the slot survives to the mount.
+      pendingFocusRef.current = { date, position: 'start' }
     },
     [focusDay],
   )
@@ -158,37 +200,62 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // top before the first frame is shown, instead of painting the top of the
   // five-year window and then lurching down.
   useLayoutEffect(() => {
+    const target = targetDateRef.current
+    const extended = extendDayWindowBack(dayWindow, target)
+    if (extended !== dayWindow) {
+      // An arrival before the window (a Cmd+K pick or date link years back)
+      // grows it; virtua's `shift` keeps the viewport in place across the
+      // prepend, and the effect re-runs on the new window to anchor there.
+      setDayWindow(extended)
+      return
+    }
     const restored = savedScroll()
     if (restored !== null) {
       // A restored arrival also cancels any focus still pending from a prior
       // navigation the user backed out of before that day's editor mounted (both
       // the ⌘D autofocus and a queued cross-note boundary focus). The day would
       // otherwise steal focus when its row scrolls into view.
-      focusPending.current = null
+      focusPendingRef.current = null
       pendingFocusRef.current = null
-      virtualizerRef.current?.scrollTo(restored)
+      virtualizerRef.current?.scrollTo(restored + addedPastHeight)
       return
     }
-    const target = targetDateRef.current
     pendingFocusRef.current = null
-    focusPending.current = {
+    focusPendingRef.current = {
       date: target,
       selection: arrivalFocusEditorRef.current ? 'end' : 'start',
     }
     virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
-  }, [arrivalSeq, entryId, dayWindow, savedScroll])
+  }, [arrivalSeq, entryId, dayWindow, savedScroll, addedPastHeight])
+
+  const onScrollOffset = useCallback((offset: number) => {
+    const scrollIndex = virtualizerRef.current?.findItemIndex(offset)
+    if (scrollIndex == null) return
+    setScrollIndex(scrollIndex)
+  }, [])
+
+  // Always keep a few rows above and below the viewport/focused row mounted
+  const keepMounted = useMemo(() => {
+    const keepMounted = new Set<number>()
+    for (const referenceIndex of [focusIndex, scrollIndex]) {
+      for (let delta = -3; delta <= 3; delta++) {
+        keepMounted.add(clamp(referenceIndex + delta, 0, dayWindow.count - 1))
+      }
+    }
+    return Array.from(keepMounted).sort()
+  }, [focusIndex, scrollIndex, dayWindow.count])
 
   return (
     <div
       data-testid="daily-stream"
       className="h-full overflow-auto"
-      onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
+      onScroll={(event) => saveScrollState(event.currentTarget.scrollTop - addedPastHeight)}
       // An explicit click/touch picks its own focus target — a focus still
       // pending for a day whose editor hasn't mounted yet must not steal the
       // caret later. Typing is deliberately not a cancel: ⌘D-then-type should
       // still land focus in today once its editor mounts.
       onPointerDownCapture={() => {
-        focusPending.current = null
+        focusPendingRef.current = null
         pendingFocusRef.current = null
       }}
     >
@@ -197,7 +264,9 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
         data={data}
         itemSize={ESTIMATED_DAY_HEIGHT}
         bufferSize={2 * ESTIMATED_DAY_HEIGHT}
+        keepMounted={keepMounted}
         shift={true}
+        onScroll={onScrollOffset}
       >
         {(_, index) => {
           const date = dateAtIndex(dayWindow, index)
@@ -206,7 +275,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
           // collapses to a short row), while today and future days reserve
           // most of a viewport of writing room. ISO dates compare lexically.
           const isPast = date < today
-          const pendingFocus = focusPending.current
+          const pendingFocus = focusPendingRef.current
           const focusSelection =
             pendingFocus !== null && pendingFocus.date === date ? pendingFocus.selection : null
           const autoFocus = focusSelection !== null
@@ -217,12 +286,20 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
               className="border-b border-border py-6"
               // Focus entering this row (clicking its editor, tabbing in) makes
               // it the day the sidebar describes.
-              onFocusCapture={() => setFocusedDailyDate(date)}
+              onFocusCapture={() => {
+                setFocusedDailyDate(date)
+                setFocusIndex(index)
+              }}
             >
               {/* V1 renders the date as the note's H1-sized subject, with
                   today's tinted brand (its `highlightSubject`). */}
               <h2
-                className={cn('reflect-daily-subject mb-3', CONTENT_GUTTER, isToday && 'text-accent')}
+                className={cn(
+                  'reflect-daily-subject mb-3',
+                  CONTENT_GUTTER,
+                  isToday && 'text-accent',
+                )}
+                onClick={() => handleSubjectClick(date)}
               >
                 {formatDayLabel(date, settings.dateFormat)}
               </h2>

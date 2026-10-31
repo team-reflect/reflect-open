@@ -1,46 +1,20 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
+import type { GraphImportProgress, GraphImportSummary, GraphInfo } from '@reflect/core'
+import {
+  createTestCoreServices,
+  createTestGraphSessionService,
+  createTestIpcBridgeService,
+} from '@reflect/core/testing'
+import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { useV1Import, V1ImportProvider } from './v1-import-provider.tsx'
 
-interface SummaryFixture {
-  importedFiles: number
-  skippedFiles: number
-  downloadedAssets: number
-  failedAssetDownloads: number
-  renamedFiles: number
-  mergedFiles: number
-  changedPaths: string[]
-}
+const GRAPH: GraphInfo = { root: '/graphs/notes', name: 'Notes', generation: 42 }
 
-interface ProgressFixture {
-  stage: 'downloading' | 'writing'
-  done: number
-  total: number
-}
-
-const importReflectV1Zip = vi.hoisted(() => vi.fn<() => Promise<SummaryFixture>>())
-const cancelReflectV1Import = vi.hoisted(() => vi.fn(async () => {}))
-const markReflectV1ImportOwnWrites = vi.hoisted(() => vi.fn())
-const progressHandlers = vi.hoisted(() => new Set<(progress: ProgressFixture) => void>())
-const refreshIndex = vi.hoisted(() => vi.fn())
-
-vi.mock('@reflect/core', () => ({
-  importReflectV1Zip,
-  cancelReflectV1Import,
-  markReflectV1ImportOwnWrites,
-  subscribeImportProgress: (handler: (progress: ProgressFixture) => void) => {
-    progressHandlers.add(handler)
-    return Promise.resolve(() => progressHandlers.delete(handler))
-  },
-  errorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
-}))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ refreshIndex }),
-}))
-
-const { V1ImportProvider, useV1Import } = await import('./v1-import-provider')
-
-function summary(overrides: Partial<SummaryFixture> = {}): SummaryFixture {
+function summary(overrides: Partial<GraphImportSummary> = {}): GraphImportSummary {
   return {
     importedFiles: 2,
     skippedFiles: 1,
@@ -53,12 +27,6 @@ function summary(overrides: Partial<SummaryFixture> = {}): SummaryFixture {
   }
 }
 
-function emitProgress(progress: ProgressFixture): void {
-  for (const handler of [...progressHandlers]) {
-    handler(progress)
-  }
-}
-
 function Probe(): ReactElement {
   const { state, startImport } = useV1Import()
   return (
@@ -68,173 +36,171 @@ function Probe(): ReactElement {
   )
 }
 
-function renderProvider(graph = { root: '/graphs/notes', name: 'Notes', generation: 42 }) {
-  return render(
-    <V1ImportProvider graph={graph}>
+/**
+ * The provider over test services with `GRAPH` open. The native import
+ * answers `result`, or stays pending until `pendingImport` settles.
+ */
+async function renderProvider(result?: GraphImportSummary | Error) {
+  const pendingImport = Promise.withResolvers<GraphImportSummary>()
+  const ipc = createTestIpcBridgeService({
+    commands: {
+      graph_import_reflect_v1_zip: () => {
+        if (result instanceof Error) {
+          throw result
+        }
+        return result ?? pendingImport.promise
+      },
+      graph_import_cancel: () => null,
+    },
+  })
+  const session = createTestGraphSessionService({ state: { status: 'ready', graph: GRAPH } })
+  const refreshIndex = vi.spyOn(session, 'refreshIndex').mockImplementation(() => {})
+  const core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    ipc,
+    graphSession: session,
+  })
+  const view = await renderInApp(
+    <V1ImportProvider>
       <Probe />
     </V1ImportProvider>,
+    { core, servicesOnly: true },
   )
+  return {
+    view,
+    ipc,
+    session,
+    refreshIndex,
+    pendingImport,
+    ownWrites: () => core.fileChanges.ownWrites(),
+    commands: () => ipc.calls().map((call) => call.command),
+    emitProgress: (progress: GraphImportProgress) => ipc.emit('import:progress', progress),
+  }
 }
 
-function startButton(): HTMLElement {
-  return screen.getByRole('button', { name: /start/ })
+function startButton() {
+  return page.getByRole('button', { name: /start/ })
 }
-
-beforeEach(() => {
-  importReflectV1Zip.mockResolvedValue(summary())
-})
-
-afterEach(() => {
-  cleanup()
-  vi.clearAllMocks()
-  progressHandlers.clear()
-})
 
 describe('V1ImportProvider', () => {
   it('runs the import and reports the outcome in the dialog', async () => {
-    let finish: (value: SummaryFixture) => void = () => {}
-    importReflectV1Zip.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve
-        }),
-    )
-    renderProvider()
+    const context = await renderProvider()
 
-    fireEvent.click(startButton())
+    await startButton().click()
 
-    expect(await screen.findByText('Importing from Reflect V1')).toBeTruthy()
-    expect(screen.getByText('Reading the export…')).toBeTruthy()
-    expect(importReflectV1Zip).toHaveBeenCalledWith('/tmp/reflect-v1.zip', 42)
+    await expect.element(page.getByText('Importing from Reflect V1')).toBeInTheDocument()
+    await expect.element(page.getByText('Reading the export…')).toBeInTheDocument()
+    expect(context.ipc.calls()).toEqual([
+      {
+        command: 'graph_import_reflect_v1_zip',
+        args: { path: '/tmp/reflect-v1.zip', generation: 42 },
+      },
+    ])
 
-    emitProgress({ stage: 'downloading', done: 3, total: 8 })
-    expect(await screen.findByText('Downloading attachments… 3 of 8')).toBeTruthy()
+    context.emitProgress({ stage: 'downloading', done: 3, total: 8 })
+    await expect.element(page.getByText('Downloading attachments… 3 of 8')).toBeInTheDocument()
 
-    emitProgress({ stage: 'writing', done: 10, total: 40 })
-    expect(await screen.findByText('Adding notes… 10 of 40')).toBeTruthy()
+    context.emitProgress({ stage: 'writing', done: 10, total: 40 })
+    await expect.element(page.getByText('Adding notes… 10 of 40')).toBeInTheDocument()
 
-    finish(summary({ mergedFiles: 1, renamedFiles: 1 }))
-    expect(await screen.findByText('Import complete')).toBeTruthy()
-    expect(
-      screen.getByText(
-        '2 files imported, 1 daily note merged, 1 renamed to avoid a name clash, 1 already present.',
-      ),
-    ).toBeTruthy()
-    expect(markReflectV1ImportOwnWrites).toHaveBeenCalledTimes(1)
-    expect(refreshIndex).toHaveBeenCalledTimes(1)
+    context.pendingImport.resolve(summary({ mergedFiles: 1, renamedFiles: 1 }))
+    await expect.element(page.getByText('Import complete')).toBeInTheDocument()
+    await expect
+      .element(
+        page.getByText(
+          '2 files imported, 1 daily note merged, 1 renamed to avoid a name clash, 1 already present.',
+        ),
+      )
+      .toBeInTheDocument()
+    expect(context.ownWrites()).toEqual([['notes/a.md'], ['daily/2026-07-04.md']])
+    expect(context.refreshIndex).toHaveBeenCalledTimes(1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(screen.queryByText('Import complete')).toBeNull())
+    await page.getByRole('button', { name: 'Done' }).click()
+    await expectLocatorToHaveCount(page.getByText('Import complete'), 0)
   })
 
   it('cannot be dismissed while the import runs', async () => {
-    importReflectV1Zip.mockImplementationOnce(() => new Promise(() => {}))
-    renderProvider()
+    await renderProvider()
 
-    fireEvent.click(startButton())
-    const dialog = await screen.findByRole('dialog')
+    await startButton().click()
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument()
 
-    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
-    fireEvent.keyDown(dialog, { key: 'Escape' })
-    expect(screen.getByText('Importing from Reflect V1')).toBeTruthy()
+    expect(page.getByRole('button', { name: 'Close' }).query()).toBeNull()
+    await userEvent.keyboard('{Escape}')
+    await expect.element(page.getByText('Importing from Reflect V1')).toBeInTheDocument()
   })
 
   it('cancels the running import and settles back to idle', async () => {
-    let reject: (reason: Error) => void = () => {}
-    importReflectV1Zip.mockImplementationOnce(
-      () =>
-        new Promise((_, rejectPromise) => {
-          reject = rejectPromise
-        }),
-    )
-    renderProvider()
+    const context = await renderProvider()
 
-    fireEvent.click(startButton())
-    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    await startButton().click()
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
 
-    expect(cancelReflectV1Import).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('button', { name: 'Cancelling…' })).toBeTruthy()
+    expect(context.commands()).toEqual(['graph_import_reflect_v1_zip', 'graph_import_cancel'])
+    await expect.element(page.getByRole('button', { name: 'Cancelling…' })).toBeInTheDocument()
 
-    reject(new Error('import cancelled'))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(screen.queryByText('Import failed')).toBeNull()
-    expect(markReflectV1ImportOwnWrites).not.toHaveBeenCalled()
+    context.pendingImport.reject(new Error('import cancelled'))
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
+    expect(page.getByText('Import failed').query()).toBeNull()
+    expect(context.ownWrites()).toEqual([])
   })
 
   it('hides Cancel once writing starts (nothing can be aborted safely)', async () => {
-    importReflectV1Zip.mockImplementationOnce(() => new Promise(() => {}))
-    renderProvider()
+    const context = await renderProvider()
 
-    fireEvent.click(startButton())
-    await screen.findByRole('button', { name: 'Cancel' })
+    await startButton().click()
+    await expect
+      .element(page.getByRole('button', { name: 'Cancel', exact: true }))
+      .toBeInTheDocument()
 
-    emitProgress({ stage: 'writing', done: 1, total: 4 })
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull())
+    context.emitProgress({ stage: 'writing', done: 1, total: 4 })
+    await expectLocatorToHaveCount(page.getByRole('button', { name: 'Cancel' }), 0)
   })
 
   it('surfaces failures with the native message', async () => {
-    importReflectV1Zip.mockRejectedValueOnce(new Error('could not read the zip'))
-    renderProvider()
+    const context = await renderProvider(new Error('could not read the zip'))
 
-    fireEvent.click(startButton())
+    await startButton().click()
 
-    expect(await screen.findByText('Import failed')).toBeTruthy()
-    expect(screen.getByText('could not read the zip')).toBeTruthy()
-    expect(refreshIndex).not.toHaveBeenCalled()
+    await expect.element(page.getByText('Import failed')).toBeInTheDocument()
+    await expect.element(page.getByText('could not read the zip')).toBeInTheDocument()
+    expect(context.refreshIndex).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await page.getByRole('button', { name: 'Close' }).click()
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
   })
 
   it('drops the result when the graph switched mid-import', async () => {
-    let finish: (value: SummaryFixture) => void = () => {}
-    importReflectV1Zip.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve
-        }),
-    )
-    const view = renderProvider()
+    const context = await renderProvider()
 
-    fireEvent.click(startButton())
-    await screen.findByRole('dialog')
+    await startButton().click()
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument()
 
-    view.rerender(
-      <V1ImportProvider graph={{ root: '/graphs/other', name: 'Other', generation: 43 }}>
-        <Probe />
-      </V1ImportProvider>,
-    )
-    finish(summary())
+    context.session.setState({ graph: { root: '/graphs/other', name: 'Other', generation: 43 } })
+    context.pendingImport.resolve(summary())
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(markReflectV1ImportOwnWrites).not.toHaveBeenCalled()
-    expect(refreshIndex).not.toHaveBeenCalled()
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
+    expect(context.ownWrites()).toEqual([])
+    expect(context.refreshIndex).not.toHaveBeenCalled()
   })
 
   it('cancels and drops the result when the workspace unmounts mid-import', async () => {
-    let finish: (value: SummaryFixture) => void = () => {}
-    importReflectV1Zip.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve
-        }),
-    )
-    const view = renderProvider()
+    const context = await renderProvider()
 
-    fireEvent.click(startButton())
-    await screen.findByRole('dialog')
+    await startButton().click()
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument()
 
-    view.unmount()
-    expect(cancelReflectV1Import).toHaveBeenCalledTimes(1)
+    await context.view.unmount()
+    expect(context.commands()).toEqual(['graph_import_reflect_v1_zip', 'graph_import_cancel'])
 
-    finish(summary())
-    await waitFor(() => expect(importReflectV1Zip).toHaveBeenCalledTimes(1))
-    expect(markReflectV1ImportOwnWrites).not.toHaveBeenCalled()
-    expect(refreshIndex).not.toHaveBeenCalled()
+    context.pendingImport.resolve(summary())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(context.ownWrites()).toEqual([])
+    expect(context.refreshIndex).not.toHaveBeenCalled()
   })
 
   it('summarizes failed attachment downloads', async () => {
-    importReflectV1Zip.mockResolvedValueOnce(
+    await renderProvider(
       summary({
         importedFiles: 12,
         skippedFiles: 0,
@@ -243,14 +209,15 @@ describe('V1ImportProvider', () => {
         changedPaths: ['notes/a.md'],
       }),
     )
-    renderProvider()
 
-    fireEvent.click(startButton())
+    await startButton().click()
 
-    expect(
-      await screen.findByText(
-        "12 files imported, 140 attachments downloaded. 1 attachment couldn't be downloaded and still links to Reflect V1.",
-      ),
-    ).toBeTruthy()
+    await expect
+      .element(
+        page.getByText(
+          "12 files imported, 140 attachments downloaded. 1 attachment couldn't be downloaded and still links to Reflect V1.",
+        ),
+      )
+      .toBeInTheDocument()
   })
 })

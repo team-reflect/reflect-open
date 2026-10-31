@@ -1,29 +1,27 @@
 # Porting note templates
 
-**Status: shipped.** The editor slash-menu entry point rides meowdown's
-host-items API (`insertMarkdown` + `onSlashMenuSearch`, upstream
+**Status: shipped.** The slash-menu entry point uses meowdown's host-items
+API (`insertMarkdown` + `onSlashMenuSearch`,
 [#197](https://github.com/prosekit/meowdown/pull/197)/[#198](https://github.com/prosekit/meowdown/pull/198)),
-with two v1-parity refinements — insert-never-deletes-a-selection and the
-slash-menu `keywords` behind the `/template` affordance — landed in
-meowdown 0.33.0 ([#208](https://github.com/prosekit/meowdown/pull/208)/[#209](https://github.com/prosekit/meowdown/pull/209)).
+with two v1-parity refinements (insert never deletes a selection, and
+slash-menu `keywords` behind `/template`) in meowdown 0.33.0
+([#208](https://github.com/prosekit/meowdown/pull/208)/[#209](https://github.com/prosekit/meowdown/pull/209)).
 The [product vision](../reflect-v2-product-vision.md) deferred templates
-with "markdown snippets may be enough" — and that is exactly the design:
-templates are markdown files in the graph.
+with "markdown snippets may be enough", and that is the design: templates
+are markdown files in the graph.
 
 ## What v1 did
 
 Templates were per-graph named blocks of rich content, managed in
 **Preferences → Note Templates**, stored in the cloud account, and inserted
-via the editor's slash menu. New graphs were seeded with three starter
-templates (**journal**, **person**, **company**). There was no variable
-substitution — bodies were inserted verbatim.
+via the slash menu. New graphs got three starters (**journal**, **person**,
+**company**). No variable substitution: bodies were inserted verbatim.
 
 ## How it will work in v2
 
 ### Templates are files
 
-A `templates/` folder at the graph root, as a sibling of `daily/` and
-`notes/`:
+A `templates/` folder at the graph root, beside `daily/` and `notes/`:
 
 ```text
 my-graph/
@@ -35,41 +33,32 @@ my-graph/
 └── .reflect/
 ```
 
-Each markdown file is one template; its title (H1 or filename) is the name
-shown when inserting. That single decision buys almost everything v1 had to
-build:
-
-- **Editable anywhere** — in Reflect or any text editor; the file watcher
-  picks up changes like any other file.
-- **Per-graph scope and sync for free** — templates live in the graph and
-  ride the git backup, so every device sees them; no account storage, no
-  separate sync path.
-- **Versioned** — template history is git history.
+Each file is one template; its title (H1 or filename) is its name. That
+gives most of what v1 had to build: editable in any editor (the watcher
+picks up changes), per-graph and synced by git backup, and versioned by git
+history.
 
 ### Inserting a template
 
-- **Command palette** (`mod+k`): an "Insert template…" command lists the
-  templates in the current graph and inserts the chosen body at the cursor.
+- **Command palette** (`mod+k`): "Insert template…" lists the graph's
+  templates and inserts the body at the cursor.
 - **Editor slash/insert menu**: meowdown's insert affordances (slash menu,
-  block-handle `+`) gain host-provided items so templates appear alongside
-  built-in blocks — same host-supplies-the-items pattern as wikilink
-  autocomplete.
+  block-handle `+`) show host-provided template items beside built-in
+  blocks.
 
-Insertion is verbatim, matching v1: links, tags, tasks, and headings paste
-in as written. Frontmatter in a template file (if any) is not inserted.
+Insertion is verbatim, like v1. Template frontmatter is not inserted.
 
 ### Managing templates
 
-Templates are files first: creating, renaming, and deleting all work from
-any text editor or file manager, and the watcher picks the changes up. In
+Files first: create, rename, and delete from any editor or file manager. In
 the app, **Settings → Note templates** lists them with open / rename /
-delete rows, and a "New template" dialog (also a palette command) creates
+delete rows, and "New template" (also a palette command) creates
 `templates/<slug>.md` named via frontmatter `title:` (metadata, stripped on
-insert — v1's name/body split). Renaming moves the file onto the new name's
-slug **and** rewrites the authored title, carrying any open editor session;
-deleting sends the file to the trash. Templates open in the normal editor,
-but title edits do **not** rename the file (the rename pipeline's slug
-targets live under `notes/`) — the settings rename is the in-app rename.
+insert, like v1's name/body split). Rename moves the file to the new slug
+**and** rewrites the title, carrying any open session; delete sends the
+file to the trash. Title edits in the editor do **not** rename a template
+file (the rename pipeline's slug targets live under `notes/`); the settings
+rename is the in-app rename.
 
 ## v1 → v2 mapping
 
@@ -84,24 +73,19 @@ targets live under `notes/`) — the settings rename is the in-app rename.
 
 ## Explicitly not ported
 
-- Starter templates written into every new graph — scaffolding stays
-  minimal; the copy-pasteable **journal**/**person**/**company** examples
-  below carry v1's seed content instead.
-- Duplicate-name tolerance quirks: filenames make names unique per graph by
-  construction.
-- `unwrapInvisibleList` (v1's insert extension peeled a wrapper list off the
-  template) — an artifact of v1's mandatory outer-bullet document shape,
-  meaningless in markdown.
-- Newest-first ordering in the preferences list — A→Z everywhere, as decided
-  above.
+- Starter templates in every new graph: scaffolding stays minimal; the
+  examples below carry v1's seed content.
+- Duplicate-name quirks: filenames make names unique.
+- `unwrapInvisibleList` (v1 peeled a wrapper list off the template): an
+  artifact of v1's mandatory outer-bullet document shape.
+- Newest-first ordering in the preferences list.
 
 ## Starter examples
 
-v1 seeded every new graph with these three. Create a file under
-`templates/` and paste one in. The frontmatter `title:` is the template's
-display name; frontmatter is stripped on insert, so — exactly like v1 —
-the name never lands in a note. (An H1 also works as the name, but then it
-inserts with the body.)
+v1 seeded every graph with these. Create a file under `templates/` and
+paste one in. The frontmatter `title:` is the display name and is stripped
+on insert, so (like v1) the name never lands in a note. An H1 also works as
+the name, but then it is inserted with the body.
 
 `templates/journal.md`
 
@@ -143,25 +127,22 @@ title: Company
 
 ## How it was built
 
-- **Indexing.** `templates/*.md` is indexed like any note, with a new
+- **Indexing.** `templates/*.md` is indexed like any note, with a
   `notes.kind` column (`daily` / `note` / `template`, migration 0014,
-  projection v12) derived from the path. Every note surface — All Notes,
+  projection v12) derived from the path. Every note surface (All Notes,
   search, backlinks, tasks, pinned, tag facets, wikilink autocomplete and
-  resolution, graph stats, the CLI — excludes `kind = 'template'`; the
-  `note_keys`/`backlinks` views enforce the wikilink rule at the schema
-  level. Templates are never embedded, so AI retrieval can't see them.
+  resolution, graph stats, the CLI) excludes `kind = 'template'`; the
+  `note_keys`/`backlinks` views enforce the wikilink rule in the schema.
+  Templates are never embedded, so AI retrieval can't see them.
 - **Insertion.** The picker reads the file, strips frontmatter, and inserts
-  the body as a parsed fragment at the cursor
-  (`NoteEditorHandle.insertMarkdown`) — one undoable edit with paste
-  semantics.
+  the body as a parsed fragment (`NoteEditorHandle.insertMarkdown`): one
+  undoable edit with paste semantics.
 
 ## Open questions
 
 - **Daily-note templates.** v1 never auto-applied a template to daily notes
-  and users asked for it constantly. A designated `templates/daily.md`
-  applied to new daily notes is a natural v2 extension, but it interacts
-  with the lazy "no file until first keystroke" contract — deferred to its
-  own decision.
-- **Variables.** `{{date}}`-style substitution is deliberately out for
-  parity, but the files-first design leaves room for it later without
-  migration.
+  and users asked for it constantly. A `templates/daily.md` applied to new
+  daily notes fits v2, but it interacts with the lazy "no file until first
+  keystroke" contract; deferred to its own decision.
+- **Variables.** `{{date}}`-style substitution is out for parity; the
+  files-first design allows it later without migration.

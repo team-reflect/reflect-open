@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createDb } from './db'
+import { createDb } from './db.ts'
 
 const runQuery = vi.fn<(sql: string, params: readonly unknown[]) => Promise<unknown>>()
 
@@ -40,7 +40,7 @@ describe('IpcDialect (Kysely → injected runner bridge)', () => {
   it('rejects transactions — writes go through the index_* commands', async () => {
     runQuery.mockResolvedValue([])
     const db = createDb(runQuery)
-    await expect(db.transaction().execute(async () => undefined)).rejects.toThrow(
+    await expect(db.transaction().execute(() => Promise.resolve())).rejects.toThrow(
       /transactions run in Rust/,
     )
   })

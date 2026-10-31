@@ -1,9 +1,10 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { Check } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import type { TaskFilters } from '@/lib/tasks/task-filters'
-import { cn } from '@/lib/utils'
-import { hapticImpactLight } from '@/mobile/haptics'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import type { TaskFilters } from '@reflect/core'
+import { cn } from '@/lib/utils.ts'
+import { hapticImpactLight } from '@/mobile/haptics.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 
 interface TaskFiltersDrawerProps {
   open: boolean
@@ -37,17 +38,24 @@ export function TaskFiltersDrawer({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Task filters">
         <DrawerTitle>Task filters</DrawerTitle>
-        <div className="flex flex-col">
-          {BUCKETS.map(({ key, label }) => (
-            <FilterRow key={key} label={label} checked={filters[key]} onToggle={() => toggle(key)} />
-          ))}
-          <div className="my-1 border-t border-border" />
-          <FilterRow
-            label="Show archived"
-            checked={filters.archived}
-            onToggle={() => toggle('archived')}
-          />
-        </div>
+        <DrawerBody className="px-4">
+          <div className="flex flex-col">
+            {BUCKETS.map(({ key, label }) => (
+              <FilterRow
+                key={key}
+                label={label}
+                checked={filters[key]}
+                onToggle={() => toggle(key)}
+              />
+            ))}
+            <div className="my-1 border-t border-border" />
+            <FilterRow
+              label="Show archived"
+              checked={filters.archived}
+              onToggle={() => toggle('archived')}
+            />
+          </div>
+        </DrawerBody>
       </DrawerContent>
     </Drawer>
   )
@@ -62,13 +70,14 @@ function FilterRow({
   checked: boolean
   onToggle: () => void
 }): ReactElement {
+  const { haptics } = useMobileServices()
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={checked}
       onClick={() => {
-        hapticImpactLight()
+        hapticImpactLight(haptics)
         onToggle()
       }}
       className="flex h-12 items-center gap-3 text-left text-base"

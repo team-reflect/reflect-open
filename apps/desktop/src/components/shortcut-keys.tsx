@@ -1,7 +1,8 @@
 import { useMemo, type ReactElement } from 'react'
-import { KBD_FRAME_CLASS } from '@/components/kbd'
-import { formatBinding, isApplePlatform } from '@/lib/keybindings'
-import { cn } from '@/lib/utils'
+import { KBD_FRAME_CLASS } from '@/components/kbd.tsx'
+import { formatBinding } from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface ShortcutKeysProps {
   /** A keymap-registry binding, e.g. `Mod-d` or `Mod-\`. */
@@ -19,13 +20,11 @@ interface ShortcutKeysProps {
  * this so bindings always read the same way.
  */
 export function ShortcutKeys({ binding, ghost, className }: ShortcutKeysProps): ReactElement {
-  const keys = useMemo(() => formatBinding(binding, isApplePlatform()), [binding])
+  const { platform } = useCoreServices()
+  const keys = useMemo(() => formatBinding(binding, platform.isApplePlatform), [binding, platform])
   if (ghost) {
     return (
-      <span
-        aria-hidden
-        className={cn('shrink-0 font-shortcut text-2xs uppercase', className)}
-      >
+      <span aria-hidden className={cn('shrink-0 font-shortcut text-2xs uppercase', className)}>
         {keys.join('')}
       </span>
     )

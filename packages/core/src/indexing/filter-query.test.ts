@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSearchQuery } from './filter-query'
+import { parseSearchQuery } from './filter-query.ts'
 
 function startOfLocalDay(date: string, days = 0): number {
   const [year, month, day] = date.split('-').map(Number)

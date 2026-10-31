@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assetFileName } from './asset-names'
+import { assetFileName } from './asset-names.ts'
 
 describe('assetFileName', () => {
   it('slugs the stem and keeps a lowercased extension', () => {

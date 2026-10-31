@@ -7,12 +7,12 @@ import {
   AttachmentActions,
   AttachmentGroup,
   AttachmentMedia,
-} from '@/components/ui/attachment'
-import { Button } from '@/components/ui/button'
-import { ChatModelDrawer } from '@/mobile/chat-model-drawer'
-import { useArrivalFocus } from '@/mobile/use-arrival-focus'
-import { useChatSession } from '@/providers/chat-provider'
-import { useRouter } from '@/routing/router'
+} from '@/components/ui/attachment.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { ChatModelDrawer } from '@/mobile/chat-model-drawer.tsx'
+import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
+import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useRouter } from '@/routing/router.tsx'
 
 /**
  * The mobile chat composer (Plan 23): a plain textarea bound to the
@@ -52,7 +52,7 @@ export function MobileChatComposer(): ReactElement {
   }
 
   return (
-    <div className="shrink-0 border-t border-border px-3 pb-2 pt-2">
+    <div className="shrink-0 border-t border-border px-safe-offset-3 pb-2 pt-2">
       {attachments.length > 0 ? (
         <AttachmentGroup className="flex-wrap gap-2 overflow-visible pb-1">
           {attachments.map((attachment) => (

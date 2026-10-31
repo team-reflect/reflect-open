@@ -1,35 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readNote, writeNote, type FileChange } from '@reflect/core'
-import { useFileChanges } from '@/lib/use-file-changes'
-import { createDocumentBinding, type DocumentBinding } from './document-binding'
-import type { NoteEditorHandle } from './note-editor'
-import { createRenameCoordinator } from './rename-coordinator'
 import {
-  createNoteSession,
+  createDocumentBinding,
   INITIAL_NOTE_SNAPSHOT,
+  type DocumentBinding,
   type NoteSessionSnapshot,
-} from './note-session'
-import { checkRoundTrip } from './roundtrip'
+  type RenameCoordinator,
+} from '@reflect/core'
+import { useMaybeGraph } from '@/providers/graph-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import type { NoteEditorHandle } from './note-editor.tsx'
+import { checkRoundTrip } from '@meowdown/markdown'
 
 /**
- * React adapter over the {@link createNoteSession} document state machine: one
- * session per open `(path, generation)`, wired to the `@reflect/core` file
- * commands, the watcher event stream, and the editor's imperative handle. All
- * save/conflict/protection semantics live in `note-session.ts`, and the
- * create/adopt/teardown/hand-off lifecycle (a rename retargets the live
- * session and the route follows, Plan 17) lives in `document-binding.ts` —
- * this hook only adapts both to React.
+ * React adapter over the `@reflect/core` document state machine
+ * (`NoteSessionService`): one session per open path, wired to
+ * the watcher event stream (through `OpenDocumentsService`) and the editor's
+ * imperative handle. All save/merge/protection semantics live in core's
+ * `note-session-service.ts`, and the create/adopt/teardown/hand-off lifecycle
+ * (a rename retargets the live session and the route follows, Plan 17) lives
+ * in core's `document-binding.ts` — this hook only adapts both to React.
  */
 
 export interface NoteDocument extends NoteSessionSnapshot {
-  /** Wire to the editor: every document change enters the pipeline here. */
+  /**
+   * Wire to the editor: every document change enters the pipeline here.
+   */
   onEditorChange: (markdown: string) => void
-  /** Wire to the editor's imperative handle (reload/conflict application). */
+  /**
+   * Wire to the editor's imperative handle (reload and merged-save application).
+   */
   bindEditor: (handle: NoteEditorHandle | null) => void
-  /** Resolve a conflict by keeping the buffer (rewrites the file). */
-  keepMine: () => void
-  /** Resolve a conflict by loading the external content (discards the buffer). */
-  loadTheirs: () => void
   /**
    * Stable identity of the underlying session: increments when a session is
    * *created*, not when a rename retargets one (Plan 17). Key the editor on
@@ -45,13 +45,14 @@ export interface NoteDocumentOptions {
    * created by the first save — Plan 06's lazy daily-note contract: opening a
    * day never litters the graph; writing does.
    */
-  createIfMissing?: boolean
+  createIfMissing?: boolean | undefined
   /**
-   * Auto-rewrite inbound `[[links]]` (and move the file onto its title's slug,
-   * Plan 17) when this note's settled title changes. Off for daily notes —
-   * their date labels are stream chrome, not content.
+   * Maintain inbound `[[links]]` when this note's settled title changes. The
+   * coordinator separately requires a direct `notes/*.md` path with valid
+   * Reflect ULID frontmatter before moving a file onto its title's slug, so
+   * adopted and stable-path notes keep their filenames.
    */
-  trackRenames?: boolean
+  trackRenames?: boolean | undefined
   /**
    * Markdown to seed a missing note's buffer with (the new-note title
    * template). Requires `createIfMissing`; see `NoteSessionOptions.missingSeed`
@@ -61,42 +62,27 @@ export interface NoteDocumentOptions {
 }
 
 /**
- * @param path graph-relative path of the open note
- * @param generation the open graph's session generation (`GraphInfo.generation`);
- *   pins every write to that graph — Rust rejects a write whose generation is
- *   stale, so a flush racing a graph switch can't land in the new graph.
+ * @param path graph-relative path of the open note; the session writes to the
+ *   graph open when it is created, and is read-only while no graph is open.
  */
-export function useNoteDocument(
-  path: string | null,
-  generation: number | null,
-  options?: NoteDocumentOptions,
-): NoteDocument {
+export function useNoteDocument(path: string | null, options?: NoteDocumentOptions): NoteDocument {
   const createIfMissing = options?.createIfMissing ?? false
   const trackRenames = options?.trackRenames ?? false
   const missingSeed = options?.missingSeed
   const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
   const editorRef = useRef<NoteEditorHandle | null>(null)
-  /** Mirrors the snapshot's conflict for non-reactive checks (rename gating). */
-  const conflictRef = useRef<string | null>(null)
-  /** The pane's lifecycle policy object — one per hook instance. */
-  const [binding] = useState<DocumentBinding>(() => createDocumentBinding())
+  /**
+   * The pane's lifecycle policy object — one per hook instance.
+   */
+  const { noteSessions, openDocuments, titleRename } = useCoreServices()
+  const [binding] = useState<DocumentBinding<RenameCoordinator>>(() => {
+    return createDocumentBinding({ openDocuments })
+  })
 
-  // Writes read the generation at write time, not at session creation, so the
-  // session must NOT be keyed on `generation`: reopening the *same* graph bumps
-  // it without remounting the pane, and recreating the session would dispose-
-  // flush with a stale generation (rejected by Rust) and silently reload the
-  // buffer from disk — losing unsaved edits. Cross-graph safety is preserved
-  // because a real graph switch remounts the whole workspace (keyed by root):
-  // the unmounted pane never re-renders, its ref keeps the old generation, and
-  // Rust rejects its final flush instead of landing it in the new graph.
-  const generationRef = useRef(generation)
-  // Written during render, not in an effect: a debounced save or rename reads
-  // this at write time, and reopening the *same* graph bumps the generation
-  // without remounting the pane — an effect-based update would lag and let a
-  // write land with the previous generation, which Rust rejects.
-  // eslint-disable-next-line react-hooks/refs
-  generationRef.current = generation
-  const canWrite = generation !== null
+  // The session is keyed on whether a graph is open, not on its generation:
+  // reopening the *same* graph bumps the generation without remounting the
+  // pane, and the session's writes follow that reopen on their own.
+  const canWrite = useMaybeGraph()?.graph != null
 
   useEffect(() => {
     if (!path) {
@@ -105,34 +91,13 @@ export function useNoteDocument(
     const { session, created } = binding.bind(path, {
       // The auto-rename lifecycle (Plan 07b/17) is owned by the coordinator —
       // the tracker, the rewrite chain, alias placement, and the file move.
-      coordinator: () =>
-        trackRenames
-          ? createRenameCoordinator({
-              path,
-              generation: () => generationRef.current,
-              canFire: () => conflictRef.current === null,
-            })
-          : null,
-      session: (coordinator) =>
-        createNoteSession({
+      coordinator: () => (trackRenames ? titleRename.createCoordinator({ path }) : null),
+      session: (coordinator) => {
+        return noteSessions.create({
           path,
-          io: {
-            read: readNote,
-            write: canWrite
-              ? (forPath, contents) => {
-                  const current = generationRef.current
-                  if (current === null) {
-                    return Promise.reject(new Error('no graph generation available for save'))
-                  }
-                  return writeNote(forPath, contents, current)
-                }
-              : null,
-          },
+          readOnly: !canWrite,
           classify: checkRoundTrip,
-          onSnapshot: (next) => {
-            conflictRef.current = next.conflict
-            setSnapshot(next)
-          },
+          onSnapshot: setSnapshot,
           applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
           reconcilePendingEditorInput: () => {
             // Meowdown 0.43.1 synchronously emits onDocChange only when this
@@ -141,35 +106,28 @@ export function useNoteDocument(
             // merely normalized relative to their on-disk Markdown.
             editorRef.current?.getMarkdown()
           },
-          onContent: coordinator ? coordinator.content : undefined,
+          onContent: coordinator
+            ? (content, origin) => coordinator.content(content, origin)
+            : undefined,
           createIfMissing,
           missingSeed,
-        }),
+        })
+      },
     })
     if (created) {
       session.load()
     }
     return () => binding.unbind(path)
-  }, [binding, path, canWrite, createIfMissing, trackRenames, missingSeed])
-
-  // External-change reconciliation via the watcher (Plan 04b events). The
-  // comparison reads the session's CURRENT path, not the route prop: a rename
-  // retargets the session before React re-renders the pane (Plan 17), and an
-  // external change landing at the new path inside that window must still
-  // reconcile — matching the prop would leave the editor stale against disk.
-  const onFileChanges = useCallback(
-    (changes: FileChange[]) => {
-      const session = binding.session()
-      if (session === null) {
-        return
-      }
-      if (changes.some((change) => change.path === session.path && change.kind === 'upsert')) {
-        session.externalChanged()
-      }
-    },
-    [binding],
-  )
-  useFileChanges(path ? onFileChanges : null)
+  }, [
+    binding,
+    noteSessions,
+    titleRename,
+    path,
+    canWrite,
+    createIfMissing,
+    trackRenames,
+    missingSeed,
+  ])
 
   // Flush pending edits when the window loses focus, and register with the
   // app-global registry so quit-time teardown (window close, ⌘Q — paths where
@@ -214,20 +172,10 @@ export function useNoteDocument(
     editorRef.current = handle
   }, [])
 
-  const keepMine = useCallback(() => {
-    binding.session()?.keepMine()
-  }, [binding])
-
-  const loadTheirs = useCallback(() => {
-    binding.session()?.loadTheirs()
-  }, [binding])
-
   return {
     ...snapshot,
     onEditorChange,
     bindEditor,
-    keepMine,
-    loadTheirs,
     sessionEpoch: binding.epoch(),
   }
 }

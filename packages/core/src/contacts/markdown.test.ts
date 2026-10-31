@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ContactMatch } from './commands'
-import { appendContactDetails, contactDetailsMarkdown, noteHasContactDetails } from './markdown'
+import type { ContactMatch } from './commands.ts'
+import { appendContactDetails, contactDetailsMarkdown, noteHasContactDetails } from './markdown.ts'
 
 function contact(overrides: Partial<ContactMatch>): ContactMatch {
   return {
@@ -32,11 +32,13 @@ describe('contactDetailsMarkdown', () => {
     )
   })
 
-  it('dedupes values case-insensitively, keeping first casing and order', () => {
+  it('canonicalizes and deduplicates emails in order', () => {
     const details = contactDetailsMarkdown(
-      contact({ emails: ['Ada@Example.com', 'ada@example.com', 'ada@work.com'] }),
+      contact({
+        emails: ['Ada Lovelace <Ada@Example.com>', 'ada@example.com', 'ada@work.com'],
+      }),
     )
-    expect(details).toBe('- Type: #person\n- Email: Ada@Example.com\n- Email: ada@work.com')
+    expect(details).toBe('- Type: #person\n- Email: ada@example.com\n- Email: ada@work.com')
   })
 
   it('omits the typing line when the target body already carries a Type bullet', () => {

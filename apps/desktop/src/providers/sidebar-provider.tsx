@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useMemo,
   useState,
   type ReactElement,
@@ -32,12 +32,12 @@ export function SidebarProvider({ children }: { children: ReactNode }): ReactEle
     () => ({ collapsed, toggleSidebar }),
     [collapsed, toggleSidebar],
   )
-  return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
+  return <SidebarContext value={value}>{children}</SidebarContext>
 }
 
 /** Access side-panel visibility + the toggle. Use within a SidebarProvider. */
 export function useSidebar(): SidebarContextValue {
-  const context = useContext(SidebarContext)
+  const context = use(SidebarContext)
   if (!context) {
     throw new Error('useSidebar must be used within a SidebarProvider')
   }

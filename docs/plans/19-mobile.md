@@ -19,7 +19,7 @@ fallback with explicit triggers.
 > **Status (2026-06-14): In progress in source.** The app has the platform root gate
 > (`src/platform-root.tsx`), mobile route shell (`src/mobile/`), fixed-root graph
 > bootstrap/onboarding in `GraphProvider`, mobile-gated Rust commands and stand-ins
-> (`mobile_graph_root`, `watcher_mobile.rs`, `embed_mobile.rs`), iOS identity/config, and
+> (`mobile_graph_root`, `watcher_mobile.rs`, `embed_unsupported.rs`), iOS identity/config, and
 > the first-party `tauri-plugin-keyboard`. The Daily/All shell, editable note screen,
 > note actions, share helper, and settings sheet exist. Still open: physical-device
 > editing validation, full GitHub-connect restore polish on mobile, foreground-sync
@@ -32,8 +32,8 @@ fallback with explicit triggers.
 > settings sheet grew a **Switch graph** section — so "one graph per device / no
 > iCloud containers" no longer holds (one graph *open* at a time still does). The
 > formatting toolbar shipped **webview-drawn** (decision 8), spike B passed with
-> meowdown on device, mobile conflict resolution shipped (mine/theirs/both), and
-> the TestFlight flow exists ([docs/ios-testflight.md](../ios-testflight.md)).
+> meowdown on device, and
+> the TestFlight flow exists ([docs/distribution.md](../distribution.md)).
 
 **Depends on:** Plans 02–05 (graph/storage, document model, index, **editor**),
 06 (daily notes/route model), 07 (backlinks/autocomplete), 08 (lexical
@@ -154,6 +154,13 @@ Onboarding routes through two paths and lands on Today:
 
 ### 4. Frontend: one bundle, runtime platform gate, mobile surface tree
 
+> **Update:** shell builds no longer ask at run time. `vite.config.ts` aliases
+> `@platform-root` from the Tauri CLI's `TAURI_ENV_PLATFORM`, so a desktop or
+> mobile build imports its surface tree statically and ships without the
+> other one. Plain `vite` leaves the variable unset (browser dev) and gets
+> `src/platform-root.unknown.tsx`, which installs the in-memory dev bridge
+> and picks the tree from the `?platform=` override.
+
 ```tsx
 // main.tsx — platform gate; each side stays a lazy chunk
 const MobileApp = lazy(() => import('@/mobile/mobile-app'))
@@ -201,7 +208,7 @@ ends without touching the network.)
 Editing makes suspension a data-loss class: saves debounce (800ms default) and
 iOS both suspends the process soon after backgrounding and may kill the
 WebContent process outright. Contract, extending the quit-flush trio
-(`lib/quit-flush.ts`) with a mobile leg:
+(today `QuitPolicyService.installDesktopQuitPolicy`) with a mobile leg:
 
 - **On background** (visibility/pause): flush open documents + settings, then
   a local commit (never a push — same as desktop quit; the next resume cycle
@@ -305,6 +312,13 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    > `ios.project.yml` (`libz.tbd`, `libiconv.tbd`); after editing the
    > template, re-run `tauri ios init` to regenerate `gen/apple/`.
    > Remaining: the same probes on a physical iPhone.
+   >
+   > **Status (2026-07-31): `spike_mobile.rs` removed.** The formal
+   > physical-device probe run never happened, but every probed capability has
+   > long since shipped in production iOS features (keychain-backed secrets,
+   > the SQLite/FTS5 index, `Documents/` graphs, libgit2 GitHub sync), which
+   > settles the gate. The probe itself had become a startup cost: it ran on
+   > every launch, on the main thread, after the window was shown.
 
 2. **Gate spike B — editing on a real iPhone (timeboxed).** Prototype the
    Swift keyboard plugin (decision 8) far enough to evaluate honestly, then
@@ -337,7 +351,7 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    >
    > **Also landed 2026-06-12: step 5 and the decision-8 keyboard plugin.**
    > The write-event seam ships as `setLocalWriteEcho`/`echoLocalWrite` in
-   > core — `writeNote`/`writeAsset`/`deleteNote` emit their change batch
+   > core (now `FileChangeService.reportOwnWrite`) — `writeNote`/`writeAsset`/`deleteNote` emit their change batch
    > in-process after the write lands, enabled by the mobile root chunk at
    > load, unit-tested (including no-emit-on-failed-write).
    > `plugins/tauri-plugin-keyboard` (workspace member, mobile-only dep)
@@ -352,6 +366,10 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    > exists (keyboard:default). Spike B's remaining on-device checklist
    > (IME, autocorrect, selection, real-device feel) still gates the editor
    > decision.
+   >
+   > **Update:** the `keyboardChange` event bridge was later removed;
+   > `--keyboard-height` is now derived from `visualViewport` on the web side
+   > and the plugin only pins the webview (see decision 0003's keyboard note).
 5. **The in-process write-notification seam (decision 5).** Local write paths
    emit file-change batches on mobile; prove with a unit-level test that a
    session save reaches the index and the engine's dirty mark without a
@@ -375,12 +393,11 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    webview's Web Share API — `navigator.share`, verified working in the Tauri
    iOS WKWebView, so no native plugin — and trash).
 10. **Sync wiring.** Resume/edit/online triggers, background-flush + local
-    commit on pause, `onRemoteChanges` reindex (unchanged), conflicted notes
-    protected with raw-marker resolution actions, status pill live.
+    commit on pause, `onRemoteChanges` reindex (unchanged), status pill live.
 11. **Harden + ship.** Memory pass on a large graph (webview process limits;
     editing a very large note), resume-after-process-death recovery check,
     a11y labels, TestFlight build (`pnpm release:ios testflight`; see
-    `docs/ios-testflight.md`), then App Store submission with the review story.
+    `docs/distribution.md`), then App Store submission with the review story.
 12. **Android (fast follow, same shape).** `tauri android init`, Kotlin half
     of the keyboard plugin, keystore signing, the same frontend gate already
     matching `'android'`, Play submission. No new product surface.
@@ -407,9 +424,8 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
 - The keyboard never permanently occludes the editor or capture input, and
   the caret stays visible above the keyboard while typing (notched device,
   portrait + landscape).
-- A conflicted note opens protected with its "Needs review" state, offers
-  mine/theirs/both resolution actions, and never blocks sync of other notes; a
-  lossy-round-trip note opens protected, same as desktop.
+- A conflict never blocks sync of other notes; a lossy-round-trip note opens
+  protected, same as desktop.
 - No `private: true` content leaves the device: mobile v1 makes **no** AI or
   transcription calls at all; network egress is GitHub (sync) only.
 - A TestFlight build installs and survives backgrounding/resume without a

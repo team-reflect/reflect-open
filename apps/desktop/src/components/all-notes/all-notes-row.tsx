@@ -1,9 +1,9 @@
 import { memo, type MouseEvent, type ReactElement } from 'react'
-import type { NoteListEntry } from '@reflect/core'
-import { formatRecencyLabel } from '@/lib/dates'
-import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
-import { useSettings } from '@/providers/settings-provider'
+import { type NoteListEntry, formatRecencyLabel } from '@reflect/core'
+import { cn } from '@/lib/utils.ts'
+import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 /**
  * The shared column template (Subject · Snippet · Tags · Updated) — the header
@@ -22,7 +22,7 @@ interface AllNotesRowProps {
   /** Indicator click: toggle this row (Shift extends a range) — V1's check gutter. */
   onToggle: (path: string, event: Pick<MouseEvent, 'shiftKey'>) => void
   /** Open the note (subject click / double-click). */
-  onOpen: (path: string, event?: NewWindowClickEvent) => void
+  onOpen: (path: string, event?: ModClickEvent) => void
 }
 
 /**
@@ -30,8 +30,15 @@ interface AllNotesRowProps {
  * multi-select: plain = exclusive, ⌘/Ctrl = toggle, Shift = range); the
  * indicator gutter toggles it; the subject or a double-click opens the note.
  */
-export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect, onToggle, onOpen }: AllNotesRowProps): ReactElement {
+export const AllNotesRow = memo(function AllNotesRow({
+  note,
+  selected,
+  onSelect,
+  onToggle,
+  onOpen,
+}: AllNotesRowProps): ReactElement {
   const { settings } = useSettings()
+  const noteLabel = useNoteLabel()
   return (
     <div
       onClick={(event) => {
@@ -44,7 +51,7 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
       }}
       onDoubleClick={(event) => onOpen(note.path, event)}
       className={cn(
-        'group/row relative h-12 cursor-default select-none transition-colors duration-100',
+        'group/row relative h-12 cursor-default select-none',
         ALL_NOTES_GRID,
         selected
           ? 'border-y border-accent/20 bg-accent-soft text-text dark:border-accent/10 dark:text-text'
@@ -90,9 +97,11 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
           selected ? 'text-accent' : 'text-text',
         )}
       >
-        {note.title}
+        {noteLabel(note)}
       </button>
-      <span className={cn('truncate text-[13px]', selected ? 'text-accent' : 'text-text-secondary')}>
+      <span
+        className={cn('truncate text-[13px]', selected ? 'text-accent' : 'text-text-secondary')}
+      >
         {note.snippet}
       </span>
       <span className="truncate text-right text-[13px] text-text-secondary">

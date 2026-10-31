@@ -8,227 +8,63 @@
 
 pub mod asset_protocol;
 pub mod assets;
-mod import;
-mod import_assets;
-mod io;
-mod resolve;
+pub mod x_archive;
+mod x_download;
+pub mod x_media_protocol;
+pub mod x_syndication;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
-use serde::Serialize;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{AppError, AppResult};
 
-use self::io::{
-    atomic_create, atomic_write, bootstrap, collect_files, AtomicCreateOutcome, NOTE_DIRS,
-};
-use self::resolve::resolve;
+pub use reflect_graph_io::io;
+use reflect_graph_io::io::{AtomicCreateOutcome, atomic_create, bootstrap, initialize_runtime};
+pub use reflect_graph_io::own_writes;
+pub use reflect_graph_io::x_archive_store;
+pub use reflect_graph_io::*;
+pub use reflect_types::FileMeta;
 
+use reflect_graph_io::import;
 /// Cancellation flag for the running Reflect V1 import, managed as Tauri
 /// state in `lib.rs` (`graph_import_cancel` trips it).
-pub use self::import::ImportCancel;
+pub use reflect_graph_io::import::ImportCancel;
 
 /// Atomic byte write staged under `.reflect/tmp/`, shared with the conflict
 /// machinery (shadow bases, resolution writes) so every graph write follows
 /// the same crash-safe, sync-clean path.
-pub(crate) use self::io::atomic_write_bytes;
+pub(crate) use reflect_graph_io::io::atomic_write_bytes;
 
-/// iCloud eviction-placeholder name mapping, shared with the watcher (which
-/// must treat an evicted note as present, not deleted — Plan 21). Desktop-only
-/// like the watcher itself; mobile's change source is the Plan 21 Phase 2
-/// metadata query, which maps placeholders on its own side.
-#[cfg(desktop)]
-pub(crate) use self::io::eviction_placeholder;
 /// "Occupied" probe (real file OR eviction placeholder), shared with the
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
-pub(crate) use self::io::file_occupied;
-/// The one home of the `.{name}.icloud` placeholder grammar, shared with the
-/// desktop watcher and the iCloud container discovery (`icloud::storage`).
-pub(crate) use self::io::icloud_placeholder_target;
-/// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
-/// backup repo must never ride a file-sync provider — Plan 21).
-pub(crate) use self::io::mark_dir_local_only;
-pub(crate) use self::io::modified_ms;
-/// The lexical traversal guard, shared with the conflict stores that mirror
-/// note paths under `.reflect/` (shadow bases, conflict archive).
-pub(crate) use self::resolve::ensure_relative;
+pub(crate) use reflect_graph_io::io::file_occupied;
+pub(crate) use reflect_graph_io::io::modified_ms;
 /// The full traversal guard, shared with sibling modules that address graph
 /// files (capture promotes screenshots into `assets/`).
-pub(crate) use self::resolve::resolve as resolve_in_graph;
-
-/// The open graph root plus a monotonic generation, kept **under one lock** so
-/// they swap atomically (the same pattern as the index's `IndexState`, Plan 04b).
-/// Mutating commands carry the generation they were issued for and are rejected
-/// when it's stale — so a write enqueued for one graph can never land in another
-/// graph's same-named file after a switch swaps the root.
-#[derive(Default)]
-pub struct GraphInner {
-    pub generation: u64,
-    pub root: Option<PathBuf>,
-}
-
-/// Tauri-managed state holding the currently open graph (root + generation).
-#[derive(Default)]
-pub struct GraphState(pub Mutex<GraphInner>);
-
-/// Identity of an open graph, returned to the frontend.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GraphInfo {
-    /// Absolute path of the graph root.
-    pub root: String,
-    /// Display name (the root folder name).
-    pub name: String,
-    /// Open-session generation; mutating file commands must echo it back.
-    pub generation: u64,
-}
-
-/// Metadata for a file inside the graph.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FileMeta {
-    /// Graph-relative path, forward-slashed.
-    pub path: String,
-    pub size: u64,
-    /// Last-modified time in epoch milliseconds.
-    pub modified_ms: u64,
-    /// True when the file is an iCloud eviction placeholder: the note exists
-    /// but its content is not on disk until re-downloaded. Consumers must not
-    /// read it — and must not treat it as deleted (Plan 21). `size` and
-    /// `modified_ms` describe the placeholder stub, not the real file.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub placeholder: bool,
-}
-
-/// Result of claiming a note path without overwriting an existing file.
-#[derive(Debug, Serialize)]
-#[serde(
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase",
-    tag = "kind"
-)]
-pub enum NoteCreateOutcome {
-    /// The path was free and now contains the supplied bytes.
-    Created { modified_ms: Option<u64> },
-    /// A file or iCloud eviction placeholder already owns the path.
-    Collision,
-}
-
-// ---- state accessors --------------------------------------------------------
-
-fn graph_info(root: &Path, generation: u64) -> GraphInfo {
-    let name = root
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    GraphInfo {
-        root: root.to_string_lossy().into_owned(),
-        name,
-        generation,
-    }
-}
-
-/// Set the active root (bumping the generation atomically), record it in
-/// recents, and return its info.
-fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
-    let generation = {
-        let mut inner = lock_graph(state)?;
-        inner.generation += 1;
-        inner.root = Some(root.to_path_buf());
-        inner.generation
-    };
-    let info = graph_info(root, generation);
-    // Recents is a convenience cache: a failure to persist it must not fail the
-    // open (which would leave Rust treating the graph as open while the command
-    // returns an error, out of sync with the UI). Best-effort, log and move on.
-    if let Err(err) = crate::recents::record(root, &info.name) {
-        tracing::warn!(?err, "failed to record recent graph");
-    }
-    Ok(info)
-}
-
-fn lock_graph<'a>(
-    state: &'a State<GraphState>,
-) -> AppResult<std::sync::MutexGuard<'a, GraphInner>> {
-    state.0.lock().map_err(|err| {
-        // A poisoned lock means a command panicked while holding it — the panic
-        // itself is the bug; this context points at the blast radius.
-        tracing::error!(?err, "graph state lock poisoned by an earlier panic");
-        AppError::io("graph state lock poisoned")
-    })
-}
-
-pub(crate) fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
-    lock_graph(state)?
-        .root
-        .clone()
-        .ok_or_else(AppError::no_graph)
-}
-
-/// The open graph's identity as a pure read — the note-window bootstrap
-/// (`windows::window_bootstrap`) must *adopt* the session, never re-open it:
-/// a generation bump here would strand every command the main window has
-/// pinned to the current one.
-pub(crate) fn current_graph_info(state: &State<GraphState>) -> AppResult<GraphInfo> {
-    let inner = lock_graph(state)?;
-    let root = inner.root.clone().ok_or_else(AppError::no_graph)?;
-    Ok(graph_info(&root, inner.generation))
-}
-
-/// The current root, verified against the generation a mutating command was
-/// issued for. A stale generation means the graph was switched after the
-/// command was enqueued — the mutation must be rejected (loudly), or it would
-/// land in the *new* graph's same-named file.
-pub(crate) fn root_for_generation(
-    state: &State<GraphState>,
-    generation: u64,
-) -> AppResult<PathBuf> {
-    let inner = lock_graph(state)?;
-    if inner.generation != generation {
-        return Err(AppError::io(
-            "the graph changed since this command was issued; dropping it",
-        ));
-    }
-    inner.root.clone().ok_or_else(AppError::no_graph)
-}
-
-/// `current_root`, or `root_for_generation` when the caller pinned the
-/// command. Read commands take an optional pin: UI reads for the open graph
-/// omit it, background passes (audio-memo reconcile) that can span a graph
-/// switch must supply it so every step of a pass sees one graph.
-fn root_for(state: &State<GraphState>, generation: Option<u64>) -> AppResult<PathBuf> {
-    match generation {
-        Some(generation) => root_for_generation(state, generation),
-        None => current_root(state),
-    }
-}
-
-fn ensure_asset_path(path: &str) -> AppResult<()> {
-    if path
-        .strip_prefix("assets/")
-        .is_some_and(|rest| !rest.is_empty())
-    {
-        return Ok(());
-    }
-    Err(AppError::traversal(format!(
-        "asset path must be under assets/: {path}"
-    )))
-}
-
-// ---- commands --------------------------------------------------------------
-
+pub(crate) use reflect_graph_io::resolve as resolve_in_graph;
+/// iCloud eviction-placeholder path construction, shared with note deletion
+/// and the desktop watcher (which treats an evicted note as present, not
+/// deleted — Plan 21). The grammar now lives in `reflect-graph-paths`.
+pub(crate) use reflect_graph_paths::eviction_placeholder;
+/// iCloud eviction-placeholder name mapping, shared with the iCloud
+/// container discovery (`icloud::storage`) — Apple-only, like its callers.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+pub(crate) use reflect_graph_paths::icloud_placeholder_target;
+/// Dataless-file probe (modern macOS eviction: bytes remote, real path
+/// intact), shared with the desktop watcher and the iCloud pending walk —
+/// every place that must not mistake an evicted note for a readable one.
+pub(crate) use reflect_graph_paths::is_dataless;
 /// Create a new graph at `path` (scaffolds the layout) and open it.
 #[tauri::command]
 pub fn graph_create(path: String, state: State<GraphState>) -> AppResult<GraphInfo> {
     let root = PathBuf::from(&path);
     fs::create_dir_all(&root)?;
     bootstrap(&root)?;
-    activate(&state, &root)
+    open_graph(&state, &root)
 }
 
 /// Import a user-selected Reflect V1 export `.zip` into the open graph. V1's
@@ -277,13 +113,19 @@ pub async fn graph_import_reflect_v1_zip(
     // Writing is fast and local; throttle the events to ~100 per import so a
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
-    import::finalize_import(&root, prepared, downloads, |done, total| {
-        let step = (total / 100).max(1);
-        if done == total || done >= last_emitted + step {
-            last_emitted = done;
-            emit_import_progress(&app, "writing", done, total);
-        }
-    })
+    let summary = with_graph_lock(&root, || {
+        cancel.ensure_active()?;
+        root_for_generation(&state, generation)?;
+        import::finalize_import(&root, prepared, downloads, |done, total| {
+            let step = (total / 100).max(1);
+            if done == total || done >= last_emitted + step {
+                last_emitted = done;
+                emit_import_progress(&app, "writing", done, total);
+            }
+        })
+    })?;
+    invalidate_file_catalog(&state, &root);
+    Ok(summary)
 }
 
 /// Cancel the running Reflect V1 import (a no-op when none is running). The
@@ -300,50 +142,130 @@ fn emit_import_progress(app: &tauri::AppHandle, stage: &'static str, done: usize
     );
 }
 
-/// Open an existing graph at `path`, ensuring the standard layout exists.
+/// Activate `root` and record it in recents. Recents is a convenience cache:
+/// a failure to persist it must not fail the open (which would leave Rust
+/// treating the graph as open while the command returns an error, out of sync
+/// with the UI). Best-effort, log and move on.
+fn open_graph(state: &GraphState, root: &Path) -> AppResult<GraphInfo> {
+    let info = activate(state, root)?;
+    if let Err(err) = crate::recents::record(root, &info.name) {
+        tracing::warn!(?err, "failed to record recent graph");
+    }
+    Ok(info)
+}
+
+/// Open an existing Markdown vault in place, adding only `.reflect/` runtime
+/// state. Reflect's authoring directories remain lazy for adopted vaults.
 #[tauri::command]
 pub fn graph_open(path: String, state: State<GraphState>) -> AppResult<GraphInfo> {
     let root = PathBuf::from(&path);
     if !root.is_dir() {
         return Err(AppError::not_found(format!("not a directory: {path}")));
     }
-    bootstrap(&root)?;
-    activate(&state, &root)
+    initialize_runtime(&root)?;
+    open_graph(&state, &root)
 }
 
 /// Read a note's markdown by graph-relative path. `generation`, when given,
 /// pins the read to the issuing graph session (see [`root_for`]).
+///
+/// Off the main thread on purpose: this read *does* materialize an evicted
+/// iCloud note (that is its contract — bulk passes use [`note_read_local`]),
+/// and an on-demand download from a sync command would freeze the whole app
+/// for its duration, exactly like the old synchronous asset protocol.
 #[tauri::command]
-pub fn note_read(
+pub async fn note_read(
     path: String,
     generation: Option<u64>,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<String> {
     let root = root_for(&state, generation)?;
-    Ok(fs::read_to_string(resolve(&root, &path)?)?)
+    let abs = resolve(&root, &path)?;
+    crate::blocking::run_blocking(move || Ok(io::read_note_no_follow(&root, &abs)?)).await
+}
+
+/// Read a note's markdown **only when its bytes are local**. Bulk background
+/// passes (the embedding backfill, asset-description gathering) must use this
+/// instead of [`note_read`]: reading an evicted note makes `fileproviderd`
+/// materialize it on demand, and a whole-graph pass over an evicted iCloud
+/// graph becomes thousands of serial blocking downloads. Runs off the main
+/// thread — even a local read must not stall the UI under a busy provider.
+/// Dataless materialization is switched off for the whole check-and-read
+/// ([`io::NoMaterialize`], per TN3150), so an eviction racing the stat
+/// reports `Evicted` instead of blocking on a download; engaging the policy
+/// is best-effort, and on the rare refusal a narrow stat-then-read race
+/// remains (see the call-site comment).
+#[tauri::command]
+pub async fn note_read_local(
+    path: String,
+    generation: Option<u64>,
+    state: State<'_, GraphState>,
+) -> AppResult<LocalNoteRead> {
+    let root = root_for(&state, generation)?;
+    let abs = resolve(&root, &path)?;
+    let read_root = root;
+    crate::blocking::run_blocking(move || {
+        // Best-effort: when the guard refuses to engage, the read keeps a
+        // slim stat-then-read race (an eviction landing between the two
+        // materializes that one file).
+        let _no_materialize = io::NoMaterialize::engage();
+        match fs::metadata(&abs) {
+            Ok(meta) if is_dataless(&meta) => return Ok(LocalNoteRead::Evicted),
+            Err(err)
+                if err.kind() == std::io::ErrorKind::NotFound
+                    && eviction_placeholder(&abs).is_some_and(|stub| stub.exists()) =>
+            {
+                return Ok(LocalNoteRead::Evicted);
+            }
+            _ => {}
+        }
+        match io::read_note_no_follow(&read_root, &abs) {
+            Ok(content) => Ok(LocalNoteRead::Content { content }),
+            // The engaged policy answers a dataless read with EDEADLK
+            // instead of downloading: the eviction raced the stat.
+            Err(err) if err.kind() == std::io::ErrorKind::Deadlock => Ok(LocalNoteRead::Evicted),
+            Err(err) => Err(err.into()),
+        }
+    })
+    .await
 }
 
 /// Atomically write a note's markdown by graph-relative path. `generation` pins
 /// the write to the graph it was issued for (see `root_for_generation`).
-/// Returns the written file's on-disk mtime (epoch ms, `None` when the
-/// platform can't provide one) so the caller's index echo can stamp the row
-/// with the value a later `list_files` will report — a `Date.now()` stamp
-/// never matches and costs a re-read on every reconcile.
-#[tauri::command]
+/// The outcome's `modified_ms` is the file's on-disk mtime after the call
+/// (epoch ms, `None` when the platform can't provide one), so the caller's
+/// index echo stamps the row with the value a later `list_files` reports.
+///
+/// `expected_contents` is compared with the note as [`note_read`] returns it,
+/// with `\n` line endings. When it matches, `contents` is written as given;
+/// when the file moved past it, the outcome's `merged` holds the text the
+/// file holds now (see [`write_note_revision`]).
+#[tauri::command(async)]
 pub fn note_write(
     path: String,
     contents: String,
     generation: u64,
+    check_contents: Option<bool>,
+    expected_contents: Option<String>,
     state: State<GraphState>,
-) -> AppResult<Option<u64>> {
+) -> AppResult<NoteWriteOutcome> {
     let root = root_for_generation(&state, generation)?;
-    atomic_write(&root, &resolve(&root, &path)?, &contents)
+    let outcome = write_note_revision(
+        &root,
+        &path,
+        &contents,
+        check_contents == Some(true),
+        expected_contents.as_deref(),
+        || root_for_generation(&state, generation).map(drop),
+    )?;
+    invalidate_file_catalog(&state, &root);
+    Ok(outcome)
 }
 
 /// Atomically create a note only when `path` is still free. Unlike
 /// [`note_write`], this is a no-clobber claim: a concurrent sync checkout or
 /// creator wins as `Collision`, with its file left byte-for-byte intact.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_create(
     path: String,
     contents: String,
@@ -351,9 +273,20 @@ pub fn note_create(
     state: State<GraphState>,
 ) -> AppResult<NoteCreateOutcome> {
     let root = root_for_generation(&state, generation)?;
-    let target = resolve(&root, &path)?;
-    match atomic_create(&root, &target, &contents)? {
-        AtomicCreateOutcome::Created(modified_ms) => Ok(NoteCreateOutcome::Created { modified_ms }),
+    let outcome = with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        let target = resolve(&root, &path)?;
+        let outcome = atomic_create(&root, &target, &contents)?;
+        if matches!(outcome, AtomicCreateOutcome::Created(_)) {
+            own_writes::record(&root, &path, contents.as_bytes());
+        }
+        Ok(outcome)
+    })?;
+    match outcome {
+        AtomicCreateOutcome::Created(modified_ms) => {
+            invalidate_file_catalog(&state, &root);
+            Ok(NoteCreateOutcome::Created { modified_ms })
+        }
         AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
     }
 }
@@ -361,7 +294,7 @@ pub fn note_create(
 /// Atomically write a binary asset (pasted/dropped image) by graph-relative
 /// path. Contents arrive base64-encoded — Tauri IPC args are JSON, and pasted
 /// images are small enough that the ~33% encoding overhead is irrelevant.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_write(
     path: String,
     contents_base64: String,
@@ -373,8 +306,91 @@ pub fn asset_write(
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
-    atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
+    with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)
+    })?;
+    invalidate_file_catalog(&state, &root);
     Ok(())
+}
+
+/// Delete one recording under `audio-memos/`: cancelling a recording session
+/// discards the segments it already landed. Deliberately scoped to the
+/// `audio-memos/` prefix so this command can never grow into a general
+/// file-delete IPC. Idempotent — a segment deleted twice (or never written)
+/// is fine.
+#[tauri::command(async)]
+pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
+    if !path.starts_with("audio-memos/") {
+        return Err(AppError::traversal(format!(
+            "not an audio memo path: {path}"
+        )));
+    }
+    let root = root_for_generation(&state, generation)?;
+    with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        let abs = resolve(&root, &path)?;
+        // An iCloud-evicted segment exists only as its `.name.icloud` stub,
+        // mirror `note_delete` so a cancelled session's evicted parts still
+        // delete.
+        let target = if abs.exists() {
+            abs
+        } else {
+            eviction_placeholder(&abs)
+                .filter(|stub| stub.exists())
+                .unwrap_or(abs)
+        };
+        match fs::remove_file(target) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err.into()),
+        }
+    })
+}
+
+/// Read one cached segment transcript; `notFound` when nothing is cached.
+#[tauri::command]
+pub fn transcript_cache_read(
+    name: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<String> {
+    let root = root_for_generation(&state, generation)?;
+    match fs::read_to_string(transcript_cache_file(&root, &name)?) {
+        Ok(contents) => Ok(contents),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            Err(AppError::not_found(format!("no cached transcript: {name}")))
+        }
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Cache one segment's transcription result. A torn write is harmless — the
+/// reader treats undecodable JSON as "no cache" and re-transcribes.
+#[tauri::command]
+pub fn transcript_cache_write(
+    name: String,
+    contents: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
+    fs::write(transcript_cache_file(&root, &name)?, contents)?;
+    Ok(())
+}
+
+/// Read a binary asset's bytes as a **raw IPC response** — no base64, no
+/// JSON. Long audio memos read back for transcription would otherwise cross
+/// the bridge ~1.33× inflated inside one giant JSON string. Pinned to
+/// `generation` for the same reason as [`asset_read`].
+#[tauri::command]
+pub fn asset_read_binary(
+    path: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<tauri::ipc::Response> {
+    let root = root_for_generation(&state, generation)?;
+    Ok(tauri::ipc::Response::new(fs::read(resolve(&root, &path)?)?))
 }
 
 /// Read a binary asset's bytes, base64-encoded for the JSON IPC (e.g. audio
@@ -385,6 +401,7 @@ pub fn asset_write(
 #[tauri::command]
 pub fn asset_read(path: String, generation: u64, state: State<GraphState>) -> AppResult<String> {
     use base64::Engine;
+    ensure_readable_attachment_path(&path)?;
     let root = root_for_generation(&state, generation)?;
     let bytes = fs::read(resolve(&root, &path)?)?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
@@ -400,7 +417,7 @@ pub fn asset_open(
     app: tauri::AppHandle,
     state: State<GraphState>,
 ) -> AppResult<()> {
-    ensure_asset_path(&path)?;
+    ensure_readable_attachment_path(&path)?;
     let root = root_for_generation(&state, generation)?;
     let abs = resolve(&root, &path)?;
     if !abs.is_file() {
@@ -421,6 +438,38 @@ fn open_asset_path(app: &tauri::AppHandle, path: &Path) -> AppResult<()> {
 fn open_asset_path(app: &tauri::AppHandle, path: &Path) -> AppResult<()> {
     app.opener()
         .open_path(path.to_string_lossy().into_owned(), None::<&str>)
+        .map_err(|err| AppError::io(err.to_string()))
+}
+
+/// Reveal a graph file in the OS file manager. Deliberately laxer than
+/// [`asset_open`]: revealing never executes anything, so lexical path safety
+/// plus existence is the whole requirement. This is the frontend's fallback
+/// when `asset_open` refuses a file type.
+#[tauri::command]
+pub fn asset_reveal(
+    path: String,
+    generation: u64,
+    app: tauri::AppHandle,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    ensure_revealable_path(&path)?;
+    let root = root_for_generation(&state, generation)?;
+    let abs = resolve(&root, &path)?;
+    if !abs.is_file() {
+        return Err(AppError::not_found(format!("asset not found: {path}")));
+    }
+    reveal_asset_path(&app, &abs)
+}
+
+#[cfg(target_os = "ios")]
+fn reveal_asset_path(_app: &tauri::AppHandle, _path: &Path) -> AppResult<()> {
+    Err(AppError::io("revealing files is not supported on iOS"))
+}
+
+#[cfg(not(target_os = "ios"))]
+fn reveal_asset_path(app: &tauri::AppHandle, path: &Path) -> AppResult<()> {
+    app.opener()
+        .reveal_item_in_dir(path)
         .map_err(|err| AppError::io(err.to_string()))
 }
 
@@ -448,7 +497,7 @@ pub fn dir_list(
     let root = root_for_generation(&state, generation)?;
     resolve(&root, &dir)?; // traversal guard; the walk itself skips symlinks
     let mut out = Vec::new();
-    collect_files(&root, &dir, None, &mut out)?;
+    io::collect_files(&root, &dir, None, &mut out)?;
     Ok(out)
 }
 
@@ -464,89 +513,48 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
     Ok(io::file_occupied(&resolve(&root, &path)?))
 }
 
-/// Rename `from` → `to` on disk (both graph-relative, traversal-guarded).
-///
-/// An occupied destination refuses (loudly), matching the projection half
-/// (`db::write::move_note`): the collision probe raced something — nothing is
-/// deleted or overwritten, the caller compensates, and the rename simply
-/// reports failed. One rule, no adoption heuristics; the filename drifts
-/// until the next settled rename retries.
-pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()> {
-    let from_abs = resolve(root, from)?;
-    let to_abs = resolve(root, to)?;
-    // Occupied includes an evicted iCloud note (placeholder only on disk):
-    // renaming onto it would collide with the re-download (Plan 21).
-    if io::file_occupied(&to_abs) {
-        return Err(AppError::io(format!(
-            "cannot move note: {to} already exists on disk"
-        )));
-    }
-    if let Some(parent) = to_abs.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::rename(from_abs, to_abs)?;
-    // Carry the note's sync ancestor across the rename (Plan 21) — a missed
-    // move only degrades one future merge, never blocks the rename.
-    crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
-    Ok(())
-}
-
 /// Send a note to the OS trash (recoverable), not a hard delete (pinned to
 /// `generation`). Mobile has no OS trash: the file moves into the graph-local
 /// `.reflect/trash/` instead (Plan 19), the same recoverability promise, and
 /// `.reflect/` is already excluded from sync and indexing.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    let abs = resolve(&root, &path)?;
-    // An iCloud-evicted note exists only as its `.name.md.icloud` stub —
-    // trashing the logical path would fail and the note would be
-    // undeletable. Removing the stub deletes the iCloud item (Plan 21).
-    let target = if abs.exists() {
-        abs
-    } else {
-        io::eviction_placeholder(&abs)
-            .filter(|stub| stub.exists())
-            .unwrap_or(abs)
-    };
-    #[cfg(desktop)]
-    os_trash_delete(&target)?;
-    #[cfg(mobile)]
-    move_to_graph_trash(&root, &target)?;
-    // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
-    crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
+    with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        delete_note_locked(&root, &path, |target| {
+            #[cfg(desktop)]
+            return os_trash_delete(target);
+            #[cfg(mobile)]
+            move_to_graph_trash(&root, target)
+        })
+    })?;
+    invalidate_file_catalog(&state, &root);
     Ok(())
 }
 
 /// Move the open graph's **entire directory** to the OS trash (recoverable)
 /// and drop it from recents. The session is invalidated (root cleared,
-/// generation bumped) **before** the filesystem is touched: a concurrent
-/// write pinned to this generation must fail its root check instead of
-/// `create_dir_all`-recreating directories under a path being trashed. If
+/// generation bumped) **before** the filesystem is touched: a pinned write
+/// re-checks its generation under the graph lock, so one queued behind this
+/// delete fails instead of recreating directories under the trashed path. If
 /// the trash move itself then fails, the session stays invalidated and the
 /// frontend re-opens the intact directory to restore a writable session.
 /// Pinned to `generation` — a delete enqueued before a graph switch must
 /// never trash the newly opened graph. Desktop-only: mobile's fixed roots
 /// have no OS trash and no delete UI.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> {
     #[cfg(desktop)]
     {
-        // Check-and-invalidate under one lock hold — `root_for_generation`
-        // followed by a separate invalidation would leave a window where a
-        // pinned write still resolves the doomed root.
-        let root = {
-            let mut inner = lock_graph(&state)?;
-            if inner.generation != generation {
-                return Err(AppError::io(
-                    "the graph changed since this command was issued; dropping it",
-                ));
-            }
-            let root = inner.root.take().ok_or_else(AppError::no_graph)?;
-            inner.generation += 1;
-            root
-        };
-        os_trash_delete(&root)?;
+        let root = root_for_generation(&state, generation)?;
+        // Take the graph lock first, then check the generation and invalidate
+        // under one session lock hold. Pinned writes re-check the generation
+        // under the graph lock, so one that waited here fails afterwards.
+        with_graph_lock(&root, || {
+            invalidate_for_delete(&state, generation)?;
+            os_trash_delete(&root)
+        })?;
         // Recents is a convenience cache (same stance as `activate`): the
         // directory is already in the trash, so a failure to persist must not
         // report the delete as failed. A stale entry fails loudly on open.
@@ -585,144 +593,75 @@ fn os_trash_delete(abs: &Path) -> AppResult<()> {
     ctx.delete(abs).map_err(|err| AppError::io(err.to_string()))
 }
 
-/// Move a deleted file under `<graph>/.reflect/trash/`, stamping the name
-/// with epoch millis — and a counter beyond that — until the name is free
-/// (repeat deletes of `a.md`, even within one millisecond).
-#[cfg(mobile)]
-fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
-    let trash_dir = root.join(".reflect").join("trash");
-    fs::create_dir_all(&trash_dir)?;
-    let name = abs
-        .file_name()
-        .ok_or_else(|| AppError::io("delete target has no file name"))?;
-    let name = Path::new(name);
-    let stem = name
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("note");
-    let ext = name.extension().and_then(|value| value.to_str());
-    let with_suffix = |suffix: &str| match ext {
-        Some(ext) => format!("{stem}{suffix}.{ext}"),
-        None => format!("{stem}{suffix}"),
-    };
-    let millis = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|err| AppError::io(err.to_string()))?
-        .as_millis();
-    let mut target = trash_dir.join(with_suffix(""));
-    let mut attempt: u32 = 0;
-    while target.exists() {
-        attempt += 1;
-        let suffix = if attempt == 1 {
-            format!("-{millis}")
-        } else {
-            format!("-{millis}-{attempt}")
-        };
-        target = trash_dir.join(with_suffix(&suffix));
-    }
-    fs::rename(abs, target)?;
-    Ok(())
-}
-
-/// List markdown notes under `daily/` and `notes/`. `generation`, when given,
-/// pins the listing to the issuing graph session (see [`root_for`]).
+/// List eligible Markdown notes anywhere in the vault. `generation`, when
+/// given, pins the listing to the issuing graph session (see [`root_for`]).
+///
+/// Async because a cold catalog is a full-tree walk; the cached case pays
+/// one thread hop, which is noise next to the IPC round-trip itself.
 #[tauri::command]
-pub fn list_files(generation: Option<u64>, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
-    let root = root_for(&state, generation)?;
-    note_files(&root)
+pub async fn list_files<R: tauri::Runtime>(
+    generation: Option<u64>,
+    app: tauri::AppHandle<R>,
+) -> AppResult<Vec<FileMeta>> {
+    catalog_off_main(generation, app, |catalog| catalog.notes).await
 }
 
-/// The same note listing as [`list_files`], callable with a plain root —
-/// the iCloud conflict sweep walks the graph outside any Tauri state.
-pub(crate) fn note_files(root: &Path) -> AppResult<Vec<FileMeta>> {
-    let mut out = Vec::new();
-    for dir in NOTE_DIRS {
-        collect_files(root, dir, Some("md"), &mut out)?;
-    }
-    Ok(out)
+/// List supported local attachments from the same cached catalog as
+/// [`list_files`], and off the main thread for the same reason: the editor
+/// asks for it as soon as a note opens, possibly before any walk has run.
+#[tauri::command]
+pub async fn list_attachments<R: tauri::Runtime>(
+    generation: Option<u64>,
+    app: tauri::AppHandle<R>,
+) -> AppResult<Vec<FileMeta>> {
+    catalog_off_main(generation, app, |catalog| catalog.attachments).await
+}
+
+/// Read one listing out of the cached catalog on the blocking pool.
+async fn catalog_off_main<R, F>(
+    generation: Option<u64>,
+    app: tauri::AppHandle<R>,
+    listing: F,
+) -> AppResult<Vec<FileMeta>>
+where
+    R: tauri::Runtime,
+    F: FnOnce(io::FileCatalog) -> Vec<FileMeta> + Send + 'static,
+{
+    // Pin the graph session before the hop, like `note_read` and `db_query`:
+    // an unpinned call resolved inside the closure could list a root swapped
+    // in after the invoke (the rebuild path calls this without a
+    // generation). A pinned call the switch superseded fails the
+    // `file_catalog` generation check instead of listing the wrong graph.
+    let generation = match generation {
+        Some(generation) => generation,
+        None => {
+            let state = app.state::<GraphState>();
+            current_graph_info(&state)?.generation
+        }
+    };
+    crate::blocking::run_blocking(move || {
+        let state = app.state::<GraphState>();
+        Ok(listing(file_catalog(&state, Some(generation))?))
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn vault_scan_stats(
+    generation: Option<u64>,
+    state: State<GraphState>,
+) -> AppResult<VaultScanStats> {
+    let catalog = file_catalog(&state, generation)?;
+    Ok(VaultScanStats {
+        notes: catalog.notes.len() as u32,
+        attachments: catalog.attachments.len() as u32,
+        skipped: catalog.skipped,
+    })
 }
 
 #[cfg(test)]
-mod note_create_tests {
-    use super::NoteCreateOutcome;
-    use serde_json::json;
-
-    #[test]
-    fn outcome_serializes_for_the_typescript_boundary() {
-        assert_eq!(
-            serde_json::to_value(NoteCreateOutcome::Created {
-                modified_ms: Some(1_234),
-            })
-            .unwrap(),
-            json!({ "kind": "created", "modifiedMs": 1_234 })
-        );
-        assert_eq!(
-            serde_json::to_value(NoteCreateOutcome::Collision).unwrap(),
-            json!({ "kind": "collision" })
-        );
-    }
-}
-
-#[cfg(test)]
-mod move_tests {
-    use super::{asset_file_url, ensure_asset_path, move_note_file};
-    use std::fs;
-
-    fn graph() -> tempfile::TempDir {
-        let dir = tempfile::tempdir().unwrap();
-        fs::create_dir_all(dir.path().join("notes")).unwrap();
-        dir
-    }
-
-    #[test]
-    fn renames_when_the_destination_is_free() {
-        let root = graph();
-        fs::write(root.path().join("notes/a.md"), "# A\n").unwrap();
-        move_note_file(root.path(), "notes/a.md", "notes/b.md").unwrap();
-        assert!(!root.path().join("notes/a.md").exists());
-        assert_eq!(
-            fs::read_to_string(root.path().join("notes/b.md")).unwrap(),
-            "# A\n"
-        );
-    }
-
-    #[test]
-    fn an_occupied_destination_refuses_with_both_files_intact() {
-        // Whatever appeared at the destination after the collision probe,
-        // nothing is deleted or overwritten — the rename just fails.
-        let root = graph();
-        fs::write(root.path().join("notes/a.md"), "# Mine\n").unwrap();
-        fs::write(root.path().join("notes/b.md"), "# Theirs\n").unwrap();
-        assert!(move_note_file(root.path(), "notes/a.md", "notes/b.md").is_err());
-        assert_eq!(
-            fs::read_to_string(root.path().join("notes/a.md")).unwrap(),
-            "# Mine\n"
-        );
-        assert_eq!(
-            fs::read_to_string(root.path().join("notes/b.md")).unwrap(),
-            "# Theirs\n"
-        );
-    }
-
-    #[test]
-    fn an_evicted_destination_also_refuses() {
-        // The destination exists only as an iCloud eviction placeholder — it
-        // looks vacant to is_file(), but the real note comes back on
-        // re-download, so the rename must refuse exactly like a present file.
-        let root = graph();
-        fs::write(root.path().join("notes/a.md"), "# Mine\n").unwrap();
-        fs::write(root.path().join("notes/.b.md.icloud"), "stub").unwrap();
-        assert!(move_note_file(root.path(), "notes/a.md", "notes/b.md").is_err());
-        assert!(root.path().join("notes/a.md").exists());
-    }
-
-    #[test]
-    fn asset_open_paths_must_stay_under_assets() {
-        assert!(ensure_asset_path("assets/cat.png").is_ok());
-        assert!(ensure_asset_path("notes/cat.png").is_err());
-        assert!(ensure_asset_path("assets/").is_err());
-        assert!(ensure_asset_path("assets").is_err());
-    }
+mod asset_url_tests {
+    use super::asset_file_url;
 
     #[test]
     fn asset_file_url_percent_encodes_local_paths() {
@@ -731,5 +670,72 @@ mod move_tests {
 
         assert_eq!(url.scheme(), "file");
         assert!(url.as_str().contains("Reflect%20Cat%20Photo.png"));
+    }
+}
+
+#[cfg(test)]
+mod graph_delete_race_tests {
+    use super::{GraphState, note_write};
+    use reflect_graph_io::{graph_lock_holders, invalidate_for_delete, with_graph_lock};
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+    use tauri::Manager;
+
+    /// The command-level half of the race: `note_write` must re-check its
+    /// generation under the graph lock, so a write that waited behind a graph
+    /// delete fails instead of recreating directories under the trashed root.
+    #[test]
+    fn a_note_write_queued_behind_graph_delete_fails_its_generation_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("graph");
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        let state = GraphState::default();
+        {
+            let mut inner = state.0.lock().unwrap();
+            inner.generation = 1;
+            inner.root = Some(root.clone());
+        }
+        let app = tauri::test::mock_builder()
+            .manage(state)
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        let graph = app.state::<GraphState>().inner();
+        let handle = app.handle().clone();
+
+        std::thread::scope(|scope| {
+            let (locked_tx, locked_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel::<()>();
+            let root = &root;
+            let deleter = scope.spawn(move || {
+                with_graph_lock(root, || {
+                    locked_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    invalidate_for_delete(graph, 1)?;
+                    std::fs::remove_dir_all(root)?;
+                    Ok(())
+                })
+            });
+            locked_rx.recv().unwrap();
+            let writer = scope.spawn(move || {
+                note_write(
+                    "notes/late.md".to_string(),
+                    "# Late\n".to_string(),
+                    1,
+                    None,
+                    None,
+                    handle.state::<GraphState>(),
+                )
+            });
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while graph_lock_holders(root) < 2 {
+                assert!(Instant::now() < deadline, "the write never queued");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            release_tx.send(()).unwrap();
+            deleter.join().unwrap().unwrap();
+            let error = writer.join().unwrap().unwrap_err();
+            assert!(error.message().contains("graph changed"), "{error:?}");
+        });
+        assert!(!root.exists());
     }
 }

@@ -1,4 +1,4 @@
-import { settingsSectionDomId, type SettingsSectionId } from './sections'
+import { settingsSectionDomId, type SettingsSectionId } from './sections.ts'
 
 /**
  * Breathing room (px) left above a section's heading when jumping to it —

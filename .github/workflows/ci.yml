@@ -2,40 +2,47 @@ name: CI
 
 on:
   push:
-    # next is the development default; master only advances on release merges.
-    branches: [master, next]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
-# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Least-privilege default: CI only needs to read the repo.
 permissions:
   contents: read
 
 jobs:
-  node:
-    name: Lint · typecheck · non-desktop tests · build (Node)
-    runs-on: ubuntu-latest
+  classify:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    outputs:
+      draft: ${{ steps.classify.outputs.draft }}
+      stack-middle: ${{ steps.classify.outputs.stack-middle }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - id: classify
+        env:
+          PR_IS_DRAFT: ${{ github.event.pull_request.draft == true }}
+          # In a stack, but neither the lowest unmerged PR nor the top PR.
+          PR_IS_STACK_MIDDLE: >-
+            ${{ github.event.pull_request.stack != null
+            && github.event.pull_request.stack.base.ref != github.event.pull_request.base.ref
+            && github.event.pull_request.stack.position != github.event.pull_request.stack.size }}
+        run: |
+          echo "draft=$PR_IS_DRAFT" >> "$GITHUB_OUTPUT"
+          echo "stack-middle=$PR_IS_STACK_MIDDLE" >> "$GITHUB_OUTPUT"
+
+  lint-node:
+    needs: classify
+    if: needs.classify.outputs.stack-middle == 'false'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-
-      - name: Install Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-node
 
       - name: Verify generated DB types are current
         run: |
@@ -43,107 +50,169 @@ jobs:
           git diff --exit-code packages/db/src/schema.gen.ts \
             || (echo "::error::schema.gen.ts is stale — run 'pnpm --filter @reflect/db db:codegen' and commit the result." && exit 1)
 
-      - name: Lint (oxlint)
+      - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test non-desktop packages
-        run: pnpm turbo run test --filter='!@reflect/desktop'
-
       - name: Build
         run: pnpm build
 
-  desktop-tests:
-    name: Desktop tests (${{ matrix.shard }}/3)
-    runs-on: ubuntu-latest
+  test-node:
+    needs: classify
+    if: needs.classify.outputs.stack-middle == 'false'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node
+
+      - name: Test
+        run: pnpm run test:node
+
+  test-chromium:
+    needs: classify
+    if: needs.classify.outputs.stack-middle == 'false'
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
+    name: test-chromium (${{ matrix.shard }}/3)
+    env:
+      REFLECT_TEST_BROWSER: chromium
+      # Chromium on Linux does not promptly free the iframe of a finished
+      # test file (https://issues.chromium.org/issues/530892387), so one
+      # browser process grows by 10 to 30 MB per file and dies near 2.5 GB,
+      # which Vitest reports as "Browser connection was closed". Vitest can
+      # collect garbage after each file, but only when the temp disk has
+      # less free space than this threshold; an unreachable threshold makes
+      # it collect every time (about 60 ms per file).
+      # Vitest reads this variable: https://github.com/vitest-dev/vitest/blob/v5.0.4/packages/vitest/src/node/pools/browser.ts#L773
+      VITEST_CHROMIUM_GC_DISK_THRESHOLD_GB: '100000'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: ./.github/actions/setup-node
 
-      - name: Install Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 22
-          cache: pnpm
+      - name: Install Playwright
+        run: pnpm --filter @reflect/desktop test:install:chromium
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Test
+        run: pnpm run test:browser --shard=${{ matrix.shard }}/3
 
-      - name: Test desktop shard
-        run: pnpm --filter @reflect/desktop exec vitest run --shard=${{ matrix.shard }}/3
-
-  rust:
-    name: fmt · clippy · test (Rust)
-    runs-on: ubuntu-latest
+  # Not part of `all-green`: a WebKit failure does not block merging.
+  test-webkit:
+    needs: classify
+    if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
+    runs-on: xcode-27
+    env:
+      REFLECT_TEST_BROWSER: webkit
+      # Suspected workaround, root cause unknown: WebContent sometimes
+      # segfaults in JavaScriptCore JIT code ("The webkit page crashed") in
+      # Playwright WebKit builds 2359, 2370 and 2378. Full browser test runs
+      # crashed about 1 in 8 times with the JIT and 0 in 15 without it. The
+      # `__XPC_` prefix passes the variable to the WebContent XPC service.
+      __XPC_JSC_useJIT: '0'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
-      - name: Install Tauri system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libxdo-dev \
-            libssl-dev \
-            build-essential \
-            curl wget file patchelf
+      - uses: ./.github/actions/setup-xcode
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - uses: ./.github/actions/setup-node
+
+      - name: Install Playwright
+        run: pnpm --filter @reflect/desktop test:install:webkit
+
+      # WebKit keeps the memory of every finished test file, so each shard
+      # runs in its own Vitest process to restart the browser.
+      - name: Test browser (shard 1/3)
+        run: pnpm run test:browser --shard=1/3
+
+      - name: Test browser (shard 2/3)
+        run: pnpm run test:browser --shard=2/3
+
+      - name: Test browser (shard 3/3)
+        run: pnpm run test:browser --shard=3/3
+
+  lint-rust:
+    needs: classify
+    if: needs.classify.outputs.stack-middle == 'false'
+    runs-on: ubuntu-24.04
+    # Clippy and the tests never run the desktop sidecars, so drop them from the
+    # Tauri config instead of building them (tauri-build and tauri-codegen merge
+    # this JSON into the config). `pnpm sidecar` still stages them for dev and
+    # release builds.
+    env:
+      TAURI_CONFIG: '{"bundle":{"externalBin":null}}'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          components: rustfmt, clippy
+          persist-credentials: false
 
-      - name: Cache cargo build
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          # A failed clippy/test run still compiled the dependency tree; save it
-          # so the next push doesn't pay the cold-build cost again.
-          cache-on-failure: true
-
-      # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
-      # build time and extracts them to ~/.cache/ort.pyke.io — outside target/,
-      # so rust-cache never captures them and every run re-downloads. The build
-      # script skips the download when the extracted dir is already present.
-      # Entries are content-addressed (dfbin/<target>/<hash>), so restoring a
-      # stale cache after an ort upgrade is safe — it just downloads anew.
-      - name: Cache ONNX Runtime binaries
-        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
-        with:
-          path: ~/.cache/ort.pyke.io
-          key: ort-bin-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ort-bin-${{ runner.os }}-
-
-      # Without this, actions/cache warns at save time on builds that never
-      # trigger the ort download (the path wouldn't exist).
-      - name: Ensure ort cache dir exists
-        run: mkdir -p ~/.cache/ort.pyke.io
-
-      # tauri-build requires the sidecar to exist before the desktop crate's
-      # build script runs (clippy/test compile it), so stage the CLI first.
-      - name: Stage the reflect CLI sidecar
-        run: node apps/desktop/scripts/build-sidecar.mjs
+      - uses: ./.github/actions/setup-rust
 
       - name: Format check
         run: cargo fmt --all -- --check
 
+      - name: Install cargo-shear
+        uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
+        with:
+          tool: cargo-shear@1.14.0
+
+      # Fails on a dependency that no code uses, in a member or in the root
+      # `[workspace.dependencies]`.
+      - name: Unused dependencies
+        run: cargo shear
+
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets
+
+  test-rust:
+    needs: classify
+    if: needs.classify.outputs.stack-middle == 'false'
+    runs-on: ubuntu-24.04
+    # Clippy and the tests never run the desktop sidecars, so drop them from the
+    # Tauri config instead of building them (tauri-build and tauri-codegen merge
+    # this JSON into the config). `pnpm sidecar` still stages them for dev and
+    # release builds.
+    env:
+      TAURI_CONFIG: '{"bundle":{"externalBin":null}}'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-rust
 
       - name: Test
         run: cargo test --workspace
+
+  # A single job for branch protection to require, instead of listing every
+  # job as a required status check.
+  all-green:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+
+    if: always()
+    needs: [classify, lint-node, test-node, test-chromium, lint-rust, test-rust]
+
+    steps:
+      - name: Fail because this PR is in the middle of a stack
+        if: needs.classify.outputs.stack-middle == 'true'
+        run: |
+          echo '::error title=Expected failure::This PR is in the middle of a stack, so some jobs were skipped. This failure is expected. They run when the PR becomes the lowest unmerged PR or the top PR of the stack.'
+          exit 1
+
+      - name: Verify that all jobs succeeded
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: |
+          echo 'Some jobs did not succeed: ${{ toJSON(needs) }}'
+          exit 1

@@ -1,7 +1,9 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { BacklinkSource } from '@/lib/group-backlinks'
-import { BacklinkSourceGroup } from './backlink-source-group'
+import { page } from 'vitest/browser'
+import { describe, expect, it, vi } from 'vitest'
+import { isModEvent } from '@meowdown/core'
+import type { BacklinkSource } from '@/lib/group-backlinks.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { BacklinkSourceGroup } from './backlink-source-group.tsx'
 
 const SOURCE: BacklinkSource = {
   path: 'notes/source.md',
@@ -9,41 +11,41 @@ const SOURCE: BacklinkSource = {
   snippets: [],
 }
 
-function mount(onOpen: (path: string, event?: { metaKey: boolean }) => void) {
-  return render(
+type OnOpen = (path: string, event?: { metaKey: boolean; ctrlKey: boolean }) => void
+
+function mount(onOpen: OnOpen) {
+  return renderInApp(
     <BacklinkSourceGroup
       source={SOURCE}
       first
       expanded={false}
       onOpen={onOpen}
       onWikilinkClick={() => {}}
-      resolveImageUrl={() => undefined}
     />,
   )
 }
 
-afterEach(cleanup)
-
 describe('BacklinkSourceGroup', () => {
-  it('forwards the click event so ⌘-click can open a new window', () => {
-    const onOpen = vi.fn()
-    mount(onOpen)
+  it('forwards the click event so ⌘-click can open a new window', async () => {
+    const onOpen = vi.fn<OnOpen>()
+    await mount(onOpen)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source Note' }), { metaKey: true })
+    await page.getByRole('button', { name: 'Source Note' }).click({ modifiers: ['ControlOrMeta'] })
 
     expect(onOpen).toHaveBeenCalledTimes(1)
     const [path, event] = onOpen.mock.calls[0]!
     expect(path).toBe('notes/source.md')
-    expect(event?.metaKey).toBe(true)
+    // The platform's mod key: Meta on mac dev machines, Ctrl on Linux CI.
+    expect(event !== undefined && isModEvent(event)).toBe(true)
   })
 
-  it('plain clicks arrive without the modifier', () => {
-    const onOpen = vi.fn()
-    mount(onOpen)
+  it('plain clicks arrive without the modifier', async () => {
+    const onOpen = vi.fn<OnOpen>()
+    await mount(onOpen)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source Note' }))
+    await page.getByRole('button', { name: 'Source Note' }).click()
 
     const [, event] = onOpen.mock.calls[0]!
-    expect(event?.metaKey).toBe(false)
+    expect(event !== undefined && isModEvent(event)).toBe(false)
   })
 })

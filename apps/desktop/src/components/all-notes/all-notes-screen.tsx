@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { hasBridge, listNotes, listNoteTags } from '@reflect/core'
+import { canTrashNote, foldTag } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import { allNotesQueryKey, allNotesTagsQueryKey } from '@/lib/notes/all-notes-query'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
-import { useListSelection } from '@/lib/selection/use-list-selection'
-import { useScrollRestoration } from '@/lib/use-scroll-restoration'
-import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge'
-import { useGraph } from '@/providers/graph-provider'
-import { routeForPath } from '@/routing/route'
-import { useRouter } from '@/routing/router'
-import { AllNotesFilters } from './all-notes-filters'
-import { AllNotesTable } from './all-notes-table'
-import { AllNotesTrashDialog } from './all-notes-trash-dialog'
-import { NewNoteButton } from './new-note-button'
-import { useAllNotesKeyboard } from './use-all-notes-keyboard'
+import { Button } from '@/components/ui/button.tsx'
+import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
+import { useNoteRows } from '@/hooks/note-row-overlay.ts'
+import { queryKeys } from '@/lib/query-client.ts'
+import { useListSelection } from '@/lib/selection/use-list-selection.ts'
+import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
+import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { routeForPath } from '@reflect/app'
+import { useRouter } from '@/routing/router.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
+import { AllNotesFilters } from './all-notes-filters.tsx'
+import { AllNotesTable } from './all-notes-table.tsx'
+import { AllNotesTrashDialog } from './all-notes-trash-dialog.tsx'
+import { NewNoteButton } from './new-note-button.tsx'
+import { useAllNotesKeyboard } from './use-all-notes-keyboard.ts'
+import { isModEvent } from '@meowdown/core'
 
 interface AllNotesScreenProps {
   /** Active tag filter carried by the route (`null` = all non-daily notes). */
@@ -27,7 +29,8 @@ interface AllNotesScreenProps {
  * The All Notes screen (a routed view, like settings): every non-daily note,
  * newest first, filterable by tag. The active tag lives on the route so
  * back/forward and "open a note, come back" keep the filter. Daily notes are
- * deliberately absent — the stream is their home.
+ * deliberately absent from the unfiltered view, but appear when they match the
+ * active tag.
  *
  * Rows are multi-selectable (V1 parity): click to select (⌘ toggle, Shift
  * range), the indicator gutter toggles, the subject or a double-click opens.
@@ -40,6 +43,7 @@ interface AllNotesScreenProps {
  */
 export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const { graph } = useGraph()
+  const { noteList } = useCoreServices()
   const { navigate } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation()
   // The scroll container lives in state, not a ref, so scroll restoration
@@ -50,16 +54,19 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)
-  const enabled = hasBridge() && graph !== null
 
-  const { data: notes } = useQuery({
-    queryKey: allNotesQueryKey(graph?.root, tag),
-    queryFn: () => listNotes({ tag }),
+  const enabled = graph !== null
+
+  const { data: indexedNotes } = useQuery({
+    queryKey: queryKeys.index.allNotesWithTag(graph?.root, tag === null ? null : foldTag(tag)),
+    queryFn: () => noteList.listNotes({ tag }),
     enabled,
   })
+  // Unfiltered, the list holds every note that can be trashed.
+  const notes = useNoteRows(indexedNotes, { complete: tag === null })
   const { data: facets } = useQuery({
-    queryKey: allNotesTagsQueryKey(graph?.root),
-    queryFn: () => listNoteTags(),
+    queryKey: queryKeys.index.allNotesTags(graph?.root),
+    queryFn: () => noteList.listNoteTags(),
     enabled,
   })
 
@@ -70,8 +77,12 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const orderedPaths = useMemo(() => (notes ?? []).map((note) => note.path), [notes])
   const selection = useListSelection(orderedPaths)
   const openNote = useCallback(
-    (path: string, event?: NewWindowClickEvent) =>
-      navigateNoteLink(routeForPath(path), event),
+    (path: string, event?: ModClickEvent) => {
+      navigateNoteLink({
+        target: routeForPath(path),
+        openInNewWindow: event !== undefined && isModEvent(event),
+      })
+    },
     [navigateNoteLink],
   )
   const handleFilterSelect = useCallback(
@@ -81,16 +92,21 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
 
   // The bulk-trash confirm: the screen owns whether it's open and which paths it
   // acts on (snapshotted at open time, since the delete prunes the live
-  // selection); the dialog owns the delete and its error.
+  // selection); the dialog owns the delete and its error. Daily rows remain
+  // selectable for keyboard navigation, but are never valid trash targets.
   const [confirmingTrash, setConfirmingTrash] = useState(false)
   const [pendingPaths, setPendingPaths] = useState<readonly string[]>([])
+  const trashableSelectedPaths = useMemo(
+    () => [...selection.selected].filter((path) => canTrashNote(path)),
+    [selection.selected],
+  )
   const openTrashConfirm = useCallback(() => {
-    if (selection.selectedCount === 0) {
+    if (trashableSelectedPaths.length === 0) {
       return
     }
-    setPendingPaths([...selection.selected])
+    setPendingPaths(trashableSelectedPaths)
     setConfirmingTrash(true)
-  }, [selection])
+  }, [trashableSelectedPaths])
 
   // The table owns the virtualizer; the bridge lets the keyboard nav pull an
   // off-screen (unmounted) row into view through the virtualizer's scrollToIndex.
@@ -121,11 +137,11 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
       <header className="flex flex-none flex-wrap items-center justify-between gap-3 border-b border-border py-4 pl-12 pr-7">
         <h1 className="text-[15px] font-semibold text-text">Notes</h1>
         <div className="flex flex-wrap items-center gap-3">
-          {selection.selectedCount > 0 ? (
+          {trashableSelectedPaths.length > 0 ? (
             <Button
               type="button"
               variant="outline"
-              aria-label={`Trash (${selection.selectedCount})`}
+              aria-label={`Trash (${trashableSelectedPaths.length})`}
               onClick={openTrashConfirm}
               className="text-text-secondary hover:text-destructive"
             >
@@ -135,15 +151,11 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
                 aria-hidden
                 className="flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive/10 px-1 text-[10px] font-semibold leading-none tabular-nums text-destructive"
               >
-                {selection.selectedCount}
+                {trashableSelectedPaths.length}
               </span>
             </Button>
           ) : null}
-          <AllNotesFilters
-            tag={tag}
-            facets={facets ?? []}
-            onSelect={handleFilterSelect}
-          />
+          <AllNotesFilters tag={tag} facets={facets ?? []} onSelect={handleFilterSelect} />
           <NewNoteButton />
         </div>
       </header>

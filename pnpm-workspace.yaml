@@ -7,9 +7,11 @@ allowBuilds:
   '@sentry/cli': true
   better-sqlite3: true
   esbuild: true
-  spawn-sync: true
+  simple-git-hooks: false
 
 dedupePeers: true
+
+strictPeerDependencies: true
 
 ignoreWorkspaceRootCheck: true
 
@@ -17,14 +19,17 @@ minimumReleaseAgeExclude:
   - '@meowdown/*'
   - '@prosekit/*'
   - '@aria-ui/*'
+  - '@ocavue/*'
+  - '@post-embed/*'
+  - '@prosemirror-adapter/*'
   - prosemirror-flat-list
-  - prosemirror-view
-  - '@floating-ui/core@1.8.0'
-  - '@floating-ui/dom@1.8.0'
-  - '@floating-ui/utils@0.2.12'
-  - prosemirror-model@1.25.11
 
-# overrides:
-#   '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@623bc43
-#   '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@623bc43
+patchedDependencies:
+  mdast-util-gfm-autolink-literal@2.0.1: patches/mdast-util-gfm-autolink-literal@2.0.1.patch
+
+# Keep these commented examples for future pkg.pr.new testing; do not remove them.
 # blockExoticSubdeps: false
+# overrides:
+#   '@meowdown/core': https://pkg.pr.new/@meowdown/core@346867e5f1b5336c889e829b146a04fcc0c115c1
+#   '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
+#   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1

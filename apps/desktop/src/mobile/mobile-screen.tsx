@@ -1,14 +1,33 @@
-import { type ReactElement } from 'react'
-import { useToday } from '@/lib/use-today'
-import { MobileAllNotes } from '@/mobile/screens/all-notes'
-import { MobileChat } from '@/mobile/screens/chat'
-import { MobileDaily } from '@/mobile/screens/daily'
-import { MobileGraphs } from '@/mobile/screens/graphs'
-import { MobileNote } from '@/mobile/screens/note'
-import { MobileSettings } from '@/mobile/screens/settings'
-import { MobileTasks } from '@/mobile/screens/tasks'
-import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
-import type { Route } from '@/routing/route'
+import { lazy, type ReactElement } from 'react'
+import { useToday } from '@/lib/use-today.ts'
+import { MobileDaily } from '@/mobile/screens/daily.tsx'
+import { MobileNote } from '@/mobile/screens/note.tsx'
+import type { AllNotesFilters, Route } from '@reflect/app'
+
+const MobileAllNotes = lazy(async () => {
+  const { MobileAllNotes } = await import('@/mobile/screens/all-notes.tsx')
+  return { default: MobileAllNotes }
+})
+const MobileChat = lazy(async () => {
+  const { MobileChat } = await import('@/mobile/screens/chat.tsx')
+  return { default: MobileChat }
+})
+const MobileGraphs = lazy(async () => {
+  const { MobileGraphs } = await import('@/mobile/screens/graphs.tsx')
+  return { default: MobileGraphs }
+})
+const MobileLicenses = lazy(async () => {
+  const { MobileLicenses } = await import('@/mobile/screens/licenses.tsx')
+  return { default: MobileLicenses }
+})
+const MobileSettings = lazy(async () => {
+  const { MobileSettings } = await import('@/mobile/screens/settings.tsx')
+  return { default: MobileSettings }
+})
+const MobileTasks = lazy(async () => {
+  const { MobileTasks } = await import('@/mobile/screens/tasks.tsx')
+  return { default: MobileTasks }
+})
 
 interface MobileScreenProps {
   /**
@@ -80,6 +99,8 @@ export function MobileScreen({
       return <MobileSettings key="settings" />
     case 'graphs':
       return <MobileGraphs key="graphs" />
+    case 'licenses':
+      return <MobileLicenses key="licenses" />
     default:
       return <MobileDaily key="daily" date={today} />
   }

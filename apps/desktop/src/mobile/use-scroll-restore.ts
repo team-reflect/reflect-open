@@ -73,6 +73,7 @@ export function useScrollRestore({
     restoringRef.current = true
     let observer: ResizeObserver | null = null
     let deadline: ReturnType<typeof setTimeout> | null = null
+    const listeners = new AbortController()
     const stop = (): void => {
       restoringRef.current = false
       if (stopRestoringRef.current === stop) {
@@ -82,7 +83,7 @@ export function useScrollRestore({
         clearTimeout(deadline)
       }
       observer?.disconnect()
-      container.removeEventListener('pointerdown', stop)
+      listeners.abort()
     }
     stopRestoringRef.current = stop
     const apply = (): void => {
@@ -95,7 +96,10 @@ export function useScrollRestore({
     if (restoringRef.current) {
       observer = new ResizeObserver(apply)
       observer.observe(content)
-      container.addEventListener('pointerdown', stop, { passive: true })
+      container.addEventListener('pointerdown', stop, {
+        passive: true,
+        signal: listeners.signal,
+      })
       deadline = setTimeout(stop, RESTORE_DEADLINE_MS)
     }
     return stop

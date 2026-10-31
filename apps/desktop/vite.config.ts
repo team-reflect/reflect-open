@@ -1,18 +1,38 @@
-import { fileURLToPath } from 'node:url'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
-import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
-import { reactWithCompiler } from './react-compiler-plugin'
+import { fileURLToPath } from 'node:url'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 // The single version source; tauri.conf.json's `version` also points here.
-import pkg from './package.json'
+import pkg from './package.json' with { type: 'json' }
 
-// @ts-expect-error process is a Node.js global available in the Vite config context
-const host = process.env.TAURI_DEV_HOST
+const host: string | undefined = process.env.TAURI_DEV_HOST
+const port = 1420
+
+const platform: 'mobile' | 'desktop' | '' = (() => {
+  const env = process.env.TAURI_ENV_PLATFORM
+  if (!env) {
+    return ''
+  }
+
+  switch (env) {
+    case 'ios':
+    case 'android':
+      return 'mobile'
+    case 'windows':
+    case 'darwin':
+    case 'linux':
+      return 'desktop'
+  }
+
+  throw new Error(`Unknown environment variable TAURI_ENV_PLATFORM: ${env}`)
+})()
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [
-    reactWithCompiler(),
+    react({ compiler: { reportDiagnostics: true } }),
+
     tailwindcss(),
     sentryVitePlugin({
       authToken: process.env.SENTRY_AUTH_TOKEN,
@@ -28,15 +48,22 @@ export default defineConfig(async () => ({
     }),
   ],
 
-  define: {
-    __REFLECT_VERSION__: JSON.stringify(pkg.version),
-  },
-
-  // If the target is below Safari 17.5, Lightning CSS downlevels `light-dark()` to a broken polyfill.
-  build: { cssTarget: 'safari17.5', sourcemap: 'hidden' },
+  // The JS target lowers syntax that Safari 16.4 introduced (class static blocks).
+  // If the CSS target is below Safari 17.5, Lightning CSS downlevels `light-dark()` to a broken polyfill.
+  build: { target: 'safari16', cssTarget: 'safari17.5', sourcemap: 'hidden' },
 
   resolve: {
     alias: {
+      '@platform-root': fileURLToPath(
+        new URL(
+          platform === 'mobile'
+            ? './src/platform-root.mobile.tsx'
+            : platform === 'desktop'
+              ? './src/platform-root.desktop.tsx'
+              : './src/platform-root.unknown.tsx',
+          import.meta.url,
+        ),
+      ),
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
@@ -58,19 +85,21 @@ export default defineConfig(async () => ({
   clearScreen: false,
   // 2. Tauri expects a fixed port; fail if it is not available
   server: {
-    port: 1420,
+    port,
     strictPort: true,
     host: host || false,
-    hmr: host
-      ? {
-          protocol: 'ws',
-          host,
-          port: 1421,
-        }
-      : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
     },
+    forwardConsole: {
+      unhandledErrors: true,
+      logLevels: ['error', 'warn', 'info', 'log', 'debug'],
+    },
+    ...(host
+      ? {
+          ws: { host, port },
+        }
+      : {}),
   },
-}))
+})

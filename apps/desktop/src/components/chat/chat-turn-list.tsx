@@ -6,9 +6,9 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
-} from '@/components/ui/message-scroller'
-import { useChatSession } from '@/providers/chat-provider'
-import { ChatTurn } from './chat-turn'
+} from '@/components/ui/message-scroller.tsx'
+import { useChatSession } from '@/providers/chat-provider.tsx'
+import { ChatTurn } from './chat-turn.tsx'
 
 /**
  * The conversation column: a centered list of turns inside shadcn's chat
@@ -20,12 +20,22 @@ export function ChatTurnList(): ReactElement {
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="end">
       <MessageScroller className="min-h-0 flex-1">
-        <MessageScrollerViewport className="px-6" aria-label="Chat conversation">
+        <MessageScrollerViewport className="px-safe-offset-6" aria-label="Chat conversation">
           {turns.length > 0 ? (
             <div className="mx-auto w-full max-w-2xl">
               <MessageScrollerContent className="gap-6 py-8">
                 {turns.map((turn) => (
-                  <MessageScrollerItem key={turn.id} messageId={turn.id} scrollAnchor>
+                  // The item's content-visibility paint containment clips at its
+                  // padding edge, cutting the copy button's focus ring where the
+                  // button sits flush with the turn's left/bottom edge. The
+                  // padding moves that clip edge outward; the negative margin
+                  // cancels it in layout, so the visual spacing is unchanged.
+                  <MessageScrollerItem
+                    key={turn.id}
+                    messageId={turn.id}
+                    scrollAnchor
+                    className="-m-1 p-1"
+                  >
                     <ChatTurn turn={turn} />
                   </MessageScrollerItem>
                 ))}

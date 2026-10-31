@@ -1,0 +1,86 @@
+name: Publish Windows
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag (v<version>) created by release-please
+        required: true
+        type: string
+      commit:
+        description: Immutable commit targeted by the release tag.
+        required: true
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+
+concurrency:
+  group: publish-windows
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  windows:
+    name: Build Windows ${{ matrix.name }}
+    if: github.repository == 'team-reflect/reflect-open'
+    environment: release_app
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each runner's host triple is the build target, so no extra rustup
+        # target and no cross-compilation.
+        include:
+          - name: x64
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+          - name: arm64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+
+      # Any master job can write the caches, so a release build starts cold.
+      - uses: ./.github/actions/setup-node
+        with:
+          cache: false
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache: false
+
+      - name: Build Windows installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: pnpm build:windows --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/windows-artifacts"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reflect-windows-${{ matrix.name }}
+          path: ${{ runner.temp }}/windows-artifacts/*
+          if-no-files-found: error
+          # The NSIS installer is already lzma-compressed; zipping it again
+          # wastes minutes for nothing.
+          compression-level: 0
+          retention-days: 30
+
+      # Uploads clobber, so a failed run can be retried.
+      - name: Upload the assets to the draft release
+        working-directory: ${{ runner.temp }}/windows-artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" ./* --clobber

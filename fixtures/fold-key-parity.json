@@ -1,0 +1,15 @@
+[
+  { "input": "Weekly Plan", "key": "weekly plan" },
+  { "input": "  padded  ", "key": "padded" },
+  { "input": "", "key": "" },
+  { "input": "   ", "key": "" },
+  { "input": "MiXeD-Case_123", "key": "mixed-case_123" },
+  { "input": "Caf\u00e9", "key": "caf\u00e9" },
+  { "input": "Cafe\u0301", "key": "caf\u00e9" },
+  { "input": "\u212aNOTE", "key": "knote" },
+  { "input": "GRO\u1e9e", "key": "gro\u00df" },
+  { "input": "\u0130stanbul", "key": "i\u0307stanbul" },
+  { "input": "\u03a3\u039f\u03a6\u0399\u0391", "key": "\u03c3\u03bf\u03c6\u03b9\u03b1" },
+  { "input": "100%", "key": "100%" },
+  { "input": "50% off", "key": "50% off" }
+]

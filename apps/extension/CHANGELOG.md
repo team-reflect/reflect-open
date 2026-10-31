@@ -1,0 +1,51 @@
+# Changelog
+
+## [0.4.2](https://github.com/team-reflect/reflect-open/compare/extension-v0.4.1...extension-v0.4.2) (2026-10-19)
+
+
+### Bug Fixes
+
+* **extension:** trigger a release ([#1662](https://github.com/team-reflect/reflect-open/issues/1662)) ([b99de83](https://github.com/team-reflect/reflect-open/commit/b99de83cc1294265524e14937c32e18dda33a88c))
+
+## [0.4.1](https://github.com/team-reflect/reflect-open/compare/extension-v0.4.0...extension-v0.4.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* update meowdown ([#1564](https://github.com/team-reflect/reflect-open/issues/1564)) ([58e2854](https://github.com/team-reflect/reflect-open/commit/58e2854118686c1d1d8588b37bbfcc1a35f225e4))
+
+## [0.4.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.3.0...extension-v0.4.0) (2026-09-21)
+
+
+### Features
+
+* **desktop:** open X post photos and videos in the lightbox ([#1323](https://github.com/team-reflect/reflect-open/issues/1323)) ([b2dd673](https://github.com/team-reflect/reflect-open/commit/b2dd673da5571cfa2a9cc4057f7de73f89b0d153))
+
+## [0.3.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.2.1...extension-v0.3.0) (2026-09-17)
+
+
+### Features
+
+* save liked X posts to daily notes ([#1288](https://github.com/team-reflect/reflect-open/issues/1288)) ([0bcf272](https://github.com/team-reflect/reflect-open/commit/0bcf2724b9239b9e2a21df5e09116999fc12de00))
+
+## [0.2.1](https://github.com/team-reflect/reflect-open/compare/extension-v0.2.0...extension-v0.2.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* update post-embed and meowdown ([#1289](https://github.com/team-reflect/reflect-open/issues/1289)) ([5e7b4cc](https://github.com/team-reflect/reflect-open/commit/5e7b4ccf9422cfc2ddc523eeb72ec13550a4ae7b))
+
+## [0.2.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.1.3...extension-v0.2.0) (2026-09-14)
+
+
+### Features
+
+* **extension:** move the X bookmark switch to an options page ([#1285](https://github.com/team-reflect/reflect-open/issues/1285)) ([f19b134](https://github.com/team-reflect/reflect-open/commit/f19b1341c6b6d15d5b08611eea8b9327eb7fb006))
+* save X posts and media for offline reading ([#1284](https://github.com/team-reflect/reflect-open/issues/1284)) ([b72a93c](https://github.com/team-reflect/reflect-open/commit/b72a93cb153ed00362f0efe9f811ee9147da1e43))
+
+## [0.1.3](https://github.com/team-reflect/reflect-open/compare/extension-v0.1.2...extension-v0.1.3) (2026-09-14)
+
+
+### Bug Fixes
+
+* **extension:** trigger a new extension release ([#1278](https://github.com/team-reflect/reflect-open/issues/1278)) ([da06f4c](https://github.com/team-reflect/reflect-open/commit/da06f4c0529d8852aeba931e4b799f4186545250))

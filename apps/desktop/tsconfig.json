@@ -1,13 +1,29 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@ocavue/tsconfig/dom/app.json",
   "compilerOptions": {
-    "useDefineForClassFields": true,
     "jsx": "react-jsx",
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
 
     /* Path aliases */
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@platform-root": ["./src/platform-root.unknown.tsx"]
     }
   },
-  "include": ["src"]
+  "references": [
+    {
+      "path": "../../packages/app/tsconfig.json"
+    },
+    {
+      "path": "../../packages/core/tsconfig.json"
+    },
+    {
+      "path": "../../packages/db/tsconfig.json"
+    },
+    {
+      "path": "../../packages/utils/tsconfig.json"
+    }
+  ]
 }

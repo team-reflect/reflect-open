@@ -1,8 +1,8 @@
 import type { ReactElement, ReactNode } from 'react'
 import { Check, ChevronRight, type LucideIcon } from 'lucide-react'
-import { Spinner } from '@/components/ui/spinner'
-import { Switch } from '@/components/ui/switch'
-import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner.tsx'
+import { Switch } from '@/components/ui/switch.tsx'
+import { cn } from '@/lib/utils.ts'
 
 /**
  * iOS-style inset-grouped list primitives for the mobile settings screens:
@@ -22,12 +22,19 @@ interface SettingsGroupProps {
   /** Small muted caption above the card (iOS section header). */
   header?: string
   /** Explanatory text below the card (iOS section footer). */
-  footer?: string | null
+  footer?: ReactNode
+  /** Optional id for associating the footer with a control in the group. */
+  footerId?: string
   children: ReactNode
 }
 
 /** One inset-grouped section: header caption, rounded card, footer text. */
-export function SettingsGroup({ header, footer, children }: SettingsGroupProps): ReactElement {
+export function SettingsGroup({
+  header,
+  footer,
+  footerId,
+  children,
+}: SettingsGroupProps): ReactElement {
   return (
     <section className="flex flex-col">
       {header !== undefined ? (
@@ -36,7 +43,11 @@ export function SettingsGroup({ header, footer, children }: SettingsGroupProps):
       <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
         {children}
       </div>
-      {footer != null ? <p className="px-4 pt-1.5 text-[13px] text-text-muted">{footer}</p> : null}
+      {footer != null ? (
+        <p id={footerId} className="px-4 pt-1.5 text-[13px] text-text-muted">
+          {footer}
+        </p>
+      ) : null}
     </section>
   )
 }
@@ -45,12 +56,15 @@ export function SettingsGroup({ header, footer, children }: SettingsGroupProps):
 export function SettingsValueRow({
   label,
   value,
+  onPress,
 }: {
   label: string
   value: string
+  /** Optional tap handler without pressable styling (the row stays static-looking). */
+  onPress?: () => void
 }): ReactElement {
   return (
-    <div className={ROW_CLASS}>
+    <div className={ROW_CLASS} onClick={onPress}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 text-text-muted tabular-nums">{value}</span>
     </div>
@@ -66,10 +80,15 @@ interface SettingsNavRowProps {
 }
 
 /** A disclosure row: tapping navigates deeper (trailing chevron). */
-export function SettingsNavRow({ label, value, onPress, disabled }: SettingsNavRowProps): ReactElement {
+export function SettingsNavRow({
+  label,
+  value,
+  onPress,
+  disabled,
+}: SettingsNavRowProps): ReactElement {
   return (
     <button type="button" className={PRESSABLE_ROW_CLASS} onClick={onPress} disabled={disabled}>
-      <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
       {value !== undefined ? <span className="shrink-0 text-text-muted">{value}</span> : null}
       <ChevronRight aria-hidden className="size-4 shrink-0 text-text-muted" strokeWidth={1.75} />
     </button>
@@ -80,6 +99,8 @@ interface SettingsSwitchRowProps {
   label: string
   checked: boolean
   onCheckedChange: (checked: boolean) => void
+  /** Id of explanatory copy announced after the switch label. */
+  descriptionId?: string
 }
 
 /** A toggle row. The whole row is the label, so tapping anywhere flips it. */
@@ -87,11 +108,16 @@ export function SettingsSwitchRow({
   label,
   checked,
   onCheckedChange,
+  descriptionId,
 }: SettingsSwitchRowProps): ReactElement {
   return (
     <label className={ROW_CLASS}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch
+        aria-describedby={descriptionId}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+      />
     </label>
   )
 }
@@ -118,7 +144,11 @@ export function SettingsSegmentedRow<Value extends string>({
   return (
     <div className={cn(ROW_CLASS, 'justify-between')}>
       <span className="min-w-0 truncate">{label}</span>
-      <div role="radiogroup" aria-label={label} className="flex shrink-0 rounded-lg bg-secondary p-0.5">
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="flex shrink-0 rounded-lg bg-secondary p-0.5"
+      >
         {options.map((option) => {
           const selected = option.value === value
           return (

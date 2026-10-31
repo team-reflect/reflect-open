@@ -1,6 +1,6 @@
-import { foldKey } from '../markdown'
-import { HIGHLIGHT_END, HIGHLIGHT_START, parseHighlights } from './search'
-import { titleRecallTerms } from './search-query'
+import { foldKey } from '../markdown/index.ts'
+import { HIGHLIGHT_END, HIGHLIGHT_START, parseHighlights } from './search.ts'
+import { titleRecallTerms } from './search-query.ts'
 
 interface TextRange {
   readonly start: number
@@ -30,11 +30,7 @@ function foldWithSourceSpans(value: string): FoldedText {
   return { value: foldKey(value), sourceSpans }
 }
 
-function findRanges(
-  foldedTitle: FoldedText,
-  literal: string,
-  anywhere: boolean,
-): TextRange[] {
+function findRanges(foldedTitle: FoldedText, literal: string, anywhere: boolean): TextRange[] {
   const ranges: TextRange[] = []
   let searchFrom = 0
 
@@ -63,14 +59,9 @@ function titleRecallRanges(title: string, query: string): TextRange[] {
   }
 
   const foldedTitle = foldWithSourceSpans(title)
-  const termRanges = terms.map((term) =>
-    findRanges(foldedTitle, term.value, term.anywhere),
-  )
-  if (termRanges.some((ranges) => ranges.length === 0)) {
-    return []
-  }
+  const termRanges = terms.map((term) => findRanges(foldedTitle, term.value, term.anywhere))
 
-  if (terms.length > 1) {
+  if (terms.length > 1 && termRanges.every((ranges) => ranges.length > 0)) {
     const phraseRanges = findRanges(
       foldedTitle,
       terms.map((term) => term.value).join(' '),
@@ -82,6 +73,10 @@ function titleRecallRanges(title: string, query: string): TextRange[] {
   }
 
   return termRanges.flat()
+}
+
+function rangesOverlap(first: TextRange, second: TextRange): boolean {
+  return first.start < second.end && second.start < first.end
 }
 
 function ftsRanges(title: string, highlightedTitle: string | null): TextRange[] {
@@ -139,8 +134,9 @@ export function highlightTitle(
   query: string,
   ftsHighlightedTitle: string | null,
 ): string {
-  return markRanges(title, [
-    ...ftsRanges(title, ftsHighlightedTitle),
-    ...titleRecallRanges(title, query),
-  ])
+  const recallRanges = titleRecallRanges(title, query)
+  const lexicalRanges = ftsRanges(title, ftsHighlightedTitle).filter(
+    (lexicalRange) => !recallRanges.some((recallRange) => rangesOverlap(lexicalRange, recallRange)),
+  )
+  return markRanges(title, [...lexicalRanges, ...recallRanges])
 }

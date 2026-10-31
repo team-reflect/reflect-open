@@ -1,11 +1,11 @@
-import type { Span } from './model'
+import type { Span } from './model.ts'
 
 /**
  * Plain-text rendering (Plan 03): turn a slice of markdown body into the text a
  * reader sees — emphasis/marker syntax dropped, wiki brackets/pipes flattened,
- * backslash escapes resolved, code spans kept literal. Shared by {@link parseNote}
- * for the whole-body FTS/AI text and by each task's display text, so a task
- * renders exactly as the note's body does.
+ * backslash escapes resolved, code spans kept literal. A display projection
+ * and only that: it feeds the UI slots that render a plain string rather than
+ * Markdown (the All Notes row preview, task rows and their breadcrumbs).
  *
  * The walk in `extract.ts` supplies two span sets in body coordinates: `cuts`
  * (syntax ranges to drop — `*emphasis*` marks, the `[ ]` TaskMarker, URLs) and
@@ -20,13 +20,39 @@ const MARKDOWN_ESCAPE_RE = /\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g
 
 /** Resolve CommonMark backslash escapes (`\*` → `*`). */
 export function unescapeMarkdownText(text: string): string {
-  return text.replace(MARKDOWN_ESCAPE_RE, '$1')
+  return text.replaceAll(MARKDOWN_ESCAPE_RE, '$1')
+}
+
+/**
+ * Strip the ATX marks from a heading line: up to six opening `#`s, the
+ * closing `#` sequence, and the spaces/tabs around them. Scans by index, so
+ * it runs in linear time on any input.
+ */
+export function stripAtxHeadingMarks(line: string): string {
+  let start = 0
+  while (start < 6 && line[start] === '#') {
+    start++
+  }
+  while (line[start] === ' ' || line[start] === '\t') {
+    start++
+  }
+  let end = line.length
+  while (end > start && (line[end - 1] === ' ' || line[end - 1] === '\t')) {
+    end--
+  }
+  while (end > start && line[end - 1] === '#') {
+    end--
+  }
+  while (end > start && (line[end - 1] === ' ' || line[end - 1] === '\t')) {
+    end--
+  }
+  return line.slice(start, end).trim()
 }
 
 function renderMarkdownText(text: string): string {
   return text
-    .replace(WIKI_INNER_RE, (_, inner: string) => inner.replace(/\|/g, ' '))
-    .replace(MARKDOWN_ESCAPE_RE, '$1')
+    .replaceAll(WIKI_INNER_RE, (_, inner: string) => inner.replaceAll('|', ' '))
+    .replaceAll(MARKDOWN_ESCAPE_RE, '$1')
 }
 
 function appendPlainTextChunk(
@@ -92,7 +118,7 @@ export function plainTextOfRange(
   if (pos < end) {
     kept += appendPlainTextChunk(body, pos, end, sortedLiteralRanges)
   }
-  return kept.replace(/\s+/g, ' ').trim()
+  return kept.replaceAll(/\s+/g, ' ').trim()
 }
 
 /** Body text minus the cut (syntax) ranges, with wiki brackets/pipes flattened. */

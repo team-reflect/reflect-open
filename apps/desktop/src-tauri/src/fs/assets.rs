@@ -22,16 +22,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use tauri::ipc::{InvokeBody, Request};
 use tauri::State;
+use tauri::ipc::{InvokeBody, Request};
 
 use crate::error::{AppError, AppResult};
+use reflect_graph_io::io::staging_dir;
 
-use super::resolve::resolve;
-use super::{root_for_generation, GraphState};
+use super::resolve;
+use super::{GraphState, root_for_generation, with_graph_lock};
 
 /// Header carrying the upload id on `asset_upload_append` calls — raw-body
 /// requests have no JSON args, so the id travels out-of-band.
@@ -49,7 +50,7 @@ struct Upload {
 pub struct AssetUploads(Mutex<HashMap<String, Upload>>);
 
 fn lock_uploads<'locked>(
-    uploads: &'locked State<'_, AssetUploads>,
+    uploads: &'locked AssetUploads,
 ) -> AppResult<std::sync::MutexGuard<'locked, HashMap<String, Upload>>> {
     uploads.0.lock().map_err(|err| {
         tracing::error!(?err, "asset upload state lock poisoned by an earlier panic");
@@ -94,6 +95,7 @@ fn persist_unique(
     assets_dir: &Path,
     desired: &str,
 ) -> AppResult<String> {
+    temp.as_file().sync_all()?;
     let (stem, ext) = split_name(desired);
     for attempt in 1..=MAX_NAME_PROBES {
         let candidate = if attempt == 1 {
@@ -114,28 +116,13 @@ fn persist_unique(
     )))
 }
 
-/// The staging directory for in-flight uploads (and the V1 import's asset
-/// downloads): inside the graph (so the commit rename stays on one
-/// filesystem) but under `.reflect/` (so the watcher, indexer, and sync never
-/// see a partial file).
-pub(super) fn staging_dir(root: &Path) -> AppResult<std::path::PathBuf> {
-    let dir = root.join(".reflect").join("tmp");
-    fs::create_dir_all(&dir)?;
-    Ok(dir)
-}
-
 /// Resolved `assets/` directory for a commit/import destination, traversal-
-/// and generation-guarded.
-fn assets_dir_for(
-    state: &State<GraphState>,
-    generation: u64,
-    name: &str,
-) -> AppResult<std::path::PathBuf> {
+/// guarded. Call it with the graph lock held.
+fn assets_dir_for(root: &Path, name: &str) -> AppResult<std::path::PathBuf> {
     ensure_asset_name(name)?;
-    let root = root_for_generation(state, generation)?;
     // Resolve the target through the shared guard even though `name` is
     // already vetted — defense in depth, and it canonicalizes symlink games.
-    resolve(&root, &format!("assets/{name}"))?;
+    resolve(root, &format!("assets/{name}"))?;
     let dir = root.join("assets");
     fs::create_dir_all(&dir)?;
     Ok(dir)
@@ -185,7 +172,7 @@ pub fn asset_upload_append(request: Request<'_>, uploads: State<AssetUploads>) -
 /// Finish a streamed upload: fsync, then move the staged file into `assets/`
 /// under `desired_name` (or the first free `-2`-suffixed variant). Returns the
 /// final graph-relative `assets/…` path.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn asset_upload_commit(
     id: String,
     desired_name: String,
@@ -201,10 +188,72 @@ pub fn asset_upload_commit(
             "upload was started for a different graph session; dropping it",
         ));
     }
-    let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    upload.file.as_file().sync_all()?;
-    let final_name = persist_unique(upload.file, &assets_dir, &desired_name)?;
+    // Pin the root before persisting: after the file lands, a failed root
+    // lookup would otherwise skip invalidation and strand a stale catalog.
+    let root = root_for_generation(&state, generation)?;
+    let final_name = with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        let assets_dir = assets_dir_for(&root, &desired_name)?;
+        persist_unique(upload.file, &assets_dir, &desired_name)
+    })?;
+    super::invalidate_file_catalog(&state, &root);
     Ok(format!("assets/{final_name}"))
+}
+
+/// Persist a staged upload at an exact target path, creating parent
+/// directories. No-clobber: the temp file only ever *claims* a free path, so
+/// a concurrent writer's file is never overwritten. Like [`persist_unique`],
+/// fsyncs before the rename — durability is the persist helpers' job, never
+/// their callers'.
+fn persist_exact(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> {
+    // An iCloud-evicted file occupies its path through its `.icloud` stub
+    // alone — `persist_noclobber` would happily claim the logical name and
+    // collide with the re-download (Plan 21).
+    if super::file_occupied(target) {
+        return Err(AppError::io(format!(
+            "target already exists: {}",
+            target.display()
+        )));
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    temp.as_file().sync_all()?;
+    temp.persist_noclobber(target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
+}
+
+/// Finish a streamed upload at an **exact graph-relative path** — the audio
+/// memo intake, where `audio-memos/<base>.<ext>` *is* the memo's identity
+/// (its transcription note and daily-note backlink share the basename), so
+/// the `assets/` collision renaming of [`asset_upload_commit`] would corrupt
+/// it. Memo basenames carry millisecond precision; an existing file at
+/// `path` is a bug and fails loudly rather than being clobbered.
+#[tauri::command(async)]
+pub fn asset_upload_commit_path(
+    id: String,
+    path: String,
+    generation: u64,
+    state: State<GraphState>,
+    uploads: State<AssetUploads>,
+) -> AppResult<()> {
+    let upload = lock_uploads(&uploads)?
+        .remove(&id)
+        .ok_or_else(|| AppError::not_found(format!("unknown upload: {id}")))?;
+    if upload.generation != generation {
+        return Err(AppError::io(
+            "upload was started for a different graph session; dropping it",
+        ));
+    }
+    let root = root_for_generation(&state, generation)?;
+    with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        let target = resolve(&root, &path)?;
+        persist_exact(upload.file, &target)
+    })?;
+    super::invalidate_file_catalog(&state, &root);
+    Ok(())
 }
 
 /// Discard an in-flight upload; dropping the temp file deletes it. Idempotent
@@ -219,31 +268,118 @@ pub fn asset_upload_abort(id: String, uploads: State<AssetUploads>) -> AppResult
 /// under `desired_name`, with the same collision policy as uploads. The bytes
 /// never cross the IPC. Returns the final graph-relative `assets/…` path.
 #[tauri::command]
-pub fn asset_import(
+pub async fn asset_import(
     source_path: String,
     desired_name: String,
     generation: u64,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<String> {
-    let source = Path::new(&source_path);
-    if !source.is_file() {
+    if !Path::new(&source_path).is_file() {
         return Err(AppError::not_found(format!(
             "import source is not a file: {source_path}"
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
-    std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
-    temp.as_file().sync_all()?;
-    let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    let final_name = persist_unique(temp, &assets_dir, &desired_name)?;
+    let staging = staging_dir(&root)?;
+    let temp = crate::blocking::run_blocking(move || {
+        let mut temp = tempfile::NamedTempFile::new_in(staging)?;
+        std::io::copy(&mut fs::File::open(&source_path)?, temp.as_file_mut())?;
+        temp.as_file().sync_all()?; // the persist's own fsync is then cheap
+        Ok(temp)
+    })
+    .await?;
+    let final_name = with_graph_lock(&root, || {
+        root_for_generation(&state, generation)?;
+        let assets_dir = assets_dir_for(&root, &desired_name)?;
+        persist_unique(temp, &assets_dir, &desired_name)
+    })?;
+    super::invalidate_file_catalog(&state, &root);
     Ok(format!("assets/{final_name}"))
+}
+
+/// Copy `source` into the graph at `target`, staging the bytes under
+/// `.reflect/tmp/` so the watcher never sees a partial file.
+///
+/// Idempotent by construction, in both directions: a segment's path encodes
+/// its session and position, so an existing target *is* that same segment,
+/// and a source that is already gone means an earlier ingest moved it (or a
+/// cancelled session swept it away while this capture sat in the queue).
+/// Neither is a failure worth parking the capture queue behind.
+#[cfg(test)]
+fn import_exact(source: &Path, staging: &Path, target: &Path) -> AppResult<()> {
+    match stage_import(source, staging, target)? {
+        Some(temp) => persist_import(temp, target),
+        None => Ok(()),
+    }
+}
+
+/// Copy `source` into `staging`. Returns `None` when there is nothing to
+/// persist: the target is already taken or the source is gone.
+fn stage_import(
+    source: &Path,
+    staging: &Path,
+    target: &Path,
+) -> AppResult<Option<tempfile::NamedTempFile>> {
+    if super::file_occupied(target) {
+        return Ok(None);
+    }
+    if !source.is_file() {
+        tracing::warn!(?source, "audio memo import source is gone");
+        return Ok(None);
+    }
+    let mut temp = tempfile::NamedTempFile::new_in(staging)?;
+    std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
+    temp.as_file().sync_all()?; // the persist's own fsync is then cheap
+    Ok(Some(temp))
+}
+
+/// Persist a staged copy unless a concurrent import took the target first.
+fn persist_import(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> {
+    if super::file_occupied(target) {
+        return Ok(());
+    }
+    persist_exact(temp, target)
+}
+
+/// Copy a recording the OS gave us a real path for (the iOS recorder's
+/// staging directory) into `audio-memos/` at an exact path. The bytes never
+/// enter webview memory, which is what makes meeting-length segments
+/// affordable on a phone. The destination is fenced to `audio-memos/` like
+/// `audio_memo_delete`, and the path *is* the memo's identity, so the
+/// `assets/` collision renaming of [`asset_import`] would corrupt it.
+#[tauri::command]
+pub async fn audio_memo_import(
+    source_path: String,
+    path: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<()> {
+    if !path.starts_with("audio-memos/") {
+        return Err(AppError::traversal(format!(
+            "not an audio memo path: {path}"
+        )));
+    }
+    let root = root_for_generation(&state, generation)?;
+    let staging = staging_dir(&root)?;
+    let target = resolve(&root, &path)?;
+    let staged = crate::blocking::run_blocking(move || {
+        stage_import(Path::new(&source_path), &staging, &target)
+    })
+    .await?;
+    if let Some(temp) = staged {
+        with_graph_lock(&root, || {
+            root_for_generation(&state, generation)?;
+            persist_import(temp, &resolve(&root, &path)?)
+        })?;
+    }
+    super::invalidate_file_catalog(&state, &root);
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::io::bootstrap;
+    use reflect_graph_io::io::bootstrap;
     use tempfile::tempdir;
 
     fn temp_in(dir: &Path, contents: &[u8]) -> tempfile::NamedTempFile {
@@ -305,6 +441,66 @@ mod tests {
         fs::write(assets.join("README"), b"first").unwrap();
         let temp = temp_in(graph.path(), b"second");
         assert_eq!(persist_unique(temp, &assets, "README").unwrap(), "README-2");
+    }
+
+    #[test]
+    fn persist_exact_creates_parents_and_writes_the_target() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let temp = temp_in(graph.path(), b"opus bytes");
+        let target = graph
+            .path()
+            .join("audio-memos/audio-memo-2026-07-19-090000-000.m4a");
+        persist_exact(temp, &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"opus bytes");
+    }
+
+    #[test]
+    fn persist_exact_never_clobbers_an_existing_file() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.m4a");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, b"first").unwrap();
+        let temp = temp_in(graph.path(), b"second");
+        assert!(persist_exact(temp, &target).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"first");
+    }
+
+    #[test]
+    fn import_copies_the_source_to_the_exact_target() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let source = temp_in(graph.path(), b"segment bytes");
+        let target = graph.path().join("audio-memos/memo.part-001.m4a");
+        import_exact(source.path(), &staging_dir(graph.path()).unwrap(), &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"segment bytes");
+    }
+
+    #[test]
+    fn import_skips_a_source_that_is_already_gone() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.part-001.m4a");
+        import_exact(
+            &graph.path().join("staging/vanished.m4a"),
+            &staging_dir(graph.path()).unwrap(),
+            &target,
+        )
+        .unwrap();
+        assert!(!target.exists());
+    }
+
+    #[test]
+    fn import_leaves_an_existing_target_alone() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.part-001.m4a");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, b"already landed").unwrap();
+        let source = temp_in(graph.path(), b"second copy");
+        import_exact(source.path(), &staging_dir(graph.path()).unwrap(), &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"already landed");
     }
 
     #[test]

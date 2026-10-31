@@ -1,18 +1,29 @@
 import { useState, type ReactElement } from 'react'
-import { AI_PROVIDERS, aiProvider, aiProviderIdSchema, type AiProviderId } from '@reflect/core'
-import { InlineAlert } from '@/components/inline-alert'
-import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { Input } from '@/components/ui/input'
+import {
+  AI_PROVIDERS,
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  aiProvider,
+  aiProviderIdSchema,
+  aiProviderRequiresApiKey,
+  isPlainHttpRemoteBaseUrl,
+  type AiProviderId,
+  type NewAiProvider,
+} from '@reflect/core'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Input } from '@/components/ui/input.tsx'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit'
-import type { NewAiProvider } from '@/hooks/use-ai-providers'
+} from '@/components/ui/select.tsx'
+import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit.ts'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { AiProviderConsent } from '@/mobile/ai-provider-consent.tsx'
 
 interface AddAiProviderDrawerProps {
   open: boolean
@@ -27,10 +38,10 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * The mobile "Add AI provider" bottom sheet — desktop's dialog as a Drawer
  * (the {@link ConnectGithubDrawer} form idiom: labeled fields, shadcn
  * Selects) over the same {@link useAddAiProviderSubmit} flow: verify key →
- * inline rejection / save-anyway downgrade → persist. Models come from the
- * provider's curated list; custom model ids stay a desktop affordance. The
- * sheet body mounts per open cycle, so a dismissed half-typed key never
- * leaks into the next open.
+ * inline rejection / save-anyway downgrade → persist. Hosted providers use
+ * the curated model list; OpenAI-compatible endpoints expose free-form
+ * endpoint and model inputs. The sheet body mounts per open cycle, so a
+ * dismissed half-typed key never leaks into the next open.
  */
 export function AddAiProviderDrawer({
   open,
@@ -56,28 +67,35 @@ function AddAiProviderSheet({
 }): ReactElement {
   const [providerId, setProviderId] = useState<AiProviderId>(AI_PROVIDERS[0].id)
   const [model, setModel] = useState(AI_PROVIDERS[0].models[0].id)
+  const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [isDefault, setIsDefault] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [consented, setConsented] = useState(false)
   const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
     onAdd,
     onDone: onClose,
   })
+  // `submit` reports its own failures and never rejects, so only `pending` is used.
+  const { run, pending: submitting } = useAsyncAction()
   const provider = aiProvider(providerId)
+  const isOpenAICompatible = provider.id === 'openai-compatible'
+  const apiKeyRequired = aiProviderRequiresApiKey(provider.id)
 
   const submitDraft = async (): Promise<void> => {
-    setSubmitting(true)
-    try {
-      await submit({ provider: providerId, model, apiKey, isDefault })
-    } finally {
-      setSubmitting(false)
-    }
+    await run(() => submit({ provider: providerId, model, baseUrl, apiKey, isDefault }))
   }
+
+  const submitDisabled =
+    submitting ||
+    !consented ||
+    model.trim() === '' ||
+    (apiKeyRequired && apiKey.trim() === '') ||
+    (isOpenAICompatible && baseUrl.trim() === '')
 
   return (
     <>
-      <DrawerTitle className="px-4 pt-1">Add AI provider</DrawerTitle>
-      <div className="flex max-h-[75dvh] flex-col gap-4 overflow-y-auto px-4 pb-8 pt-3">
+      <DrawerTitle>Add AI provider</DrawerTitle>
+      <DrawerBody>
         <p className="text-sm text-text-muted">
           The API key is stored in this device’s keychain, never in your graph — add it on each
           device you chat from.
@@ -87,10 +105,16 @@ function AddAiProviderSheet({
           <span className={FIELD_LABEL_CLASS}>Provider</span>
           <Select
             value={provider.id}
+            items={AI_PROVIDERS.map((candidate) => ({
+              value: candidate.id,
+              label: candidate.label,
+            }))}
             onValueChange={(value) => {
               const next = aiProvider(aiProviderIdSchema.parse(value))
               setProviderId(next.id)
               setModel(next.models[0].id)
+              setBaseUrl(next.id === 'openai-compatible' ? DEFAULT_OPENAI_COMPATIBLE_BASE_URL : '')
+              setConsented(false)
               resetUnverified()
             }}
           >
@@ -98,33 +122,85 @@ function AddAiProviderSheet({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {AI_PROVIDERS.map((candidate) => (
-                <SelectItem key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {AI_PROVIDERS.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
 
         <div className="flex flex-col gap-1">
           <span className={FIELD_LABEL_CLASS}>Default model</span>
-          <Select value={model} onValueChange={setModel}>
-            <SelectTrigger aria-label="Default model" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {provider.models.map((candidate) => (
-                <SelectItem key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isOpenAICompatible ? (
+            <Input
+              aria-label="Default model"
+              autoComplete="off"
+              spellCheck={false}
+              value={model}
+              onChange={(event) => {
+                setModel(event.target.value)
+                resetUnverified()
+              }}
+            />
+          ) : (
+            <Select
+              value={model}
+              items={provider.models.map((candidate) => ({
+                value: candidate.id,
+                label: candidate.label,
+              }))}
+              onValueChange={(value) => {
+                setModel(value ?? '')
+                resetUnverified()
+              }}
+            >
+              <SelectTrigger aria-label="Default model" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {provider.models.map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
+        {isOpenAICompatible ? (
+          <label className="flex flex-col gap-1">
+            <span className={FIELD_LABEL_CLASS}>Endpoint base URL</span>
+            <Input
+              type="url"
+              placeholder={DEFAULT_OPENAI_COMPATIBLE_BASE_URL}
+              autoComplete="off"
+              spellCheck={false}
+              value={baseUrl}
+              onChange={(event) => {
+                setBaseUrl(event.target.value)
+                resetUnverified()
+              }}
+            />
+            {isPlainHttpRemoteBaseUrl(baseUrl) ? (
+              <InlineAlert tone="warning">
+                This endpoint uses plain http, so the API key and note content are visible to the
+                network in transit.
+              </InlineAlert>
+            ) : null}
+          </label>
+        ) : null}
+
         <label className="flex flex-col gap-1">
-          <span className={FIELD_LABEL_CLASS}>API key</span>
+          <span className={FIELD_LABEL_CLASS}>
+            {apiKeyRequired ? 'API key' : 'API key (optional)'}
+          </span>
           <Input
             type="password"
             placeholder={provider.keyPlaceholder}
@@ -137,6 +213,12 @@ function AddAiProviderSheet({
             }}
           />
         </label>
+
+        <AiProviderConsent
+          provider={provider}
+          consented={consented}
+          onConsentedChange={setConsented}
+        />
 
         <label className="flex items-center gap-2 py-1">
           <input
@@ -154,10 +236,10 @@ function AddAiProviderSheet({
             Couldn’t reach {provider.label} to verify the key. Submit again to save it unverified.
           </InlineAlert>
         ) : null}
-        <Button disabled={apiKey.trim() === '' || submitting} onClick={() => void submitDraft()}>
+        <Button disabled={submitDisabled} onClick={() => void submitDraft()}>
           {unverified ? 'Save anyway' : 'Add provider'}
         </Button>
-      </div>
+      </DrawerBody>
     </>
   )
 }

@@ -1,12 +1,14 @@
-import { useState, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { UserRound } from 'lucide-react'
-import { errorMessage } from '@reflect/core'
-import { Button } from '@/components/ui/button'
-import { suggestedContactQueryKey, useSuggestedContact } from '@/hooks/use-suggested-contact'
-import { addContactToNote, ignoreContactSuggestion } from '@/lib/note-contact'
-import { cn } from '@/lib/utils'
-import { useGraph } from '@/providers/graph-provider'
+import { suggestedContactDetails } from '@reflect/core'
+import { Button } from '@/components/ui/button.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useSuggestedContact } from '@/hooks/use-suggested-contact.ts'
+import { queryKeys } from '@/lib/query-client.ts'
+import { cn } from '@/lib/utils.ts'
+import { useGraph } from '@/providers/graph-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface SuggestedContactCardProps {
   /** Graph-relative path of the note the card sits above. */
@@ -23,40 +25,34 @@ interface SuggestedContactCardProps {
  * query cache is settled optimistically so it hides without waiting for the
  * watcher round trip.
  */
-export function SuggestedContactCard({ path, className }: SuggestedContactCardProps): ReactElement | null {
+export function SuggestedContactCard({
+  path,
+  className,
+}: SuggestedContactCardProps): ReactElement | null {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
+  const { contactSuggestions } = useCoreServices()
   const contact = useSuggestedContact(path)
-  const [isBusy, setIsBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const generation = graph?.generation ?? null
+  const resolveAction = useAsyncAction()
 
-  if (contact === null || generation === null) {
+  if (contact === null) {
     return null
   }
 
   async function resolve(action: () => Promise<void>): Promise<void> {
-    setIsBusy(true)
-    setError(null)
-    try {
+    await resolveAction.run(async () => {
       await action()
       // Invalidate rather than hand-set null: the refetch reads the live
       // source, so a handled note computes null (card hides) while a stale
       // Ignore — which skipped the mark — computes the renamed title's own
       // suggestion instead of suppressing it until the next disk write.
       await queryClient.invalidateQueries({
-        queryKey: suggestedContactQueryKey(graph?.root, path),
+        queryKey: queryKeys.index.suggestedContact(graph?.root, path),
       })
-    } catch (cause) {
-      setError(errorMessage(cause))
-    } finally {
-      setIsBusy(false)
-    }
+    })
   }
 
-  const details = [contact.emails[0], contact.phones[0]]
-    .filter((value): value is string => value !== undefined && value.trim() !== '')
-    .join(' · ')
+  const details = suggestedContactDetails(contact)
 
   return (
     <div
@@ -70,9 +66,9 @@ export function SuggestedContactCard({ path, className }: SuggestedContactCardPr
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-text">{contact.fullName}</div>
         <div className="truncate text-xs text-text-muted">
-          {error !== null ? (
+          {resolveAction.error !== null ? (
             <span role="alert" className="text-red-500">
-              {error}
+              {resolveAction.error}
             </span>
           ) : (
             details
@@ -82,15 +78,15 @@ export function SuggestedContactCard({ path, className }: SuggestedContactCardPr
       <Button
         size="xs"
         variant="ghost"
-        disabled={isBusy}
-        onClick={() => void resolve(() => ignoreContactSuggestion(path, contact, generation))}
+        disabled={resolveAction.pending}
+        onClick={() => void resolve(() => contactSuggestions.ignore(path, contact))}
       >
         Ignore
       </Button>
       <Button
         size="xs"
-        disabled={isBusy}
-        onClick={() => void resolve(() => addContactToNote(path, contact, generation))}
+        disabled={resolveAction.pending}
+        onClick={() => void resolve(() => contactSuggestions.addToNote(path, contact))}
       >
         Add
       </Button>

@@ -6,55 +6,93 @@ import {
   type ReactElement,
 } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
-import type { OpenTask } from '@reflect/core'
-import { formatDayLabel } from '@/lib/dates'
-import { taskKey } from '@/lib/tasks/task-identity'
-import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
-import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
-import { useSettings } from '@/providers/settings-provider'
-import { TaskEditor, type TaskNavigate } from './task-editor'
-import { TaskText } from './task-text'
+import { getTaskKey, type OpenTask } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
+import { cn } from '@/lib/utils.ts'
+import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
+import { TaskEditor, type TaskNavigate } from './task-editor.tsx'
+import { TaskText } from './task-text.tsx'
+import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 interface TaskRowProps {
   task: OpenTask
-  /** Show the source-note date — date buckets aggregate tasks from many notes. */
+  /**
+   * Show the source-note date — date buckets aggregate tasks from many notes.
+   */
   showSource: boolean
-  /** Whether this row is part of the current multi-selection (Plan 18). */
+  /**
+   * Whether this row is part of the current multi-selection (Plan 18).
+   */
   selected: boolean
-  /** Whether this row is the sole selection — it shows the inline editor. */
+  /**
+   * Whether this row is the sole selection — it shows the inline editor.
+   */
   editing: boolean
-  /** Whether a Tasks-view write is already in flight. */
+  /**
+   * Whether a Tasks-view write is already in flight.
+   */
   taskActionPending: boolean
-  /** Whether this checkbox click should apply to the whole multi-selection. */
+  /**
+   * Whether this checkbox click should apply to the whole multi-selection.
+   */
   togglesSelection: boolean
-  /** Select the row, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers. */
+  /**
+   * Select the row, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers.
+   */
   onSelect: (event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
-  /** Checkbox click while part of a multi-selection: apply this row's next state to it. */
+  /**
+   * Checkbox click on an unselected or solely selected row: toggle this task.
+   */
+  onCheckboxToggle: () => void
+  /**
+   * Checkbox click while part of a multi-selection: apply this row's next state to it.
+   */
   onSelectionCheckboxToggle: () => void
-  /** Persist an inline edit (content after the marker) and exit edit mode. */
+  /**
+   * Persist an inline edit (content after the marker) and exit edit mode.
+   */
   onEditCommit: (content: string) => void
-  /** Enter in the editor: persist this row then add the next task (V1 continuous entry). */
+  /**
+   * Enter in the editor: persist this row then add the next task (V1 continuous entry).
+   */
   onEditContinue: (content: string | null) => void
-  /** Delete the task from the inline editor (emptied via ⌘↵ / ⌘⌫) and exit edit mode. */
+  /**
+   * Delete the task from the inline editor (emptied via ⌘↵ / ⌘⌫) and exit edit mode.
+   */
   onEditDelete: () => void
-  /** Backspace on an empty row in the editor: delete it and select the previous task. */
+  /**
+   * Backspace on an empty row in the editor: delete it and select the previous task.
+   */
   onEditDeleteEmpty: () => void
-  /** Exit edit mode without writing (Escape / unchanged). */
+  /**
+   * Exit edit mode without writing (Escape / unchanged).
+   */
   onEditCancel: () => void
-  /** ⌘↵ in the editor: complete the task, saving the edit first when `content` isn't null. */
+  /**
+   * ⌘↵ in the editor: complete the task, saving the edit first when `content` isn't null.
+   */
   onEditComplete: (content: string | null) => void
-  /** Checkbox click while editing: save any draft, then toggle checked state. */
+  /**
+   * Checkbox click while editing: save any draft, then toggle checked state.
+   */
   onEditCheckboxToggle: (content: string | null) => void
-  /** ⌘⇧K in the editor: convert the task to a bullet, saving the edit first when changed. */
+  /**
+   * ⌘⇧K in the editor: convert the task to a bullet, saving the edit first when changed.
+   */
   onEditConvertToBullet: (content: string | null) => void
-  /** Persist a changed edit when the row unmounts (selection moved), without exiting. */
+  /**
+   * Persist a changed edit when the row unmounts (selection moved), without exiting.
+   */
   onEditFlush: (content: string) => void
-  /** ↑/↓ in the editor: move the selection between rows (Shift extends). */
+  /**
+   * ↑/↓ in the editor: move the selection between rows (Shift extends).
+   */
   onEditNavigate: TaskNavigate
-  /** Holds the editing row's flush-then-convert trigger for the toolbar button. */
+  /**
+   * Holds the editing row's flush-then-convert trigger for the toolbar button.
+   */
   convertControllerRef: MutableRefObject<(() => void) | null>
-  onOpen: (notePath: string, event?: NewWindowClickEvent) => void
+  onOpen: (notePath: string, event?: ModClickEvent) => void
 }
 
 /**
@@ -75,6 +113,7 @@ export function TaskRow({
   taskActionPending,
   togglesSelection,
   onSelect,
+  onCheckboxToggle,
   onSelectionCheckboxToggle,
   onEditCommit,
   onEditContinue,
@@ -89,13 +128,14 @@ export function TaskRow({
   convertControllerRef,
   onOpen,
 }: TaskRowProps): ReactElement {
-  const { settings } = useSettings()
-  const { toggle, isPending } = useTaskCheckboxToggle(task)
+  const noteLabel = useNoteLabel()
   const checkboxToggleControllerRef = useRef<(() => void) | null>(null)
-  const checkboxPending = isPending || taskActionPending
   const done = task.checked
   const label = task.text || 'Empty task'
   const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (getIsComposing()) {
+      return
+    }
     if (event.key !== 'Enter' && event.key !== ' ') {
       return
     }
@@ -116,10 +156,10 @@ export function TaskRow({
 
   return (
     <li
-      data-task-key={taskKey(task)}
+      data-task-key={getTaskKey(task)}
       onClick={selectFromRow}
       className={cn(
-        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface px-4 py-2 transition-colors duration-100 lg:px-12',
+        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface px-4 py-2 lg:px-12',
         !editing && 'cursor-pointer',
         selected
           ? 'bg-accent-soft ring-1 ring-inset ring-accent/20 dark:ring-accent/10'
@@ -130,7 +170,7 @@ export function TaskRow({
         type="button"
         data-task-row
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-        disabled={checkboxPending}
+        disabled={taskActionPending}
         onClick={(event) => {
           event.stopPropagation()
           if (editing) {
@@ -141,9 +181,9 @@ export function TaskRow({
             onSelectionCheckboxToggle()
             return
           }
-          toggle()
+          onCheckboxToggle()
         }}
-        // h-6 matches the text/editor's leading-6 line so the circle centers on
+        // h-6 matches the text/editor's 24px line so the circle centers on
         // the first line (items-start keeps it there when a task wraps).
         className="flex h-6 shrink-0 items-center text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
       >
@@ -193,9 +233,7 @@ export function TaskRow({
           }}
           className="flex h-6 shrink-0 items-center whitespace-nowrap text-xs text-text-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
         >
-          {task.dailyDate !== null
-            ? formatDayLabel(task.dailyDate, settings.dateFormat)
-            : task.noteTitle}
+          {noteLabel({ path: task.notePath, title: task.noteTitle })}
         </button>
       ) : null}
     </li>

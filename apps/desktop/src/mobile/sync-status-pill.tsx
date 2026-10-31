@@ -1,22 +1,20 @@
 import type { ReactElement } from 'react'
-import { cn } from '@/lib/utils'
-import { useKeyboardVisible } from '@/mobile/use-keyboard'
-import { useMobileSyncStatus } from '@/mobile/use-sync-status'
+import { getMobileSyncStatus } from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 
 /**
  * The sync-status pill (Plan 19, step 10): a small chip that appears only
- * while sync has something to say — `Syncing` during a cycle, `Needs review`
- * while any note carries conflict markers, `Offline`/`Needs attention` after
- * a failed cycle. The quiet `Backed up` state renders nothing (detail lives
+ * while sync has something to say: `Syncing` during a cycle, `Offline`/`Needs attention` after
+ * a failed cycle. The quiet `Up to date` state renders nothing (detail lives
  * in the settings sheet) and it never intercepts touches. Positioning above
- * the tab bar belongs to {@link MobileStatusLayer}; the keyboard check here
- * backstops the layer's, keeping the pill correct if ever mounted alone.
+ * the tab bar belongs to {@link MobileStatusLayer}.
  */
 export function SyncStatusPill(): ReactElement | null {
-  const status = useMobileSyncStatus()
-  const keyboardVisible = useKeyboardVisible()
+  const sync = useGitSyncContext()
+  const status = getMobileSyncStatus(sync?.state ?? null)
 
-  if (status === null || status.tone === 'ok' || keyboardVisible) {
+  if (status === null || status.tone === 'ok') {
     return null
   }
 

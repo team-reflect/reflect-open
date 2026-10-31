@@ -10,9 +10,9 @@
 
 #[cfg(any(target_os = "ios", test))]
 use std::collections::HashMap;
+use std::sync::Arc;
 #[cfg(any(target_os = "ios", test))]
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 #[cfg(any(target_os = "ios", test))]
 use std::sync::{Mutex, MutexGuard};
 
@@ -112,7 +112,7 @@ impl Drop for ScopedBackgroundTask {
 
 /// Acquire an iOS background assertion before entering a native critical
 /// section. Other platforms return an inert guard.
-pub(crate) fn scoped(state: &State<'_, BackgroundTaskState>, name: &str) -> ScopedBackgroundTask {
+pub(crate) fn scoped(state: &BackgroundTaskState, name: &str) -> ScopedBackgroundTask {
     ScopedBackgroundTask {
         registry: Arc::clone(&state.scoped),
         token: platform::begin(Arc::clone(&state.scoped), name),

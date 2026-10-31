@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react'
-import { findScrollContainer, SECTION_JUMP_OFFSET_PX } from './section-scrolling'
-import { SETTINGS_SECTIONS, settingsSectionDomId, type SettingsSectionId } from './sections'
+import { findScrollContainer, SECTION_JUMP_OFFSET_PX } from './section-scrolling.ts'
+import { SETTINGS_SECTIONS, settingsSectionDomId, type SettingsSectionId } from './sections.ts'
 
 /**
  * The reading line: a section is active while it is the last one whose top

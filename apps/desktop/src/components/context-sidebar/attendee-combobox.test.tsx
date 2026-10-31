@@ -1,38 +1,24 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ContactMatch, MeetingAttendee, WikiSuggestion } from '@reflect/core'
-import { AttendeeCombobox } from './attendee-combobox'
+import { page, userEvent, type Locator } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type {
+  ContactMatch,
+  MeetingAttendee,
+  SuggestionService,
+  WikiSuggestion,
+} from '@reflect/core'
+import {
+  createTestCoreServices,
+  createTestContactsService,
+  type TestContactsService,
+} from '@reflect/core/testing'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { AttendeeCombobox } from './attendee-combobox.tsx'
 
-// jsdom can't scroll or observe resizes; cmdk scrolls the highlighted row
-// into view and Radix's popper observes the anchor.
-window.HTMLElement.prototype.scrollIntoView = () => {}
-class NoopResizeObserver {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-}
-window.ResizeObserver ??= NoopResizeObserver as unknown as typeof ResizeObserver
+// The note suggestions are the seam: one case needs a fetch that never settles.
+const suggestWikiTargets = vi.fn<SuggestionService['suggestWikiTargets']>(() => [])
 
-const suggestWikiTargets = vi.hoisted(() => vi.fn<() => Promise<WikiSuggestion[]>>(async () => []))
-const contactLinkSuggestions = vi.hoisted(() =>
-  vi.fn<() => Promise<ContactMatch[]>>(async () => []),
-)
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  hasBridge: () => true,
-  suggestWikiTargets,
-  contactLinkSuggestions,
-}))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
-}))
-vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({ settings: { contactsEnabled: true }, updateSettings: () => {} }),
-}))
-vi.mock('@/hooks/use-contacts-authorization', () => ({
-  useContactsAuthorization: () => 'authorized',
-}))
+let contacts: TestContactsService
 
 function noteSuggestion(title: string, overrides: Partial<WikiSuggestion> = {}): WikiSuggestion {
   return { target: title, path: `notes/${title}.md`, title, alias: null, date: null, ...overrides }
@@ -44,114 +30,143 @@ function contact(fullName: string, email: string): ContactMatch {
 
 const onAdd = vi.fn<(attendee: MeetingAttendee) => void>()
 
-function renderCombobox(attendees: MeetingAttendee[] = []): HTMLInputElement {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
-    <QueryClientProvider client={client}>
-      <AttendeeCombobox attendees={attendees} onAdd={onAdd} />
-    </QueryClientProvider>,
-  )
-  return screen.getByPlaceholderText<HTMLInputElement>('Add attendee')
+async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locator> {
+  const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    contacts,
+    meetings: createTestCoreServices({
+      database: createWasmTestDatabaseService(),
+      suggestions: { ...base.suggestions, suggestWikiTargets },
+      contacts,
+    }).meetings,
+  })
+  await renderInApp(<AttendeeCombobox attendees={attendees} onAdd={onAdd} />, {
+    core,
+    graph: { root: '/g', name: 'g' },
+    settings: { contactsEnabled: true },
+  })
+  return page.getByPlaceholder('Add attendee')
 }
 
 /** cmdk highlights the first row in an effect — selection isn't synchronous. */
-async function findHighlighted(text: string): Promise<HTMLElement> {
-  const row = await screen.findByText(text)
-  const item = row.closest('[cmdk-item]')
-  await waitFor(() => expect(item?.getAttribute('aria-selected')).toBe('true'))
+async function findHighlighted(text: string): Promise<Locator> {
+  const row = page.getByText(text)
+  await expect.element(row).toBeInTheDocument()
+  await vi.waitFor(() => {
+    expect(row.element().closest('[cmdk-item]')?.getAttribute('aria-selected')).toBe('true')
+  })
   return row
 }
 
 beforeEach(() => {
   suggestWikiTargets.mockReset().mockResolvedValue([])
-  contactLinkSuggestions.mockReset().mockResolvedValue([])
+  contacts = createTestContactsService()
   onAdd.mockClear()
 })
-
-afterEach(cleanup)
 
 describe('AttendeeCombobox', () => {
   it('Enter adds the highlighted note suggestion by its canonical title', async () => {
     suggestWikiTargets.mockResolvedValue([noteSuggestion('Ada Lovelace')])
-    const input = renderCombobox()
+    const input = await renderCombobox()
 
-    fireEvent.change(input, { target: { value: 'ada' } })
+    await input.fill('ada')
     await findHighlighted('Ada Lovelace')
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await userEvent.keyboard('{Enter}')
 
     expect(onAdd).toHaveBeenCalledWith({ name: 'Ada Lovelace' })
-    expect(input.value).toBe('')
+    await expect.element(input).toHaveValue('')
   })
 
-  it('a picked contact carries its invite email for the note pre-fill', async () => {
-    contactLinkSuggestions.mockResolvedValue([contact('Grace Hopper', 'grace@example.com')])
-    const input = renderCombobox()
+  it('a picked contact carries all emails for identity resolution', async () => {
+    contacts.setContacts([
+      {
+        ...contact('Grace Hopper', 'grace@example.com'),
+        emails: ['grace@example.com', 'grace@work.example'],
+      },
+    ])
+    const input = await renderCombobox()
 
-    fireEvent.change(input, { target: { value: 'gra' } })
+    await input.fill('gra')
     await findHighlighted('Grace Hopper')
-    expect(screen.getByText('grace@example.com')).toBeTruthy()
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await expect.element(page.getByText('grace@example.com')).toBeInTheDocument()
+    await userEvent.keyboard('{Enter}')
 
-    expect(onAdd).toHaveBeenCalledWith({ name: 'Grace Hopper', email: 'grace@example.com' })
+    expect(onAdd).toHaveBeenCalledWith({
+      name: 'Grace Hopper',
+      emails: ['grace@example.com', 'grace@work.example'],
+    })
   })
 
   it('Enter with no suggestions adds the typed name verbatim', async () => {
-    const input = renderCombobox()
+    const input = await renderCombobox()
 
-    fireEvent.change(input, { target: { value: 'Brand New Person' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await input.fill('Brand New Person')
+    await userEvent.keyboard('{Enter}')
 
     expect(onAdd).toHaveBeenCalledWith({ name: 'Brand New Person' })
-    expect(input.value).toBe('')
+    await expect.element(input).toHaveValue('')
   })
 
-  it('Enter during a pending refetch adds the typed text, not a stale row', async () => {
-    suggestWikiTargets.mockResolvedValue([noteSuggestion('Ada Lovelace')])
-    const input = renderCombobox()
+  it('blur does not bypass an exact Contact row', async () => {
+    contacts.setContacts([contact('Grace Hopper', 'grace@example.com')])
+    const input = await renderCombobox()
 
-    fireEvent.change(input, { target: { value: 'ada' } })
+    await input.fill('Grace Hopper')
+    await expect.element(page.getByText('grace@example.com')).toBeInTheDocument()
+    await userEvent.tab()
+
+    expect(onAdd).not.toHaveBeenCalled()
+    await expect.element(input).toHaveValue('Grace Hopper')
+  })
+
+  it('Enter during a pending refetch does not add stale or identity-less text', async () => {
+    suggestWikiTargets.mockResolvedValue([noteSuggestion('Ada Lovelace')])
+    const input = await renderCombobox()
+
+    await input.fill('ada')
     await findHighlighted('Ada Lovelace')
 
     // Keep typing: the popover still shows the previous query's rows
     // (keepPreviousData) while the new fetch hangs. Enter must take the
     // live text, not the stale highlighted suggestion.
     suggestWikiTargets.mockReturnValue(new Promise(() => {}))
-    fireEvent.change(input, { target: { value: 'Adam Smith' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await input.fill('Adam Smith')
+    await userEvent.keyboard('{Enter}')
 
-    expect(onAdd).toHaveBeenCalledWith({ name: 'Adam Smith' })
+    expect(onAdd).not.toHaveBeenCalled()
+    await expect.element(input).toHaveValue('Adam Smith')
   })
 
   it('offers an Add row for a name that matches nothing exactly', async () => {
     suggestWikiTargets.mockResolvedValue([noteSuggestion('Ada Lovelace')])
-    const input = renderCombobox()
+    const input = await renderCombobox()
 
-    fireEvent.change(input, { target: { value: 'Ada L' } })
-    const addRow = await screen.findByText('Add “Ada L”')
-    fireEvent.click(addRow)
+    await input.fill('Ada L')
+    await userEvent.click(page.getByText('Add “Ada L”'))
 
     expect(onAdd).toHaveBeenCalledWith({ name: 'Ada L' })
   })
 
   it('keeps already-added attendees out of the suggestions', async () => {
     suggestWikiTargets.mockResolvedValue([noteSuggestion('Ada Lovelace')])
-    const input = renderCombobox([{ name: 'Ada Lovelace' }])
+    const input = await renderCombobox([{ name: 'Ada Lovelace' }])
 
-    fireEvent.change(input, { target: { value: 'Ada Lovelace' } })
-    await waitFor(() => expect(suggestWikiTargets).toHaveBeenCalled())
+    await input.fill('Ada Lovelace')
+    await vi.waitFor(() => expect(suggestWikiTargets).toHaveBeenCalled())
 
-    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    expect(page.getByText('Ada Lovelace').query()).toBeNull()
   })
 
   it('Escape dismisses the suggestions without bubbling to the dialog', async () => {
     suggestWikiTargets.mockResolvedValue([noteSuggestion('Ada Lovelace')])
-    const input = renderCombobox()
+    const input = await renderCombobox()
 
-    fireEvent.change(input, { target: { value: 'ada' } })
+    await input.fill('ada')
     await findHighlighted('Ada Lovelace')
-    fireEvent.keyDown(input, { key: 'Escape' })
+    await userEvent.keyboard('{Escape}')
 
-    await waitFor(() => expect(screen.queryByText('Ada Lovelace')).toBeNull())
-    expect(input.value).toBe('ada')
+    await expect.element(page.getByText('Ada Lovelace')).not.toBeInTheDocument()
+    await expect.element(input).toHaveValue('ada')
   })
 })

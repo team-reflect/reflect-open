@@ -1,0 +1,17 @@
+[package]
+name = "tauri-plugin-web-auth"
+version = "0.1.0"
+description = "Signs in to web services through the system authentication session (ASWebAuthenticationSession on iOS)."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+links = "tauri-plugin-web-auth"
+
+[dependencies]
+tauri = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { workspace = true }

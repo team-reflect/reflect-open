@@ -1,5 +1,5 @@
-import { lookupContactsByName, type ContactMatch } from './commands'
-import { contactDetailsMarkdown } from './markdown'
+import type { ContactMatch } from './commands.ts'
+import { contactDetailsMarkdown } from './markdown.ts'
 
 /**
  * The person-note matching rule: a note earns a suggested-contact card only
@@ -20,9 +20,9 @@ import { contactDetailsMarkdown } from './markdown'
 function normalizeName(value: string): string {
   return value
     .normalize('NFD')
-    .replace(/\p{M}/gu, '')
+    .replaceAll(/\p{M}/gu, '')
     .trim()
-    .replace(/\s+/g, ' ')
+    .replaceAll(/\s+/g, ' ')
     .toLowerCase()
 }
 
@@ -52,50 +52,28 @@ export function matchContactForTitle(
   if (wanted === '') {
     return null
   }
-  const exact = candidates.filter(
-    (candidate) => normalizeName(candidate.fullName) === wanted,
-  )
+  const exact = candidates.filter((candidate) => normalizeName(candidate.fullName) === wanted)
   if (exact.length === 0) {
     return null
   }
-  const detailed = [...exact].sort(
-    (left, right) =>
-      right.emails.length + right.phones.length - (left.emails.length + left.phones.length),
-  )
+  const detailed = [...exact].sort((left, right) => {
+    return right.emails.length + right.phones.length - (left.emails.length + left.phones.length)
+  })
   return detailed[0] ?? null
 }
 
 /**
- * Look up `title` in Apple Contacts and apply the exact-match rule. Returns
- * null for blank titles without touching the bridge. Callers gate on the
- * integration being enabled and readable first (`isContactsReadable`).
+ * The filter for contacts in the `[[` link menu, over name-lookup
+ * `candidates`. v1 mixed contacts into the backlink autocomplete so a person
+ * note could be born from the address book. Unlike the card's exact rule,
+ * this keeps the framework's word-prefix matches (typing "Ada" should offer
+ * "Ada Lovelace"). One row per name; contacts without a name or any details
+ * are dropped, mirroring v1's valid-contact filter; at most `limit` rows.
  */
-export async function suggestContactForTitle(title: string): Promise<ContactMatch | null> {
-  if (title.trim() === '') {
-    return null
-  }
-  const candidates = await lookupContactsByName(title.trim())
-  return matchContactForTitle(title, candidates)
-}
-
-/**
- * Contacts for the `[[` link menu — v1 mixed contacts into the backlink
- * autocomplete so a person note could be born from the address book. Unlike
- * the card's exact rule, this keeps the framework's word-prefix matches
- * (typing "Ada" should offer "Ada Lovelace"); contacts without a name or any
- * details are dropped, mirroring v1's valid-contact filter. Queries shorter
- * than two characters answer empty — one letter matches half the address
- * book. Callers gate on the integration being enabled and readable.
- */
-export async function contactLinkSuggestions(
-  query: string,
-  limit = 4,
-): Promise<ContactMatch[]> {
-  const trimmed = query.trim()
-  if (trimmed.length < 2) {
-    return []
-  }
-  const candidates = await lookupContactsByName(trimmed)
+export function pickContactLinkSuggestions(
+  candidates: readonly ContactMatch[],
+  limit: number,
+): ContactMatch[] {
   const seen = new Set<string>()
   const suggestions: ContactMatch[] = []
   for (const candidate of candidates) {

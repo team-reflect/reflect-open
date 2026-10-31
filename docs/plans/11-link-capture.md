@@ -10,7 +10,7 @@
 > `apps/extension` (WXT MV3, popup + queue + ⌘⇧K), `apps/native-host`
 > (`reflect-capture-host`, bundled as a second sidecar), the capture inbox +
 > watcher carve-out, `drainCaptureInbox`/`reconcileCaptureEnrichment` in
-> `packages/core/src/actions/capture.ts`, and the desktop controller
+> `packages/core/src/capture/`, and the desktop controller
 > (`apps/desktop/src/lib/capture-controller.ts`). Two deliberate narrowings for
 > the first release: browser-manifest registration is **macOS-only** (Windows
 > HKCU keys / Linux paths land with Plan 15), and there is **no settings UI** —
@@ -36,7 +36,7 @@ this plan.
 
 **Architecture:** the extension lives in `apps/extension`; all durable writes, AI
 enrichment, and privacy checks go through `apps/desktop` + `@reflect/core`
-(`actions/capture`). See [Architecture & Conventions](architecture-conventions.md).
+(`capture/`). See [Architecture & Conventions](architecture-conventions.md).
 
 **Libraries:** WXT (Chrome extension framework, TS), `image` (Rust, screenshot
 downscale). See [Libraries](libraries.md).
@@ -125,7 +125,7 @@ Every capture lands in two phases so saving never waits on the network or AI:
    manifests for detected browsers on every launch.
 
 3. **Capture inbox + drain (core action).** A platform-agnostic capture envelope (zod)
-   in `actions/capture` — `{url, title, selection?, screenshotRef?, note?, capturedAt,
+   in `capture/` — `{url, title, selection?, screenshotRef?, note?, capturedAt,
    source}` — written identically by the desktop host today and by the future iOS
    share extension (app-group inbox) / Android intent handler. `drainCaptureInbox`
    executes these steps **in order**:

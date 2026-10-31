@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseInlineLink } from './link-syntax'
+import { parseInlineLink } from './link-syntax.ts'
 
 describe('parseInlineLink', () => {
   it('decomposes a plain inline link', () => {

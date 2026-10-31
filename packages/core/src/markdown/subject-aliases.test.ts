@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { subjectAliases } from './subject-aliases'
+import { subjectAliases } from './subject-aliases.ts'
 
 describe('subjectAliases', () => {
   it('derives every segment of a v1 subject, first included', () => {

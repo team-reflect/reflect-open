@@ -1,5 +1,5 @@
 import { useEffect, type ReactElement } from 'react'
-import { useSettings } from '@/providers/settings-provider'
+import { useSettings } from '@/providers/settings-provider.tsx'
 
 /**
  * Applies the desktop note-width preference to every note surface.

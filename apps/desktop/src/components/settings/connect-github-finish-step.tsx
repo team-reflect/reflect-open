@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
-import { InlineAlert } from '@/components/inline-alert'
-import { Button } from '@/components/ui/button'
-import type { ConnectGithubWizard } from '@/hooks/use-connect-github-wizard'
+import { InlineAlert } from '@/components/inline-alert.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import type { ConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
 
 interface ConnectGithubFinishStepProps {
   wizard: ConnectGithubWizard
@@ -63,7 +63,7 @@ export function ConnectGithubFinishStep({
               disabled={wizard.pending || wizard.user === null}
               onClick={wizard.confirmPublic}
             >
-              Back up to a public repo
+              Sync with a public repo
             </Button>
             {layout === 'stack' ? changeRepository('Choose another repo') : null}
           </div>
@@ -109,7 +109,7 @@ export function ConnectGithubFinishStep({
             <strong>
               {view.repo.owner}/{view.repo.name}
             </strong>{' '}
-            so it can back up here.
+            so it can sync here.
           </p>
           <div className={groupClass}>
             <Button size={buttonSize} onClick={wizard.openInstallPage}>
@@ -132,12 +132,12 @@ export function ConnectGithubFinishStep({
       {!wizard.pending && wizard.error !== null ? (
         <>
           <InlineAlert tone="error">{wizard.error}</InlineAlert>
-          {view.kind === 'idle' ? (
-            // A failed connect must never strand the user here — offer the
-            // way back to a different repository. (The parked handoffs render
-            // their own escapes.)
-            changeRepository()
-          ) : null}
+          {view.kind === 'idle'
+            ? // A failed connect must never strand the user here — offer the
+              // way back to a different repository. (The parked handoffs render
+              // their own escapes.)
+              changeRepository()
+            : null}
         </>
       ) : null}
     </div>

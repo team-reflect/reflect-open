@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react'
-import { MobileScreen } from '@/mobile/mobile-screen'
-import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
-import { BACK_SWIPE_SETTLE_MS, useBackSwipe, type BackSwipeState } from '@/mobile/use-back-swipe'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion'
-import type { Route } from '@/routing/route'
-import { RouterFreeze, useRouter } from '@/routing/router'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from 'react'
+import { MobileScreen } from '@/mobile/mobile-screen.tsx'
+import type { AllNotesFilters, Route } from '@reflect/app'
+import { BACK_SWIPE_SETTLE_MS, useBackSwipe, type BackSwipeState } from '@/mobile/use-back-swipe.ts'
+import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
+import { RouterFreeze, useRouter } from '@/routing/router.tsx'
 import './mobile-stack.css'
 
 /** Mirrors the animation durations in mobile-stack.css. */
@@ -32,7 +38,12 @@ interface StackLayer {
  * else (daily, All, search-as-All) is a root.
  */
 function isStacked(route: Route): boolean {
-  return route.kind === 'note' || route.kind === 'settings' || route.kind === 'graphs'
+  return (
+    route.kind === 'note' ||
+    route.kind === 'settings' ||
+    route.kind === 'graphs' ||
+    route.kind === 'licenses'
+  )
 }
 
 /**
@@ -49,6 +60,8 @@ function layerKey(route: Route): string {
       return 'settings'
     case 'graphs':
       return 'graphs'
+    case 'licenses':
+      return 'licenses'
     case 'allNotes':
     case 'search':
       return 'all'
@@ -137,7 +150,7 @@ function presentLayer(
   }
   // Resting layers carry no transform at all: a transform would turn the
   // layer into the containing block for `position: fixed` descendants (the
-  // daily screen's new-note button, floating editor UI) and shift them.
+  // daily screen's capture menu, floating editor UI) and shift them.
   return { style: base }
 }
 
@@ -261,8 +274,9 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     if (!node) {
       return
     }
-    const isStackLayer = (target: EventTarget | null): boolean =>
-      target instanceof HTMLElement && target.classList.contains('mobile-stack-layer')
+    const isStackLayer = (target: EventTarget | null): boolean => {
+      return target instanceof HTMLElement && target.classList.contains('mobile-stack-layer')
+    }
     const onAnimationEnd = (event: Event): void => {
       if (isStackLayer(event.target)) {
         finishTransition()
@@ -284,7 +298,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below
   // it, so it sits over today — where its back button lands too.
-  const belowRoute: Route | null = isStacked(route) ? backRoute ?? { kind: 'today' } : null
+  const belowRoute: Route | null = isStacked(route) ? (backRoute ?? { kind: 'today' }) : null
   const belowKey = belowRoute === null ? null : layerKey(belowRoute)
 
   const layers: StackLayer[] = []

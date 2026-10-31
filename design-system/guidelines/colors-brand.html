@@ -1,29 +1,88 @@
 <!-- @dsCard group="Colors" viewport="700x150" name="Brand · Indigo" subtitle="The one saturated accent — #4F46E5 primary" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 20px; background: var(--surface); }
-  .row { display: flex; gap: 10px; }
-  .sw { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .chip { height: 56px; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px rgba(11,19,36,.06); }
-  .name { font-family: var(--font-sans); font-size: 11px; font-weight: var(--weight-medium); color: var(--text); }
-  .hex { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-  .star { position: relative; }
-  .star::after { content: "primary"; position: absolute; top: 6px; left: 8px; font-family: var(--font-sans); font-size: 9px; font-weight: 600; color: #fff; letter-spacing: .03em; text-transform: uppercase; }
-</style>
-</head>
-<body>
-  <div class="row">
-    <div class="sw"><div class="chip" style="background:var(--indigo-50)"></div><span class="name">50</span><span class="hex">#EEF2FF</span></div>
-    <div class="sw"><div class="chip" style="background:var(--indigo-100)"></div><span class="name">100</span><span class="hex">#E0E7FF</span></div>
-    <div class="sw"><div class="chip" style="background:var(--indigo-300)"></div><span class="name">300</span><span class="hex">#A5B4FC</span></div>
-    <div class="sw"><div class="chip" style="background:var(--indigo-500)"></div><span class="name">500 · dark</span><span class="hex">#6366F1</span></div>
-    <div class="sw"><div class="chip star" style="background:var(--indigo-600)"></div><span class="name">600 · brand</span><span class="hex">#4F46E5</span></div>
-    <div class="sw"><div class="chip" style="background:var(--indigo-700)"></div><span class="name">700</span><span class="hex">#4338CA</span></div>
-    <div class="sw"><div class="chip" style="background:var(--indigo-900)"></div><span class="name">900</span><span class="hex">#312E81</span></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: var(--surface);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+      }
+      .sw {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .chip {
+        height: 56px;
+        border-radius: var(--radius-lg);
+        box-shadow: inset 0 0 0 1px rgba(11, 19, 36, 0.06);
+      }
+      .name {
+        font-family: var(--font-sans);
+        font-size: 11px;
+        font-weight: var(--weight-medium);
+        color: var(--text);
+      }
+      .hex {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .star {
+        position: relative;
+      }
+      .star::after {
+        content: 'primary';
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        font-family: var(--font-sans);
+        font-size: 9px;
+        font-weight: 600;
+        color: #fff;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="sw">
+        <div class="chip" style="background: var(--indigo-50)"></div>
+        <span class="name">50</span><span class="hex">#EEF2FF</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--indigo-100)"></div>
+        <span class="name">100</span><span class="hex">#E0E7FF</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--indigo-300)"></div>
+        <span class="name">300</span><span class="hex">#A5B4FC</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--indigo-500)"></div>
+        <span class="name">500 · dark</span><span class="hex">#6366F1</span>
+      </div>
+      <div class="sw">
+        <div class="chip star" style="background: var(--indigo-600)"></div>
+        <span class="name">600 · brand</span><span class="hex">#4F46E5</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--indigo-700)"></div>
+        <span class="name">700</span><span class="hex">#4338CA</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--indigo-900)"></div>
+        <span class="name">900</span><span class="hex">#312E81</span>
+      </div>
+    </div>
+  </body>
 </html>

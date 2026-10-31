@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react'
-import { ShortcutKeys } from '@/components/shortcut-keys'
-import { formatBindingLabel } from '@/lib/keybindings'
-import type { Shortcut } from '@/lib/shortcuts'
-import { cn } from '@/lib/utils'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
+import type { Shortcut } from '@/lib/shortcuts.ts'
+import { cn } from '@/lib/utils.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 interface ShortcutListProps {
   /** Group heading (a keymap scope: "App", "Editor"). */
@@ -25,6 +25,7 @@ export function ShortcutList({
   className,
   listClassName,
 }: ShortcutListProps): ReactElement {
+  const { keymap } = useAppServices()
   return (
     <div className={className}>
       <h3 className="text-[11px] font-semibold tracking-[0.08em] text-text-muted uppercase">
@@ -38,7 +39,7 @@ export function ShortcutList({
           >
             <span className="min-w-0 truncate">{description}</span>
             {/* The keycaps are aria-hidden decoration; this carries the binding for AT. */}
-            <span className="sr-only">{formatBindingLabel(binding)}</span>
+            <span className="sr-only">{keymap.formatLabel(binding)}</span>
             <ShortcutKeys binding={binding} />
           </li>
         ))}

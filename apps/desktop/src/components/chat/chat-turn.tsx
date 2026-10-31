@@ -1,11 +1,13 @@
 import type { ReactElement } from 'react'
 import type { ChatTurn as ChatTurnModel } from '@reflect/core'
-import { Bubble, BubbleContent } from '@/components/ui/bubble'
-import { Marker, MarkerContent } from '@/components/ui/marker'
-import { Message, MessageContent, MessageGroup } from '@/components/ui/message'
-import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
-import { ChatAssistantPart } from './chat-assistant-part'
-import { ChatUserAttachments } from './chat-user-attachments'
+import { Bubble, BubbleContent } from '@/components/ui/bubble.tsx'
+import { Marker, MarkerContent } from '@/components/ui/marker.tsx'
+import { Message, MessageContent, MessageFooter, MessageGroup } from '@/components/ui/message.tsx'
+import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
+import { assistantReplyMarkdown } from '@/lib/chat-copy.ts'
+import { ChatAssistantPart } from './chat-assistant-part.tsx'
+import { ChatCopyButton } from './chat-copy-button.tsx'
+import { ChatUserAttachments } from './chat-user-attachments.tsx'
 
 interface ChatTurnProps {
   turn: ChatTurnModel
@@ -16,18 +18,19 @@ interface ChatTurnProps {
  * shadcn chat primitives, followed by assistant text, tool markers, and
  * notices in the order the engine produced them.
  *
- * Text still streaming renders as plain text; once it settles it re-renders
- * through the same read-only markdown preview the palette uses (so
- * `[[citations]]` appear as the editor's wiki-link chips and click through
- * to the note). Live markdown would re-parse the whole message through a
- * ProseMirror editor on every delta — quadratic work the reader can feel.
+ * Assistant text uses the same lightweight, read-only markdown preview while
+ * streaming and after completion, including clickable `[[citation]]` chips.
  *
- * Wiki navigation passes a null generation deliberately: a clicked citation
- * that doesn't resolve must never *create* a note the model hallucinated.
+ * Wiki navigation is read-only deliberately: a clicked citation that doesn't
+ * resolve must never *create* a note the model hallucinated.
+ *
+ * A settled turn that produced answer text gets a copy button revealed by
+ * hovering the response content or focusing the action; a turn that only ran
+ * tools or errored has nothing to copy, so it gets none.
  */
 export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
-  const navigateWikiLink = useWikiLinkNavigation(null)
-  const lastIndex = turn.parts.length - 1
+  const navigateWikiLink = useWikiLinkNavigation({ readOnly: true })
+  const replyMarkdown = turn.status === 'done' ? assistantReplyMarkdown(turn) : null
 
   return (
     <MessageGroup className="gap-6">
@@ -45,22 +48,20 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
       </Message>
 
       <Message align="start">
-        <MessageContent className="gap-2">
+        <MessageContent className="group/assistant-response w-fit max-w-full gap-2">
           {turn.parts.length === 0 && turn.status === 'streaming' ? (
             <Marker className="animate-pulse text-sm text-text-muted">
               <MarkerContent>Thinking…</MarkerContent>
             </Marker>
           ) : null}
           {turn.parts.map((part, index) => (
-            <ChatAssistantPart
-              key={index}
-              index={index}
-              lastIndex={lastIndex}
-              part={part}
-              status={turn.status}
-              onWikiLinkClick={navigateWikiLink}
-            />
+            <ChatAssistantPart key={index} part={part} onWikiLinkClick={navigateWikiLink} />
           ))}
+          {replyMarkdown !== null ? (
+            <MessageFooter className="pointer-events-none -mt-1 opacity-0 transition-opacity duration-100 group-hover/assistant-response:pointer-events-auto group-hover/assistant-response:opacity-100 group-focus-within/assistant-response:pointer-events-auto group-focus-within/assistant-response:opacity-100">
+              <ChatCopyButton text={replyMarkdown} />
+            </MessageFooter>
+          ) : null}
         </MessageContent>
       </Message>
     </MessageGroup>

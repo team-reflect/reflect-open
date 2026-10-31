@@ -1,39 +1,39 @@
-import { cleanup, render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { UpdateState } from '@/lib/update-controller'
-import { UpdateField } from './update-field'
+import { page, userEvent } from 'vitest/browser'
+import { describe, expect, it } from 'vitest'
+import type { UpdateState } from '@reflect/app'
+import { createTestUpdateService, type TestUpdateService } from '@reflect/app/testing'
+import { UpdateProvider } from '@/providers/update-provider.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { UpdateField } from './update-field.tsx'
 
-const update = vi.hoisted(() => ({
-  state: { phase: 'idle' } as UpdateState,
-  supported: true,
-  checkNow: vi.fn(async () => {}),
-  install: vi.fn(async () => {}),
-  restart: vi.fn(async () => {}),
-}))
-vi.mock('@/providers/update-provider', () => ({ useUpdate: () => update }))
-
-afterEach(() => {
-  cleanup() // `globals: false` disables testing-library's automatic cleanup
-  update.checkNow.mockClear()
-  update.install.mockClear()
-})
+async function renderField(state: UpdateState): Promise<TestUpdateService> {
+  const update = createTestUpdateService(state)
+  await renderInApp(<UpdateField />, {
+    appServices: { update },
+    wrapper: (children) => <UpdateProvider autoCheck={false}>{children}</UpdateProvider>,
+  })
+  return update
+}
 
 describe('UpdateField', () => {
-  it('retries the install after an install failure — the found update is still there', async () => {
-    update.state = { phase: 'error', message: 'signature verification failed', during: 'install' }
-    render(<UpdateField />)
-    expect(screen.getByRole('alert').textContent).toMatch(/signature verification failed/)
-    await userEvent.click(screen.getByRole('button', { name: 'Retry install' }))
-    expect(update.install).toHaveBeenCalledTimes(1)
-    expect(update.checkNow).not.toHaveBeenCalled()
+  it('retries the install after an install failure: the found update is still there', async () => {
+    const update = await renderField({
+      phase: 'error',
+      message: 'signature verification failed',
+      during: 'install',
+    })
+    expect(page.getByRole('alert').element().textContent).toMatch(/signature verification failed/)
+    await userEvent.click(page.getByRole('button', { name: 'Retry install' }))
+    expect(update.calls).toEqual(['retryAction', 'install'])
   })
 
   it('re-checks after a check failure', async () => {
-    update.state = { phase: 'error', message: 'release endpoint unreachable', during: 'check' }
-    render(<UpdateField />)
-    await userEvent.click(screen.getByRole('button', { name: 'Check for updates' }))
-    expect(update.checkNow).toHaveBeenCalledTimes(1)
-    expect(update.install).not.toHaveBeenCalled()
+    const update = await renderField({
+      phase: 'error',
+      message: 'release endpoint unreachable',
+      during: 'check',
+    })
+    await userEvent.click(page.getByRole('button', { name: 'Check for updates' }))
+    expect(update.calls).toEqual(['retryAction', 'checkNow'])
   })
 })

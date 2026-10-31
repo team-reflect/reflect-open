@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scanInlineImages, scanInlineSegments, scanInlineWikiLinks } from './scan'
+import { scanInlineSegments, scanInlineWikiLinks } from './scan.ts'
 
 describe('scanInlineWikiLinks', () => {
   it('finds plain and aliased links with display spans', () => {
@@ -37,23 +37,6 @@ describe('scanInlineWikiLinks', () => {
   })
 })
 
-describe('scanInlineImages', () => {
-  it('finds images with alt and src spans', () => {
-    const text = 'A pic ![screenshot](assets/shot.png) and ![](https://x.com/i.jpg "t").'
-    const images = scanInlineImages(text)
-    expect(images).toHaveLength(2)
-    expect(images[0]).toMatchObject({ alt: 'screenshot', src: 'assets/shot.png' })
-    expect(text.slice(images[0]!.from, images[0]!.to)).toBe('![screenshot](assets/shot.png)')
-    expect(images[1]).toMatchObject({ alt: '', src: 'https://x.com/i.jpg' })
-  })
-
-  it('respects code contexts and plain links', () => {
-    expect(scanInlineImages('code `![x](y.png)` stays literal')).toEqual([])
-    expect(scanInlineImages('a [link](not-an-image.png) only')).toEqual([])
-    expect(scanInlineImages('no images')).toEqual([])
-  })
-})
-
 describe('scanInlineSegments', () => {
   it('returns a single text segment for plain content', () => {
     expect(scanInlineSegments('just buy milk')).toEqual([{ kind: 'text', text: 'just buy milk' }])
@@ -87,6 +70,30 @@ describe('scanInlineSegments', () => {
   it('leaves links inside a code span as literal text (no regex false-positive)', () => {
     expect(scanInlineSegments('code `[[NotALink]]` stays literal')).toEqual([
       { kind: 'text', text: 'code `[[NotALink]]` stays literal' },
+    ])
+  })
+})
+
+describe('scan — meowdown grammar recovery & embeds', () => {
+  it('segments only the inner link of a nested opener', () => {
+    expect(scanInlineSegments('x [[a [[b]] y')).toEqual([
+      { kind: 'text', text: 'x [[a ' },
+      { kind: 'wikiLink', target: 'b', alias: null },
+      { kind: 'text', text: ' y' },
+    ])
+  })
+
+  it('segments a ![[x]] embed as a wiki link, keeping the ! as text', () => {
+    expect(scanInlineSegments('a ![[photo.png]] b')).toEqual([
+      { kind: 'text', text: 'a !' },
+      { kind: 'wikiLink', target: 'photo.png', alias: null },
+      { kind: 'text', text: ' b' },
+    ])
+  })
+
+  it('scanInlineWikiLinks anchors an embed at its brackets', () => {
+    expect(scanInlineWikiLinks('![[x]]')).toEqual([
+      { from: 1, to: 6, target: 'x', alias: null, displayFrom: 3, displayTo: 4 },
     ])
   })
 })

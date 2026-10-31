@@ -1,50 +1,54 @@
 import { describe, expect, it } from 'vitest'
-import type { AiProviderConfig } from '../../settings/schema'
-import { aiProvider } from '../provider-catalog'
-import { chatModelOptions, resolveChatModel } from './model-options'
+import type { HostedAiProviderConfig } from '../../settings/schema.ts'
+import { aiProvider } from '../provider-catalog.ts'
+import { chatModelOptions, resolveChatModel } from './model-options.ts'
 
-function config(overrides: Partial<AiProviderConfig>): AiProviderConfig {
+function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderConfig {
+  const provider = overrides.provider ?? 'anthropic'
   return {
     id: 'id',
-    provider: 'anthropic',
-    model: 'claude-sonnet-4-6',
+    provider,
+    model: aiProvider(provider).models[0].id,
     keyHint: 'hint1',
     ...overrides,
   }
 }
 
 describe('chatModelOptions', () => {
-  it('offers every catalog model of a configured provider', () => {
+  it('offers every catalog model id for a configured provider', () => {
     const options = chatModelOptions([config({ id: 'a' })])
     expect(options.map((option) => option.modelId)).toEqual(
       aiProvider('anthropic').models.map((model) => model.id),
     )
     expect(options.every((option) => option.configId === 'a')).toBe(true)
-    expect(options.find((option) => option.modelId === 'claude-fable-5')?.label).toBe(
-      'Claude Fable 5',
-    )
-    expect(options.find((option) => option.modelId === 'claude-sonnet-5')?.label).toBe(
-      'Claude Sonnet 5',
-    )
   })
 
-  it('keeps a custom configured model selectable, labeled by its raw id', () => {
-    const options = chatModelOptions([config({ id: 'a', model: 'claude-custom' })])
-    const custom = options.at(-1)
-    expect(custom).toEqual({
+  it('keeps a custom configured model selectable', () => {
+    const options = chatModelOptions([config({ id: 'a', model: 'custom-model' })])
+    expect(options.at(-1)).toEqual({
       configId: 'a',
       provider: 'anthropic',
-      modelId: 'claude-custom',
-      label: 'claude-custom',
+      modelId: 'custom-model',
+      label: 'custom-model',
     })
     expect(options).toHaveLength(aiProvider('anthropic').models.length + 1)
   })
 
-  it('groups options consecutively per configured entry', () => {
+  it('keeps the configured OpenAI-compatible model selectable', () => {
     const options = chatModelOptions([
-      config({ id: 'a' }),
-      config({ id: 'b', provider: 'openai', model: 'gpt-5.5' }),
+      {
+        id: 'local',
+        provider: 'openai-compatible',
+        model: 'llama-local',
+        baseUrl: 'http://localhost:1234/v1',
+        keyHint: '',
+      },
     ])
+    expect(options.at(-1)?.modelId).toBe('llama-local')
+  })
+
+  it('groups options consecutively per configured entry', () => {
+    const options = chatModelOptions([config({ id: 'a' }), config({ id: 'b', provider: 'openai' })])
     const firstOpenAi = options.findIndex((option) => option.configId === 'b')
     expect(options.slice(0, firstOpenAi).every((option) => option.configId === 'a')).toBe(true)
     expect(options.slice(firstOpenAi).every((option) => option.configId === 'b')).toBe(true)
@@ -57,22 +61,23 @@ describe('chatModelOptions', () => {
 
 describe('resolveChatModel', () => {
   const entryA = config({ id: 'a' })
-  const entryB = config({ id: 'b', provider: 'openai', model: 'gpt-5.5' })
+  const entryB = config({ id: 'b', provider: 'openai' })
   const state = { providers: [entryA, entryB], defaultProviderId: 'b' }
 
-  it('falls back to the default entry and its configured model with no selection', () => {
+  it('falls back to the default entry with no selection', () => {
     expect(resolveChatModel(state, null)).toEqual(entryB)
   })
 
-  it('applies the selected model to the selected entry', () => {
-    expect(resolveChatModel(state, { configId: 'a', modelId: 'claude-haiku-4-5' })).toEqual({
+  it('applies the selected model id to the selected entry', () => {
+    const modelId = aiProvider('anthropic').models.at(-1)!.id
+    expect(resolveChatModel(state, { configId: 'a', modelId })).toEqual({
       ...entryA,
-      model: 'claude-haiku-4-5',
+      model: modelId,
     })
   })
 
-  it('a selection whose entry was removed falls back to the default', () => {
-    expect(resolveChatModel(state, { configId: 'gone', modelId: 'gpt-5.4' })).toEqual(entryB)
+  it('falls back when the selected entry is gone', () => {
+    expect(resolveChatModel(state, { configId: 'gone', modelId: 'x' })).toEqual(entryB)
   })
 
   it('returns null when nothing is configured', () => {

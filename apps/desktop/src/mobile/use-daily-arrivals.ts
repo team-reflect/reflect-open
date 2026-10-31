@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { dailyArrivalIntent } from '@reflect/app'
 
 export interface DailyArrivalsOptions {
   /** The router's navigation counter — bumped on every `navigate`. */
@@ -45,16 +46,17 @@ export function useDailyArrivals({
   // The mounting arrival seeds the state directly — it never re-anchors
   // (there is no previously-shown day), but its focus request counts.
   const [focusDate, setFocusDate] = useState<string | null>(arrivalFocusEditor ? date : null)
-  const lastArrival = useRef({ seq: arrivalSeq, date })
+  const lastArrivalRef = useRef({ seq: arrivalSeq, date })
   useEffect(() => {
-    const last = lastArrival.current
-    lastArrival.current = { seq: arrivalSeq, date }
-    if (arrivalSeq !== last.seq && arrivalFocusEditor) {
+    const last = lastArrivalRef.current
+    lastArrivalRef.current = { seq: arrivalSeq, date }
+    const intent = dailyArrivalIntent(last, lastArrivalRef.current, arrivalFocusEditor)
+    if (intent.focus === 'request') {
       setFocusDate(date)
-    } else if (arrivalSeq !== last.seq) {
+    } else if (intent.focus === 'clear') {
       setFocusDate(null)
     }
-    if (arrivalSeq !== last.seq && date === last.date) {
+    if (intent.reanchor) {
       setResetSeq((seq) => seq + 1)
     }
   }, [arrivalSeq, arrivalFocusEditor, date])

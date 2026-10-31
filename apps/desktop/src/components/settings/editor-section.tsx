@@ -1,12 +1,12 @@
 import type { ReactElement } from 'react'
 import type { EditorMarkdownSyntax, EditorTextSize } from '@reflect/core'
-import { cn } from '@/lib/utils'
-import { useSettings } from '@/providers/settings-provider'
-import { SettingsField } from './field'
-import { KeyboardShortcutsField } from './keyboard-shortcuts-field'
-import { SettingsOptionCard } from './option-card'
-import { SettingsSection } from './section'
-import { SettingsSwitchField } from './switch-field'
+import { cn } from '@/lib/utils.ts'
+import { useSettings } from '@/providers/settings-provider.tsx'
+import { SettingsField } from './field.tsx'
+import { KeyboardShortcutsField } from './keyboard-shortcuts-field.tsx'
+import { SettingsOptionCard } from './option-card.tsx'
+import { SettingsSection } from './section.tsx'
+import { SettingsSwitchField } from './switch-field.tsx'
 
 interface MarkdownSyntaxOption {
   value: EditorMarkdownSyntax
@@ -103,10 +103,7 @@ export function EditorSection(): ReactElement {
         </div>
       </SettingsField>
 
-      <SettingsField
-        legend="Text size"
-        description="The reading size of the note editor."
-      >
+      <SettingsField legend="Text size" description="The reading size of the note editor.">
         <div className="mt-3 @container">
           <div className="grid grid-cols-1 gap-2 @xl:grid-cols-3">
             {TEXT_SIZE_OPTIONS.map((option) => {
@@ -171,6 +168,13 @@ export function EditorSection(): ReactElement {
         description="Pressing Return at the end of a heading starts a new bullet."
         checked={settings.editorBulletAfterHeading}
         onCheckedChange={(checked) => updateSettings({ editorBulletAfterHeading: checked })}
+      />
+
+      <SettingsSwitchField
+        legend="Smooth caret animation"
+        description="Animate the text cursor as it moves while editing."
+        checked={settings.editorSmoothCaretAnimation}
+        onCheckedChange={(checked) => updateSettings({ editorSmoothCaretAnimation: checked })}
       />
 
       <KeyboardShortcutsField />

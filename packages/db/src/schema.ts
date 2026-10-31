@@ -7,4 +7,4 @@
  * where JSON-column `ColumnType` overrides would live if we add any. CI fails if
  * regenerating produces a diff, so these types can't drift from the schema.
  */
-export type { DB as Database } from './schema.gen'
+export type { DB as Database } from './schema.gen.ts'

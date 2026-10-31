@@ -7,7 +7,14 @@ import React from 'react'
  * search field.
  */
 export function ShortcutKey({ shortcut = '', apple = true, ghost = false, style = {} }) {
-  const symbols = { mod: apple ? '⌘' : 'Ctrl', shift: '⇧', alt: apple ? '⌥' : 'Alt', meta: '⌘', enter: '↩', ctrl: 'Ctrl' }
+  const symbols = {
+    mod: apple ? '⌘' : 'Ctrl',
+    shift: '⇧',
+    alt: apple ? '⌥' : 'Alt',
+    meta: '⌘',
+    enter: '↩',
+    ctrl: 'Ctrl',
+  }
   const keys = shortcut.split('+').map((k) => symbols[k.toLowerCase()] ?? k.toUpperCase())
 
   const cap = {
@@ -30,7 +37,9 @@ export function ShortcutKey({ shortcut = '', apple = true, ghost = false, style 
   return (
     <span style={{ display: 'inline-flex', gap: 3, ...style }}>
       {keys.map((k, i) => (
-        <kbd key={i} style={cap}>{k}</kbd>
+        <kbd key={i} style={cap}>
+          {k}
+        </kbd>
       ))}
     </span>
   )

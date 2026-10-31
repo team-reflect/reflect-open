@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { monthLabel } from '@/lib/month-grid'
-import { cn } from '@/lib/utils'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion'
+import { formatMonthLabel } from '@reflect/app'
+import { cn } from '@/lib/utils.ts'
+import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './month-title.css'
 
 /** Mirrors the animation durations in month-title.css (the fallback timer). */
@@ -34,9 +34,7 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
   // must appear in the same paint or the roll flickers.
   if (shown !== month) {
     setShown(month)
-    setOutgoing(
-      reducedMotion ? null : { month: shown, direction: month > shown ? 'up' : 'down' },
-    )
+    setOutgoing(reducedMotion ? null : { month: shown, direction: month > shown ? 'up' : 'down' })
   }
 
   // The outgoing label leaves on `animationend` — a native listener, like
@@ -65,10 +63,11 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
         data-slot="month-title"
         className={cn(
           'block truncate leading-[1.5]',
-          outgoing && (outgoing.direction === 'up' ? 'month-title-enter-up' : 'month-title-enter-down'),
+          outgoing &&
+            (outgoing.direction === 'up' ? 'month-title-enter-up' : 'month-title-enter-down'),
         )}
       >
-        {monthLabel(shown)}
+        {formatMonthLabel(shown)}
       </span>
       {outgoing ? (
         <span
@@ -83,7 +82,7 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
             outgoing.direction === 'up' ? 'month-title-exit-up' : 'month-title-exit-down',
           )}
         >
-          {monthLabel(outgoing.month)}
+          {formatMonthLabel(outgoing.month)}
         </span>
       ) : null}
     </span>

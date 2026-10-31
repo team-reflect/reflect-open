@@ -1,5 +1,5 @@
 //! The wire message and capture envelope, mirroring the zod schemas in
-//! `@reflect/core` (`actions/capture-envelope.ts` — the source of truth).
+//! `@reflect/core` (`capture/capture-envelope.ts` — the source of truth).
 //! Serde tolerates unknown fields (a newer extension must not break an older
 //! host); the checks here are the ones the host *must* enforce before the
 //! envelope id names files on disk.
@@ -50,7 +50,7 @@ pub struct ValidatedCapture {
 
 /// Strict UUID shape (8-4-4-4-12 hex). The id names the spool files, so this
 /// doubles as the path-safety guard — no separators, no dots, no traversal.
-fn is_uuid(candidate: &str) -> bool {
+pub(crate) fn is_uuid(candidate: &str) -> bool {
     let groups: Vec<&str> = candidate.split('-').collect();
     let lengths = [8, 4, 4, 4, 12];
     groups.len() == lengths.len()
@@ -84,7 +84,7 @@ fn days_in_month(year: u32, month: u32) -> u32 {
 /// must be **at least as strict** here as the drain's zod schema
 /// (`capture-envelope.ts`), or it would spool envelopes the drain can only
 /// quarantine; the shared fixtures pin the two together.
-fn is_iso_datetime(candidate: &str) -> bool {
+pub(crate) fn is_iso_datetime(candidate: &str) -> bool {
     let Some((date, rest)) = candidate.split_once('T') else {
         return false;
     };
@@ -328,7 +328,7 @@ mod tests {
     fn shared_fixtures_pin_the_ts_contract() {
         let fixtures: serde_json::Value = serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../packages/core/src/actions/capture-envelope.fixtures.json"
+            "/../../packages/core/src/capture/capture-envelope.fixtures.json"
         )))
         .unwrap();
         for case in fixtures["accepted"].as_array().unwrap() {

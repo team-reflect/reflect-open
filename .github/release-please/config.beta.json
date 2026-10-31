@@ -1,17 +1,23 @@
 {
-  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.10.3/schemas/config.json",
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.6.0/schemas/config.json",
   "release-type": "simple",
   "include-component-in-tag": false,
   "bump-minor-pre-major": true,
   "versioning": "prerelease",
   "prerelease": true,
-  "prerelease-type": "beta",
+  "prerelease-type": "beta.1",
   "draft": true,
+  "draft-pull-request": true,
   "force-tag-creation": true,
   "always-update": true,
+  "bootstrap-sha": "23e2f664c27908699181850697bb3fdc05bdee19",
+  "label": "autorelease: pending-beta",
+  "release-label": "autorelease: tagged-beta",
+  "pull-request-title-pattern": "chore: release ${version}",
   "packages": {
     ".": {
       "package-name": "reflect-open",
+      "component": "reflect-open-beta",
       "changelog-path": "apps/desktop/CHANGELOG.beta.md",
       "exclude-paths": ["docs", "fixtures", ".github", "apps/extension"],
       "extra-files": [

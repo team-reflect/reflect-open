@@ -1,6 +1,6 @@
-import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../../settings/schema'
-import { aiProvider } from '../provider-catalog'
-import { defaultAiProvider, type AiProvidersState } from '../provider-config'
+import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../../settings/schema.ts'
+import { aiProvider } from '../provider-catalog.ts'
+import { defaultAiProvider, type AiProvidersState } from '../provider-config.ts'
 
 /**
  * The chat screen's model picker (Plan 10): every configured provider offers
@@ -20,8 +20,6 @@ export interface ChatModelOption {
   /** Display name (catalog label, or the raw id for custom models). */
   label: string
 }
-
-export type { ChatModelSelection }
 
 /**
  * Every model the chat picker offers, grouped consecutively per configured
