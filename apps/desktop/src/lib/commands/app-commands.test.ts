@@ -111,6 +111,15 @@ describe('sortGraphsByName', () => {
 
     expect(sortGraphsByName([lower, upper])).toEqual([upper, lower])
   })
+
+  it('keeps a stable order for roots that collate as equal but differ in encoding', () => {
+    const composed = recentGraph('/graphs/\u{E9}', 1, 'Notes')
+    const decomposed = recentGraph('/graphs/e\u{301}', 2, 'Notes')
+
+    expect(composed.root.localeCompare(decomposed.root)).toBe(0)
+    expect(sortGraphsByName([composed, decomposed])).toEqual([decomposed, composed])
+    expect(sortGraphsByName([decomposed, composed])).toEqual([decomposed, composed])
+  })
 })
 
 describe('keybindingFor', () => {

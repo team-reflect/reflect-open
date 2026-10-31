@@ -38,13 +38,15 @@ function openNewNote(context: CommandContext): void {
  * Order the graph menu and its numbered slots (Cmd+1..9) alphabetically by
  * graph name, so a number maps to a predictable graph instead of following the
  * recents list, which reshuffles by most-recently-used. Case-insensitive, with
- * the root path as a stable tiebreak.
+ * the root path as a stable tiebreak. Roots that collate as equal but differ in
+ * Unicode encoding fall back to an exact comparison.
  */
 export function sortGraphsByName(recents: readonly RecentGraph[]): RecentGraph[] {
   return [...recents].sort((a, b) => {
     return (
       a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
-      a.root.localeCompare(b.root)
+      a.root.localeCompare(b.root) ||
+      (a.root < b.root ? -1 : a.root > b.root ? 1 : 0)
     )
   })
 }
