@@ -131,9 +131,9 @@ async function shortcutsHook() {
       graph: GRAPH,
       graphState: {
         recents: [
-          { root: '/g', name: 'g', openedMs: 3 },
-          { root: '/work', name: 'Work', openedMs: 2 },
-          { root: '/side', name: 'Side', openedMs: 1 },
+          { root: '/side', name: 'Zed', openedMs: 3 },
+          { root: '/g', name: 'g', openedMs: 2 },
+          { root: '/work', name: 'Work', openedMs: 1 },
         ],
       },
       settings: { editorMarkdownSyntax: 'hide', semanticSearchEnabled: false, theme: 'system' },
@@ -421,7 +421,7 @@ describe('app shortcuts', () => {
     expect(newChat).not.toHaveBeenCalled()
   })
 
-  it('⌘number switches to the matching recent graph', async () => {
+  it('⌘number switches to the graph at that position by name', async () => {
     await shortcutsHook()
 
     await act(() => press('1'))
