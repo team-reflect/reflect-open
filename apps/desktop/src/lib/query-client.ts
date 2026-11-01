@@ -83,6 +83,12 @@ export const queryKeys = {
       return [...this.all, root, path] as const
     },
   },
+  suggestedBacklinks: {
+    all: ['suggested-backlinks'] as const,
+    note(root: GraphRoot, path: string) {
+      return [...this.all, root, path] as const
+    },
+  },
   xPost: {
     all: ['x-post'] as const,
     archive(root: GraphRoot, postId: string) {

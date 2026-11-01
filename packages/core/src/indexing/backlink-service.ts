@@ -8,6 +8,7 @@ import {
   type BlockContextSource,
 } from './block-context.ts'
 import type { DatabaseService } from './database-service.ts'
+import { sourceRecency } from './queries-shared.ts'
 import {
   createSourceTaskLocator,
   extractSnippetTasks,
@@ -85,11 +86,6 @@ export interface BacklinkContextPage {
    */
   readonly indexedLinkCount: number
 }
-
-const sourceRecency = sql<number>`coalesce(
-  strftime('%s', "notes"."daily_date") * 1000,
-  "notes"."updated_at"
-)`
 
 function afterSource(cursor: BacklinkSourceCursor) {
   return sql<boolean>`(

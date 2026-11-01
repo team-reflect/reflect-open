@@ -32,7 +32,7 @@ const FTS_TOKEN_CHAR_RE = /[\p{L}\p{N}\p{Co}]/u
 const FTS_TOKEN_SEPARATOR_RE = /[^\p{L}\p{N}\p{Co}]+/u
 
 /** Wrap a term as an FTS5 string literal, doubling quotes (FTS5's own escape). */
-function quoteFtsLiteral(term: string): string {
+export function quoteFtsLiteral(term: string): string {
   return `"${term.replaceAll('"', '""')}"`
 }
 

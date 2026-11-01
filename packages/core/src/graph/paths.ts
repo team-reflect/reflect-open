@@ -85,7 +85,7 @@ export type GraphPathKind = 'note' | 'attachment'
  * Full-Unicode `toLowerCase` folds characters Rust does not (KELVIN SIGN → k),
  * and the two classifiers must never disagree on the same wire path.
  */
-function asciiLowerCase(value: string): string {
+export function asciiLowerCase(value: string): string {
   return value.replaceAll(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32))
 }
 

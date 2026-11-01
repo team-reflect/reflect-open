@@ -104,11 +104,17 @@ function branchMentions(body: string, branch: SyntaxNode, keys: ReadonlySet<stri
   return false
 }
 
-function lineStartAt(body: string, pos: number): number {
+/**
+ * Offset of the start of the line holding `pos`.
+ */
+export function lineStartAt(body: string, pos: number): number {
   return body.lastIndexOf('\n', Math.max(0, pos - 1)) + 1
 }
 
-function lineEndAt(body: string, pos: number): number {
+/**
+ * Offset of the end (the newline, or the text's end) of the line holding `pos`.
+ */
+export function lineEndAt(body: string, pos: number): number {
   const next = body.indexOf('\n', pos)
   return next === -1 ? body.length : next
 }
@@ -191,7 +197,11 @@ function headingHasText(body: string, heading: SyntaxNode): boolean {
  * frontmatter authors a `title:`, that derivation never promotes an H1, so no
  * heading is the title and every H1 keeps the section rule.
  */
-function isTitleHeading(body: string, heading: SyntaxNode, frontmatterTitled: boolean): boolean {
+export function isTitleHeading(
+  body: string,
+  heading: SyntaxNode,
+  frontmatterTitled: boolean,
+): boolean {
   if (frontmatterTitled) {
     return false
   }
