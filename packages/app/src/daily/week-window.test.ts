@@ -5,7 +5,6 @@ import {
   weekAtIndex,
   weekIndexOf,
   weekOf,
-  weekStartOf,
 } from './week-window.ts'
 
 /**
@@ -73,30 +72,6 @@ describe('monthPickTarget', () => {
   it('opens any other month on its first day', () => {
     expect(monthPickTarget('2026-09', '2026-06-12', '2026-07-04')).toBe('2026-09-01')
     expect(monthPickTarget('2025-12', '2026-06-12', '2026-07-04')).toBe('2025-12-01')
-  })
-})
-
-describe('weekStartOf', () => {
-  it('finds the Monday of a mid-week date', () => {
-    expect(weekStartOf('2026-06-12', 'monday')).toBe('2026-06-08')
-  })
-
-  it('keeps a Sunday in its own Monday-first week', () => {
-    expect(weekStartOf('2026-06-14', 'monday')).toBe('2026-06-08')
-  })
-
-  it('finds the Sunday of a Sunday-first week', () => {
-    expect(weekStartOf('2026-06-12', 'sunday')).toBe('2026-06-07')
-  })
-
-  it('finds the Saturday of a Saturday-first week', () => {
-    expect(weekStartOf('2026-06-12', 'saturday')).toBe('2026-06-06')
-  })
-
-  it('is a fixed point on the week-start day itself', () => {
-    expect(weekStartOf('2026-06-08', 'monday')).toBe('2026-06-08')
-    expect(weekStartOf('2026-06-07', 'sunday')).toBe('2026-06-07')
-    expect(weekStartOf('2026-06-13', 'saturday')).toBe('2026-06-13')
   })
 })
 

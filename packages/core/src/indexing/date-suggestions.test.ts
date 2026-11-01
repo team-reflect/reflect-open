@@ -42,6 +42,10 @@ describe('generateDateSuggestions', () => {
       ])
     })
 
+    it('offers nothing for an amount past the relative limit', () => {
+      expect(gen('1000000')).toEqual([])
+    })
+
     it('shows both directions when a unit but no direction is given', () => {
       expect(gen('one day')).toEqual([
         { date: '2020-01-02', phrase: '1 day from now' },

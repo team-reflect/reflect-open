@@ -10,6 +10,11 @@
   "scripts": {
     "test": "vitest run"
   },
+  "dependencies": {
+    "@date-fns/utc": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "pretty-ms": "^10.0.0"
+  },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "typescript": "~6.0.3",

@@ -1,233 +1,151 @@
 # Reflect V1 Mobile Overview
 
-This document is a handoff for an agent or engineer building the mobile experience for a second version of Reflect. It summarizes what the existing iOS app does, how it shares code with the V1 web app, and which architectural choices shaped the mobile implementation.
+A handoff for building the V2 mobile experience: what the V1 iOS app does, how it shares code with the V1 web app, and which architectural choices shaped it. The [V1 Overview](./reflect-v1-overview.md) covers the shared product model; this document covers what differs on mobile.
 
-It is a companion to the [V1 Overview](./reflect-v1-overview.md), which covers the shared product model (graphs, notes, backlinks, tasks, sync). This document focuses on what is different on mobile.
-
-Source code: the `reflect-mobile` repository (separate from the main V1 `reflect` repo).
-
-Per-feature porting docs — what each V1 mobile feature did in detail and how it maps onto V2 — live in [docs/porting/reflect-mobile/](./porting/reflect-mobile/README.md).
+Source code: the `reflect-mobile` repository (separate from the main V1 `reflect` repo). Per-feature porting docs live in [docs/porting/reflect-mobile/](./porting/reflect-mobile/README.md).
 
 ## Product Summary
 
-Reflect V1 Mobile is a capture-first companion app, not a port of the desktop experience. It is an iOS app (iPhone-first, iPad-capable) built with Capacitor 6 wrapping a Next.js 14 + Ionic React web app, sharing the V1 domain model and sync stack with the web codebase.
+V1 Mobile is a capture-first companion, not a port of desktop: an iOS app (iPhone-first, iPad-capable) built with Capacitor 6 around a Next.js 14 + Ionic React web app, sharing the V1 domain model and sync stack.
 
-The product bet is that mobile is where life happens and desktop is where organization happens. The app optimizes three things:
+The bet: mobile is where life happens, desktop is where organization happens. The app optimizes:
 
-1. **Frictionless capture**: daily note opens by default, voice memos are reachable from the lock screen, Siri, widgets, and home-screen quick actions, and a share extension saves links from any app.
-2. **Trustworthy recording**: audio capture and upload run natively, surviving webview crashes, phone calls, route changes, and network loss.
-3. **Fast recall on the go**: full local SQLite projection of the graph with full-text search, so reading and searching notes works offline.
+1. **Frictionless capture**: daily note by default; voice memos from the lock screen, Siri, widgets, and quick actions; a share extension for links.
+2. **Trustworthy recording**: native audio capture and upload that survive webview crashes, calls, route changes, and network loss.
+3. **Fast recall on the go**: a full local SQLite projection with full-text search, so reading and searching work offline.
 
-What mobile deliberately does *not* try to be: the place where users manage templates, connections, imports, the graph map, or note history. Those stay on desktop/web.
+Mobile deliberately leaves templates, connections, imports, the graph map, and note history to desktop/web.
 
 ## Relationship to the V1 Web Codebase
 
-The mobile repo does not depend on the web repo as a package. Instead, shared code is **rsynced from a sibling checkout** of the main `reflect` repo:
+Shared code is **rsynced from a sibling checkout** of `reflect`, not consumed as a package: `sync.sh` copies the directories in `sync-include.txt` and skips web/desktop-only files listed in `sync-ignore.txt` (OPFS, web SQLite, embeddings/vector search, web keychain, and similar). Synced code (actions, most models, helpers, lib, and the api/asset/auth/db/firebase/search services) is read-only in the mobile repo. Mobile owns the app shell, screens, UI components, `capacitor/` bridges, `ios/`, and build/CI. Where web has platform variants, mobile provides a same-path file (e.g. `services/db/sqlite/kysely-setup.ts`) or a stub (vector search returns nothing). `currentPlatform()` is hardcoded to `Platform.Mobile`.
 
-- `sync.sh` copies directories listed in `sync-include.txt` from `../reflect` into the mobile repo.
-- `sync-ignore.txt` excludes web/desktop-only files (`*.desktop.ts`, import helpers, service-worker hooks, OPFS, web SQLite setup, embedding/vector search, asset text extraction, web keychain).
-
-What is synced (shared, treat as read-only in the mobile repo):
-
-- `client/actions`, `client/errors`, and most `client/models/*` (note, graph, task, backlink, change, search, user, preferences, etc.).
-- `helpers`, `lib`, `shared`, `testing`.
-- `services/api`, `services/asset`, `services/auth`, `services/db`, `services/firebase`, `services/search`, `services/logger`, `services/export/export-json.ts`.
-
-What is mobile-owned:
-
-- `client/core/` (app shell, router), `client/screens/`, `client/models/ui/`, `client/models/capacitor/`.
-- `components/` (all UI components).
-- `capacitor/` (TypeScript plugin bridges) and `ios/` (the Xcode project and Swift code).
-- `pages/` (a thin Next.js shell), build scripts, fastlane, CI.
-
-Where the web repo has platform variants, mobile either provides its own file with the same path (e.g. `services/db/sqlite/kysely-setup.ts`, `lib/platform-keychain.ts`) or stubs the capability (e.g. vector search returns no results).
-
-This code-sharing model kept the domain logic identical across platforms, but it is manual, drift-prone, and makes the synced files second-class citizens in the mobile repo. A V2 monorepo with shared packages removes this entire class of problem.
-
-`services/platform.ts` is hardcoded on mobile: `currentPlatform()` always returns `Platform.Mobile` and the agent is `iphone`. Shared code branches on this to disable web-only behavior.
+This kept domain logic identical across platforms, but it is manual, drift-prone, and makes synced files second-class. A V2 monorepo with shared packages removes the problem.
 
 ## How to Think About the Mobile App
 
-The app is three layers with different reliability guarantees:
+Three layers with different reliability guarantees:
 
-1. **The webview app** (Next.js + Ionic React + MobX): all product UI, the editor, local SQLite, and sync. Assumed to be restartable at any time.
-2. **The TypeScript bridge** (`capacitor/`): seven small plugin interfaces (alert, assets, auth-sync, image-preview, keyboard-toolbar, native-actions, recording) that define the webview↔native contract.
-3. **The native Swift layer** (`ios/App/`): custom Capacitor plugins plus app extensions. Anything that must not fail when the webview is dead lives here — audio recording and upload, share-extension link capture, auth token storage, asset caching.
+1. **The webview app** (Next.js + Ionic React + MobX): all UI, the editor, local SQLite, and sync. Assumed restartable at any time.
+2. **The TypeScript bridge** (`capacitor/`): seven small plugin interfaces that define the webview↔native contract.
+3. **The native Swift layer** (`ios/App/`): plugins plus app extensions. Anything that must not fail when the webview is dead lives here: recording and upload, share-extension capture, auth token storage, asset caching.
 
-The defining V1 mobile design decision is that **critical capture paths do not depend on JavaScript being alive**. Recording uploads straight from Swift to storage; the share extension calls the Reflect API directly with natively-stored OAuth tokens; pending uploads persist in App Group defaults across app restarts. The webview is treated as crashy (it is — the repo ships webview-crash detection and Sentry context for it), and the native layer is the reliability floor.
+The defining decision: **critical capture paths do not depend on JavaScript being alive**. Recording uploads straight from Swift; the share extension calls the Reflect API with natively stored OAuth tokens; pending uploads persist in App Group defaults across restarts. The webview is treated as crashy (the repo ships crash detection for it), and the native layer is the reliability floor.
 
 ## Main App Surfaces
 
-Navigation is an Ionic tab bar with three tabs, plus modals. Routing is Ionic React Router (react-router v5) with routes like `/:graph/daily/:id`, `/:graph/all/:id`, `/:graph/all/tag/:tag`, `/:graph/tasks`, and `/:graph/all/ai-chat`.
+An Ionic tab bar with three tabs plus modals, routed by Ionic React Router (react-router v5), e.g. `/:graph/daily/:id`, `/:graph/tasks`.
 
-### Daily (default tab)
+- **Daily (default tab)**: a horizontal Swiper carousel of days (about ±50 days, re-centered near the edges) with a synced calendar strip. Mounted once to preserve swiper state. Waking from background on a new date re-navigates to today.
+- **All Notes**: a virtualized list with a search bar and filter badges (tags, dates, pinned, public). Local FTS with desktop's ranking (BM25 with subject boost, recency boost, exact-subject pinning). Tag taps land here.
+- **Search Chat (AI)**: an AI chat over the current search results, the same "chat over an explicit retrieval set" model as desktop, as its own page.
+- **Tasks**: today / overdue / upcoming groups with drag-and-drop between groups (haptics), a quick-edit modal, and a scheduling picker.
+- **Profile / Settings (modal)**: account, graph switcher, counts, a small settings subset (font size, week start, date/time format), JSON export to the share sheet, recovery and encryption keys, sign out, account deletion. Full preferences stay on desktop/web.
+- **Note actions**: pin, share markdown, publish/unpublish, trash. The desktop context sidebar reduced to actions: no suggested backlinks, similar notes, or contacts.
 
-The daily-notes surface is a horizontal Swiper carousel of date slides (roughly ±50 days around the selected date, re-centered as the user swipes near the edges), with a swipeable calendar strip at the top that stays in sync with the main carousel. The component mounts once and is reused across navigation to preserve swiper state.
-
-The app re-navigates to today when it wakes from background and the date has changed — open the app, see today.
-
-### All Notes
-
-A virtualized list (react-virtuoso) of notes with an `IonSearchbar`, filter badges (tags, dates, pinned, public), and tap-to-open. Search is local FTS with the same ranking logic as desktop (BM25 with subject boosting, recency boost, exact-subject pinning). Tag taps from the editor land here as filtered lists.
-
-### Search Chat (AI)
-
-From the search bar, the user can start an AI chat grounded in the current search results — the same "chat over an explicit retrieval set" model as desktop, presented as its own page (`/:graph/all/ai-chat`) rather than a modal toggle. The chat view model is shared with the notes-list code.
-
-### Tasks
-
-A grouped task list (today / overdue / upcoming, mirroring desktop's groupings) with mobile-native interactions: drag-and-drop between groups via dnd-kit with haptic feedback, a quick-edit modal for editing a task without opening its note, and a scheduling picker.
-
-### Profile / Settings (modal)
-
-A card modal, not a screen: avatar and email, graph switcher, note/recording counts, a small settings subset (font size, week start, date/time format), JSON export (written to the cache directory and handed to the iOS share sheet), recovery-key creation, encryption key access, sign out, and account deletion. Full preferences (templates, connections, AI providers, billing) remain on desktop/web.
-
-### Note actions
-
-Each note has an options popover: pin/unpin, share (native share sheet with the note's markdown), publish/copy public URL/unpublish, move to trash. This is the mobile equivalent of the desktop context sidebar, reduced to actions only — there is no suggested-backlinks/similar-notes/contacts intelligence on mobile.
-
-### What is absent vs. desktop
-
-No graph map, no note history UI, no imports, no command palette (search is a tab, not `Cmd+K`), no semantic search, no split panes, no template/prompt-template management, no calendar/meeting context on daily notes, no connections management. The mobile app reads and writes the same graph; it just exposes a smaller surface over it.
+Absent vs. desktop: graph map, note history, imports, command palette, semantic search, split panes, template management, calendar context on dailies, connections management. Mobile exposes a smaller surface over the same graph.
 
 ## The Editor on Mobile
 
-The same `@team-reflect/reflect-editor` (ProseMirror + Yjs) is embedded with mobile-specific configuration: `mobile` mode on, inline toolbar off, merge menu off, backlinks and tags open on tap instead of becoming selectable.
+The same `@team-reflect/reflect-editor` (ProseMirror + Yjs) runs in `mobile` mode: no inline toolbar or merge menu, and backlinks/tags open on tap.
 
-The signature mobile piece is the **native keyboard accessory toolbar**:
+The signature piece is the **native keyboard accessory toolbar**: a Swift plugin renders it above the iOS keyboard while the webview drives its items (slash commands, AI prediction, bullet, todo, backlink, tag, indent/outdent, move, image). A view model enables indent/move by selection, and the toolbar hides when a hardware keyboard (`GCKeyboard`) is attached.
 
-- A Swift Capacitor plugin renders a toolbar above the iOS keyboard; the webview drives its items and enabled states.
-- Items: slash commands, AI prediction toggle, bullet, todo, backlink, tag, indent/outdent, move up/down, and image insertion (via the Capacitor Camera plugin, base64 round-trip into the editor's upload pipeline).
-- A MobX view model (`client/models/capacitor/keyboard-toolbar-view.ts`) observes editor selection and enables/disables indent/move buttons accordingly.
-- The native side detects hardware keyboards (`GCKeyboard`) and hides the toolbar when one is attached.
-
-AI in the editor matches desktop: prompt templates are passed into the editor (AI palette) and prediction is toggleable from the toolbar. Editor focus is managed outside the editor (a `requestedFocusForNoteId` flag on the mobile UI store) so navigation — e.g. tapping a backlink — can blur, route, and restore focus on the destination note.
-
-`y-prosemirror` is patched via patch-package for a null-selection crash; expect mobile webview selection behavior to be a recurring source of editor bugs.
+AI in the editor matches desktop. Editor focus is managed outside the editor (`requestedFocusForNoteId`) so navigation can blur, route, and restore focus on the destination. `y-prosemirror` is patched for a null-selection crash: expect mobile webview selection to be a recurring source of editor bugs.
 
 ## Capture: Audio Recording
 
-Audio is the most engineered feature in the app and the clearest expression of the native-reliability philosophy.
+The most engineered feature and the clearest expression of the native-reliability philosophy. Entry points: in-app button, lock-screen widget, Live Activity / Dynamic Island, Siri App Intents, a quick action, and a `reflect-widget://` deep link.
 
-Entry points: in-app record button, lock-screen widget, Dynamic Island / Live Activity, Siri App Intents ("Start recording in Reflect" / stop), home-screen quick action, and a `reflect-widget://` deep link.
+The native flow (`RecordingPlugin.swift`):
 
-The native flow (`RecordingPlugin.swift`, ~600 lines):
+1. `AVAudioRecorder` captures AAC mono at 44.1kHz; a Live Activity shows the timer with a stop button.
+2. Interruptions (calls, Siri, alarms) and route changes stop the recording cleanly instead of corrupting it.
+3. On stop, Swift uploads directly to Firebase Storage with metadata, using native auth tokens. No webview involved.
+4. Failures persist in App Group defaults and retry with backoff, on network return, and with background-task time.
+5. The V1 backend transcribes, and the transcript syncs into the daily note through normal note sync.
 
-1. `AVAudioRecorder` captures AAC mono at 44.1kHz; a Live Activity shows the elapsed timer with a stop button (Dynamic Island on iOS 17+).
-2. Audio interruptions (calls, Siri, alarms) and input-route changes (headphones unplugged) stop the recording cleanly instead of corrupting it.
-3. On stop, Swift uploads the file directly to Firebase Storage with metadata (`processAs: audioRecording-v2`, user/graph/note IDs, transcription language/format flags) using natively-stored auth tokens — no webview involved.
-4. Failures persist in App Group defaults and retry with exponential backoff; `NWPathMonitor` retries when the network returns; a background task buys upload time after the app is backgrounded.
-5. The V1 backend transcribes the file and the transcript syncs into the daily note through the normal note-sync pipeline.
-
-The webview side (`capacitor/recording.ts` + a recording modal with a live waveform from native metering events) is presentation only. Transcription preferences (language, format, prompt hints) are pushed from the webview's preference store into the native plugin reactively.
+The webview side (a modal with a live waveform) is presentation only; transcription preferences are pushed into the native plugin.
 
 ## Capture: Share Extension, Widgets, Intents
 
-- **Share extension** (separate target, SwiftUI): accepts URLs, web pages, and text from the iOS share sheet and POSTs to `/api/graphs/{graphId}/links/async` directly, using OAuth tokens shared through the `group.ReflectData` App Group. Link enrichment then happens through the V1 operations pipeline (the client later applies the resulting note). Errors are queued in App Group defaults and reported to Sentry when the main app next foregrounds.
-- **Lock-screen widget**: a record button that deep-links via `reflect-widget://`.
-- **Siri App Intents**: start/stop recording.
-- **Quick actions** (home-screen long-press): Create Note and Record Audio.
-- **Native action handshake**: because these entry points can fire before the webview is ready, a `NativeActions` plugin queues the requested action natively; the webview calls `finishSetup()` when its UI is mounted and then `confirmPerformed()` — a two-stage handshake that prevents lost or double-fired actions across app restarts.
-- **Universal links / dynamic links**: associated domains for `m.reflect.app`, `l.reflect.app`, and Firebase Dynamic Links domains; used for email-link auth and web→app handoff.
-- **Push notifications** are wired (`@capacitor/push-notifications`, APNs entitlement) but are a minor surface.
+- **Share extension** (SwiftUI): accepts URLs, pages, and text, and POSTs to `/api/graphs/{graphId}/links/async` with OAuth tokens shared through the `group.ReflectData` App Group. The V1 operations pipeline enriches the link. Errors queue in App Group defaults and reach Sentry on next foreground.
+- **Lock-screen widget**, **Siri intents** (start/stop recording), and **quick actions** (Create Note, Record Audio).
+- **Native action handshake**: these entry points can fire before the webview is ready, so a `NativeActions` plugin queues the action natively. The webview calls `finishSetup()` when mounted, then `confirmPerformed()`. The two stages prevent lost or double-fired actions across restarts.
+- **Universal / dynamic links** for email-link auth and web→app handoff. **Push notifications** are wired but minor.
 
 ## Authentication and Secrets
 
-- Sign in with Apple, Google (native sheets via `@capacitor-firebase/authentication`), or email (OTP code or magic link; magic links round-trip through Firebase Dynamic Links into `/auth/callback/email`).
-- After Firebase auth resolves in the webview, an **auth-sync bridge** sends the Firebase ID token to Swift, which exchanges it for Reflect OAuth access/refresh tokens via `/api/oauth/token` and stores them in App Group defaults. This is what lets the share extension, recording uploads, and widgets authenticate without the webview.
-- Graph encryption passwords are stored in the iOS Keychain (`capacitor-secure-storage-plugin`), keyed per graph.
-- OAuth client credentials and the API endpoint live in `ReflectConfig.plist`, which is git-ignored and generated from env vars by a fastlane lane (`sync_config`).
+- Sign in with Apple, Google (native sheets), or email (OTP or magic link via Firebase Dynamic Links).
+- An **auth-sync bridge** sends the Firebase ID token to Swift, which exchanges it for Reflect OAuth tokens and stores them in App Group defaults. This is what lets the share extension, uploads, and widgets authenticate without the webview.
+- Graph encryption passwords live in the iOS Keychain, per graph. OAuth client config lives in a git-ignored `ReflectConfig.plist` generated by fastlane.
 
-The boot gate sequence mirrors desktop, expressed as a loading-state machine on the root store: Auth → SQLite migrating → graph setup → graph loading → encryption unlock → version check → initial sync (with progress UI) → main tabs.
+Boot gates mirror desktop: Auth → SQLite migrating → graph setup → graph loading → encryption unlock → version check → initial sync → main tabs.
 
 ## Data, Sync, and Offline
 
-The mobile app runs the full V1 local-first stack, with a Capacitor-specific bottom layer:
+The full V1 local-first stack with a Capacitor bottom layer:
 
-- **SQLite** via `@capacitor-community/sqlite` with a `capacitor-sqlite-kysely` dialect, one database file, the same Kysely schema and migration pattern as the web. All DB access is serialized through a `pLimit(1)` lock because the Capacitor bridge cannot tolerate concurrent access.
-- **Tables** match the web projection: `notes` (with Yjs update state + derived fields), `notesFts`, `noteBacklinks`, `assets`/`assetsFts`, `contacts`, `books`, `commitBackups`, `jobs`, `lastSyncs`, plus a `notesVec` table that exists in the schema but is unused.
-- **Search** is FTS5 only (unicode61 tokenizer, BM25 with 3× subject weighting, recency/pinned/exact-match re-ranking). The vector search manager is a stub that returns empty results — there is no on-device embedding or semantic search in V1 mobile. The trigram extension used on desktop is also disabled on mobile.
-- **Sync** is the shared table-sync abstraction: Firestore→SQLite down-sync with per-table watermarks (`lastSyncs`) and pagination; SQLite→Firestore up-sync with `hasChanges` flags, debounced flushes, and flush-on-reconnect. Note content syncs as Yjs commits through the shared change manager. Deletes are soft locally until the remote delete succeeds.
-- **Job queue** (`jobs` table): reindex search, rewrite backlinks, repair outdated docs — persisted so background work survives app restarts.
-- **Offline**: reading, searching, editing, and creating notes all work offline; changes queue locally. Network state comes from `@capacitor/network`. The app also monitors free disk space periodically and pauses sync when the device is nearly full.
+- **SQLite** via `@capacitor-community/sqlite` with a Kysely dialect and the web's schema and migrations. All DB access is serialized (`pLimit(1)`) because the Capacitor bridge cannot handle concurrent access.
+- **Tables** match the web projection; a `notesVec` table exists but is unused.
+- **Search** is FTS5 only (BM25 with 3× subject weighting, recency/pinned/exact-match re-ranking). No on-device embeddings or semantic search, and desktop's trigram extension is disabled.
+- **Sync** is the shared table-sync: Firestore→SQLite with per-table watermarks, SQLite→Firestore with change flags, debounced flushes, and flush-on-reconnect. Note content syncs as Yjs commits. Deletes stay soft locally until the remote delete succeeds.
+- **Job queue** (`jobs` table): reindex, rewrite backlinks, repair docs; persisted so work survives restarts.
+- **Offline**: reading, searching, editing, and creating all work offline. Sync pauses when the device is nearly full.
 
-### Assets
-
-Encrypted asset handling has a native cache layer:
-
-- Files are encrypted client-side (`@team-reflect/file-crypto` in a worker) and uploaded to the asset host; the encrypted blobs are also cached natively in `Library/Caches/AssetsCache`.
-- A `reserveUpload → addUpload → getUpload` bridge protocol coordinates the webview's crypto pipeline with the native cache and resolves races between concurrent uploads and downloads.
-- A custom `reflect-assets://` WKWebView scheme handler serves images: it fetches the encrypted blob (with retries), decrypts AES-GCM natively, and returns the asset to the webview — so images in notes work offline and load fast.
-- Image capture comes from the Capacitor Camera plugin; full-screen image preview is a native viewer (Agrume).
+**Assets** are encrypted client-side and cached natively as encrypted blobs. A `reserveUpload → addUpload → getUpload` bridge protocol resolves races between concurrent uploads and downloads. A `reflect-assets://` scheme handler decrypts AES-GCM natively, so images work offline and load fast.
 
 ## Native Resilience Machinery
 
-Worth knowing because it reveals where V1 mobile actually hurt:
+Where V1 mobile actually hurt:
 
-- **WebView crash detection**: the bridge view controller posts a notification when WKWebView terminates; the app tracks it in Sentry with an "activated recently" flag to separate startup crashes from background kills.
-- **Beta workaround plugin**: iOS 17.2 betas broke Firebase persistence; a dedicated plugin detects OS beta upgrades, backs up local data, and warns the user. The lesson: webview storage on iOS is not stable ground — keep canonical local state in SQLite/native files, not IndexedDB.
-- **Recording state recovery**: pending uploads, requested native actions, and extension errors all persist in App Group defaults precisely because the webview and even the app process are assumed mortal.
+- **WebView crash detection**: WKWebView terminations go to Sentry with an "activated recently" flag to separate startup crashes from background kills.
+- **Beta workaround plugin**: iOS 17.2 betas broke Firebase persistence; a plugin detected OS beta upgrades, backed up local data, and warned the user. Lesson: iOS webview storage is not stable ground. Keep canonical state in SQLite/native files, not IndexedDB.
+- **State recovery**: pending uploads, native actions, and extension errors persist in App Group defaults because the webview and even the process are assumed mortal.
 
 ## Build, Release, and CI
 
-- **Dev loop**: `nr dev` runs Next.js on port 3001; `capacitor.config.ts` auto-detects the machine's LAN IP and points the device/simulator at it. The app is also testable in a desktop browser in responsive mode.
-- **Builds**: `nr dist` does a static Next.js export to `out/`, `cap sync`/`copy`, and syncs `ReflectConfig.plist` from env vars. Env vars come from Vercel (`vercel env pull`).
-- **Release**: fastlane lanes handle config sync, build-number bumps (build numbers are UTC timestamps, `YYYYMMDDHHmm`), certificate management (fastlane match against a private encrypted certificates repo), TestFlight upload, and version bumps after App Store promotion.
-- **CI** (GitHub Actions): lint + 4-shard vitest with the Firebase emulator on every push; every push to `next` or a `testflight-*` branch builds and uploads a TestFlight build on a macOS runner.
-- **Crash reporting**: Sentry on both sides (`@sentry/capacitor` natively, `@sentry/nextjs` in the webview), with shared user context set from the auth-sync plugin.
+- **Dev loop**: `nr dev` serves Next.js on port 3001; `capacitor.config.ts` points the device at the machine's LAN IP.
+- **Builds**: `nr dist` exports static Next.js, runs `cap sync`, and generates `ReflectConfig.plist`. Env vars come from Vercel.
+- **Release**: fastlane handles config, build numbers (UTC timestamps, `YYYYMMDDHHmm`), certificates (fastlane match), TestFlight upload, and post-promotion version bumps.
+- **CI**: lint + 4-shard vitest with the Firebase emulator on every push; pushes to `next` or `testflight-*` upload a TestFlight build.
+- **Crash reporting**: Sentry natively and in the webview, with shared user context.
 
 ## Code Map for V2 Readers
 
-Mobile-owned starting points (paths in the `reflect-mobile` repo):
-
-- `client/core/app.tsx`, `client/core/loader.tsx`: app shell and loading-state gates.
-- `client/core/router-tabs.tsx`: tab structure and routes.
-- `client/models/ui/mobile-view.ts`: central mobile UI state (app lifecycle, recording modal, focus requests, disk space).
-- `client/models/ui/navigation-view.ts`: navigation + deep-link intents.
-- `client/screens/note-edit/`: daily-note swiper and editor integration (`note-daily-edit-view.ts`, `note-edit-main.tsx`).
-- `client/models/capacitor/keyboard-toolbar-view.ts` + `capacitor/keyboard-toolbar.ts`: keyboard accessory toolbar.
-- `client/screens/notes-list/`: all-notes list, search, filters, AI chat.
-- `client/screens/tasks/`: task groups, drag-and-drop, quick edit.
-- `client/screens/profile/`: settings modal, export, recovery key.
-- `capacitor/`: the full webview↔native contract in seven small files.
-- `ios/App/App/Capacitor Plugins/`: Swift plugins (Recording, AuthSync, NativeActions, KeyboardToolbar, Assets, Alert, ImagePreview, BetaWorkaround).
-- `ios/App/ShareExtension/`: share-sheet link capture.
-- `ios/App/App Widget/`: lock-screen widget and recording Live Activity.
-- `ios/App/fastlane/Fastfile` and `.github/workflows/`: release pipeline.
-- `services/db/sqlite/kysely-setup.ts`, `services/db/sqlite/sqlite-db.ts`: mobile SQLite bottom layer.
-- `sync.sh`, `sync-include.txt`, `sync-ignore.txt`: the code-sharing mechanism with the main repo.
+Starting points in `reflect-mobile`: `client/core/` (shell, loading gates, tab routes), `client/models/ui/mobile-view.ts` (central mobile UI state), `client/screens/` (daily swiper, notes list, tasks, profile), `capacitor/` (the full webview↔native contract), `ios/App/App/Capacitor Plugins/` (Swift plugins), `ios/App/ShareExtension/`, `ios/App/App Widget/`, `ios/App/fastlane/Fastfile`, and `sync.sh` (the code-sharing mechanism).
 
 ## V2 Design Notes
 
-Things V1 mobile got right and worth preserving:
+Worth preserving:
 
-- **Capture-first scope.** Mobile as a companion (daily note, voice, share, tasks, search) rather than a full port. Users did not lose anything important by not having the map or preferences on their phone.
-- **Native reliability floor.** Recording and link capture work even when the web layer is dead. Whatever V2's shell is, voice capture and share-ins should not depend on the app's main runtime being healthy.
-- **OS-level capture entry points.** Lock-screen widget, Live Activity, Siri intents, quick actions, and the share extension are a large part of mobile's value. These require native targets and shared auth state (App Groups in V1) regardless of framework.
-- **Keyboard accessory toolbar.** The single most important mobile editor affordance; selection-aware enable/disable matters.
-- **Open-to-today + swipeable days.** The daily carousel with a synced calendar strip is the right mental model for mobile daily notes.
-- **Full local projection.** Having the whole graph in SQLite with FTS made the app feel fast and genuinely offline-capable.
-- **The native-action handshake.** Queuing OS-triggered actions natively until the UI declares readiness eliminates a whole class of cold-start races.
+- **Capture-first scope.** Mobile as a companion (daily note, voice, share, tasks, search), not a full port. Users did not miss the map or preferences on their phone.
+- **Native reliability floor.** Voice capture and share-ins should not depend on the app's main runtime being healthy.
+- **OS-level capture entry points.** Widget, Live Activity, Siri, quick actions, and the share extension are a large part of mobile's value. They need native targets and shared auth state regardless of framework.
+- **Keyboard accessory toolbar.** The most important mobile editor affordance; selection-aware enable/disable matters.
+- **Open-to-today + swipeable days** with a synced calendar strip.
+- **Full local projection.** The whole graph in SQLite with FTS made the app fast and genuinely offline.
+- **The native-action handshake** removes a whole class of cold-start races.
 
-Things V2 changes or must decide differently:
+V2 changes or must decide:
 
-- **Shell**: V2 already targets Tauri 2 iOS instead of Capacitor, sharing one frontend and Rust core in a monorepo. That dissolves the rsync code-sharing scheme, the Capacitor plugin layer, and the serial-DB-lock constraint — but every native capability above (share extension, widgets, Live Activities, intents, background audio, App Groups, keychain) still has to be rebuilt as native iOS targets alongside the Tauri shell. Capacitor gave V1 most of these as plugins; V2 owns them directly.
-- **No Reflect-hosted APIs.** V1 mobile's most reliable paths — native recording upload and share-extension capture — work by POSTing to Reflect's servers with OAuth tokens. V2's principles (markdown source of truth, no Reflect infrastructure, BYOK) remove that option. The share extension and voice capture need a new design: write to shared local storage (App Group container) and let the app ingest into markdown, with sync via Git/iCloud. This is the hardest open problem this document surfaces; "capture when the app isn't running" was previously solved by the server.
-- **Transcription**: V1 transcribed server-side after upload. V2 must choose on-device transcription (Apple Speech / local models) or BYOK provider calls, and honor `private: true` as a hard block at the capture layer.
-- **Sync without Firestore.** V1 mobile got real-time-ish sync and watermarked catch-up from Firestore listeners. Git/iCloud-based sync has different latency and conflict characteristics; the daily-note-on-two-devices case (phone + desktop, same day) becomes the canonical conflict to design for.
-- **Semantic search parity.** V1 quietly shipped mobile without vector search and nobody seems to have missed it badly — useful data point when deciding whether on-device embeddings are worth it in V2.
-- **iPad**: V1 supports iPad orientations but ships a phone UI. Decide early whether V2 treats iPad as a desktop-class layout or a big phone.
-- **WebView fragility is real.** Crash detection, beta-OS workarounds, and patched selection bugs were all responses to WKWebView instability. Keep canonical state out of webview storage, and keep an eye on editor selection behavior in any embedded-webview editor.
+- **Shell**: V2 targets Tauri 2 iOS with one frontend and Rust core in a monorepo. That removes the rsync scheme, the Capacitor plugin layer, and the serial-DB-lock constraint, but every native capability above (share extension, widgets, Live Activities, intents, background audio, App Groups, keychain) must be rebuilt as native iOS targets. Capacitor gave V1 most of these as plugins.
+- **No Reflect-hosted APIs.** V1's most reliable paths POST to Reflect's servers. V2's principles remove that. The share extension and voice capture need a new design: write to shared local storage (App Group container), let the app ingest into markdown, and sync via Git/iCloud. This is the hardest open problem here: "capture when the app isn't running" was previously solved by the server.
+- **Transcription**: V1 transcribed server-side. V2 must choose on-device (Apple Speech / local models) or BYOK, and honor `private: true` as a hard block at the capture layer.
+- **Sync without Firestore.** Git/iCloud sync has different latency and conflicts. The daily note edited on phone and desktop the same day is the canonical conflict.
+- **Semantic search parity.** V1 shipped mobile without vector search and nobody seems to have missed it badly: a data point for on-device embeddings in V2.
+- **iPad**: V1 ships a phone UI on iPad. Decide early whether V2 treats iPad as desktop-class or a big phone.
+- **WebView fragility is real.** Keep canonical state out of webview storage, and watch editor selection behavior.
 
-Questions a V2 mobile agent should answer before building:
+Questions to answer before building:
 
-- How does the share extension write a link into a markdown graph when the main app process isn't running, and how does that interact with Git/iCloud sync?
-- Where does audio capture live (native target writing to an App Group container?) and when/where does transcription happen under BYOK?
-- Which capture entry points ship at v1: share extension, widget, intents, quick actions — and which can wait?
-- Is the mobile SQLite index the same `.reflect/index.sqlite` schema as desktop (one schema, two writers?) or a separate projection?
+- How does the share extension write a link into a markdown graph when the app isn't running, and how does that interact with Git/iCloud sync?
+- Where does audio capture live (a native target writing to an App Group container?), and when does transcription happen under BYOK?
+- Which capture entry points ship first, and which can wait?
+- Does mobile use desktop's `.reflect/index.sqlite` schema (one schema, two writers?) or a separate projection?
 - What is the offline conflict story for the daily note edited on two devices?
-- Does mobile get the full editor or a constrained capture editor at first release?
+- Does mobile get the full editor or a constrained capture editor at first?
 
 ## One-Sentence Product Brief
 
-Reflect V1 Mobile is a capture-first iOS companion to the Reflect graph — open-to-today daily notes, native-grade voice memos, share-sheet link capture, tasks, and offline full-text search — built as a Capacitor shell around the shared V1 web codebase with a native Swift reliability layer for everything that must not fail.
+Reflect V1 Mobile is a capture-first iOS companion to the Reflect graph (open-to-today daily notes, native-grade voice memos, share-sheet link capture, tasks, and offline full-text search), built as a Capacitor shell around the shared V1 web codebase with a native Swift reliability layer for everything that must not fail.

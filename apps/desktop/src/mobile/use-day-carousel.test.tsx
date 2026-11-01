@@ -1,6 +1,6 @@
 import { act } from '@/test-utils/act.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createDayWindow, dateAtIndex } from '@/lib/day-window.ts'
+import { createDayWindow, dateAtIndex } from '@reflect/app'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import {
   CAROUSEL_RADIUS,

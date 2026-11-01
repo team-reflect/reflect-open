@@ -10,7 +10,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx'
-import type { TaskFilters, TaskFiltersControl } from '@/lib/tasks/task-filters.ts'
+import type { TaskFiltersControl } from '@/lib/tasks/task-filters.ts'
+import type { TaskFilters } from '@reflect/core'
 
 const BUCKET_FILTERS: ReadonlyArray<{ key: keyof TaskFilters; label: string }> = [
   { key: 'pinned', label: 'Pinned tasks' },

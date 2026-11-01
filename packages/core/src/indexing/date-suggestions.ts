@@ -15,8 +15,17 @@
  * which needs no friendlier label than the date itself).
  */
 
-import { addDaysIso, addMonthsIso, isCalendarDate, isoFromParts, weekdayIso } from '@reflect/utils'
-import { weekStartDow, type WeekStartDay } from '../settings/schema.ts'
+import {
+  addDaysToIsoDate,
+  addMonthsToIsoDate,
+  isIsoDate,
+  getIsoDateFromParts,
+  getYearMonth,
+  getYearMonthStart,
+  getWeekday,
+  getYear,
+} from '@reflect/utils'
+import { getUserWeekStart, type WeekStartDay } from '../settings/schema.ts'
 import type { DateSuggestion, DateSuggestionContext } from './date-suggestion-types.ts'
 import { monthNameSuggestions } from './date-suggestions-months.ts'
 
@@ -27,13 +36,11 @@ const MAX_RELATIVE_YEARS = 15
 /** Natural-language phrases need at least this many typed characters to appear. */
 const MIN_PHRASE_CHARS = 3
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-
 /** Is `iso` within {@link MAX_RELATIVE_YEARS} of `today`? ISO strings sort chronologically. */
 function withinRelativeLimit(iso: string, today: string): boolean {
   return (
-    iso >= addMonthsIso(today, -12 * MAX_RELATIVE_YEARS) &&
-    iso <= addMonthsIso(today, 12 * MAX_RELATIVE_YEARS)
+    iso >= addMonthsToIsoDate(today, -12 * MAX_RELATIVE_YEARS) &&
+    iso <= addMonthsToIsoDate(today, 12 * MAX_RELATIVE_YEARS)
   )
 }
 
@@ -109,13 +116,13 @@ function extractDirection(tokens: readonly string[]): Direction | null {
 function shiftByUnit(today: string, unit: Unit, amount: number): string {
   switch (unit) {
     case 'day':
-      return addDaysIso(today, amount)
+      return addDaysToIsoDate(today, amount)
     case 'week':
-      return addDaysIso(today, amount * 7)
+      return addDaysToIsoDate(today, amount * 7)
     case 'month':
-      return addMonthsIso(today, amount)
+      return addMonthsToIsoDate(today, amount)
     case 'year':
-      return addMonthsIso(today, amount * 12)
+      return addMonthsToIsoDate(today, amount * 12)
   }
 }
 
@@ -125,6 +132,10 @@ function relativeSuggestions(
 ): DateSuggestion[] {
   const amount = extractNumber(tokens)
   if (amount === null) {
+    return []
+  }
+  // Even in days, a larger amount is past the limit, and it can overflow `Date`.
+  if (amount > MAX_RELATIVE_YEARS * 366) {
     return []
   }
   const unitFilter = extractUnit(tokens)
@@ -165,7 +176,7 @@ function relativeSuggestions(
 type Modifier = 'this' | 'next' | 'last'
 const MODIFIERS: readonly Modifier[] = ['this', 'next', 'last']
 
-// Weekdays in display order (Monday first), paired with their JS `getUTCDay`
+// Weekdays in display order (Monday first), paired with their JS `getDay`
 // index (Sunday = 0). One table avoids an unchecked name→index lookup.
 const WEEKDAYS: readonly { word: string; dow: number }[] = [
   { word: 'monday', dow: 1 },
@@ -179,12 +190,7 @@ const WEEKDAYS: readonly { word: string; dow: number }[] = [
 
 /** The smallest date on or after `today` whose weekday is `target` (today counts). */
 function upcomingWeekday(today: string, target: number): string {
-  return addDaysIso(today, (target - weekdayIso(today) + 7) % 7)
-}
-
-/** The first day of `today`'s week, honouring the user's week-start preference. */
-function firstOfWeek(today: string, weekStartDay: WeekStartDay): string {
-  return addDaysIso(today, -((weekdayIso(today) - weekStartDow(weekStartDay) + 7) % 7))
+  return addDaysToIsoDate(today, (target - getWeekday(today) + 7) % 7)
 }
 
 /**
@@ -195,10 +201,8 @@ function firstOfWeek(today: string, weekStartDay: WeekStartDay): string {
  */
 function weekendOf(today: string, weekStartDay: WeekStartDay): string {
   const weekendDow = weekStartDay === 'saturday' ? 5 : 6
-  return addDaysIso(
-    firstOfWeek(today, weekStartDay),
-    (weekendDow - weekStartDow(weekStartDay) + 7) % 7,
-  )
+  const weekStart = getUserWeekStart(today, weekStartDay)
+  return addDaysToIsoDate(weekStart, (weekendDow - getWeekday(weekStart) + 7) % 7)
 }
 
 function resolveWeekday(today: string, target: number, modifier: Modifier): string {
@@ -206,14 +210,14 @@ function resolveWeekday(today: string, target: number, modifier: Modifier): stri
   if (modifier === 'this') {
     return upcoming
   }
-  return addDaysIso(upcoming, modifier === 'next' ? 7 : -7)
+  return addDaysToIsoDate(upcoming, modifier === 'next' ? 7 : -7)
 }
 
 function resolveFromAnchor(anchor: string, modifier: Modifier, stepDays: number): string {
   if (modifier === 'this') {
     return anchor
   }
-  return addDaysIso(anchor, modifier === 'next' ? stepDays : -stepDays)
+  return addDaysToIsoDate(anchor, modifier === 'next' ? stepDays : -stepDays)
 }
 
 interface NlUnit {
@@ -239,7 +243,7 @@ const NL_UNITS: readonly NlUnit[] = [
     display: 'Week',
     order: 7,
     resolve: (context, modifier) => {
-      return resolveFromAnchor(firstOfWeek(context.today, context.weekStartDay), modifier, 7)
+      return resolveFromAnchor(getUserWeekStart(context.today, context.weekStartDay), modifier, 7)
     },
   },
   {
@@ -255,9 +259,8 @@ const NL_UNITS: readonly NlUnit[] = [
     display: 'Month',
     order: 9,
     resolve: (context, modifier) => {
-      const [year, month] = context.today.split('-').map(Number) as [number, number]
-      const first = isoFromParts(year, month, 1)
-      return modifier === 'this' ? first : addMonthsIso(first, modifier === 'next' ? 1 : -1)
+      const first = getYearMonthStart(getYearMonth(context.today))
+      return modifier === 'this' ? first : addMonthsToIsoDate(first, modifier === 'next' ? 1 : -1)
     },
   },
 ]
@@ -302,14 +305,14 @@ function naturalLanguageSuggestions(
     { phrase: 'Today', date: context.today, modifier: null, unitWord: 'today', sort: 0 },
     {
       phrase: 'Yesterday',
-      date: addDaysIso(context.today, -1),
+      date: addDaysToIsoDate(context.today, -1),
       modifier: null,
       unitWord: 'yesterday',
       sort: 1,
     },
     {
       phrase: 'Tomorrow',
-      date: addDaysIso(context.today, 1),
+      date: addDaysToIsoDate(context.today, 1),
       modifier: null,
       unitWord: 'tomorrow',
       sort: 2,
@@ -341,8 +344,8 @@ function typedDateSuggestions(
   rawQuery: string,
   context: DateSuggestionContext,
 ): DateSuggestion[] {
-  if (ISO_DATE_RE.test(lower)) {
-    return isCalendarDate(lower) ? [{ date: lower, phrase: null }] : []
+  if (isIsoDate(lower)) {
+    return [{ date: lower, phrase: null }]
   }
   if (!lower.includes('/')) {
     return []
@@ -362,7 +365,7 @@ function typedDateSuggestions(
   }
   const first = Number(firstPart)
   const second = Number(secondPart)
-  const year = yearPart !== undefined ? Number(yearPart) : Number(context.today.slice(0, 4))
+  const year = yearPart !== undefined ? Number(yearPart) : getYear(context.today)
   // The preferred reading follows the date-format setting; ISO display has no
   // slash-date order, so it keeps the default M/D reading. The swapped reading
   // is offered only for bare shorthand, where "12/10" is genuinely ambiguous.
@@ -383,11 +386,8 @@ function typedDateSuggestions(
     if (index === 1 && !allowSwap) {
       continue
     }
-    if (reading.month < 1 || reading.month > 12) {
-      continue
-    }
-    const iso = isoFromParts(year, reading.month, reading.day)
-    if (!isCalendarDate(iso) || seen.has(iso)) {
+    const iso = getIsoDateFromParts(year, reading.month, reading.day)
+    if (iso === null || seen.has(iso)) {
       continue
     }
     seen.add(iso)

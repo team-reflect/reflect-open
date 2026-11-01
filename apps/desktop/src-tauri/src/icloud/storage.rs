@@ -64,7 +64,7 @@ pub async fn mobile_storage(app: tauri::AppHandle) -> AppResult<MobileStorage> {
             .path()
             .document_dir()
             .map_err(|err| AppError::io(format!("no documents directory: {err}")))?;
-        tauri::async_runtime::spawn_blocking(move || {
+        crate::blocking::run_blocking(move || {
             let documents = platform::ubiquity_documents_dir();
             let icloud_graph_roots = documents
                 .as_deref()
@@ -80,7 +80,6 @@ pub async fn mobile_storage(app: tauri::AppHandle) -> AppResult<MobileStorage> {
             })
         })
         .await
-        .map_err(|err| AppError::io(err.to_string()))?
     }
     #[cfg(desktop)]
     {
@@ -106,11 +105,10 @@ pub async fn mobile_storage(app: tauri::AppHandle) -> AppResult<MobileStorage> {
 /// for the rest once the note count reaches zero.
 #[tauri::command]
 pub async fn icloud_download_pending(root: String, notes_only: bool) -> AppResult<u32> {
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::blocking::run_blocking(move || {
         Ok(platform::pending_walk(Path::new(&root), true, notes_only))
     })
     .await
-    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Command: the app-sandbox `Documents/` root alone — the cheap half of
@@ -147,11 +145,10 @@ pub fn mobile_storage_local(app: tauri::AppHandle) -> AppResult<String> {
 /// scope the nudge requested, so the poll drains when the *notes* are in.
 #[tauri::command]
 pub async fn icloud_pending_count(root: String, notes_only: bool) -> AppResult<u32> {
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::blocking::run_blocking(move || {
         Ok(platform::pending_walk(Path::new(&root), false, notes_only))
     })
     .await
-    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Whether a placeholder found under `rel_dir` (the stub's directory,
@@ -229,7 +226,7 @@ pub async fn icloud_request_downloads(
     state: tauri::State<'_, crate::fs::GraphState>,
 ) -> AppResult<u32> {
     let root = crate::fs::current_root(&state)?;
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::blocking::run_blocking(move || {
         let mut requested: u32 = 0;
         for path in &paths {
             match crate::fs::resolve_in_graph(&root, path) {
@@ -245,7 +242,6 @@ pub async fn icloud_request_downloads(
         Ok(requested)
     })
     .await
-    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// The app container's `Documents/` directory as a pure lookup — nothing is
@@ -413,7 +409,7 @@ pub struct IcloudStatus {
 /// thread.
 #[tauri::command]
 pub async fn icloud_status() -> AppResult<IcloudStatus> {
-    tauri::async_runtime::spawn_blocking(|| {
+    crate::blocking::run_blocking(|| {
         let documents = platform::ubiquity_documents_dir();
         let existing_graph_roots = documents
             .as_deref()
@@ -429,7 +425,6 @@ pub async fn icloud_status() -> AppResult<IcloudStatus> {
         })
     })
     .await
-    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Command: copy the open graph into the iCloud container (Plan 21 Phase 1,
@@ -449,9 +444,7 @@ pub async fn icloud_adopt_graph(
     state: tauri::State<'_, crate::fs::GraphState>,
 ) -> AppResult<String> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    tauri::async_runtime::spawn_blocking(move || adopt_graph(&root))
-        .await
-        .map_err(|err| AppError::io(err.to_string()))?
+    crate::blocking::run_blocking(move || adopt_graph(&root)).await
 }
 
 fn adopt_graph(root: &Path) -> AppResult<String> {

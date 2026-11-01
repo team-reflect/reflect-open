@@ -36,6 +36,10 @@ const MODEL_FILES: [&str; 5] = [
 /// workers spin-wait between ops. A call embeds one note (two or three
 /// chunks), so a large pool mostly spins.
 const INTRA_OP_THREADS: usize = 2;
+/// Texts per ONNX Runtime run. Peak memory grows with the batch (fastembed's
+/// default of 256 needs about 17 GB for a 300 KB note), and the freed memory
+/// stays in the process. One text keeps the peak near the model's own size.
+const EMBED_BATCH_SIZE: usize = 1;
 
 /// Byte counts for an active model download. Absent until the download
 /// starts (cache probing, or a cached model that skips downloading); after
@@ -329,7 +333,7 @@ pub async fn embed_texts(
             .lock()
             .map_err(|_| AppError::io("embedding model lock poisoned"))?;
         model
-            .embed(texts, None)
+            .embed(texts, Some(EMBED_BATCH_SIZE))
             .map_err(|err| AppError::io(format!("embedding failed: {err}")))
     })
     .await

@@ -1,61 +1,39 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addMonths,
   buildMonthGrid,
-  monthLabel,
-  monthOf,
-  monthShortLabel,
-  weekdayLabels,
+  formatMonthLabel,
+  formatShortMonthLabel,
+  getWeekdayLabels,
 } from './month-grid.ts'
 
-describe('monthOf', () => {
-  it('extracts the YYYY-MM month of an ISO date', () => {
-    expect(monthOf('2026-06-09')).toBe('2026-06')
-    expect(monthOf('1999-12-31')).toBe('1999-12')
-  })
-})
-
-describe('monthLabel', () => {
+describe('formatMonthLabel', () => {
   it('formats a human month label', () => {
-    expect(monthLabel('2026-06')).toBe('June 2026')
-    expect(monthLabel('2026-01')).toBe('January 2026')
+    expect(formatMonthLabel('2026-06')).toBe('June 2026')
+    expect(formatMonthLabel('2026-01')).toBe('January 2026')
   })
 })
 
-describe('monthShortLabel', () => {
+describe('formatShortMonthLabel', () => {
   it('formats the abbreviated month name', () => {
-    expect(monthShortLabel('2026-06')).toBe('Jun')
-    expect(monthShortLabel('2026-01')).toBe('Jan')
+    expect(formatShortMonthLabel('2026-06')).toBe('Jun')
+    expect(formatShortMonthLabel('2026-01')).toBe('Jan')
   })
 })
 
-describe('addMonths', () => {
-  it('moves across year boundaries in both directions', () => {
-    expect(addMonths('2026-12', 1)).toBe('2027-01')
-    expect(addMonths('2026-01', -1)).toBe('2025-12')
-    expect(addMonths('2026-06', 0)).toBe('2026-06')
-  })
-})
-
-describe('weekdayLabels', () => {
+describe('getWeekdayLabels', () => {
   it('returns seven labels starting on Monday', () => {
-    const labels = weekdayLabels()
-    expect(labels).toHaveLength(7)
-    expect(labels[0]).toBe('Mo')
-    expect(labels[6]).toBe('Su')
+    expect(getWeekdayLabels('monday')).toEqual(['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'])
   })
 
   it('returns Saturday-first labels when configured', () => {
-    const labels = weekdayLabels(6)
-    expect(labels[0]).toBe('Sa')
-    expect(labels[6]).toBe('Fr')
+    expect(getWeekdayLabels('saturday')).toEqual(['Sa', 'Su', 'Mo', 'Tu', 'We', 'Th', 'Fr'])
   })
 })
 
 describe('buildMonthGrid', () => {
   it('pads the month to full Monday-first weeks', () => {
     // June 2026 starts on a Monday and ends on a Tuesday.
-    const grid = buildMonthGrid('2026-06')
+    const grid = buildMonthGrid('2026-06', 'monday')
     expect(grid.start).toBe('2026-06-01')
     expect(grid.end).toBe('2026-07-05')
     expect(grid.weeks).toHaveLength(5)
@@ -66,7 +44,7 @@ describe('buildMonthGrid', () => {
 
   it('pads the month to full Saturday-first weeks when configured', () => {
     // August 2026 starts on a Saturday and ends on a Monday.
-    const grid = buildMonthGrid('2026-08', 6)
+    const grid = buildMonthGrid('2026-08', 'saturday')
     expect(grid.start).toBe('2026-08-01')
     expect(grid.end).toBe('2026-09-04')
     expect(grid.weeks).toHaveLength(5)
@@ -74,7 +52,7 @@ describe('buildMonthGrid', () => {
 
   it('flags leading and trailing fill days as outside the month', () => {
     // August 2026 starts on a Saturday.
-    const grid = buildMonthGrid('2026-08')
+    const grid = buildMonthGrid('2026-08', 'monday')
     expect(grid.start).toBe('2026-07-27')
     expect(grid.weeks[0]!.slice(0, 5).every((cell) => !cell.inMonth)).toBe(true)
     expect(grid.weeks[0]![5]).toEqual({ date: '2026-08-01', inMonth: true })
@@ -84,15 +62,15 @@ describe('buildMonthGrid', () => {
   })
 
   it('covers every day of the month exactly once', () => {
-    const grid = buildMonthGrid('2026-02')
+    const grid = buildMonthGrid('2026-02', 'monday')
     const inMonth = grid.weeks.flat().filter((cell) => cell.inMonth)
     expect(inMonth).toHaveLength(28)
     expect(new Set(inMonth.map((cell) => cell.date)).size).toBe(28)
   })
 
   it('rejects malformed months', () => {
-    expect(() => buildMonthGrid('2026-13')).toThrow(/YYYY-MM/)
-    expect(() => buildMonthGrid('June')).toThrow(/YYYY-MM/)
+    expect(() => buildMonthGrid('2026-13', 'monday')).toThrow(/YYYY-MM/)
+    expect(() => buildMonthGrid('June', 'monday')).toThrow(/YYYY-MM/)
   })
 
   it('stays contiguous day-by-day across US DST transitions', () => {
@@ -107,7 +85,7 @@ describe('buildMonthGrid', () => {
       { month: '2026-03', lastDay: '2026-03-31' },
       { month: '2026-11', lastDay: '2026-11-30' },
     ]) {
-      const grid = buildMonthGrid(month)
+      const grid = buildMonthGrid(month, 'monday')
       for (const week of grid.weeks) {
         expect(week).toHaveLength(7)
       }

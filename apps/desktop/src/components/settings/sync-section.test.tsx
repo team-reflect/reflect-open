@@ -195,10 +195,10 @@ describe('moving a graph to iCloud', () => {
   it('keeps the dialog open and reports a copy that failed', async () => {
     await confirmMove({ copyFails: true })
 
+    // Shown inside the open dialog, not only behind its backdrop.
     await expect
-      .element(page.getByText('test iCloud: the container is unavailable'))
-      .toBeInTheDocument()
-    await expect.element(page.getByRole('dialog')).toBeInTheDocument()
+      .element(page.getByRole('dialog').getByText('test iCloud: the container is unavailable'))
+      .toBeVisible()
     expect(openRecent).not.toHaveBeenCalled()
   })
 })

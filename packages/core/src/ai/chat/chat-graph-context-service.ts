@@ -1,5 +1,6 @@
 import type { GraphStatsService } from '../../indexing/graph-stats-service.ts'
-import type { CloudGraphContext, CloudSafe, PrivacyService } from '../../privacy/privacy-service.ts'
+import type { CloudGraphContext, PrivacyService } from '../../privacy/privacy-service.ts'
+import type { CloudSafe } from '../../privacy/cloud-safe.ts'
 
 /**
  * The graph-level grounding block for one chat turn's system prompt: what

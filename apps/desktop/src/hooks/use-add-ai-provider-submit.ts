@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react'
-import { errorMessage } from '@reflect/core'
-import type { NewAiProvider } from '@/hooks/use-ai-providers.ts'
+import { errorMessage, type NewAiProvider } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface UseAddAiProviderSubmitOptions {

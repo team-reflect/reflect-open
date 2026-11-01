@@ -17,7 +17,7 @@
  * A malformed token (impossible date, empty value) stays search text — typing
  * never makes results vanish behind a filter the user didn't form yet.
  */
-import { isCalendarDate } from '@reflect/utils'
+import { addDaysToIsoDate, isIsoDate, parseIsoDate } from '@reflect/utils'
 import { foldTag } from '../markdown/index.ts'
 
 export interface SearchFilters {
@@ -75,8 +75,6 @@ export function literalSearchQuery(text: string): ParsedSearchQuery {
   return { text, filters: { ...EMPTY_FILTERS, tags: [] }, filtered: false }
 }
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-
 /**
  * Mirrors the indexed tag grammar (extract.ts TAG_RE: a leading letter, then
  * letter/number/slash/underscore/dash). A `#` token that couldn't have been
@@ -84,16 +82,6 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
  * would guarantee zero rows for a tag that cannot exist.
  */
 const TAG_TOKEN_RE = /^#\p{L}[\p{L}\p{N}/_-]*$/u
-
-/** Epoch ms of the **local** start of `YYYY-MM-DD` (+`days`). */
-function localDayStartMs(date: string, days = 0): number {
-  // Callers gate on ISO_DATE_RE first, so the split always yields three parts.
-  const parts = date.split('-').map(Number)
-  const year = parts[0]!
-  const month = parts[1]!
-  const day = parts[2]!
-  return new Date(year, month - 1, day + days).getTime()
-}
 
 /** Split on whitespace, keeping `key:"quoted value"` (and bare quotes) whole. */
 function tokenize(query: string): string[] {
@@ -168,14 +156,14 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
       const value = token.slice('updated:'.length)
       const op = value.startsWith('>') || value.startsWith('<') ? value[0] : null
       const date = op === null ? value : value.slice(1)
-      if (ISO_DATE_RE.test(date) && isCalendarDate(date)) {
+      if (isIsoDate(date)) {
         if (op === '>') {
-          filters.updatedAfterMs = localDayStartMs(date)
+          filters.updatedAfterMs = parseIsoDate(date).getTime()
         } else if (op === '<') {
-          filters.updatedBeforeMs = localDayStartMs(date)
+          filters.updatedBeforeMs = parseIsoDate(date).getTime()
         } else {
-          filters.updatedAfterMs = localDayStartMs(date)
-          filters.updatedBeforeMs = localDayStartMs(date, 1)
+          filters.updatedAfterMs = parseIsoDate(date).getTime()
+          filters.updatedBeforeMs = parseIsoDate(addDaysToIsoDate(date, 1)).getTime()
         }
         filtered = true
         continue

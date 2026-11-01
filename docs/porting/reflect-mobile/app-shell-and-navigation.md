@@ -1,106 +1,101 @@
 # Porting the app shell and navigation
 
 **v2 status: v1, shipped-in-progress.** The Daily/All tab shell, screens,
-and settings sheet exist under `apps/desktop/src/mobile/` (Plan 19 steps
-3–4). This doc records the V1 interaction details parity should be
-measured against, and the pieces v2 deliberately changed.
+and settings exist under `apps/desktop/src/mobile/` (Plan 19 steps 3–4).
+This doc records the V1 interaction details to measure parity against, and
+what v2 deliberately changed.
 
 ## What V1 mobile does
 
 ### Shell
 
-The app is an Ionic tab shell (`client/core/router-tabs.tsx`) with three
-bottom tabs and a floating action button:
+An Ionic tab shell (`client/core/router-tabs.tsx`) with three bottom tabs
+and a floating action button:
 
-- **Daily** (pencil icon) → `/:graph/daily/:id` — the default surface.
-- **Tasks** (checkmark icon) → `/:graph/tasks`.
-- **All** (list icon) → `/:graph/all`, with a detail stack
-  (`/:graph/all/:id`), tag filters (`/:graph/all/tag/:tag`), and the AI
-  chat page (`/:graph/all/ai-chat`) nested inside it.
+- **Daily** (pencil) → `/:graph/daily/:id`, the default surface.
+- **Tasks** (checkmark) → `/:graph/tasks`.
+- **All** (list) → `/:graph/all`, with a detail stack (`/:graph/all/:id`),
+  tag filters (`/:graph/all/tag/:tag`), and AI chat
+  (`/:graph/all/ai-chat`) nested inside.
 - **FAB** (`components/buttons/add-fab-button.tsx`), bottom-right: expands
-  to **Create note** and **Record audio**. Hidden while the keyboard is
-  up, in the Tasks tab, and in AI chat.
+  to **Create note** and **Record audio**. Hidden while the keyboard is up,
+  in Tasks, and in AI chat.
 
-Routing is Ionic React Router (react-router v5). Two glue components sync
-router and MobX state: `NavCapturing` (router → `navigationView.pathname`)
-and `RouteToStoreSyncing` (URL graph param → current graph). Navigation
-intents live in `client/models/ui/navigation-view.ts`; mobile UI state
-(recording modal, focus requests, current tab) in
-`client/models/ui/mobile-view.ts`.
+Routing is Ionic React Router (react-router v5). `NavCapturing` (router →
+`navigationView.pathname`) and `RouteToStoreSyncing` (URL graph param →
+current graph) sync router and MobX state. Navigation intents live in
+`client/models/ui/navigation-view.ts`; mobile UI state (recording modal,
+focus requests, current tab) in `client/models/ui/mobile-view.ts`.
 
 ### Interaction details that make it feel native
 
-- **Tab bar hides when the keyboard shows** (`useHideTabBar()` listening
-  to the Capacitor Keyboard plugin) — the editor gets the full viewport.
+- **Tab bar hides when the keyboard shows** (`useHideTabBar()` on the
+  Capacitor Keyboard plugin), giving the editor the full viewport.
 - **Double-tap a tab to scroll to top**; on Daily it also re-centers the
   calendar on today. Light haptic on every tab press (`lib/haptics.ts`).
-- **Status-bar tap** scrolls the current list to top (notification posted
-  from `AppDelegate.touchesBegan`).
-- **iOS swipe-back** works on stacked screens (Ionic default transitions:
-  slide-in push, slide-out pop, card-modal dismiss).
-- **Wake to today**: on foreground, if the date changed while
-  backgrounded, the app re-navigates to today's daily note.
-- Every screen wraps a shared `Page` component
-  (`components/page/page.tsx`): sticky header with back button (detail
-  views only), a profile button with a sync spinner badge, a tappable
-  title, and per-screen action buttons.
+- **Status-bar tap** scrolls the list to top (posted from
+  `AppDelegate.touchesBegan`).
+- **iOS swipe-back** on stacked screens (Ionic default transitions).
+- **Wake to today**: on foreground, if the date changed, the app navigates
+  to today's daily note.
+- Every screen wraps `components/page/page.tsx`: sticky header with back
+  button (detail views only), a profile button with a sync spinner badge, a
+  tappable title, and per-screen actions.
 
 ### Boot gates
 
 `client/core/loader.tsx` renders by `rootStore.loadingState`, in order:
 Auth → SQLite migrating ("Preparing your notes…") → graph setup → graph
-loading → encryption unlock → version-unsupported → initial sync (with
-"Got X notes" progress) → main tabs.
+loading → encryption unlock → version-unsupported → initial sync ("Got X
+notes" progress) → main tabs.
 
 ### Profile modal
 
-The header avatar opens a card modal (`client/screens/profile/`), not a
-screen: avatar/email, graph switcher, note + recording counts, a small
-settings subset (font size, week start, date format, time format), JSON
-export, recovery-kit creation, sign out, delete account.
+The header avatar opens a card modal (`client/screens/profile/`):
+avatar/email, graph switcher, note + recording counts, a settings subset
+(font size, week start, date format, time format), JSON export,
+recovery-kit creation, sign out, delete account.
 
 ## What changes in v2, and why
 
-- **Two tabs, not three.** v2 ships a **Daily / All** shell
-  (`apps/desktop/src/mobile/mobile-shell.tsx`, `mobile-tab-bar.tsx`);
-  Tasks is post-release (see [tasks](./tasks.md)). Screens render over a
-  subset of the typed `Route` union — no URL router at all, so the
+- **Two tabs, not three.** v2 ships **Daily / All**
+  (`apps/desktop/src/mobile/mobile-shell.tsx`, `mobile-tab-bar.tsx`); Tasks
+  is post-release (see [tasks](./tasks.md)). Screens render a subset of the
+  typed `Route` union with no URL router, so the
   `NavCapturing`/`RouteToStoreSyncing` glue has no equivalent.
-- **The capture FAB is compact by default.** A single persistent `+` expands
-  vertically to **Create note** and **Record audio**, then collapses after an
-  action. Create note uses desktop's ⌘N seed/ghost-title flow; recording opens
-  the native audio drawer.
-- **Most boot gates vanish.** No auth, no encryption unlock, no version
-  gate, no Firestore initial sync. What remains: onboarding
-  (`onboarding-screen.tsx`: Start fresh / Connect GitHub with device flow,
-  clone, and initial index progress) and graph open.
-- **Settings sheet replaces the profile modal**
-  (`apps/desktop/src/mobile/settings-sheet.tsx`), in V1's avatar spot:
+- **The capture FAB is compact.** One persistent `+` expands to **Create
+  note** and **Record audio**, then collapses. Create note uses desktop's
+  ⌘N seed/ghost-title flow; recording opens the native audio drawer.
+- **Most boot gates vanish.** No auth, unlock, version gate, or Firestore
+  sync. What remains: onboarding (`onboarding-screen.tsx`: Start fresh /
+  Connect GitHub with device flow, clone, and initial index progress) and
+  graph open.
+- **Settings replaces the profile modal**
+  (`apps/desktop/src/mobile/screens/settings.tsx`), in V1's avatar spot:
   graph name, storage kind, note count, GitHub connect/disconnect, sync
-  status, version — and, since Plan 21, a **Switch graph** section (other
+  status, version, and (since Plan 21) **Switch graph** (other
   iCloud-container graphs + the on-device root; one graph open at a time).
-  No account rows, no JSON export (the workspace is already
-  Files-app-visible markdown).
+  No account rows, no JSON export (the workspace is already Files-visible
+  markdown).
 
 ## Worth porting deliberately
 
-Cheap, load-bearing-for-feel V1 details to carry into the v2 shell where
-not already present:
+Cheap V1 details that carry the native feel:
 
-- Tab-bar hide on keyboard (drive it from the `--keyboard-height` CSS
-  variable set by `plugins/tauri-plugin-keyboard`).
-- Double-tap-tab → scroll-to-top (+ re-center Daily on today).
-- ~~Light haptics on tab presses and date selection~~ — done: the haptics
-  plugin's `impact_light` command (`UIImpactFeedbackGenerator`), fired from
-  `src/mobile/haptics.ts` in the tab bar and the calendar strip.
-- Wake-to-today on foreground date change.
-- ~~Back-swipe and stack transitions on the note detail screen~~ — done:
-  `src/mobile/mobile-stack.tsx` renders note screens as cards over their tab
-  root (slide-in push, slide-out pop, tab switches stay instant) and
+- Tab-bar hide on keyboard (from the `--keyboard-height` CSS variable set
+  by `plugins/tauri-plugin-keyboard`).
+- Double-tap tab → scroll to top (+ re-center Daily on today).
+- ~~Light haptics on tab presses and date selection~~: done, via the haptics
+  plugin's `impact_light` (`UIImpactFeedbackGenerator`) from
+  `src/mobile/haptics.ts`.
+- Wake to today on foreground date change.
+- ~~Back-swipe and stack transitions on note detail~~: done.
+  `src/mobile/mobile-stack.tsx` renders note screens as cards over their
+  tab root (slide-in push, slide-out pop, instant tab switches) and
   `src/mobile/use-back-swipe.ts` is the edge back-swipe. Transform-based on
   purpose: the View Transitions API commits the DOM swap before animating,
   which would remount the editor on every canceled swipe.
-- Status-bar-tap scroll-to-top, if reachable from the Tauri shell.
+- Status-bar tap → scroll to top, if reachable from the Tauri shell.
 
 ## V1 → v2 mapping
 

@@ -7,13 +7,13 @@ import {
   displayTitle,
   hasDescription,
   metadataValue,
-  notePrivate,
   noteSource,
   withDescription,
   withScreenshot,
   withTitle,
   type CaptureNoteMeta,
 } from './capture-note.ts'
+import { notePrivate, type PrivacyService } from '../privacy/privacy-service.ts'
 import type { AiCredentialService } from '../ai/ai-credential-service.ts'
 import type { AiProviderConfigService } from '../ai/ai-provider-config-service.ts'
 import {
@@ -31,7 +31,6 @@ import { dailyPath } from '../graph/paths.ts'
 import type { PageMeta } from '../link-preview/metadata.ts'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import type { CloudSafe } from '../privacy/cloud-safe.ts'
-import type { PrivacyService } from '../privacy/privacy-service.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import {
   finishCaptureWrite,

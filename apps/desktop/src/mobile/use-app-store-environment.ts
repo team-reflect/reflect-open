@@ -3,8 +3,6 @@ import type { AppStoreEnvironment } from '@reflect/core'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useServiceState } from '@/services/use-service-state.ts'
 
-export type { AppStoreEnvironment } from '@reflect/core'
-
 /**
  * The live or startup-seeded App Store install channel, verified on mount.
  */

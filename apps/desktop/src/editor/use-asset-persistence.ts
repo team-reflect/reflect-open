@@ -10,8 +10,6 @@ import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { useMaybeGraph } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
-export type { AssetSaveError }
-
 export interface AssetPersistence {
   /**
    * Resolve an image source in the note to a displayable URL, possibly later.

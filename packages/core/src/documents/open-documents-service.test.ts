@@ -5,11 +5,8 @@ import { createTestFileChangeService, type TestFileChangeService } from '../test
 import { createTestNoteFileService, type TestNoteFileService } from '../testing/graph.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
-import {
-  createNoteSessionService,
-  type NoteSession,
-  type NoteSessionSnapshot,
-} from './note-session-service.ts'
+import { createNoteSessionService } from './note-session-service.ts'
+import type { NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
 import { createOpenDocumentsService, type OpenDocumentsService } from './open-documents-service.ts'
 
 /**

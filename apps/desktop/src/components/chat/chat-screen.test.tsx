@@ -21,12 +21,11 @@ import {
   type TestOpenGraph,
 } from '@reflect/core/testing'
 import { useChatSession, type ChatContextValue } from '@/providers/chat-provider.tsx'
-import type { Route } from '@/routing/route.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ChatScreen } from './chat-screen.tsx'
-import { deepLinkForRoute } from '@reflect/app'
+import { deepLinkForRoute, type Route } from '@reflect/app'
 
 /**
  * The chat view over a faked engine: the provider stack, the chat session and

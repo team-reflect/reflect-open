@@ -1,7 +1,10 @@
-import { differenceInCalendarDays, getDay } from 'date-fns'
-import { addDaysIso } from '@reflect/utils'
-import { parseIsoDate, weekStartDow, type WeekStartDay } from '@reflect/core'
-import { monthOf } from './month-grid.ts'
+import {
+  addDaysToIsoDate,
+  getDaysBetweenIsoDates,
+  getYearMonth,
+  getYearMonthStart,
+} from '@reflect/utils'
+import { getUserWeekStart, type WeekStartDay } from '@reflect/core'
 
 /**
  * Date math for the V1-parity Daily surface's **calendar strip** — the month
@@ -12,19 +15,11 @@ import { monthOf } from './month-grid.ts'
  */
 
 /**
- * The first day of `date`'s week, honoring the week-start setting.
- */
-export function weekStartOf(date: string, weekStart: WeekStartDay): string {
-  const weekday = getDay(parseIsoDate(date)) // 0 = Sunday … 6 = Saturday
-  return addDaysIso(date, -((weekday - weekStartDow(weekStart) + 7) % 7))
-}
-
-/**
  * The seven ISO dates of `date`'s week, honoring the week-start setting.
  */
 export function weekOf(date: string, weekStart: WeekStartDay): string[] {
-  const first = weekStartOf(date, weekStart)
-  return Array.from({ length: 7 }, (_, index) => addDaysIso(first, index))
+  const first = getUserWeekStart(date, weekStart)
+  return Array.from({ length: 7 }, (_, index) => addDaysToIsoDate(first, index))
 }
 
 /**
@@ -33,13 +28,13 @@ export function weekOf(date: string, weekStart: WeekStartDay): string[] {
  * and any other month opens on its first day.
  */
 export function monthPickTarget(month: string, selected: string, today: string): string {
-  if (monthOf(selected) === month) {
+  if (getYearMonth(selected) === month) {
     return selected
   }
-  if (monthOf(today) === month) {
+  if (getYearMonth(today) === month) {
     return today
   }
-  return `${month}-01`
+  return getYearMonthStart(month)
 }
 
 /**
@@ -77,7 +72,7 @@ export function createWeekWindow(
   radius: number = WEEK_WINDOW_RADIUS,
 ): WeekWindow {
   return {
-    start: addDaysIso(weekStartOf(date, weekStart), -radius * 7),
+    start: addDaysToIsoDate(getUserWeekStart(date, weekStart), -radius * 7),
     count: radius * 2 + 1,
     anchorIndex: radius,
   }
@@ -87,7 +82,7 @@ export function createWeekWindow(
  * The week-start ISO date at `index` (0 = oldest).
  */
 export function weekAtIndex(window: WeekWindow, index: number): string {
-  return addDaysIso(window.start, index * 7)
+  return addDaysToIsoDate(window.start, index * 7)
 }
 
 /**
@@ -96,8 +91,8 @@ export function weekAtIndex(window: WeekWindow, index: number): string {
  * day** (its weeks no longer align), the strip's signal to rebuild it.
  */
 export function weekIndexOf(window: WeekWindow, date: string, weekStart: WeekStartDay): number {
-  const target = weekStartOf(date, weekStart)
-  const offset = differenceInCalendarDays(parseIsoDate(target), parseIsoDate(window.start))
+  const target = getUserWeekStart(date, weekStart)
+  const offset = getDaysBetweenIsoDates(target, window.start)
   if (offset % 7 !== 0) {
     return -1
   }

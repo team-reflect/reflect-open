@@ -4,7 +4,7 @@ description: Use this skill to generate well-branded interfaces and assets for R
 user-invocable: true
 ---
 
-Read the README.md file within this skill, and explore the other available files.
+Read `readme.md` in this skill, then explore the other files.
 
 If creating visual artifacts (slides, mocks, throwaway prototypes, etc), copy assets
 out and create static HTML files for the user to view. If working on production code,

@@ -69,7 +69,7 @@ jobs:
 
       # Without the certificate, signing only fails at codesign time — after
       # the whole Rust build. Check every required secret up front instead.
-      # docs/macos-distribution.md describes how to produce each one.
+      # docs/distribution.md describes how to produce each one.
       - name: Verify release secrets are configured
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -87,7 +87,7 @@ jobs:
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::missing release secret(s): ${missing[*]} — see docs/macos-distribution.md"
+            echo "::error::missing release secret(s): ${missing[*]} — see docs/distribution.md"
             exit 1
           fi
 
@@ -107,9 +107,6 @@ jobs:
         if: matrix.target == 'universal-apple-darwin'
         run: rustup target add x86_64-apple-darwin
 
-      # Tauri signs the .app; the script then repairs sidecar signatures,
-      # notarizes + staples the app and DMG, signs the updater archive, and
-      # runs the Gatekeeper checks.
       - name: Build, sign and notarize
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}

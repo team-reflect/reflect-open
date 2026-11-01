@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkRoundTrip } from './roundtrip.ts'
+import { checkRoundTrip } from '@meowdown/markdown'
 
 describe('checkRoundTrip', () => {
   it('classifies faithful content as exact', () => {

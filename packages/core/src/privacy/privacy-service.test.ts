@@ -1,6 +1,6 @@
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { describe, expect, it } from 'vitest'
-import type { RetrievalHit } from '../embeddings/retrieve.ts'
+import type { RetrievalHit } from '../embeddings/retrieval-service.ts'
 import { createTestNoteFileService } from '../testing/graph.ts'
 import {
   assertCloudAllowed,

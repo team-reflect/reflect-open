@@ -9,7 +9,7 @@ import {
 import { useMaybeGraph } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import type { NoteEditorHandle } from './note-editor.tsx'
-import { checkRoundTrip } from './roundtrip.ts'
+import { checkRoundTrip } from '@meowdown/markdown'
 
 /**
  * React adapter over the `@reflect/core` document state machine

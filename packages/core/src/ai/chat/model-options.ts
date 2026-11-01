@@ -21,8 +21,6 @@ export interface ChatModelOption {
   label: string
 }
 
-export type { ChatModelSelection }
-
 /**
  * Every model the chat picker offers, grouped consecutively per configured
  * entry: the provider's curated catalog, plus the entry's configured default

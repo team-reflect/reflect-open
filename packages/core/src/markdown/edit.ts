@@ -1,8 +1,6 @@
 import { normalizeWikiTarget } from './resolve.ts'
 import { scanInlineWikiLinks } from './scan.ts'
 
-export { appendBlock } from './append-section.ts'
-
 /**
  * Source-level edit helpers (Plan 03). These splice the original string by node
  * position rather than re-serializing the document, so untouched bytes — and

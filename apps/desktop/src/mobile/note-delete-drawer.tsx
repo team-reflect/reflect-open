@@ -1,5 +1,4 @@
-import { useRef, useState, type ReactElement } from 'react'
-import { errorMessage } from '@reflect/core'
+import type { ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Drawer,
@@ -8,6 +7,7 @@ import {
   DrawerDescription,
   DrawerTitle,
 } from '@/components/ui/drawer.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface NoteDeleteDrawerProps {
@@ -31,34 +31,21 @@ export function NoteDeleteDrawer({
   onDeleted,
 }: NoteDeleteDrawerProps): ReactElement {
   const { noteActions } = useCoreServices()
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const submittingRef = useRef(false)
+  const { run, pending: busy, error, reset } = useAsyncAction()
 
   const handleOpenChange = (next: boolean): void => {
     if (!busy) {
-      setError(null)
+      reset()
       onOpenChange(next)
     }
   }
 
   const confirmDelete = async (): Promise<void> => {
-    if (submittingRef.current) {
-      return
-    }
-    submittingRef.current = true
-    setBusy(true)
-    setError(null)
-    try {
+    await run(async () => {
       await noteActions.trashOne(path)
       onOpenChange(false)
       onDeleted?.()
-    } catch (cause) {
-      setError(errorMessage(cause))
-    } finally {
-      submittingRef.current = false
-      setBusy(false)
-    }
+    })
   }
 
   return (

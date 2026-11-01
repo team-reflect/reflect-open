@@ -17,18 +17,9 @@ targets only and registers it under `#[cfg(mobile)]`; desktop records through
 the webview's MediaRecorder instead. Android has no implementation yet and
 fails the build on purpose (`src/mobile.rs`).
 
-## Layers
+## Sharp edges
 
-| Layer | Path |
-| --- | --- |
-| Rust crate (command routing, serde models, desktop stub) | `src/` |
-| Swift implementation | `ios/Sources/RecordingPlugin.swift` |
-| Live Activity attributes (also compiled into the widget target) | `ios/Sources/RecordingActivityAttributes.swift` |
-| TypeScript bindings | `packages/core/src/ipc/recording-plugin.ts` |
-
-Two sharp edges:
-
-- `RecordingActivityAttributes.swift` is compiled into both the plugin and
+- `ios/Sources/RecordingActivityAttributes.swift` is compiled into both the plugin and
   the `RecordingWidget` target (by path, see
   `apps/desktop/src-tauri/gen/apple/project.yml`); ActivityKit matches the
   two sides by type name, so keep the file free of plugin imports.

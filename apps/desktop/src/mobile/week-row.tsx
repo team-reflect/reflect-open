@@ -1,6 +1,6 @@
 import { memo, type ReactElement } from 'react'
-import { format } from 'date-fns'
-import { addDaysIso, formatDayLabel, parseIsoDate } from '@/lib/dates.ts'
+import { addDaysToIsoDate, formatDate } from '@reflect/utils'
+import { formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -36,7 +36,7 @@ function WeekRowComponent({
 }: WeekRowProps): ReactElement {
   const { haptics } = useMobileServices()
   const dateFormat = useDateFormat()
-  const days = Array.from({ length: 7 }, (_, index) => addDaysIso(weekStart, index))
+  const days = Array.from({ length: 7 }, (_, index) => addDaysToIsoDate(weekStart, index))
   const selectedIndex = selectedDay ? days.indexOf(selectedDay) : -1
   return (
     <div className="relative flex min-w-0 flex-[0_0_100%]">
@@ -78,7 +78,7 @@ function WeekRowComponent({
             className="relative flex flex-1 flex-col items-center gap-0.5 py-1"
           >
             <span className="text-[11px] font-medium text-text-muted">
-              {format(parseIsoDate(day), 'EEEEE')}
+              {formatDate(day, 'EEEEE')}
             </span>
             <span
               className={cn(
@@ -88,7 +88,7 @@ function WeekRowComponent({
                 !selected && !isToday && 'text-text',
               )}
             >
-              {format(parseIsoDate(day), 'd')}
+              {formatDate(day, 'd')}
             </span>
             {/* A daily note takes the strip's marker slot. Otherwise it keeps
                 V1's Today dot when today is not selected. */}

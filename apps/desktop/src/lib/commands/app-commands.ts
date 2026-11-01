@@ -1,8 +1,7 @@
 import type { NoteCreationService } from '@reflect/core'
-import type { CommandService } from '@reflect/app'
+import { type CommandService, routeForPath, type Route } from '@reflect/app'
 import { attachFilesToNote } from '@/lib/attach-files.ts'
 import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
-import { routeForPath, type Route } from '@/routing/route.ts'
 import type { AppCommand, CommandContext } from './types.ts'
 
 /**

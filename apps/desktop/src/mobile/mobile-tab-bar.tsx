@@ -3,7 +3,7 @@ import { CircleCheck, Files, MessageSquare, SquarePen } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import type { Route } from '@/routing/route.ts'
+import type { Route } from '@reflect/app'
 
 export type MobileTab = 'daily' | 'all' | 'tasks' | 'chat'
 

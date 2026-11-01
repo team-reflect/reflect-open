@@ -7,8 +7,6 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  * (`NoteRowService`); this module is its React view.
  */
 
-export { applyNoteRowOverlay, type NoteRowOverlay, type NoteRowOverlayPatch } from '@reflect/core'
-
 /**
  * Subscribe a component to `path`'s overlay on the open graph; `null` when none.
  */

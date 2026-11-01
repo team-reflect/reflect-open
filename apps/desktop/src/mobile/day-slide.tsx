@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
-import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane.tsx'
-import { formatDayLabel } from '@/lib/dates.ts'
+import { dailyPath, formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks.tsx'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'

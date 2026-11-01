@@ -22,11 +22,7 @@ import {
   createTestLoggerService,
 } from '@reflect/core/testing'
 import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db.ts'
-import {
-  buildAllNotesSearch,
-  EMPTY_ALL_NOTES_FILTERS,
-  searchPlanFor,
-} from '@/mobile/search-filters/filter-state.ts'
+import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
 
 function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
   return {

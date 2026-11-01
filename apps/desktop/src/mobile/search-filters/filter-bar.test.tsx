@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { NoteTagFacet } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { FilterBar } from './filter-bar.tsx'
-import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from './filter-state.ts'
+import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from '@reflect/app'
 
 /**
  * The filter badge row (Plan 19): chips toggle or open pickers, everything

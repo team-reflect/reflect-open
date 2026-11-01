@@ -14,7 +14,7 @@
     "test": "vitest run --config ../../vitest.config.ts --project core"
   },
   "dependencies": {
-    "@meowdown/markdown": "^0.77.0",
+    "@meowdown/markdown": "^0.78.0",
     "@ocavue/utils": "^1.9.0",
     "@post-embed/exporter": "^0.5.0",
     "@post-embed/schema": "^0.5.2",
@@ -22,7 +22,6 @@
     "@reflect/db": "workspace:*",
     "@reflect/modules": "workspace:*",
     "@reflect/utils": "workspace:*",
-    "date-fns": "^4.4.0",
     "kysely": "^0.28.18",
     "pkce-challenge": "^6.0.0",
     "ulid": "^3.0.2",
