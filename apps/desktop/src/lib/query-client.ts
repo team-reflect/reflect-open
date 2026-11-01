@@ -77,6 +77,18 @@ export const queryKeys = {
       return [...this.graph(root), 'mobile-note-count'] as const
     },
   },
+  noteHistory: {
+    all: ['note-history'] as const,
+    available(root: GraphRoot) {
+      return [...this.all, root, 'available'] as const
+    },
+    revisions(root: GraphRoot, path: string) {
+      return [...this.all, root, 'revisions', path] as const
+    },
+    revisionText(root: GraphRoot, oid: string, path: string) {
+      return [...this.all, root, 'revision-text', oid, path] as const
+    },
+  },
   similar: {
     all: ['similar'] as const,
     note(root: GraphRoot, path: string) {

@@ -14,6 +14,7 @@ import { createTestCoreServices, createTestPlatformService } from '@reflect/core
 import { createTestOperationsService, type TestOperationsService } from '@reflect/app/testing'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { NoteHistoryProvider } from '@/providers/note-history-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteActionsSection } from './note-actions-section.tsx'
 
@@ -75,6 +76,7 @@ async function renderSection(path: string, showTrash = false, copies = 1) {
       core,
       graph: { root: '/g', name: 'g', generation: 7 },
       route: { kind: 'note', path },
+      wrapper: (children) => <NoteHistoryProvider>{children}</NoteHistoryProvider>,
     },
   )
   return Object.assign(view, { client: view.queryClient })

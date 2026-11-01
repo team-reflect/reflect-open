@@ -5,6 +5,7 @@ import { createTestCoreServices, createTestRetrievalService } from '@reflect/cor
 import type { ReactNode } from 'react'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { NoteHistoryProvider } from '@/providers/note-history-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteContextSidebar } from './note-context-sidebar.tsx'
 
@@ -28,6 +29,7 @@ async function renderSidebar(path: string) {
       }),
       graph: { root: '/g', name: 'g' },
       settings: { semanticSearchEnabled: true },
+      wrapper: (children) => <NoteHistoryProvider>{children}</NoteHistoryProvider>,
     },
   )
 }

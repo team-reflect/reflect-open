@@ -44,6 +44,7 @@ async function renderDialog(): Promise<{ context: CommandContext; core: TestCore
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),
     openTemplateCreate: vi.fn(),
+    openNoteHistory: vi.fn(),
     enableSemanticSearch: vi.fn(),
   }
   await renderInApp(

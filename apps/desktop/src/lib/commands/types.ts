@@ -56,6 +56,8 @@ export interface CommandContext {
   openTemplatePicker: () => void
   /** Open the "New template" name dialog. */
   openTemplateCreate: () => void
+  /** Open the history dialog of the note at `path`. */
+  openNoteHistory: (path: string) => void
   /**
    * Persist the semantic-search opt-in (`semanticSearchEnabled`).
    * EmbeddingsSync reacts to the setting by loading — first time:

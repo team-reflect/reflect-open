@@ -87,6 +87,7 @@ import {
 } from './sync/git-repository-service.ts'
 import { createGistService, type GistService } from './sync/gist-service.ts'
 import { createGistPublishService, type GistPublishService } from './sync/gist-publish-service.ts'
+import { createNoteHistoryService, type NoteHistoryService } from './sync/note-history-service.ts'
 import { createGithubAuthService, type GithubAuthService } from './sync/github-auth-service.ts'
 import {
   createGitHostCredentialService,
@@ -349,6 +350,10 @@ export interface CoreServices {
    * Publishes a note as a secret GitHub gist, and takes it down again.
    */
   readonly gistPublish: GistPublishService
+  /**
+   * A note's past versions from the graph's git repository, and restoring one.
+   */
+  readonly noteHistory: NoteHistoryService
   /**
    * The native side of the iCloud Drive container.
    */
@@ -670,6 +675,7 @@ export const coreServiceFactories = {
   meetings: createMeetingService,
   agentSkill: createAgentSkillService,
   gistPublish: createGistPublishService,
+  noteHistory: createNoteHistoryService,
   icloudMigration: createICloudMigrationService,
   embedMedia: createEmbedMediaService,
   linkPreview: createLinkPreviewService,
@@ -1204,6 +1210,12 @@ export function composeCoreServices(
       noteRows,
       privacy,
       progress,
+      graphSession,
+    }),
+    noteHistory: create.noteHistory({
+      gitRepository,
+      noteDocuments,
+      persistenceFlush,
       graphSession,
     }),
     icloudNative,

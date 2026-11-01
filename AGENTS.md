@@ -119,7 +119,7 @@ Read the sync safety rules in [docs/git-backup-safety.md](docs/git-backup-safety
 
 - **TS owns policy.** Cadence, single-flight queueing and status live in `packages/core/src/sync/`. Rust owns the capabilities: `git/` (libgit2 commit, fetch, merge, push) and `icloud/` (sweep, versions, watch).
 - **Conflicts.** `.md` notes go through `conflict/ladder.rs` (also used by `note_write`). Other files get a conflict copy from `conflict/copy.rs`. See S7.
-- **One lock per graph.** `fs/graph_lock.rs` serializes git commands, note writes and sweep writes. Take it before you touch notes in Rust. `git_fetch` and `git_remote_head` run outside it.
+- **One lock per graph.** `fs/graph_lock.rs` serializes git commands, note writes and sweep writes. Take it before you touch notes in Rust. `git_fetch`, `git_remote_head` and the read-only `git_note_history` and `git_note_revision` run outside it.
 - **Own writes.** `fs/own_writes.rs` records the note bytes this process wrote, so a later read can tell its own content from a change that arrived from elsewhere.
 
 ### Related repos

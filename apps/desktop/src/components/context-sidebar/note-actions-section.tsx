@@ -7,6 +7,7 @@ import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { NoteActionButton } from './note-action-button.tsx'
 import { NoteGistAction } from './note-gist-action.tsx'
+import { NoteHistoryAction } from './note-history-action.tsx'
 import { NoteTrashAction } from './note-trash-action.tsx'
 import { SidebarSection } from './sidebar-section.tsx'
 
@@ -25,7 +26,8 @@ const GIST_KEYBINDING = keybindingFor('note.publishGist')
 
 /**
  * "Note actions" as a context-sidebar section: mouse-reachable counterparts
- * to the note-scoped commands — pin/unpin and the `private` flag. Shared by
+ * to the note-scoped commands — pin/unpin, the `private` flag, sharing and
+ * note history. Shared by
  * the daily and note context sidebars; dailies are valid targets for both.
  * Pin reads the pinned shelf and privacy reads the note row, both with the
  * note-row overlay every entrypoint writes merged over them.
@@ -67,6 +69,7 @@ export function NoteActionsSection({
         tooltip="Locks this note out of AI. Backup and sync still include it."
       />
       <NoteGistAction path={path} keybinding={GIST_KEYBINDING} />
+      <NoteHistoryAction path={path} />
       {showTrash ? <NoteTrashAction path={path} /> : null}
     </SidebarSection>
   )

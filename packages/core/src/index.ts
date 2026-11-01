@@ -45,6 +45,8 @@ export {
 export { type GitHostCredentialService } from './sync/git-host-credential-service.ts'
 export { isICloudRoot } from './sync/icloud-sync-service.ts'
 export { type GistPublishService } from './sync/gist-publish-service.ts'
+export { type NoteHistoryService } from './sync/note-history-service.ts'
+export type { NoteHistoryPage, NoteRevision } from './sync/git-repository-service.ts'
 export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'
 export { createSystemClock, type ClockService, type TimerHandle } from './ports/clock-service.ts'
 export { type IdService } from './ports/id-service.ts'

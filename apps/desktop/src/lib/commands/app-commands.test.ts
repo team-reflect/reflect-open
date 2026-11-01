@@ -87,6 +87,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),
     openTemplateCreate: vi.fn(),
+    openNoteHistory: vi.fn(),
     enableSemanticSearch: vi.fn(),
     ...overrides,
   }
@@ -186,6 +187,16 @@ describe('app commands', () => {
     const { context: noNote } = fakeContext({ route: () => ({ kind: 'settings' }) })
     await command('template.insert').run(noNote)
     expect(noNote.openTemplatePicker).not.toHaveBeenCalled()
+  })
+
+  it('note.showHistory opens the history of the note being edited', async () => {
+    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
+    await command('note.showHistory').run(context)
+    expect(context.openNoteHistory).toHaveBeenCalledWith('notes/a.md')
+
+    const { context: noNote } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    await command('note.showHistory').run(noNote)
+    expect(noNote.openNoteHistory).not.toHaveBeenCalled()
   })
 
   it('template.new opens the name dialog through the context capability', async () => {

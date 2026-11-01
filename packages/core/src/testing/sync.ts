@@ -24,6 +24,8 @@ import type {
   GitCredential,
   GitRepositoryService,
   GitStatus,
+  NoteHistoryPage,
+  NoteRevision,
   PullOutcome,
   PushOutcome,
   RemoteDelta,
@@ -71,13 +73,16 @@ export interface TestGitRepositoryService extends GitRepositoryService {
   onRemoteHead(handler: GitRepositoryHandler<'remoteHead'>): void
   onPush(handler: GitRepositoryHandler<'push'>): void
   onPull(handler: GitRepositoryHandler<'pull'>): void
+  onNoteHistory(handler: GitRepositoryHandler<'noteHistory'>): void
+  onNoteRevision(handler: GitRepositoryHandler<'noteRevision'>): void
 }
 
 /**
  * An in-memory {@link GitRepositoryService} that records every call. By
  * default `setup` and `disconnect` update the status, `commitAll` finds a
- * clean tree, `fetch` reports no delta, `push` succeeds and `pull` is
- * up to date; the `onXxx` setters replace one method's answer.
+ * clean tree, `fetch` reports no delta, `push` succeeds, `pull` is
+ * up to date, every note has no history and reading a revision rejects with
+ * `notFound`; the `onXxx` setters replace one method's answer.
  */
 class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
   #status: GitStatus
@@ -113,6 +118,10 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
       reviewPaths: [],
       changedFiles: [],
     }),
+    noteHistory: (): NoteHistoryPage => ({ revisions: [], nextCursor: null }),
+    noteRevision: (revision) => {
+      throw new AppError('notFound', `${revision.path} is not in revision ${revision.oid}`)
+    },
   }
 
   constructor(initialStatus?: Partial<GitStatus>) {
@@ -177,6 +186,21 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     return await this.#handlers.pull(fallbackMessage, generation)
   }
 
+  async noteHistory(
+    path: string,
+    after: string | null,
+    limit: number,
+    generation: number,
+  ): Promise<NoteHistoryPage> {
+    this.#log.push({ method: 'noteHistory', args: [path, after, limit, generation] })
+    return await this.#handlers.noteHistory(path, after, limit, generation)
+  }
+
+  async noteRevision(revision: NoteRevision, generation: number): Promise<string> {
+    this.#log.push({ method: 'noteRevision', args: [revision, generation] })
+    return await this.#handlers.noteRevision(revision, generation)
+  }
+
   calls(): readonly GitRepositoryCall[] {
     return [...this.#log]
   }
@@ -211,6 +235,14 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
 
   onPull(handler: GitRepositoryHandler<'pull'>): void {
     this.#handlers.pull = handler
+  }
+
+  onNoteHistory(handler: GitRepositoryHandler<'noteHistory'>): void {
+    this.#handlers.noteHistory = handler
+  }
+
+  onNoteRevision(handler: GitRepositoryHandler<'noteRevision'>): void {
+    this.#handlers.noteRevision = handler
   }
 }
 

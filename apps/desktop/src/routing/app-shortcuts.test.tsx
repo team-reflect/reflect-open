@@ -30,6 +30,7 @@ import { registerAppKeymaps } from '@/lib/shortcuts.ts'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { NoteFindProvider, useNoteFind } from '@/providers/note-find-provider.tsx'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
+import { NoteHistoryProvider } from '@/providers/note-history-provider.tsx'
 import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { MOD_KEY, NON_MOD_KEY } from '@/test-utils/mod-key.ts'
@@ -141,13 +142,15 @@ async function shortcutsHook() {
         <PaletteProvider>
           <ShortcutsProvider>
             <NoteTemplatesProvider>
-              <SidebarProvider>
-                <FocusedDailyProvider>
-                  <NoteFindProvider>
-                    <AudioMemoProvider graph={GRAPH}>{children}</AudioMemoProvider>
-                  </NoteFindProvider>
-                </FocusedDailyProvider>
-              </SidebarProvider>
+              <NoteHistoryProvider>
+                <SidebarProvider>
+                  <FocusedDailyProvider>
+                    <NoteFindProvider>
+                      <AudioMemoProvider graph={GRAPH}>{children}</AudioMemoProvider>
+                    </NoteFindProvider>
+                  </FocusedDailyProvider>
+                </SidebarProvider>
+              </NoteHistoryProvider>
             </NoteTemplatesProvider>
           </ShortcutsProvider>
         </PaletteProvider>

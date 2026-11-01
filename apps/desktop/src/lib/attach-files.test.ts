@@ -49,6 +49,7 @@ function contextFor(notePath: string | null): CommandContext {
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),
     openTemplateCreate: vi.fn(),
+    openNoteHistory: vi.fn(),
     enableSemanticSearch: vi.fn(),
     clearScrollState: vi.fn(),
   }

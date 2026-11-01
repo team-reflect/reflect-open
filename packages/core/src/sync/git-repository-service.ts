@@ -106,6 +106,30 @@ export const pushOutcomeSchema = z.object({
 export type PushOutcome = z.infer<typeof pushOutcomeSchema>
 
 /**
+ * One commit that changed a note.
+ */
+export const noteRevisionSchema = z.object({
+  oid: z.string(),
+  /** The note's graph-relative path in this commit; older than a rename, the old path. */
+  path: z.string(),
+  /** Commit time in epoch ms. */
+  timeMs: z.number(),
+  /** The commit subject. */
+  summary: z.string(),
+})
+export type NoteRevision = z.infer<typeof noteRevisionSchema>
+
+/**
+ * A page of a note's revisions, newest first.
+ */
+export const noteHistoryPageSchema = z.object({
+  revisions: z.array(noteRevisionSchema),
+  /** Pass back as `after` for the next page; `null` on the last page. */
+  nextCursor: z.string().nullable(),
+})
+export type NoteHistoryPage = z.infer<typeof noteHistoryPageSchema>
+
+/**
  * The Rust git primitives for the open graph's repository. The Rust layer is
  * remote-agnostic: URLs and a per-call {@link GitCredential}, nothing
  * GitHub-specific. Every method is pinned to the graph `generation` it was
@@ -154,6 +178,20 @@ export interface GitRepositoryService {
    * conflicts keep a copy: the repo is never left mid-merge.
    */
   pull(fallbackMessage: string, generation: number): Promise<PullOutcome>
+  /**
+   * A page of the commits that changed the note at `path`, newest first,
+   * following renames. `after` is the previous page's `nextCursor`.
+   */
+  noteHistory(
+    path: string,
+    after: string | null,
+    limit: number,
+    generation: number,
+  ): Promise<NoteHistoryPage>
+  /**
+   * The note's text at `revision`.
+   */
+  noteRevision(revision: NoteRevision, generation: number): Promise<string>
 }
 
 export interface GitRepositoryServiceDeps {
@@ -212,6 +250,27 @@ class GitRepositoryServiceImpl implements GitRepositoryService {
       'git_pull',
       { message: fallbackMessage, generation },
       pullOutcomeSchema,
+    )
+  }
+
+  noteHistory(
+    path: string,
+    after: string | null,
+    limit: number,
+    generation: number,
+  ): Promise<NoteHistoryPage> {
+    return this.#deps.ipc.call(
+      'git_note_history',
+      { path, after, limit, generation },
+      noteHistoryPageSchema,
+    )
+  }
+
+  noteRevision(revision: NoteRevision, generation: number): Promise<string> {
+    return this.#deps.ipc.call(
+      'git_note_revision',
+      { oid: revision.oid, path: revision.path, generation },
+      z.string(),
     )
   }
 }

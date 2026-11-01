@@ -7,6 +7,7 @@ import { NoteContextSidebar } from '@/components/context-sidebar/note-context-si
 import type { ContextSidebarTarget } from '@/components/context-sidebar/sidebar-route.ts'
 import { EmbeddingsSync } from '@/components/embeddings-sync.tsx'
 import { NoteFindBar } from '@/components/note-find-bar.tsx'
+import { NoteHistoryDialog } from '@/components/note-history/note-history-dialog.tsx'
 import { RouteContent } from '@/components/route-content.tsx'
 import { ShortcutsDialog } from '@/components/shortcuts-dialog.tsx'
 import { Sidebar } from '@/components/sidebar/sidebar.tsx'
@@ -67,6 +68,7 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
         <ShortcutsDialog />
         <TemplatePicker context={commandContext} />
         <TemplateCreateDialog context={commandContext} />
+        <NoteHistoryDialog />
         <EmbeddingsSync />
       </div>
     </AppShell>

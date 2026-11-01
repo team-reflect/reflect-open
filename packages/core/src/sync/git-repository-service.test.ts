@@ -8,6 +8,7 @@ const STATUS = {
   ahead: 0,
   behind: 0,
 }
+const REVISION = { oid: 'abc', path: 'notes/a.md', timeMs: 1_700_000_000_000, summary: 'Update A' }
 const CRED = { origin: 'https://github.com', username: 'x-access-token', secret: 'tok' }
 
 describe('createGitRepositoryService', () => {
@@ -28,6 +29,8 @@ describe('createGitRepositoryService', () => {
           reviewPaths: ['a (conflict 2026-10-16 08-05-31 a1b2c3d4).json'],
           changedFiles: [{ path: 'a.md', kind: 'upsert', modifiedMs: null }],
         }),
+        git_note_history: () => ({ revisions: [REVISION], nextCursor: 'abc' }),
+        git_note_revision: () => '# A\n',
       },
     })
     const git = createGitRepositoryService({ ipc })
@@ -50,6 +53,11 @@ describe('createGitRepositoryService', () => {
       reviewPaths: ['a (conflict 2026-10-16 08-05-31 a1b2c3d4).json'],
       changedFiles: [{ path: 'a.md', kind: 'upsert', modifiedMs: null }],
     })
+    await expect(git.noteHistory('notes/a.md', null, 50, 3)).resolves.toEqual({
+      revisions: [REVISION],
+      nextCursor: 'abc',
+    })
+    await expect(git.noteRevision(REVISION, 3)).resolves.toBe('# A\n')
 
     expect(ipc.calls()).toEqual([
       { command: 'git_status', args: { generation: 3 } },
@@ -63,6 +71,14 @@ describe('createGitRepositoryService', () => {
       { command: 'git_remote_head', args: { url: null, credential: CRED, generation: 3 } },
       { command: 'git_push', args: { credential: null, generation: 3 } },
       { command: 'git_pull', args: { message: 'Update notes', generation: 3 } },
+      {
+        command: 'git_note_history',
+        args: { path: 'notes/a.md', after: null, limit: 50, generation: 3 },
+      },
+      {
+        command: 'git_note_revision',
+        args: { oid: 'abc', path: 'notes/a.md', generation: 3 },
+      },
     ])
   })
 

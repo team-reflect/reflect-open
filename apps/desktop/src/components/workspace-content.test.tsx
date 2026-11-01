@@ -10,6 +10,7 @@ import { DeepLinkProvider } from '@/providers/deep-link-provider.tsx'
 import { FocusedDailyProvider } from '@/providers/focused-daily-provider.tsx'
 import { NoteFindProvider } from '@/providers/note-find-provider.tsx'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
+import { NoteHistoryProvider } from '@/providers/note-history-provider.tsx'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
@@ -43,20 +44,22 @@ function renderWorkspace(route: Route) {
     <PaletteProvider>
       <ShortcutsProvider>
         <NoteTemplatesProvider>
-          <SidebarProvider>
-            <AudioMemoProvider graph={GRAPH}>
-              <DeepLinkProvider>
-                <FocusedDailyProvider>
-                  <NoteFindProvider>
-                    <V1ImportProvider>
-                      <WorkspaceContent graph={GRAPH} />
-                      <SidebarToggle />
-                    </V1ImportProvider>
-                  </NoteFindProvider>
-                </FocusedDailyProvider>
-              </DeepLinkProvider>
-            </AudioMemoProvider>
-          </SidebarProvider>
+          <NoteHistoryProvider>
+            <SidebarProvider>
+              <AudioMemoProvider graph={GRAPH}>
+                <DeepLinkProvider>
+                  <FocusedDailyProvider>
+                    <NoteFindProvider>
+                      <V1ImportProvider>
+                        <WorkspaceContent graph={GRAPH} />
+                        <SidebarToggle />
+                      </V1ImportProvider>
+                    </NoteFindProvider>
+                  </FocusedDailyProvider>
+                </DeepLinkProvider>
+              </AudioMemoProvider>
+            </SidebarProvider>
+          </NoteHistoryProvider>
         </NoteTemplatesProvider>
       </ShortcutsProvider>
     </PaletteProvider>,
