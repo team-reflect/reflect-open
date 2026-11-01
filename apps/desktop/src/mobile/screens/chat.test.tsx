@@ -15,7 +15,7 @@ import {
   createTestSecretStoreService,
   type TestChatEngineService,
 } from '@reflect/core/testing'
-import type { Route } from '@/routing/route.ts'
+import type { Route } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'

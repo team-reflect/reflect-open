@@ -1,82 +1,60 @@
 # Reflect V2 Sync Strategy
 
-This document captures the current V2 sync direction. It focuses on a storage/sync adapter model, with AI-assisted conflict resolution sitting above the adapters.
+The V2 sync direction: a storage/sync adapter model, with AI-assisted conflict resolution above
+the adapters. It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 
-It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
-
-> **Status (2026-06-12) — what actually shipped in the first release** (see
-> [Plan 12](./plans/12-backup-and-sync.md) and
-> [Plan 16](./plans/16-generic-git-remotes.md), which supersede this doc where they
-> differ):
+> **Status: what shipped** ([Plan 12](./plans/12-backup-and-sync.md),
+> [Plan 16](./plans/16-generic-git-remotes.md), and [Plan 21](./plans/21-icloud-drive-sync.md)
+> supersede this doc where they differ):
 >
-> - **Git is the only sync backend.** GitHub via device-flow auth (token in the OS
->   keychain), plus generic git remotes over SSH (agent) and filesystem paths
->   (Plan 16 V1). HTTPS credential helpers are a later phase.
-> - **File-sync folder providers (iCloud Drive/Dropbox/Drive) are unsupported for
->   sync by design** in the first wave — not adapters-in-waiting. The adapter
->   sections below are preserved as long-term direction only.
->   **Update (2026-07-04):** [Plan 21](./plans/21-icloud-drive-sync.md)
->   revises this — iCloud Drive **shipped** as the primary consumer sync
->   path (app container, iCloud-first onboarding on both platforms, and a
->   deterministic on-device resolution ladder over per-device shadow bases
->   whose last rung is a word-level merge, see
->   [icloud-sync.md](./icloud-sync.md)). A graph syncs via iCloud *or* a
->   Git remote (one method per graph is recommended). The AI-assisted
->   resolution below remains deferred.
-> - **AI-assisted conflict resolution did not ship.** Conflicts resolve on-device,
->   see [git-backup-safety.md](./git-backup-safety.md) S7 and S9.
-> - Plain-language product states (Backed up / Backing up / Offline /
->   Backup failed) shipped as described below.
+> - **Git** (2026-06-12): GitHub via device-flow auth (token in the OS keychain), plus generic
+>   git remotes over SSH (agent) and filesystem paths. HTTPS credential helpers are a later
+>   phase.
+> - **iCloud Drive** (2026-07-04): the first release left file-sync folders unsupported by
+>   design. Plan 21 then shipped iCloud Drive as the primary consumer sync path, with a
+>   deterministic on-device resolution ladder ending in a word-level merge
+>   ([icloud-sync.md](./icloud-sync.md)). A graph syncs via iCloud *or* a Git remote (one method
+>   per graph recommended). Dropbox/Drive adapters remain long-term direction only.
+> - **AI-assisted conflict resolution did not ship.** Conflicts resolve on-device (see
+>   [git-backup-safety.md](./git-backup-safety.md), S7 and S9).
+> - The plain-language states (Backed up / Backing up / Offline / Backup failed) shipped as
+>   described below.
 
 ## Strategy
 
-Reflect V2 should treat sync as an adapter-backed capability, not as a single hard-coded backend.
+Sync is an adapter-backed capability, not one hard-coded backend. A stable internal sync
+interface can have many adapters over time: Git backup and history, GitHub multi-device sync, a
+local folder, iCloud Drive, Dropbox/Google Drive-style folders, and future protocols.
 
-The app should define a stable internal sync interface. Different adapters can implement that interface over time:
+Git/GitHub is the first serious target: it gives free backup, history, merge bases, and an open
+mental model. But Git must not leak into the product as commits, branches, rebases, remotes, or
+merge markers. Plain product states hide them.
 
-- Git repository backup and history.
-- GitHub remote backup and multi-device sync.
-- Local folder backup.
-- iCloud Drive or OS-level file sync.
-- Dropbox/Google Drive-style folder sync.
-- Future protocol-based sync.
+Reflect hosts no sync API for the V2 core. An adapter that needs a network service talks
+directly to a user-approved provider. Reflect owns the local UX and the adapter interface, not a
+proprietary server path.
 
-Git/GitHub should be treated as the first serious adapter target because it gives free backup, history, merge bases, and an open mental model. But Git should not leak into the product as commits, branches, rebases, remotes, or merge markers. The app should hide those mechanics behind plain product states.
+The product distinguishes **backup** (the user can recover data), **sync** (devices converge
+safely), and **collaboration** (several users edit shared content). The first wave commits to
+backup, local ownership, and the adapter boundary. Full multi-device sync waits until the file
+format, conflict model, and mobile story are clearer.
 
-Reflect should not host a sync API for the V2 core product. If an adapter needs a network service, it should talk directly from the app to a user-approved provider such as GitHub, a Git remote, iCloud Drive, Dropbox, Google Drive, or another open/protocol-based service. Reflect should own the local UX and adapter interface, not a proprietary server path.
-
-The product should distinguish:
-
-- **Backup**: user can recover data.
-- **Sync**: multiple devices converge safely.
-- **Collaboration**: multiple users edit shared content.
-
-V2 first wave should commit to backup, local ownership, and a sync adapter boundary. A full multi-device sync implementation can remain TBD until the markdown file format, conflict model, and mobile story are clearer.
-
-GitHub setup should let the user choose the repository. Reflect should not assume it owns a managed private repo, though it can guide repository setup, configure safe ignore defaults, and explain recovery behavior.
+The user chooses the GitHub repository. Reflect does not assume it owns a managed repo, but it
+can guide setup, set safe ignore defaults, and explain recovery.
 
 ## Adapter Boundary
 
-Adapters should translate provider-specific behavior into Reflect-native sync events.
+Adapters translate provider behavior into Reflect-native sync events. An adapter detects local
+and remote changes, pulls changed versions, reports progress, reports conflicts in a generic
+shape, applies a resolved file or plan, keeps enough raw data for recovery, and makes local
+checkpoints before risky operations or background writes.
 
-An adapter should be responsible for:
-
-- Detecting local file changes.
-- Detecting remote/provider changes.
-- Pulling or receiving changed file versions.
-- Reporting sync progress.
-- Reporting conflicts in a generic shape.
-- Applying a resolved file or resolution plan.
-- Preserving enough raw data for recovery.
-- Creating local checkpoints before risky operations or background sync writes.
-
-Adapters should not own markdown semantics, AI behavior, or final conflict-resolution policy. Those belong to Reflect's higher-level resolution layer.
+Adapters do not own markdown semantics, AI behavior, or the final resolution policy. Those
+belong to the resolution layer above.
 
 ## Generic Conflict Model
 
-Every adapter should normalize native conflicts into a Reflect conflict model.
-
-Conceptual interface:
+Every adapter normalizes native conflicts into one model:
 
 ```ts
 interface SyncConflict {
@@ -109,15 +87,15 @@ interface NoteVersion {
 }
 ```
 
-This shape should be intentionally familiar to an AI model: a base version, a local version, and a remote version when available. If no base is available, the conflict becomes a two-way semantic merge.
+The base/local/remote shape is familiar to an AI model. Without a base, the conflict becomes a
+two-way semantic merge.
 
-Notes with `private: true` must not be sent to cloud AI for conflict resolution. If a locked note has a content conflict, Reflect should use local diff/review tooling or explicitly defer to manual resolution.
+`private: true` notes must not go to cloud AI for resolution. For those, Reflect uses local
+diff/review tools or defers to manual resolution.
 
 ## Resolution Model
 
-AI and UI should produce a resolution plan, not directly mutate adapter state.
-
-Conceptual interface:
+AI and UI produce a resolution plan. They never mutate adapter state directly:
 
 ```ts
 interface ResolutionPlan {
@@ -130,131 +108,100 @@ interface ResolutionPlan {
 }
 ```
 
-The adapter applies the accepted resolution. This keeps Git operations, iCloud duplicate cleanup, provider-specific sync writes, and local file writes behind the adapter boundary.
-
-Every accepted resolution should be applied after a local checkpoint exists. This checkpoint is part of the recovery model, not a user-facing Git concept.
+The adapter applies the accepted plan, so Git operations, iCloud duplicate cleanup, and file
+writes stay behind the boundary. Every accepted resolution is applied after a local checkpoint
+exists. The checkpoint is part of recovery, not a user-facing Git concept.
 
 ## AI-Assisted Conflict Resolution
 
-Reflect should use AI to make sync conflicts humane.
+AI makes sync conflicts humane:
 
-Flow:
+1. The adapter detects a conflict and emits a `SyncConflict`.
+2. Reflect parses the versions into a structured diff.
+3. The AI proposes merged markdown, if the note is not locked from cloud AI.
+4. Reflect shows it as a reviewable patch. The user accepts, edits, or rejects note-body
+   resolutions.
+5. The adapter applies the accepted plan after checkpointing. Raw versions stay recoverable.
 
-1. Adapter detects a conflict.
-2. Adapter emits a `SyncConflict`.
-3. Reflect parses the conflicting markdown versions into a structured diff.
-4. The AI copilot proposes a merged markdown note when the note is not locked from cloud AI.
-5. Reflect shows the proposed resolution as a reviewable patch.
-6. User accepts, edits, or rejects the proposed resolution for note-body conflicts.
-7. Adapter applies the accepted resolution after checkpointing.
-8. Raw conflicting versions remain recoverable.
+The prompt treats conflicts as markdown merges: keep both devices' intent; keep headings, lists,
+backlinks, frontmatter, and links; do not delete unique content unless clearly duplicated; call
+out ambiguous choices. Note-body conflicts always need review. Only trivial non-content
+conflicts (metadata-safe updates, duplicate cleanup with no body change) may auto-resolve.
 
-The AI prompt should treat conflicts as markdown merge problems:
-
-- Preserve both devices' intent.
-- Preserve headings, lists, backlinks, frontmatter, and links.
-- Avoid deleting unique content unless clearly duplicated.
-- Call out ambiguous choices.
-- Require review for note-body conflicts.
-- Allow automatic resolution only for trivial non-content conflicts, such as metadata-safe state updates or duplicate cleanup where no markdown body is changed.
-
-AI conflict resolution should be a product layer above all adapters. Git may be the first beneficiary, but the same flow should be usable for iCloud Drive, folder sync, user-chosen provider sync, or future sync protocols.
+This layer sits above all adapters: Git may benefit first, but iCloud, folder sync, and future
+protocols use the same flow.
 
 ## Git Adapter
 
-A Git adapter can use normal Git mechanics internally while exposing a simple Reflect UX.
+Git mechanics stay internal behind a simple UX:
 
-Possible implementation mapping:
+- Repository = backup/sync container; user-chosen GitHub repository = destination.
+- Commit = internal checkpoint. Pull/fetch/merge = sync.
+- Merge base / ours / theirs = `base`, `local`, `remote`. A merge conflict = `SyncConflict`.
+- Accepted resolution = write the merged file, mark resolved, commit internally.
 
-- Git repository = workspace backup/sync container.
-- User-chosen GitHub repository = backup/sync destination.
-- Commit = internal checkpoint.
-- Pull/fetch/merge = sync operation.
-- Merge base / ours / theirs = `base`, `local`, `remote`.
-- Merge conflict = `SyncConflict`.
-- Accepted resolution = write merged file, mark resolved, create internal commit.
+Suggested user-facing states: `Backed up`, `Syncing`, `Needs attention`, `Resolved`,
+`Backup failed`.
 
-The product should not require the user to understand Git. Suggested user-facing states:
+Git is valuable even as backup/history only. If AI resolution works well, Git could support
+consumer-grade sync without exposing its complexity.
 
-- `Backed up`
-- `Syncing`
-- `Needs attention`
-- `Resolved`
-- `Backup failed`
+Checkpoint after meaningful changes and before risky sync operations, not on every save: that
+would make noisy history and sync churn.
 
-Git remains valuable even if it is only used for backup/history at first. If AI-assisted resolution works well, Git can plausibly support consumer-grade sync without exposing Git complexity.
-
-Reflect should create automatic checkpoints opportunistically after meaningful changes and before risky sync operations. It should avoid committing every save as a user-meaningful event because that would create noisy history and unnecessary sync churn.
-
-GitHub credentials should live in per-device OS keychain or secure storage. They must not be written to markdown files, committed to Git, or stored in the ignored `.reflect/` directory unless a later security design explicitly replaces this default.
+GitHub credentials live in the per-device OS keychain. They must never be written to markdown,
+committed to Git, or stored in `.reflect/`, unless a later security design replaces this
+default.
 
 ## iCloud Drive Adapter
 
-> **Shipped (2026-07-04):** this section's direction became [Plan 21](./plans/21-icloud-drive-sync.md), now merged. The shipped design resolves most conflicts deterministically on-device (diff3 over shadow bases, daily append-union, a word-level merge as the last rung), with the AI layer still deferred. [icloud-sync.md](./icloud-sync.md) is the current contract; this section is preserved as the original reasoning.
+> **Shipped (2026-07-04)** as [Plan 21](./plans/21-icloud-drive-sync.md): most conflicts resolve
+> deterministically on-device (diff3 over shadow bases, daily append-union, a word-level merge
+> last), with AI still deferred. [icloud-sync.md](./icloud-sync.md) is the current contract.
+> This section keeps the original reasoning.
 
-iCloud Drive is attractive for Apple-first sync because it works with normal files and is built into macOS and iOS. Its conflict behavior is file-level, not markdown-aware.
+iCloud Drive suits Apple-first sync: normal files, built into macOS and iOS. But its conflict
+behavior is file-level, not markdown-aware. Expect duplicate files (`note.md` and `note 2.md`),
+provider-managed versions, files not downloaded because of optimized storage, and rename/delete
+races.
 
-An iCloud Drive adapter should expect conflicts such as:
-
-- Duplicate files, for example `note.md` and `note 2.md`.
-- Provider-managed file versions.
-- Files that are not currently downloaded because of optimized storage.
-- Rename/delete races.
-
-Possible implementation mapping:
-
-- Canonical markdown file = `local` or current version.
-- Conflict duplicate or provider version = `remote`.
-- Existing file version, if discoverable = `base`.
-- Duplicate cleanup or version replacement = adapter-specific application of `ResolutionPlan`.
-
-The same AI resolution layer can merge markdown intent. The adapter handles iCloud-specific file cleanup and recovery.
-
-If the conflicting file is locked with `private: true`, the iCloud adapter should still normalize the conflict, but cloud AI must not receive the note content.
+Mapping: the canonical file = `local`; the conflict duplicate or provider version = `remote`; an
+existing file version, if discoverable = `base`; duplicate cleanup or version replacement = the
+adapter's way to apply a `ResolutionPlan`. The shared AI layer merges intent, and the adapter
+handles iCloud cleanup and recovery. A `private: true` conflict is still normalized, but cloud
+AI never sees its content.
 
 ## Other Adapters
 
-Other adapters should still emit the same normalized conflict model.
-
-Examples:
-
-- Local-folder adapter can copy snapshots and report file-level conflicts.
-- Dropbox/Google Drive-style adapters can detect duplicate conflict files.
-- Future protocol sync can map its native revisions into `base`, `local`, and `remote`.
-
-The point is not that all adapters behave the same. The point is that Reflect should translate provider behavior into the same resolution workflow.
+Other adapters emit the same model: a local-folder adapter copies snapshots and reports
+file-level conflicts, Dropbox/Google Drive-style adapters detect duplicate conflict files, and
+future protocols map their revisions to `base`, `local`, and `remote`. Adapters differ; the
+resolution workflow does not.
 
 ## UX Principles
 
-Normal users should not see raw sync internals.
-
-The UI should:
-
-- Use plain state names.
-- Offer "Review conflict" rather than "resolve merge".
-- Show readable diffs.
-- Let the user accept, edit, or reject AI resolutions.
-- Keep original versions recoverable.
-- Auto-resolve only trivial non-content conflicts.
-- Require review for markdown body conflicts.
-- Make provider/account setup understandable.
-
-The AI can handle the first pass, but the user should remain in control when data loss is possible.
+Normal users never see raw sync internals. Use plain state names and "Review conflict," not
+"resolve merge." Show readable diffs. Let the user accept, edit, or reject AI resolutions. Keep
+original versions recoverable. Auto-resolve only trivial non-content conflicts. Make provider
+setup understandable. The AI does the first pass, but the user stays in control when data loss
+is possible.
 
 ## Attachments And GitHub Guardrails
 
-Attachments should be normal files under the workspace `assets/` directory and referenced from markdown with relative links. They should remain part of the user's portable data, not database blobs.
+Attachments are normal files under `assets/`, linked from markdown with relative links. They are
+portable user data, not database blobs.
 
-GitHub backup needs guardrails for large binaries. First-wave V2 should warn when attachments are likely to make GitHub backup slow, expensive, or unreliable. Git LFS, user-chosen object storage, or another binary sync adapter can be explored later, but they should not be required for the first GitHub adapter.
-
-Generated indexes and local state under `.reflect/` should be ignored by GitHub backup by default.
+Large binaries need guardrails: the first wave warns when attachments are likely to make GitHub
+backup slow, expensive, or unreliable. Git LFS, user-chosen object storage, or a binary adapter
+can come later, but the first GitHub adapter must not need them. `.reflect/` is ignored by
+backup by default.
 
 ## Open Questions
 
 - How should Reflect authenticate GitHub without making setup feel developer-oriented?
 - How should iCloud optimized-storage placeholders be handled for indexing and sync?
-- What metadata is required in markdown frontmatter to make conflict resolution safer?
-- Which trivial non-content conflicts are safe enough to auto-resolve?
-- How should large binary attachments participate in future sync adapters?
-- How should mobile apply resolutions if AI calls require user API keys?
+- What frontmatter metadata would make conflict resolution safer?
+- Which trivial non-content conflicts are safe to auto-resolve?
+- How should large binary attachments join future sync adapters?
+- How should mobile apply resolutions if AI calls need user API keys?
 - Should sync logs be user-visible, exportable, or only diagnostic?

@@ -1,9 +1,8 @@
-import { useState } from 'react'
 import { usePaywallRequested } from '@/hooks/use-paywall-requested.ts'
-import { formatFullDate } from '@/lib/dates.ts'
+import { formatFullDate } from '@reflect/core'
 import { TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
-import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useActiveSubscription } from '@/mobile/use-active-subscription.ts'
+import { useIapRestoreRedeem } from '@/mobile/use-iap-restore-redeem.ts'
 import {
   classicAccessMessage,
   useClassicAccess,
@@ -38,8 +37,8 @@ export interface SubscriptionControls {
   /** Show the paywall, which replaces the app until a purchase or dismissal. */
   subscribe: () => void
   manage: () => void
-  restore: () => Promise<void>
-  redeem: () => Promise<void>
+  restore: () => void
+  redeem: () => void
   removeClassicVerification: () => void
   openTerms: () => void
 }
@@ -48,13 +47,10 @@ export function useSubscriptionControls(): SubscriptionControls {
   const subscription = useActiveSubscription()
   const classicAccess = useClassicAccess()
   const classicSignOut = useClassicSignOut()
-  const { paywall } = useMobileServices()
   const { opener } = useAppServices()
   const { settings } = useSettings()
   const [, setPaywallRequested] = usePaywallRequested()
-  const [restorePending, setRestorePending] = useState(false)
-  const [redeemPending, setRedeemPending] = useState(false)
-  const [subscriptionMessage, setSubscriptionMessage] = useState<string | null>(null)
+  const iap = useIapRestoreRedeem()
 
   const planLabel =
     subscription.value === 'monthly'
@@ -72,9 +68,9 @@ export function useSubscriptionControls(): SubscriptionControls {
     canSubscribe: subscription.value === null && !classicAccess.active,
     canManage: subscription.value !== null,
     classicAccount: classicAccess.value === null ? null : (classicAccess.value.email ?? 'Unknown'),
-    message: subscriptionMessage ?? classicAccessMessage(classicAccess),
-    restorePending,
-    redeemPending,
+    message: iap.restoreFeedback ?? iap.redeemFeedback ?? classicAccessMessage(classicAccess),
+    restorePending: iap.restoreMutation.isPending,
+    redeemPending: iap.redeemMutation.isPending,
     removeClassicVerificationPending: classicSignOut.isPending,
     // The request flips usePaywallGate to 'show', so the gate in
     // mobile-app.tsx replaces the app with the paywall immediately. It is
@@ -86,31 +82,8 @@ export function useSubscriptionControls(): SubscriptionControls {
     manage: () => {
       opener.openUrlSync('https://apps.apple.com/account/subscriptions')
     },
-    restore: async () => {
-      setRestorePending(true)
-      setSubscriptionMessage(null)
-      try {
-        const found = await paywall.restore()
-        if (found === null) {
-          setSubscriptionMessage('No previous purchase found for this Apple account.')
-        }
-      } catch {
-        setSubscriptionMessage('Restore failed. Check your connection and try again.')
-      } finally {
-        setRestorePending(false)
-      }
-    },
-    redeem: async () => {
-      setRedeemPending(true)
-      setSubscriptionMessage(null)
-      try {
-        await paywall.redeemCode()
-      } catch {
-        setSubscriptionMessage('Could not open the redemption sheet. Try again.')
-      } finally {
-        setRedeemPending(false)
-      }
-    },
+    restore: iap.restore,
+    redeem: iap.redeem,
     removeClassicVerification: () => {
       classicSignOut.mutate()
     },

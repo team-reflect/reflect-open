@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react'
-import { dailyPath, displayNoteTitle } from '@reflect/core'
 import { NoteFindBar } from '@/components/note-find-bar.tsx'
 import { RouteContent } from '@/components/route-content.tsx'
 import { SingleNoteView } from '@/components/single-note-view.tsx'
 import { useNoteRow } from '@/hooks/use-note-row.ts'
 import { useNoteWindowTitle } from '@/hooks/use-note-window-title.ts'
-import { formatDayLabel, todayIso } from '@/lib/dates.ts'
+import { getIsoToday } from '@reflect/utils'
+import { dailyPath, displayNoteTitle, formatDayLabel } from '@reflect/core'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -22,7 +22,8 @@ import { useRouter } from '@/routing/router.tsx'
 export function NoteWindowContent(): ReactElement {
   const { route } = useRouter()
   const { settings } = useSettings()
-  const dailyDate = route.kind === 'daily' ? route.date : route.kind === 'today' ? todayIso() : null
+  const dailyDate =
+    route.kind === 'daily' ? route.date : route.kind === 'today' ? getIsoToday() : null
 
   // The OS window title follows the shown note — the day label for dailies,
   // the indexed title otherwise (it tracks renames because the row rides the

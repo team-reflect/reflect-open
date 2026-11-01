@@ -163,10 +163,8 @@ import {
   createNotePreviewService,
   type NotePreviewService,
 } from './documents/note-preview-service.ts'
-import {
-  createNoteSessionService,
-  type NoteSessionService,
-} from './documents/note-session-service.ts'
+import { createNoteSessionService } from './documents/note-session-service.ts'
+import type { NoteSessionService } from './documents/note-session-types.ts'
 import {
   createOpenDocumentsService,
   type OpenDocumentsService,
@@ -227,7 +225,7 @@ import { createBackgroundReconcilerFactory } from './reconcile/background-reconc
 import type { ClockService } from './ports/clock-service.ts'
 import type { HttpService } from './ports/http-service.ts'
 import { createSystemIdService, type IdService } from './ports/id-service.ts'
-import { isMobilePlatform } from './ports/platform-facts.ts'
+import { isMobilePlatform, type PlatformFacts } from './ports/platform-facts.ts'
 import type { ActivityPort } from './ports/activity-port.ts'
 import type { ProgressPort } from './ports/progress-port.ts'
 import { createUnavailableImageCodec, type ImageCodecService } from './ports/image-codec-service.ts'
@@ -239,7 +237,6 @@ import {
   type PersistenceFlushService,
 } from './graph/persistence-flush-service.ts'
 import { appleFileSrc, type FileSrcConverter } from './ports/file-src.ts'
-import type { PlatformFacts } from './ports/platform-facts.ts'
 import { createWebStorageService, type StorageService } from './ports/storage-service.ts'
 import type { GraphServices, GraphServicesDeps } from './create-graph-services.ts'
 import type { AudioRecorderService } from './audio/audio-recorder-service.ts'

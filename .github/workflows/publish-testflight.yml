@@ -54,7 +54,7 @@ jobs:
             [ -n "${!name}" ] || missing+=("$name")
           done
           if [ "${#missing[@]}" -gt 0 ]; then
-            echo "::error::missing TestFlight secret(s): ${missing[*]} — see docs/ios-testflight.md"
+            echo "::error::missing TestFlight secret(s): ${missing[*]} — see docs/distribution.md"
             exit 1
           fi
 
@@ -127,6 +127,5 @@ jobs:
           name: reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}
           path: ${{ runner.temp }}/reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}.zip
           if-no-files-found: ignore
-          # The archive holds the dSYMs that symbolicate TestFlight crash reports.
           retention-days: 90
           compression-level: 0

@@ -4,13 +4,15 @@ import type {
   AudioRecorderService,
   AudioRecorderState,
   AudioRecorderStopped,
+} from '../audio/audio-recorder-service.ts'
+import type {
   RecordingLevelEvent,
   RecordingNativeActionEvent,
   RecordingSessionStart,
   RecordingStatus,
   StagedRecordingFile,
   StartRecordingOptions,
-} from '../audio/audio-recorder-service.ts'
+} from '../ipc/recording-plugin.ts'
 import type { Unlisten } from '../unlisten.ts'
 
 export type AudioRecorderCall =

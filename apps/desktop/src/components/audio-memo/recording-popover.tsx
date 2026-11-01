@@ -3,7 +3,7 @@ import { RecordingWaveform } from '@/components/audio-memo/recording-waveform.ts
 import { Button } from '@/components/ui/button.tsx'
 import { PopoverContent } from '@/components/ui/popover.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { formatRecordingElapsed } from '@/lib/recording-time.ts'
+import { formatElapsed } from '@reflect/utils'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 
 /**
@@ -55,9 +55,7 @@ export function RecordingPopover({
       ) : (
         <div className="flex items-center gap-3">
           {memo.stream ? <RecordingWaveform stream={memo.stream} /> : null}
-          <span className="text-sm font-medium tabular-nums">
-            {formatRecordingElapsed(memo.elapsedMs)}
-          </span>
+          <span className="text-sm font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
         </div>
       )}
     </PopoverContent>

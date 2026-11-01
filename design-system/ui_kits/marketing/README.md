@@ -7,12 +7,6 @@ from the design system — the glassmorphic `space` Button variant and `Avatar`,
 ## Run
 Open `index.html`. Loads `_ds_bundle.js` + `Site.jsx`, mounts `Site`.
 
-## Sections
-Sticky glass header (logo · centered nav capsule · Login · Start free trial) → hero
-("Think better with Reflect" + the graph illustration under a purple radial glow) →
-8-up feature grid → Reflect AI banner → "One plan, one price" pricing card → "Wall of
-love" testimonials → closing CTA.
-
 ## Fidelity notes
 Copy is taken from the live site. The signature treatments — near-black `#030014`
 canvas, top-center radial purple glow, glass hairline borders, and the inset-glow

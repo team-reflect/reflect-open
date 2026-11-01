@@ -6,4 +6,4 @@ Reflect's button. Solid indigo `primary` for confirming actions; `space` for the
 <Button variant="space">Start free trial</Button>
 ```
 
-Variants: `primary` (solid indigo-600, hover → indigo-500), `secondary` (soft indigo-100/700), `white` (bordered, hover text → purple), `text` & `ghost` (chromeless), `space` (glass + inset purple glow, for `.reflect-space`). Sizes `sm` | `md`. Sentence-case, verb-led labels — never Title Case.
+Variants and sizes are in `Button.d.ts`. Use sentence-case, verb-led labels, never Title Case.

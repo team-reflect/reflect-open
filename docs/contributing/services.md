@@ -3,9 +3,8 @@
 All stateful TypeScript logic is a **service**. Two composition roots build
 every service once and pass each one the services it calls. There are no global
 instances. The conventions are in
-[architecture-conventions](../plans/architecture-conventions.md) §3. This guide
-walks through adding one, with `NoteMoveService`
-(`packages/core/src/documents/note-move-service.ts`) as the running example.
+[architecture-conventions](../plans/architecture-conventions.md). The running
+example is `NoteMoveService` (`packages/core/src/documents/note-move-service.ts`).
 
 ```text
 packages/core/src/documents/note-move-service.ts       deps + interface + class + factory
@@ -135,8 +134,9 @@ factory takes only `deps`. A per-session factory adds a second `options`
 parameter for what identifies the session (§10).
 
 - Put in it every collaborator: `ipc` for native commands, `logger` instead of
-  `console.*` ([logging](logging.md)), `clock` instead of `Date.now()` and `setTimeout`, `id` instead
-  of `crypto.randomUUID()`, `http` instead of `fetch`. A test controls them.
+  `console.*` ([logging](logging.md)), `clock` instead of `Date.now()` and
+  `setTimeout`, `id` instead of `crypto.randomUUID()`, `http` instead of
+  `fetch`. A test controls them.
 - Declare each dependency as the full service type (`LoggerService`, not
   `Pick<LoggerService, 'error'>`). List only the services the class uses.
 - Do not import another service's instance, and do not read a global.
@@ -181,20 +181,15 @@ invalidates queries on `indexLifecycle.onApplied`.
 
 ## 5. Add it to a composition root
 
-There are two roots. `apps/desktop/src/boot.ts` builds them in this order:
-
-1. The shared primitives: `logger`, `clock`, `ipc`.
-2. The host: `createDesktopHost` builds the app services that core needs as
-   ports (`window`, `lifecycle`, `operations`) plus the other `AppHost` fields.
-3. Core: `createCoreServices(adapters)`. `createDesktopAdapters` supplies the
-   `CoreAdapters`. The ports come from the host: `progress` is
-   `host.operations`, `activity` is `host.lifecycle`, `role` comes from
-   `host.window.isMainWindow()`.
-4. App: `createAppServices(core, host)`.
+There are two roots, core and app. `apps/desktop/src/boot.ts` builds the
+shared primitives (`logger`, `clock`, `ipc`), then the host (`createDesktopHost`:
+the app services core needs as ports, plus the other `AppHost` fields), then
+core (`createCoreServices`, with ports taken from the host), then app
+(`createAppServices(core, host)`).
 
 A port is an interface in `packages/core/src/ports/` (`activity-port.ts`,
-`progress-port.ts`) that core calls and an app service implements. `role` (`'main'` or `'note-window'`) replaces every
-window check in core.
+`progress-port.ts`) that core calls and an app service implements. `role`
+(`'main'` or `'note-window'`) replaces every window check in core.
 
 **Core layout.** The composition roots sit in `packages/core/src/`. Host ports and
 their default implementations sit in `packages/core/src/ports/`. Everything else
@@ -203,8 +198,7 @@ sits in a domain directory. A file that exports a service is named after it:
 
 **A core service**, in `packages/core/src/create-core-services.ts`:
 
-1. Add the field to `CoreServices`, and its key to `SERVICE_KEYS` in
-   `create-core-services.test.ts`.
+1. Add the field to `CoreServices`.
 2. Add the factory to `coreServiceFactories`.
 3. Build it in `composeCoreServices` through the table, after the services it
    depends on: `const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })`.
@@ -218,9 +212,8 @@ A service that only other services use stays a local and goes in
 
 **An app service**, in `packages/app/src/create-app-services.ts`: add the field
 to `AppServices`, and build it in `createAppServices` from `core.<x>`,
-`host.<x>`, or app services built earlier in the function. Add its key to the
-list in `create-app-services.test.ts`, and export its names from
-`packages/app/src/index.ts`.
+`host.<x>`, or app services built earlier in the function. Export its names
+from `packages/app/src/index.ts`.
 
 ## 6. The test double
 
@@ -321,7 +314,8 @@ Keep the adapter thin: every decision stays in the service.
 
 An app-scoped service lives as long as the webview. Make it a factory, or give
 it an `openSession(options)` method, when an instance must start and stop with
-something shorter-lived. Examples: a loop for one open graph (`createBackupService(deps, { generation, indexGeneration })`,
+something shorter-lived. Examples: a loop for one open graph
+(`createGitSyncService(deps, { root, generation, indexGeneration })`,
 `capture.openSession({ generation })`), state that must not survive a graph
 switch (`chatSessions.create({ session })`), or one instance per note pane
 (`noteSessions.create(options)`).
@@ -348,7 +342,7 @@ switch (`chatSessions.create({ session })`), or one instance per note pane
       `createXxxService(deps)`
 - [ ] Every collaborator comes through `deps`, typed as the full service
 - [ ] Core: in `coreServiceFactories`, built in `composeCoreServices`, on
-      `CoreServices` (key in `SERVICE_KEYS`) or `CoreInternalServices`. App: on
+      `CoreServices` or `CoreInternalServices`. App: on
       `AppServices`, built in `createAppServices`
 - [ ] A test double only for a fake or a recording wrapper (§6)
 - [ ] Read with `useCoreServices()` / `useAppServices()`, module parameters, or

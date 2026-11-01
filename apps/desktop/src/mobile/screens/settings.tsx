@@ -1,27 +1,10 @@
 import { useId, useState, type ReactElement, type ReactNode } from 'react'
-import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
 import { useQuery } from '@tanstack/react-query'
-import {
-  aiProvider,
-  aiProviderRequiresApiKey,
-  errorMessage,
-  marketingVersion,
-  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
-  TRANSCRIPTION_PROMPT_MAX_LENGTH,
-  normalizeChatSystemPrompt,
-  normalizeTranscriptionPrompt,
-  type AiPrompt,
-  type AiProviderConfig,
-  type DateFormat,
-  type EditorTextSize,
-  type ThemePreference,
-  type TimeFormat,
-  type WeekStartDay,
-} from '@reflect/core'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 import { useAppVersion } from '@/hooks/use-app-version.ts'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
@@ -46,9 +29,28 @@ import {
 } from '@/mobile/settings-list.tsx'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
+import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { formatFullDate } from '@/lib/dates.ts'
+import {
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  marketingVersion,
+  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
+  TRANSCRIPTION_PROMPT_MAX_LENGTH,
+  normalizeChatSystemPrompt,
+  normalizeTranscriptionPrompt,
+  type AiPrompt,
+  type AiProviderConfig,
+  type EditorTextSize,
+  type ThemePreference,
+  type TimeFormat,
+  type WeekStartDay,
+  DATE_FORMATS,
+  formatFullDate,
+} from '@reflect/core'
+import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
@@ -73,8 +75,6 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
   { value: 'medium', label: 'Medium' },
   { value: 'large', label: 'Large' },
 ]
-
-const DATE_FORMATS: readonly DateFormat[] = ['mdy', 'dmy', 'iso']
 
 const WEEK_START_OPTIONS: readonly SegmentedOption<WeekStartDay>[] = [
   { value: 'sunday', label: 'Sunday' },
@@ -122,6 +122,7 @@ export function MobileSettings(): ReactElement {
   const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
+  const perfHudEnabled = usePerfHudEnabled()
   const environment = useAppStoreEnvironment()
   // Development and TestFlight installs show the prerelease tag; anything else hides it.
   const showPrerelease =
@@ -129,9 +130,8 @@ export function MobileSettings(): ReactElement {
   const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
   const sync = useGitSyncContext()
   const githubConnected = useGithubConnected()
-  const [disconnecting, setDisconnecting] = useState(false)
-  const [signingOut, setSigningOut] = useState(false)
-  const [signOutError, setSignOutError] = useState<string | null>(null)
+  const disconnectAction = useAsyncAction()
+  const signOutAction = useAsyncAction()
   const [signInOpen, setSignInOpen] = useState(false)
   // Which connect sheet is open: the host choice, or one host's own flow.
   // `remoteUrl` prefills the host form for a remote that is already set.
@@ -191,29 +191,27 @@ export function MobileSettings(): ReactElement {
     if (sync === null) {
       return
     }
-    setDisconnecting(true)
-    try {
-      await sync.disconnectGraph()
-    } catch (err) {
-      logger.error('stop syncing failed:', errorMessage(err))
-    } finally {
-      setDisconnecting(false)
-    }
+    await disconnectAction.run(async () => {
+      try {
+        await sync.disconnectGraph()
+      } catch (err) {
+        logger.error('stop syncing failed:', errorMessage(err))
+      }
+    })
   }
 
   // Forget the GitHub sign-in of this device; every GitHub repository stops
   // syncing until the next sign-in.
   async function signOut(): Promise<void> {
-    setSigningOut(true)
-    setSignOutError(null)
-    try {
-      await githubAuth.clear()
-    } catch (err) {
-      setSignOutError(errorMessage(err))
-      logger.error('GitHub sign-out failed:', errorMessage(err))
-    } finally {
-      setSigningOut(false)
-    }
+    await signOutAction.run(async () => {
+      try {
+        await githubAuth.clear()
+      } catch (err) {
+        logger.error('GitHub sign-out failed:', errorMessage(err))
+        // Rethrown so `signOutAction.error` shows it in the Accounts footer.
+        throw err
+      }
+    })
   }
 
   const storageLabel =
@@ -415,7 +413,7 @@ export function MobileSettings(): ReactElement {
                 <SettingsActionRow
                   label="Stop syncing"
                   tone="destructive"
-                  pending={disconnecting}
+                  pending={disconnectAction.pending}
                   onPress={() => void disconnect()}
                 />
               ) : null}
@@ -425,7 +423,7 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup
             header="Accounts"
             footer={
-              signOutError ??
+              signOutAction.error ??
               'GitHub is used for GitHub repositories and for sharing notes as gists.'
             }
           >
@@ -433,7 +431,7 @@ export function MobileSettings(): ReactElement {
               <SettingsActionRow
                 label="Sign out of GitHub"
                 tone="destructive"
-                pending={signingOut}
+                pending={signOutAction.pending}
                 onPress={() => void signOut()}
               />
             ) : (
@@ -469,16 +467,12 @@ export function MobileSettings(): ReactElement {
               <SettingsActionRow
                 label="Redeem Code"
                 pending={subscriptionControls.redeemPending}
-                onPress={() => {
-                  void subscriptionControls.redeem()
-                }}
+                onPress={subscriptionControls.redeem}
               />
               <SettingsActionRow
                 label="Restore Purchases"
                 pending={subscriptionControls.restorePending}
-                onPress={() => {
-                  void subscriptionControls.restore()
-                }}
+                onPress={subscriptionControls.restore}
               />
               <SettingsActionRow label="Terms of Use" onPress={subscriptionControls.openTerms} />
             </SettingsGroup>
@@ -513,6 +507,11 @@ export function MobileSettings(): ReactElement {
                   value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
                 />
               ) : null}
+              <SettingsSwitchRow
+                label="Performance HUD"
+                checked={perfHudEnabled}
+                onCheckedChange={setPerfHudEnabled}
+              />
               <SettingsActionRow
                 label="Trigger test error"
                 tone="destructive"

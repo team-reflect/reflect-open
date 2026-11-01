@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
-import { todayIso } from '@/lib/dates.ts'
+import { getIsoToday } from '@reflect/utils'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useMaybeChatSession } from '@/providers/chat-provider.tsx'
@@ -14,7 +14,7 @@ import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useTheme } from '@/providers/theme-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { focusedNotePathForRoute } from './route.ts'
+import { focusedNotePathForRoute } from '@reflect/app'
 import { useRouter } from './router.tsx'
 
 /**
@@ -114,12 +114,12 @@ export function useAppShortcuts(): CommandContext {
       // the same day the context sidebar shows (see `effectiveDailyDate`); off
       // the daily views it falls back to the routed note.
       notePath: () => {
-        return focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current)
+        return focusedNotePathForRoute(routeRef.current, getIsoToday(), focusedDailyDateRef.current)
       },
       togglePin: async () => {
         const path = focusedNotePathForRoute(
           routeRef.current,
-          todayIso(),
+          getIsoToday(),
           focusedDailyDateRef.current,
         )
         if (path !== null) {
@@ -129,7 +129,7 @@ export function useAppShortcuts(): CommandContext {
       togglePrivate: async () => {
         const path = focusedNotePathForRoute(
           routeRef.current,
-          todayIso(),
+          getIsoToday(),
           focusedDailyDateRef.current,
         )
         if (path !== null) {
@@ -144,7 +144,7 @@ export function useAppShortcuts(): CommandContext {
       newChat,
       openNoteFind: () => {
         openNoteFindForPath(
-          focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current),
+          focusedNotePathForRoute(routeRef.current, getIsoToday(), focusedDailyDateRef.current),
         )
       },
       findNextInNote,

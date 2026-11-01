@@ -1,4 +1,5 @@
 import type { AppPlatform, BuildPlatform, PlatformFacts } from '@reflect/core'
+import { version } from '../../package.json' with { type: 'json' }
 
 function buildPlatformFromEnv(env: string): BuildPlatform | null {
   switch (env) {
@@ -81,6 +82,6 @@ export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
     hasMacosTitleBarOverlay: macosDesktop,
     surface: { touchEditor: mobile, mobileApp: mobile },
     isDev: import.meta.env.DEV,
-    appVersion: __REFLECT_VERSION__,
+    appVersion: version,
   }
 }

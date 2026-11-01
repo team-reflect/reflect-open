@@ -8,6 +8,7 @@ import {
   type IapService,
 } from '@reflect/core'
 import { createTestLoggerService } from '@reflect/core/testing'
+import { createDevAssetStore } from '@/dev/dev-asset-store.ts'
 import { createDevBridge } from '@/dev/dev-bridge.ts'
 import { createDevFileStore } from '@/dev/dev-file-store.ts'
 import { createDevIndexDb } from '@/dev/dev-index-db.ts'
@@ -24,6 +25,7 @@ async function openPreview(): Promise<void> {
     transport: createDevBridge({
       files: createDevFileStore({}),
       index: await createDevIndexDb(),
+      assets: createDevAssetStore(),
     }),
     logger,
   })

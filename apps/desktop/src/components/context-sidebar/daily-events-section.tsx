@@ -1,7 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import type { CalendarEvent } from '@reflect/core'
-import { formatTimeOfDay } from '@/lib/dates.ts'
+import { type CalendarEvent, formatTimeOfDay } from '@reflect/core'
 import { useCalendarChangeInvalidation, useDayEvents } from '@/lib/use-calendar.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { AddMeetingDialog } from './add-meeting-dialog.tsx'

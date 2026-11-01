@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cloudSafeLinkHref } from '../privacy/checkers.ts'
+import { cloudSafeLinkHref } from '../privacy/privacy-service.ts'
 import { createTestIpcBridgeService } from '../testing/index.ts'
 import { createWebFetchService } from './web-fetch-service.ts'
 

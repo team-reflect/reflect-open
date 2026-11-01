@@ -2,7 +2,7 @@
 // The manifest is rebuilt from the signature files on the release, so a rerun
 // gives the same result.
 //
-//   pnpm release:manifest --tag=<tag>
+//   node apps/desktop/scripts/write-release-manifest.ts --tag=<tag>
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

@@ -1,8 +1,6 @@
 import type { TaskFilters } from '@reflect/core'
 import { useSessionFlag } from '@/lib/use-session-flag.ts'
 
-export type { TaskFilters } from '@reflect/core'
-
 export interface TaskFiltersControl {
   filters: TaskFilters
   toggle: (key: keyof TaskFilters) => void

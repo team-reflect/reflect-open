@@ -1,3 +1,4 @@
+import { formatIsoDate } from '@reflect/utils'
 import {
   aliasHint,
   ambiguousNoteTitleMessage,
@@ -5,7 +6,6 @@ import {
   displayNoteTitle,
   errorMessage,
   formatDayLabel,
-  localIsoDate,
   type ClockService,
   type ContactMatch,
   type ContactsService,
@@ -103,7 +103,7 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
     // integration is on and the permission readable.
     const contactsInMenu = contacts.canLookup(current)
     const dateContext = {
-      today: localIsoDate(new Date(clock.now())),
+      today: formatIsoDate(new Date(clock.now())),
       dateFormat,
       weekStartDay,
     }

@@ -28,16 +28,11 @@ cannot observe the desktop drain.
 
 ## Develop
 
-```bash
-pnpm --filter @reflect/extension dev     # wxt dev server (hot-reloads a loaded extension)
-pnpm --filter @reflect/extension build   # production build → .output/chrome-mv3
-pnpm --filter @reflect/extension test    # vitest over lib/
-```
+Scripts are in `package.json` (`dev`, `build`, `test`, `zip`).
 
 Load a build via `chrome://extensions` → Developer mode → **Load unpacked**.
 The dev server does not open Chrome for you: load `.output/chrome-mv3-dev` once,
-and it hot-reloads from then on. Prefer `pnpm … dev` for development, since it
-always keeps the pinned `key`. You can also load the `pnpm … build` output
+and it hot-reloads from then on. You can also load the `build` output
 (`.output/chrome-mv3`), but **do not load the `pnpm zip` output**: the store
 artifact omits `key`, so it loads under a random ID the host won't allowlist.
 
@@ -51,17 +46,15 @@ restart Chrome so it re-reads the manifests.
 
 ### Troubleshooting: "Install Reflect to finish saving…" while Reflect is installed
 
-That message is the `no-host` state — Chrome could not reach (or was not
+That message is the `no-host` state: Chrome could not reach (or was not
 allowlisted by) the native-messaging host. Check, in order:
 
 1. **The extension's ID.** In `chrome://extensions`, the card must read either
-   `ccabifmooehighoonjeiololjfofkhkd` for the Chrome Web Store listing or
-   `dlbliojklpickgimjdmjjdnbjdiomjik` for an unpacked development build. Any
-   other ID means you loaded a **keyless** local build (typically
-   `.output/chrome-mv3` right after `pnpm zip`, which builds with
-   `WXT_STORE_BUILD=true`). Rebuild with `pnpm … dev` or `pnpm … build`, then
-   **Reload** the extension. The host allowlists only the store and pinned dev
-   IDs, so a wrong ID is rejected as "forbidden" → this message.
+   `ccabifmooehighoonjeiololjfofkhkd` (Chrome Web Store) or
+   `dlbliojklpickgimjdmjjdnbjdiomjik` (unpacked build). Any other ID means you
+   loaded a **keyless** local build (typically `.output/chrome-mv3` right after
+   `pnpm zip`). The host rejects it as "forbidden". Rebuild with `dev` or
+   `build`, then **Reload** the extension.
 2. **The desktop app has run at least once** on this machine, so it has written
    `~/Library/Application Support/<browser>/NativeMessagingHosts/app.reflect.capture.json`.
    If Chrome was already open when that file appeared, restart Chrome.
@@ -72,26 +65,13 @@ allowlisted by) the native-messaging host. Check, in order:
 The capture is never lost while held — it stays queued and retries automatically
 once the host is reachable.
 
-## The unpacked ID is pinned — and the store ID is not the same
+## The unpacked ID is pinned, and the store ID is different
 
-`wxt.config.ts` carries a public `key`, which fixes the extension ID to
-`dlbliojklpickgimjdmjjdnbjdiomjik` for **unpacked** loads — `wxt dev`, CI, and a
-`wxt build` you load by hand. The desktop app's host manifests
-(`apps/desktop/src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`) allowlist exactly
-this origin, so during development the native hop works. Changing the key without
-updating that constant silently breaks it. The private half of the key is
-deliberately discarded; unpacked loads only need the public key.
-
-**The Chrome Web Store does not use this key.** It rejects a `key` field in the
-uploaded package (`key field is not allowed in manifest`) and minted the live
-listing ID `ccabifmooehighoonjeiololjfofkhkd`. So:
-
-- The store artifact must **omit** `key`. `pnpm zip` sets `WXT_STORE_BUILD=true`,
-  which drops it; every other build keeps it. (`manifest-key.test.ts` still pins
-  the dev key against `EXTENSION_ORIGINS`.)
-- `apps/desktop/src-tauri/src/capture.rs` must keep both the store ID and the
-  pinned dev ID in `EXTENSION_ORIGINS`, or the native hop will fail for one of
-  the two install modes.
+`wxt.config.ts` explains the two IDs: a public `key` pins the unpacked ID, and
+the store rejects `key` and minted its own ID, so `pnpm zip` drops it.
+`EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs` must keep both
+IDs, or the native hop fails for one of the two install modes. Changing the key
+without updating that constant silently breaks unpacked loads.
 
 To derive an ID from a key (if it ever has to change):
 
@@ -122,9 +102,8 @@ the affected behavior. A `chore` commit alone does not trigger a release.
 
 ### Configuration
 
-The workflow reads the `release_extension` environment secrets `CHROME_PUBLISHER_ID`,
-`CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL`, and `CHROME_SERVICE_ACCOUNT_PRIVATE_KEY`.
-The service account must be linked to the existing publisher in the Chrome Web
+The workflow reads its secrets from the `release_extension` environment. The
+service account must be linked to the existing publisher in the Chrome Web
 Store dashboard. See [Google's setup instructions](https://developer.chrome.com/docs/webstore/service-accounts).
 Use the v2 API service account credentials, not the deprecated v1 OAuth tokens.
 
@@ -144,16 +123,14 @@ the dashboard. A published regression needs a higher version containing the fix.
 Before merging a Release PR, update listing/privacy declarations for changed
 permissions or capture behavior and check compatibility with the oldest supported
 installed desktop host. Test the store-installed extension on macOS, including
-queued captures while the app is closed. Preserve both extension IDs in
-`EXTENSION_ORIGINS`; a store ZIP omits `key` and is unsuitable for unpacked
-native-messaging tests. Use a normal `pnpm --filter @reflect/extension build`
-for those tests.
+queued captures while the app is closed. For unpacked native-messaging tests, use
+a normal `build`, not a store ZIP.
 
 ### Manual packaging fallback
 
 Run `pnpm check` at the repository root and
 `pnpm --filter @reflect/extension test`, then
-`pnpm --filter @reflect/extension zip`. The store build omits the dev key. Upload
+`pnpm --filter @reflect/extension zip`. Upload
 `apps/extension/.output/reflect-capture-<version>-chrome.zip` to the existing
 listing only after checking its current published and submitted versions.
 
@@ -209,7 +186,7 @@ submission.
 
 ### Permission justifications
 
-Each is reviewed individually; every permission below is exercised by the code:
+The store reviews each permission individually:
 
 | Permission | Why it's needed |
 | --- | --- |

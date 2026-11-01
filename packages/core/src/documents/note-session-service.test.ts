@@ -9,11 +9,8 @@ import {
   type TestGraphSessionService,
 } from '../testing/graph-session.ts'
 import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
-import {
-  createNoteSessionService,
-  type NoteSession,
-  type NoteSessionSnapshot,
-} from './note-session-service.ts'
+import { createNoteSessionService } from './note-session-service.ts'
+import type { NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
 import { createTitleRenameTracker, type TitleRename } from './title-rename-tracker.ts'
 
 /** The first task's locator as the index records it. */

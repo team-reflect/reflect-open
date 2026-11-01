@@ -1,5 +1,5 @@
 import type { MeetingAttendee } from '../contacts/meeting-service.ts'
-import type { CalendarAttendee, CalendarEvent } from './commands.ts'
+import type { CalendarAttendee, CalendarEvent } from './calendar-service.ts'
 
 /**
  * Display policy for the daily-note events panel — the TypeScript half of the

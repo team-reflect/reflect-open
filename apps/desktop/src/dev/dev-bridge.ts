@@ -1,5 +1,13 @@
-import { IAP_PRODUCT_IDS, indexedNoteSchema, AppError, type IpcBridge } from '@reflect/core'
+import {
+  IAP_PRODUCT_IDS,
+  indexedNoteSchema,
+  AppError,
+  pickFreeAssetPath,
+  type IpcBridge,
+} from '@reflect/core'
+import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
 import { z } from 'zod'
+import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import type { DevIndexDb } from '@/dev/dev-index-db.ts'
 
@@ -14,6 +22,7 @@ export const DEV_GRAPH_ROOT = '/dev-graph'
 export interface DevBridgeBackend {
   readonly files: DevFileStore
   readonly index: DevIndexDb
+  readonly assets: DevAssetStore
 }
 
 const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
@@ -24,7 +33,8 @@ const writeArgsSchema = z.object({
   checkContents: z.boolean().optional(),
   expectedContents: z.string().nullable().optional(),
 })
-const createArgsSchema = writeArgsSchema.extend({ generation: z.number().int().nonnegative() })
+const generationArgsSchema = z.object({ generation: z.number().int().nonnegative() })
+const createArgsSchema = writeArgsSchema.extend(generationArgsSchema.shape)
 const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
 const moveRequestArgsSchema = z.object({
   request: z.object({ from: z.string(), to: z.string() }),
@@ -55,6 +65,15 @@ const chatSaveArgsSchema = z.object({
     createdMs: z.number(),
   }),
 })
+const uploadIdArgsSchema = z.object({ id: z.string() })
+const uploadCommitArgsSchema = uploadIdArgsSchema.extend({
+  ...generationArgsSchema.shape,
+  desiredName: z.string(),
+})
+const uploadCommitPathArgsSchema = uploadIdArgsSchema.extend({
+  ...generationArgsSchema.shape,
+  path: z.string(),
+})
 const chatDeleteArgsSchema = z.object({ id: z.string() })
 const iapPayloadSchema = z.object({ productType: z.literal('subs') })
 const iapProductArgsSchema = z.object({
@@ -74,7 +93,8 @@ class DevBridgeImpl implements IpcBridge {
   readonly #deps: DevBridgeBackend
   readonly #graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   #settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
-  readonly #assets = new Map<string, string>()
+  readonly #uploads = new Map<string, Uint8Array<ArrayBuffer>[]>()
+  #uploadCount = 0
   #ownedProductId: string | null = null
   // In-memory keychain stand-in so the AI-provider settings flow (and chat,
   // against a CORS-permissive provider) works end-to-end in the harness.
@@ -91,8 +111,23 @@ class DevBridgeImpl implements IpcBridge {
     })
   }
 
+  invokeBinary(
+    command: string,
+    body: Uint8Array,
+    headers: Record<string, string>,
+  ): Promise<unknown> {
+    return new Promise((resolve) => {
+      if (command !== 'asset_upload_append') {
+        throw new AppError('unknown', `dev bridge: unimplemented binary command "${command}"`)
+      }
+      const id = headers['x-upload-id'] ?? ''
+      this.#upload(id).push(new Uint8Array(body))
+      resolve(null)
+    })
+  }
+
   #runCommand(command: string, args: Record<string, unknown>): unknown {
-    const { files, index } = this.#deps
+    const { files, index, assets } = this.#deps
     switch (command) {
       case 'app_version':
         return '0.0.0-dev'
@@ -149,9 +184,7 @@ class DevBridgeImpl implements IpcBridge {
         // A browser has no embedding runtime.
         return { status: 'unsupported' }
       case 'vault_scan_stats':
-        return { notes: files.list().length, attachments: 0, skipped: 0 }
-      case 'list_attachments':
-        return []
+        return { notes: files.list().length, attachments: assets.list().length, skipped: 0 }
       case 'forget_recent':
       case 'capture_host_register':
       case 'watch_start':
@@ -195,9 +228,7 @@ class DevBridgeImpl implements IpcBridge {
       }
       case 'note_create': {
         const { path, contents, generation } = createArgsSchema.parse(args)
-        if (generation !== this.#graphInfo.generation) {
-          throw new AppError('io', 'the graph changed since this command was issued; dropping it')
-        }
+        this.#checkGeneration(generation)
         return files.create(path, contents)
       }
       case 'note_exists':
@@ -229,19 +260,46 @@ class DevBridgeImpl implements IpcBridge {
       }
 
       case 'asset_write': {
-        const { path, contentsBase64 } = z
-          .object({ path: z.string(), contentsBase64: z.string() })
+        const { path, contentsBase64, generation } = generationArgsSchema
+          .extend({ path: z.string(), contentsBase64: z.string() })
           .parse(args)
-        this.#assets.set(path, contentsBase64)
+        this.#checkGeneration(generation)
+        assets.write(path, base64ToBytes(contentsBase64))
         return null
       }
-      case 'asset_read': {
-        const { path } = pathArgsSchema.parse(args)
-        const contents = this.#assets.get(path)
-        if (contents === undefined) {
-          throw new AppError('notFound', `asset not found: ${path}`)
+      case 'asset_read':
+        return bytesToBase64(this.#readAsset(pathArgsSchema.parse(args).path))
+      case 'asset_read_binary':
+        return this.#readAsset(pathArgsSchema.parse(args).path).slice().buffer
+      case 'list_attachments':
+        return assets.list()
+      case 'asset_upload_begin': {
+        this.#checkGeneration(generationArgsSchema.parse(args).generation)
+        this.#uploadCount += 1
+        const id = `upload-${this.#uploadCount}`
+        this.#uploads.set(id, [])
+        return id
+      }
+      case 'asset_upload_commit': {
+        const { id, desiredName, generation } = uploadCommitArgsSchema.parse(args)
+        this.#checkGeneration(generation)
+        const path = pickFreeAssetPath(desiredName, (candidate) => assets.exists(candidate))
+        assets.write(path, this.#finishUpload(id))
+        return path
+      }
+      case 'asset_upload_commit_path': {
+        const { id, path, generation } = uploadCommitPathArgsSchema.parse(args)
+        this.#checkGeneration(generation)
+        const bytes = this.#finishUpload(id)
+        if (assets.exists(path)) {
+          throw new AppError('io', `target already exists: ${path}`)
         }
-        return contents
+        assets.write(path, bytes)
+        return null
+      }
+      case 'asset_upload_abort': {
+        this.#uploads.delete(uploadIdArgsSchema.parse(args).id)
+        return null
       }
       case 'asset_open':
         return null
@@ -341,6 +399,40 @@ class DevBridgeImpl implements IpcBridge {
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)
         throw new AppError('unknown', `dev bridge: unimplemented command "${command}"`)
     }
+  }
+
+  #checkGeneration(generation: number): void {
+    if (generation !== this.#graphInfo.generation) {
+      throw new AppError('io', 'the graph changed since this command was issued; dropping it')
+    }
+  }
+
+  #upload(id: string): Uint8Array<ArrayBuffer>[] {
+    const chunks = this.#uploads.get(id)
+    if (chunks === undefined) {
+      throw new AppError('notFound', `unknown upload: ${id}`)
+    }
+    return chunks
+  }
+
+  #finishUpload(id: string): Uint8Array<ArrayBuffer> {
+    const chunks = this.#upload(id)
+    this.#uploads.delete(id)
+    const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0))
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return bytes
+  }
+
+  #readAsset(path: string): Uint8Array<ArrayBuffer> {
+    const bytes = this.#deps.assets.read(path)
+    if (bytes === null) {
+      throw new AppError('notFound', `asset not found: ${path}`)
+    }
+    return bytes
   }
 
   // Native event streams (watcher, embeddings, EventKit) don't exist in the

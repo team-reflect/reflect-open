@@ -9,13 +9,6 @@ import {
 import type { GithubUser } from '@reflect/core'
 import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-
-export type {
-  ConnectAuthKind,
-  ConnectFinishView,
-  ConnectGithubWizardOptions,
-  ConnectWizardStep,
-} from '@reflect/app'
 import { useServiceState } from '@/services/use-service-state.ts'
 
 export interface ConnectGithubWizard {

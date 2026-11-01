@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useCallback, useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Switch } from '@/components/ui/switch.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -26,22 +27,18 @@ export function DescribeAssetsField(): ReactElement {
   const { graph } = useGraph()
   const { assetDescription } = useCoreServices()
   const [confirming, setConfirming] = useState(false)
-  const [running, setRunning] = useState(false)
+  const backfill = useAsyncAction()
 
   const hasProvider = settings.aiProviders.length > 0
 
-  const runBackfill = async (): Promise<void> => {
+  const { run: runAction } = backfill
+  const runBackfill = useCallback((): void => {
     setConfirming(false)
-    if (running) {
-      return
-    }
-    setRunning(true)
-    try {
+    // `error` is intentionally not rendered: the operations UI owns failures.
+    void runAction(async () => {
       await assetDescription.backfillVisibly()
-    } finally {
-      setRunning(false)
-    }
-  }
+    })
+  }, [runAction, assetDescription])
 
   return (
     <SettingsField
@@ -61,11 +58,11 @@ export function DescribeAssetsField(): ReactElement {
           type="button"
           variant="outline"
           size="sm"
-          disabled={graph === null || !hasProvider || running}
+          disabled={graph === null || !hasProvider || backfill.pending}
           onClick={() => setConfirming(true)}
           className="text-text-secondary"
         >
-          {running ? 'Scanning…' : 'Scan existing files'}
+          {backfill.pending ? 'Scanning…' : 'Scan existing files'}
         </Button>
         {!hasProvider ? (
           <p className="mt-2 text-xs text-text-muted">Add an AI provider to enable this.</p>
@@ -90,7 +87,7 @@ export function DescribeAssetsField(): ReactElement {
               <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
-              <Button type="button" size="sm" onClick={() => void runBackfill()}>
+              <Button type="button" size="sm" onClick={runBackfill}>
                 Scan existing files
               </Button>
             </DialogFooter>

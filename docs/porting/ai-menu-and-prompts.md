@@ -1,48 +1,41 @@
 # Porting the AI menu and prompts
 
 **Status: implemented.** The meowdown primitives (selection command menu +
-pending-replacement preview) shipped upstream via
-[prosekit/meowdown#191](https://github.com/prosekit/meowdown/pull/191),
-released in meowdown 0.33.0. Select text and press ⌘⇧J (or the sparkle
-affordance on the selection), pick a prompt ("Fix spelling and grammar",
-"Write a short summary", or one saved in Settings → AI prompts), and the
-transformation streams into a preview with Accept / Discard / Retry (with a
-one-shot model switch).
+pending-replacement preview) shipped upstream in
+[prosekit/meowdown#191](https://github.com/prosekit/meowdown/pull/191)
+(meowdown 0.33.0). Select text and press ⌘⇧J (or the sparkle affordance),
+pick a prompt (built-in or saved in Settings → AI prompts), and the result
+streams into a preview with Accept / Discard / Retry (with a one-shot model
+switch).
 
 ## What v1 did
 
-- A prompt picker in the editor ran a chosen prompt against the current
-  selection and streamed the reply into the note.
-- A library of 23 built-in prompt templates, plus user-created ones (with a
-  `{{selectedText}}` placeholder), managed in preferences and synced to the
-  account.
-- Provider choice (Anthropic / OpenAI / Google) with bundled metered access;
-  personal API keys lifted the quotas.
+- An editor prompt picker ran a prompt against the selection and streamed
+  the reply into the note.
+- 23 built-in prompt templates plus user prompts (with a `{{selectedText}}`
+  placeholder), synced to the account.
+- Anthropic / OpenAI / Google with bundled metered access; personal API keys
+  lifted the quotas.
 
 ## How it works in v2
 
 ### User experience
 
-1. Select text in a note and invoke the AI menu — via a keyboard shortcut
-   registered in the editor keymap, and via a small affordance on the
-   selection.
-2. A picker lists prompts: the user's saved prompts first (v1's order), then
-   a curated built-in set carrying v1's battle-tested bodies (fix grammar,
-   copy editor, rephrase, simplify, format paragraphs, short summary, key
-   takeaways, action items, points to document, next paragraph, decorate
-   with backlinks), with label filtering. Typed text that matches nothing is
-   itself runnable as a one-off prompt (v1's "Ask anything to AI"). The rest
-   of v1's 23 (tweets, blog posts, emails, outlines…) stay unported — any of
-   them can be recreated verbatim as a saved prompt.
-3. The result streams into view with explicit **Accept / Discard / Retry**
-   controls, plus the alternate placement (v1's Replace-vs-Insert choice:
-   "Insert below" on a replace prompt, "Replace selection" on an append
-   one). Nothing is written to the markdown file until the user accepts; a
-   discarded run leaves the note byte-identical.
-4. Saved prompts are managed in **Settings → AI**, next to the provider
-   configuration that already exists. A prompt has a label and a body with a
-   `{{selectedText}}` placeholder (same syntax as v1, so saved v1 prompts
-   port over verbatim).
+1. Select text and invoke the AI menu by keyboard shortcut or the selection
+   affordance.
+2. The picker lists the user's saved prompts first (v1's order), then a
+   curated built-in set with v1's bodies (fix grammar, copy editor, rephrase,
+   simplify, format paragraphs, short summary, key takeaways, action items,
+   points to document, next paragraph, decorate with backlinks), with label
+   filtering. Typed text that matches nothing runs as a one-off prompt (v1's
+   "Ask anything to AI"). The rest of v1's 23 stay unported; users can
+   recreate them as saved prompts.
+3. The result streams into a preview with **Accept / Discard / Retry**, plus
+   the alternate placement (v1's Replace-vs-Insert: "Insert below" on a
+   replace prompt, "Replace selection" on an append one). Nothing is written
+   until the user accepts; a discard leaves the note byte-identical.
+4. Saved prompts live in **Settings → AI**: a label and a body with a
+   `{{selectedText}}` placeholder (v1 syntax, so v1 prompts port verbatim).
 
 ### What changes from v1, and why
 
@@ -56,46 +49,37 @@ one-shot model switch).
 
 ### Architecture
 
-The work splits cleanly along the existing seams:
-
-- **meowdown** (upstream) grows the editor-level primitives, keeping them
-  host-agnostic the way the slash/wikilink/tag menus already are:
-  - a selection affordance / command hook the host can populate with items
-    (Reflect passes the prompt list, exactly as it passes wikilink
-    suggestions today);
-  - a "pending replacement" UI: render streamed text as an overlay or
-    preview decoration over the selection, with accept (apply as a single
-    ProseMirror transaction) / discard (no-op) — this is also the natural
-    home for future copilot-driven edits.
-- **`@reflect/core`** owns policy: the prompt library schema (zod, in
+- **meowdown** (upstream) owns host-agnostic editor primitives, like the
+  slash/wikilink/tag menus: a selection command hook the host fills with
+  items, and a "pending replacement" preview over the selection with accept
+  (one ProseMirror transaction) / discard (no-op). That preview is also the
+  natural home for future copilot edits.
+- **`@reflect/core`** owns policy: the prompt schema (zod, in
   `settings/schema.ts` per
   [adding-a-setting](../contributing/adding-a-setting.md)), placeholder
-  substitution, and the provider call — reusing the existing AI layer
-  (`packages/core/src/ai/`), the provider catalog, keychain-stored keys, and
-  the Vercel AI SDK streaming plumbing the copilot already uses.
-- **Privacy enforcement** reuses the `CloudSafe` pattern
-  (`packages/core/src/privacy/privacy-service.ts`): the selection text must pass the
-  same structural check as copilot context, so a private note's content
-  cannot typecheck its way to a provider. The UI reflects this by disabling
-  the menu in private notes with an explanatory tooltip.
+  substitution, and the provider call, reusing the copilot's AI layer
+  (`packages/core/src/ai/`), provider catalog, keychain keys, and Vercel AI
+  SDK streaming.
+- **Privacy** reuses `CloudSafe`
+  (`packages/core/src/privacy/privacy-service.ts`): the selection passes the
+  same structural check as copilot context, so private content cannot
+  typecheck its way to a provider. The menu is disabled in private notes
+  with an explanatory tooltip.
 
 ## Explicitly not ported
 
-- Usage limits, quota error messages, and the free/paid distinction — there
-  is no metered tier to enforce.
-- The "Default (Anthropic)" bundled provider — v2 always uses the user's
-  configured provider and key; with no key, the menu is disabled with a
-  pointer to Settings (same pattern as audio memos).
-- Automatic context beyond the selection (unchanged from v1: prompts see the
-  selection only; broader context is the copilot's job).
+- Usage limits, quota errors, and the free/paid distinction.
+- The "Default (Anthropic)" bundled provider. With no key, the menu is
+  disabled with a pointer to Settings (same as audio memos).
+- Context beyond the selection (same as v1; broader context is the
+  copilot's job).
 
 ## Resolved questions
 
-- The picker is a dedicated selection popover, not a command-palette mode —
-  the palette closes over the editor and loses the selection visual.
-- "Retry" does offer a one-shot model switch (`AiPreviewActions` renders a
-  model dropdown next to Retry, listing the configured providers' catalogs;
-  the pick applies to that retry only).
-- The meowdown primitives landed first ([prosekit/meowdown#191](https://github.com/prosekit/meowdown/pull/191),
-  released in 0.33.0); the app depended on pkg.pr.new snapshots of the PR
-  during development and now uses the plain npm release.
+- The picker is a dedicated selection popover, not a command-palette mode:
+  the palette covers the editor and loses the selection visual.
+- Retry offers a one-shot model switch (`AiPreviewActions` renders a model
+  dropdown from the configured providers' catalogs; the pick applies to that
+  retry only).
+- The meowdown primitives landed first (meowdown#191, 0.33.0); the app used
+  pkg.pr.new snapshots during development and now uses the npm release.

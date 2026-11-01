@@ -136,6 +136,43 @@ describe('GitSyncSettingsField', () => {
     await expect.element(page.getByRole('button', { name: 'Open on GitHub' })).toBeVisible()
   })
 
+  it('disables Stop syncing while Sync now runs', async () => {
+    const gate = Promise.withResolvers<void>()
+    vi.spyOn(gitSync, 'syncNow').mockImplementation(() => gate.promise)
+    await renderSection({
+      phase: 'connected',
+      ...GITHUB,
+      isPrimaryChannel: true,
+      status: { state: 'idle' },
+    })
+
+    await userEvent.click(page.getByRole('button', { name: 'Sync now' }))
+
+    await expect.element(page.getByRole('button', { name: 'Stop syncing' })).toBeDisabled()
+
+    gate.resolve()
+
+    await expect.element(page.getByRole('button', { name: 'Stop syncing' })).toBeEnabled()
+  })
+
+  it('keeps an open-repo failure when a sync starts', async () => {
+    openUrl.mockRejectedValueOnce(new Error('No browser'))
+    await renderSection({
+      phase: 'connected',
+      ...GITHUB,
+      isPrimaryChannel: true,
+      status: { state: 'idle' },
+    })
+
+    await userEvent.click(page.getByRole('button', { name: 'Open on GitHub' }))
+    await expect.element(page.getByText(/Couldn’t open the browser/)).toBeVisible()
+
+    await userEvent.click(page.getByRole('button', { name: 'Sync now' }))
+
+    await vi.waitFor(() => expect(gitSync.calls()).toContainEqual({ method: 'syncNow' }))
+    await expect.element(page.getByText(/Couldn’t open the browser/)).toBeVisible()
+  })
+
   it('shows the waiting countdown', async () => {
     await renderSection({
       phase: 'connected',

@@ -1,11 +1,10 @@
 import {
   contactsCanLookup,
   lookupContactPeople,
-  type ContactMatch,
-  type ContactsAuthorization,
   type ContactsService,
   type ContactsState,
 } from '../contacts/contacts-service.ts'
+import type { ContactMatch, ContactsAuthorization } from '../contacts/commands.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { Settings } from '../settings/schema.ts'
 

@@ -1,8 +1,7 @@
 # Contributing to Reflect
 
-Thanks for helping build Reflect. This is the short version; the full
-contributor/agent guide lives in [AGENTS.md](AGENTS.md), and the architecture
-decisions in
+Thanks for helping build Reflect. This is the short version. The full guide is
+[AGENTS.md](AGENTS.md), and the architecture decisions are in
 [docs/plans/architecture-conventions.md](docs/plans/architecture-conventions.md).
 
 ## Setup
@@ -25,12 +24,12 @@ cargo test        # from apps/desktop/src-tauri, if you touched Rust
 ## PR titles
 
 PR titles must follow [Conventional Commits](https://www.conventionalcommits.org)
-— CI enforces the format. The repo squash-merges, so your PR title becomes the
-commit message and, for `feat`/`fix`, the user-facing changelog entry.
+(CI enforces it). The repo squash-merges, so your PR title becomes the commit
+message and, for `feat`/`fix`, the user-facing changelog entry.
 
-- `feat: …` — new behavior; bumps the minor version (of the next beta and stable).
-- `fix: …` — a fix; bumps the patch version (of the next beta and stable).
-- `docs:` / `chore:` / `ci:` / `test:` / `refactor:` / `build:` — no release,
+- `feat: …`: new behavior; bumps the minor version of the next beta and stable.
+- `fix: …`: a fix; bumps the patch version of the next beta and stable.
+- `docs:` / `chore:` / `ci:` / `test:` / `refactor:` / `build:`: no release,
   no changelog entry.
 - Reflect is an app, not a library: `feat!:` and `BREAKING CHANGE:` footers are
   not used (CI rejects `!`). Going 1.0 someday is a product decision: set a
@@ -39,35 +38,33 @@ commit message and, for `feat`/`fix`, the user-facing changelog entry.
 - Write the title as user-visible behavior (`fix: keep the daily caret in view
   on long iOS notes`), not implementation detail.
 - The changelog is scoped to `apps/desktop/`: a change that should appear in it
-  must touch that directory. Core changes usually ship alongside their
-  desktop-side counterpart; a pure `packages/core` fix that lands alone still
-  ships in the next release, it just gets no changelog line.
+  must touch that directory. A pure `packages/core` fix still ships in the next
+  release, but gets no changelog line.
 - GitHub's Revert button writes `Revert "…"`; retitle it to `revert: …`.
 
 ## Where code goes
 
 - **Business logic → `packages/core`.** No file/DB/AI logic in React
   components, hooks, or Tauri command handlers. Desktop components call
-  `@reflect/core` and `@reflect/app` services, read with `useCoreServices()`,
-  `useAppServices()` or `useGraphServices()`
+  `@reflect/core` and `@reflect/app` services
   (`apps/desktop/src/services/services-provider.tsx`); Rust commands are
   thin wrappers over native primitives.
 - **Rust owns capabilities, TypeScript owns policy.** A Rust command never
   encodes a product rule beyond the primitive it exposes (e.g. the watcher
   emits events; *what* to reindex is decided in core).
 - **`@reflect/core` and `@reflect/db` never import Tauri.** Native access goes
-  through the adapters the app passes to `createAppServices(adapters)`. Core
+  through the adapters the app passes to `createCoreServices(adapters)`. Core
   has no global instances: a service gets what it needs through its `deps`,
-  and tests construct services over the test doubles in
-  `@reflect/core/testing` instead of module mocks.
+  and tests build services over the test doubles in `@reflect/core/testing`
+  instead of module mocks.
 
 ## Conventions that are checked in review
 
 - TypeScript: strict, no `any` (ever), zod at external boundaries,
   kebab-case filenames, one React component per file, named exports,
   explicit return types on public functions.
-- Keep modules small and single-responsibility; extract logic from components
-  into hooks or pure modules so it's testable without rendering.
+- Keep modules small and single-responsibility. Extract logic from components
+  into hooks or pure modules so you can test it without rendering.
 - Document every public API with a doc comment that explains *why*, not what.
   Comments that restate the code get dropped in review.
 - Tests are the behavioral documentation: cover the invariants of anything you
@@ -83,24 +80,16 @@ commit message and, for `feat`/`fix`, the user-facing changelog entry.
 
 ## Guides
 
-Step-by-step walkthroughs for the most common kinds of change:
-
-- [Adding a service](docs/contributing/services.md) — interface and factory,
-  `deps`, events, the composition root, the test double, and React.
-- [Adding a native command](docs/contributing/adding-a-command.md) — the full
-  Rust → IPC → zod → service → React path, with conventions and a checklist.
-- [Adding a user setting](docs/contributing/adding-a-setting.md) — schema key,
-  defaults-by-construction, the settings screen. (No Rust involved.)
-- [Editor architecture](docs/contributing/editor-architecture.md) — the
-  session/adapter split, the save loop, and where new editor code goes.
-- [Testing](docs/contributing/testing.md) — the test projects, testing a
-  service over test doubles, and rendering components with `renderInApp`.
-- [Upgrading dependencies](docs/contributing/upgrading-dependencies.md) —
-  age gates, manifests, local checks, draft PRs.
-- [Logging](docs/contributing/logging.md): log sinks and conventions.
+- [Adding a service](docs/contributing/services.md)
+- [Adding a native command](docs/contributing/adding-a-command.md)
+- [Adding a user setting](docs/contributing/adding-a-setting.md)
+- [Editor architecture](docs/contributing/editor-architecture.md)
+- [Testing](docs/contributing/testing.md)
+- [Upgrading dependencies](docs/contributing/upgrading-dependencies.md)
+- [Logging](docs/contributing/logging.md)
 
 ## "Plan NN" in comments?
 
-Numbered plans in [docs/plans/](docs/plans/) are the implementation roadmap;
-a comment citing "Plan 04b" points at that plan's design rationale. Start with
-[docs/plans/00-overview.md](docs/plans/00-overview.md).
+Numbered plans in [docs/plans/](docs/plans/) are the implementation roadmap.
+A comment that cites "Plan 04b" points at that plan's design rationale. Start
+with [docs/plans/00-overview.md](docs/plans/00-overview.md).

@@ -13,13 +13,6 @@ import {
 } from './commands.ts'
 import { pickContactLinkSuggestions } from './match.ts'
 
-export {
-  contactMatchSchema,
-  contactsAuthorizationSchema,
-  type ContactMatch,
-  type ContactsAuthorization,
-} from './commands.ts'
-
 /**
  * The Rust `contacts` capability: live Apple Contacts (`CNContactStore`)
  * reads. Lookups are on-demand queries: the address book is never mirrored

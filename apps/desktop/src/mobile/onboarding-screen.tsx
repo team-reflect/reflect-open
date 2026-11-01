@@ -44,8 +44,18 @@ export function MobileOnboardingScreen(): ReactElement {
   const icloudGraphs = mobileStorageInfo?.icloudGraphRoots ?? []
 
   function runChoice(choice: Exclude<PendingChoice, null>, task: () => Promise<void>): void {
-    setPendingChoice(choice)
-    void action.run(task).finally(() => setPendingChoice(null))
+    void action
+      .run(async () => {
+        // Only a run that actually starts marks its button.
+        setPendingChoice(choice)
+        await task()
+      })
+      .then((ran) => {
+        // `run` never rejects, so this covers failure too.
+        if (ran) {
+          setPendingChoice(null)
+        }
+      })
   }
 
   return (

@@ -22,7 +22,12 @@ export {
   MIN_VISIBLE_MS,
   type OperationsService,
 } from './app/operations-service.ts'
-export { type UpdaterAdapter, type UpdateService, type UpdateState } from './app/update-service.ts'
+export {
+  type AvailableUpdate,
+  type UpdaterAdapter,
+  type UpdateService,
+  type UpdateState,
+} from './app/update-service.ts'
 export {
   createThemeService,
   THEME_PREFERENCE_CACHE_KEY,
@@ -85,6 +90,7 @@ export { dailyArrivalIntent } from './daily/daily-arrivals.ts'
 export {
   createDayWindow,
   dateAtIndex,
+  extendDayWindowBack,
   FUTURE_DAYS,
   indexOfDate,
   indexWithin,
@@ -94,12 +100,10 @@ export {
   type DayWindowRadius,
 } from './daily/day-window.ts'
 export {
-  addMonths,
   buildMonthGrid,
-  monthLabel,
-  monthOf,
-  monthShortLabel,
-  weekdayLabels,
+  formatMonthLabel,
+  formatShortMonthLabel,
+  getWeekdayLabels,
   type MonthGrid,
   type MonthGridCell,
 } from './daily/month-grid.ts'
@@ -110,7 +114,6 @@ export {
   weekAtIndex,
   weekIndexOf,
   weekOf,
-  weekStartOf,
   type WeekWindow,
 } from './daily/week-window.ts'
 export { type Command, type CommandService } from './commands/command-service.ts'

@@ -9,7 +9,7 @@ import { createTestFileChangeService } from '../testing/file-change.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestCoreServices } from '../testing/services.ts'
 import { buildIndexedNote, type IndexedNote } from './indexed-note.ts'
-import type { WikiLinkSuggestionResult } from './suggestion-service.ts'
+import type { WikiLinkSuggestionResult } from './queries-shared.ts'
 
 /**
  * Shared helpers for projection-flow tests (`*-flow.test.ts`): projections

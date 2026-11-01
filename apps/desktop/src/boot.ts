@@ -35,11 +35,14 @@ const ipc = createIpcBridgeService({
 const host = createDesktopHost(facts, { ipc, clock, logger })
 const role = host.window.isMainWindow() ? 'main' : 'note-window'
 
+const adapters = createDesktopAdapters(facts, { logger, clock }, role)
+
 /**
  * The app-scoped services of this webview.
  */
 export const coreServices = createCoreServices({
-  ...createDesktopAdapters(facts, { logger, clock }, role),
+  ...adapters,
+  convertFileSrc: pendingDevIpc?.convertFileSrc ?? adapters.convertFileSrc,
   ipc,
   role,
   activity: host.lifecycle,

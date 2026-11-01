@@ -43,6 +43,10 @@ export interface AvailableUpdate {
    * Download, verify, and install the update, reporting progress through `onEvent`.
    */
   downloadAndInstall(onEvent: (event: UpdateDownloadEvent) => void): Promise<void>
+  /**
+   * Release the native resource that holds this update.
+   */
+  close(): Promise<void>
 }
 
 /**
@@ -175,7 +179,7 @@ class UpdateServiceImpl implements UpdateService {
   }
 
   async install(): Promise<void> {
-    const update = this.#pendingUpdate
+    const update: AvailableUpdate | null = this.#pendingUpdate
     if (!update || this.#state.phase === 'downloading' || this.#state.phase === 'ready') {
       return
     }
@@ -229,6 +233,14 @@ class UpdateServiceImpl implements UpdateService {
     }
   }
 
+  async #close(update: AvailableUpdate | null): Promise<void> {
+    try {
+      await update?.close()
+    } catch (error) {
+      this.#deps.logger.warn('closing an update failed', error)
+    }
+  }
+
   async #runCheck(silent: boolean): Promise<void> {
     const phase = this.#state.phase
     if (phase === 'checking' || phase === 'downloading' || phase === 'ready') {
@@ -246,14 +258,17 @@ class UpdateServiceImpl implements UpdateService {
     // (e.g. an install of a previously found update) transitioned while we awaited".
     const baseline = this.#state
     try {
-      const update = await this.#deps.updater.check()
+      const update: AvailableUpdate | null = await this.#deps.updater.check()
       if (this.#state !== baseline) {
+        void this.#close(update)
         return
       }
       if (update) {
+        void this.#close(this.#pendingUpdate)
         this.#pendingUpdate = update
         this.#setState({ phase: 'available', version: update.version })
       } else if (!silent) {
+        void this.#close(this.#pendingUpdate)
         this.#pendingUpdate = null
         this.#setState({ phase: 'upToDate' })
       }

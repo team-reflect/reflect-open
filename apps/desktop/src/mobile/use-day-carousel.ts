@@ -1,6 +1,6 @@
 import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@/lib/day-window.ts'
+import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@reflect/app'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**

@@ -10,14 +10,10 @@
 
 ## What was audited
 
-Seven parallel domain audits covering:
-- Supply chain (package scripts, lockfile, CI/CD workflows)
-- Tauri capabilities and IPC command boundaries
-- Rust native code (path traversal, secrets, watcher, SQL)
-- BYOK AI boundaries and `private: true` enforcement
-- Markdown/HTML rendering and link handling
-- Database and query validation
-- Secrets handling and config leakage
+Seven parallel domain audits: supply chain (package scripts, lockfile, CI/CD),
+Tauri capabilities and IPC boundaries, Rust native code (path traversal,
+secrets, watcher, SQL), BYOK AI boundaries and `private: true`, markdown/HTML
+rendering and links, database and query validation, secrets and config leakage.
 
 ---
 
@@ -50,24 +46,13 @@ Seven parallel domain audits covering:
 
 ## Remaining risks
 
-1. **Private note content in `embedding_chunks`** — `backfillEmbeddings()` indexes private notes.
-   The SEC-03 fix ensures they don't surface in the UI, but the vectors exist in SQLite. A
-   comprehensive fix requires retroactive deletion when `private:` is set and re-indexing when
-   unset. Tracked in `findings.md` D-01.
+All are tracked in [findings.md](findings.md):
 
-2. **Keychain entry name enumeration** — `secret_get` accepts arbitrary names. Blocked by the CSP
-   fix; an allowlist in Rust is defence-in-depth. Tracked in `findings.md` D-04.
-
-3. **`spike_mobile.rs` in production** — Development instrumentation in the mobile binary.
-   Marked `TEMPORARY` in the code; remove when Plan 19 spike concludes. Tracked in `findings.md`
-   D-09.
-
-4. **`capture_meta_fetch` SSRF** — The bounded Rust HTTP fetch can reach any http(s) URL, including
-   internal hosts. Mitigated by the 512 KB cap, 5-redirect limit, 15 s timeout, and Content-Type
-   HTML-only check. Tracked in `findings.md` D-03.
-
----
-
-## PR URL
-
-https://github.com/team-reflect/reflect-open/pull/232
+1. **Private note vectors in `embedding_chunks`** (D-01). SEC-03 hides them in
+   the UI, but `backfillEmbeddings()` still indexes private notes.
+2. **Keychain entry name enumeration** (D-04). Blocked by the CSP; a Rust
+   allowlist is defence-in-depth.
+3. **`spike_mobile.rs` in production** (D-09). Temporary mobile
+   instrumentation (since removed).
+4. **`capture_meta_fetch` SSRF** (D-03). Mitigated by size, redirect, timeout
+   and content-type limits.

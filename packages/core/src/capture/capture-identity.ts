@@ -1,4 +1,6 @@
-import { assetPath, dailyPath, notePath } from '../graph/paths.ts'
+import { formatIsoDate } from '@reflect/utils'
+import { formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
+import { assetPath, notePath } from '../graph/paths.ts'
 
 const INBOX_PREFIX = '.reflect/inbox/'
 
@@ -24,20 +26,7 @@ export interface CaptureIdentity {
   assetPath: string
 }
 
-const CAPTURE_PATH_RE =
-  /^notes\/(capture-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3}-[0-9a-f]{4})\.md$/
-
-function pad(value: number, width: number): string {
-  return String(value).padStart(width, '0')
-}
-
-/**
- * The **local** calendar day of a capture — the daily note it lands on, per
- * the audio-memo convention.
- */
-export function captureLocalDate(capturedAt: Date): string {
-  return `${capturedAt.getFullYear()}-${pad(capturedAt.getMonth() + 1, 2)}-${pad(capturedAt.getDate(), 2)}`
-}
+const CAPTURE_PATH_RE = /^notes\/(capture-(\d{4}-\d{2}-\d{2}-\d{6}-\d{3})-[0-9a-f]{4})\.md$/
 
 function buildIdentity(base: string, date: string): CaptureIdentity {
   return {
@@ -53,11 +42,9 @@ function buildIdentity(base: string, date: string): CaptureIdentity {
  * plus a slice of the envelope UUID.
  */
 export function captureIdentity(capturedAt: Date, envelopeId: string): CaptureIdentity {
-  const date = captureLocalDate(capturedAt)
-  const stamp = `${pad(capturedAt.getHours(), 2)}${pad(capturedAt.getMinutes(), 2)}${pad(capturedAt.getSeconds(), 2)}`
   const suffix = envelopeId.slice(0, 4).toLowerCase()
-  const base = `capture-${date}-${stamp}-${pad(capturedAt.getMilliseconds(), 3)}-${suffix}`
-  return buildIdentity(base, date)
+  const base = `capture-${formatFileStamp(capturedAt)}-${suffix}`
+  return buildIdentity(base, formatIsoDate(capturedAt))
 }
 
 /**
@@ -69,23 +56,10 @@ export function captureFromPath(path: string): CaptureIdentity | null {
   if (match === null) {
     return null
   }
-  const [, base, date, hours, minutes, seconds] = match
-  if (
-    base === undefined ||
-    date === undefined ||
-    hours === undefined ||
-    minutes === undefined ||
-    seconds === undefined
-  ) {
+  const [, base, stamp] = match
+  const parsed = stamp === undefined ? null : parseFileStamp(stamp)
+  if (base === undefined || parsed === null) {
     return null
   }
-  if (Number(hours) > 23 || Number(minutes) > 59 || Number(seconds) > 59) {
-    return null
-  }
-  try {
-    dailyPath(date)
-  } catch {
-    return null
-  }
-  return buildIdentity(base, date)
+  return buildIdentity(base, parsed.date)
 }

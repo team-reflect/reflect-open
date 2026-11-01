@@ -14,8 +14,6 @@ import {
 import { useServiceState } from '@/services/use-service-state.ts'
 import { useMobileGraphBoot, type MobileGraphBoot } from './use-mobile-graph-boot.ts'
 
-export type { GraphStatus } from '@reflect/core'
-
 /**
  * The graph context surface: the session state and its actions, the
  * mobile-only slice documented on {@link MobileGraphBoot}, and the platform.

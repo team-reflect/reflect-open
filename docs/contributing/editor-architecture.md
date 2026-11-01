@@ -1,10 +1,8 @@
 # Editor architecture
 
-A map of the editor for contributors: the React side in
-`apps/desktop/src/editor/` and the document logic in
-`packages/core/src/documents/`. The design docs are Plans 05/05b (editor +
-fidelity), 06 (daily notes), and 07/07b (backlinks, renames); this is the
-orientation layer those plans don't give you.
+A map of the editor: the React side in `apps/desktop/src/editor/` and the
+document logic in `packages/core/src/documents/`. The design docs are Plans
+05/05b (editor + fidelity), 06 (daily notes), and 07/07b (backlinks, renames).
 
 ## The layers
 
@@ -31,7 +29,7 @@ stream, and the editor's imperative handle; it gets `noteSessions`,
 `documents/document-binding.ts` owns the pane lifecycle around that session:
 create, adopt after a rename-following route change, teardown, and the
 microtask hand-off when a moved note is not adopted. Tests drive the session
-and binding directly over test doubles (`note-session.test.ts`,
+and binding directly over test doubles (`note-session-service.test.ts`,
 `document-binding.test.ts`, with `createTestNoteFileService()` and
 `createTestClockService()`); if you're changing *what happens*, you're almost
 certainly in one of those core modules, and your test belongs there too.
@@ -73,7 +71,7 @@ Invariants the loop maintains:
   bytes aside, and rejoins them on every write. The editor only ever sees the
   body; metadata writes go through `session.updateFrontmatter()` without
   disturbing the view.
-- **Round-trip fidelity gates editability** (`editor/roundtrip.ts`, passed to
+- **Round-trip fidelity gates editability** (meowdown's `checkRoundTrip`, passed to
   the session as its `classify` option). Before the save
   pipeline may rewrite a note, the editor must prove it can reproduce it; a
   converter gap (e.g. task lists today) opens the note as a `protected`
@@ -96,13 +94,12 @@ none of these work:
   (`chat-screen.tsx`), both of which read `event.dataTransfer` off HTML5 drop
   events.
 
-Tauri's native drag-drop handler (on by default) registers an OS-level drop
-target on the webview so file drops reach Rust. While it is on, it intercepts
-`dragstart`/`dragover`/`drop` before the DOM sees them, so the features above
-silently do nothing inside the app even though they work in a plain browser
-(for example the meowdown dev server). Turning it off costs us Tauri's
-`onDragDropEvent` (OS file drops delivered to Rust), which the app does not use:
-we handle every drop in the webview with HTML5 events instead.
+Tauri's native handler (on by default) registers an OS-level drop target so
+file drops reach Rust, and it intercepts `dragstart`/`dragover`/`drop` before
+the DOM sees them. The features above then silently do nothing in the app,
+though they work in a plain browser (e.g. the meowdown dev server). Turning it
+off costs `onDragDropEvent`, which the app does not use: every drop is handled
+in the webview.
 
 ## Work that outlives a pane
 
@@ -153,13 +150,13 @@ Core, `packages/core/src/documents/`:
 | `title-rename-service.ts`, `title-rename-tracker.ts` | settled-title detection and the rename pipeline |
 | `attachment-service.ts` | the attachment catalog, asset saves, image URLs |
 
-Core, elsewhere:
+App, `packages/app/src/`:
 
 | File | Owns |
 |---|---|
-| `packages/app/src/search/autocomplete-suggestion-service.ts`, `packages/app/src/search/wiki-autocomplete-entries.ts` | the `[[` and `#` menus' data; pure row builders |
-| `packages/app/src/navigation/link-navigation-service.ts` | what a clicked wiki link, Markdown link or deep link does |
-| `packages/app/src/commands/keymap-service.ts` | the shortcut registry (rejects duplicate bindings) |
+| `search/autocomplete-suggestion-service.ts`, `search/wiki-autocomplete-entries.ts` | the `[[` and `#` menus' data; pure row builders |
+| `navigation/link-navigation-service.ts` | what a clicked wiki link, Markdown link or deep link does |
+| `commands/keymap-service.ts` | the shortcut registry (rejects duplicate bindings) |
 
 Desktop, `apps/desktop/src/editor/`:
 
@@ -167,7 +164,6 @@ Desktop, `apps/desktop/src/editor/`:
 |---|---|
 | `use-note-document.ts` | React adapter: session ↔ state/watcher/editor |
 | `note-editor.tsx` | meowdown composition + our extensions; imperative handle |
-| `roundtrip.ts` | fidelity classification (`exact` / `normalizing` / `lossy`), re-exported from meowdown |
 | `use-editor-autocomplete.ts` | `[[` and `#` search handlers over `AutocompleteSuggestionService` |
 | `use-wiki-link-navigation.ts`, `use-tag-navigation.ts` | chip click → resolve → navigate or create |
 | `use-wiki-link-hover-preview.tsx` | desktop chip hover → side-effect-free local preview renderer |

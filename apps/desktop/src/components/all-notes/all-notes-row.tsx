@@ -1,6 +1,5 @@
 import { memo, type MouseEvent, type ReactElement } from 'react'
-import type { NoteListEntry } from '@reflect/core'
-import { formatRecencyLabel } from '@/lib/dates.ts'
+import { type NoteListEntry, formatRecencyLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
