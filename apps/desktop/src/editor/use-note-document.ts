@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   createDocumentBinding,
   INITIAL_NOTE_SNAPSHOT,
   type DocumentBinding,
+  type NoteSession,
   type NoteSessionSnapshot,
   type RenameCoordinator,
 } from '@reflect/core'
@@ -39,6 +40,66 @@ export interface NoteDocument extends NoteSessionSnapshot {
   sessionEpoch: number
 }
 
+/**
+ * The editor wiring of one session: an editor mounted with it reads and writes
+ * that session only, never whichever session the pane binds next.
+ */
+interface SessionEditor {
+  onEditorChange: (markdown: string) => void
+  bindEditor: (handle: NoteEditorHandle | null) => void
+  /**
+   * Push markdown into this session's editor without reporting a change.
+   */
+  applyContent: (markdown: string) => void
+  /**
+   * Let this session's editor report native input it has not reported yet.
+   */
+  reconcilePendingInput: () => void
+}
+
+/**
+ * What the pane renders from, set as one value so the editor's key, its seed,
+ * and its wiring always come from the same session.
+ */
+interface SessionView {
+  readonly epoch: number
+  readonly snapshot: NoteSessionSnapshot
+  readonly editor: SessionEditor
+}
+
+function createSessionEditor(session: () => NoteSession): SessionEditor {
+  let handle: NoteEditorHandle | null = null
+  function reconcilePendingInput(): void {
+    // Meowdown 0.43.1 synchronously emits onDocChange only when this
+    // reconciliation changes the document. Discarding the always-
+    // returned snapshot avoids dirtying files whose serialization is
+    // merely normalized relative to their on-disk Markdown.
+    handle?.getMarkdown()
+  }
+  return {
+    onEditorChange: (markdown) => session().editorChanged(markdown),
+    bindEditor: (next) => {
+      if (next === null) {
+        // React detaches this consumer ref while the child editor handle is
+        // still live, so its last input can still reach this session.
+        reconcilePendingInput()
+      }
+      handle = next
+    },
+    applyContent: (markdown) => handle?.setMarkdown(markdown),
+    reconcilePendingInput,
+  }
+}
+
+const NO_EDITOR: SessionEditor = {
+  onEditorChange: () => {},
+  bindEditor: () => {},
+  applyContent: () => {},
+  reconcilePendingInput: () => {},
+}
+
+const INITIAL_VIEW: SessionView = { epoch: 0, snapshot: INITIAL_NOTE_SNAPSHOT, editor: NO_EDITOR }
+
 export interface NoteDocumentOptions {
   /**
    * Treat a missing file as an empty note instead of an error. The file is then
@@ -69,8 +130,11 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
   const createIfMissing = options?.createIfMissing ?? false
   const trackRenames = options?.trackRenames ?? false
   const missingSeed = options?.missingSeed
-  const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
-  const editorRef = useRef<NoteEditorHandle | null>(null)
+  // The epoch lives in state with the snapshot rather than being read from the
+  // binding during render: a mutable read there can be memoized away (React
+  // Compiler) or tear, leaving the previous note's editor mounted under the
+  // next note's session.
+  const [view, setView] = useState<SessionView>(INITIAL_VIEW)
   /**
    * The pane's lifecycle policy object — one per hook instance.
    */
@@ -92,26 +156,24 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
       // The auto-rename lifecycle (Plan 07b/17) is owned by the coordinator —
       // the tracker, the rewrite chain, alias placement, and the file move.
       coordinator: () => (trackRenames ? titleRename.createCoordinator({ path }) : null),
-      session: (coordinator) => {
-        return noteSessions.create({
+      session: (coordinator, epoch) => {
+        // A getter, as the wiring and the session need each other: it is first
+        // called from an editor, which mounts only after this session emits.
+        const editor = createSessionEditor(() => session)
+        const session = noteSessions.create({
           path,
           readOnly: !canWrite,
           classify: checkRoundTrip,
-          onSnapshot: setSnapshot,
-          applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
-          reconcilePendingEditorInput: () => {
-            // Meowdown 0.43.1 synchronously emits onDocChange only when this
-            // reconciliation changes the document. Discarding the always-
-            // returned snapshot avoids dirtying files whose serialization is
-            // merely normalized relative to their on-disk Markdown.
-            editorRef.current?.getMarkdown()
-          },
+          onSnapshot: (snapshot) => setView({ epoch, snapshot, editor }),
+          applyContent: editor.applyContent,
+          reconcilePendingEditorInput: editor.reconcilePendingInput,
           onContent: coordinator
             ? (content, origin) => coordinator.content(content, origin)
             : undefined,
           createIfMissing,
           missingSeed,
         })
+        return session
       },
     })
     if (created) {
@@ -155,27 +217,10 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
     }
   }, [binding, path])
 
-  const onEditorChange = useCallback(
-    (markdown: string) => {
-      binding.session()?.editorChanged(markdown)
-    },
-    [binding],
-  )
-
-  const bindEditor = useCallback((handle: NoteEditorHandle | null) => {
-    if (handle === null) {
-      // React detaches this consumer ref while the child editor handle is
-      // still live. Reconcile before dropping it; onDocChange updates the
-      // current session synchronously only when pending input changed state.
-      editorRef.current?.getMarkdown()
-    }
-    editorRef.current = handle
-  }, [])
-
   return {
-    ...snapshot,
-    onEditorChange,
-    bindEditor,
-    sessionEpoch: binding.epoch(),
+    ...view.snapshot,
+    onEditorChange: view.editor.onEditorChange,
+    bindEditor: view.editor.bindEditor,
+    sessionEpoch: view.epoch,
   }
 }

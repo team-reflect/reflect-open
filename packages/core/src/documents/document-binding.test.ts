@@ -35,8 +35,21 @@ function fakeCoordinator() {
   return { coordinator, settle, dispose }
 }
 
-function factories(session: NoteSession, coordinator: DocumentCoordinator | null): BindFactories {
-  return { session: () => session, coordinator: () => coordinator }
+/**
+ * Factories that build `session`, recording each epoch it is created under in `epochs`.
+ */
+function factories(
+  session: NoteSession,
+  coordinator: DocumentCoordinator | null,
+  epochs: number[] = [],
+): BindFactories {
+  return {
+    session: (_coordinator, epoch) => {
+      epochs.push(epoch)
+      return session
+    },
+    coordinator: () => coordinator,
+  }
 }
 
 let openDocuments: OpenDocumentsService
@@ -55,11 +68,12 @@ describe('createDocumentBinding', () => {
   it('creates on first bind, registers, and counts the epoch', () => {
     const binding = createBinding()
     const { session } = fakeSession('notes/a.md')
-    const bound = binding.bind('notes/a.md', factories(session, null))
+    const epochs: number[] = []
+    const bound = binding.bind('notes/a.md', factories(session, null, epochs))
 
     expect(bound.created).toBe(true)
     expect(binding.session()).toBe(session)
-    expect(binding.epoch()).toBe(1)
+    expect(epochs).toEqual([1])
     expect(openDocuments.sessionFor('notes/a.md')).toBe(session)
     binding.unbind('notes/a.md')
     expect(openDocuments.sessionFor('notes/a.md')).toBeNull()
@@ -68,15 +82,16 @@ describe('createDocumentBinding', () => {
   it('a same-path rebind recreates (io bindings are taken at construction)', () => {
     const binding = createBinding()
     const first = fakeSession('notes/a.md')
-    binding.bind('notes/a.md', factories(first.session, null))
+    const epochs: number[] = []
+    binding.bind('notes/a.md', factories(first.session, null, epochs))
     binding.unbind('notes/a.md')
     expect(first.dispose).toHaveBeenCalled()
 
     const second = fakeSession('notes/a.md')
-    const rebound = binding.bind('notes/a.md', factories(second.session, null))
+    const rebound = binding.bind('notes/a.md', factories(second.session, null, epochs))
     expect(rebound.created).toBe(true)
     expect(rebound.session).toBe(second.session)
-    expect(binding.epoch()).toBe(2)
+    expect(epochs).toEqual([1, 2])
     binding.unbind('notes/a.md')
   })
 
@@ -84,17 +99,18 @@ describe('createDocumentBinding', () => {
     const binding = createBinding()
     const moved = fakeSession('notes/a.md')
     const { coordinator } = fakeCoordinator()
-    binding.bind('notes/a.md', factories(moved.session, coordinator))
+    const epochs: number[] = []
+    binding.bind('notes/a.md', factories(moved.session, coordinator, epochs))
 
     moved.session.retarget('notes/renamed.md') // what moveNoteCarryingSession does
     binding.unbind('notes/a.md') // route follows → React cleanup for the old path
     const spare = fakeSession('notes/renamed.md')
-    const adopted = binding.bind('notes/renamed.md', factories(spare.session, null))
+    const adopted = binding.bind('notes/renamed.md', factories(spare.session, null, epochs))
 
     expect(adopted.created).toBe(false)
     expect(adopted.session).toBe(moved.session)
     expect(adopted.coordinator).toBe(coordinator)
-    expect(binding.epoch()).toBe(1) // no remount: the editor keeps its cursor
+    expect(epochs).toEqual([1]) // no new epoch: the editor keeps its cursor
     await microtasks()
     expect(moved.dispose).not.toHaveBeenCalled() // the hand-off cancelled teardown
 

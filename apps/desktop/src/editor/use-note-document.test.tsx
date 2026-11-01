@@ -318,6 +318,51 @@ describe('useNoteDocument', () => {
     expect(noteFile.getWrites('notes/b.md')).toEqual([])
   })
 
+  it('a note switch gives the next note a new session epoch, so its editor remounts', async () => {
+    noteFile.set('notes/b.md', '# B\n')
+    const hook = await mount(
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
+      { initialProps: { path: 'notes/a.md' } },
+    )
+    await vi.waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    const epochOnA = hook.result.current.sessionEpoch
+
+    await hook.rerender({ path: 'notes/b.md' })
+    await vi.waitFor(() => expect(hook.result.current.initialContent).toBe('# B\n'))
+
+    // The editor is keyed on the epoch: reusing A's would leave A's text on
+    // screen, wired to B's session.
+    expect(hook.result.current.sessionEpoch).not.toBe(epochOnA)
+  })
+
+  it("an editor's input reaches only the note it was opened on", async () => {
+    noteFile.set('notes/b.md', '# B\n')
+    const hook = await mount(
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
+      { initialProps: { path: 'notes/a.md' } },
+    )
+    await vi.waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    // The wiring A's editor was mounted with, as the pane hands it over.
+    const { onEditorChange, bindEditor } = hook.result.current
+    const editor = fakeEditor()
+    await act(() => bindEditor(editor))
+
+    await hook.rerender({ path: 'notes/b.md' })
+    await vi.waitFor(() => expect(hook.result.current.initialContent).toBe('# B\n'))
+
+    // A's editor detaches only now, and Meowdown reports its pending native
+    // input as it does.
+    editor.getMarkdown = () => {
+      onEditorChange('# Hello\n\ntyped on A\n')
+      return '# Hello\n\ntyped on A\n'
+    }
+    await act(() => bindEditor(null))
+    await act(() => clock.advance(2000))
+
+    expect(noteFile.getWrites('notes/b.md')).toEqual([])
+    expect(file('notes/b.md')).toBe('# B\n')
+  })
+
   it('reconciles pending editor input during a same-path session rebind', async () => {
     const hook = await mount(
       ({ createIfMissing }: { createIfMissing: boolean } = { createIfMissing: false }) => {
