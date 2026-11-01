@@ -1,9 +1,9 @@
 //! Per-note history over the backup repository: the commits that changed one
 //! note, newest first, and the note's text at any of them.
 //!
-//! Read-only: these walk the object database and never touch the index, the
-//! working tree or a ref, so they run outside the graph lock (git supports
-//! concurrent readers alongside a writer).
+//! Read-only: these read HEAD and the object database but never modify the
+//! index, the working tree or a ref, so they run outside the graph lock (git
+//! supports concurrent readers alongside a writer).
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -11,7 +11,7 @@ use std::path::Path;
 use git2::{Delta, Oid, Repository, Sort, Tree};
 use serde::Serialize;
 
-use reflect_graph_paths::{is_note, to_slash_lossy};
+use reflect_graph_paths::{is_note, normalize_line_endings, to_slash_lossy};
 use reflect_types::{AppError, AppResult};
 
 use super::repo;
@@ -130,7 +130,8 @@ pub fn note_history(
 }
 
 /// The note's text at `revision` (a commit oid, or `HEAD`), where it lived at
-/// `path`. Only notes can be read, never other tracked files.
+/// `path`, with `\n` line endings like every other note read. Only notes can
+/// be read, never other tracked files.
 pub fn note_at_revision(root: &Path, revision: &str, path: &str) -> AppResult<String> {
     if !is_note(path) {
         return Err(AppError::traversal(format!("{path} is not a note")));
@@ -143,8 +144,9 @@ pub fn note_at_revision(root: &Path, revision: &str, path: &str) -> AppResult<St
         )));
     };
     let blob = repo.find_blob(blob_id)?;
-    String::from_utf8(blob.content().to_vec())
-        .map_err(|_| AppError::parse(format!("{path} in revision {revision} is not UTF-8 text")))
+    let text = String::from_utf8(blob.content().to_vec())
+        .map_err(|_| AppError::parse(format!("{path} in revision {revision} is not UTF-8 text")))?;
+    Ok(normalize_line_endings(text))
 }
 
 fn blob_at(tree: &Tree<'_>, path: &str) -> Option<Oid> {
@@ -226,6 +228,23 @@ mod history_tests {
         assert_eq!(
             note_at_revision(root, "HEAD", "notes/a.md").unwrap(),
             "# A\n\ntwo\n"
+        );
+    }
+
+    #[test]
+    fn reads_revision_text_with_lf_line_endings() {
+        let fixture = fixture();
+        let root = &fixture.graph_a;
+        write(
+            root,
+            "notes/a.md",
+            "---\r\nid: 01j\r\n---\r\n# A\r\n\rone\r\n",
+        );
+        let sha = commit(root);
+
+        assert_eq!(
+            note_at_revision(root, &sha, "notes/a.md").unwrap(),
+            "---\nid: 01j\n---\n# A\n\none\n"
         );
     }
 

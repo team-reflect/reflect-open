@@ -61,8 +61,8 @@ export function NoteHistoryBody({ path, onRestored }: NoteHistoryBodyProps): Rea
           No saved versions yet. Edits are saved to history every few seconds.
         </p>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[16rem_1fr]">
-          <div className="flex min-h-0 flex-col border-r border-border">
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,10rem)_1fr] sm:grid-cols-[16rem_1fr] sm:grid-rows-none">
+          <div className="flex min-h-0 flex-col border-b border-border sm:border-r sm:border-b-0">
             <NoteRevisionList
               history={history}
               selectedOid={selected.oid}
