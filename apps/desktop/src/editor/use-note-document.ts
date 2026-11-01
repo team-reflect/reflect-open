@@ -22,7 +22,7 @@ import { checkRoundTrip } from '@meowdown/markdown'
  * in core's `document-binding.ts` — this hook only adapts both to React.
  */
 
-export interface NoteDocument extends NoteSessionSnapshot {
+export interface NoteDocument extends Omit<NoteSessionSnapshot, 'path'> {
   /**
    * Wire to the editor: every document change enters the pipeline here.
    */
@@ -38,6 +38,13 @@ export interface NoteDocument extends NoteSessionSnapshot {
    * keeps its live editor — cursor, selection, undo history and all.
    */
   sessionEpoch: number
+  /**
+   * The path of the note whose session the editor shows. During a note switch
+   * it briefly differs from the route's path, so anything that sends the
+   * editor's content out (AI, link previews) gates on this note's privacy, not
+   * the route's. Null before the first session reports.
+   */
+  editorPath: string | null
 }
 
 /**
@@ -217,10 +224,12 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
     }
   }, [binding, path])
 
+  const { path: editorPath, ...snapshot } = view.snapshot
   return {
-    ...view.snapshot,
+    ...snapshot,
     onEditorChange: view.editor.onEditorChange,
     bindEditor: view.editor.bindEditor,
     sessionEpoch: view.epoch,
+    editorPath,
   }
 }

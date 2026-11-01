@@ -177,6 +177,7 @@ class NoteSessionImpl implements NoteSession {
 
   retarget(to: string): void {
     this.path = to
+    this.#emit()
   }
 
   content(): string {
@@ -200,6 +201,7 @@ class NoteSessionImpl implements NoteSession {
       return
     }
     const next: NoteSessionSnapshot = {
+      path: this.path,
       status: this.#status,
       initialContent: this.#initialContent,
       protected: this.#isProtected,
@@ -209,6 +211,7 @@ class NoteSessionImpl implements NoteSession {
     }
     if (
       this.#lastEmitted !== null &&
+      this.#lastEmitted.path === next.path &&
       this.#lastEmitted.status === next.status &&
       this.#lastEmitted.initialContent === next.initialContent &&
       this.#lastEmitted.protected === next.protected &&
