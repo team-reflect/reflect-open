@@ -289,7 +289,9 @@ describe('useNoteDocument', () => {
 
     // Lock reaches the session under its new path, and the privacy subject the
     // pane gates AI on follows it there.
-    await act(() => core.noteActions.togglePrivate('notes/new-title.md'))
+    const locked = await act(() => core.noteActions.togglePrivate('notes/new-title.md'))
+    expect(locked).toEqual({ status: 'done', isPrivate: true })
+    expect(file('notes/new-title.md')).toContain('private: true')
     expect(hook.result.current.editorPath).toBe('notes/new-title.md')
     await hook.unmount()
   })
