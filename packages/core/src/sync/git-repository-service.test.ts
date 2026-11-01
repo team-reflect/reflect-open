@@ -29,7 +29,7 @@ describe('createGitRepositoryService', () => {
           reviewPaths: ['a (conflict 2026-10-16 08-05-31 a1b2c3d4).json'],
           changedFiles: [{ path: 'a.md', kind: 'upsert', modifiedMs: null }],
         }),
-        git_note_history: () => ({ revisions: [REVISION], nextCursor: 'abc' }),
+        git_note_history: () => ({ revisions: [REVISION], nextCursor: 'next' }),
         git_note_revision: () => '# A\n',
       },
     })
@@ -53,9 +53,9 @@ describe('createGitRepositoryService', () => {
       reviewPaths: ['a (conflict 2026-10-16 08-05-31 a1b2c3d4).json'],
       changedFiles: [{ path: 'a.md', kind: 'upsert', modifiedMs: null }],
     })
-    await expect(git.noteHistory('notes/a.md', null, 50, 3)).resolves.toEqual({
+    await expect(git.noteHistory('notes/a.md', 'cursor', 50, 3)).resolves.toEqual({
       revisions: [REVISION],
-      nextCursor: 'abc',
+      nextCursor: 'next',
     })
     await expect(git.noteRevision(REVISION, 3)).resolves.toBe('# A\n')
 
@@ -73,7 +73,7 @@ describe('createGitRepositoryService', () => {
       { command: 'git_pull', args: { message: 'Update notes', generation: 3 } },
       {
         command: 'git_note_history',
-        args: { path: 'notes/a.md', after: null, limit: 50, generation: 3 },
+        args: { path: 'notes/a.md', after: 'cursor', limit: 50, generation: 3 },
       },
       {
         command: 'git_note_revision',

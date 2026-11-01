@@ -6,12 +6,15 @@ import {
   createTestGitRepositoryService,
   createTestGraphSessionService,
   createTestNoteFileService,
+  createTestNoteSession,
   createTestPersistenceFlushService,
 } from '../testing/index.ts'
 import type { NoteRevision } from './git-repository-service.ts'
 import { createNoteHistoryService, NOTE_HISTORY_PAGE_SIZE } from './note-history-service.ts'
 
 const PATH = 'notes/atlas.md'
+const NOW = '---\nid: 01j\nprivate: true\n---\n# Atlas\n\nnow\n'
+const THEN = '---\nid: 01j\n---\n# Atlas\n\nthen\n'
 const REVISION: NoteRevision = {
   oid: 'abc',
   path: 'notes/01j.md',
@@ -19,43 +22,49 @@ const REVISION: NoteRevision = {
   summary: 'Update Atlas',
 }
 
-function setup(options?: { source?: string; open?: boolean; initialized?: boolean }) {
-  const files = createTestNoteFileService({
-    files: { [PATH]: options?.source ?? '---\nid: 01j\nprivate: true\n---\n# Atlas\n\nnow\n' },
-  })
+function setup(options?: { open?: boolean; liveContent?: string }) {
+  const files = createTestNoteFileService({ files: { [PATH]: NOW } })
   const graphSession = createTestGraphSessionService(
     options?.open === false ? undefined : { graph: { generation: 4 } },
   )
-  const gitRepository = createTestGitRepositoryService({
-    initialized: options?.initialized ?? true,
-  })
-  const order: string[] = []
-  gitRepository.onNoteRevision(() => '---\nid: 01j\n---\n# Atlas\n\nthen\n')
+  // HEAD holds whatever the last git-sync flush committed.
+  let head = NOW
+  const gitRepository = createTestGitRepositoryService({ initialized: true })
+  gitRepository.onNoteRevision((revision) => (revision.oid === 'HEAD' ? head : THEN))
+  let commit = async (): Promise<void> => {
+    head = await files.read(PATH, 4)
+  }
   const persistenceFlush = createTestPersistenceFlushService()
-  persistenceFlush.registerFlusher('git-sync', () => {
-    order.push('commit')
-    return Promise.resolve()
-  })
+  persistenceFlush.registerFlusher('git-sync', () => commit())
+  const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
+  const session =
+    options?.liveContent === undefined
+      ? null
+      : createTestNoteSession({ path: PATH, content: options.liveContent })
+  if (session !== null) {
+    openDocuments.register({ session })
+  }
   const service = createNoteHistoryService({
     gitRepository,
-    noteDocuments: createNoteDocumentService({
-      openDocuments: createOpenDocumentsService({ fileChanges: createTestFileChangeService() }),
-      noteFile: files,
-      graphSession,
-    }),
+    noteDocuments: createNoteDocumentService({ openDocuments, noteFile: files, graphSession }),
     persistenceFlush,
     graphSession,
   })
-  return { service, files, gitRepository, order }
+  return {
+    service,
+    files,
+    gitRepository,
+    session,
+    setCommit: (fn: () => Promise<void>) => {
+      commit = fn
+    },
+    setHead: (text: string) => {
+      head = text
+    },
+  }
 }
 
 describe('createNoteHistoryService', () => {
-  it('is available only for a graph with a repository', async () => {
-    await expect(setup().service.isAvailable()).resolves.toBe(true)
-    await expect(setup({ initialized: false }).service.isAvailable()).resolves.toBe(false)
-    await expect(setup({ open: false }).service.isAvailable()).resolves.toBe(false)
-  })
-
   it('pages revisions at the open generation', async () => {
     const { service, gitRepository } = setup()
 
@@ -83,16 +92,39 @@ describe('createNoteHistoryService', () => {
     )
   })
 
-  it('commits pending edits before it restores', async () => {
-    const { service, order, files } = setup()
-    const write = files.write.bind(files)
-    files.write = async (...args) => {
-      order.push('write')
-      return await write(...args)
-    }
+  it('restores an open note through its live session', async () => {
+    const { service, session, setHead } = setup({ liveContent: NOW })
+    setHead(NOW)
 
     await service.restore(PATH, REVISION)
 
-    expect(order).toEqual(['commit', 'write'])
+    expect(session?.content()).toBe('---\nid: 01j\nprivate: true\n---\n# Atlas\n\nthen\n')
+  })
+
+  it('waits for the pre-restore commit before it writes', async () => {
+    const { service, files, setCommit } = setup()
+    let finishCommit = (): void => {}
+    setCommit(() => {
+      return new Promise<void>((resolve) => {
+        finishCommit = resolve
+      })
+    })
+
+    const restoring = service.restore(PATH, REVISION)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await expect(files.read(PATH, 4)).resolves.toBe(NOW)
+
+    finishCommit()
+    await restoring
+    await expect(files.read(PATH, 4)).resolves.toContain('then')
+  })
+
+  it('restores nothing when the current text did not reach history', async () => {
+    const { service, files, setCommit, setHead } = setup()
+    setHead('---\nid: 01j\n---\n# Atlas\n\nolder\n')
+    setCommit(() => Promise.resolve())
+
+    await expect(service.restore(PATH, REVISION)).rejects.toMatchObject({ kind: 'io' })
+    await expect(files.read(PATH, 4)).resolves.toBe(NOW)
   })
 })

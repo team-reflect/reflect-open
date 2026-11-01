@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { History } from 'lucide-react'
-import { useNoteHistoryAvailable } from '@/hooks/use-note-history.ts'
 import { useNoteHistory } from '@/providers/note-history-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 import { NoteActionButton } from './note-action-button.tsx'
 
 interface NoteHistoryActionProps {
@@ -10,13 +10,13 @@ interface NoteHistoryActionProps {
 }
 
 /**
- * Opens the note history dialog. Rendered only when the graph keeps history
- * (it has a git repository).
+ * Opens the note history dialog. Rendered only in the native app, where every
+ * graph keeps history in git; plain-browser dev has no git.
  */
 export function NoteHistoryAction({ path }: NoteHistoryActionProps): ReactElement | null {
-  const available = useNoteHistoryAvailable()
+  const { platform } = useCoreServices()
   const { openNoteHistory } = useNoteHistory()
-  if (!available) {
+  if (!platform.isNativeShell) {
     return null
   }
   return (

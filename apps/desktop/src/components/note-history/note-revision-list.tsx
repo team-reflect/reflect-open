@@ -62,43 +62,49 @@ export function NoteRevisionList({
     }
     event.preventDefault()
     const index = revisions.findIndex((revision) => revision.oid === selectedOid)
-    const next = revisions[Math.min(Math.max(index + step, 0), revisions.length - 1)]
+    const nextIndex = Math.min(Math.max(index + step, 0), revisions.length - 1)
+    const next = revisions[nextIndex]
     if (next !== undefined) {
       onSelect(next)
+    }
+    if (nextIndex === revisions.length - 1) {
+      loadMore()
     }
   }
 
   return (
-    <div
-      ref={listRef}
-      role="listbox"
-      aria-label="Versions"
-      tabIndex={0}
-      aria-activedescendant={selectedOid === null ? undefined : optionId(selectedOid)}
-      onKeyDown={onKeyDown}
-      className="flex min-h-0 flex-col gap-0.5 overflow-y-auto p-2 outline-none"
-    >
-      {revisions.map((revision) => {
-        const selected = revision.oid === selectedOid
-        return (
-          <div
-            key={revision.oid}
-            id={optionId(revision.oid)}
-            role="option"
-            aria-selected={selected}
-            onClick={() => onSelect(revision)}
-            className={cn(
-              'cursor-default rounded-lg px-3 py-2 text-text-muted hover:bg-surface-hover',
-              selected && 'bg-surface-hover text-text',
-            )}
-          >
-            <div className="truncate text-xs font-medium">
-              {formatDate(new Date(revision.timeMs), 'PP p')}
+    <div className="min-h-0 overflow-y-auto p-2">
+      <div
+        ref={listRef}
+        role="listbox"
+        aria-label="Versions"
+        tabIndex={0}
+        aria-activedescendant={selectedOid === null ? undefined : optionId(selectedOid)}
+        onKeyDown={onKeyDown}
+        className="flex flex-col gap-0.5 outline-none"
+      >
+        {revisions.map((revision) => {
+          const selected = revision.oid === selectedOid
+          return (
+            <div
+              key={revision.oid}
+              id={optionId(revision.oid)}
+              role="option"
+              aria-selected={selected}
+              onClick={() => onSelect(revision)}
+              className={cn(
+                'cursor-default rounded-lg px-3 py-2 text-text-muted hover:bg-surface-hover',
+                selected && 'bg-surface-hover text-text',
+              )}
+            >
+              <div className="truncate text-xs font-medium">
+                {formatDate(new Date(revision.timeMs), 'PP p')}
+              </div>
+              <div className="truncate text-xs">{revision.summary}</div>
             </div>
-            <div className="truncate text-xs">{revision.summary}</div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
       <div ref={endRef} className="flex justify-center py-2">
         {isFetchingNextPage ? (
           <Spinner className="size-4 text-text-muted" />

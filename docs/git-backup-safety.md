@@ -42,7 +42,9 @@ change, and never pushes a commit that reverts a pull.
 
 Git commands, note writes, and iCloud sweep writes on one graph are
 serialized. The quit-time and background flush go through the sync engine's
-queue, never straight to `git_commit_all`.
+queue, never straight to `git_commit_all`. The note history reads
+(`git_note_history`, `git_note_revision`) are exempt: they only read the
+object database, never the index, working tree or a ref.
 
 - Test: `git::tests::commit_during_fast_forward_never_reverts_pulled_notes`,
   `backup-service.test.ts` "quit flush waits for an in-flight pull before

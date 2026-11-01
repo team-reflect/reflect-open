@@ -1,7 +1,10 @@
 import { useCallback, useMemo } from 'react'
-import { skipToken, useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type { NoteRevision } from '@reflect/core'
-import { queryKeys } from '@/lib/query-client.ts'
+import {
+  createNoteRevisionTextQueryOptions,
+  createNoteRevisionsQueryOptions,
+} from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
@@ -22,20 +25,6 @@ export interface NoteRevisions {
 }
 
 /**
- * Whether the open graph keeps note history (it has a git repository).
- */
-export function useNoteHistoryAvailable(): boolean {
-  const { graph } = useGraph()
-  const { noteHistory } = useCoreServices()
-  const { data } = useQuery({
-    queryKey: queryKeys.noteHistory.available(graph?.root),
-    queryFn: () => noteHistory.isAvailable(),
-    enabled: graph !== null,
-  })
-  return data ?? false
-}
-
-/**
  * The revisions of the note at `path`, paged newest first. Refetched each
  * time a list mounts: new commits land every few seconds of editing.
  */
@@ -50,13 +39,7 @@ export function useNoteRevisions(path: string): NoteRevisions {
     isPending,
     isFetchingNextPage,
     isFetchNextPageError,
-  } = useInfiniteQuery({
-    queryKey: queryKeys.noteHistory.revisions(graph?.root, path),
-    queryFn: ({ pageParam }) => noteHistory.revisions(path, pageParam),
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: graph !== null,
-  })
+  } = useInfiniteQuery(createNoteRevisionsQueryOptions(noteHistory, graph?.root, path))
   const revisions = useMemo(() => data?.pages.flatMap((page) => page.revisions) ?? [], [data])
   const loadMore = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) {
@@ -77,8 +60,7 @@ export function useNoteRevisions(path: string): NoteRevisions {
 }
 
 /**
- * The note's full text at `revision`; `null` selects nothing. A revision
- * never changes, so its text is cached for the session.
+ * The note's full text at `revision`; `null` selects nothing.
  */
 export function useNoteRevisionText(revision: NoteRevision | null): {
   text: string | undefined
@@ -86,15 +68,8 @@ export function useNoteRevisionText(revision: NoteRevision | null): {
 } {
   const { graph } = useGraph()
   const { noteHistory } = useCoreServices()
-  const { data, error } = useQuery({
-    queryKey: queryKeys.noteHistory.revisionText(
-      graph?.root,
-      revision?.oid ?? '',
-      revision?.path ?? '',
-    ),
-    queryFn:
-      graph === null || revision === null ? skipToken : () => noteHistory.revisionText(revision),
-    staleTime: Infinity,
-  })
+  const { data, error } = useQuery(
+    createNoteRevisionTextQueryOptions(noteHistory, graph?.root, revision),
+  )
   return { text: data, error }
 }

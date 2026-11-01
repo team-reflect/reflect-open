@@ -20,11 +20,6 @@ export const NOTE_HISTORY_PAGE_SIZE = 50
  */
 export interface NoteHistoryService {
   /**
-   * Whether the open graph keeps history: it has a git repository. `false`
-   * when no graph is open.
-   */
-  isAvailable(): Promise<boolean>
-  /**
    * A page of the note's revisions, newest first, following renames. `after`
    * is the previous page's `nextCursor`.
    */
@@ -38,7 +33,8 @@ export interface NoteHistoryService {
    * current frontmatter stays: the id, the `private` flag, pins and gist
    * metadata describe the note now, and an old block could silently unlock a
    * private note. Pending edits are saved and committed first, so the text
-   * being replaced stays in history and the restore can itself be undone.
+   * being replaced stays in history and the restore can itself be undone;
+   * when that commit didn't land, nothing is restored.
    */
   restore(path: string, revision: NoteRevision): Promise<void>
 }
@@ -55,15 +51,6 @@ class NoteHistoryServiceImpl implements NoteHistoryService {
 
   constructor(deps: NoteHistoryServiceDeps) {
     this.#deps = deps
-  }
-
-  async isAvailable(): Promise<boolean> {
-    const session = this.#deps.graphSession.getState().session
-    if (session === null) {
-      return false
-    }
-    const status = await this.#deps.gitRepository.status(session.generation)
-    return status.initialized
   }
 
   async revisions(path: string, after: string | null): Promise<NoteHistoryPage> {
@@ -84,10 +71,21 @@ class NoteHistoryServiceImpl implements NoteHistoryService {
     const generation = this.#generation()
     const text = await gitRepository.noteRevision(revision, generation)
     await persistenceFlush.flushAll()
+    // The flush never rejects, so check its outcome: the text being replaced
+    // must be the note at HEAD, or it would be lost from history.
+    const committed = await gitRepository.noteRevision(
+      { ...revision, oid: 'HEAD', path },
+      generation,
+    )
     const { body } = splitFrontmatter(text)
     await noteDocuments.commitSourceEdit(
       path,
-      (current) => current.slice(0, splitFrontmatter(current).bodyOffset) + body,
+      (current) => {
+        if (current !== committed) {
+          throw new AppError('io', 'Couldn’t save the current version to history first')
+        }
+        return current.slice(0, splitFrontmatter(current).bodyOffset) + body
+      },
       { generation },
     )
   }

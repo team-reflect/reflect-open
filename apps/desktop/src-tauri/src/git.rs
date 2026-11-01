@@ -180,7 +180,8 @@ pub async fn git_note_history(
     run_blocking(move || reflect_git::note_history(&root, &path, after.as_deref(), limit)).await
 }
 
-/// The text of the note at `path` in revision `oid`.
+/// The text of the note at `path` in revision `oid` (or `HEAD`). Refuses any
+/// path that isn't a note.
 #[tauri::command]
 pub async fn git_note_revision(
     oid: String,

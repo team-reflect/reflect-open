@@ -11,7 +11,7 @@ use std::path::Path;
 use git2::{Delta, Oid, Repository, Sort, Tree};
 use serde::Serialize;
 
-use reflect_graph_paths::to_slash_lossy;
+use reflect_graph_paths::{is_note, to_slash_lossy};
 use reflect_types::{AppError, AppResult};
 
 use super::repo;
@@ -129,18 +129,22 @@ pub fn note_history(
     })
 }
 
-/// The note's text at revision `oid`, where it lived at `path`.
-pub fn note_at_revision(root: &Path, oid: &str, path: &str) -> AppResult<String> {
+/// The note's text at `revision` (a commit oid, or `HEAD`), where it lived at
+/// `path`. Only notes can be read, never other tracked files.
+pub fn note_at_revision(root: &Path, revision: &str, path: &str) -> AppResult<String> {
+    if !is_note(path) {
+        return Err(AppError::traversal(format!("{path} is not a note")));
+    }
     let repo = repo::open_existing(root)?;
-    let tree = repo.find_commit(Oid::from_str(oid)?)?.tree()?;
+    let tree = repo.revparse_single(revision)?.peel_to_commit()?.tree()?;
     let Some(blob_id) = blob_at(&tree, path) else {
         return Err(AppError::not_found(format!(
-            "{path} is not in revision {oid}"
+            "{path} is not in revision {revision}"
         )));
     };
     let blob = repo.find_blob(blob_id)?;
     String::from_utf8(blob.content().to_vec())
-        .map_err(|_| AppError::parse(format!("{path} in revision {oid} is not UTF-8 text")))
+        .map_err(|_| AppError::parse(format!("{path} in revision {revision} is not UTF-8 text")))
 }
 
 fn blob_at(tree: &Tree<'_>, path: &str) -> Option<Oid> {
@@ -170,6 +174,8 @@ fn path_in_parent(
 #[cfg(test)]
 mod history_tests {
     use std::fs;
+
+    use reflect_types::AppError;
 
     use super::{note_at_revision, note_history};
     use crate::MAX_FILE_BYTES;
@@ -217,6 +223,26 @@ mod history_tests {
             "# A\n\none\n"
         );
         assert!(note_at_revision(root, &first, "notes/missing.md").is_err());
+        assert_eq!(
+            note_at_revision(root, "HEAD", "notes/a.md").unwrap(),
+            "# A\n\ntwo\n"
+        );
+    }
+
+    #[test]
+    fn reads_only_notes() {
+        let fixture = fixture();
+        let root = &fixture.graph_a;
+        write(root, "notes/a.md", "# A\n");
+        write(root, "notes/data.txt", "secret\n");
+        let sha = commit(root);
+
+        for path in ["notes/data.txt", "../notes/a.md"] {
+            assert!(matches!(
+                note_at_revision(root, &sha, path),
+                Err(AppError::Traversal { .. })
+            ));
+        }
     }
 
     #[test]

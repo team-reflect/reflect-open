@@ -79,9 +79,6 @@ export const queryKeys = {
   },
   noteHistory: {
     all: ['note-history'] as const,
-    available(root: GraphRoot) {
-      return [...this.all, root, 'available'] as const
-    },
     revisions(root: GraphRoot, path: string) {
       return [...this.all, root, 'revisions', path] as const
     },

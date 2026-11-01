@@ -1,7 +1,7 @@
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import type { NoteRevision } from '@reflect/core'
-import { createTestCoreServices } from '@reflect/core/testing'
+import { createTestCoreServices, createTestPlatformService } from '@reflect/core/testing'
 import { NoteHistoryAction } from '@/components/context-sidebar/note-history-action.tsx'
 import { NoteHistoryProvider } from '@/providers/note-history-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -26,11 +26,11 @@ const TEXT: Record<string, string> = {
   a1: '---\nid: 01j\n---\n# Untitled\n\nolder words\n',
 }
 
-async function renderHistory(options?: { available?: boolean; revisions?: NoteRevision[] }) {
-  const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  const isAvailable = vi
-    .spyOn(core.noteHistory, 'isAvailable')
-    .mockResolvedValue(options?.available ?? true)
+async function renderHistory(options?: { nativeShell?: boolean; revisions?: NoteRevision[] }) {
+  const core = createTestCoreServices({
+    database: createWasmTestDatabaseService(),
+    platform: createTestPlatformService({ isNativeShell: options?.nativeShell ?? true }),
+  })
   const revisions = vi.spyOn(core.noteHistory, 'revisions').mockResolvedValue({
     revisions: options?.revisions ?? [NEWER, OLDER],
     nextCursor: null,
@@ -46,14 +46,13 @@ async function renderHistory(options?: { available?: boolean; revisions?: NoteRe
     </NoteHistoryProvider>,
     { core, route: { kind: 'note', path: PATH } },
   )
-  return { restore, isAvailable, revisions }
+  return { restore, revisions }
 }
 
 describe('NoteHistoryDialog', () => {
-  it('offers note history only for a graph that keeps it', async () => {
-    const { isAvailable } = await renderHistory({ available: false })
+  it('offers note history only in the native app', async () => {
+    await renderHistory({ nativeShell: false })
 
-    await vi.waitFor(() => expect(isAvailable).toHaveBeenCalled())
     await expect.element(page.getByRole('button', { name: 'Note history' })).not.toBeInTheDocument()
   })
 

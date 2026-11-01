@@ -198,10 +198,11 @@ const APP_COMMANDS: AppCommand[] = [
     keywords: ['history', 'versions', 'revisions', 'restore', 'undo', 'git', 'backup'],
     // The past versions of the note the current route edits, from the graph's
     // git history. No default keybinding: the palette keeps it
-    // keyboard-reachable without spending a shortcut.
+    // keyboard-reachable without spending a shortcut. Plain-browser dev has
+    // no git, so it no-ops there.
     run: (context) => {
       const path = context.notePath()
-      if (path === null) {
+      if (path === null || !context.services.platform.isNativeShell) {
         return
       }
       context.openNoteHistory(path)
