@@ -1,13 +1,19 @@
+import type { MaybePromise } from '@reflect/utils'
 import {
-  contactsCanLookup,
+  createContactsService,
   lookupContactPeople,
   type ContactsService,
   type ContactsState,
 } from '../contacts/contacts-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { ContactMatch, ContactsAuthorization } from '../contacts/commands.ts'
-import { WritableStore } from '../store.ts'
+import {
+  isContactsReadable,
+  type ContactMatch,
+  type ContactsAuthorization,
+} from '../contacts/commands.ts'
 import type { Settings } from '../settings/schema.ts'
+import { createTestIpcBridgeService } from './ipc.ts'
+import { createTestLoggerService } from './logger.ts'
 
 export interface TestContactsServiceOptions {
   /**
@@ -27,9 +33,9 @@ export type ContactsLookup =
 
 export interface TestContactsService extends ContactsService {
   /**
-   * Set the permission state, as the OS and as already read by the app.
+   * Set the permission state in the OS, and resolve once the app has read it.
    */
-  setStatus(status: ContactsAuthorization): void
+  setStatus(status: ContactsAuthorization): Promise<void>
   setContacts(contacts: readonly ContactMatch[]): void
   /**
    * How many times `requestAccess` ran.
@@ -46,46 +52,46 @@ function words(text: string): string[] {
 }
 
 class TestContactsServiceImpl implements TestContactsService {
-  readonly #grantAccess: boolean
+  readonly #inner: ContactsService
   readonly #log: ContactsLookup[] = []
   #status: ContactsAuthorization
   #contacts: ContactMatch[]
   #requests = 0
-  readonly #state: WritableStore<ContactsState>
   readonly get: () => ContactsState
   readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(options?: TestContactsServiceOptions) {
     this.#status = options?.status ?? 'authorized'
     this.#contacts = [...(options?.contacts ?? [])]
-    this.#grantAccess = options?.grantAccess ?? true
-    this.#state = new WritableStore<ContactsState>(
-      { authorization: this.#status },
-      (a, b) => a.authorization === b.authorization,
-    )
-    this.get = this.#state.get
-    this.subscribe = this.#state.subscribe
+    const grantAccess = options?.grantAccess ?? true
+    const ipc = createTestIpcBridgeService({
+      commands: {
+        contacts_authorization_status: () => this.#status,
+        contacts_request_access: () => {
+          this.#requests++
+          if (this.#status === 'notDetermined') {
+            this.#status = grantAccess ? 'authorized' : 'denied'
+          }
+          return isContactsReadable(this.#status)
+        },
+      },
+    })
+    this.#inner = createContactsService({ ipc, logger: createTestLoggerService() })
+    this.get = this.#inner.get
+    this.subscribe = this.#inner.subscribe
+    void this.#inner.refresh()
   }
 
-  refresh(): Promise<void> {
-    return Promise.try(() => {
-      this.#adoptStatus()
-    })
+  refresh(): MaybePromise<void> {
+    return this.#inner.refresh()
   }
 
-  requestAccess(): Promise<boolean> {
-    return Promise.try(() => {
-      this.#requests++
-      if (this.#status === 'notDetermined') {
-        this.#status = this.#grantAccess ? 'authorized' : 'denied'
-      }
-      this.#adoptStatus()
-      return this.#status === 'authorized' || this.#status === 'limited'
-    })
+  requestAccess(): MaybePromise<boolean> {
+    return this.#inner.requestAccess()
   }
 
   canLookup(settings: Pick<Settings, 'contactsEnabled'>): boolean {
-    return contactsCanLookup(this.#state.get(), settings)
+    return this.#inner.canLookup(settings)
   }
 
   lookupPeople(query: string): Promise<ContactMatch[]> {
@@ -115,9 +121,9 @@ class TestContactsServiceImpl implements TestContactsService {
     )
   }
 
-  setStatus(next: ContactsAuthorization): void {
+  async setStatus(next: ContactsAuthorization): Promise<void> {
     this.#status = next
-    this.#adoptStatus()
+    await this.#inner.refresh()
   }
 
   setContacts(next: readonly ContactMatch[]): void {
@@ -131,15 +137,12 @@ class TestContactsServiceImpl implements TestContactsService {
   lookups(): readonly ContactsLookup[] {
     return [...this.#log]
   }
-
-  #adoptStatus(): void {
-    this.#state.set({ authorization: this.#status })
-  }
 }
 
 /**
- * An in-memory {@link ContactsService} over a fixed address book. Its state
- * starts read: `get` answers `status` at once.
+ * The real {@link ContactsService} over an in-memory permission and a fixed
+ * address book. It reads `status` on creation, so `get` answers `null` until
+ * that read lands.
  * `lookupByEmail` matches an address case-insensitively; `lookupByName`
  * matches when every query word is a prefix of a word in a contact's names.
  * Like the OS, `requestAccess` prompts only while the status is
