@@ -280,6 +280,32 @@ describe('DailyCaptureMenu', () => {
     expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
   })
 
+  it('removes a late task even while an earlier sheet’s delete is still pending', async () => {
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await focusedSheetEditor()
+    // The first sheet is dismissed untyped; its empty-task delete stays in flight.
+    const firstDelete = Promise.withResolvers<TaskWriteResult>()
+    writeTask.mockReturnValueOnce(firstDelete.promise)
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    await expect.element(sheet).not.toBeInTheDocument()
+
+    const pending = Promise.withResolvers<typeof INSERTED>()
+    insertTask.mockReturnValueOnce(pending.promise)
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await view.unmount()
+    pending.resolve({ ...INSERTED, created: { ...INSERTED.created, astPath: [1] } })
+
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(2))
+    expect(writeTask).toHaveBeenLastCalledWith(expect.objectContaining({ astPath: [1] }), [
+      { kind: 'remove' },
+    ])
+    firstDelete.resolve(WRITTEN)
+  })
+
   it('opens no sheet when adding the task fails', async () => {
     insertTask.mockRejectedValue(new Error('disk full'))
     const view = await renderMenu()

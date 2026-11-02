@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { isSameTask, todaysDailyTarget, type OpenTask, type Unlisten } from '@reflect/core'
+import {
+  errorMessage,
+  isSameTask,
+  todaysDailyTarget,
+  type OpenTask,
+  type Unlisten,
+} from '@reflect/core'
 import { useTaskActions, type TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The Daily capture menu's new-task sheet state; see {@link useNewTaskSheet}.
@@ -41,6 +47,7 @@ export interface NewTaskSheet {
  */
 export function useNewTaskSheet(): NewTaskSheet {
   const { tasks: taskService } = useCoreServices()
+  const { operations } = useAppServices()
   const today = useToday()
   const actions = useTaskActions()
   const [created, setCreated] = useState<OpenTask | null>(null)
@@ -71,6 +78,17 @@ export function useNewTaskSheet(): NewTaskSheet {
   // the guard then refuses any write that no longer applies.
   const task = created === null ? null : (rows?.find((row) => isSameTask(row, created)) ?? created)
 
+  // Straight to the service, not `actions.remove`: that skips while a delete
+  // is pending (a repeat-key guard), and after unmount it reads the pending
+  // state frozen at the tap, so an earlier sheet's delete would drop this one.
+  const removeUnclaimed = async (inserted: OpenTask): Promise<void> => {
+    try {
+      await taskService.deleteTasks([inserted])
+    } catch (cause) {
+      operations.start('Deleting tasks').fail(errorMessage(cause))
+    }
+  }
+
   const start = async (): Promise<void> => {
     if (insertingRef.current) {
       return
@@ -82,7 +100,7 @@ export function useNewTaskSheet(): NewTaskSheet {
       return
     }
     if (!mountedRef.current) {
-      actions.remove([inserted])
+      void removeUnclaimed(inserted)
       return
     }
     setCreated(inserted)
