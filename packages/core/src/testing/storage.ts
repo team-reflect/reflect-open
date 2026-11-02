@@ -1,4 +1,5 @@
 import type { KeyValueStore, StorageService } from '../ports/storage-service.ts'
+import { DefaultMap } from '@ocavue/utils'
 import { WritableStore, type Store } from '../store.ts'
 
 export interface TestStorageService extends StorageService {
@@ -10,7 +11,9 @@ export interface TestStorageService extends StorageService {
 
 class MemoryStore implements KeyValueStore {
   readonly #values: Map<string, string>
-  readonly #stores = new Map<string, WritableStore<string | null>>()
+  readonly #stores = new DefaultMap<string, WritableStore<string | null>>(
+    () => new WritableStore<string | null>(null),
+  )
 
   constructor(initial: Record<string, string>) {
     this.#values = new Map(Object.entries(initial))
@@ -29,7 +32,7 @@ class MemoryStore implements KeyValueStore {
     } else {
       this.#values.set(key, value)
     }
-    this.#stores.get(key)?.set(value)
+    this.#stores.get(key).set(value)
   }
 
   subscribe(key: string, listener: () => void): () => void {
@@ -37,11 +40,8 @@ class MemoryStore implements KeyValueStore {
   }
 
   store(key: string): Store<string | null> {
-    let store = this.#stores.get(key)
-    if (store === undefined) {
-      store = new WritableStore(this.get(key))
-      this.#stores.set(key, store)
-    }
+    const store = this.#stores.get(key)
+    store.set(this.get(key))
     return store
   }
 

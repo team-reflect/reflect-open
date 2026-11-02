@@ -1,5 +1,6 @@
 import type { ZodType } from 'zod'
 import { safeParseJson } from '@reflect/utils'
+import { DefaultMap } from '@ocavue/utils'
 import { WritableStore, type Store } from '../store.ts'
 import type { LoggerService } from './logger-service.ts'
 
@@ -44,7 +45,9 @@ class WebKeyValueStore implements KeyValueStore {
   readonly #name: string
   readonly #storage: Storage | null
   readonly #cache = new Map<string, string | null>()
-  readonly #stores = new Map<string, WritableStore<string | null>>()
+  readonly #stores = new DefaultMap<string, WritableStore<string | null>>(
+    () => new WritableStore<string | null>(null),
+  )
   #warned = false
 
   constructor(logger: LoggerService, name: string, storage: Storage | null) {
@@ -81,7 +84,7 @@ class WebKeyValueStore implements KeyValueStore {
     } catch (error) {
       this.#warn('writing', key, error)
     }
-    this.#stores.get(key)?.set(value)
+    this.#stores.get(key).set(value)
   }
 
   subscribe(key: string, listener: () => void): () => void {
@@ -89,11 +92,8 @@ class WebKeyValueStore implements KeyValueStore {
   }
 
   store(key: string): Store<string | null> {
-    let store = this.#stores.get(key)
-    if (store === undefined) {
-      store = new WritableStore(this.get(key))
-      this.#stores.set(key, store)
-    }
+    const store = this.#stores.get(key)
+    store.set(this.get(key))
     return store
   }
 
