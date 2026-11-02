@@ -18,23 +18,6 @@ import type {
   SubscriptionState,
 } from '../monetization/subscription-service.ts'
 
-class Listeners {
-  readonly #listeners = new Set<() => void>()
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
-
-  notify(): void {
-    for (const listener of this.#listeners) {
-      listener()
-    }
-  }
-}
-
 export type ClassicAccessCall = 'read' | 'load' | 'signIn' | 'signOut' | 'start'
 
 export interface TestClassicAccessService extends ClassicAccessService {
@@ -57,7 +40,7 @@ export interface TestClassicAccessService extends ClassicAccessService {
 }
 
 class TestClassicAccessServiceImpl implements TestClassicAccessService {
-  #current: ClassicAccessState
+  readonly #state: WritableStore<ClassicAccessState>
   #signIn: (options: ClassicSignInOptions) => Promise<ClassicSignInResult> = () => {
     return Promise.resolve({
       kind: 'cancelled',
@@ -65,24 +48,28 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
   }
   readonly #log: ClassicAccessCall[] = []
   readonly #signInLog: ClassicSignInOptions[] = []
-  readonly #listeners = new Listeners()
+  readonly get: () => ClassicAccessState
+  readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(state?: Partial<ClassicAccessState>) {
-    this.#current = { access: null, active: false, isLoading: false, ...state }
+    this.#state = new WritableStore<ClassicAccessState>({
+      access: null,
+      active: false,
+      isLoading: false,
+      ...state,
+    })
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
   }
-
-  readonly getState = (): ClassicAccessState => this.#current
-
-  readonly subscribe = this.#listeners.subscribe
 
   read(): ClassicAccess | null {
     this.#log.push('read')
-    return this.#current.access
+    return this.get().access
   }
 
   load(): ClassicAccess | null {
     this.#log.push('load')
-    return this.#current.access
+    return this.get().access
   }
 
   async signIn(options: ClassicSignInOptions): Promise<ClassicSignInResult> {
@@ -103,8 +90,7 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
   }
 
   setState(patch: Partial<ClassicAccessState>): void {
-    this.#current = { ...this.#current, ...patch }
-    this.#listeners.notify()
+    this.#state.set({ ...this.get(), ...patch })
   }
 
   setSignIn(handler: (options: ClassicSignInOptions) => Promise<ClassicSignInResult>): void {
