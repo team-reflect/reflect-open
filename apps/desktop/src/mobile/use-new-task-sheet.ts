@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { isSameTask, todaysDailyTarget, type OpenTask, type Unlisten } from '@reflect/core'
 import { useTaskActions, type TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
@@ -9,7 +9,8 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export interface NewTaskSheet {
   /**
-   * Add an empty task to today's daily note, then open the sheet on it.
+   * Add an empty task to today's daily note, then open the sheet on it. A
+   * call while an earlier insert is still pending does nothing.
    */
   start: () => void
   /**
@@ -35,7 +36,8 @@ export interface NewTaskSheet {
  * shows another day, like the Tasks tab), then opens the quick-edit sheet on
  * it for the caller to render with the editor focused. The sheet's exit rules
  * own the rest: an untyped task is deleted on dismissal, so a change of heart
- * leaves no bare `+ [ ]` in the note.
+ * leaves no bare `+ [ ]` in the note. A task that lands after the screen has
+ * gone gets no sheet, so it is deleted at once for the same reason.
  */
 export function useNewTaskSheet(): NewTaskSheet {
   const { tasks: taskService } = useCoreServices()
@@ -43,6 +45,16 @@ export function useNewTaskSheet(): NewTaskSheet {
   const actions = useTaskActions()
   const [created, setCreated] = useState<OpenTask | null>(null)
   const [open, setOpen] = useState(false)
+  // Set while an insert is pending: a second tap must not add a second task
+  // the sheet never shows. A ref, so a tap in the same tick already sees it.
+  const insertingRef = useRef(false)
+  const mountedRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // Follow the task rows only while the sheet is up: a subscription reads
   // every open task in the graph and re-reads on each index change, which the
@@ -60,11 +72,21 @@ export function useNewTaskSheet(): NewTaskSheet {
   const task = created === null ? null : (rows?.find((row) => isSameTask(row, created)) ?? created)
 
   const start = async (): Promise<void> => {
-    const inserted = await actions.insert(todaysDailyTarget(today))
-    if (inserted !== null) {
-      setCreated(inserted)
-      setOpen(true)
+    if (insertingRef.current) {
+      return
     }
+    insertingRef.current = true
+    const inserted = await actions.insert(todaysDailyTarget(today))
+    insertingRef.current = false
+    if (inserted === null) {
+      return
+    }
+    if (!mountedRef.current) {
+      actions.remove([inserted])
+      return
+    }
+    setCreated(inserted)
+    setOpen(true)
   }
 
   return {

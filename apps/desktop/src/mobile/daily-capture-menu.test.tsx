@@ -125,6 +125,15 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
  */
 const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
 
+/**
+ * The empty task `insertTask` writes at the top of today's note.
+ */
+const INSERTED: Awaited<ReturnType<TaskService['insertTask']>> = {
+  created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+  moved: [],
+  updatedAt: 0,
+}
+
 let core: TestCoreServices
 let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
 let insertTask: MockInstance<TaskService['insertTask']>
@@ -147,11 +156,7 @@ beforeEach(() => {
   // Today is 2026-06-14.
   core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
   getOpenTasks = vi.spyOn(core.tasks, 'getOpenTasks').mockResolvedValue([])
-  insertTask = vi.spyOn(core.tasks, 'insertTask').mockResolvedValue({
-    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
-    moved: [],
-    updatedAt: 0,
-  })
+  insertTask = vi.spyOn(core.tasks, 'insertTask').mockResolvedValue(INSERTED)
   writeTask = vi.spyOn(core.tasks, 'writeTask').mockResolvedValue(WRITTEN)
 })
 
@@ -295,6 +300,36 @@ describe('DailyCaptureMenu', () => {
     await view.getByRole('button', { name: 'dismiss-drawer' }).click()
 
     // V1's empty-task rule: a change of heart leaves no bare `+ [ ]` behind.
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
+  })
+
+  it('adds one task when New task is tapped again before the first lands', async () => {
+    const pending = Promise.withResolvers<typeof INSERTED>()
+    insertTask.mockReturnValue(pending.promise)
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    pending.resolve(INSERTED)
+
+    await expect.element(view.getByRole('textbox', { name: 'Task text' })).toBeInTheDocument()
+    expect(insertTask).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes a task that lands after the menu has gone', async () => {
+    const pending = Promise.withResolvers<typeof INSERTED>()
+    insertTask.mockReturnValue(pending.promise)
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    await view.unmount()
+    pending.resolve(INSERTED)
+
+    // No sheet will ever show it, so it must not stay behind as a bare `+ [ ]`.
     await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
     expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
   })
