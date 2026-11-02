@@ -1,6 +1,6 @@
 import type { ZodType } from 'zod'
 import { safeParseJson } from '@reflect/utils'
-import { WritableStore } from '../store.ts'
+import { type Store, WritableStore } from '../store.ts'
 import type { LoggerService } from './logger-service.ts'
 
 /**
@@ -19,6 +19,10 @@ export interface KeyValueStore {
    * Calls `listener` after every change to `key` made through this store.
    */
   subscribe(key: string, listener: () => void): () => void
+  /**
+   * The value of `key` as a `Store`. The same key returns the same store.
+   */
+  store(key: string): Store<string | null>
 }
 
 /**
@@ -68,6 +72,10 @@ class WebKeyValueStore implements KeyValueStore {
 
   subscribe(key: string, listener: () => void): () => void {
     return this.#store(key).subscribe(listener)
+  }
+
+  store(key: string): Store<string | null> {
+    return this.#store(key)
   }
 
   #store(key: string): WritableStore<string | null> {

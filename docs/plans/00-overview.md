@@ -80,7 +80,7 @@ before the editor, and the editor lands before search/AI.
 | 20 | [Asset descriptions](20-asset-descriptions.md) | **Post-release add-on.** AI-generated `.reflect.md` description files for referenced, non-private images/PDFs under `assets/`; BYOK, privacy-gated, manual backfill |
 | 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **Shipped (2026-07-04).** iCloud Drive as the primary consumer sync path: graphs in the app's iCloud container, deterministic resolution ladder over per-device shadow bases (markers as the fallback), `.reflect/`/`.git/` sync-exclusion, iCloud-first onboarding on both platforms with multi-graph lists + the mobile switcher; git remotes stay the self-managed path. AI-assisted resolution deferred |
 | 22 | [Mobile GitHub connect](22-mobile-github-connect.md) | **Implemented; device pass pending.** The connect front door for local (non-iCloud) graphs on iOS: shared wizard hook, `ConnectGithubDrawer`, Settings entry point — no new sync mechanism |
-| 23 | [Mobile AI chat](23-mobile-ai-chat.md) | The Plan 10 chat on iOS as a fourth tab: same engine/store/privacy gate, mobile composer + history/model sheets, per-device BYOK provider settings, lexical-only `search_notes`; streaming-on-iOS spike gates the build |
+| 23 | [Mobile AI chat](23-mobile-ai-chat.md) | **Implemented; device streaming pass pending.** The Plan 10 chat on iOS, reached from the All tab ("Search or ask…" Ask row + header Chat button; a fourth tab until 2026-11): same engine/store/privacy gate, mobile composer + history/model sheets, per-device BYOK provider settings, lexical-only `search_notes` |
 
 ## Milestone map
 

@@ -1,5 +1,5 @@
 import type { KeyValueStore, StorageService } from '../ports/storage-service.ts'
-import { WritableStore } from '../store.ts'
+import { type Store, WritableStore } from '../store.ts'
 
 export interface TestStorageService extends StorageService {
   /**
@@ -27,6 +27,10 @@ class MemoryStore implements KeyValueStore {
 
   subscribe(key: string, listener: () => void): () => void {
     return this.#store(key).subscribe(listener)
+  }
+
+  store(key: string): Store<string | null> {
+    return this.#store(key)
   }
 
   dump(): Record<string, string> {

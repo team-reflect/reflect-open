@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { History, MessageSquare, Plus } from 'lucide-react'
+import { ChevronLeft, History, MessageSquare, Plus } from 'lucide-react'
 import { ChatTurnList } from '@/components/chat/chat-turn-list.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
@@ -9,19 +9,21 @@ import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/c
 import { useRouter } from '@/routing/router.tsx'
 
 /**
- * The Chat tab (Plan 23): desktop's dedicated chat view as a root tab —
+ * The Chat screen (Plan 23): desktop's dedicated chat view as a card pushed
+ * over All, where the search field's Ask row and the Chat button open it —
  * the transcript reuses desktop's turn components wholesale (tool chips,
  * settled-markdown citations that navigate), over a mobile composer and
  * bottom-sheet history/model pickers. The conversation and draft live in
- * the graph's `ChatSession` above the screen, so switching tabs and coming back
- * loses nothing. With no AI provider configured the tab is one
+ * the graph's `ChatSession` above the screen, so going back and coming in
+ * again loses nothing. Back pops the stack (a cold entry lands on today, as
+ * the back-swipe does). With no AI provider configured the screen is one
  * call-to-action into Settings, where keys are added per device.
  */
 export function MobileChat(): ReactElement {
   const providers = useChatProviders()
   const hasTurns = useHasChatTurns()
   const { newChat } = useChatActions()
-  const { navigate } = useRouter()
+  const { navigate, back, canBack } = useRouter()
   const [historyOpen, setHistoryOpen] = useState(false)
   const hasProvider = providers.length > 0
 
@@ -29,6 +31,13 @@ export function MobileChat(): ReactElement {
     <div className="flex h-full w-screen flex-col pt-safe">
       <MobileTopBar>
         <MobileTopBarRow>
+          <MobileTopBarIconButton
+            edge="leading"
+            aria-label="Back"
+            onClick={() => (canBack ? back() : navigate({ kind: 'today' }))}
+          >
+            <ChevronLeft aria-hidden />
+          </MobileTopBarIconButton>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>
           {hasProvider ? (
             <>
