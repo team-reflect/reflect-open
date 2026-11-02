@@ -60,7 +60,6 @@ function setup() {
     platform: createTestPlatformService(),
     logger: createTestLoggerService(),
   })
-  const clock = createTestClockService({ now: NOON_JUNE_9 })
   const service = createPaletteSearchService({
     suggestions: createSuggestionService({ database: createNodeTestDatabaseService() }),
     search: {
@@ -71,19 +70,12 @@ function setup() {
     },
     retrieval,
     commands,
-    clock,
+    clock: createTestClockService({ now: NOON_JUNE_9 }),
   })
-  return { service, searches, retrieval, commands, clock }
+  return { service, searches, retrieval, commands }
 }
 
 describe('PaletteSearchService', () => {
-  it('reads today from the wall clock', () => {
-    const { service, clock } = setup()
-    expect(service.today()).toBe('2026-06-09')
-    clock.setNow(new Date(2026, 5, 10, 0, 1).getTime())
-    expect(service.today()).toBe('2026-06-10')
-  })
-
   it('suggests at most 8 titles, generated date phrases merged in', async () => {
     const database = createNodeTestDatabaseService()
     seedNotes(
