@@ -1,3 +1,4 @@
+import { addDaysToIsoDate, isIsoDate, parseIsoDate } from '@reflect/utils'
 import type { MeetingAttendee } from '../contacts/meeting-service.ts'
 import type { CalendarAttendee, CalendarEvent } from './calendar-service.ts'
 
@@ -93,12 +94,11 @@ export function defaultAttendees(event: CalendarEvent): MeetingAttendee[] {
  * (EventKit predicates work in absolute time).
  */
 export function dayRange(date: string): { start: number; end: number } {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
-  if (match === null) {
+  if (!isIsoDate(date)) {
     throw new Error(`dayRange expects an ISO YYYY-MM-DD date, got: ${date}`)
   }
-  const [, year, month, day] = match
-  const start = new Date(Number(year), Number(month) - 1, Number(day))
-  const end = new Date(Number(year), Number(month) - 1, Number(day) + 1)
-  return { start: start.getTime(), end: end.getTime() }
+  return {
+    start: parseIsoDate(date).getTime(),
+    end: parseIsoDate(addDaysToIsoDate(date, 1)).getTime(),
+  }
 }
