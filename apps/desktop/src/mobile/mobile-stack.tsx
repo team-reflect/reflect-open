@@ -77,11 +77,17 @@ function layerKey(route: Route): string {
 /**
  * The animation an arrival deserves, V1 semantics: entering the note stack
  * slides in, leaving it slides out, moving within it follows history order,
- * and root-to-root moves (tab switches, date links) stay instant.
+ * and root-to-root moves (tab switches, date links) stay instant. A card that
+ * lands over a different root than the screen being left (the All tab
+ * returning to its open Chat or note, with All's list put beneath it) is a
+ * tab switch too, so it appears in place.
+ *
+ * @param below The screen the arriving route sits on (what its Back reveals).
  */
 function transitionFor(
   from: { route: Route; entryId: number },
   to: { route: Route; entryId: number },
+  below: Route,
 ): StackTransition {
   const fromStacked = isStacked(from.route)
   const toStacked = isStacked(to.route)
@@ -90,7 +96,7 @@ function transitionFor(
     exiting: { key: layerKey(from.route), route: from.route },
   }
   if (toStacked && !fromStacked) {
-    return { kind: 'push' }
+    return layerKey(below) === layerKey(from.route) ? { kind: 'push' } : { kind: 'none' }
   }
   if (!toStacked && fromStacked) {
     return pop
@@ -230,7 +236,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     setTransition(
       poppedByGesture || reducedMotion
         ? { kind: 'none' }
-        : transitionFor(arrival, { route, entryId }),
+        : transitionFor(arrival, { route, entryId }, backRoute ?? { kind: 'today' }),
     )
   } else if (route !== arrival.route) {
     // Same entry, new route object: a note move rewrote the history in

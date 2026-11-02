@@ -5,6 +5,7 @@ import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import { MobileStack } from '@/mobile/mobile-stack.tsx'
 import { MobileTabBar, tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { SafeAreaBoundary } from '@/mobile/safe-area-boundary.tsx'
+import { useAllTabScreen } from '@/mobile/use-all-tab-screen.ts'
 import {
   EMPTY_ALL_NOTES_FILTERS,
   type AllNotesFilters,
@@ -27,9 +28,12 @@ function dailyRouteFrom(route: Route): DailyRoute | null {
  * keeps whichever tab it was opened from, so reading a search result
  * doesn't flip the bar. The All tab's search text and filter badges live
  * here, not in the screen, so opening a note and coming back loses neither.
+ * All also remembers the card it was left on (an open Chat or note): tapping
+ * All from another tab returns to it, and tapping All again, or
+ * double-tapping it, goes back to the list.
  */
 export function MobileShell(): ReactElement {
-  const { route, navigate, entryId } = useRouter()
+  const { route, navigate, entryId, backRoute } = useRouter()
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
@@ -53,10 +57,14 @@ export function MobileShell(): ReactElement {
     }
   }, [route, entryId])
 
-  // A note keeps whichever tab it was opened from: routes that don't map to a
-  // tab fall back to the last one, remembered across renders. Tracking that in
-  // state (adjusted during render) avoids reading/writing a ref in render.
-  const tab: MobileTab = tabRootFor(route) ?? lastTab
+  // A card (a note, Chat) keeps the tab of the screen it was opened from:
+  // the tab root its Back reveals, which also covers All returning to its
+  // card with the list put beneath it in the same render. Deeper cards (a
+  // note opened from a note) fall back to the last tab, remembered across
+  // renders. Tracking that in state (adjusted during render) avoids
+  // reading/writing a ref in render.
+  const tab: MobileTab =
+    tabRootFor(route) ?? (backRoute === null ? null : tabRootFor(backRoute)) ?? lastTab
   const currentDailyRoute = dailyRouteFrom(route)
   if (tab !== lastTab) {
     setLastTab(tab)
@@ -64,14 +72,29 @@ export function MobileShell(): ReactElement {
   if (currentDailyRoute !== null && !routesEqual(currentDailyRoute, lastDailyRoute)) {
     setLastDailyRoute(currentDailyRoute)
   }
+  const allScreen = useAllTabScreen(route, tab)
 
   const handleTabSelect = (next: MobileTab): void => {
-    const doubleTap = isDoubleTap(next)
+    // From another tab, All returns to the card it was left on. That tap
+    // moves off All's list by itself, so it must still pair with a quick
+    // second tap.
+    const restoredAllScreen = next === 'all' && tab !== 'all' ? allScreen : null
+    const doubleTap = isDoubleTap(next, { leavesKey: restoredAllScreen !== null })
 
     if (next === 'all') {
-      // The double-tap is a search gesture: land on the tab with its search
-      // input focused (the Daily tab's capture double-tap, All-flavored).
-      navigate({ kind: 'allNotes', tag: null }, doubleTap ? { focusEditor: true } : undefined)
+      const allList: Route = { kind: 'allNotes', tag: null }
+      if (restoredAllScreen !== null && !doubleTap) {
+        // The list goes underneath, so the card's Back lands on All (and the
+        // bar lights All), not the tab just left.
+        navigate(allList)
+        navigate(restoredAllScreen)
+        return
+      }
+      // Tapped on All (its list or a card over it), the tab pops back to the
+      // list. The double-tap is a search gesture: it lands there with the
+      // search input focused (the Daily tab's capture double-tap,
+      // All-flavored).
+      navigate(allList, doubleTap ? { focusEditor: true } : undefined)
       return
     }
 

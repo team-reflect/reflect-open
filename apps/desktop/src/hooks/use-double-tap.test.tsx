@@ -87,6 +87,30 @@ describe('useDoubleTap', () => {
     })
   })
 
+  it('forgives a leavesKey tap its own move off the key, but not a later one', async () => {
+    // The All tab returning to an open Chat: the first tap itself moves the
+    // route off the All root, and a quick second tap must still pair.
+    const hook = await mountTaps('a')
+    atTimes(1000, 1100, 2000, 2100)
+    await act(() => {
+      expect(hook.result.current('b', { leavesKey: true })).toBe(false)
+    })
+    await hook.rerender(null)
+    await act(() => {
+      expect(hook.result.current('b')).toBe(true)
+    })
+
+    // Forgiven once: a further move (a deep link) still strands the tap.
+    await act(() => {
+      expect(hook.result.current('b', { leavesKey: true })).toBe(false)
+    })
+    await hook.rerender('a')
+    await hook.rerender(null)
+    await act(() => {
+      expect(hook.result.current('b')).toBe(false)
+    })
+  })
+
   it('honors a custom window', async () => {
     const hook = await renderHook(() => useDoubleTap<string>('a', 100))
     atTimes(1000, 1150)
