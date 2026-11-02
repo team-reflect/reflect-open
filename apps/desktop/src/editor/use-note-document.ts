@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   createDocumentBinding,
   INITIAL_NOTE_SNAPSHOT,
+  WritableStore,
   type DocumentBinding,
+  type NoteSession,
   type NoteSessionSnapshot,
   type RenameCoordinator,
+  type Store,
 } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import type { NoteEditorHandle } from './note-editor.tsx'
@@ -61,6 +65,8 @@ export interface NoteDocumentOptions {
   missingSeed?: string | undefined
 }
 
+const INITIAL_SNAPSHOT_STORE: Store<NoteSessionSnapshot> = new WritableStore(INITIAL_NOTE_SNAPSHOT)
+
 /**
  * @param path graph-relative path of the open note; the session writes to the
  *   graph open when it is created, and is read-only while no graph is open.
@@ -69,7 +75,8 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
   const createIfMissing = options?.createIfMissing ?? false
   const trackRenames = options?.trackRenames ?? false
   const missingSeed = options?.missingSeed
-  const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
+  const [session, setSession] = useState<NoteSession | null>(null)
+  const snapshot = useStore(session?.snapshot ?? INITIAL_SNAPSHOT_STORE)
   const editorRef = useRef<NoteEditorHandle | null>(null)
   /**
    * The pane's lifecycle policy object — one per hook instance.
@@ -97,7 +104,6 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
           path,
           readOnly: !canWrite,
           classify: checkRoundTrip,
-          onSnapshot: setSnapshot,
           applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
           reconcilePendingEditorInput: () => {
             // Meowdown 0.43.1 synchronously emits onDocChange only when this
@@ -114,6 +120,7 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
         })
       },
     })
+    setSession(session)
     if (created) {
       session.load()
     }

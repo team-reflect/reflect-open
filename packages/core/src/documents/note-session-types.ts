@@ -1,9 +1,10 @@
+import type { Store } from '../store.ts'
 import type { FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { RoundTripFidelity } from '@meowdown/markdown'
 
 export type NoteSessionStatus = 'loading' | 'ready' | 'error'
 
-/** The observable document state, emitted to `onSnapshot` whenever it changes. */
+/** The observable document state, held by {@link NoteSession.snapshot}. */
 export interface NoteSessionSnapshot {
   status: NoteSessionStatus
   /**
@@ -56,8 +57,6 @@ export interface NoteSessionOptions {
    * Round-trip fidelity check gating editability (meowdown's `checkRoundTrip`).
    */
   classify: (markdown: string) => RoundTripFidelity
-  /** Receives every state change. Not called after `dispose()`. */
-  onSnapshot: (snapshot: NoteSessionSnapshot) => void
   /**
    * Receives the full document (frontmatter + body) whenever it transitions
    * to a known-on-disk state: the initial load, an adopted external change
@@ -105,6 +104,10 @@ export interface NoteSessionOptions {
 export interface NoteSession {
   /** The graph-relative path this session is bound to (mutable via {@link NoteSession.retarget}). */
   readonly path: string
+  /**
+   * The document state. It stops changing after `dispose()`.
+   */
+  readonly snapshot: Store<NoteSessionSnapshot>
   /**
    * Rebind the session to a renamed path (Plan 17). The *file* moved; the
    * document didn't: buffer, header, and dirtiness are all

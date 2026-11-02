@@ -597,13 +597,13 @@ function lazySession(
   }).create({
     path: 'notes/new.md',
     classify: () => 'exact',
-    onSnapshot: (snapshot) => {
-      snapshots.push(snapshot)
-    },
     applyContent: () => {},
     createIfMissing: true,
     missingSeed: '#\n',
     saveDebounceMs: 10,
+  })
+  session.snapshot.subscribe(() => {
+    snapshots.push(session.snapshot.get())
   })
   return { session, snapshots }
 }

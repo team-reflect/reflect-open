@@ -130,9 +130,6 @@ function harness(options?: {
     path: PATH,
     readOnly: options?.write === false,
     classify: options?.classify ?? (() => 'exact'),
-    onSnapshot: (snapshot) => {
-      snapshots.push(snapshot)
-    },
     applyContent: (markdown) => {
       applied.push(markdown)
       options?.onApply?.(markdown)
@@ -144,6 +141,9 @@ function harness(options?: {
     createIfMissing: options?.createIfMissing,
     missingSeed: options?.missingSeed,
     saveDebounceMs: 10,
+  })
+  session.snapshot.subscribe(() => {
+    snapshots.push(session.snapshot.get())
   })
   return {
     snapshots,
@@ -1192,7 +1192,7 @@ describe('commitSourceEdit', () => {
       beforeRead: () => pendingRead.promise,
     })
     h.session.load()
-    expect(h.snapshots.at(-1)?.status).toBe('loading')
+    expect(h.session.snapshot.get().status).toBe('loading')
 
     let result: boolean | undefined
     const commit = h.session

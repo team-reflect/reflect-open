@@ -202,7 +202,7 @@ describe('reloadAll with live sessions', () => {
     snapshots: NoteSessionSnapshot[],
     options?: { readOnly?: boolean },
   ): NoteSession {
-    return createNoteSessionService({
+    const session = createNoteSessionService({
       noteFile,
       clock: createTestClockService(),
       logger: createTestLoggerService(),
@@ -213,13 +213,14 @@ describe('reloadAll with live sessions', () => {
       // so a dirty buffer can't race a debounced save into the assertions.
       readOnly: options?.readOnly ?? true,
       classify: () => 'exact',
-      onSnapshot: (snapshot) => {
-        snapshots.push(snapshot)
-      },
       applyContent: (markdown) => {
         applied.push(markdown)
       },
     })
+    session.snapshot.subscribe(() => {
+      snapshots.push(session.snapshot.get())
+    })
+    return session
   }
 
   it('a clean open note adopts the new disk content silently', async () => {

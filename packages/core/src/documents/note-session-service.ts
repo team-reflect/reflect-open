@@ -8,13 +8,16 @@ import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { splitDoc } from './note-session-doc.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
-import type {
-  NoteSession,
-  NoteSessionOptions,
-  NoteSessionService,
-  NoteSessionSnapshot,
-  NoteSessionStatus,
+import {
+  INITIAL_NOTE_SNAPSHOT,
+  type NoteSession,
+  type NoteSessionOptions,
+  type NoteSessionService,
+  type NoteSessionSnapshot,
+  type NoteSessionStatus,
 } from './note-session-types.ts'
+import { WritableStore, type Store } from '../store.ts'
+import { isShallowEqual } from '@ocavue/utils'
 
 /**
  * File access of one session, with the graph generation bound to its writes.
@@ -62,7 +65,6 @@ class NoteSessionImpl implements NoteSession {
   readonly #deps: NoteSessionServiceDeps
   readonly #io: NoteSessionIo
   readonly #classify: NoteSessionOptions['classify']
-  readonly #onSnapshot: NoteSessionOptions['onSnapshot']
   readonly #applyContent: NoteSessionOptions['applyContent']
   readonly #onContent: NoteSessionOptions['onContent']
   readonly #reconcilePendingEditorInput: NoteSessionOptions['reconcilePendingEditorInput']
@@ -75,7 +77,7 @@ class NoteSessionImpl implements NoteSession {
    */
   path: string
 
-  // Snapshot state (surfaces via onSnapshot).
+  // Snapshot state (surfaces via `snapshot`).
   #status: NoteSessionStatus = 'loading'
   #initialContent = ''
   #isProtected = false
@@ -143,13 +145,13 @@ class NoteSessionImpl implements NoteSession {
    */
   #retriedFailedSave = false
 
-  #lastEmitted: NoteSessionSnapshot | null = null
+  readonly #snapshot = new WritableStore<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT, isShallowEqual)
+  readonly snapshot: Store<NoteSessionSnapshot> = this.#snapshot
 
   constructor(deps: NoteSessionServiceDeps, options: NoteSessionOptions) {
     this.#deps = deps
     const { noteFile, graphSession } = deps
     this.#classify = options.classify
-    this.#onSnapshot = options.onSnapshot
     this.#applyContent = options.applyContent
     this.#onContent = options.onContent
     this.#reconcilePendingEditorInput = options.reconcilePendingEditorInput
@@ -199,27 +201,14 @@ class NoteSessionImpl implements NoteSession {
     if (this.#disposed) {
       return
     }
-    const next: NoteSessionSnapshot = {
+    this.#snapshot.set({
       status: this.#status,
       initialContent: this.#initialContent,
       protected: this.#isProtected,
       dirty: this.#dirty,
       missing: this.#missing,
       error: this.#error,
-    }
-    if (
-      this.#lastEmitted !== null &&
-      this.#lastEmitted.status === next.status &&
-      this.#lastEmitted.initialContent === next.initialContent &&
-      this.#lastEmitted.protected === next.protected &&
-      this.#lastEmitted.dirty === next.dirty &&
-      this.#lastEmitted.missing === next.missing &&
-      this.#lastEmitted.error === next.error
-    ) {
-      return
-    }
-    this.#lastEmitted = next
-    this.#onSnapshot(next)
+    })
   }
 
   #save(): void {

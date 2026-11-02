@@ -9,7 +9,12 @@ import {
   frontmatterPatchToYaml,
   type FrontmatterPatch,
 } from '../documents/note-session-frontmatter.ts'
-import type { NoteSession } from '../documents/note-session-types.ts'
+import {
+  INITIAL_NOTE_SNAPSHOT,
+  type NoteSession,
+  type NoteSessionSnapshot,
+} from '../documents/note-session-types.ts'
+import { WritableStore, type Store } from '../store.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
@@ -69,6 +74,7 @@ class TestNoteSessionImpl implements TestNoteSession {
   readonly #callLog: NoteSessionCall[] = []
   #content: string
   path: string
+  readonly snapshot: Store<NoteSessionSnapshot>
 
   constructor(options: TestNoteSessionOptions) {
     this.#options = options
@@ -76,6 +82,11 @@ class TestNoteSessionImpl implements TestNoteSession {
     this.#loaded = options.loaded ?? true
     this.#accepts = options.accepts ?? true
     this.path = options.path
+    this.snapshot = new WritableStore<NoteSessionSnapshot>({
+      ...INITIAL_NOTE_SNAPSHOT,
+      status: this.#loaded ? 'ready' : 'loading',
+      dirty: options.dirty ?? false,
+    })
   }
 
   retarget(to: string): void {
