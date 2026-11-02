@@ -48,11 +48,9 @@ export class WriteableStore<T> implements Store<T> {
     }
   }
 
-  readonly subscribe = (listener: () => void): Unlisten => {
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
     this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
+    return () => this.#listeners.delete(listener)
   }
 
   /**
