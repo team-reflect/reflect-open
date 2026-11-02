@@ -2,20 +2,16 @@ import { deriveStore, type Store } from '@reflect/core'
 import { useMemo, useSyncExternalStore } from 'react'
 
 /**
- * The value of `store`, re-rendered when it changes.
+ * Returns the value of `store`, re-rendered when it changes.
  */
 export function useStore<T>(store: Store<T>): T {
   return useSyncExternalStore(store.subscribe, store.get, store.get)
 }
 
 /**
- * `selector(store.get())`, re-rendered only when the selected value changes
- * (`Object.is`, or `isEqual` when given).
+ * Returns the value of a derived store, re-rendered only when the selected value changes.
  *
- * `selector` and `isEqual` MUST be stable: module-level functions, or wrapped
- * in `useCallback`. Never pass an inline arrow. Each new function builds a new
- * derived store, which drops its cache and resubscribes on every render, and
- * a selector that returns a new object then re-renders the component every time.
+ * `selector` and `isEqual` must be stable: module-level functions, or wrapped in `useCallback`. Never pass an inline arrow.
  */
 export function useSelector<T, U>(
   store: Store<T>,
