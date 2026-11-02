@@ -157,17 +157,35 @@ describe('createSaveScope', () => {
     })
     const scope = attachments.createSaveScope()
     let notified = 0
-    scope.subscribe(() => {
+    scope.error.subscribe(() => {
       notified += 1
     })
 
     await expect(scope.saveFile(fileOf('a.png', 'image/png'))).resolves.toBeNull()
-    expect(scope.error()).toEqual({ kind: 'image', message: 'disk full' })
+    expect(scope.error.get()).toEqual({ kind: 'image', message: 'disk full' })
 
     failure = null
     await expect(scope.saveFile(fileOf('b.pdf', 'application/pdf'))).resolves.toBe('assets/b.pdf')
-    expect(scope.error()).toBeNull()
+    expect(scope.error.get()).toBeNull()
+    scope.reset()
     expect(notified).toBe(2)
+  })
+
+  it('stops notifying after unsubscribe', async () => {
+    const { attachments } = setup({
+      assetStore: Object.assign(createTestAssetStoreService(), {
+        uploadBlob: failing('disk full'),
+      }),
+    })
+    const scope = attachments.createSaveScope()
+    const listener = vi.fn()
+    const unlisten = scope.error.subscribe(listener)
+    unlisten()
+
+    await scope.saveFile(fileOf('a.pdf', 'application/pdf'))
+
+    expect(scope.error.get()).toEqual({ kind: 'file', message: 'disk full' })
+    expect(listener).not.toHaveBeenCalled()
   })
 
   it('drops an outcome that lands after a reset', async () => {
@@ -184,7 +202,7 @@ describe('createSaveScope', () => {
     upload.reject(new AppError('io', 'late failure'))
 
     await expect(saving).resolves.toBeNull()
-    expect(scope.error()).toBeNull()
+    expect(scope.error.get()).toBeNull()
   })
 
   it('keeps each scope separate', async () => {
@@ -199,8 +217,8 @@ describe('createSaveScope', () => {
     await first.saveFile(fileOf('a.pdf', 'application/pdf'))
     second.reset()
 
-    expect(first.error()).toEqual({ kind: 'file', message: 'disk full' })
-    expect(second.error()).toBeNull()
+    expect(first.error.get()).toEqual({ kind: 'file', message: 'disk full' })
+    expect(second.error.get()).toBeNull()
   })
 })
 
@@ -453,7 +471,7 @@ describe('resolveFileInfo', () => {
     const freshLookup = attachments.resolveFileInfo('notes/a.md', 'assets/q3.pdf')
     listings[0]?.resolve([{ path: 'assets/q3.pdf', size: 999 }])
     await staleLookup
-    expect(attachments.peekCatalog()).toBeNull()
+    expect(attachments.catalog.get()).toBeNull()
 
     listings[1]?.resolve([{ path: 'assets/q3.pdf', size: 111 }])
     await expect(freshLookup).resolves.toEqual({ size: 111 })
@@ -466,7 +484,7 @@ describe('watchCatalog', () => {
     const noteFile = listingNoteFile(() => files)
     const { attachments, fileChanges } = setup({ noteFile })
     let changes = 0
-    attachments.onCatalogChanged(() => {
+    attachments.catalog.subscribe(() => {
       changes += 1
     })
 
@@ -512,7 +530,7 @@ describe('watchCatalog', () => {
     const noteFile = listingNoteFile(() => [{ path: 'assets/a.png', size: 1 }])
     const { attachments, fileChanges } = setup({ noteFile })
     let changes = 0
-    attachments.onCatalogChanged(() => {
+    attachments.catalog.subscribe(() => {
       changes += 1
     })
 
@@ -522,7 +540,7 @@ describe('watchCatalog', () => {
     await expect.poll(() => noteFile.listings()).toBe(2)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(attachments.peekCatalog()).toBe(first)
+    expect(attachments.catalog.get()).toBe(first)
     expect(changes).toBe(1)
   })
 })
@@ -688,9 +706,9 @@ describe('with no graph open', () => {
     })
     await attachments.openOrReveal('assets/a.pdf')
 
-    expect(scope.error()).toBeNull()
+    expect(scope.error.get()).toBeNull()
     expect(assetStore.uploads()).toEqual([])
-    expect(attachments.peekCatalog()).toBeNull()
+    expect(attachments.catalog.get()).toBeNull()
     await expect(attachments.loadCatalog()).rejects.toThrow('No graph is open.')
   })
 })

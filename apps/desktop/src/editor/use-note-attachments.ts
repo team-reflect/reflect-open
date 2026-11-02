@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useMemo } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
 import type { AttachmentService, GraphInfo, GraphSessionService } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 import { useMaybeGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
@@ -61,11 +62,7 @@ export function createNoteAttachments(
 export function useNoteAttachments(notePath: string): NoteAttachments {
   const graph = useMaybeGraphInfo()
   const { attachments, graphSession } = useCoreServices()
-  const subscribeCatalog = useCallback(
-    (listener: () => void) => attachments.onCatalogChanged(listener),
-    [attachments],
-  )
-  useSyncExternalStore(subscribeCatalog, () => attachments.peekCatalog())
+  useStore(attachments.catalog)
   return useMemo(
     () => createNoteAttachments(graph, notePath, attachments, graphSession),
     [attachments, graph, graphSession, notePath],
