@@ -416,7 +416,7 @@ class TestGithubAuthServiceImpl implements TestGithubAuthService {
     })
   }
 
-  readonly getState = (): GithubAuthState => this.#inner.getState()
+  readonly get = (): GithubAuthState => this.#inner.get()
 
   load(): Promise<GithubAuth | null> {
     return this.#inner.load()
