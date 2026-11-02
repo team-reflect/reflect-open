@@ -175,10 +175,6 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     return this.#inner.onMoved(listener)
   }
 
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten {
-    return this.#inner.onFileProgress(listener)
-  }
-
   onStalePlaceholders(listener: (paths: readonly string[]) => void): Unlisten {
     return this.#inner.onStalePlaceholders(listener)
   }
