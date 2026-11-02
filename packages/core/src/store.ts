@@ -18,7 +18,11 @@
  *   source in the constructor to copy it into a `WritableStore`.
  * - Work that runs only while someone listens: start it in `subscribe`, and
  *   stop it after an `Unlisten` when {@link WritableStore.subscribed} is
- *   false. Do not count subscribers.
+ *   false. Do not count subscribers. Do not add a `start()` or `attach()`
+ *   method for a React effect to call.
+ * - A value has one owner service. Other code reads it from that service and
+ *   writes it through that service's methods. It never computes the value
+ *   itself. For example, today's date comes from `TodayService`.
  *
  * Rules:
  *
@@ -27,7 +31,16 @@
  * - Values are immutable. A write sets a new object and keeps the references
  *   of unchanged fields.
  * - `get`, `subscribe`, and any member that is passed around are arrow
- *   function properties.
+ *   function properties. Other members are methods.
+ * - The private `WritableStore` that holds the service's main value is named
+ *   `#store`.
+ * - A `Store` service has no other member that returns data `get` already
+ *   returns, such as `list()` or `state()`.
+ * - Pass a `Store`, not a separate `get` and `subscribe`.
+ * - A listener added twice is held once, and the first `Unlisten` removes
+ *   it. Forward `subscribe` as it is. Do not wrap the listener.
+ * - Logic that reads a value and writes it back is a service method, not code
+ *   at the call site.
  * - A source notifies on every change and may notify more often. The derived
  *   layer (`deriveStore`, `combineStores`, `useSelector`) drops a notification
  *   whose result is unchanged, so a source needs no extra caching or finer
@@ -35,15 +48,19 @@
  *   place from an existing `get` and `subscribe` instead of changing a port.
  * - Never notify when the value is unchanged. A different thing that changes
  *   is its own `Store`.
- * - `WritableStore` compares with `Object.is`. Put content equality
- *   (`isDeepEqual`, `isShallowEqual`) on the derived `Store`.
+ * - `WritableStore` compares with `Object.is` by default. When the writer
+ *   builds a new value each time (from a payload or from private fields), pass
+ *   `isShallowEqual` or `isDeepEqual`. Do not hand-write an equality
+ *   function that one of them can replace.
  * - Notifications are synchronous. Values that must be seen together go in one
- *   `set`.
+ *   `set`. One change is one `set`, so a subscriber never sees a half-done
+ *   state.
  *
  * React reads a `Store` with `useStore` or `useSelector`. A selector and its
  * `isEqual` must be stable: a module-level function, or `useCallback`. A
- * component reads only the fields it renders. A context holds services and
- * actions, never state.
+ * component reads only the fields it renders, at the precision it renders
+ * them: select whole seconds from a store that ticks in milliseconds. A
+ * context holds services and actions, never state.
  *
  * Tests of a `Store` cover: `get` keeps its reference after an unrelated write,
  * an equal write does not notify, a derived `Store` does not notify when an
