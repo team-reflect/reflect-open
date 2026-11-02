@@ -9,8 +9,15 @@ export class RevealedRowStore {
   #key: string | null = null
   readonly #listeners = new Set<() => void>()
 
+  /**
+   * The key of the open row, or `null` when every row is closed.
+   */
   getKey = (): string | null => this.#key
 
+  /**
+   * Opens the row `key` (closing the previous one), or closes every row with
+   * `null`. Notifies the listeners only when the key changes.
+   */
   setKey = (key: string | null): void => {
     if (key === this.#key) {
       return
@@ -21,6 +28,9 @@ export class RevealedRowStore {
     }
   }
 
+  /**
+   * Calls `listener` after every key change. Returns the unsubscribe function.
+   */
   subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener)
     return () => {
@@ -29,9 +39,21 @@ export class RevealedRowStore {
   }
 }
 
+/**
+ * One row's state and callbacks, from `useRevealedRow`.
+ */
 export interface RevealedRow {
+  /**
+   * Whether this row is the open one.
+   */
   revealed: boolean
+  /**
+   * Opens this row and closes the row that was open.
+   */
   reveal: () => void
+  /**
+   * Closes this row. Does nothing when another row is the open one.
+   */
   close: () => void
   /**
    * Closes any other open row, for every press on this row (a tap included).
