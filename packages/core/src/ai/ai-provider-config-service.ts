@@ -163,6 +163,10 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
     return { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId }
   }
 
+  readonly get: () => AiProvidersState = () => {
+    return this.#store.get()
+  }
+
   readonly defaultProvider = (): AiProviderConfig | null => defaultAiProvider(this.state())
 
   // Every write goes through `updateWith` so the state is rebuilt from the
