@@ -146,9 +146,7 @@ class SettingsServiceImpl implements SettingsService {
   }
 
   #emit(): void {
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#store.emit()
   }
 
   #submit(target: Settings): void {
