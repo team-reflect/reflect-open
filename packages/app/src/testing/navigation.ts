@@ -40,13 +40,9 @@ class TestNavigationServiceImpl implements TestNavigationService {
     this.#inner = inner
   }
 
-  getState(): NavigationState {
-    return this.#inner.getState()
-  }
+  readonly get = (): NavigationState => this.#inner.get()
 
-  subscribe(listener: () => void): Unlisten {
-    return this.#inner.subscribe(listener)
-  }
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#inner.subscribe(listener)
 
   navigate(route: Route, navigateOptions?: NavigateOptions): void {
     this.#calls.push({ route, options: navigateOptions })

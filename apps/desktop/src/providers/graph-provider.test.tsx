@@ -267,7 +267,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(result.current.needsOnboarding).toBe(false)
     expect(result.current.graph?.root).toBe('/local/Documents')
     expect(result.current.mobileStorageKind).toBe('local')
-    expect(appServices.mobileOnboarding.getState().kind).toBe('local')
+    expect(appServices.mobileOnboarding.get().kind).toBe('local')
     await vi.waitFor(() => expect(core.settings.saves().at(-1)?.mobileOnboarded).toBe(true))
   })
 })

@@ -8,9 +8,9 @@ import {
 } from '@reflect/core'
 import { showsDayEvents } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { useCalendarEnabled, useCalendarIds } from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
  * TanStack Query hooks over `CalendarEventsService`
@@ -36,7 +36,7 @@ export function useCalendarAuthorization(
 ): CalendarAuthorizationStatus | undefined {
   const { calendarEvents } = useAppServices()
   const available = useCalendarAvailable()
-  const { authorization } = useServiceState(calendarEvents, calendarEvents.getState)
+  const { authorization } = useStore(calendarEvents)
   useEffect(() => {
     if (!enabled || !available) {
       return

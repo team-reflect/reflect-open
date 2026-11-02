@@ -48,6 +48,28 @@ describe('usePaywallGate', () => {
     expect(result.current).toBe('hide')
   })
 
+  it('does not re-render when a check changes without moving the gate', async () => {
+    const services = iosServices()
+    services.mobile.appStoreEnvironment.setState({ value: 'Production' })
+    let renders = 0
+    const { result } = await renderHookInApp(
+      () => {
+        renders += 1
+        return usePaywallGate()
+      },
+      { core: services },
+    )
+    expect(result.current).toBe('show')
+    const settled = renders
+
+    await act(() => {
+      services.mobile.subscription.setState({ isError: true })
+      services.classicAccess.setState({ access: null })
+    })
+    expect(result.current).toBe('show')
+    expect(renders).toBe(settled)
+  })
+
   it('starts the subscription, Reflect Classic, and install-channel checks', async () => {
     const services = iosServices()
     await renderHookInApp(() => usePaywallGate(), { core: services })
@@ -124,7 +146,7 @@ describe('usePaywallGate', () => {
         { core: services },
       )
       await vi.waitFor(() => {
-        expect(services.mobile.appStoreEnvironment.getState().value).toBe('Sandbox')
+        expect(services.mobile.appStoreEnvironment.get().value).toBe('Sandbox')
       })
       expect(result.current.gate).toBe('hide')
 

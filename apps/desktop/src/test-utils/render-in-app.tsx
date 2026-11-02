@@ -278,7 +278,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
  * the graph services) and `RouterProvider`. All of them read `core`, which defaults to test doubles. Tests drive and observe
  * the app through the returned `core`: `core.graphSession.setGraph()`,
  * `core.settings.get()`, `appServices.navigation.navigations()`,
- * `core.progress.getAll()`.
+ * `core.progress.get()`.
  *
  * Pass your own `core` to replace or spy on a service before the first render.
  */
