@@ -511,7 +511,7 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
   #snapshot(): AudioMemoPipelineState {
     return {
       pendingCount: this.#pendingCount,
-      transcribing: this.#reconciler?.getTranscribing() ?? false,
+      transcribing: this.#reconciler?.get() ?? false,
       hasTranscriptionConfig: this.#hasTranscriptionConfig,
       error: this.#error,
       canRetry: this.#parked !== null,
