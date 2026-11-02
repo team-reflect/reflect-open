@@ -139,6 +139,13 @@ export function useChatProviders(): ChatModels['providers'] {
 }
 
 /**
+ * The model the next message is sent with.
+ */
+export function useChatActiveModel(): ChatModels['activeModel'] {
+  return useSelector(useChat(), selectActiveModel)
+}
+
+/**
  * The configured providers, the picker's model options, and the active model.
  */
 export function useChatModels(): ChatModels {
