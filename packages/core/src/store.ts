@@ -37,8 +37,8 @@
  * - A `Store` service has no other member that returns data `get` already
  *   returns, such as `list()` or `state()`.
  * - Pass a `Store`, not a separate `get` and `subscribe`.
- * - A listener added twice is held once, and the first `Unlisten` removes
- *   it. Forward `subscribe` as it is. Do not wrap the listener.
+ * - `WritableStore` holds a listener once, so subscribe each time with a
+ *   fresh function.
  * - Logic that reads a value and writes it back is a service method, not code
  *   at the call site.
  * - A source notifies on every change and may notify more often. The derived
