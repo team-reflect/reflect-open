@@ -55,6 +55,17 @@ function getScroller(element: Element): HTMLElement {
   return scroller
 }
 
+/**
+ * Clicks the harness's Toggle button in place. A locator click moves the
+ * mouse and scrolls first, which a row test does not need.
+ */
+async function toggle(view: Awaited<ReturnType<typeof mount>>): Promise<void> {
+  const button = view.getByRole('button', { name: 'Toggle' }).element() as HTMLElement
+  await act(() => {
+    button.click()
+  })
+}
+
 beforeEach(() => {
   onBeginInteraction.mockClear()
   onAction.mockClear()
@@ -99,14 +110,14 @@ describe('SwipeRow', () => {
   it('scrolls itself when `revealed` changes from outside', async () => {
     const view = await mount(<Harness />)
     const scroller = getScroller(view.getByText('Row').element())
-    const toggle = view.getByRole('button', { name: 'Toggle' })
 
-    await toggle.click()
+    await toggle(view)
+    await expect.element(view.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ACTION_WIDTH))
 
-    await toggle.click()
+    await toggle(view)
+    await vi.waitFor(() => expect(view.getByRole('button', { name: 'Delete' }).query()).toBeNull())
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
-    expect(view.getByRole('button', { name: 'Delete' }).query()).toBeNull()
   })
 
   it('mounts an open row at its open position', async () => {
@@ -122,7 +133,8 @@ describe('SwipeRow', () => {
     const scroller = getScroller(view.getByText('Row').element())
 
     await touch(scroller, 'start')
-    await view.getByRole('button', { name: 'Toggle' }).click()
+    await toggle(view)
+    await vi.waitFor(() => expect(view.getByRole('button', { name: 'Delete' }).query()).toBeNull())
     expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
 
     // The finger did not move the row, so no settle report follows.
