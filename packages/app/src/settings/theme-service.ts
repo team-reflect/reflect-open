@@ -108,7 +108,7 @@ class ThemeServiceImpl implements ThemeService {
       settled: this.#isSettled,
     }
     this.#preference = settings.get().theme
-    const status = settings.status()
+    const status = settings.status.get()
     this.#isSettled = status !== 'loading'
     if (status === 'loaded' && this.#mirrored !== this.#preference) {
       this.#mirrored = this.#preference
@@ -141,6 +141,9 @@ class ThemeServiceImpl implements ThemeService {
       }
     })
     settings.subscribe(() => {
+      this.#sync()
+    })
+    settings.status.subscribe(() => {
       this.#sync()
     })
     this.#sync()
