@@ -431,7 +431,7 @@ class ChatSessionImpl implements ChatSession {
         today: clock.today(),
         // A stray enabled flag must lose to the runtime here.
         semanticSearchEnabled:
-          settings.get().semanticSearchEnabled && embeddingRuntime.lastStatus().status === 'ready',
+          settings.get().semanticSearchEnabled && embeddingRuntime.get().status === 'ready',
         generation: this.#graph.generation,
         customSystemPrompt,
         context,

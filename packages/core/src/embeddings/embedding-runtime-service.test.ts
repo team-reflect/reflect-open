@@ -30,11 +30,11 @@ describe('createEmbeddingRuntimeService', () => {
   it('remembers the last observed status and notifies subscribers', async () => {
     const { ipc, runtime } = setup()
     ipc.onCommand('embed_status', () => LOADING)
-    expect(runtime.lastStatus()).toEqual({ status: 'uninitialized' })
+    expect(runtime.get()).toEqual({ status: 'uninitialized' })
 
     const seen: EmbedStatus[] = []
-    const unlisten = runtime.subscribe((status) => {
-      seen.push(status)
+    const unlisten = runtime.subscribe(() => {
+      seen.push(runtime.get())
     })
     await runtime.status()
     ipc.emit('embed:status', READY)
@@ -42,7 +42,39 @@ describe('createEmbeddingRuntimeService', () => {
     ipc.emit('embed:status', { status: 'failed', message: 'offline' })
 
     expect(seen).toEqual([LOADING, READY])
-    expect(runtime.lastStatus()).toEqual(READY)
+    expect(runtime.get()).toEqual(READY)
+  })
+
+  it('keeps the status when an observation repeats it', async () => {
+    const { ipc, runtime } = setup()
+    ipc.onCommand('embed_status', () => ({ ...READY }))
+    const listener = vi.fn()
+    runtime.subscribe(listener)
+
+    await runtime.status()
+    const first = runtime.get()
+    await runtime.status()
+    ipc.emit('embed:status', { ...READY })
+
+    expect(runtime.get()).toBe(first)
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('listens for status events only while subscribed', async () => {
+    const { ipc, runtime } = setup()
+    const stop = vi.fn()
+    const listen = vi.spyOn(ipc, 'listen').mockResolvedValue(stop)
+
+    const first = runtime.subscribe(() => {})
+    const second = runtime.subscribe(() => {})
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    first()
+    first()
+    expect(listen).toHaveBeenCalledTimes(1)
+    expect(stop).not.toHaveBeenCalled()
+    second()
+
+    expect(stop).toHaveBeenCalledTimes(1)
   })
 
   it('logs an invalid status event', () => {
@@ -50,7 +82,7 @@ describe('createEmbeddingRuntimeService', () => {
     runtime.subscribe(() => {})
     ipc.emit('embed:status', { status: 'mystery' })
 
-    expect(runtime.lastStatus()).toEqual({ status: 'uninitialized' })
+    expect(runtime.get()).toEqual({ status: 'uninitialized' })
     expect(logger.getErrors()).toHaveLength(1)
   })
 
@@ -86,6 +118,13 @@ describe('createEmbeddingRuntimeService', () => {
     it('re-polls once the listener lands, in case the event already fired', async () => {
       const { ipc, runtime } = setup()
       ipc.onCommand('embed_status', () => READY)
+      await expect(runtime.awaitTerminalStatus(LOADING)).resolves.toEqual(READY)
+    })
+
+    it('resolves when the re-poll answers the status already held', async () => {
+      const { ipc, runtime } = setup()
+      ipc.onCommand('embed_status', () => READY)
+      await runtime.status()
       await expect(runtime.awaitTerminalStatus(LOADING)).resolves.toEqual(READY)
     })
   })
