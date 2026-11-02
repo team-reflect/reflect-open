@@ -1,4 +1,4 @@
-import { formatIsoDate } from '@reflect/utils'
+import { addDays, formatIsoDate, startOfDay } from '@reflect/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -58,16 +58,14 @@ class TodayServiceImpl implements TodayService {
   // DOM timers pause while the machine sleeps, so the heartbeat and the
   // visibility listener catch a midnight that this timer misses.
   #scheduleMidnightRollover(): void {
-    const now = new Date(this.#deps.clock.now())
-    const midnight = new Date(now)
-    midnight.setDate(midnight.getDate() + 1)
-    midnight.setHours(0, 0, 0, 0)
+    const now: number = this.#deps.clock.now()
+    const midnight: Date = addDays(startOfDay(now), 1)
     this.#midnightTimer = this.#deps.clock.setTimeout(
       () => {
         this.#syncToday()
         this.#scheduleMidnightRollover()
       },
-      midnight.getTime() - now.getTime() + MIDNIGHT_PAD_MS,
+      midnight.getTime() - now + MIDNIGHT_PAD_MS,
     )
   }
 
