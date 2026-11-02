@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils.ts'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks.tsx'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'
 import { useScrollRestore } from '@/mobile/use-scroll-restore.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 
 interface DaySlideProps {
   /** The slide's ISO day — its daily note path and scroll-memory key. */
@@ -52,7 +52,7 @@ export function DaySlide({
   focusRequested,
   onFocusConsumed,
 }: DaySlideProps): ReactElement {
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const { handleScroll, resetToTop, cancelRestore } = useScrollRestore({

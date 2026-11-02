@@ -1,5 +1,5 @@
 import { useEffect, type ReactElement } from 'react'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useEditorFullWidth } from '@/providers/settings-provider.tsx'
 
 /**
  * Applies the desktop note-width preference to every note surface.
@@ -10,7 +10,7 @@ import { useSettingsField } from '@/providers/settings-provider.tsx'
  * leaving the mobile-specific gutter unchanged.
  */
 export function EditorFullWidthEffect(): ReactElement | null {
-  const fullWidth = useSettingsField('editorFullWidth')
+  const fullWidth = useEditorFullWidth()
 
   useEffect(() => {
     const root = document.documentElement

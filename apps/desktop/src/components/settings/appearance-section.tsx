@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { ThemePreference } from '@reflect/core'
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import { useSettingsService, useThemeSetting } from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsOptionCard } from './option-card.tsx'
 import { SettingsSection } from './section.tsx'
@@ -25,7 +25,7 @@ const THEME_OPTIONS: ThemeOption[] = [
  * this section needs no theme context of its own.
  */
 export function AppearanceSection(): ReactElement {
-  const theme = useSettingsField('theme')
+  const theme = useThemeSetting()
   const settingsService = useSettingsService()
 
   return (

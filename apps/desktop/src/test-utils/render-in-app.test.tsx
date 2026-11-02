@@ -11,7 +11,7 @@ import {
   useMaybeGraphInfo,
 } from '@/providers/graph-provider.tsx'
 import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import { useDateFormat, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
@@ -25,7 +25,7 @@ function Probe(): ReactElement {
   const indexing = useGraphIndexing()
   const recents = useGraphRecents()
   const { mobileStorageKind } = useMobileGraphBoot()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const settingsService = useSettingsService()
   const { route, navigate } = useRouter()
   const sync = useGitSyncContext()

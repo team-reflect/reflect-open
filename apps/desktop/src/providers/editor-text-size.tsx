@@ -1,5 +1,5 @@
 import { useEffect, type ReactElement } from 'react'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useEditorTextSize } from '@/providers/settings-provider.tsx'
 
 /**
  * Applies the editor reading size to the document root.
@@ -12,7 +12,7 @@ import { useSettingsField } from '@/providers/settings-provider.tsx'
  * applies to every editor surface (desktop and mobile) at once.
  */
 export function EditorTextSizeEffect(): ReactElement | null {
-  const textSize = useSettingsField('editorTextSize')
+  const textSize = useEditorTextSize()
 
   useEffect(() => {
     document.documentElement.setAttribute('data-editor-text-size', textSize)

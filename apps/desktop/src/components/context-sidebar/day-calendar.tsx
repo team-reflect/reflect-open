@@ -13,7 +13,7 @@ import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat, useWeekStartDay } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
@@ -45,8 +45,8 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   const navigateNoteLink = useNoteLinkNavigation(selectedDate)
   const graph = useGraphInfo()
   const { dailyNotes } = useCoreServices()
-  const dateFormat = useSettingsField('dateFormat')
-  const weekStartDay = useSettingsField('weekStartDay')
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
 
   const [month, setMonth] = useState(() => getYearMonth(selectedDate))
   // Render-time state adjustment (not an effect): navigating to another day

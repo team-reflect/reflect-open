@@ -8,7 +8,7 @@ import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { useRowSwipe } from '@/mobile/use-row-swipe.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 
 /**
  * Total width of the two actions (open note, delete) under every task row.
@@ -71,7 +71,7 @@ export function MobileTaskRow({
   onDelete,
 }: MobileTaskRowProps): ReactElement {
   const { haptics } = useMobileServices()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const label = task.text || 'Empty task'
   const edit = (): void => onEdit(task)
   const swipe = useRowSwipe({

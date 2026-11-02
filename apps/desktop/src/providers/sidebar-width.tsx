@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { activeSidebarWidthDrags, effectiveSidebarWidths } from '@/hooks/use-sidebar-resize.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useContextSidebarWidth, useSidebarWidth } from '@/providers/settings-provider.tsx'
 
 /**
  * Applies the sidebar widths to the document root.
@@ -22,8 +22,8 @@ import { useSettingsField } from '@/providers/settings-provider.tsx'
  * commits, and this effect re-asserts that committed value.
  */
 export function SidebarWidthEffect(): ReactElement | null {
-  const sidebarWidth = useSettingsField('sidebarWidth')
-  const contextSidebarWidth = useSettingsField('contextSidebarWidth')
+  const sidebarWidth = useSidebarWidth()
+  const contextSidebarWidth = useContextSidebarWidth()
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
 
   useEffect(() => {

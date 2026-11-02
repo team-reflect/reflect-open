@@ -31,7 +31,7 @@ import {
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
 import { useRouter } from '@/routing/router.tsx'
 

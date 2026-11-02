@@ -4,7 +4,7 @@ import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
 import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat, useWeekStartDay } from '@/providers/settings-provider.tsx'
 
 interface TaskScheduleGridProps {
   /** Today's live ISO date — anchors the opening month and marks "today". */
@@ -23,8 +23,8 @@ interface TaskScheduleGridProps {
  * Reuses {@link buildMonthGrid}, so it shares the daily calendar's math.
  */
 export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridProps): ReactElement {
-  const dateFormat = useSettingsField('dateFormat')
-  const weekStartDay = useSettingsField('weekStartDay')
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
   // Open on the due date's month when there is one — that's the date being
   // rescheduled — else today's.
   const [month, setMonth] = useState(() => getYearMonth(selected ?? today))
