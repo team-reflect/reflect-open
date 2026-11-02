@@ -1,6 +1,8 @@
+import { isShallowEqual } from '@ocavue/utils'
 import {
   combineStores,
-  WritableStore,
+  type Settings,
+  type SettingsLoadOutcome,
   type SettingsService,
   type StorageService,
   type Store,
@@ -35,10 +37,10 @@ export interface ThemeState {
 
 /**
  * The app theme: the `theme` setting resolved against the system color
- * scheme. After a successful settings load, the preference (not the resolved
- * theme) is mirrored into local storage so the next launch can paint it
- * before the settings arrive. After a failed load nothing is mirrored,
- * because changes are session-only.
+ * scheme. While subscribed and after a successful settings load, the
+ * preference (not the resolved theme) is mirrored into local storage so the
+ * next launch can paint it before the settings arrive. After a failed load
+ * nothing is mirrored, because changes are session-only.
  */
 export interface ThemeService extends Store<ThemeState> {
   setPreference: (preference: ThemePreference) => void
@@ -58,54 +60,59 @@ export interface ThemeServiceDeps {
   readonly systemPreferences: SystemPreferencesService
 }
 
-interface ThemeSourceState {
-  readonly preference: ThemePreference
-  readonly settled: boolean
-}
+type SettingsStatus = SettingsLoadOutcome | 'loading'
 
-function resolveTheme(state: ThemeSourceState, system: ColorScheme): ThemeState {
+function resolveTheme(settings: Settings, status: SettingsStatus, system: ColorScheme): ThemeState {
   return {
-    preference: state.preference,
-    resolved: state.preference === 'system' ? system : state.preference,
-    settled: state.settled,
+    preference: settings.theme,
+    resolved: settings.theme === 'system' ? system : settings.theme,
+    settled: status !== 'loading',
   }
 }
 
-function isThemeStateEqual(a: ThemeState, b: ThemeState): boolean {
-  return a.preference === b.preference && a.resolved === b.resolved && a.settled === b.settled
+/**
+ * The preference to mirror into local storage, or `null` until a successful load.
+ */
+function selectMirroredPreference(
+  settings: Settings,
+  status: SettingsStatus,
+): ThemePreference | null {
+  return status === 'loaded' ? settings.theme : null
 }
 
 class ThemeServiceImpl implements ThemeService {
   readonly #deps: ThemeServiceDeps
-  readonly #state = new WritableStore<ThemeSourceState>({
-    preference: 'system',
-    settled: false,
-  })
   readonly #theme: Store<ThemeState>
-  #started = false
+  readonly #mirror: Store<ThemePreference | null>
   #mirrored: ThemePreference | null = null
 
   constructor(deps: ThemeServiceDeps) {
     this.#deps = deps
     this.#theme = combineStores(
-      [this.#state, deps.systemPreferences.colorScheme],
+      [deps.settings, deps.settings.status, deps.systemPreferences.colorScheme],
       resolveTheme,
-      isThemeStateEqual,
+      isShallowEqual,
     )
+    this.#mirror = combineStores([deps.settings, deps.settings.status], selectMirroredPreference)
   }
 
   readonly get = (): ThemeState => {
-    this.#start()
     return this.#theme.get()
   }
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
-    this.#start()
-    return this.#theme.subscribe(listener)
+    const unlistenMirror = this.#mirror.subscribe(() => {
+      this.#writeMirror()
+    })
+    const unlisten = this.#theme.subscribe(listener)
+    this.#writeMirror()
+    return () => {
+      unlistenMirror()
+      unlisten()
+    }
   }
 
   readonly setPreference = (preference: ThemePreference): void => {
-    this.#start()
     this.#deps.settings.update({ theme: preference })
   }
 
@@ -114,38 +121,15 @@ class ThemeServiceImpl implements ThemeService {
   }
 
   async whenSettled(): Promise<void> {
-    this.#start()
     await this.#deps.settings.whenLoaded()
   }
 
-  #setState(patch: Partial<ThemeSourceState>): void {
-    this.#state.set({ ...this.#state.get(), ...patch })
-  }
-
-  #sync(): void {
-    const { settings, storage } = this.#deps
-    const preference = settings.get().theme
-    const status = settings.status.get()
-    if (status === 'loaded' && this.#mirrored !== preference) {
+  #writeMirror(): void {
+    const preference = this.#mirror.get()
+    if (preference !== null && preference !== this.#mirrored) {
       this.#mirrored = preference
-      storage.local.set(THEME_PREFERENCE_CACHE_KEY, preference)
+      this.#deps.storage.local.set(THEME_PREFERENCE_CACHE_KEY, preference)
     }
-    this.#setState({ preference, settled: status !== 'loading' })
-  }
-
-  #start(): void {
-    const { settings } = this.#deps
-    if (this.#started) {
-      return
-    }
-    this.#started = true
-    settings.subscribe(() => {
-      this.#sync()
-    })
-    settings.status.subscribe(() => {
-      this.#sync()
-    })
-    this.#sync()
   }
 }
 

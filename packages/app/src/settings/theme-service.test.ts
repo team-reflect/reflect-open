@@ -35,6 +35,7 @@ describe('createThemeService', () => {
 
   it('reports the `system` default and does not cache until the load settles', async () => {
     const { theme, storage, releaseLoad } = setup({ theme: 'dark' }, { gateLoad: true })
+    theme.subscribe(() => {})
     expect(theme.get().preference).toBe('system')
     expect(theme.get().resolved).toBe('light')
     expect(theme.get().settled).toBe(false)
@@ -67,6 +68,7 @@ describe('createThemeService', () => {
 
   it('caches `system` verbatim rather than the theme it resolved to', async () => {
     const { theme, storage, systemPreferences } = setup({ theme: 'system' })
+    theme.subscribe(() => {})
     systemPreferences.colorScheme.set('dark')
     await theme.whenSettled()
     expect(cached(storage)).toBe('system')
@@ -75,6 +77,7 @@ describe('createThemeService', () => {
 
   it('writes a new preference through the settings and caches it', async () => {
     const { theme, settings, storage } = setup({ theme: 'light' })
+    theme.subscribe(() => {})
     await theme.whenSettled()
     expect(cached(storage)).toBe('light')
 
@@ -85,6 +88,22 @@ describe('createThemeService', () => {
     expect(cached(storage)).toBe('dark')
     await settings.flush()
     expect(settings.saves().at(-1)?.theme).toBe('dark')
+  })
+
+  it('mirrors the preference only while subscribed', async () => {
+    const { theme, storage } = setup({ theme: 'light' })
+    await theme.whenSettled()
+    expect(cached(storage)).toBeNull()
+
+    const unsubscribe = theme.subscribe(() => {})
+    expect(cached(storage)).toBe('light')
+
+    unsubscribe()
+    theme.setPreference('dark')
+    expect(cached(storage)).toBe('light')
+
+    theme.subscribe(() => {})
+    expect(cached(storage)).toBe('dark')
   })
 
   it('toggles the preference to the opposite of the resolved theme', async () => {
@@ -101,6 +120,7 @@ describe('createThemeService', () => {
   it('applies but does not cache a preference after a failed load', async () => {
     const { theme, settings, storage } = setup()
     settings.failLoad()
+    theme.subscribe(() => {})
     await theme.whenSettled()
     expect(theme.get().settled).toBe(true)
     expect(cached(storage)).toBeNull()
