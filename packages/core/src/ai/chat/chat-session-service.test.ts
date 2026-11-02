@@ -358,6 +358,99 @@ describe('ChatSession persistence', () => {
     expect(session.get().turns.at(-1)?.userText).toBe('half-typed question')
   })
 
+  it('asks in a fresh conversation and leaves the composer draft and images alone', async () => {
+    const { session, chatEngine } = await setup()
+    await session.send('earlier question')
+    const earlierConversation = session.get().activeConversationId
+    session.setDraft('half-typed follow-up')
+    await session.attachImages([
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'cat.png', { type: 'image/png' }),
+    ])
+    const queued = session.get().attachments
+
+    await session.ask('what did I decide about pricing?')
+
+    expect(session.get().activeConversationId).not.toBe(earlierConversation)
+    expect(session.get().turns).toMatchObject([
+      { userText: 'what did I decide about pricing?', attachments: [] },
+    ])
+    expect(chatEngine.calls().at(-1)?.messages.at(-1)).toEqual({
+      role: 'user',
+      content: 'what did I decide about pricing?',
+    })
+    expect(session.get().draft).toBe('half-typed follow-up')
+    expect(session.get().attachments).toEqual(queued)
+  })
+
+  it('reopens the open conversation when asked the question it began with', async () => {
+    const { session, chatEngine } = await setup()
+    await session.ask('what did I decide about pricing?')
+    await session.send('and the student discount?')
+    const askedConversation = session.get().activeConversationId
+
+    await session.ask('  what did I decide about pricing?  ')
+
+    expect(session.get().activeConversationId).toBe(askedConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual([
+      'what did I decide about pricing?',
+      'and the student discount?',
+    ])
+    expect(chatEngine.calls()).toHaveLength(2)
+  })
+
+  it('asks afresh when the open conversation began with the same words and a photo', async () => {
+    const { session, chatEngine } = await setup()
+    await session.attachImages([
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'cat.png', { type: 'image/png' }),
+    ])
+    await session.send('what is this?')
+    const photoConversation = session.get().activeConversationId
+
+    await session.ask('what is this?')
+
+    expect(session.get().activeConversationId).not.toBe(photoConversation)
+    expect(session.get().turns).toMatchObject([{ userText: 'what is this?', attachments: [] }])
+    expect(chatEngine.calls()).toHaveLength(2)
+  })
+
+  it('abandons a history switch still loading when an Ask reopens the conversation', async () => {
+    const pendingLoad = Promise.withResolvers<ChatTurn[]>()
+    const { session } = await setup({
+      history: (history) => {
+        return overrideHistory(history, { loadConversation: () => pendingLoad.promise })
+      },
+    })
+    await session.ask('what did I decide about pricing?')
+    const askedConversation = session.get().activeConversationId
+
+    const openDone = session.openConversation('conv-9')
+    await session.ask('what did I decide about pricing?')
+    pendingLoad.resolve([RESTORED_TURN])
+    await openDone
+
+    expect(session.get().activeConversationId).toBe(askedConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual([
+      'what did I decide about pricing?',
+    ])
+  })
+
+  it('keeps the open conversation when asked nothing, or with no model to ask', async () => {
+    const { session, chatEngine } = await setup()
+    await session.send('earlier question')
+    const earlierConversation = session.get().activeConversationId
+
+    await session.ask('   ')
+    expect(session.get().activeConversationId).toBe(earlierConversation)
+
+    const unconfigured = await setup({ settings: { aiProviders: [], defaultAiProviderId: null } })
+    const unconfiguredConversation = unconfigured.session.get().activeConversationId
+    await unconfigured.session.ask('what did I decide?')
+
+    expect(unconfigured.session.get().activeConversationId).toBe(unconfiguredConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual(['earlier question'])
+    expect(chatEngine.calls()).toHaveLength(1)
+  })
+
   it('rejects a second send while the first one is in flight', async () => {
     const { session, chatEngine } = await setup()
 
