@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
-import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 /**
@@ -13,12 +13,14 @@ import { useRouter } from '@/routing/router.tsx'
  * the transcript reuses desktop's turn components wholesale (tool chips,
  * settled-markdown citations that navigate), over a mobile composer and
  * bottom-sheet history/model pickers. The conversation and draft live in
- * {@link useChatSession} above the screen, so switching tabs and coming back
+ * the graph's `ChatSession` above the screen, so switching tabs and coming back
  * loses nothing. With no AI provider configured the tab is one
  * call-to-action into Settings, where keys are added per device.
  */
 export function MobileChat(): ReactElement {
-  const { providers, turns, newChat } = useChatSession()
+  const providers = useChatProviders()
+  const hasTurns = useHasChatTurns()
+  const { newChat } = useChatActions()
   const { navigate } = useRouter()
   const [historyOpen, setHistoryOpen] = useState(false)
   const hasProvider = providers.length > 0
@@ -30,7 +32,7 @@ export function MobileChat(): ReactElement {
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>
           {hasProvider ? (
             <>
-              {turns.length > 0 ? (
+              {hasTurns ? (
                 <MobileTopBarIconButton aria-label="New chat" onClick={newChat}>
                   <Plus aria-hidden />
                 </MobileTopBarIconButton>

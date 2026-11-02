@@ -1,11 +1,12 @@
 import type { MaybePromise } from '@reflect/utils'
-import type { GraphRole, GraphSession, GraphSessionSource } from '../graph/graph-session.ts'
+import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage } from '../errors.ts'
 import { isNotePath } from '../graph/paths.ts'
+import type { Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { FileChange, FileChangeService } from './file-change-service.ts'
 import { createNoteIndexer, type IndexingDeps, type NoteIndexer } from './indexer.ts'
@@ -285,7 +286,7 @@ export interface IndexLifecycleService {
 export interface IndexLifecycleDeps extends IndexingDeps {
   readonly fileChanges: FileChangeService
   readonly progress: ProgressPort
-  readonly graphSession: GraphSessionSource & { subscribe: (listener: () => void) => Unlisten }
+  readonly graphSession: Store<{ readonly session: GraphSession | null }>
   readonly activity: ActivityPort
   readonly platform: PlatformFacts
   readonly role: GraphRole
@@ -526,9 +527,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       this.suspend()
     }
     // A session that opens while hidden starts suspended.
-    let indexGeneration = graphSession.getState().session?.indexGeneration ?? null
+    let indexGeneration = graphSession.get().session?.indexGeneration ?? null
     const stopSession = graphSession.subscribe(() => {
-      const next = graphSession.getState().session?.indexGeneration ?? null
+      const next = graphSession.get().session?.indexGeneration ?? null
       if (next !== indexGeneration) {
         indexGeneration = next
         if (activity.isHidden()) {
@@ -546,7 +547,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       // before onboarding/open has produced an index session. With a session,
       // the full pass recovers every event missed while hidden; stacked
       // resume/iCloud triggers fold into the lifecycle's queued rerun.
-      this.resume(graphSession.getState().session)
+      this.resume(graphSession.get().session)
     })
     return () => {
       stopSession()
@@ -610,7 +611,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   }
 
   rebuildVisibly(): Promise<void> {
-    const { session } = this.#deps.graphSession.getState()
+    const { session } = this.#deps.graphSession.get()
     const generation = session?.indexGeneration ?? null
     if (session === null || generation === null) {
       return Promise.resolve()

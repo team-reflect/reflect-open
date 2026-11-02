@@ -108,7 +108,7 @@ class TestAttachmentServiceImpl implements TestAttachmentService {
       indexGeneration: 1,
     })
     this.#graphSession = options?.graphSession ?? {
-      getState: () => ({ session: defaultSession }),
+      get: () => ({ session: defaultSession }),
     }
   }
 
@@ -263,7 +263,7 @@ class TestAttachmentServiceImpl implements TestAttachmentService {
   }
 
   #openGeneration(): number | null {
-    return this.#graphSession.getState().session?.generation ?? null
+    return this.#graphSession.get().session?.generation ?? null
   }
 
   #resolveAttachmentPath(

@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { GraphColor } from '@reflect/core'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import { useGraphColorsSetting, useSettingsService } from '@/providers/settings-provider.tsx'
 
 interface GraphColorsValue {
   /** The color chosen for `root`, or `undefined` if it's on the default. */
@@ -16,7 +16,7 @@ interface GraphColorsValue {
  */
 export function useGraphColors(): GraphColorsValue {
   const settingsService = useSettingsService()
-  const colors = useSettingsField('graphColors')
+  const colors = useGraphColorsSetting()
 
   const colorFor = useCallback((root: string) => colors[root], [colors])
 

@@ -1,6 +1,6 @@
 import { GraphChooser } from '@/components/graph-chooser.tsx'
 import { GraphWorkspace } from '@/components/graph-workspace.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphError, useGraphInfo, useGraphStatus } from '@/providers/graph-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import { useEffect, type ReactElement } from 'react'
 
@@ -11,7 +11,9 @@ import { useEffect, type ReactElement } from 'react'
  */
 export function App(): ReactElement {
   const { quitPolicy, window } = useAppServices()
-  const { graph, status, error } = useGraph()
+  const graph = useGraphInfo()
+  const status = useGraphStatus()
+  const error = useGraphError()
 
   // Quit-time persistence: flush dirty note buffers when exiting, awaiting
   // persistence before destruction but hiding the macOS main window first.

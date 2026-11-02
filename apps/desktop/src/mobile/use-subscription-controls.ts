@@ -8,7 +8,7 @@ import {
   useClassicAccess,
   useClassicSignOut,
 } from '@/mobile/use-classic-access.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -48,7 +48,7 @@ export function useSubscriptionControls(): SubscriptionControls {
   const classicAccess = useClassicAccess()
   const classicSignOut = useClassicSignOut()
   const { opener } = useAppServices()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const [, setPaywallRequested] = usePaywallRequested()
   const iap = useIapRestoreRedeem()
 

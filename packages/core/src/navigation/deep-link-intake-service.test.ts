@@ -135,7 +135,7 @@ describe('DeepLinkIntakeService.resolve', () => {
 
   it('spools into the given graph session', async () => {
     const { service, graphSession, captureInbox } = setup()
-    const pinned = graphSession.getState().session
+    const pinned = graphSession.get().session
     graphSession.setGraph({ generation: 8 })
 
     await service.resolve('reflect://append?text=milk', { session: pinned })

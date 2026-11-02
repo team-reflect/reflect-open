@@ -15,7 +15,7 @@ import { ConnectRepositoryDialog } from '@/components/settings/connect-repositor
 import { SettingsField } from '@/components/settings/field.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
@@ -67,7 +67,7 @@ function githubRepoBrowserUrl(repo: GithubRepoRef): string {
  */
 export function GitSyncSettingsField(): ReactElement {
   const { state, disconnectGraph, syncNow } = useGitSync()
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { opener } = useAppServices()
   const [dialog, setDialog] = useState<OpenDialog | null>(null)
   const openRepoAttemptRef = useRef(0)

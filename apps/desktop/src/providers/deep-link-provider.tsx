@@ -1,5 +1,5 @@
 import { useEffect, type ReactElement, type ReactNode } from 'react'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphSession } from '@/providers/graph-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
@@ -19,7 +19,7 @@ export function DeepLinkProvider({ children }: DeepLinkProviderProps): ReactElem
   const { deepLinkRouter, linkNavigation } = useAppServices()
   // Serve again for each graph session: the service acts on the session open
   // when `serve` is called.
-  const { session } = useGraph()
+  const session = useGraphSession()
 
   useEffect(() => {
     return deepLinkRouter.serve({

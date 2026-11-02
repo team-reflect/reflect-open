@@ -1,10 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { MobileStorageInfo, MobileStorageKind } from '@reflect/core'
 import { useAppServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
- * The mobile-only slice of the graph context, read from `MobileOnboardingService`.
+ * The mobile-only graph state, read from `MobileOnboardingService`.
  */
 export interface MobileGraphBoot {
   /**
@@ -48,15 +48,12 @@ export interface MobileGraphBoot {
 }
 
 /**
- * The mobile graph bootstrap (Plans 19/21) as the graph context reads it:
- * boots the `MobileOnboardingService` and publishes its state. Inert on
- * desktop.
+ * The mobile graph bootstrap (Plans 19/21): the state of the
+ * `MobileOnboardingService` that `GraphProvider` boots. Inert on desktop.
  */
 export function useMobileGraphBoot(): MobileGraphBoot {
   const { mobileOnboarding: service } = useAppServices()
   const state = useServiceState(service, service.getState)
-
-  useEffect(() => service.boot(), [service])
 
   return useMemo(
     () => ({

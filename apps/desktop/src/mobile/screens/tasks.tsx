@@ -22,7 +22,7 @@ import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
 import { MobileTaskGroup } from '@/mobile/task-group.tsx'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -46,7 +46,7 @@ import { useServiceState } from '@/services/use-service-state.ts'
 export function MobileTasks(): ReactElement {
   const { haptics } = useMobileServices()
   const { tasks: taskService } = useCoreServices()
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { navigate, arrivalSeq, arrivalFocusEditor } = useRouter()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()

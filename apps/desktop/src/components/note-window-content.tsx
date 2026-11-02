@@ -6,7 +6,7 @@ import { useNoteRow } from '@/hooks/use-note-row.ts'
 import { useNoteWindowTitle } from '@/hooks/use-note-window-title.ts'
 import { getIsoToday } from '@reflect/utils'
 import { dailyPath, displayNoteTitle, formatDayLabel } from '@reflect/core'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 /**
@@ -21,7 +21,7 @@ import { useRouter } from '@/routing/router.tsx'
  */
 export function NoteWindowContent(): ReactElement {
   const { route } = useRouter()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const dailyDate =
     route.kind === 'daily' ? route.date : route.kind === 'today' ? getIsoToday() : null
 

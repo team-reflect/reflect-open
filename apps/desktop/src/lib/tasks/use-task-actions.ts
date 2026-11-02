@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { errorMessage, type InsertTaskTarget, type OpenTask } from '@reflect/core'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -83,7 +83,7 @@ type TaskWriteKind =
 type PendingWrites = Readonly<Partial<Record<TaskWriteKind, number>>>
 
 export function useTaskActions(): TaskActions {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const root = graph?.root ?? null
   const { tasks: taskService } = useCoreServices()
   const { operations } = useAppServices()

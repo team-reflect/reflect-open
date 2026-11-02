@@ -48,6 +48,13 @@ export class WritableStore<T> implements Store<T> {
     this.#listeners.add(listener)
     return () => this.#listeners.delete(listener)
   }
+
+  /**
+   * Whether the store has any listener.
+   */
+  subscribed(): boolean {
+    return this.#listeners.size > 0
+  }
 }
 
 /**
