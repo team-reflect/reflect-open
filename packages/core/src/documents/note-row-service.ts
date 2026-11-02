@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { GraphSession } from '../graph/graph-session.ts'
 import type { NoteRow, PinnedNote } from '../indexing/index-query-service.ts'
 import { combineStores, deriveStore, WritableStore, type Store } from '../store.ts'
@@ -323,7 +324,7 @@ class NoteRowServiceImpl implements NoteRowService {
       (entries, generation) => {
         return generation === null ? EMPTY_OVERLAYS : collectOverlays(entries, generation)
       },
-      isOverlaysEqual,
+      isShallowEqual,
     )
   }
 
@@ -446,24 +447,6 @@ function storeEntry(
   } else {
     entries.set(path, { generation, overlay })
   }
-}
-
-/**
- * Whether `a` and `b` hold the same overlay objects under the same paths.
- */
-function isOverlaysEqual(
-  a: ReadonlyMap<string, NoteRowOverlay>,
-  b: ReadonlyMap<string, NoteRowOverlay>,
-): boolean {
-  if (a.size !== b.size) {
-    return false
-  }
-  for (const [path, overlay] of a) {
-    if (b.get(path) !== overlay) {
-      return false
-    }
-  }
-  return true
 }
 
 function collectOverlays(
