@@ -152,7 +152,7 @@ async function openSession(options?: SetupOptions) {
     surfaceHidden: options?.surfaceHidden ?? false,
   })
   await flush()
-  return { ...kit, surface, session, phase: () => session.getState().phase }
+  return { ...kit, surface, session, phase: () => session.get().phase }
 }
 
 /**
@@ -308,7 +308,7 @@ describe('AudioMemoService.openPipeline', () => {
 describe('AudioMemoService.openSession', () => {
   it('toggle records, then stops and captures the recording', async () => {
     const { session, phase, assetStore } = await openSession()
-    expect(session.getState().available).toBe(true)
+    expect(session.get().available).toBe(true)
 
     session.toggle()
     await flush()
@@ -326,15 +326,15 @@ describe('AudioMemoService.openSession', () => {
     const { session } = await openSession()
     const listener = vi.fn()
     session.subscribe(listener)
-    const before = session.getState()
-    expect(session.getState()).toBe(before)
+    const before = session.get()
+    expect(session.get()).toBe(before)
 
     session.toggle()
     await flush()
 
     expect(listener).toHaveBeenCalled()
-    expect(session.getState()).not.toBe(before)
-    expect(session.getState().recorderState).toBe('recording')
+    expect(session.get()).not.toBe(before)
+    expect(session.get().recorderState).toBe('recording')
   })
 
   it('runs the launch pass when it opens, and stops following triggers when disposed', async () => {
@@ -364,7 +364,7 @@ describe('AudioMemoService.openSession', () => {
   it('adding the first transcription-capable model kicks the pass the gate was suppressing', async () => {
     const { session, settings, passes } = await openSession({ providers: ANTHROPIC_ONLY })
     expect(passes()).toBe(0)
-    expect(session.getState().available).toBe(false)
+    expect(session.get().available).toBe(false)
 
     settings.update({
       aiProviders: PROVIDERS.providers,
@@ -373,7 +373,7 @@ describe('AudioMemoService.openSession', () => {
     await flush()
 
     expect(passes()).toBe(1)
-    expect(session.getState().available).toBe(true)
+    expect(session.get().available).toBe(true)
   })
 
   it('a too-short recording is discarded without saving', async () => {
@@ -400,8 +400,8 @@ describe('AudioMemoService.openSession', () => {
     session.toggle()
     await flush()
     expect(phase()).toBe('error')
-    expect(session.getState().error).toBe('disk full')
-    expect(session.getState().canRetry).toBe(true)
+    expect(session.get().error).toBe('disk full')
+    expect(session.get().canRetry).toBe(true)
 
     session.retry()
     await flush()
@@ -457,12 +457,24 @@ describe('AudioMemoService.openSession', () => {
     session.toggle()
     await flush()
 
-    recorder.emitLevel({ level: 0.5, elapsedMs: 1200 })
-    expect(session.getState().elapsedMs).toBe(1200)
+    const state = session.get()
+    const listener = vi.fn()
+    const elapsedListener = vi.fn()
+    session.subscribe(listener)
+    const unsubscribeElapsed = session.elapsedMs.subscribe(elapsedListener)
 
+    recorder.emitLevel({ level: 0.5, elapsedMs: 1200 })
+    expect(session.elapsedMs.get()).toBe(1200)
+    expect(elapsedListener).toHaveBeenCalledOnce()
+    // A tick leaves the main state alone.
+    expect(session.get()).toBe(state)
+    expect(listener).not.toHaveBeenCalled()
+
+    unsubscribeElapsed()
     session.cancel()
     await flush()
-    expect(session.getState().elapsedMs).toBe(0)
+    expect(session.elapsedMs.get()).toBe(0)
+    expect(elapsedListener).toHaveBeenCalledOnce()
   })
 
   it('shows the still-recording reminder, and stopping takes it down', async () => {
@@ -559,14 +571,14 @@ describe('AudioMemoService.openSession', () => {
     session.toggle()
     await flush()
     expect(phase()).toBe('transcribing')
-    expect(session.getState().pendingCount).toBe(2)
+    expect(session.get().pendingCount).toBe(2)
     // Serial: the second memo waits — captures must land in recording order.
     expect(uploadMock).toHaveBeenCalledTimes(1)
 
     pendingFirst.resolve()
     await flush()
     expect(phase()).toBe('idle')
-    expect(session.getState().pendingCount).toBe(0)
+    expect(session.get().pendingCount).toBe(0)
     expect(uploadMock).toHaveBeenCalledTimes(2)
     expect(uploadMock.mock.calls[1]?.[1]).toBe(SECOND_BLOB)
   })
@@ -655,8 +667,8 @@ describe('AudioMemoService.openSession', () => {
     await flush()
 
     expect(phase()).toBe('error')
-    expect(session.getState().canRetry).toBe(false)
-    expect(session.getState().error).toBe(
+    expect(session.get().canRetry).toBe(false)
+    expect(session.get().error).toBe(
       'Microphone access was denied. Allow it in System Settings → Privacy & Security → Microphone.',
     )
   })
@@ -668,7 +680,7 @@ describe('AudioMemoService.openSession', () => {
     session.toggle()
     await flush()
 
-    expect(session.getState().error).toBe(
+    expect(session.get().error).toBe(
       'Microphone access was denied. Allow microphone access for Reflect in your system settings.',
     )
   })
@@ -680,7 +692,7 @@ describe('AudioMemoService.openSession', () => {
     session.toggle()
     await flush()
 
-    expect(session.getState().error).toBe('no input device')
+    expect(session.get().error).toBe('no input device')
   })
 
   it('hiding the recording UI during the permission prompt abandons the request', async () => {
@@ -767,8 +779,8 @@ describe('AudioMemoService.openSession', () => {
   it('is unavailable without an OpenAI or Gemini model, and nothing runs', async () => {
     const { session, phase, recorder, passes } = await openSession({ providers: ANTHROPIC_ONLY })
 
-    expect(session.getState().available).toBe(false)
-    expect(session.getState().unavailableReason).toMatch(/OpenAI or Gemini/)
+    expect(session.get().available).toBe(false)
+    expect(session.get().unavailableReason).toMatch(/OpenAI or Gemini/)
 
     session.toggle()
     await flush()
@@ -782,8 +794,8 @@ describe('AudioMemoService.openSession', () => {
   it('is unavailable where the platform cannot record', async () => {
     const { session, recorder } = await openSession({ supported: false })
 
-    expect(session.getState().available).toBe(false)
-    expect(session.getState().unavailableReason).toBe(
+    expect(session.get().available).toBe(false)
+    expect(session.get().unavailableReason).toBe(
       'Audio recording is not supported on this platform',
     )
 

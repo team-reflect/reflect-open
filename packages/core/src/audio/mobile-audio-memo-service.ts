@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
 import { AUDIO_MEMO_REMINDER_MS, AUDIO_MEMO_SEGMENT_MS } from './audio-memo-session.ts'
 import { audioMemoIdentity, audioMemoPartPath } from './audio-memo.ts'
@@ -5,6 +6,7 @@ import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { errorMessage } from '../errors.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { HapticsService } from '../ipc/haptics-service.ts'
 import type { AudioMemoPhase, AudioMemoService } from './audio-memo-service.ts'
@@ -23,14 +25,6 @@ const MIC_DENIED_REASON = 'Microphone access was denied. Allow it for Reflect in
  */
 export interface MobileAudioMemoSessionState {
   readonly phase: AudioMemoPhase
-  /**
-   * Live while recording.
-   */
-  readonly elapsedMs: number
-  /**
-   * Latest input level 0…1, for the waveform.
-   */
-  readonly level: number
   /**
    * Recordings committed but not yet written to the graph.
    */
@@ -95,12 +89,17 @@ export interface MobileAudioMemoServiceDeps {
  *   saved rather than left a hidden hot microphone, and OS entry points'
  *   queued `recordAudio` requests are claimed and confirmed.
  */
-export interface MobileAudioMemoSession {
+export interface MobileAudioMemoSession extends Store<MobileAudioMemoSessionState> {
   /**
-   * The current state. The same object until something changes.
+   * The recording's elapsed time, live while recording. Apart from the
+   * state, as it changes on every tick.
    */
-  getState: () => MobileAudioMemoSessionState
-  subscribe(listener: () => void): Unlisten
+  readonly elapsedMs: Store<number>
+  /**
+   * Latest input level 0…1, for the waveform. Apart from the state, as it
+   * changes on every tick.
+   */
+  readonly level: Store<number>
   /**
    * Audio action tap: idle → record (or key setup); recording → stop & save; error → show it.
    */
@@ -201,7 +200,6 @@ function isMicDeniedError(cause: unknown): boolean {
 
 class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
   readonly #deps: MobileAudioMemoServiceDeps
-  readonly #listeners = new Set<() => void>()
   readonly #pipeline: ReturnType<AudioMemoService['openPipeline']>
   readonly #available: boolean
   readonly #unlisten: Unlisten[]
@@ -210,8 +208,10 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
    * True from the stop tap until the recorder hands over the file.
    */
   #stopping = false
-  #elapsedMs = 0
-  #level = 0
+  readonly #elapsedMs = new WritableStore(0)
+  readonly elapsedMs: Store<number> = this.#elapsedMs
+  readonly #level = new WritableStore(0)
+  readonly level: Store<number> = this.#level
   #live: LiveSession | null = null
   /**
    * Sessions the user discarded, by identity timestamp. A native discard that
@@ -229,7 +229,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
    */
   #scanning = false
   #disposed = false
-  #state: MobileAudioMemoSessionState
+  readonly #state: WritableStore<MobileAudioMemoSessionState>
 
   constructor(deps: MobileAudioMemoServiceDeps) {
     const { audioMemo, audioRecorder, nativeAction, activity, platform } = deps
@@ -239,7 +239,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
       isErrorSurfaceVisible: () => this.#drawerOpen,
     })
     this.#available = platform.isNativeShell
-    this.#state = this.#snapshot()
+    this.#state = new WritableStore(this.#snapshot(), isShallowEqual)
 
     this.#unlisten = [
       this.#pipeline.subscribe(() => {
@@ -247,15 +247,14 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
       }),
       audioRecorder.state.subscribe(() => {
         if (audioRecorder.state.get() !== 'recording') {
-          this.#elapsedMs = 0
-          this.#level = 0
+          this.#elapsedMs.set(0)
+          this.#level.set(0)
         }
         this.#publish()
       }),
       audioRecorder.subscribeLevel((event) => {
-        this.#level = event.level
-        this.#elapsedMs = event.elapsedMs
-        this.#publish()
+        this.#level.set(event.level)
+        this.#elapsedMs.set(event.elapsedMs)
       }),
       // A segment the recorder rotated away from; the session keeps recording.
       audioRecorder.subscribeSegment((segment) => {
@@ -284,17 +283,8 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
     }
   }
 
-  readonly getState = (): MobileAudioMemoSessionState => this.#state
-
-  subscribe(listener: () => void): Unlisten {
-    const entry = (): void => {
-      listener()
-    }
-    this.#listeners.add(entry)
-    return () => {
-      this.#listeners.delete(entry)
-    }
-  }
+  readonly get = (): MobileAudioMemoSessionState => this.#state.get()
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#state.subscribe(listener)
 
   toggle(): void {
     const { audioRecorder } = this.#deps
@@ -396,8 +386,6 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
               : this.#stopping || pipelineState.pendingCount > 0 || pipelineState.transcribing
                 ? 'transcribing'
                 : 'idle',
-      elapsedMs: this.#elapsedMs,
-      level: this.#level,
       pendingCount: pipelineState.pendingCount,
       available: this.#available,
       hasTranscriptionConfig: pipelineState.hasTranscriptionConfig,
@@ -408,24 +396,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
   }
 
   #publish(): void {
-    const state = this.#state
-    const next = this.#snapshot()
-    if (
-      next.phase === state.phase &&
-      next.elapsedMs === state.elapsedMs &&
-      next.level === state.level &&
-      next.pendingCount === state.pendingCount &&
-      next.hasTranscriptionConfig === state.hasTranscriptionConfig &&
-      next.error === state.error &&
-      next.canRetry === state.canRetry &&
-      next.drawerOpen === state.drawerOpen
-    ) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(this.#snapshot())
   }
 
   #setDrawerOpen(open: boolean): void {
