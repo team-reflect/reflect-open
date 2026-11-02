@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import { userEvent } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { createTestCoreServices, makeOpenTask, type TestCoreServices } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
@@ -40,86 +39,6 @@ function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
   state.set({ ...state.get(), ...patch })
 }
 
-const editorProbe = vi.hoisted(() => ({ focusCalls: 0 }))
-
-// The quick-edit sheet hosts the real markdown editor, covered by its own
-// tests. This textarea stand-in keeps the NoteEditor contract the sheet
-// relies on: an uncontrolled seed, `onChange` with the markdown, and a focus probe.
-vi.mock('@/editor/note-editor.tsx', async () => {
-  const { useEffect, useRef } = await import('react')
-  return {
-    NoteEditor: ({
-      initialContent,
-      onChange,
-      handleRef,
-    }: {
-      initialContent: string
-      onChange?: (markdown: string) => void
-      handleRef?: (handle: import('@/editor/note-editor.tsx').NoteEditorHandle | null) => void
-    }) => {
-      const areaRef = useRef<HTMLTextAreaElement | null>(null)
-      useEffect(() => {
-        handleRef?.({
-          getMarkdown: () => areaRef.current?.value ?? '',
-          setMarkdown: (markdown) => {
-            if (areaRef.current !== null) {
-              areaRef.current.value = markdown
-            }
-          },
-          insertMarkdown: () => {},
-          focus: () => {
-            editorProbe.focusCalls += 1
-          },
-          setSelection: () => {},
-          getSelectedText: () => '',
-          openSelectionMenu: () => {},
-          startPendingReplacement: () => false,
-          appendPendingReplacementText: () => {},
-          acceptPendingReplacement: () => {},
-          discardPendingReplacement: () => {},
-          findNext: () => {},
-          findPrevious: () => {},
-        })
-        return () => handleRef?.(null)
-      }, [handleRef])
-      return (
-        <textarea
-          ref={areaRef}
-          aria-label="Task text"
-          defaultValue={initialContent}
-          onChange={(event) => onChange?.(event.target.value)}
-        />
-      )
-    },
-  }
-})
-
-// Vaul's drag/animation is verified on-device. This passthrough honours `open`
-// and exposes the dismissal path as a button.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({
-    open,
-    onOpenChange,
-    children,
-  }: {
-    open?: boolean
-    onOpenChange?: (open: boolean) => void
-    children?: ReactNode
-  }) => {
-    return open ? (
-      <div data-testid="drawer">
-        {children}
-        <button type="button" onClick={() => onOpenChange?.(false)}>
-          dismiss-drawer
-        </button>
-      </div>
-    ) : null
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
-
 /**
  * The result of a write that changed nothing the cache needs to re-address.
  */
@@ -139,6 +58,34 @@ let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
 let insertTask: MockInstance<TaskService['insertTask']>
 let writeTask: MockInstance<TaskService['writeTask']>
 
+/**
+ * The quick-edit sheet, which the drawer portals outside the menu.
+ */
+const sheet = page.getByRole('dialog', { name: 'Edit task' })
+
+/**
+ * The open sheet's editor, once it has focus, so typing lands in it.
+ */
+function focusedSheetEditor(): Promise<HTMLElement> {
+  return vi.waitFor(() => {
+    const editor = document.querySelector<HTMLElement>('[role="dialog"] [contenteditable="true"]')
+    if (editor === null) {
+      throw new Error('the sheet editor is not mounted')
+    }
+    expect(editor.contains(document.activeElement)).toBe(true)
+    return editor
+  })
+}
+
+/**
+ * The `+` toggle, read directly: an open modal sheet hides it from the accessibility tree.
+ */
+function captureToggle(view: InAppRenderResult<TestCoreServices>): HTMLButtonElement | null {
+  return view.container.querySelector<HTMLButtonElement>(
+    'button[aria-controls="daily-capture-actions"]',
+  )
+}
+
 function renderMenu(): Promise<InAppRenderResult<TestCoreServices>> {
   return renderInApp(
     <MobileAudioMemoContext value={{ session, ...actions }}>
@@ -151,7 +98,6 @@ function renderMenu(): Promise<InAppRenderResult<TestCoreServices>> {
 beforeEach(() => {
   vi.clearAllMocks()
   state.set(INITIAL)
-  editorProbe.focusCalls = 0
   core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   // Today is 2026-06-14.
   core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
@@ -234,29 +180,25 @@ describe('DailyCaptureMenu', () => {
       .toHaveAttribute('aria-expanded', 'false')
   })
 
-  it("adds a task to today's daily note and opens its sheet with the editor focused", async () => {
+  it("adds a task to today's daily note and Enter saves what was typed into its sheet", async () => {
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
 
     await view.getByRole('button', { name: 'New task' }).click()
 
     await vi.waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
-    await expect
-      .element(view.getByRole('button', { name: 'Show capture actions' }))
-      .toHaveAttribute('aria-expanded', 'false')
-    const input = view.getByRole('textbox', { name: 'Task text' })
-    await expect.element(input).toHaveValue('')
-    // The task is brand new, so typing is the next step and the keyboard rises.
-    await vi.waitFor(() => expect(editorProbe.focusCalls).toBeGreaterThan(0))
+    expect(captureToggle(view)?.getAttribute('aria-expanded')).toBe('false')
+    // The task is brand new, so the editor has focus and typing starts at once.
+    await focusedSheetEditor()
 
-    await userEvent.type(input, 'buy oat milk')
-    await view.getByRole('button', { name: 'dismiss-drawer' }).click()
+    await userEvent.keyboard('buy oat milk')
+    await userEvent.keyboard('{Enter}')
 
-    expect(writeTask).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
     expect(writeTask).toHaveBeenCalledWith(expect.objectContaining({ markdown: '' }), [
       { kind: 'setMarkdown', markdown: 'buy oat milk' },
     ])
-    expect(view.getByRole('textbox', { name: 'Task text' }).query()).toBeNull()
+    await expect.element(sheet).not.toBeInTheDocument()
   })
 
   it('edits the live row when a reindex rewrites the task while its sheet is open', async () => {
@@ -266,8 +208,7 @@ describe('DailyCaptureMenu', () => {
     expect(getOpenTasks).not.toHaveBeenCalled()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await view.getByRole('button', { name: 'New task' }).click()
-    const input = view.getByRole('textbox', { name: 'Task text' })
-    await expect.element(input).toBeInTheDocument()
+    await focusedSheetEditor()
 
     // Another device rewrites the task in place; the reindex re-reads the rows.
     const readsBefore = getOpenTasks.mock.calls.length
@@ -285,10 +226,11 @@ describe('DailyCaptureMenu', () => {
       await getOpenTasks.mock.results.at(-1)?.value
     })
 
-    await userEvent.type(input, 'buy oat milk')
-    await view.getByRole('button', { name: 'dismiss-drawer' }).click()
+    await userEvent.keyboard('buy oat milk')
+    await userEvent.keyboard('{Escape}')
 
     // The write addresses the row as it is now, so the guard matches it.
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
     expect(writeTask).toHaveBeenCalledWith(
       expect.objectContaining({ markdown: 'synced from another device' }),
       [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
@@ -299,9 +241,9 @@ describe('DailyCaptureMenu', () => {
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await view.getByRole('button', { name: 'New task' }).click()
-    await expect.element(view.getByRole('textbox', { name: 'Task text' })).toBeInTheDocument()
+    await focusedSheetEditor()
 
-    await view.getByRole('button', { name: 'dismiss-drawer' }).click()
+    await userEvent.keyboard('{Escape}')
 
     // V1's empty-task rule: a change of heart leaves no bare `+ [ ]` behind.
     await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
@@ -319,7 +261,7 @@ describe('DailyCaptureMenu', () => {
 
     pending.resolve(INSERTED)
 
-    await expect.element(view.getByRole('textbox', { name: 'Task text' })).toBeInTheDocument()
+    await expect.element(sheet).toBeInTheDocument()
     expect(insertTask).toHaveBeenCalledTimes(1)
   })
 
@@ -347,7 +289,7 @@ describe('DailyCaptureMenu', () => {
 
     await vi.waitFor(() => expect(insertTask).toHaveBeenCalledTimes(1))
     await vi.waitFor(() => expect(core.progress.findByLabel('Adding task')?.status).toBe('failed'))
-    expect(view.getByRole('textbox', { name: 'Task text' }).query()).toBeNull()
+    expect(sheet.query()).toBeNull()
   })
 
   it('starts the audio memo and collapses', async () => {
