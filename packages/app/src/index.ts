@@ -171,11 +171,11 @@ export {
   type PickFolderOptions,
 } from './app/dialog-service.ts'
 export {
-  createPlatformService,
+  createSystemPreferencesService,
   type ColorScheme,
   type PlatformMedia,
-  type PlatformService,
-} from './app/platform-service.ts'
+  type SystemPreferencesService,
+} from './app/system-preferences-service.ts'
 export { type GraphBootService } from './graph/graph-boot-service.ts'
 export {
   type MobileOnboardingService,

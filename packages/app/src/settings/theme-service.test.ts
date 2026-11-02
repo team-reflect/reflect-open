@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createTestPlatformService,
   createTestSettingsService,
   createTestStorageService,
   type TestStorageService,
 } from '@reflect/core/testing'
 import type { Settings } from '@reflect/core'
+import { createTestSystemPreferencesService } from '../testing/system-preferences.ts'
 import { createThemeService, THEME_PREFERENCE_CACHE_KEY } from './theme-service.ts'
 
 function setup(stored: Partial<Settings> = {}, options: { gateLoad?: boolean } = {}) {
@@ -18,9 +18,9 @@ function setup(stored: Partial<Settings> = {}, options: { gateLoad?: boolean } =
     })
   }
   const storage = createTestStorageService()
-  const platform = createTestPlatformService({ colorScheme: 'light' })
-  const theme = createThemeService({ settings, storage, platform })
-  return { theme, settings, storage, platform, releaseLoad: () => gate.resolve() }
+  const systemPreferences = createTestSystemPreferencesService({ colorScheme: 'light' })
+  const theme = createThemeService({ settings, storage, systemPreferences })
+  return { theme, settings, storage, systemPreferences, releaseLoad: () => gate.resolve() }
 }
 
 function cached(storage: TestStorageService): string | null {
@@ -66,8 +66,8 @@ describe('createThemeService', () => {
   })
 
   it('caches `system` verbatim rather than the theme it resolved to', async () => {
-    const { theme, storage, platform } = setup({ theme: 'system' })
-    platform.setColorScheme('dark')
+    const { theme, storage, systemPreferences } = setup({ theme: 'system' })
+    systemPreferences.colorScheme.set('dark')
     await theme.whenSettled()
     expect(cached(storage)).toBe('system')
     expect(theme.get().resolved).toBe('dark')
@@ -88,8 +88,8 @@ describe('createThemeService', () => {
   })
 
   it('toggles the preference to the opposite of the resolved theme', async () => {
-    const { theme, platform } = setup({ theme: 'system' })
-    platform.setColorScheme('dark')
+    const { theme, systemPreferences } = setup({ theme: 'system' })
+    systemPreferences.colorScheme.set('dark')
     await theme.whenSettled()
 
     theme.toggleTheme()
@@ -111,21 +111,21 @@ describe('createThemeService', () => {
   })
 
   it('follows the system color scheme only while the preference is `system`', async () => {
-    const { theme, platform } = setup({ theme: 'system' })
+    const { theme, systemPreferences } = setup({ theme: 'system' })
     await theme.whenSettled()
     let calls = 0
     theme.subscribe(() => {
       calls += 1
     })
 
-    platform.setColorScheme('dark')
+    systemPreferences.colorScheme.set('dark')
     expect(theme.get().resolved).toBe('dark')
     expect(calls).toBe(1)
 
     theme.setPreference('light')
     expect(calls).toBe(2)
-    platform.setColorScheme('light')
-    platform.setColorScheme('dark')
+    systemPreferences.colorScheme.set('light')
+    systemPreferences.colorScheme.set('dark')
     expect(theme.get().resolved).toBe('light')
     expect(calls).toBe(2)
   })
@@ -143,12 +143,12 @@ describe('createThemeService', () => {
   })
 
   it('keeps the same state until a field changes', async () => {
-    const { theme, platform } = setup({ theme: 'light' })
+    const { theme, systemPreferences } = setup({ theme: 'light' })
     await theme.whenSettled()
     const state = theme.get()
     expect(theme.get()).toBe(state)
 
-    platform.setColorScheme('dark')
+    systemPreferences.colorScheme.set('dark')
     expect(theme.get()).toBe(state)
 
     theme.setPreference('dark')
@@ -156,13 +156,13 @@ describe('createThemeService', () => {
   })
 
   it('does not notify when the system scheme changes under a pinned preference', async () => {
-    const { theme, platform } = setup({ theme: 'light' })
+    const { theme, systemPreferences } = setup({ theme: 'light' })
     await theme.whenSettled()
     let calls = 0
     theme.subscribe(() => {
       calls += 1
     })
-    platform.setColorScheme('dark')
+    systemPreferences.colorScheme.set('dark')
     expect(calls).toBe(0)
   })
 

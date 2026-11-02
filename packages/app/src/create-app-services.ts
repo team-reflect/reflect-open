@@ -49,10 +49,10 @@ import { createQuitPolicyService, type QuitPolicyService } from './app/quit-poli
 import type { WindowService } from './app/window-service.ts'
 import type { DialogService } from './app/dialog-service.ts'
 import {
-  createPlatformService,
+  createSystemPreferencesService,
   type PlatformMedia,
-  type PlatformService,
-} from './app/platform-service.ts'
+  type SystemPreferencesService,
+} from './app/system-preferences-service.ts'
 import {
   createMobileOnboardingService,
   type MobileOnboardingService,
@@ -120,9 +120,9 @@ export interface AppServices {
    */
   readonly dialog: DialogService
   /**
-   * The platform facts plus the webview's reduced-motion and color-scheme signals.
+   * The webview's reduced-motion and color-scheme preferences.
    */
-  readonly platform: PlatformService
+  readonly systemPreferences: SystemPreferencesService
   /**
    * The window-aware graph flows: the boot path, the folder picker, and the
    * opens and closes that end the session note windows adopted.
@@ -214,7 +214,7 @@ export interface AppServices {
  * Build the app layer once per webview.
  */
 export function createAppServices(core: CoreServices, host: AppHost): AppServices {
-  const platform = createPlatformService({ facts: core.platform, media: host.media })
+  const systemPreferences = createSystemPreferencesService({ media: host.media })
   const commands = createCommandService({ platform: core.platform, logger: core.logger })
   const keymap = createKeymapService({ platform: core.platform })
   const nativeMenu = createNativeMenuService({
@@ -256,7 +256,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
   return {
     window: host.window,
     dialog: host.dialog,
-    platform,
+    systemPreferences,
     graphBoot: createGraphBootService({
       graphSession: core.graphSession,
       window: host.window,
@@ -285,7 +285,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     theme: createThemeService({
       settings: core.settings,
       storage: core.storage,
-      platform,
+      systemPreferences,
     }),
     update: createUpdateService({
       updater: host.updater,
