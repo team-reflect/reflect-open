@@ -473,10 +473,6 @@ class TaskServiceImpl implements TaskService {
   )
   readonly recentlyCompleted: Store<RecentlyCompleted> = this.#recentlyCompleted
   readonly #state = new WritableStore<TaskListState>(EMPTY_STATE, isSameTaskListState)
-  /**
-   * How many subscriptions are active. Reads run only while one is.
-   */
-  #watchers = 0
   #sessionKey: string | null = null
   #open: TaskListSlot = emptySlot()
   #completed: TaskListSlot = emptySlot()
@@ -506,18 +502,9 @@ class TaskServiceImpl implements TaskService {
   readonly subscribe = (listener: VoidFunction): Unlisten => {
     this.#attach()
     const unlisten = this.#state.subscribe(listener)
-    this.#watchers += 1
     this.#syncSession()
     this.#loadStale()
-    let active = true
-    return () => {
-      if (!active) {
-        return
-      }
-      active = false
-      this.#watchers -= 1
-      unlisten()
-    }
+    return unlisten
   }
 
   async refresh(): Promise<void> {
@@ -953,7 +940,7 @@ class TaskServiceImpl implements TaskService {
    * Read each held list whose rows may be behind the index.
    */
   #loadStale(): void {
-    if (this.#watchers > 0 && this.#open.stale) {
+    if (this.#state.subscribed() && this.#open.stale) {
       void this.#readOpen()
     }
     if (this.#completedHolds > 0 && this.#completed.stale) {
@@ -1000,7 +987,7 @@ class TaskServiceImpl implements TaskService {
    * Re-read the rows when a screen shows them, else mark them stale for the next one.
    */
   #invalidate(): void {
-    if (this.#watchers > 0) {
+    if (this.#state.subscribed()) {
       void this.refresh()
     } else {
       this.#open.stale = true
