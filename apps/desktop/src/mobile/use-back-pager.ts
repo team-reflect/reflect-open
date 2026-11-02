@@ -111,8 +111,10 @@ export function useBackPager({
       linkOpacityToScroll({ target: scrim, scroller, axis: 'x', from: 0, to: 1, signal })
     }
 
+    // A finger on the pager owns its position, even when the keyboard or the
+    // safe area resizes it mid-swipe.
     const resize = new ResizeObserver(() => {
-      if (scroller.scrollLeft > REVEALED_PX) {
+      if (!watch.isTouching() && scroller.scrollLeft > REVEALED_PX) {
         pinToLastPage(scroller)
       }
     })

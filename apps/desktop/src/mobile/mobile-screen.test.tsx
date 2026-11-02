@@ -1076,6 +1076,32 @@ describe('MobileStack transitions & back pager', () => {
     await mouse.up()
   }
 
+  it('leaves a finger-held pager where it is when the pager resizes', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    const held = Math.round(scroller.clientWidth / 3)
+    // Mid-drag, nothing snaps the pager; a real finger scroll holds snapping off too.
+    scroller.style.scrollSnapType = 'none'
+    await touch(scroller, 'start')
+    await act(async () => {
+      const scrolled = new Promise((resolve) => {
+        scroller.addEventListener('scroll', resolve, { once: true })
+      })
+      scroller.scrollLeft = held
+      await scrolled
+    })
+    // A height change, like the keyboard closing mid-swipe.
+    scroller.style.height = `${scroller.clientHeight - 40}px`
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+
+    expect(scroller.scrollLeft).toBe(held)
+    await touch(scroller, 'end')
+    scroller.style.removeProperty('scroll-snap-type')
+  })
+
   it('pops when a mouse drags the edge strip past half', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
