@@ -25,7 +25,9 @@ export class WriteableStore<T> {
   }
 
   set(value: T): void {
+    if (this.#value === value) return
     this.#value = value
+    this.emit()
   }
 
   subscribe(listener: () => void): Unlisten {
