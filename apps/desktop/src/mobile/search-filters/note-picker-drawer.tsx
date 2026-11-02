@@ -70,13 +70,17 @@ export function NotePickerDrawer({
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>{title}</DrawerTitle>
-        <DrawerBody className="px-4">
-          <SearchInput
-            placeholder="Find a note…"
-            aria-label="Find a note"
-            value={query}
-            onValueChange={setQuery}
-          />
+        {/* One scroller, so a drag at its top still closes the sheet. The search
+            field sticks to its top instead (no top fade, which would dim it). */}
+        <DrawerBody className="px-4 scroll-fade-t-0">
+          <div className="sticky top-0 z-10 bg-popover">
+            <SearchInput
+              placeholder="Find a note…"
+              aria-label="Find a note"
+              value={query}
+              onValueChange={setQuery}
+            />
+          </div>
           <div className="flex-1">
             {hits !== undefined && hits.length === 0 && (
               <p className="py-6 text-center text-sm text-text-muted">No matches</p>
