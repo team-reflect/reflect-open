@@ -158,7 +158,12 @@ export function MobileTaskRow({
               }
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
-                edit()
+                // Like a tap, a key press on a revealed row only closes it.
+                if (revealed) {
+                  close()
+                } else {
+                  edit()
+                }
               }
             }}
             className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 pr-4 text-left focus-visible:outline-none"
