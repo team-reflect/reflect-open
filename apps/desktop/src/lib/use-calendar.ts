@@ -27,22 +27,13 @@ function useCalendarAvailable(): boolean {
 }
 
 /**
- * The macOS calendar permission state (never prompts). While `enabled`, the
- * service re-checks it every time the window turns visible: exactly the
- * "flip it in System Settings and come back" path.
+ * The macOS calendar permission state (never prompts). While the integration
+ * is on, the service re-checks it every time the window turns visible:
+ * exactly the "flip it in System Settings and come back" path.
  */
-export function useCalendarAuthorization(
-  enabled: boolean,
-): CalendarAuthorizationStatus | undefined {
+export function useCalendarAuthorization(): CalendarAuthorizationStatus | undefined {
   const { calendarEvents } = useAppServices()
-  const available = useCalendarAvailable()
   const { authorization } = useStore(calendarEvents)
-  useEffect(() => {
-    if (!enabled || !available) {
-      return
-    }
-    return calendarEvents.watchAuthorization()
-  }, [available, calendarEvents, enabled])
   return authorization ?? undefined
 }
 

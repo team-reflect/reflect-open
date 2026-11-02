@@ -41,7 +41,7 @@ export function CalendarIntegrationField(): ReactElement | null {
   const calendarIds = useCalendarIds()
   const queryClient = useQueryClient()
   const { opener, calendarEvents } = useAppServices()
-  const status = useCalendarAuthorization(calendarEnabled)
+  const status = useCalendarAuthorization()
   const canRead = status !== undefined && canReadCalendars(status)
   const { calendars, isLoaded } = useCalendars(calendarEnabled && canRead)
   useCalendarChangeInvalidation(calendarEnabled)

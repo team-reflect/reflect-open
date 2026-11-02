@@ -107,18 +107,17 @@ describe('subscribeChanged', () => {
   })
 })
 
-describe('watchAuthorization', () => {
-  it('reads the permission state now, on every page turning visible, and on every calendar change', async () => {
+describe('authorization reads', () => {
+  it('reads the permission state on subscribe, on every page turning visible, and on every calendar change', async () => {
     const calendar = createTestCalendarService({ status: 'denied' })
     const lifecycle = createTestLifecycleService()
-    const service = createService({ calendar, lifecycle })
+    const settings = createTestSettingsService({ calendarEnabled: true })
+    const service = createService({ calendar, lifecycle, settings })
     expect(service.get().authorization).toBeNull()
     let notified = 0
-    service.subscribe(() => {
+    const unsubscribe = service.subscribe(() => {
       notified += 1
     })
-
-    const stop = service.watchAuthorization()
     await vi.waitFor(() => expect(service.get().authorization).toBe('denied'))
 
     calendar.setStatus('fullAccess')
@@ -130,12 +129,44 @@ describe('watchAuthorization', () => {
     await vi.waitFor(() => expect(service.get().authorization).toBe('restricted'))
     expect(notified).toBe(3)
 
-    stop()
+    unsubscribe()
     calendar.setStatus('denied')
     lifecycle.emitVisible()
     calendar.emitChanged()
     await service.listCalendars()
     expect(service.get().authorization).toBe('restricted')
+  })
+
+  it('reads only while the integration is on', async () => {
+    const calendar = createTestCalendarService({ status: 'denied' })
+    const lifecycle = createTestLifecycleService()
+    const settings = createTestSettingsService({ calendarEnabled: false })
+    const authorizationStatus = vi.spyOn(calendar, 'authorizationStatus')
+    const service = createService({ calendar, lifecycle, settings })
+    service.subscribe(() => {})
+    lifecycle.emitVisible()
+    expect(authorizationStatus).not.toHaveBeenCalled()
+
+    settings.update({ calendarEnabled: true })
+    await vi.waitFor(() => expect(service.get().authorization).toBe('denied'))
+    expect(authorizationStatus).toHaveBeenCalledOnce()
+
+    settings.update({ calendarEnabled: false })
+    lifecycle.emitVisible()
+    calendar.emitChanged()
+    expect(authorizationStatus).toHaveBeenCalledOnce()
+  })
+
+  it('never reads where calendars are unavailable', () => {
+    const calendar = createTestCalendarService()
+    const authorizationStatus = vi.spyOn(calendar, 'authorizationStatus')
+    const service = createService({
+      calendar,
+      settings: createTestSettingsService({ calendarEnabled: true }),
+      platform: createTestPlatformService({ isMacosDesktop: false }),
+    })
+    service.subscribe(() => {})
+    expect(authorizationStatus).not.toHaveBeenCalled()
   })
 
   it('keeps the state and stays quiet when a read finds the same permission', async () => {
@@ -164,9 +195,13 @@ describe('watchAuthorization', () => {
     const failure = new Error('EventKit is gone')
     const calendar = createTestCalendarService()
     vi.spyOn(calendar, 'authorizationStatus').mockRejectedValue(failure)
-    const service = createService({ logger, calendar })
+    const service = createService({
+      logger,
+      calendar,
+      settings: createTestSettingsService({ calendarEnabled: true }),
+    })
 
-    service.watchAuthorization()
+    service.subscribe(() => {})
 
     await vi.waitFor(() => {
       expect(logger.getErrors()).toEqual([

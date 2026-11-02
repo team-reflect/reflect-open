@@ -1,5 +1,6 @@
 import {
   dayRange,
+  deriveStore,
   WritableStore,
   type CalendarAuthorizationStatus,
   type CalendarEvent,
@@ -28,14 +29,13 @@ export interface CalendarEventsState {
  * The calendar integration behind the daily note's events panel and the
  * settings field (docs/porting/calendar-meetings-integration.md). Events are
  * fetched live: nothing here is cached, and nothing is indexed.
+ *
+ * While the service has a subscriber, {@link isAvailable} holds, and the
+ * integration is on, it reads the permission state now and again whenever the
+ * page turns visible or the calendar reports a change. The state changes
+ * behind Reflect's back in System Settings. These reads never prompt.
  */
 export interface CalendarEventsService extends Store<CalendarEventsState> {
-  /**
-   * Read the permission state now, again whenever the page turns visible or
-   * the calendar reports a change, until the returned function runs. The
-   * state changes behind Reflect's back in System Settings. Never prompts.
-   */
-  watchAuthorization(): Unlisten
   /**
    * Whether calendar reads can run at all: the macOS desktop shell only.
    */
@@ -113,6 +113,10 @@ export function countSelectedCalendars(
   return calendars.filter((calendar) => calendarIds.includes(calendar.id)).length
 }
 
+function selectCalendarEnabled(settings: Settings): boolean {
+  return settings.calendarEnabled
+}
+
 export interface CalendarEventsServiceDeps {
   readonly calendar: CalendarService
   readonly settings: SettingsService
@@ -127,29 +131,27 @@ class CalendarEventsServiceImpl implements CalendarEventsService {
     { authorization: null },
     (a, b) => a.authorization === b.authorization,
   )
+  readonly #calendarEnabled: Store<boolean>
   // Bumped by every read, so only the latest one publishes.
   #reads = 0
+  #watch: Unlisten | null = null
 
   constructor(deps: CalendarEventsServiceDeps) {
     this.#deps = deps
+    this.#calendarEnabled = deriveStore(deps.settings, selectCalendarEnabled)
   }
 
   readonly get = this.#state.get
 
-  readonly subscribe = this.#state.subscribe
-
-  watchAuthorization(): Unlisten {
-    const { calendar, lifecycle } = this.#deps
-    void this.#refreshAuthorization()
-    const stopVisible = lifecycle.subscribeVisible(() => {
-      void this.#refreshAuthorization()
-    })
-    const stopChanged = calendar.subscribeChanged(() => {
-      void this.#refreshAuthorization()
-    })
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    const unlisten = this.#state.subscribe(listener)
+    this.#watch ??= this.#startWatch()
     return () => {
-      stopVisible()
-      stopChanged()
+      unlisten()
+      if (!this.#state.subscribed()) {
+        this.#watch?.()
+        this.#watch = null
+      }
     }
   }
 
@@ -193,6 +195,50 @@ class CalendarEventsServiceImpl implements CalendarEventsService {
         ? [...current.calendarIds.filter((existing) => existing !== id), id]
         : current.calendarIds.filter((existing) => existing !== id),
     }))
+  }
+
+  /**
+   * Watch the permission state while the integration is on.
+   */
+  #startWatch(): Unlisten {
+    if (!this.isAvailable()) {
+      return () => {}
+    }
+    let stopReads: Unlisten | null = null
+    const sync = (): void => {
+      if (this.#calendarEnabled.get()) {
+        stopReads ??= this.#watchAuthorization()
+      } else {
+        stopReads?.()
+        stopReads = null
+      }
+    }
+    const stopEnabled = this.#calendarEnabled.subscribe(sync)
+    sync()
+    return () => {
+      stopEnabled()
+      stopReads?.()
+      stopReads = null
+    }
+  }
+
+  /**
+   * Read the permission state now, and again whenever the page turns visible
+   * or the calendar reports a change.
+   */
+  #watchAuthorization(): Unlisten {
+    const { calendar, lifecycle } = this.#deps
+    void this.#refreshAuthorization()
+    const stopVisible = lifecycle.subscribeVisible(() => {
+      void this.#refreshAuthorization()
+    })
+    const stopChanged = calendar.subscribeChanged(() => {
+      void this.#refreshAuthorization()
+    })
+    return () => {
+      stopVisible()
+      stopChanged()
+    }
   }
 
   async #refreshAuthorization(): Promise<void> {
