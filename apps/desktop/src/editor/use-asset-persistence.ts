@@ -7,7 +7,7 @@ import type {
 } from '@meowdown/core'
 import type { AssetSaveError } from '@reflect/core'
 import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
-import { useMaybeGraph } from '@/providers/graph-provider.tsx'
+import { useMaybeGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 export interface AssetPersistence {
@@ -58,7 +58,7 @@ export interface AssetPersistence {
  * and the graph it is in (a pane is reused across note switches).
  */
 export function useAssetPersistence(path: string): AssetPersistence {
-  const graph = useMaybeGraph()?.graph ?? null
+  const graph = useMaybeGraphInfo()
   const { attachments } = useCoreServices()
   const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(path)
   // The pane outlives the note (and graph session) it shows, so a save that

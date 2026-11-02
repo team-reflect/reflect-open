@@ -1,4 +1,5 @@
 import type { KeyValueStore, StorageService } from '../ports/storage-service.ts'
+import { WritableStore } from '../store.ts'
 
 export interface TestStorageService extends StorageService {
   /**
@@ -8,42 +9,44 @@ export interface TestStorageService extends StorageService {
 }
 
 class MemoryStore implements KeyValueStore {
-  readonly #values: Map<string, string>
-  readonly #listeners = new Map<string, Set<() => void>>()
+  readonly #stores: Map<string, WritableStore<string | null>>
 
   constructor(initial: Record<string, string>) {
-    this.#values = new Map(Object.entries(initial))
+    this.#stores = new Map(
+      Object.entries(initial).map(([key, value]) => [key, new WritableStore<string | null>(value)]),
+    )
   }
 
   get(key: string): string | null {
-    return this.#values.get(key) ?? null
+    return this.#store(key).get()
   }
 
   set(key: string, value: string | null): void {
-    if ((this.#values.get(key) ?? null) === value) {
-      return
-    }
-    if (value === null) {
-      this.#values.delete(key)
-    } else {
-      this.#values.set(key, value)
-    }
-    for (const listener of this.#listeners.get(key) ?? []) {
-      listener()
-    }
+    this.#store(key).set(value)
   }
 
   subscribe(key: string, listener: () => void): () => void {
-    const keyListeners = this.#listeners.get(key) ?? new Set<() => void>()
-    this.#listeners.set(key, keyListeners)
-    keyListeners.add(listener)
-    return () => {
-      keyListeners.delete(listener)
-    }
+    return this.#store(key).subscribe(listener)
   }
 
   dump(): Record<string, string> {
-    return Object.fromEntries(this.#values)
+    const values: Record<string, string> = {}
+    for (const [key, store] of this.#stores) {
+      const value = store.get()
+      if (value !== null) {
+        values[key] = value
+      }
+    }
+    return values
+  }
+
+  #store(key: string): WritableStore<string | null> {
+    let store = this.#stores.get(key)
+    if (!store) {
+      store = new WritableStore<string | null>(null)
+      this.#stores.set(key, store)
+    }
+    return store
   }
 }
 

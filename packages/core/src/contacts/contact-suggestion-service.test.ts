@@ -330,13 +330,13 @@ describe('the enable flow', () => {
     await service.requestAccess()
 
     expect(contacts.accessRequests()).toBe(1)
-    expect(contacts.getState()).toEqual({ authorization: 'authorized' })
+    expect(contacts.get()).toEqual({ authorization: 'authorized' })
   })
 
   it('requestAccess swallows a failed prompt', async () => {
     const failing = contactSuggestionsOver({
       contacts: {
-        getState: contacts.getState,
+        get: contacts.get,
         subscribe: contacts.subscribe,
         refresh: () => contacts.refresh(),
         canLookup: (current) => contacts.canLookup(current),
@@ -368,7 +368,7 @@ describe('showsSuggestionFor', () => {
   ): boolean {
     const gated = contactSuggestionsOver({
       contacts: {
-        getState: () => ({ authorization }),
+        get: () => ({ authorization }),
         subscribe: contacts.subscribe,
         refresh: () => contacts.refresh(),
         requestAccess: () => contacts.requestAccess(),

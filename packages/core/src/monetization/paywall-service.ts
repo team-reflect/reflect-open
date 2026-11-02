@@ -1,14 +1,19 @@
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import type { StorageService } from '../ports/storage-service.ts'
-import type { ClassicAccessService } from '../classic/classic-access-service.ts'
+import type { ClassicAccessService, ClassicAccessState } from '../classic/classic-access-service.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
 import { IAP_PRODUCT_IDS, type IapProduct, type IapService } from '../ipc/iap-service.ts'
-import type { Unlisten } from '../unlisten.ts'
+import { combineStores, deriveStore, type Store } from '../store.ts'
 import type {
   AppStoreEnvironment,
   AppStoreEnvironmentService,
+  AppStoreEnvironmentState,
 } from './app-store-environment-service.ts'
-import type { ActiveSubscription, SubscriptionService } from './subscription-service.ts'
+import type {
+  ActiveSubscription,
+  SubscriptionService,
+  SubscriptionState,
+} from './subscription-service.ts'
 
 /**
  * Paywall visibility: `show` replaces the app; `hide` leaves the app visible.
@@ -25,18 +30,15 @@ export const PAYWALL_REQUESTED_STORAGE_KEY = 'reflect.paywall-requested'
  */
 export interface PaywallService {
   /**
-   * Whether to render the paywall. An unsettled subscription check returns
-   * `hide` so verification never blocks app startup.
+   * Whether to render the paywall. An unsettled subscription check reads
+   * `hide` so verification never blocks app startup. It subscribes to its
+   * inputs only while it has subscribers.
    */
-  gate: () => PaywallGate
-  /**
-   * Calls `listener` whenever `gate()` or `requested()` may have changed.
-   */
-  subscribe: (listener: () => void) => Unlisten
+  readonly gate: Store<PaywallGate>
   /**
    * Whether the user asked to see the paywall in this session.
    */
-  requested: () => boolean
+  readonly requested: Store<boolean>
   setRequested: (next: boolean) => void
   /**
    * The store's offers for the yearly and monthly plans.
@@ -67,6 +69,26 @@ function isAppStoreInstall(environment: AppStoreEnvironment): boolean {
   return environment !== 'Sandbox' && environment !== 'Xcode'
 }
 
+/**
+ * The paywall visibility on iOS for the given inputs.
+ */
+function computeGate(
+  active: SubscriptionState,
+  classic: ClassicAccessState,
+  environment: AppStoreEnvironmentState,
+  requested: boolean,
+): PaywallGate {
+  if (active.value !== null || classic.active) {
+    return 'hide'
+  }
+  // Ahead of the pending checks on purpose: a build that already knows it is
+  // not from the App Store drops into the notes without waiting on StoreKit.
+  if (!isAppStoreInstall(environment.value) && !requested) {
+    return 'hide'
+  }
+  return active.isLoading || classic.isLoading ? 'hide' : 'show'
+}
+
 export interface PaywallServiceDeps {
   readonly subscription: SubscriptionService
   readonly classicAccess: ClassicAccessService
@@ -79,46 +101,25 @@ export interface PaywallServiceDeps {
 
 class PaywallServiceImpl implements PaywallService {
   readonly #deps: PaywallServiceDeps
+  readonly gate: Store<PaywallGate>
+  readonly requested: Store<boolean>
 
   constructor(deps: PaywallServiceDeps) {
     this.#deps = deps
-  }
-
-  readonly gate = (): PaywallGate => {
-    const { subscription, classicAccess, appStoreEnvironment, platform } = this.#deps
-    if (platform.appPlatform !== 'ios') {
-      return 'hide'
+    const { subscription, classicAccess, appStoreEnvironment, platform, storage } = deps
+    const stored: Store<string | null> = {
+      get: () => storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY),
+      subscribe: (listener) => storage.session.subscribe(PAYWALL_REQUESTED_STORAGE_KEY, listener),
     }
-    const active = subscription.getState()
-    const classic = classicAccess.getState()
-    if (active.value !== null || classic.active) {
-      return 'hide'
-    }
-    // Ahead of the pending checks on purpose: a build that already knows it is
-    // not from the App Store drops into the notes without waiting on StoreKit.
-    if (!isAppStoreInstall(appStoreEnvironment.getState().value) && !this.requested()) {
-      return 'hide'
-    }
-    return active.isLoading || classic.isLoading ? 'hide' : 'show'
-  }
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    const { subscription, classicAccess, appStoreEnvironment, storage } = this.#deps
-    const unlisten = [
-      subscription.subscribe(listener),
-      classicAccess.subscribe(listener),
-      appStoreEnvironment.subscribe(listener),
-      storage.session.subscribe(PAYWALL_REQUESTED_STORAGE_KEY, listener),
-    ]
-    return () => {
-      for (const stop of unlisten) {
-        stop()
-      }
-    }
-  }
-
-  readonly requested = (): boolean => {
-    return this.#deps.storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY) === 'true'
+    this.requested = deriveStore(stored, (value) => value === 'true')
+    this.gate = combineStores(
+      [subscription, classicAccess, appStoreEnvironment, this.requested],
+      (active, classic, environment, requested) => {
+        return platform.appPlatform === 'ios'
+          ? computeGate(active, classic, environment, requested)
+          : 'hide'
+      },
+    )
   }
 
   readonly setRequested = (next: boolean): void => {

@@ -1,9 +1,9 @@
-import type { ReactElement, ReactNode } from 'react'
+import { Profiler, type ReactElement, type ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { AppServices } from '@reflect/app'
 import { createTestDialogService } from '@reflect/app/testing'
-import type { AppPlatform, CoreServices, RecentGraph } from '@reflect/core'
+import type { AppPlatform, CoreServices, GraphInfo, GraphStatus, RecentGraph } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestGraphSessionService,
@@ -13,7 +13,16 @@ import {
 import { useGraphServices } from '@/services/services-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { GraphProvider, useGraph } from './graph-provider.tsx'
+import {
+  GraphProvider,
+  useGraphActions,
+  useGraphIndexing,
+  useGraphInfo,
+  useGraphRecents,
+  useGraphStatus,
+  useIndexGeneration,
+} from './graph-provider.tsx'
+import { useMobileGraphBoot, type MobileGraphBoot } from './use-mobile-graph-boot.ts'
 
 /**
  * The graph session, its boot flows and the mobile onboarding are covered in
@@ -28,6 +37,16 @@ import { GraphProvider, useGraph } from './graph-provider.tsx'
 const MOBILE_ROOT = '/Documents'
 const ICLOUD_ROOT = '/iCloud/Documents'
 
+/**
+ * Every slice of the graph context, as one object.
+ */
+interface GraphProbe extends ReturnType<typeof useGraphActions>, MobileGraphBoot {
+  status: GraphStatus
+  graph: GraphInfo | null
+  indexGeneration: number | null
+  recents: RecentGraph[]
+}
+
 function tree(children: ReactNode, platform?: AppPlatform): ReactElement {
   return <GraphProvider {...(platform === undefined ? {} : { platform })}>{children}</GraphProvider>
 }
@@ -40,9 +59,16 @@ async function renderGraph<Core extends CoreServices>(
   platform?: AppPlatform,
   appServices?: Partial<AppServices>,
 ) {
-  const result = {} as { current: ReturnType<typeof useGraph> }
+  const result = {} as { current: GraphProbe }
   function Probe(): null {
-    result.current = useGraph()
+    result.current = {
+      ...useGraphActions(),
+      ...useMobileGraphBoot(),
+      status: useGraphStatus(),
+      graph: useGraphInfo(),
+      indexGeneration: useIndexGeneration(),
+      recents: useGraphRecents(),
+    }
     return null
   }
   const view = await renderInApp(tree(<Probe />, platform), {
@@ -122,7 +148,7 @@ describe('GraphProvider', () => {
     expect(result.current.status).toBe('ready')
     expect(result.current.graph).toEqual({ root: '/a', name: 'a', generation: 1 })
     expect(result.current.indexGeneration).toBe(1)
-    expect(core.graphSession.getState().graph?.root).toBe('/a')
+    expect(core.graphSession.get().graph?.root).toBe('/a')
   })
 
   it('provides the open session’s graph services', async () => {
@@ -135,7 +161,8 @@ describe('GraphProvider', () => {
       )
     }
     function Probe() {
-      const { status, openRecent } = useGraph()
+      const status = useGraphStatus()
+      const { openRecent } = useGraphActions()
       if (status === 'ready') {
         return <SessionRoot />
       }
@@ -155,7 +182,45 @@ describe('GraphProvider', () => {
     await screen.getByRole('button', { name: 'Open' }).click()
 
     await expect.element(screen.getByText('main /a')).toBeVisible()
-    expect(core.graphSession.getState().session?.signal.aborted).toBe(false)
+    expect(core.graphSession.get().session?.signal.aborted).toBe(false)
+  })
+
+  it('re-renders a slice reader only when its field changes', async () => {
+    const renders = { graph: 0, indexing: 0 }
+    function GraphProbe() {
+      return <p>{useGraphInfo()?.root ?? 'none'}</p>
+    }
+    function IndexingProbe() {
+      return <p>{useGraphIndexing() ? 'indexing' : 'idle'}</p>
+    }
+    const core = createTestCoreServices({
+      database: createWasmTestDatabaseService(),
+      graphSession: createTestGraphSessionService({ graph: { root: '/a' } }),
+    })
+    const screen = await renderInApp(
+      tree(
+        <>
+          <Profiler id="graph" onRender={() => (renders.graph += 1)}>
+            <GraphProbe />
+          </Profiler>
+          <Profiler id="indexing" onRender={() => (renders.indexing += 1)}>
+            <IndexingProbe />
+          </Profiler>
+        </>,
+      ),
+      { core, servicesOnly: true },
+    )
+    await expect.element(screen.getByText('/a')).toBeVisible()
+    await expect.element(screen.getByText('idle')).toBeVisible()
+    const before = { ...renders }
+
+    await act(() => {
+      core.graphSession.setState({ indexing: true })
+    })
+
+    await expect.element(screen.getByText('indexing')).toBeVisible()
+    expect(renders.graph).toBe(before.graph)
+    expect(renders.indexing).toBeGreaterThan(before.indexing)
   })
 })
 
@@ -180,7 +245,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(result.current.graph).toBeNull()
     await vi.waitFor(() => expect(result.current.mobileStorageInfo).toEqual(storage))
     expect(result.current.mobileStorageResolving).toBe(false)
-    expect(core.graphSession.getState().graph).toBeNull()
+    expect(core.graphSession.get().graph).toBeNull()
   })
 
   it('publishes the app’s mobile onboarding and passes completeOnboarding through', async () => {
@@ -202,7 +267,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(result.current.needsOnboarding).toBe(false)
     expect(result.current.graph?.root).toBe('/local/Documents')
     expect(result.current.mobileStorageKind).toBe('local')
-    expect(appServices.mobileOnboarding.getState().kind).toBe('local')
+    expect(appServices.mobileOnboarding.get().kind).toBe('local')
     await vi.waitFor(() => expect(core.settings.saves().at(-1)?.mobileOnboarded).toBe(true))
   })
 })

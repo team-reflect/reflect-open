@@ -94,7 +94,7 @@ async function signIn(wizard: ConnectGithubWizardService): Promise<void> {
 describe('createConnectGithubWizardService', () => {
   it('starts on the repo step with the suggested name', () => {
     const wizard = createWizard()
-    expect(wizard.getState()).toEqual({
+    expect(wizard.get()).toEqual({
       step: 'repo',
       mode: 'create',
       repoName: 'g-backup',
@@ -111,30 +111,31 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     wizard.setRepoName('   ')
     wizard.continueFromRepo()
-    expect(wizard.getState()).toMatchObject({ step: 'repo', error: 'Name the repository.' })
+    expect(wizard.get()).toMatchObject({ step: 'repo', error: 'Name the repository.' })
 
     wizard.setMode('existing')
     wizard.setExistingRepo('not a repo')
     wizard.continueFromRepo()
-    expect(wizard.getState()).toMatchObject({
+    expect(wizard.get()).toMatchObject({
       step: 'repo',
       error: 'Enter the repository as owner/name or a GitHub URL.',
     })
 
     wizard.setExistingRepo('alex/notes')
     wizard.continueFromRepo()
-    expect(wizard.getState()).toMatchObject({ step: 'auth', error: null })
+    expect(wizard.get()).toMatchObject({ step: 'auth', error: null })
   })
 
   it('notifies subscribers on every change until they unsubscribe', () => {
     const wizard = createWizard()
     const listener = vi.fn()
     const unsubscribe = wizard.subscribe(listener)
-    const before = wizard.getState()
+    const before = wizard.get()
+    expect(wizard.get()).toBe(before)
 
     wizard.setRepoName('other')
     expect(listener).toHaveBeenCalledOnce()
-    expect(wizard.getState()).not.toBe(before)
+    expect(wizard.get()).not.toBe(before)
 
     unsubscribe()
     wizard.setRepoName('again')
@@ -155,7 +156,7 @@ describe('createConnectGithubWizardService', () => {
       },
     ])
     expect(onClose).toHaveBeenCalledOnce()
-    expect(wizard.getState()).toMatchObject({
+    expect(wizard.get()).toMatchObject({
       step: 'finish',
       user: ALEX,
       authKind: 'pat',
@@ -170,10 +171,10 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     await signIn(wizard)
 
-    expect(wizard.getState()).toMatchObject({ pending: true, finishView: { kind: 'connecting' } })
+    expect(wizard.get()).toMatchObject({ pending: true, finishView: { kind: 'connecting' } })
     gate.resolve('connected')
     await flush()
-    expect(wizard.getState()).toMatchObject({ pending: false, finishView: { kind: 'idle' } })
+    expect(wizard.get()).toMatchObject({ pending: false, finishView: { kind: 'idle' } })
   })
 
   it('API-creates a new repo that does not exist yet and closes', async () => {
@@ -192,7 +193,7 @@ describe('createConnectGithubWizardService', () => {
     const detach = wizard.attach()
     await signIn(wizard)
 
-    expect(wizard.getState().finishView).toEqual({
+    expect(wizard.get().finishView).toEqual({
       kind: 'createGuide',
       owner: 'alex',
       name: 'g-backup',
@@ -226,7 +227,7 @@ describe('createConnectGithubWizardService', () => {
     expect(opener.openedUrls()).toHaveLength(2)
     expect(opener.openedUrls()[0]).toContain('github.com/new')
     expect(opener.openedUrls()[0]).toContain('my')
-    expect(wizard.getState().error).toBeNull()
+    expect(wizard.get().error).toBeNull()
   })
 
   it('surfaces the URL to visit by hand when the browser cannot open', async () => {
@@ -235,7 +236,7 @@ describe('createConnectGithubWizardService', () => {
     wizard.openInstallPage()
     await flush()
 
-    expect(wizard.getState().error).toMatch(
+    expect(wizard.get().error).toMatch(
       /^Couldn’t open the browser — visit https:\/\/.* yourself\.$/,
     )
   })
@@ -248,7 +249,7 @@ describe('createConnectGithubWizardService', () => {
     wizard.setExistingRepo('team/notes')
     await signIn(wizard)
 
-    expect(wizard.getState()).toMatchObject({
+    expect(wizard.get()).toMatchObject({
       authKind: 'app',
       error: null,
       finishView: { kind: 'grantAccess', repo: { owner: 'team', name: 'notes' } },
@@ -268,7 +269,7 @@ describe('createConnectGithubWizardService', () => {
     wizard.setExistingRepo('team/notes')
     await signIn(wizard)
 
-    expect(wizard.getState()).toMatchObject({
+    expect(wizard.get()).toMatchObject({
       finishView: { kind: 'idle' },
       error: 'Repository not found. Check the name and your token’s repository access.',
     })
@@ -283,7 +284,7 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     await signIn(wizard)
 
-    expect(wizard.getState().finishView).toEqual({
+    expect(wizard.get().finishView).toEqual({
       kind: 'publicConfirm',
       repo: { owner: 'alex', name: 'g-backup' },
     })
@@ -308,7 +309,7 @@ describe('createConnectGithubWizardService', () => {
 
     await advance(POLL_MS)
     // The consent question outranks the create guide, and the poll is over.
-    expect(wizard.getState().finishView).toMatchObject({ kind: 'publicConfirm' })
+    expect(wizard.get().finishView).toMatchObject({ kind: 'publicConfirm' })
     await advance(POLL_MS * 3)
     expect(existingCalls()).toHaveLength(2)
     expect(clock.pendingTimers()).toBe(0)
@@ -321,10 +322,10 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     const detach = wizard.attach()
     await signIn(wizard)
-    expect(wizard.getState().finishView).toMatchObject({ kind: 'createGuide' })
+    expect(wizard.get().finishView).toMatchObject({ kind: 'createGuide' })
 
     wizard.backToRepo()
-    expect(wizard.getState()).toMatchObject({
+    expect(wizard.get()).toMatchObject({
       step: 'repo',
       error: null,
       finishView: { kind: 'idle' },
@@ -341,7 +342,7 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     await signIn(wizard)
 
-    expect(wizard.getState()).toMatchObject({
+    expect(wizard.get()).toMatchObject({
       pending: false,
       error: 'Connect GitHub first (no credential stored)',
       finishView: { kind: 'idle' },
@@ -355,7 +356,7 @@ describe('createConnectGithubWizardService', () => {
       connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
       const wizard = createWizard()
       await signIn(wizard)
-      expect(wizard.getState().finishView).toMatchObject({ kind: 'createGuide' })
+      expect(wizard.get().finishView).toMatchObject({ kind: 'createGuide' })
       return wizard
     }
 
@@ -401,7 +402,7 @@ describe('createConnectGithubWizardService', () => {
       await advance(POLL_MS)
       expect(existingCalls()).toHaveLength(3)
       // A poll failure is silent: the handoff stays on screen.
-      expect(wizard.getState()).toMatchObject({ error: null, finishView: { kind: 'createGuide' } })
+      expect(wizard.get()).toMatchObject({ error: null, finishView: { kind: 'createGuide' } })
       detach()
     })
 

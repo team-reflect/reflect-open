@@ -14,7 +14,7 @@ import {
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { createTemplatesQueryOptions } from '@/lib/query-options.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 
 /**
@@ -32,7 +32,7 @@ interface TemplatePickerProps {
 
 export function TemplatePicker({ context }: TemplatePickerProps): ReactElement {
   const { pickerOpen, closeTemplatePicker, openTemplateCreate } = useNoteTemplates()
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { data: templates } = useQuery({
     ...createTemplatesQueryOptions(context.services.indexQuery, graph?.root),
     enabled: graph !== null && pickerOpen,

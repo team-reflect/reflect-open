@@ -1,4 +1,5 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type {
   RecordingLevelEvent,
@@ -108,8 +109,8 @@ export interface WebAudioRecorderDeps {
 
 class WebAudioRecorderImpl implements AudioRecorderService {
   readonly #deps: WebAudioRecorderDeps
-  #state: AudioRecorderState = 'idle'
-  readonly #stateListeners = new Set<(state: AudioRecorderState) => void>()
+  readonly #state = new WritableStore<AudioRecorderState>('idle')
+  readonly state: Store<AudioRecorderState> = this.#state
   readonly #levelListeners = new Set<(event: RecordingLevelEvent) => void>()
   readonly #segmentListeners = new Set<(segment: AudioRecorderSegment) => void>()
   readonly #reminderListeners = new Set<(elapsedMs: number) => void>()
@@ -163,14 +164,6 @@ class WebAudioRecorderImpl implements AudioRecorderService {
     )
   }
 
-  state(): AudioRecorderState {
-    return this.#state
-  }
-
-  subscribeState(listener: (state: AudioRecorderState) => void): Unlisten {
-    return subscribeTo(this.#stateListeners, listener)
-  }
-
   stream(): MediaStream | null {
     return this.#input
   }
@@ -186,14 +179,14 @@ class WebAudioRecorderImpl implements AudioRecorderService {
     }
     this.#requesting = true
     const owner = this.#session
-    this.#setState('requesting')
+    this.#state.set('requesting')
     let stream: MediaStream
     try {
       stream = await devices.getUserMedia({ audio: true })
     } catch (error) {
       if (this.#currentSession() === owner) {
         this.#requesting = false
-        this.#setState('idle')
+        this.#state.set('idle')
       }
       throw error
     }
@@ -222,7 +215,7 @@ class WebAudioRecorderImpl implements AudioRecorderService {
       // the state at `requesting`.
       this.#stopTracks(stream)
       this.#recorder = null
-      this.#setState('idle')
+      this.#state.set('idle')
       throw error
     }
 
@@ -231,7 +224,7 @@ class WebAudioRecorderImpl implements AudioRecorderService {
     this.#ticker = clock.setInterval(() => {
       this.#tick()
     }, ELAPSED_TICK_MS)
-    this.#setState('recording')
+    this.#state.set('recording')
     return { sessionStartedMs: this.#startedAt }
   }
 
@@ -292,8 +285,8 @@ class WebAudioRecorderImpl implements AudioRecorderService {
 
   status(): RecordingStatus {
     return {
-      recording: this.#state === 'recording',
-      elapsedMs: this.#state === 'recording' ? this.#deps.clock.now() - this.#startedAt : 0,
+      recording: this.#state.get() === 'recording',
+      elapsedMs: this.#state.get() === 'recording' ? this.#deps.clock.now() - this.#startedAt : 0,
     }
   }
 
@@ -362,14 +355,6 @@ class WebAudioRecorderImpl implements AudioRecorderService {
     return this.#session
   }
 
-  #setState(next: AudioRecorderState): void {
-    if (next === this.#state) {
-      return
-    }
-    this.#state = next
-    emit(this.#stateListeners, next)
-  }
-
   #pickMimeType(): string | undefined {
     const MediaRecorderClass = this.#recorderClass()
     return MIME_CANDIDATES.find(
@@ -403,7 +388,7 @@ class WebAudioRecorderImpl implements AudioRecorderService {
       this.#stopTracks(this.#input)
     }
     this.#input = null
-    this.#setState('idle')
+    this.#state.set('idle')
   }
 
   #attachRecorder(stream: MediaStream): WebMediaRecorder {

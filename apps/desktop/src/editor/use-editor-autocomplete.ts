@@ -5,7 +5,7 @@ import type {
   WikilinkItem,
   WikilinkSearchHandler,
 } from '@meowdown/react'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /** The `[[` and `#` autocomplete search handlers a {@link NoteEditor} wires up. */
@@ -27,7 +27,7 @@ export interface EditorAutocomplete {
  * forces a menu onto an editor that doesn't pass it through.
  */
 export function useEditorAutocomplete(): EditorAutocomplete {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { autocompleteSuggestions } = useAppServices()
 
   const onWikilinkSearch = useCallback(

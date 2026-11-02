@@ -225,7 +225,7 @@ describe('AudioMemoService.openPipeline', () => {
 
     expect(assetStore.uploads()).toEqual([{ kind: 'path', path: FINAL_PATH, generation: 3 }])
     expect(passes()).toBe(0)
-    expect(pipeline.getState().transcribing).toBe(false)
+    expect(pipeline.get().transcribing).toBe(false)
   })
 
   it('a failing post-capture cleanup is logged, never parked', async () => {
@@ -244,7 +244,7 @@ describe('AudioMemoService.openPipeline', () => {
     })
     await flush()
 
-    expect(pipeline.getState()).toMatchObject({ pendingCount: 0, error: null, canRetry: false })
+    expect(pipeline.get()).toMatchObject({ pendingCount: 0, error: null, canRetry: false })
     expect(logger.getErrors()).toEqual([
       { message: 'audio memo post-capture cleanup failed:', cause },
     ])
@@ -264,13 +264,44 @@ describe('AudioMemoService.openPipeline', () => {
       onDiscarded,
     })
     await flush()
-    expect(pipeline.getState()).toMatchObject({ error: 'disk full', canRetry: true })
+    expect(pipeline.get()).toMatchObject({ error: 'disk full', canRetry: true })
 
     pipeline.discard()
     await flush()
 
     expect(onDiscarded).toHaveBeenCalledTimes(1)
-    expect(pipeline.getState()).toMatchObject({ error: null, canRetry: false })
+    expect(pipeline.get()).toMatchObject({ error: null, canRetry: false })
+  })
+
+  it('keeps one state object until a field changes, and notifies until unsubscribed', async () => {
+    const { service, settings, passes } = await setup()
+    const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
+    await flush()
+    const listener = vi.fn()
+    const unsubscribe = pipeline.subscribe(listener)
+    const before = pipeline.get()
+
+    // A provider change that keeps a transcription model neither notifies nor kicks a pass.
+    settings.update({ defaultAiProviderId: null })
+    settings.update({ semanticSearchEnabled: true })
+    await flush()
+    expect(pipeline.get()).toBe(before)
+    expect(listener).not.toHaveBeenCalled()
+    expect(passes()).toBe(1)
+
+    pipeline.reportError('microphone unplugged')
+    const failed = pipeline.get()
+    expect(failed).toMatchObject({ error: 'microphone unplugged' })
+    expect(listener).toHaveBeenCalledOnce()
+    pipeline.reportError('microphone unplugged')
+    expect(pipeline.get()).toBe(failed)
+    expect(listener).toHaveBeenCalledOnce()
+
+    unsubscribe()
+    pipeline.discard()
+    expect(pipeline.get().error).toBeNull()
+    expect(listener).toHaveBeenCalledOnce()
+    pipeline.dispose()
   })
 })
 
@@ -692,7 +723,7 @@ describe('AudioMemoService.openSession', () => {
     await flush()
 
     expect(phase()).toBe('error')
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('a parked error never invisibly blocks recording: toggle surfaces, then clears it', async () => {
@@ -830,6 +861,6 @@ describe('AudioMemoService.openSession', () => {
     session.dispose()
 
     expect(recorder.calls()).toContainEqual({ method: 'cancel' })
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
   })
 })

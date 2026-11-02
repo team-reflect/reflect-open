@@ -69,6 +69,19 @@ describe('createWebStorageService', () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
+  it('does not notify when a write matches the stored value', () => {
+    const storage = createWebStorageService({
+      logger: createTestLoggerService(),
+      localStorage: createStorage({ key: 'stored' }),
+      sessionStorage: null,
+    })
+    const listener = vi.fn()
+    storage.local.subscribe('key', listener)
+
+    storage.local.set('key', 'stored')
+    expect(listener).not.toHaveBeenCalled()
+  })
+
   it('keeps values in memory when an area is missing', () => {
     const storage = createWebStorageService({
       logger: createTestLoggerService(),

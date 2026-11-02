@@ -9,7 +9,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { useListSelection } from '@/lib/selection/use-list-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -42,7 +42,7 @@ interface AllNotesScreenProps {
  * wired to the router's per-entry scroll memory by hand.
  */
 export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { noteList } = useCoreServices()
   const { navigate } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation()

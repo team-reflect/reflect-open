@@ -86,7 +86,7 @@ function setup(options?: SetupOptions) {
     fileChanges,
     logger,
     graphSession: {
-      getState: () => session.getState(),
+      get: () => session.get(),
       subscribe: (listener) => session.subscribe(listener),
     },
   })
@@ -150,15 +150,15 @@ function setup(options?: SetupOptions) {
 async function bootDesktop(options?: SetupOptions) {
   const context = setup(options)
   const stop = context.boot.boot()
-  await expect.poll(() => context.session.getState().status).not.toBe('loading')
-  await expect.poll(() => context.session.getState().status).not.toBe('opening')
+  await expect.poll(() => context.session.get().status).not.toBe('loading')
+  await expect.poll(() => context.session.get().status).not.toBe('opening')
   return { ...context, stop }
 }
 
 describe('GraphBootService desktop boot', () => {
   it('starts at the chooser when there are no recents', async () => {
     const { session } = await bootDesktop()
-    expect(session.getState()).toMatchObject({
+    expect(session.get()).toMatchObject({
       status: 'choosing',
       graph: null,
       session: null,
@@ -172,7 +172,7 @@ describe('GraphBootService desktop boot', () => {
       { root: '/older', name: 'older', openedMs: 1 },
     ]
     const context = await bootDesktop({ recents })
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'ready',
       graph: { root: '/known', name: 'known', generation: 1 },
       indexGeneration: 1,
@@ -185,17 +185,17 @@ describe('GraphBootService desktop boot', () => {
     const context = setup()
     context.failures.recents = true
     context.boot.boot()
-    await expect.poll(() => context.session.getState().status).toBe('choosing')
-    expect(context.session.getState().error).toMatch(/recents are corrupt/)
+    await expect.poll(() => context.session.get().status).toBe('choosing')
+    expect(context.session.get().error).toMatch(/recents are corrupt/)
   })
 
   it('opens nothing when the boot was stopped before the recents arrived', async () => {
     const context = setup({ recents: [{ root: '/known', name: 'known', openedMs: 1 }] })
     const stop = context.boot.boot()
     stop()
-    await expect.poll(() => context.session.getState().recents).toHaveLength(1)
+    await expect.poll(() => context.session.get().recents).toHaveLength(1)
     await Promise.resolve()
-    expect(context.session.getState().status).toBe('loading')
+    expect(context.session.get().status).toBe('loading')
     expect(context.commands()).not.toContain('graph_open')
   })
 
@@ -206,7 +206,7 @@ describe('GraphBootService desktop boot', () => {
     })
     context.boot.boot()
     await Promise.resolve()
-    expect(context.session.getState().status).toBe('loading')
+    expect(context.session.get().status).toBe('loading')
     expect(context.commands()).toEqual([])
   })
 })
@@ -222,8 +222,8 @@ describe('GraphBootService note-window boot', () => {
 
   it('adopts the open sessions and seeds the router from a path-shaped link', async () => {
     const context = bootNoteWindow(BOOT)
-    await expect.poll(() => context.session.getState().status).toBe('ready')
-    expect(context.session.getState()).toMatchObject({
+    await expect.poll(() => context.session.get().status).toBe('ready')
+    expect(context.session.get()).toMatchObject({
       graph: BOOT.graph,
       indexGeneration: 5,
       session: { root: '/g', generation: 3, indexGeneration: 5, role: 'note-window' },
@@ -240,14 +240,14 @@ describe('GraphBootService note-window boot', () => {
 
   it('falls back to the intake for a target only the index can answer', async () => {
     const context = bootNoteWindow({ ...BOOT, initialDeepLink: 'reflect://note/Meeting%20Notes' })
-    await expect.poll(() => context.session.getState().status).toBe('ready')
+    await expect.poll(() => context.session.get().status).toBe('ready')
     expect(context.routes).toEqual([])
     expect(context.dispatched).toEqual(['reflect://note/Meeting%20Notes'])
   })
 
   it('skips the deep-link dispatch when none is pending (a reload)', async () => {
     const context = bootNoteWindow({ ...BOOT, initialDeepLink: null })
-    await expect.poll(() => context.session.getState().status).toBe('ready')
+    await expect.poll(() => context.session.get().status).toBe('ready')
     expect(context.routes).toEqual([])
     expect(context.dispatched).toEqual([])
   })
@@ -256,21 +256,21 @@ describe('GraphBootService note-window boot', () => {
     const context = bootNoteWindow(BOOT)
     context.stop()
     await expect.poll(() => context.routes).toHaveLength(1)
-    expect(context.session.getState().status).toBe('loading')
+    expect(context.session.get().status).toBe('loading')
     context.window.emitNavigate('reflect://note/notes%2Fbar.md')
     expect(context.dispatched).toEqual([])
   })
 
   it('parks the window on a failed bootstrap', async () => {
     const context = bootNoteWindow()
-    await expect.poll(() => context.session.getState().status).toBe('choosing')
-    expect(context.session.getState().error).toContain('no bootstrap configured')
-    expect(context.session.getState().graph).toBeNull()
+    await expect.poll(() => context.session.get().status).toBe('choosing')
+    expect(context.session.get().error).toContain('no bootstrap configured')
+    expect(context.session.get().graph).toBeNull()
   })
 
   it('stops following navigation requests when stopped', async () => {
     const context = bootNoteWindow(BOOT)
-    await expect.poll(() => context.session.getState().status).toBe('ready')
+    await expect.poll(() => context.session.get().status).toBe('ready')
     context.stop()
     context.window.emitNavigate('reflect://note/notes%2Fbar.md')
     expect(context.dispatched).toEqual([])
@@ -278,12 +278,12 @@ describe('GraphBootService note-window boot', () => {
 
   it('refuses graph switches', async () => {
     const context = bootNoteWindow(BOOT)
-    await expect.poll(() => context.session.getState().status).toBe('ready')
+    await expect.poll(() => context.session.get().status).toBe('ready')
 
     await expect(context.boot.openRecent('/other')).resolves.toBe(false)
     await context.boot.chooseGraph()
 
-    expect(context.session.getState().graph).toEqual(BOOT.graph)
+    expect(context.session.get().graph).toEqual(BOOT.graph)
     expect(context.window.closeSecondaryWindowsCalls()).toBe(0)
     expect(context.logger.getWarnings().map((entry) => entry.message)).toEqual([
       'opening a graph is only available from the main window',
@@ -326,7 +326,7 @@ describe('GraphBootService note windows', () => {
 
     await context.boot.forgetRecent('/known')
     expect(context.window.closeSecondaryWindowsCalls()).toBe(2)
-    expect(context.session.getState()).toMatchObject({ status: 'choosing', graph: null })
+    expect(context.session.get()).toMatchObject({ status: 'choosing', graph: null })
   })
 
   it('closes them before deleting the open graph', async () => {
@@ -334,7 +334,7 @@ describe('GraphBootService note windows', () => {
     await context.boot.deleteGraph()
     expect(context.commands()).toContain('graph_delete')
     expect(context.window.closeSecondaryWindowsCalls()).toBe(2)
-    expect(context.session.getState()).toMatchObject({ status: 'choosing', graph: null })
+    expect(context.session.get()).toMatchObject({ status: 'choosing', graph: null })
   })
 
   it('closes them and the graph to show the chooser, without the folder picker', async () => {
@@ -342,7 +342,7 @@ describe('GraphBootService note windows', () => {
 
     await context.boot.chooseGraph()
 
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'choosing',
       graph: null,
       indexGeneration: null,
@@ -370,7 +370,7 @@ describe('GraphBootService folder picker', () => {
         },
       },
     ])
-    expect(context.session.getState()).toMatchObject({ status: 'ready', graph: { root: '/fresh' } })
+    expect(context.session.get()).toMatchObject({ status: 'ready', graph: { root: '/fresh' } })
     expect(context.window.closeSecondaryWindowsCalls()).toBe(1)
   })
 
@@ -381,7 +381,7 @@ describe('GraphBootService folder picker', () => {
       { kind: 'folder', options: { title: 'Choose a graph folder' } },
     ])
     // A cancelled picker changes nothing.
-    expect(context.session.getState().graph?.root).toBe('/known')
+    expect(context.session.get().graph?.root).toBe('/known')
   })
 
   it('suggests no folder off macOS', async () => {
@@ -396,6 +396,6 @@ describe('GraphBootService folder picker', () => {
     const context = await bootDesktop({ recents: [{ root: '/known', name: 'known', openedMs: 1 }] })
     context.dialog.pickFolder = () => Promise.reject(new Error('picker crashed'))
     await context.boot.pickAndOpen()
-    expect(context.session.getState()).toMatchObject({ status: 'ready', error: 'picker crashed' })
+    expect(context.session.get()).toMatchObject({ status: 'ready', error: 'picker crashed' })
   })
 })

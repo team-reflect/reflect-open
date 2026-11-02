@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
 import type { AttachmentService, GraphInfo, GraphSessionService } from '@reflect/core'
-import { useMaybeGraph } from '@/providers/graph-provider.tsx'
+import { useMaybeGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -38,7 +38,7 @@ export function createNoteAttachments(
   graphSession: GraphSessionService,
 ): NoteAttachments {
   const isCurrent = (): boolean => {
-    return graph !== null && graphSession.getState().session?.generation === graph.generation
+    return graph !== null && graphSession.get().session?.generation === graph.generation
   }
   return {
     resolveAttachmentPath: (destination) => {
@@ -59,7 +59,7 @@ export function createNoteAttachments(
  * The caller re-renders whenever the catalog changes.
  */
 export function useNoteAttachments(notePath: string): NoteAttachments {
-  const graph = useMaybeGraph()?.graph ?? null
+  const graph = useMaybeGraphInfo()
   const { attachments, graphSession } = useCoreServices()
   const subscribeCatalog = useCallback(
     (listener: () => void) => attachments.onCatalogChanged(listener),

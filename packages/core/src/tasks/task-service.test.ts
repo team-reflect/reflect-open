@@ -100,7 +100,7 @@ function sessionSource(read: () => GraphSession | null): TaskServiceDeps['graphS
 } {
   const listeners = new Set<() => void>()
   return {
-    getState: () => ({ session: read() }),
+    get: () => ({ session: read() }),
     subscribe: (listener) => {
       listeners.add(listener)
       return () => {
@@ -578,7 +578,7 @@ describe('snippet tasks', () => {
     expect(
       tasks.resolveSnippetTask(anchors, { index: 1, checked: false, text: 'square box' }),
     ).toBe(anchors[1])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('refuses a drifted click and reports it', () => {
@@ -590,7 +590,7 @@ describe('snippet tasks', () => {
       tasks.resolveSnippetTask(anchors, { index: 9, checked: false, text: 'do it' }),
     ).toBeNull()
     expect(
-      progress.getAll().map((operation) => [operation.label, operation.status, operation.message]),
+      progress.get().map((operation) => [operation.label, operation.status, operation.message]),
     ).toEqual([
       ['Updating task', 'failed', 'The note has changed — try again in a moment.'],
       ['Updating task', 'failed', 'The note has changed — try again in a moment.'],
@@ -605,7 +605,7 @@ describe('snippet tasks', () => {
       checked: false,
     })
     expect(noteFile.getWrites('notes/a.md')).toEqual(['+ [x] do it\n'])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('reports a failed toggle, labelled for its direction, and rethrows', async () => {
@@ -628,7 +628,7 @@ describe('no graph open', () => {
     await expect(closed.writeTask(task, [{ kind: 'toggle' }])).rejects.toThrow('No graph is open.')
     await closed.toggleSnippetTask('notes/a.md', { locator: task, checked: false })
     expect(noteFile.writes()).toEqual([])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('stops a batch once its graph is replaced', async () => {
