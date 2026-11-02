@@ -90,13 +90,9 @@ class GitHostCredentialServiceImpl implements GitHostCredentialService {
   }
 
   readonly subscribe = (listener: () => void): Unlisten => {
-    // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (): void => {
-      listener()
-    }
-    this.#listeners.add(deliver)
+    this.#listeners.add(listener)
     return () => {
-      this.#listeners.delete(deliver)
+      this.#listeners.delete(listener)
     }
   }
 

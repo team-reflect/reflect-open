@@ -294,18 +294,14 @@ class FanOutImpl<T> implements FanOut<T> {
   }
 
   subscribe(handler: (value: T) => void): Unlisten {
-    // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (value: T): void => {
-      handler(value)
-    }
-    this.#handlers.add(deliver)
+    this.#handlers.add(handler)
     if (this.#stop === null && this.#start !== undefined) {
       this.#stop = this.#start((value) => {
         this.emit(value)
       })
     }
     return () => {
-      if (!this.#handlers.delete(deliver) || this.#handlers.size > 0 || this.#stop === null) {
+      if (!this.#handlers.delete(handler) || this.#handlers.size > 0 || this.#stop === null) {
         return
       }
       const teardown = this.#stop

@@ -175,7 +175,7 @@ describe('createFileChangeService', () => {
     const listener = (batch: FileChangeBatch): void => {
       paths.push(...batch.changes.map((change) => change.path))
     }
-    const unlistenFirst = fileChanges.subscribe(listener)
+    const unlistenFirst = fileChanges.subscribe(() => {})
     const unlistenSecond = fileChanges.subscribe(listener)
     await settle()
 
