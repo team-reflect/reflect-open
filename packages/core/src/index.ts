@@ -26,7 +26,11 @@ export {
   type MobileStorageKind,
   type MobileStorageService,
 } from './ipc/mobile-storage-service.ts'
-export { githubAppInstallUrl, type GithubAuthService } from './sync/github-auth-service.ts'
+export {
+  githubAppInstallUrl,
+  type GithubAuthService,
+  type GithubAuthState,
+} from './sync/github-auth-service.ts'
 export { newRepoUrl, parseRepoInput } from './sync/github-repo-service.ts'
 export type { GithubRepoRef } from './sync/types.ts'
 export { type GitSyncService, type GitSyncState } from './sync/git-sync-service.ts'

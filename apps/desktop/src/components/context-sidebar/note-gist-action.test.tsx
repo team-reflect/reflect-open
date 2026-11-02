@@ -46,7 +46,7 @@ async function renderAction() {
  */
 async function waitForReads(queryClient: QueryClient): Promise<void> {
   await vi.waitFor(() => {
-    expect(core.githubAuth.getState().connected).toBe(connected)
+    expect(core.githubAuth.get().connected).toBe(connected)
     expect(queryClient.getQueryData(queryKeys.index.note('/g', 'notes/a.md'))).toEqual(row)
   })
 }
