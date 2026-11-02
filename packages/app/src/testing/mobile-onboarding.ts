@@ -1,4 +1,10 @@
-import type { MobileStorageKind, Unlisten } from '@reflect/core'
+import {
+  combineStores,
+  WritableStore,
+  type MobileStorageKind,
+  type Store,
+  type Unlisten,
+} from '@reflect/core'
 import {
   createTestActivityPort,
   createTestClockService,
@@ -36,34 +42,21 @@ export interface TestMobileOnboardingService extends MobileOnboardingService {
 
 class TestMobileOnboardingServiceImpl implements TestMobileOnboardingService {
   readonly #inner: MobileOnboardingService
-  readonly #listeners = new Set<() => void>()
-  #overlay: Partial<MobileOnboardingState>
-  #merged: { base: MobileOnboardingState; overlay: Partial<MobileOnboardingState> } | null = null
-  #snapshot: MobileOnboardingState
+  readonly #overlay: WritableStore<Partial<MobileOnboardingState>>
+  readonly #state: Store<MobileOnboardingState>
 
   constructor(inner: MobileOnboardingService, state: Partial<MobileOnboardingState> | undefined) {
     this.#inner = inner
-    this.#overlay = state ?? {}
-    this.#snapshot = inner.getState()
+    this.#overlay = new WritableStore(state ?? {})
+    this.#state = combineStores([inner, this.#overlay], (base, overlay) => ({
+      ...base,
+      ...overlay,
+    }))
   }
 
-  readonly getState = (): MobileOnboardingState => {
-    const base = this.#inner.getState()
-    if (this.#merged?.base !== base || this.#merged.overlay !== this.#overlay) {
-      this.#merged = { base, overlay: this.#overlay }
-      this.#snapshot = { ...base, ...this.#overlay }
-    }
-    return this.#snapshot
-  }
+  readonly get = (): MobileOnboardingState => this.#state.get()
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    const unlisten = this.#inner.subscribe(listener)
-    this.#listeners.add(listener)
-    return () => {
-      unlisten()
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#state.subscribe(listener)
 
   warm(): void {
     this.#inner.warm()
@@ -78,10 +71,7 @@ class TestMobileOnboardingServiceImpl implements TestMobileOnboardingService {
   }
 
   setState(patch: Partial<MobileOnboardingState>): void {
-    this.#overlay = { ...this.#overlay, ...patch }
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#overlay.set({ ...this.#overlay.get(), ...patch })
   }
 }
 
