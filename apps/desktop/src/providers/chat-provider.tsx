@@ -28,17 +28,41 @@ export type ChatActions = Omit<ChatSession, 'get' | 'subscribe' | 'attach'>
  */
 export type ChatModels = Pick<ChatSessionState, 'providers' | 'modelOptions' | 'activeModel'>
 
-const selectTurns = (state: ChatSessionState): ChatTurn[] => state.turns
-const selectHasTurns = (state: ChatSessionState): boolean => state.turns.length > 0
-const selectDraft = (state: ChatSessionState): string => state.draft
-const selectAttachments = (state: ChatSessionState): ChatAttachment[] => state.attachments
-const selectStatus = (state: ChatSessionState): ChatStatus => state.status
-const selectProviders = (state: ChatSessionState): ChatModels['providers'] => state.providers
+function selectTurns(state: ChatSessionState): ChatTurn[] {
+  return state.turns
+}
+
+function selectHasTurns(state: ChatSessionState): boolean {
+  return state.turns.length > 0
+}
+
+function selectDraft(state: ChatSessionState): string {
+  return state.draft
+}
+
+function selectAttachments(state: ChatSessionState): ChatAttachment[] {
+  return state.attachments
+}
+
+function selectStatus(state: ChatSessionState): ChatStatus {
+  return state.status
+}
+
+function selectProviders(state: ChatSessionState): ChatModels['providers'] {
+  return state.providers
+}
+
 function selectModelOptions(state: ChatSessionState): ChatModels['modelOptions'] {
   return state.modelOptions
 }
-const selectActiveModel = (state: ChatSessionState): ChatModels['activeModel'] => state.activeModel
-const selectActiveConversationId = (state: ChatSessionState): string => state.activeConversationId
+
+function selectActiveModel(state: ChatSessionState): ChatModels['activeModel'] {
+  return state.activeModel
+}
+
+function selectActiveConversationId(state: ChatSessionState): string {
+  return state.activeConversationId
+}
 
 function useChat(): ChatSession {
   const session = useMaybeGraphServices()?.chat
