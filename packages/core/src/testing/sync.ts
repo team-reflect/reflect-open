@@ -1,5 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import { AppError } from '../errors.ts'
+import { WritableStore } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type {
   ICloudNativeService,
@@ -491,30 +492,20 @@ export interface TestGitSyncService extends GitSyncService {
  * only through `setState`; every action is recorded.
  */
 class TestGitSyncServiceImpl implements TestGitSyncService {
-  #state: GitSyncState
-  readonly #listeners = new Set<() => void>()
+  readonly #state: WritableStore<GitSyncState>
   readonly #log: GitSyncCall[] = []
 
   constructor(options?: { state?: GitSyncState }) {
-    this.#state = options?.state ?? { phase: 'loading' }
+    this.#state = new WritableStore<GitSyncState>(options?.state ?? { phase: 'loading' })
   }
 
   start(): void {
     this.#log.push({ method: 'start' })
   }
 
-  readonly getState = (): GitSyncState => this.#state
+  readonly get = (): GitSyncState => this.#state.get()
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (): void => {
-      listener()
-    }
-    this.#listeners.add(deliver)
-    return () => {
-      this.#listeners.delete(deliver)
-    }
-  }
+  readonly subscribe = (listener: () => void): Unlisten => this.#state.subscribe(listener)
 
   connectRemote(remoteUrl: string, branch: string | null): Promise<void> {
     this.#log.push({ method: 'connectRemote', remoteUrl, branch })
@@ -534,10 +525,7 @@ class TestGitSyncServiceImpl implements TestGitSyncService {
   }
 
   setState(next: GitSyncState): void {
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(next)
   }
 
   calls(): readonly GitSyncCall[] {
