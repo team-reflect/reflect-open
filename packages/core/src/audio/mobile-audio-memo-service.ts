@@ -245,8 +245,8 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
       this.#pipeline.subscribe(() => {
         this.#publish()
       }),
-      audioRecorder.subscribeState((next) => {
-        if (next !== 'recording') {
+      audioRecorder.state.subscribe(() => {
+        if (audioRecorder.state.get() !== 'recording') {
           this.#elapsedMs = 0
           this.#level = 0
         }
@@ -298,7 +298,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
 
   toggle(): void {
     const { audioRecorder } = this.#deps
-    const recorderState = audioRecorder.state()
+    const recorderState = audioRecorder.state.get()
     if (recorderState === 'recording') {
       void this.#stopAndSave()
     } else if (recorderState === 'requesting') {
@@ -355,7 +355,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
     }
     // Dismissing the drawer mid-recording saves. A swipe-down must never
     // silently drop audio (discarding is the explicit Cancel control).
-    const recorderState = audioRecorder.state()
+    const recorderState = audioRecorder.state.get()
     if (recorderState === 'recording') {
       void this.#stopAndSave()
     } else if (recorderState === 'requesting') {
@@ -381,7 +381,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
   }
 
   #snapshot(): MobileAudioMemoSessionState {
-    const recorderState: AudioRecorderState = this.#deps.audioRecorder.state()
+    const recorderState: AudioRecorderState = this.#deps.audioRecorder.state.get()
     const pipelineState = this.#pipeline.getState()
     return {
       // A live capture owns the surface. A background save's failure parks and
@@ -531,7 +531,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
     const { audioRecorder } = this.#deps
     // A stop in flight keeps the state at `recording` until it settles, and
     // the recorder hands every concurrent caller the same result.
-    if (audioRecorder.state() !== 'recording') {
+    if (audioRecorder.state.get() !== 'recording') {
       return null
     }
     const final = await audioRecorder.stop()

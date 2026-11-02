@@ -231,11 +231,11 @@ describe('AudioMemoProvider', () => {
     await act(() => {
       result.current.memo.toggle()
     })
-    expect(core.audioRecorder.state()).toBe('recording')
+    expect(core.audioRecorder.state.get()).toBe('recording')
 
     await unmount()
 
-    expect(core.audioRecorder.state()).toBe('idle')
+    expect(core.audioRecorder.state.get()).toBe('idle')
     // The graph's own lifecycles listen until the graph closes.
     core.graphSession.setGraph(null)
     expect(core.fileChanges.listenerCount().changes).toBe(0)
