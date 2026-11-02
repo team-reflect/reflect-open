@@ -89,7 +89,7 @@ class PaywallServiceImpl implements PaywallService {
     if (platform.appPlatform !== 'ios') {
       return 'hide'
     }
-    const active = subscription.getState()
+    const active = subscription.get()
     const classic = classicAccess.getState()
     if (active.value !== null || classic.active) {
       return 'hide'
