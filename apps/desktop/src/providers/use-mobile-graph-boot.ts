@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
+import type { MobileOnboardingState } from '@reflect/app'
 import type { MobileStorageInfo, MobileStorageKind } from '@reflect/core'
+import { useSelector } from '@/lib/use-store.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
 
 /**
  * The mobile-only graph state, read from `MobileOnboardingService`.
@@ -47,22 +48,41 @@ export interface MobileGraphBoot {
   completeOnboarding: (kind: MobileStorageKind, root?: string) => Promise<void>
 }
 
+function selectNeedsOnboarding(state: MobileOnboardingState): boolean {
+  return state.needsOnboarding
+}
+
+function selectStorageInfo(state: MobileOnboardingState): MobileStorageInfo | null {
+  return state.storageInfo
+}
+
+function selectResolving(state: MobileOnboardingState): boolean {
+  return state.resolving
+}
+
+function selectKind(state: MobileOnboardingState): MobileStorageKind | null {
+  return state.kind
+}
+
 /**
  * The mobile graph bootstrap (Plans 19/21): the state of the
  * `MobileOnboardingService` that `GraphProvider` boots. Inert on desktop.
  */
 export function useMobileGraphBoot(): MobileGraphBoot {
   const { mobileOnboarding: service } = useAppServices()
-  const state = useServiceState(service, service.getState)
+  const needsOnboarding = useSelector(service, selectNeedsOnboarding)
+  const mobileStorageInfo = useSelector(service, selectStorageInfo)
+  const mobileStorageResolving = useSelector(service, selectResolving)
+  const mobileStorageKind = useSelector(service, selectKind)
 
   return useMemo(
     () => ({
-      needsOnboarding: state.needsOnboarding,
-      mobileStorageInfo: state.storageInfo,
-      mobileStorageResolving: state.resolving,
-      mobileStorageKind: state.kind,
+      needsOnboarding,
+      mobileStorageInfo,
+      mobileStorageResolving,
+      mobileStorageKind,
       completeOnboarding: (...args) => service.completeOnboarding(...args),
     }),
-    [state, service],
+    [needsOnboarding, mobileStorageInfo, mobileStorageResolving, mobileStorageKind, service],
   )
 }
