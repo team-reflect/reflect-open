@@ -5,7 +5,7 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/hooks/use-date-format.ts'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 import {
   isTagName,
@@ -91,7 +91,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
   }
   const pending = isToolPending(part)
   const noteLabel = useNoteLabel()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const call = part.call
 
   if (call.tool === 'search') {

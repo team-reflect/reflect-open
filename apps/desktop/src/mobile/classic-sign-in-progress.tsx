@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import type { ClassicSignIn } from '@/mobile/use-classic-access.ts'
 import { type DateFormat, formatFullDate } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/hooks/use-date-format.ts'
 
 type StepState = 'done' | 'active' | 'pending' | 'failed'
 
@@ -93,7 +93,7 @@ function StepIcon({ state }: { state: StepState }): ReactElement {
  */
 export function ClassicSignInProgress({ signIn }: { signIn: ClassicSignIn }): ReactElement | null {
   const { classicAccess: classic, logger } = useCoreServices()
-  const screen = screenFor(signIn, useSettingsField('dateFormat'))
+  const screen = screenFor(signIn, useDateFormat())
   if (screen === null) return null
   const { mutation } = signIn
 

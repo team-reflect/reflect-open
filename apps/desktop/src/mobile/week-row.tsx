@@ -4,7 +4,7 @@ import { formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/hooks/use-date-format.ts'
 
 interface WeekRowProps {
   /** The ISO date of this week's first day (per the week-start setting). */
@@ -35,7 +35,7 @@ function WeekRowComponent({
   onSelect,
 }: WeekRowProps): ReactElement {
   const { haptics } = useMobileServices()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const days = Array.from({ length: 7 }, (_, index) => addDaysToIsoDate(weekStart, index))
   const selectedIndex = selectedDay ? days.indexOf(selectedDay) : -1
   return (
