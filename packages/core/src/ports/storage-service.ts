@@ -1,5 +1,6 @@
 import type { ZodType } from 'zod'
 import { safeParseJson } from '@reflect/utils'
+import { WritableStore, type Store } from '../store.ts'
 import type { LoggerService } from './logger-service.ts'
 
 /**
@@ -18,6 +19,11 @@ export interface KeyValueStore {
    * Calls `listener` after every change to `key` made through this store.
    */
   subscribe(key: string, listener: () => void): () => void
+  /**
+   * The value at `key` as a {@link Store}, which changes with every change to
+   * `key` made through this store.
+   */
+  store(key: string): Store<string | null>
 }
 
 /**
@@ -38,7 +44,7 @@ class WebKeyValueStore implements KeyValueStore {
   readonly #name: string
   readonly #storage: Storage | null
   readonly #cache = new Map<string, string | null>()
-  readonly #listeners = new Map<string, Set<() => void>>()
+  readonly #stores = new Map<string, WritableStore<string | null>>()
   #warned = false
 
   constructor(logger: LoggerService, name: string, storage: Storage | null) {
@@ -64,9 +70,8 @@ class WebKeyValueStore implements KeyValueStore {
 
   set(key: string, value: string | null): void {
     const storage = this.#storage
-    // Writes go through even when unchanged, since other windows share the area.
-    const changed = this.get(key) !== value
     this.#cache.set(key, value)
+    // Writes go through even when unchanged, since other windows share the area.
     try {
       if (value === null) {
         storage?.removeItem(key)
@@ -76,21 +81,20 @@ class WebKeyValueStore implements KeyValueStore {
     } catch (error) {
       this.#warn('writing', key, error)
     }
-    if (!changed) {
-      return
-    }
-    for (const listener of this.#listeners.get(key) ?? []) {
-      listener()
-    }
+    this.#stores.get(key)?.set(value)
   }
 
   subscribe(key: string, listener: () => void): () => void {
-    const keyListeners = this.#listeners.get(key) ?? new Set<() => void>()
-    this.#listeners.set(key, keyListeners)
-    keyListeners.add(listener)
-    return () => {
-      keyListeners.delete(listener)
+    return this.store(key).subscribe(listener)
+  }
+
+  store(key: string): Store<string | null> {
+    let store = this.#stores.get(key)
+    if (store === undefined) {
+      store = new WritableStore(this.get(key))
+      this.#stores.set(key, store)
     }
+    return store
   }
 
   #warn(action: string, key: string, error: unknown): void {

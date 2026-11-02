@@ -69,6 +69,32 @@ describe('createWebStorageService', () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
+  it('exposes each key as a store that follows writes to that key', () => {
+    const storage = createWebStorageService({
+      logger: createTestLoggerService(),
+      localStorage: createStorage({ key: 'stored' }),
+      sessionStorage: null,
+    })
+    const store = storage.local.store('key')
+    expect(storage.local.store('key')).toBe(store)
+    expect(store.get()).toBe('stored')
+
+    const listener = vi.fn()
+    const unsubscribe = store.subscribe(listener)
+    storage.local.set('other', 'written')
+    storage.local.set('key', 'stored')
+    expect(listener).not.toHaveBeenCalled()
+
+    storage.local.set('key', 'written')
+    expect(store.get()).toBe('written')
+    expect(listener).toHaveBeenCalledOnce()
+
+    unsubscribe()
+    storage.local.set('key', null)
+    expect(store.get()).toBeNull()
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
   it('keeps values in memory when an area is missing', () => {
     const storage = createWebStorageService({
       logger: createTestLoggerService(),

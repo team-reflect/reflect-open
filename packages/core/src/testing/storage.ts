@@ -1,4 +1,5 @@
 import type { KeyValueStore, StorageService } from '../ports/storage-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 
 export interface TestStorageService extends StorageService {
   /**
@@ -9,7 +10,7 @@ export interface TestStorageService extends StorageService {
 
 class MemoryStore implements KeyValueStore {
   readonly #values: Map<string, string>
-  readonly #listeners = new Map<string, Set<() => void>>()
+  readonly #stores = new Map<string, WritableStore<string | null>>()
 
   constructor(initial: Record<string, string>) {
     this.#values = new Map(Object.entries(initial))
@@ -28,18 +29,20 @@ class MemoryStore implements KeyValueStore {
     } else {
       this.#values.set(key, value)
     }
-    for (const listener of this.#listeners.get(key) ?? []) {
-      listener()
-    }
+    this.#stores.get(key)?.set(value)
   }
 
   subscribe(key: string, listener: () => void): () => void {
-    const keyListeners = this.#listeners.get(key) ?? new Set<() => void>()
-    this.#listeners.set(key, keyListeners)
-    keyListeners.add(listener)
-    return () => {
-      keyListeners.delete(listener)
+    return this.store(key).subscribe(listener)
+  }
+
+  store(key: string): Store<string | null> {
+    let store = this.#stores.get(key)
+    if (store === undefined) {
+      store = new WritableStore(this.get(key))
+      this.#stores.set(key, store)
     }
+    return store
   }
 
   dump(): Record<string, string> {
