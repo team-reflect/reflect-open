@@ -22,9 +22,11 @@ export interface Store<T> {
 export class WriteableStore<T> implements Store<T> {
   #value: T
   readonly #listeners = new Set<() => void>()
+  readonly #isEqual: (a: T, b: T) => boolean
 
-  constructor(value: T) {
+  constructor(value: T, isEqual: (a: T, b: T) => boolean = Object.is) {
     this.#value = value
+    this.#isEqual = isEqual
   }
 
   readonly get = (): T => {
@@ -32,12 +34,14 @@ export class WriteableStore<T> implements Store<T> {
   }
 
   /**
-   * Replace the value. An identical value (`===`) is ignored. With
+   * Replace the value. An identical value is ignored. With
    * `emit: false` the caller must call {@link emit} itself, for example to
    * notify once after other state changed as well.
    */
   readonly set = (value: T, emit: boolean = true): void => {
-    if (this.#value === value) return
+    if (this.#isEqual(this.#value, value)) {
+      return
+    }
     this.#value = value
     if (emit) {
       this.emit()
