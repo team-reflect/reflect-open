@@ -72,7 +72,7 @@ describe('NoteGistAction', () => {
     row = noteRow({ isPrivate: true })
     const view = await renderAction()
     await waitForReads(view.queryClient)
-    expect(view.getByRole('button').query()).toBeNull()
+    await vi.waitFor(() => expect(view.getByRole('button').query()).toBeNull())
   })
 
   it('offers Share with private link for an unpublished note (even before its row exists)', async () => {
