@@ -1,4 +1,4 @@
-import { addDaysToIsoDate, formatIsoDate } from '@reflect/utils'
+import { addDays, formatIsoDate } from '@reflect/utils'
 import { captureFromPath, type CaptureIdentity } from './capture-identity.ts'
 import { captureNoteMeta, displayTitle, noteSource } from './capture-note.ts'
 import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
@@ -133,10 +133,7 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
     generation: number,
   ): Promise<Map<string, Map<string, CaptureLinkRepair>>> {
     const { noteFile, clock } = this.#deps
-    const cutoff = addDaysToIsoDate(
-      formatIsoDate(new Date(clock.now())),
-      -CAPTURE_LINK_REPAIR_WINDOW_DAYS,
-    )
+    const cutoff = formatIsoDate(addDays(clock.now(), -CAPTURE_LINK_REPAIR_WINDOW_DAYS))
     const repairsByDailyPath = new Map<string, Map<string, CaptureLinkRepair>>()
     for (const file of await noteFile.listNotes(generation)) {
       const identity = captureFromPath(file.path)

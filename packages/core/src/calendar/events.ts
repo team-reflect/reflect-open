@@ -1,4 +1,4 @@
-import { addDaysToIsoDate, isIsoDate, parseIsoDate } from '@reflect/utils'
+import { addDays, isIsoDate, parseIsoDate, startOfDay } from '@reflect/utils'
 import type { MeetingAttendee } from '../contacts/meeting-service.ts'
 import type { CalendarAttendee, CalendarEvent } from './calendar-service.ts'
 
@@ -97,8 +97,6 @@ export function dayRange(date: string): { start: number; end: number } {
   if (!isIsoDate(date)) {
     throw new Error(`dayRange expects an ISO YYYY-MM-DD date, got: ${date}`)
   }
-  return {
-    start: parseIsoDate(date).getTime(),
-    end: parseIsoDate(addDaysToIsoDate(date, 1)).getTime(),
-  }
+  const start = parseIsoDate(date)
+  return { start: start.getTime(), end: startOfDay(addDays(start, 1)).getTime() }
 }
