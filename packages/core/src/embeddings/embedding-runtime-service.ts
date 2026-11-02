@@ -96,7 +96,6 @@ export interface EmbeddingRuntimeServiceDeps {
 class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
   readonly #deps: EmbeddingRuntimeServiceDeps
   readonly #status = new WritableStore<EmbedStatus>(UNINITIALIZED, isDeepEqual)
-  #watchers = 0
   #events: StatusEvents | null = null
 
   constructor(deps: EmbeddingRuntimeServiceDeps) {
@@ -158,17 +157,10 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
     const unlisten = this.#status.subscribe(listener)
-    if (++this.#watchers === 1) {
-      this.#events = this.#startEvents()
-    }
-    let active = true
+    this.#events ??= this.#startEvents()
     return () => {
-      if (!active) {
-        return
-      }
-      active = false
       unlisten()
-      if (--this.#watchers === 0) {
+      if (!this.#status.subscribed()) {
         this.#events?.stop()
         this.#events = null
       }

@@ -25,7 +25,7 @@ import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore } from '@/lib/use-store.ts'
 
 /**
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
@@ -72,10 +72,7 @@ export function MobileTasks(): ReactElement {
     selectText: true,
   })
 
-  const { open, completed, openFailed, completedFailed } = useServiceState(
-    taskService,
-    taskService.getState,
-  )
+  const { open, completed, openFailed, completedFailed } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
