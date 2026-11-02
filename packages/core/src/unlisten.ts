@@ -8,7 +8,6 @@ export type Unlisten = () => void
 
 export interface Store<T> {
   get: () => T
-  set?: ((value: T) => void) | undefined
   subscribe: (onChange: VoidFunction) => Unlisten
 }
 
