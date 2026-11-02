@@ -15,8 +15,7 @@ import { isModEvent } from '@meowdown/core'
  *
  * Keys that vanish (a row removed or filtered out from under the selection) are
  * pruned as the order changes, so the count and the sole-selection check can't
- * be wrong about a row that's gone. The two consumers — the Tasks view
- * (`useTaskSelection`) and the All Notes view — share this hook unchanged.
+ * be wrong about a row that's gone.
  */
 export interface ListSelection {
   selected: ReadonlySet<string>
