@@ -38,7 +38,7 @@ export function createNoteAttachments(
   graphSession: GraphSessionService,
 ): NoteAttachments {
   const isCurrent = (): boolean => {
-    return graph !== null && graphSession.getState().session?.generation === graph.generation
+    return graph !== null && graphSession.get().session?.generation === graph.generation
   }
   return {
     resolveAttachmentPath: (destination) => {

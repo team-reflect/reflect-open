@@ -92,7 +92,7 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
 
   async suggestLinks(query: string): Promise<WikiLinkMenuItem[]> {
     const { suggestions, contacts, settings, clock, operations, logger, graphSession } = this.#deps
-    const session = graphSession.getState().session
+    const session = graphSession.get().session
     if (session === null) {
       return []
     }

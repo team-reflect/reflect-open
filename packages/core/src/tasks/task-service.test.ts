@@ -100,7 +100,7 @@ function sessionSource(read: () => GraphSession | null): TaskServiceDeps['graphS
 } {
   const listeners = new Set<() => void>()
   return {
-    getState: () => ({ session: read() }),
+    get: () => ({ session: read() }),
     subscribe: (listener) => {
       listeners.add(listener)
       return () => {

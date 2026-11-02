@@ -57,7 +57,7 @@ class EmbedMediaServiceImpl implements EmbedMediaService {
 
   async loadXPost(postId: string): Promise<XPost | null> {
     const { xArchive, platform, graphSession } = this.#deps
-    const session = graphSession.getState().session
+    const session = graphSession.get().session
     if (session === null) return null
     const { generation } = session
     const result =

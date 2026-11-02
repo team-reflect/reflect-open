@@ -106,7 +106,7 @@ class V1ImportServiceImpl implements V1ImportService {
 
   start(zipPath: string): void {
     const { ipc, graphSession } = this.#deps
-    const startedFor = graphSession.getState().graph
+    const startedFor = graphSession.get().graph
     if (this.#running || startedFor === null) {
       return
     }
@@ -125,7 +125,7 @@ class V1ImportServiceImpl implements V1ImportService {
           { path: zipPath, generation: startedFor.generation },
           graphImportSummarySchema,
         )
-        const current = graphSession.getState().graph
+        const current = graphSession.get().graph
         if (
           this.#attached &&
           current !== null &&

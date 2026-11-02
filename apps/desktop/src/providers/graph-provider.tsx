@@ -11,7 +11,7 @@ import {
   useAppServices,
   useCoreServices,
 } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { useMobileGraphBoot, type MobileGraphBoot } from './use-mobile-graph-boot.ts'
 
 /**
@@ -62,7 +62,7 @@ export function GraphProvider({
 }) {
   const { graphSession: session } = useCoreServices()
   const { graphBoot } = useAppServices()
-  const state = useServiceState(session, session.getState)
+  const state = useStore(session)
 
   // Desktop main-window boot reopens the most recent graph or shows the
   // chooser; a secondary note window adopts the main window's graph. Mobile

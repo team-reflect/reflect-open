@@ -88,7 +88,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
   // the previous one. Success closes the dialog from inside the action.
   const [error, submitAction, submitting] = useActionState(
     async (previous: string | null): Promise<string | null> => {
-      const { session } = graphSession.getState()
+      const { session } = graphSession.get()
       if (session === null) {
         return previous
       }
@@ -97,7 +97,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
         // may be stale after a System Settings trip, and a quick submit must
         // not skip the pre-fill.
         await contacts.refresh()
-        if (graphSession.getState().session !== session) {
+        if (graphSession.get().session !== session) {
           onClose()
           return null
         }
