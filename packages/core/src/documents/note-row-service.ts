@@ -132,10 +132,6 @@ export interface NoteRowService extends Store<ReadonlyMap<string, NoteRowOverlay
    */
   dropOverlay(path: string, generation: number, patch: NoteRowOverlayPatch): void
   /**
-   * The overlay for `path` on the open graph, or `null` when none applies or no graph is open.
-   */
-  getOverlay(path: string): NoteRowOverlay | null
-  /**
    * Every overlay on `generation`, by path.
    */
   getOverlaysOn(generation: number): ReadonlyMap<string, NoteRowOverlay>
@@ -376,15 +372,6 @@ class NoteRowServiceImpl implements NoteRowService {
       storeEntry(entries, path, generation, remaining)
       this.#entries.set(entries)
     }
-  }
-
-  getOverlay(path: string): NoteRowOverlay | null {
-    const generation = this.#generation.get()
-    if (generation === null) {
-      return null
-    }
-    const entry = this.#entries.get().get(path)
-    return entry !== undefined && entry.generation === generation ? entry.overlay : null
   }
 
   getOverlaysOn(generation: number): ReadonlyMap<string, NoteRowOverlay> {
