@@ -146,6 +146,12 @@ export interface ChatSession extends Store<ChatSessionState> {
    */
   newChat(): void
   /**
+   * Start a fresh conversation with `question` as its first message. For
+   * asking from outside the composer (mobile's search field), so the
+   * composer draft is left as it was.
+   */
+  ask(question: string): Promise<void>
+  /**
    * Load a past conversation from the history.
    */
   openConversation(id: string): Promise<void>
@@ -342,6 +348,15 @@ class ChatSessionImpl implements ChatSession {
   }
 
   async send(text: string): Promise<void> {
+    await this.#send(text, { keepDraft: false })
+  }
+
+  async ask(question: string): Promise<void> {
+    this.newChat()
+    await this.#send(question, { keepDraft: true })
+  }
+
+  async #send(text: string, { keepDraft }: { keepDraft: boolean }): Promise<void> {
     const { chatEngine, chatGraphContext, providerConfig, credentials, embeddingRuntime } =
       this.#deps
     const { settings, clock, id, logger } = this.#deps
@@ -356,7 +371,7 @@ class ChatSessionImpl implements ChatSession {
       return
     }
     const turnsBefore = this.#local.get().turns
-    this.#update({ draft: '', attachments: [] })
+    this.#update(keepDraft ? { attachments: [] } : { draft: '', attachments: [] })
 
     const turnId = id.uuid()
     const messages = [...buildHistory(turnsBefore), userMessage(trimmed, attached)]

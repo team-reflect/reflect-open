@@ -127,6 +127,15 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
    The V1-mobile "chat over the current search results" entry from the All
    tab is real and worth keeping *later* — as an additional entry point that
    seeds the same session, not a different chat.
+
+   > **Revised (2026-11-02): Chat moved into All.** The tab bar is back to
+   > three tabs (Daily, All, Tasks), and Chat is a card pushed over All
+   > (stacked like a note, so Back returns to the results). The search field
+   > reads "Search or ask…"; any typed query offers an Ask row that starts a
+   > fresh conversation with the question already sent (`ChatSession.ask`,
+   > which leaves the composer draft alone), and the All header's Chat button
+   > resumes the current conversation. The V1-mobile entry above is now the
+   > way in, not an extra one.
 3. **Lexical-only, stated honestly.** Mobile passes
    `semanticSearchEnabled: false` into `streamChat` unconditionally —
    regardless of the (per-device) setting — so `search_notes` runs

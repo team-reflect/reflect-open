@@ -355,6 +355,21 @@ describe('ChatSession persistence', () => {
     expect(session.get().turns.at(-1)?.userText).toBe('half-typed question')
   })
 
+  it('asks in a fresh conversation and leaves the composer draft alone', async () => {
+    const { session } = await setup()
+    await session.send('earlier question')
+    const earlierConversation = session.get().activeConversationId
+    session.setDraft('half-typed follow-up')
+
+    await session.ask('what did I decide about pricing?')
+
+    expect(session.get().activeConversationId).not.toBe(earlierConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual([
+      'what did I decide about pricing?',
+    ])
+    expect(session.get().draft).toBe('half-typed follow-up')
+  })
+
   it('rejects a second send while the first one is in flight', async () => {
     const { session, chatEngine } = await setup()
 

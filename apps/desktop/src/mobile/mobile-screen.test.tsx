@@ -4,14 +4,24 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { createTestAppServices } from '@reflect/app/testing'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import {
+  createTestChatEngineService,
+  createTestCoreServices,
+  createTestSecretStoreService,
+  type TestCoreServices,
+} from '@reflect/core/testing'
 import {
   clearFormattingToolbar,
   publishFormattingToolbar,
 } from '@/editor/formatting-toolbar-store.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { addDaysToIsoDate, getYearMonth, getIsoToday } from '@reflect/utils'
-import { type DailyNoteService, formatDayLabel } from '@reflect/core'
+import {
+  type AiProviderConfig,
+  type DailyNoteService,
+  aiKeySecretName,
+  formatDayLabel,
+} from '@reflect/core'
 import {
   type AppServices,
   type Route,
@@ -21,7 +31,7 @@ import {
 } from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
-import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileShell } from './mobile-shell.tsx'
 
@@ -145,7 +155,11 @@ beforeEach(async () => {
   editorProbe.selectionCalls = []
 })
 
-function mount(initialRoute: Route, probeRoute?: Route, options?: { strict?: boolean }) {
+function mount(
+  initialRoute: Route,
+  probeRoute?: Route,
+  options?: { strict?: boolean; settings?: RenderInAppOptions['settings'] },
+) {
   const tree = (
     <>
       <MobileShell />
@@ -159,7 +173,12 @@ function mount(initialRoute: Route, probeRoute?: Route, options?: { strict?: boo
     appServices,
     graph: { root: '/g', name: 'g', generation: 1 },
     route: initialRoute,
-    settings: { editorMarkdownSyntax: 'hide', dateFormat: 'mdy', weekStartDay: 'monday' },
+    settings: {
+      editorMarkdownSyntax: 'hide',
+      dateFormat: 'mdy',
+      weekStartDay: 'monday',
+      ...options?.settings,
+    },
   })
 }
 
@@ -690,6 +709,70 @@ describe('MobileShell', () => {
 
     expect((box.element() as HTMLInputElement).value).toBe('')
     expect(view.getByRole('button', { name: 'Clear search' }).query()).toBeNull()
+  })
+
+  it('has three tabs: Daily, All and Tasks (Chat lives in All)', async () => {
+    const view = await mount({ kind: 'today' })
+
+    const tabs = view.getByRole('navigation', { name: 'Sections' }).getByRole('button')
+    expect(tabs.elements().map((tab) => tab.getAttribute('aria-label'))).toEqual([
+      'Daily',
+      'All',
+      'Tasks',
+    ])
+  })
+
+  it('asks the search text from All: Chat opens over All, Back returns to the results', async () => {
+    const user = userEvent
+    const model: AiProviderConfig = {
+      id: 'm1',
+      provider: 'openai',
+      model: 'gpt-5.1',
+      keyHint: '12345',
+    }
+    core = createTestCoreServices({
+      database: createWasmTestDatabaseService(),
+      secretStore: createTestSecretStoreService({ [aiKeySecretName(model.id)]: 'sk-test' }),
+      chatEngine: createTestChatEngineService([
+        { type: 'text-delta', text: 'You kept one plan.' },
+        { type: 'complete', messages: [{ role: 'assistant', content: 'You kept one plan.' }] },
+      ]),
+    })
+    appServices = createTestAppServices(core)
+    core.clock.setNow(Date.now())
+    core.platform.setReducedMotion(true)
+    const view = await mount({ kind: 'allNotes', tag: null }, undefined, {
+      settings: { aiProviders: [model], defaultAiProviderId: model.id },
+    })
+
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await expect.element(box).toBeVisible()
+    // Nothing typed, nothing to ask.
+    expect(view.getByRole('button', { name: /^Ask/ }).query()).toBeNull()
+
+    await user.fill(box, 'pricing')
+    await user.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+
+    // The lazy Chat screen mounts a beat after the click: wait for it to be
+    // the visible layer before scoping to it.
+    await waitFor(() => {
+      expect(visibleLayer(view).querySelector('h1')?.textContent).toBe('Chat')
+    })
+    const chat = page.elementLocator(visibleLayer(view))
+    await expect.element(chat.getByText('You kept one plan.')).toBeVisible()
+    // Pushed over All, like a note: the All tab stays the current one.
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+
+    await user.click(chat.getByRole('button', { name: 'Back' }))
+
+    await waitFor(() => {
+      expect((box.element() as HTMLInputElement).value).toBe('pricing')
+      expect(visibleLayer(view).contains(box.element())).toBe(true)
+    })
+    // The header's Chat button now resumes that conversation.
+    await expect.element(view.getByTestId('chat-in-progress')).toBeInTheDocument()
   })
 
   it('back from a cold note entry lands on today', async () => {
