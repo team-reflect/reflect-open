@@ -9,7 +9,7 @@ import type { CommandContext } from '@/lib/commands/types.ts'
 import { displayNoteTitle, parseHighlights, formatDayLabel } from '@reflect/core'
 import { routeForPath, type NoteEntry } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons.ts'
 import { NotePreview } from './note-preview.tsx'
 import { usePalette } from './palette-provider.tsx'
@@ -55,7 +55,7 @@ interface PendingNoteOpen {
 
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
   const { open, query, setQuery, closePalette } = usePalette()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
   const navigateNoteLink = useNoteLinkNavigation()
   // cmdk's `onSelect` exposes only the selected value, not its originating

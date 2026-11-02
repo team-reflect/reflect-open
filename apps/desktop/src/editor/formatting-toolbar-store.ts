@@ -1,4 +1,5 @@
-import { useSyncExternalStore } from 'react'
+import { WritableStore } from '@reflect/core'
+import { useSelector } from '@/lib/use-store.ts'
 
 /**
  * Enable/disable state for the toolbar's structural buttons, recomputed from
@@ -61,6 +62,14 @@ export interface FormattingToolbar {
 }
 
 /**
+ * The active toolbar and the bridge instance (an opaque token) that owns it.
+ */
+interface ActiveFormattingToolbar {
+  owner: symbol
+  toolbar: FormattingToolbar
+}
+
+/**
  * Module-scope store for "the focused editor's toolbar", in the same
  * external-store shape as `use-keyboard.ts`. The daily carousel keeps up to
  * three editors mounted at once, so ownership is claimed per bridge instance
@@ -68,15 +77,7 @@ export interface FormattingToolbar {
  * blurring editor can never clobber the one that just took focus, because
  * focusout always precedes the next editor's focusin.
  */
-let active: FormattingToolbar | null = null
-let activeOwner: symbol | null = null
-const listeners = new Set<() => void>()
-
-function notify(): void {
-  for (const listener of listeners) {
-    listener()
-  }
-}
+const active = new WritableStore<ActiveFormattingToolbar | null>(null, activeEqual)
 
 function capabilitiesEqual(
   left: FormattingToolbarCapabilities,
@@ -91,23 +92,27 @@ function capabilitiesEqual(
   )
 }
 
+function activeEqual(
+  left: ActiveFormattingToolbar | null,
+  right: ActiveFormattingToolbar | null,
+): boolean {
+  if (left === null || right === null) {
+    return left === right
+  }
+  return (
+    left.owner === right.owner &&
+    left.toolbar.commands === right.toolbar.commands &&
+    capabilitiesEqual(left.toolbar.capabilities, right.toolbar.capabilities)
+  )
+}
+
 /**
  * Claim (or refresh) the active toolbar for `owner`. A refresh with equal
  * capabilities and the same command surface is dropped without notifying, so
  * caret moves that don't change enablement never re-render the toolbar.
  */
 export function publishFormattingToolbar(owner: symbol, toolbar: FormattingToolbar): void {
-  if (
-    activeOwner === owner &&
-    active !== null &&
-    active.commands === toolbar.commands &&
-    capabilitiesEqual(active.capabilities, toolbar.capabilities)
-  ) {
-    return
-  }
-  activeOwner = owner
-  active = toolbar
-  notify()
+  active.set({ owner, toolbar })
 }
 
 /**
@@ -115,23 +120,14 @@ export function publishFormattingToolbar(owner: symbol, toolbar: FormattingToolb
  * editor unpublishing after another editor already took over is a no-op.
  */
 export function clearFormattingToolbar(owner: symbol): void {
-  if (activeOwner !== owner) {
+  if (active.get()?.owner !== owner) {
     return
   }
-  activeOwner = null
-  active = null
-  notify()
+  active.set(null)
 }
 
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
-}
-
-function snapshot(): FormattingToolbar | null {
-  return active
+function selectToolbar(value: ActiveFormattingToolbar | null): FormattingToolbar | null {
+  return value?.toolbar ?? null
 }
 
 /**
@@ -140,7 +136,7 @@ function snapshot(): FormattingToolbar | null {
  * formatting toolbar would be nine dead buttons).
  */
 export function useFormattingToolbar(): FormattingToolbar | null {
-  return useSyncExternalStore(subscribe, snapshot, snapshot)
+  return useSelector(active, selectToolbar)
 }
 
 /**
@@ -149,5 +145,5 @@ export function useFormattingToolbar(): FormattingToolbar | null {
  * {@link useFormattingToolbar}, for the keyboard caret reveal.
  */
 export function focusedEditorCommands(): FormattingToolbarCommands | null {
-  return active?.commands ?? null
+  return active.get()?.toolbar.commands ?? null
 }

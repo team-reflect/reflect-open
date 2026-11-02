@@ -112,22 +112,22 @@ describe('watchAuthorization', () => {
     const calendar = createTestCalendarService({ status: 'denied' })
     const lifecycle = createTestLifecycleService()
     const service = createService({ calendar, lifecycle })
-    expect(service.getState().authorization).toBeNull()
+    expect(service.get().authorization).toBeNull()
     let notified = 0
     service.subscribe(() => {
       notified += 1
     })
 
     const stop = service.watchAuthorization()
-    await vi.waitFor(() => expect(service.getState().authorization).toBe('denied'))
+    await vi.waitFor(() => expect(service.get().authorization).toBe('denied'))
 
     calendar.setStatus('fullAccess')
     lifecycle.emitVisible()
-    await vi.waitFor(() => expect(service.getState().authorization).toBe('fullAccess'))
+    await vi.waitFor(() => expect(service.get().authorization).toBe('fullAccess'))
 
     calendar.setStatus('restricted')
     calendar.emitChanged()
-    await vi.waitFor(() => expect(service.getState().authorization).toBe('restricted'))
+    await vi.waitFor(() => expect(service.get().authorization).toBe('restricted'))
     expect(notified).toBe(3)
 
     stop()
@@ -135,7 +135,28 @@ describe('watchAuthorization', () => {
     lifecycle.emitVisible()
     calendar.emitChanged()
     await service.listCalendars()
-    expect(service.getState().authorization).toBe('restricted')
+    expect(service.get().authorization).toBe('restricted')
+  })
+
+  it('keeps the state and stays quiet when a read finds the same permission', async () => {
+    const calendar = createTestCalendarService({ status: 'denied' })
+    const service = createService({ calendar })
+    await service.requestAccess()
+    const state = service.get()
+    let notified = 0
+    const unsubscribe = service.subscribe(() => {
+      notified += 1
+    })
+
+    await service.requestAccess()
+    expect(service.get()).toBe(state)
+    expect(notified).toBe(0)
+
+    unsubscribe()
+    calendar.setStatus('fullAccess')
+    await service.requestAccess()
+    expect(service.get().authorization).toBe('fullAccess')
+    expect(notified).toBe(0)
   })
 
   it('logs a failed read and keeps the last state', async () => {
@@ -152,7 +173,7 @@ describe('watchAuthorization', () => {
         { message: 'calendar authorization read failed:', cause: failure },
       ])
     })
-    expect(service.getState().authorization).toBeNull()
+    expect(service.get().authorization).toBeNull()
   })
 })
 
@@ -164,7 +185,7 @@ describe('requestAccess', () => {
     await service.requestAccess()
 
     expect(calendar.accessRequests()).toBe(1)
-    expect(service.getState().authorization).toBe('fullAccess')
+    expect(service.get().authorization).toBe('fullAccess')
   })
 
   it('logs a failed request and still resolves', async () => {

@@ -10,8 +10,12 @@ import {
 } from '@/components/ui/dialog.tsx'
 import { Switch } from '@/components/ui/switch.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
+import {
+  useAiProvidersSetting,
+  useDescribeAssets,
+  useSettingsService,
+} from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { SettingsField } from './field.tsx'
 
@@ -23,10 +27,10 @@ import { SettingsField } from './field.tsx'
  * state surface through the operations status UI.
  */
 export function DescribeAssetsField(): ReactElement {
-  const aiProviders = useSettingsField('aiProviders')
-  const describeAssets = useSettingsField('describeAssets')
+  const graph = useGraphInfo()
+  const aiProviders = useAiProvidersSetting()
+  const describeAssets = useDescribeAssets()
   const settingsService = useSettingsService()
-  const { graph } = useGraph()
   const { assetDescription } = useCoreServices()
   const [confirming, setConfirming] = useState(false)
   const backfill = useAsyncAction()

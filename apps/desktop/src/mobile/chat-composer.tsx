@@ -11,7 +11,13 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { ChatModelDrawer } from '@/mobile/chat-model-drawer.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useChatSession } from '@/providers/chat-provider.tsx'
+import {
+  useChatActions,
+  useChatAttachments,
+  useChatDraft,
+  useChatModels,
+  useChatStatus,
+} from '@/providers/chat-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 /**
@@ -25,17 +31,11 @@ import { useRouter } from '@/routing/router.tsx'
  */
 export function MobileChatComposer(): ReactElement {
   const { arrivalSeq, arrivalFocusEditor } = useRouter()
-  const {
-    status,
-    activeModel,
-    draft,
-    setDraft,
-    attachments,
-    attachImages,
-    removeAttachment,
-    send,
-    stop,
-  } = useChatSession()
+  const status = useChatStatus()
+  const { activeModel } = useChatModels()
+  const draft = useChatDraft()
+  const attachments = useChatAttachments()
+  const { setDraft, attachImages, removeAttachment, send, stop } = useChatActions()
   const [modelOpen, setModelOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)

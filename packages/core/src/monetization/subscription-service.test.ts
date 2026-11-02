@@ -64,11 +64,11 @@ function service(appPlatform: 'ios' | 'desktop' = 'ios'): SubscriptionService {
 describe('SubscriptionService', () => {
   it('starts loading without a seed and settles on the StoreKit answer', async () => {
     const subscription = service()
-    expect(subscription.getState()).toEqual({ value: null, isLoading: true, isError: false })
+    expect(subscription.get()).toEqual({ value: null, isLoading: true, isError: false })
 
     await expect(subscription.activeSubscription()).resolves.toBeNull()
 
-    expect(subscription.getState()).toEqual({ value: null, isLoading: false, isError: false })
+    expect(subscription.get()).toEqual({ value: null, isLoading: false, isError: false })
     expect(lookups.toSorted()).toEqual([IAP_PRODUCT_IDS.monthly, IAP_PRODUCT_IDS.yearly])
     expect(storedSeed()).toEqual({ value: null, updatedAt: NOW })
   })
@@ -78,7 +78,7 @@ describe('SubscriptionService', () => {
     const subscription = service()
 
     await expect(subscription.activeSubscription()).resolves.toBe('monthly')
-    expect(subscription.getState().value).toBe('monthly')
+    expect(subscription.get().value).toBe('monthly')
     expect(storedSeed()).toEqual({ value: 'monthly', updatedAt: NOW })
   })
 
@@ -92,17 +92,17 @@ describe('SubscriptionService', () => {
   it('answers from a seed of the last two days before StoreKit says anything', () => {
     seed('yearly', NOW - 2 * DAY_MS)
     owned = never
-    expect(service().getState()).toEqual({ value: 'yearly', isLoading: false, isError: false })
+    expect(service().get()).toEqual({ value: 'yearly', isLoading: false, isError: false })
   })
 
   it('ignores a seed older than two days', () => {
     seed('yearly', NOW - 2 * DAY_MS - 1)
-    expect(service().getState()).toEqual({ value: null, isLoading: true, isError: false })
+    expect(service().get()).toEqual({ value: null, isLoading: true, isError: false })
   })
 
   it('keeps loading while it verifies a remembered null', () => {
     seed(null, NOW)
-    expect(service().getState().isLoading).toBe(true)
+    expect(service().get().isLoading).toBe(true)
   })
 
   it('lets the live answer overrule a subscription that lapsed', async () => {
@@ -111,7 +111,7 @@ describe('SubscriptionService', () => {
 
     await subscription.activeSubscription()
 
-    expect(subscription.getState().value).toBeNull()
+    expect(subscription.get().value).toBeNull()
     expect(storedSeed()).toEqual({ value: null, updatedAt: NOW })
   })
 
@@ -122,13 +122,13 @@ describe('SubscriptionService', () => {
     expect(lookups).toHaveLength(2)
 
     await clock.advance(15_000)
-    expect(subscription.getState().isLoading).toBe(true)
+    expect(subscription.get().isLoading).toBe(true)
     await clock.advance(1000)
     expect(lookups).toHaveLength(2)
     await clock.advance(15_000)
 
     await expect(answer).resolves.toBeNull()
-    expect(subscription.getState()).toEqual({ value: null, isLoading: false, isError: true })
+    expect(subscription.get()).toEqual({ value: null, isLoading: false, isError: true })
     expect(logger.getWarnings()).toEqual([
       {
         message: 'Looking up the App Store subscription failed',
@@ -160,7 +160,7 @@ describe('SubscriptionService', () => {
     await clock.advance(1000)
 
     await expect(answer).resolves.toBe('yearly')
-    expect(subscription.getState()).toEqual({ value: 'yearly', isLoading: false, isError: false })
+    expect(subscription.get()).toEqual({ value: 'yearly', isLoading: false, isError: false })
     expect(storedSeed()).toEqual({ value: 'yearly', updatedAt: NOW })
   })
 
@@ -196,7 +196,7 @@ describe('SubscriptionService', () => {
     iap.emitPurchaseUpdated()
 
     await clock.advance(0)
-    expect(subscription.getState().value).toBe('monthly')
+    expect(subscription.get().value).toBe('monthly')
     expect(notified).toBe(1)
   })
 
@@ -211,11 +211,46 @@ describe('SubscriptionService', () => {
     expect(lookups).toHaveLength(4)
   })
 
+  it('keeps the state reference and stays quiet when a lookup repeats the answer', async () => {
+    const subscription = service()
+    await subscription.activeSubscription()
+    const state = subscription.get()
+    const listener = vi.fn()
+    subscription.subscribe(listener)
+
+    await subscription.refetch()
+
+    expect(subscription.get()).toBe(state)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('stops looking up on invalidate once the last subscriber leaves', async () => {
+    const subscription = service()
+    await subscription.activeSubscription()
+    const listener = vi.fn()
+    const unsubscribe = subscription.subscribe(listener)
+    const other = subscription.subscribe(() => {})
+
+    unsubscribe()
+    unsubscribe()
+    subscription.invalidate()
+    await clock.advance(0)
+    expect(lookups).toHaveLength(4)
+
+    other()
+    owned = (productId) => Promise.resolve(productId === IAP_PRODUCT_IDS.yearly)
+    subscription.invalidate()
+    await clock.advance(0)
+    expect(lookups).toHaveLength(4)
+    expect(subscription.get().value).toBeNull()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
   it('stays out of the way off iOS', async () => {
     seed('yearly', NOW)
     const subscription = service('desktop')
 
-    expect(subscription.getState()).toEqual({ value: null, isLoading: false, isError: false })
+    expect(subscription.get()).toEqual({ value: null, isLoading: false, isError: false })
     await expect(subscription.activeSubscription()).resolves.toBeNull()
     iap.emitPurchaseUpdated()
     expect(lookups).toEqual([])

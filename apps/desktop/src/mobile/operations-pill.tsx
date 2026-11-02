@@ -1,4 +1,5 @@
-import { useCallback, useSyncExternalStore, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
+import { useStore } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
@@ -14,12 +15,7 @@ import { useAppServices } from '@/services/services-provider.tsx'
  */
 export function MobileOperationsPills(): ReactElement | null {
   const { operations } = useAppServices()
-  const subscribe = useCallback(
-    (listener: () => void) => operations.subscribe(listener),
-    [operations],
-  )
-  const getAll = useCallback(() => operations.getAll(), [operations])
-  const all = useSyncExternalStore(subscribe, getAll)
+  const all = useStore(operations)
   const attention = all.filter((operation) => operation.status !== 'running')
 
   if (attention.length === 0) {

@@ -1,7 +1,16 @@
 import type { ReactElement } from 'react'
 import type { EditorMarkdownSyntax, EditorTextSize } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import {
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorFullWidth,
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useEditorTextSize,
+  useSettingsService,
+} from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { KeyboardShortcutsField } from './keyboard-shortcuts-field.tsx'
 import { SettingsOptionCard } from './option-card.tsx'
@@ -57,13 +66,13 @@ const TEXT_SIZE_OPTIONS: TextSizeOption[] = [
 ]
 
 export function EditorSection(): ReactElement {
-  const editorMarkdownSyntax = useSettingsField('editorMarkdownSyntax')
-  const editorTextSize = useSettingsField('editorTextSize')
-  const editorFullWidth = useSettingsField('editorFullWidth')
-  const editorSpellCheck = useSettingsField('editorSpellCheck')
-  const editorDefaultBullet = useSettingsField('editorDefaultBullet')
-  const editorBulletAfterHeading = useSettingsField('editorBulletAfterHeading')
-  const editorSmoothCaretAnimation = useSettingsField('editorSmoothCaretAnimation')
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorTextSize = useEditorTextSize()
+  const editorFullWidth = useEditorFullWidth()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
   const settingsService = useSettingsService()
 
   return (

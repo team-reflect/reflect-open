@@ -2,7 +2,7 @@ import { useState, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import { type CalendarEvent, formatTimeOfDay } from '@reflect/core'
 import { useCalendarChangeInvalidation, useDayEvents } from '@/lib/use-calendar.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useCalendarEnabled, useTimeFormat } from '@/providers/settings-provider.tsx'
 import { AddMeetingDialog } from './add-meeting-dialog.tsx'
 import { SidebarSection } from './sidebar-section.tsx'
 
@@ -20,8 +20,8 @@ interface DailyEventsSectionProps {
  * events — an empty box would just advertise an absent feature.
  */
 export function DailyEventsSection({ date }: DailyEventsSectionProps): ReactElement | null {
-  const calendarEnabled = useSettingsField('calendarEnabled')
-  const timeFormat = useSettingsField('timeFormat')
+  const calendarEnabled = useCalendarEnabled()
+  const timeFormat = useTimeFormat()
   useCalendarChangeInvalidation(calendarEnabled)
   const events = useDayEvents(date)
   const [pendingEvent, setPendingEvent] = useState<CalendarEvent | null>(null)

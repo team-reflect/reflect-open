@@ -27,9 +27,17 @@ import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview.tsx'
 import { useXPostPreload } from '@/editor/use-x-post-preload.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useNoteSearchQuery, useNoteSearchReport } from '@/providers/note-find-provider.tsx'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useTimeFormat,
+} from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface NotePaneProps {
@@ -125,14 +133,14 @@ export function NotePaneComponent({
   registerHandle,
   onExitBoundary,
 }: NotePaneProps): ReactElement {
-  const { graph } = useGraph()
-  const dateFormat = useSettingsField('dateFormat')
-  const timeFormat = useSettingsField('timeFormat')
-  const editorMarkdownSyntax = useSettingsField('editorMarkdownSyntax')
-  const editorSpellCheck = useSettingsField('editorSpellCheck')
-  const editorSmoothCaretAnimation = useSettingsField('editorSmoothCaretAnimation')
-  const editorDefaultBullet = useSettingsField('editorDefaultBullet')
-  const editorBulletAfterHeading = useSettingsField('editorBulletAfterHeading')
+  const graph = useGraphInfo()
+  const dateFormat = useDateFormat()
+  const timeFormat = useTimeFormat()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
   const { noteCreation, platform } = useCoreServices()
   const graphKey = graph?.root ?? null
   const dailyNote = isDaily(path)

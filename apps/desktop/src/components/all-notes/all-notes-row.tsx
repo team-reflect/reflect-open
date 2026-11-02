@@ -2,7 +2,7 @@ import { memo, type MouseEvent, type ReactElement } from 'react'
 import { type NoteListEntry, formatRecencyLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat, useTimeFormat } from '@/providers/settings-provider.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 /**
@@ -37,8 +37,8 @@ export const AllNotesRow = memo(function AllNotesRow({
   onToggle,
   onOpen,
 }: AllNotesRowProps): ReactElement {
-  const dateFormat = useSettingsField('dateFormat')
-  const timeFormat = useSettingsField('timeFormat')
+  const dateFormat = useDateFormat()
+  const timeFormat = useTimeFormat()
   const noteLabel = useNoteLabel()
   return (
     <div

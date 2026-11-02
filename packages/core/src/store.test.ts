@@ -46,6 +46,15 @@ describe('WritableStore', () => {
     store.set(2)
     expect(listener).not.toHaveBeenCalled()
   })
+
+  it('reports whether it has listeners', () => {
+    const store = new WritableStore(1)
+    expect(store.subscribed()).toBe(false)
+    const unlisten = store.subscribe(() => {})
+    expect(store.subscribed()).toBe(true)
+    unlisten()
+    expect(store.subscribed()).toBe(false)
+  })
 })
 
 describe('deriveStore', () => {

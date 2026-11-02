@@ -30,7 +30,8 @@ import {
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
 import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import {
   aiProvider,
@@ -51,9 +52,22 @@ import {
   formatFullDate,
 } from '@reflect/core'
 import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import {
+  useChatSystemPrompt,
+  useDateFormat,
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorSmoothCaretAnimation,
+  useEditorTextSize,
+  useSettingsService,
+  useThemeSetting,
+  useTimeFormat,
+  useTranscriptionFormat,
+  useTranscriptionPrompt,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
-import { useGitSyncContext } from '@/providers/sync-provider.tsx'
+import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
@@ -112,22 +126,24 @@ function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
  */
 export function MobileSettings(): ReactElement {
   const { back, canBack, navigate } = useRouter()
-  const { graph, mobileStorageKind, platform } = useGraph()
+  const graph = useGraphInfo()
+  const { platform } = useGraphActions()
+  const { mobileStorageKind } = useMobileGraphBoot()
   const isIos = platform === 'ios'
   const subscriptionControls = useSubscriptionControls()
   const { opener } = useAppServices()
   const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
-  const theme = useSettingsField('theme')
-  const editorTextSize = useSettingsField('editorTextSize')
-  const selectedDateFormat = useSettingsField('dateFormat')
-  const weekStartDay = useSettingsField('weekStartDay')
-  const timeFormat = useSettingsField('timeFormat')
-  const editorSmoothCaretAnimation = useSettingsField('editorSmoothCaretAnimation')
-  const editorDefaultBullet = useSettingsField('editorDefaultBullet')
-  const editorBulletAfterHeading = useSettingsField('editorBulletAfterHeading')
-  const chatSystemPrompt = useSettingsField('chatSystemPrompt')
-  const transcriptionFormat = useSettingsField('transcriptionFormat')
-  const transcriptionPrompt = useSettingsField('transcriptionPrompt')
+  const theme = useThemeSetting()
+  const editorTextSize = useEditorTextSize()
+  const selectedDateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
+  const chatSystemPrompt = useChatSystemPrompt()
+  const transcriptionFormat = useTranscriptionFormat()
+  const transcriptionPrompt = useTranscriptionPrompt()
   const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
   const version = useAppVersion()
@@ -139,7 +155,8 @@ export function MobileSettings(): ReactElement {
   const showPrerelease =
     platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
   const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
-  const sync = useGitSyncContext()
+  const gitSync = useGitSyncState()
+  const { disconnectGraph } = useGitSyncActions()
   const githubConnected = useGithubConnected()
   const disconnectAction = useAsyncAction()
   const signOutAction = useAsyncAction()
@@ -171,13 +188,10 @@ export function MobileSettings(): ReactElement {
     enabled: graph !== null,
   })
 
-  const gitSync = sync?.state ?? null
   const status = getMobileSyncStatus(gitSync)
   // A graph with a remote, connected or waiting for its sign-in.
   const remote =
-    gitSync !== null && (gitSync.phase === 'connected' || gitSync.phase === 'needsCredential')
-      ? gitSync
-      : null
+    gitSync.phase === 'connected' || gitSync.phase === 'needsCredential' ? gitSync : null
   // A host remote that waits for its sign-in can get one here. Plain HTTP
   // cannot: the resolver never sends a sign-in in the clear.
   const canAddSignIn =
@@ -194,17 +208,14 @@ export function MobileSettings(): ReactElement {
   // are mutually exclusive per graph, Plan 21) and wait out the controller's
   // `loading` phase so the rows never flash on a graph that turns out to be
   // connected.
-  const canConnect = mobileStorageKind === 'local' && gitSync?.phase === 'disconnected'
+  const canConnect = mobileStorageKind === 'local' && gitSync.phase === 'disconnected'
 
   // Stop syncing this graph: drop its remote. The local clone and every
   // sign-in stay; the controller restarts into its disconnected state.
   async function disconnect(): Promise<void> {
-    if (sync === null) {
-      return
-    }
     await disconnectAction.run(async () => {
       try {
-        await sync.disconnectGraph()
+        await disconnectGraph()
       } catch (err) {
         logger.error('stop syncing failed:', errorMessage(err))
       }

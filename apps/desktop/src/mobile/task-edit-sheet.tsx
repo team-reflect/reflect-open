@@ -18,7 +18,13 @@ import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { TaskScheduleGrid } from '@/mobile/task-schedule-grid.tsx'
 import { useTaskSheetFinalizer } from '@/mobile/use-task-sheet-finalizer.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useTimeFormat,
+} from '@/providers/settings-provider.tsx'
 
 interface MobileTaskEditSheetProps {
   /** The task being edited. Remount (key by task) to reseed the draft. */
@@ -63,11 +69,11 @@ export function MobileTaskEditSheet({
   autoFocusEditor = false,
 }: MobileTaskEditSheetProps): ReactElement {
   const { haptics } = useMobileServices()
-  const dateFormat = useSettingsField('dateFormat')
-  const timeFormat = useSettingsField('timeFormat')
-  const editorMarkdownSyntax = useSettingsField('editorMarkdownSyntax')
-  const editorSpellCheck = useSettingsField('editorSpellCheck')
-  const editorSmoothCaretAnimation = useSettingsField('editorSmoothCaretAnimation')
+  const dateFormat = useDateFormat()
+  const timeFormat = useTimeFormat()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
   const navigateWikiLink = useWikiLinkNavigation()
   const onLinkClick = useMarkdownLinkClick(null)
   const navigateTag = useTagNavigation()

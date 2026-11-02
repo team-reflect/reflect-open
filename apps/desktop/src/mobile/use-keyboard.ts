@@ -1,7 +1,11 @@
 import { useEffect, useLayoutEffect } from 'react'
 import { focusedEditorCommands } from '@/editor/formatting-toolbar-store.ts'
+import { useSelector, useStore } from '@/lib/use-store.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
+
+function selectIsVisible(height: number): boolean {
+  return height > 0
+}
 
 /**
  * Whether the software keyboard is up, as reactive state. The tab bar hides
@@ -11,7 +15,7 @@ import { useServiceState } from '@/services/use-service-state.ts'
  */
 export function useKeyboardVisible(): boolean {
   const { keyboard } = useAppServices()
-  return useServiceState(keyboard, keyboard.isVisible)
+  return useSelector(keyboard, selectIsVisible)
 }
 
 /**
@@ -47,7 +51,7 @@ function readKeyboardOverlap(): number {
  * sizes itself to `calc(100dvh - var(--keyboard-height))`, and `DrawerContent`
  * pads its bottom past it so drawers end above the keyboard.
  * The height is also published to the `KeyboardService` for non-layout
- * consumers (`KeyboardService.getHeight` for the carousel's swipe guard,
+ * consumers (`KeyboardService.get` for the carousel's swipe guard,
  * {@link useKeyboardVisible} for the tab bar hiding).
  */
 export function useKeyboardHeightVar(): void {
@@ -92,7 +96,7 @@ export function useKeyboardHeightVar(): void {
 
   // Service subscriber: touches the CSS variable only when the value changed,
   // in a layout effect so the shell resizes in the same paint.
-  const height = useServiceState(keyboard, keyboard.getHeight)
+  const height = useStore(keyboard)
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--keyboard-height', `${height}px`)
     return () => {
@@ -137,7 +141,7 @@ function focusedKeyboardField(): HTMLElement | null {
  */
 export function useKeyboardFieldReveal(): void {
   const { keyboard } = useAppServices()
-  const height = useServiceState(keyboard, keyboard.getHeight)
+  const height = useStore(keyboard)
 
   useEffect(() => {
     if (height <= 0) {
@@ -169,7 +173,7 @@ export function useKeyboardFieldReveal(): void {
  */
 export function useKeyboardCaretReveal(): void {
   const { keyboard } = useAppServices()
-  const height = useServiceState(keyboard, keyboard.getHeight)
+  const height = useStore(keyboard)
 
   useEffect(() => {
     if (height <= 0) {

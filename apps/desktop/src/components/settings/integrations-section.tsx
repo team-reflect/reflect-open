@@ -3,7 +3,7 @@ import { canPromptForContacts, contactsAccessNotice, isContactsAvailable } from 
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useContactsState } from '@/hooks/use-contacts-state.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useContactsEnabled } from '@/providers/settings-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { CalendarIntegrationField } from './calendar-integration-field.tsx'
 import { SettingsSection } from './section.tsx'
@@ -20,7 +20,7 @@ import { SettingsSwitchField } from './switch-field.tsx'
  * {@link useVisibleSettingsSections}.
  */
 export function IntegrationsSection(): ReactElement | null {
-  const contactsEnabled = useSettingsField('contactsEnabled')
+  const contactsEnabled = useContactsEnabled()
   const { contacts, contactSuggestions } = useCoreServices()
   const { opener, calendarEvents } = useAppServices()
   const { authorization } = useContactsState()
