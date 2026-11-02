@@ -6,7 +6,7 @@ import { useNoteRow } from '@/hooks/use-note-row.ts'
 import { useNoteWindowTitle } from '@/hooks/use-note-window-title.ts'
 import { getIsoToday } from '@reflect/utils'
 import { dailyPath, displayNoteTitle, formatDayLabel } from '@reflect/core'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 /**
@@ -21,7 +21,7 @@ import { useRouter } from '@/routing/router.tsx'
  */
 export function NoteWindowContent(): ReactElement {
   const { route } = useRouter()
-  const { settings } = useSettings()
+  const dateFormat = useSettingsField('dateFormat')
   const dailyDate =
     route.kind === 'daily' ? route.date : route.kind === 'today' ? getIsoToday() : null
 
@@ -31,7 +31,7 @@ export function NoteWindowContent(): ReactElement {
   const noteRow = useNoteRow(route.kind === 'note' ? route.path : '')
   useNoteWindowTitle(
     dailyDate !== null
-      ? formatDayLabel(dailyDate, settings.dateFormat)
+      ? formatDayLabel(dailyDate, dateFormat)
       : route.kind === 'note'
         ? noteRow
           ? displayNoteTitle(noteRow.title)
@@ -49,7 +49,7 @@ export function NoteWindowContent(): ReactElement {
             // The stream's day label, standing in for the title a daily
             // note doesn't carry.
             <h2 className="reflect-daily-subject reflect-content-gutter mb-3">
-              {formatDayLabel(dailyDate, settings.dateFormat)}
+              {formatDayLabel(dailyDate, dateFormat)}
             </h2>
           }
         />
