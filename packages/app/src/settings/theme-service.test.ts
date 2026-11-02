@@ -139,6 +139,9 @@ describe('createThemeService', () => {
 
     platform.setColorScheme('dark')
     expect(theme.get()).toBe(state)
+
+    theme.setPreference('dark')
+    expect(theme.get()).not.toBe(state)
   })
 
   it('does not notify when the system scheme changes under a pinned preference', async () => {
