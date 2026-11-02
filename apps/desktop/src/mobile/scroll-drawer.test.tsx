@@ -144,6 +144,7 @@ describe('ScrollDrawer', () => {
 
     await vi.waitFor(() => expect(scroller.scrollTop).toBe(openTop(scroller)))
     // A detached scroller would also read 0 for both.
+    expect(scroller.isConnected).toBe(true)
     await expect.element(page.getByRole('dialog')).toBeInTheDocument()
   })
 })
