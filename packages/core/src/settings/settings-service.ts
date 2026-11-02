@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import { WritableStore, type Store } from '../store.ts'
+import { deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from './schema.ts'
 import { isDeepEqual } from '@ocavue/utils'
@@ -42,7 +42,7 @@ export interface SettingsService extends Store<Settings> {
    */
   flush: () => Promise<void>
   /**
-   * Whether the stored document is loaded. Changes after the settings it brings.
+   * Whether the stored document is loaded. Changes together with the settings it brings.
    */
   readonly status: Store<SettingsStatus>
 }
@@ -54,10 +54,22 @@ export interface SettingsServiceDeps {
   readonly progress: ProgressPort
 }
 
+interface SettingsState {
+  readonly settings: Settings
+  readonly status: SettingsStatus
+}
+
 class SettingsServiceImpl implements SettingsService {
   readonly #deps: SettingsServiceDeps
-  readonly #store = new WritableStore(DEFAULT_SETTINGS)
-  readonly #status = new WritableStore<SettingsStatus>('loading')
+  /**
+   * One store, so the settings and the status change together.
+   */
+  readonly #state = new WritableStore<SettingsState>({
+    settings: DEFAULT_SETTINGS,
+    status: 'loading',
+  })
+  readonly #settings = deriveStore(this.#state, (state) => state.settings, isDeepEqual)
+  readonly status = deriveStore(this.#state, (state) => state.status)
   #loading: Promise<SettingsLoadOutcome> | undefined
   /**
    * Updates made while loading, replayed over the loaded document.
@@ -75,12 +87,12 @@ class SettingsServiceImpl implements SettingsService {
 
   readonly get = (): Settings => {
     void this.#load()
-    return this.#store.get()
+    return this.#settings.get()
   }
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
     void this.#load()
-    return this.#store.subscribe(listener)
+    return this.#settings.subscribe(listener)
   }
 
   readonly update = (patch: Partial<Settings>): void => {
@@ -88,9 +100,9 @@ class SettingsServiceImpl implements SettingsService {
   }
 
   readonly updateWith = (updater: SettingsUpdater): void => {
-    const previous = this.get()
-    this.#store.set(mergeSettings(previous, updater(previous)))
-    if (this.#status.get() === 'loading') {
+    const settings = this.get()
+    this.#setState({ settings: { ...settings, ...updater(settings) } })
+    if (this.status.get() === 'loading') {
       this.#pending.push(updater)
     }
     this.#save()
@@ -99,8 +111,8 @@ class SettingsServiceImpl implements SettingsService {
   readonly whenLoaded = (): Promise<SettingsLoadOutcome> => this.#load()
 
   readonly reload = (): Promise<SettingsLoadOutcome> => {
-    if (this.#status.get() === 'failed') {
-      this.#status.set('loading')
+    if (this.status.get() === 'failed') {
+      this.#setState({ status: 'loading' })
       this.#loading = undefined
     }
     return this.#load()
@@ -112,23 +124,18 @@ class SettingsServiceImpl implements SettingsService {
     await this.#drain()
   }
 
-  readonly status: Store<SettingsStatus> = this.#status
-
   #load(): Promise<SettingsLoadOutcome> {
     const { ipc, progress } = this.#deps
     this.#loading ??= ipc.call('settings_load', {}, settingsSchema).then(
       (document) => {
         this.#saved = document
-        const settings = this.#pending.reduce(
-          (s, updater) => mergeSettings(s, updater(s)),
-          document,
-        )
+        const settings = this.#pending.reduce((s, updater) => ({ ...s, ...updater(s) }), document)
         return this.#settle('loaded', settings)
       },
       (error: unknown) => {
         progress.fail('Loading settings', errorMessage(error))
         // Every pending update is already visible.
-        return this.#settle('failed', this.#store.get())
+        return this.#settle('failed', this.#settings.get())
       },
     )
     return this.#loading
@@ -136,17 +143,19 @@ class SettingsServiceImpl implements SettingsService {
 
   #settle(status: SettingsLoadOutcome, settings: Settings): SettingsLoadOutcome {
     this.#pending = []
-    // Settings first, so a status listener reads the settings that came with it.
-    this.#store.set(settings)
-    this.#status.set(status)
+    this.#setState({ status, settings })
     this.#save()
     return status
   }
 
+  #setState(patch: Partial<SettingsState>): void {
+    this.#state.set({ ...this.#state.get(), ...patch })
+  }
+
   #save(): void {
     const { ipc, progress } = this.#deps
-    const settings = this.#store.get()
-    if (this.#status.get() !== 'loaded' || settings === this.#saved) {
+    const settings = this.#settings.get()
+    if (this.status.get() !== 'loaded' || isDeepEqual(settings, this.#saved)) {
       return
     }
     this.#saving = this.#saving.then(async () => {
@@ -170,16 +179,4 @@ class SettingsServiceImpl implements SettingsService {
 
 export function createSettingsService(deps: SettingsServiceDeps): SettingsService {
   return new SettingsServiceImpl(deps)
-}
-
-/**
- * `previous` with `patch` applied. A patched field deeply equal to its current
- * value keeps the current reference, so a reader of only that field sees no
- * change. Returns `previous` itself when no field changed.
- */
-function mergeSettings(previous: Settings, patch: Partial<Settings>): Settings {
-  const changed = Object.entries(patch).filter(([key, value]) => {
-    return !isDeepEqual(previous[key], value)
-  })
-  return changed.length === 0 ? previous : { ...previous, ...Object.fromEntries(changed) }
 }
