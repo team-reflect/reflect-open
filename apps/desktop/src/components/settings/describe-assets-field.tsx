@@ -11,7 +11,7 @@ import {
 import { Switch } from '@/components/ui/switch.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { SettingsField } from './field.tsx'
 
@@ -23,13 +23,15 @@ import { SettingsField } from './field.tsx'
  * state surface through the operations status UI.
  */
 export function DescribeAssetsField(): ReactElement {
-  const { settings, updateSettings } = useSettings()
   const graph = useGraphInfo()
+  const aiProviders = useSettingsField('aiProviders')
+  const describeAssets = useSettingsField('describeAssets')
+  const settingsService = useSettingsService()
   const { assetDescription } = useCoreServices()
   const [confirming, setConfirming] = useState(false)
   const backfill = useAsyncAction()
 
-  const hasProvider = settings.aiProviders.length > 0
+  const hasProvider = aiProviders.length > 0
 
   const { run: runAction } = backfill
   const runBackfill = useCallback((): void => {
@@ -48,8 +50,8 @@ export function DescribeAssetsField(): ReactElement {
       <div className="mt-3 flex items-center gap-3">
         <Switch
           aria-label="OCR new assets automatically"
-          checked={settings.describeAssets}
-          onCheckedChange={(checked) => updateSettings({ describeAssets: checked })}
+          checked={describeAssets}
+          onCheckedChange={(checked) => settingsService.update({ describeAssets: checked })}
         />
         <span className="text-xs text-text-muted">OCR new assets automatically</span>
       </div>

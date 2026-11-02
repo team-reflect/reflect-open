@@ -4,7 +4,7 @@ import { isDaily, type RetrievalHit } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const SIMILAR_NOTES_LIMIT = 6
@@ -41,13 +41,12 @@ const SIMILAR_NOTES_LIMIT = 6
  */
 export function useSimilarNotes(path: string): RetrievalHit[] {
   const graph = useGraphInfo()
-  const { settings } = useSettings()
+  const semanticSearchSetting = useSettingsField('semanticSearchEnabled')
   const queryClient = useQueryClient()
   const { semanticSearch, noteDocuments } = useCoreServices()
   const dailyNote = isDaily(path)
   const embedStatus = useEmbedStatus()
-  const semanticSearchEnabled =
-    settings.semanticSearchEnabled && embedStatus.status !== 'unsupported'
+  const semanticSearchEnabled = semanticSearchSetting && embedStatus.status !== 'unsupported'
   const { data: dailyNoteIsEmpty } = useQuery({
     queryKey: queryKeys.index.dailyEmpty(graph?.root, path),
     queryFn: async () => noteDocuments.isOstensiblyEmpty(await noteDocuments.readSource(path)),

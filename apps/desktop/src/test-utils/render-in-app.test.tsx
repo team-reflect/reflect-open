@@ -11,7 +11,7 @@ import {
   useMaybeGraphInfo,
 } from '@/providers/graph-provider.tsx'
 import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
@@ -25,7 +25,8 @@ function Probe(): ReactElement {
   const indexing = useGraphIndexing()
   const recents = useGraphRecents()
   const { mobileStorageKind } = useMobileGraphBoot()
-  const { settings, updateSettings } = useSettings()
+  const dateFormat = useSettingsField('dateFormat')
+  const settingsService = useSettingsService()
   const { route, navigate } = useRouter()
   const sync = useGitSyncContext()
   return (
@@ -34,10 +35,10 @@ function Probe(): ReactElement {
         {status} {graph?.root ?? 'none'} {graph?.generation ?? '-'} {indexGeneration ?? '-'}{' '}
         {indexing ? 'indexing' : 'idle'} {recents.length} {mobileStorageKind ?? '-'}
       </output>
-      <output data-testid="settings">{settings.dateFormat}</output>
+      <output data-testid="settings">{dateFormat}</output>
       <output data-testid="route">{JSON.stringify(route)}</output>
       <output data-testid="git-sync">{sync?.state.phase ?? 'no sync'}</output>
-      <button type="button" onClick={() => updateSettings({ dateFormat: 'iso' })}>
+      <button type="button" onClick={() => settingsService.update({ dateFormat: 'iso' })}>
         iso
       </button>
       <button type="button" onClick={() => navigate({ kind: 'tasks' })}>

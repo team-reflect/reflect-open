@@ -4,7 +4,7 @@ import { parseSearchQuery } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import type { PaletteSections } from './entries.ts'
 
@@ -32,9 +32,11 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // for the session, but its results must not. Plain-text queries blend
   // semantic hits via RRF and degrade invisibly to lexical without either.
   // Filtered queries stay constraint-based — filters are exact by nature.
-  const { settings } = useSettings()
+  const semanticSearchEnabled = useSettingsField('semanticSearchEnabled')
+  const dateFormat = useSettingsField('dateFormat')
+  const weekStartDay = useSettingsField('weekStartDay')
   const embed = useEmbedStatus()
-  const hybrid = settings.semanticSearchEnabled && embed.status === 'ready'
+  const hybrid = semanticSearchEnabled && embed.status === 'ready'
 
   // Defer the query the index sees: fast typing coalesces (the plan's
   // debounce) while the input itself stays perfectly responsive.
@@ -57,15 +59,15 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   } = useQuery({
     queryKey: queryKeys.index.paletteSuggestions(graph?.root, {
       text: trimmed,
-      dateFormat: settings.dateFormat,
-      weekStartDay: settings.weekStartDay,
+      dateFormat,
+      weekStartDay,
       today,
     }),
     queryFn: () => {
       return paletteSearch.suggestTitles(trimmed, {
         today,
-        dateFormat: settings.dateFormat,
-        weekStartDay: settings.weekStartDay,
+        dateFormat,
+        weekStartDay,
       })
     },
     enabled: searching && !parsed.filtered,

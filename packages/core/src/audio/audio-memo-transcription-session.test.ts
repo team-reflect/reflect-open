@@ -170,7 +170,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
   })
 
   it('exposes the transcribing flag while a pass has memos, and notifies subscribers', async () => {
-    const { kit, subject } = await open()
+    const { kit, subject, passes } = await open()
     kit.addRecording(MEMO.audioPath)
     const provider = Promise.withResolvers<string>()
     kit.transcription.setResult(() => provider.promise)
@@ -179,13 +179,37 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     subject.start()
     await flush()
 
-    expect(subject.getTranscribing()).toBe(true)
+    expect(subject.get()).toBe(true)
     expect(notifications).toHaveBeenCalledTimes(1)
 
     provider.resolve('memo transcript')
     await flush()
-    expect(subject.getTranscribing()).toBe(false)
+    expect(subject.get()).toBe(false)
     expect(notifications).toHaveBeenCalledTimes(2)
+
+    // A pass with nothing to transcribe leaves the flag at false: no notification.
+    const passesBefore = passes()
+    subject.schedule()
+    await flush()
+    expect(passes()).toBe(passesBefore + 1)
+    expect(notifications).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops notifying a subscriber once it unsubscribes', async () => {
+    const { kit, subject } = await open()
+    kit.addRecording(MEMO.audioPath)
+    const provider = Promise.withResolvers<string>()
+    kit.transcription.setResult(() => provider.promise)
+    const notifications = vi.fn()
+    const unsubscribe = subject.subscribe(notifications)
+    unsubscribe()
+    subject.start()
+    await flush()
+
+    expect(subject.get()).toBe(true)
+    expect(notifications).not.toHaveBeenCalled()
+    provider.resolve('memo transcript')
+    await flush()
   })
 
   it('surfaces a stop that needs attention once, deduped across retries', async () => {
