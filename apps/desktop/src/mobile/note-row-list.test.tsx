@@ -211,8 +211,9 @@ describe('NoteRowList', () => {
     const view = await mount(<SwipeHarness />)
     const surface = view.getByRole('button', { name: /Alpha.*First line/ }).element()
     await swipeRow(surface, 136)
-
-    await view.getByRole('button', { name: 'Delete Alpha' }).click()
+    // In place, like a tap: a locator click scrolls the button into view first.
+    const remove = view.getByRole('button', { name: 'Delete Alpha' }).element() as HTMLElement
+    await act(() => remove.click())
 
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onOpen).not.toHaveBeenCalled()
