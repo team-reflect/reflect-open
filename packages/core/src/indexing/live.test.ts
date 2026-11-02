@@ -177,7 +177,7 @@ describe('LiveIndex.apply', () => {
   })
 })
 
-describe('LiveIndex.subscribe', () => {
+describe('LiveIndex.follow', () => {
   it('serializes overlapping batches so later events cannot overtake earlier ones', async () => {
     const pendingFirstRead = Promise.withResolvers<void>()
     const { liveIndex, reads, writes, emit } = setup({
@@ -189,7 +189,7 @@ describe('LiveIndex.subscribe', () => {
       },
     })
 
-    liveIndex.subscribe(1, FILE_GENERATION)
+    liveIndex.follow(1, FILE_GENERATION)
     emit([{ path: 'notes/slow.md', kind: 'upsert' }])
     emit([{ path: 'notes/fast.md', kind: 'upsert' }])
     await vi.waitFor(() => {
@@ -218,7 +218,7 @@ describe('LiveIndex.subscribe', () => {
       },
     })
 
-    liveIndex.subscribe(1, FILE_GENERATION, undefined, () => canApply)
+    liveIndex.follow(1, FILE_GENERATION, undefined, () => canApply)
     emit([{ path: 'notes/started-visible.md', kind: 'upsert' }])
     emit([{ path: 'notes/queued.md', kind: 'upsert' }])
     await vi.waitFor(() => expect(reads).toContain('notes/started-visible.md'))
@@ -246,7 +246,7 @@ describe('LiveIndex.subscribe', () => {
       )
     })
 
-    liveIndex.subscribe(1, FILE_GENERATION)
+    liveIndex.follow(1, FILE_GENERATION)
     // A note batch, then an asset-only batch: the asset emit must follow the
     // note's apply, so a gate reading the index off the asset emit sees the note.
     emit([{ path: 'notes/a.md', kind: 'upsert' }])
@@ -269,7 +269,7 @@ describe('LiveIndex.subscribe', () => {
       seen.push(changes.map((change) => change.path).join(','))
     })
 
-    liveIndex.subscribe(1, FILE_GENERATION)
+    liveIndex.follow(1, FILE_GENERATION)
     emit([{ path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'upsert' }])
     emit([{ path: 'assets/y.png', kind: 'upsert' }]) // something to wait on
     await vi.waitFor(() => {
@@ -283,17 +283,17 @@ describe('LiveIndex.subscribe', () => {
   it('stamps the indexed row with the modifiedMs carried by the event', async () => {
     const { liveIndex, store, emit } = setup({ files: { 'notes/a.md': '# content' } })
 
-    liveIndex.subscribe(1, FILE_GENERATION)
+    liveIndex.follow(1, FILE_GENERATION)
     emit([{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1234 }])
     await vi.waitFor(() => {
       expect(store.applied().map((note) => note.mtime)).toEqual([1234])
     })
   })
 
-  it('stops applying once unsubscribed', async () => {
+  it('stops applying once unlistened', async () => {
     const { liveIndex, store, reads, emit } = setup({ files: { 'notes/a.md': '# content' } })
 
-    liveIndex.subscribe(1, FILE_GENERATION)()
+    liveIndex.follow(1, FILE_GENERATION)()
     emit([{ path: 'notes/a.md', kind: 'upsert' }])
     await new Promise((resolve) => setTimeout(resolve, 0))
 

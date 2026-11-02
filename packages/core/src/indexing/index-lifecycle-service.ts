@@ -400,7 +400,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
         for (const listener of this.#reconciledListeners) {
           void listener({ generation, fileGeneration, source: 'sync' })
         }
-        pending = this.#liveIndex.subscribe(
+        pending = this.#liveIndex.follow(
           generation,
           fileGeneration,
           (from, to) => {

@@ -68,9 +68,9 @@ export interface LiveIndex {
     canApply?: () => boolean,
   ): Promise<number>
   /**
-   * Subscribe to the file-change stream and apply each batch at `generation`,
+   * Follow the file-change stream and apply each batch at `generation`,
    * reading files at `fileGeneration`. Returns an unlisten function; call it
-   * (and resubscribe with the new generations) when the active graph changes.
+   * (and follow again with the new generations) when the active graph changes.
    *
    * After a batch's note rows have been written to the index,
    * `emitChangesApplied` broadcasts the **full** batch (notes *and*
@@ -86,7 +86,7 @@ export interface LiveIndex {
    * queue. Events dropped after suspension are intentionally recovered by the
    * lifecycle's foreground reconcile.
    */
-  subscribe(
+  follow(
     generation: number,
     fileGeneration: number,
     onMoved?: MovedHandler,
@@ -237,7 +237,7 @@ class LiveIndexImpl implements LiveIndex {
     return mutations + batch.applied() + touches.applied()
   }
 
-  subscribe(
+  follow(
     generation: number,
     fileGeneration: number,
     onMoved?: MovedHandler,
