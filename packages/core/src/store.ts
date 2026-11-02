@@ -62,36 +62,7 @@ export function deriveStore<T, U>(
   derive: (value: T) => U,
   isEqual: (a: U, b: U) => boolean = Object.is,
 ): Store<U> {
-  let source: T
-  let derived: U
-  let initialized = false
-
-  const get = (): U => {
-    const next = store.get()
-    if (initialized && next === source) {
-      return derived
-    }
-    const value = derive(next)
-    if (!initialized || !isEqual(derived, value)) {
-      derived = value
-    }
-    source = next
-    initialized = true
-    return derived
-  }
-
-  const subscribe = (listener: () => void): Unlisten => {
-    let last = get()
-    return store.subscribe(() => {
-      const next = get()
-      if (next !== last) {
-        last = next
-        listener()
-      }
-    })
-  }
-
-  return { get, subscribe }
+  return combineStores([store], (value) => derive(value), isEqual)
 }
 
 function isArrayShallowEqual<T>(a: T[], b: T[]): boolean {
