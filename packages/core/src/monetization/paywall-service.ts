@@ -96,7 +96,7 @@ class PaywallServiceImpl implements PaywallService {
     }
     // Ahead of the pending checks on purpose: a build that already knows it is
     // not from the App Store drops into the notes without waiting on StoreKit.
-    if (!isAppStoreInstall(appStoreEnvironment.getState().value) && !this.requested()) {
+    if (!isAppStoreInstall(appStoreEnvironment.get().value) && !this.requested()) {
       return 'hide'
     }
     return active.isLoading || classic.isLoading ? 'hide' : 'show'
