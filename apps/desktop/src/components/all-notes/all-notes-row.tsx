@@ -2,7 +2,7 @@ import { memo, type MouseEvent, type ReactElement } from 'react'
 import { type NoteListEntry, formatRecencyLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSetting } from '@/providers/settings-provider.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 /**
@@ -37,7 +37,8 @@ export const AllNotesRow = memo(function AllNotesRow({
   onToggle,
   onOpen,
 }: AllNotesRowProps): ReactElement {
-  const { settings } = useSettings()
+  const dateFormat = useSetting('dateFormat')
+  const timeFormat = useSetting('timeFormat')
   const noteLabel = useNoteLabel()
   return (
     <div
@@ -108,7 +109,7 @@ export const AllNotesRow = memo(function AllNotesRow({
         {note.tags.map((tag) => `#${tag}`).join(' ')}
       </span>
       <span className="whitespace-nowrap text-right text-[13px] tabular-nums text-text-secondary">
-        {note.mtime > 0 ? formatRecencyLabel(note.mtime, settings) : '—'}
+        {note.mtime > 0 ? formatRecencyLabel(note.mtime, { dateFormat, timeFormat }) : '—'}
       </span>
     </div>
   )

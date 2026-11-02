@@ -31,3 +31,11 @@ export function useSettings(): SettingsValue {
     whenSettingsLoaded: service.whenLoaded,
   }
 }
+
+/**
+ * One settings field. Re-renders only when that field changes.
+ */
+export function useSetting<K extends keyof Settings>(key: K): Settings[K] {
+  const service = useCoreServices().settings
+  return useServiceState(service, () => service.get()[key])
+}

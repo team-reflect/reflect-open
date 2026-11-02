@@ -1,5 +1,6 @@
 import type { IdService } from '../ports/id-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { subscribeSelector } from '../lib/subscribe-selector.ts'
 import type { AiPrompt, AiPromptMode } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 
@@ -47,7 +48,9 @@ class AiPromptServiceImpl implements AiPromptService {
 
   readonly list = (): AiPrompt[] => this.#deps.settings.get().aiPrompts
 
-  readonly subscribe = (listener: () => void): Unlisten => this.#deps.settings.subscribe(listener)
+  readonly subscribe = (listener: () => void): Unlisten => {
+    return subscribeSelector(this.#deps.settings.subscribe, this.list, listener)
+  }
 
   add(draft: AiPromptDraft): void {
     const { settings, id: idService } = this.#deps

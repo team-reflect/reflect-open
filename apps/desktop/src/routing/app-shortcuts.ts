@@ -1,19 +1,21 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { getIsoToday } from '@reflect/utils'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
-import { useMaybeChatSession } from '@/providers/chat-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useTheme } from '@/providers/theme-provider.tsx'
-import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import {
+  useAppServices,
+  useCoreServices,
+  useMaybeGraphServices,
+} from '@/services/services-provider.tsx'
 import { focusedNotePathForRoute } from '@reflect/app'
 import { useRouter } from './router.tsx'
 
@@ -44,9 +46,6 @@ const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
  * the native menu's command items dispatch into the same guard path while
  * mounted (`setMenuCommandDispatch`).
  */
-
-function doNothing(): void {}
-
 export function useAppShortcuts(): CommandContext {
   const services = useCoreServices()
   const appServices = useAppServices()
@@ -67,8 +66,11 @@ export function useAppShortcuts(): CommandContext {
   const { toggleSidebar } = useSidebar()
   const { toggle: toggleAudioMemo } = useAudioMemo()
   // The hook can outlive the open graph, and its chat session with it.
-  const newChat = useMaybeChatSession()?.newChat ?? doNothing
-  const { updateSettings } = useSettings()
+  const chat = useMaybeGraphServices()?.chat
+  const newChat = useCallback(() => {
+    chat?.newChat()
+  }, [chat])
+  const updateSettings = services.settings.update
   const {
     openForPath: openNoteFindForPath,
     next: findNextInNote,

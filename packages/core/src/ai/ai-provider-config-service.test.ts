@@ -98,6 +98,21 @@ describe('AiProviderConfigService', () => {
     expect(calls).toBe(1)
   })
 
+  it('does not notify subscribers when another setting changes', async () => {
+    const { service, settings } = await createService({ aiProviders: [A, B] })
+    let calls = 0
+    const unlisten = service.subscribe(() => {
+      calls += 1
+    })
+
+    settings.update({ editorFullWidth: true })
+    expect(calls).toBe(0)
+
+    service.selectChatModel({ configId: 'b', modelId: 'gpt-5.5' })
+    expect(calls).toBe(1)
+    unlisten()
+  })
+
   it('adds an entry: the key goes to the keychain and only the hint to the settings', async () => {
     const { service, settings, secretStore, id } = await createService()
 

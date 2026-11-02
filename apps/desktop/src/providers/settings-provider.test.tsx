@@ -4,7 +4,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { createTestCoreServices, createTestSettingsService } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { useSettings } from './settings-provider.tsx'
+import { useSetting, useSettings } from './settings-provider.tsx'
 
 describe('useSettings', () => {
   it('renders the settings of the app services and forwards updates', async () => {
@@ -45,5 +45,36 @@ describe('useSettings', () => {
     })
     const loads = settings.ipc.calls().filter(({ command }) => command === 'settings_load')
     expect(loads).toHaveLength(1)
+  })
+})
+
+describe('useSetting', () => {
+  it('re-renders only when its field changes', async () => {
+    const settings = createTestSettingsService({ editorFullWidth: false })
+    const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
+    let renders = 0
+    const { result } = await renderHookInApp(
+      () => {
+        renders += 1
+        return useSetting('editorFullWidth')
+      },
+      { core },
+    )
+    await act(async () => {
+      await settings.whenLoaded()
+    })
+    expect(result.current).toBe(false)
+    const before = renders
+
+    await act(() => {
+      settings.update({ editorTextSize: 'large' })
+    })
+    expect(renders).toBe(before)
+
+    await act(() => {
+      settings.update({ editorFullWidth: true })
+    })
+    expect(result.current).toBe(true)
+    expect(renders).toBe(before + 1)
   })
 })

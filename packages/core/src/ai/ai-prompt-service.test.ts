@@ -71,4 +71,15 @@ describe('AiPromptService', () => {
     expect(settings.saves().at(-1)?.aiPrompts).toEqual(prompts.list())
     unlisten()
   })
+
+  it('does not notify subscribers when another setting changes', async () => {
+    const { prompts, settings } = await createService()
+    const listener = vi.fn()
+    const unlisten = prompts.subscribe(listener)
+
+    settings.update({ editorFullWidth: true })
+
+    expect(listener).not.toHaveBeenCalled()
+    unlisten()
+  })
 })

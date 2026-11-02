@@ -2,6 +2,7 @@ import type { IdService } from '../ports/id-service.ts'
 import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
+import { subscribeSelector } from '../lib/subscribe-selector.ts'
 import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import type { AiCredentialService, AiKeyReader } from './ai-credential-service.ts'
@@ -142,7 +143,20 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
     this.#deps = deps
   }
 
-  readonly subscribe = (listener: () => void): Unlisten => this.#deps.settings.subscribe(listener)
+  readonly subscribe = (listener: () => void): Unlisten => {
+    return subscribeSelector(
+      this.#deps.settings.subscribe,
+      this.#deps.settings.get,
+      listener,
+      (a, b) => {
+        return (
+          a.aiProviders === b.aiProviders &&
+          a.defaultAiProviderId === b.defaultAiProviderId &&
+          a.chatModelSelection === b.chatModelSelection
+        )
+      },
+    )
+  }
 
   readonly list = (): AiProviderConfig[] => this.#deps.settings.get().aiProviders
 
