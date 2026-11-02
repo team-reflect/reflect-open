@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { TaskService, TaskWriteResult } from '@reflect/core'
-import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
+import { createTestCoreServices, makeOpenTask, type TestCoreServices } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyCaptureMenu } from './daily-capture-menu.tsx'
@@ -117,6 +117,7 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
 const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
 
 let core: TestCoreServices
+let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
 let insertTask: MockInstance<TaskService['insertTask']>
 let writeTask: MockInstance<TaskService['writeTask']>
 
@@ -133,6 +134,7 @@ beforeEach(() => {
   core = createTestCoreServices({ database: createWasmTestDatabaseService() })
   // Today is 2026-06-14.
   core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
+  getOpenTasks = vi.spyOn(core.tasks, 'getOpenTasks').mockResolvedValue([])
   insertTask = vi.spyOn(core.tasks, 'insertTask').mockResolvedValue({
     created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
     moved: [],
@@ -238,6 +240,38 @@ describe('DailyCaptureMenu', () => {
       { kind: 'setMarkdown', markdown: 'buy oat milk' },
     ])
     expect(view.getByRole('textbox', { name: 'Task text' }).query()).toBeNull()
+  })
+
+  it('edits the live row when a reindex rewrites the task while its sheet is open', async () => {
+    getOpenTasks.mockResolvedValue([
+      makeOpenTask({
+        notePath: 'daily/2026-06-14.md',
+        dailyDate: '2026-06-14',
+        astPath: [0],
+        markdown: 'synced from another device',
+      }),
+    ])
+    const view = await renderMenu()
+    // The Daily screen leaves the graph's task rows alone until a sheet needs them.
+    core.indexLifecycle.emitApplied(null, 1)
+    expect(getOpenTasks).not.toHaveBeenCalled()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    const input = view.getByRole('textbox', { name: 'Task text' })
+    await expect.element(input).toBeInTheDocument()
+
+    // A reindex while the sheet is up re-reads the rows it follows.
+    core.indexLifecycle.emitApplied(null, 1)
+    await vi.waitFor(() => expect(getOpenTasks).toHaveResolved())
+
+    await userEvent.type(input, 'buy oat milk')
+    await view.getByRole('button', { name: 'dismiss-drawer' }).click()
+
+    // The write addresses the row as it is now, so the guard matches it.
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.objectContaining({ markdown: 'synced from another device' }),
+      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
+    )
   })
 
   it('removes the new task when its sheet is dismissed untyped', async () => {
