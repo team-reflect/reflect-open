@@ -51,7 +51,8 @@ export class WritableStore<T> implements Store<T> {
 }
 
 /**
- * Whether `a` and `b` have the same own keys with `Object.is`-equal values.
+ * Whether `a` and `b` have the same enumerable own string keys with
+ * `Object.is`-equal values.
  */
 export function isShallowEqual<T extends object>(a: T, b: T): boolean {
   if (Object.is(a, b)) {
