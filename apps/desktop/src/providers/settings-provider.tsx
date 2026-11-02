@@ -2,6 +2,7 @@ import type { Settings, SettingsLoadOutcome, SettingsService, Store } from '@ref
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 import { useStore, useSelector } from '@/lib/use-store.ts'
+import { useCallback } from 'react'
 
 interface SettingsValue {
   settings: Settings
@@ -45,4 +46,14 @@ function useSettingsStore(): Settings {
 function useSettingsSelector<T>(selector: (settings: Settings) => T): T {
   const store = useSettingsService()
   return useSelector(store, selector)
+}
+
+function useSettingsField<K extends keyof Settings>(key: K): Settings[K] {
+  const selector = useCallback(
+    (settings: Settings) => {
+      return settings[key]
+    },
+    [key],
+  )
+  return useSettingsSelector(selector)
 }
