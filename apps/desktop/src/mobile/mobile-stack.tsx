@@ -167,8 +167,9 @@ function forwardStripTap(event: ReactMouseEvent<HTMLElement>): void {
     field.focus()
     return
   }
-  const control = target.closest<HTMLElement>(STRIP_CONTROLS)
-  if (control) {
+  // Only HTML controls: an SVG `<a>` or `role="button"` has no `click()`.
+  const control = target.closest(STRIP_CONTROLS)
+  if (control instanceof HTMLElement) {
     control.click()
     return
   }
