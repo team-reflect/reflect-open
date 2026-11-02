@@ -142,16 +142,6 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
   // The real resolver only lets `reflect-asset:` media through, which no test
   // browser can load; the mock also widens `X_MEDIA_URL_PROTOCOLS`.
   'apps/desktop/src/editor/note-editor.test.tsx': ['@/editor/use-x-post-resolver.ts'],
-
-  // Presentation tests over every phase of the recorder. The context value is
-  // scripted; the session behind it has its own tests in core and in
-  // `providers/audio-memo-provider.test.tsx` / `mobile/audio-memo-provider.test.tsx`.
-  'apps/desktop/src/components/audio-memo/audio-memo-button.test.tsx': [
-    '@/providers/audio-memo-provider.tsx',
-  ],
-  'apps/desktop/src/mobile/daily-capture-menu.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
-  'apps/desktop/src/mobile/recording-drawer.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
-  'apps/desktop/src/mobile/mobile-screen.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
 }
 
 /**
