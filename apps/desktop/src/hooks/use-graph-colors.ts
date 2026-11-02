@@ -27,7 +27,7 @@ export function useGraphColors(): GraphColorsValue {
   const setColor = useCallback(
     (root: string, color: GraphColor) => {
       // Read-modify-write of a record: compose over the latest settings, not a
-      // render-time snapshot (see updateSettingsWith).
+      // render-time snapshot (see updateSettingsWith). // FIXME: is this comment still correct?
       settingsService.updateWith((current) => ({
         graphColors: { ...current.graphColors, [root]: color },
       }))
