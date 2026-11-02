@@ -352,7 +352,11 @@ export {
 } from './ai/openai-compatible.ts'
 export { isHttpBaseUrl } from './lib/http-url.ts'
 
-export { TRANSCRIPTION_PROVIDERS } from './ai/provider-config.ts'
+export {
+  defaultAiProvider,
+  TRANSCRIPTION_PROVIDERS,
+  type AiProvidersState,
+} from './ai/provider-config.ts'
 export { chatModelOptions, type ChatModelOption } from './ai/chat/model-options.ts'
 export { type NoteHitSummary } from './ai/chat/note-tools-service.ts'
 export { chatSystemPrompt } from './ai/chat/system-prompt.ts'
