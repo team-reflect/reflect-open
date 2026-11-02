@@ -4,16 +4,13 @@ import { createKeyboardService } from './keyboard-service.ts'
 describe('KeyboardService', () => {
   it('starts closed and reflects the last published height', () => {
     const keyboard = createKeyboardService()
-    expect(keyboard.getHeight()).toBe(0)
-    expect(keyboard.isVisible()).toBe(false)
+    expect(keyboard.get()).toBe(0)
 
     keyboard.publish(316)
-    expect(keyboard.getHeight()).toBe(316)
-    expect(keyboard.isVisible()).toBe(true)
+    expect(keyboard.get()).toBe(316)
 
     keyboard.publish(0)
-    expect(keyboard.getHeight()).toBe(0)
-    expect(keyboard.isVisible()).toBe(false)
+    expect(keyboard.get()).toBe(0)
   })
 
   it('notifies subscribers of a changed height only', () => {
