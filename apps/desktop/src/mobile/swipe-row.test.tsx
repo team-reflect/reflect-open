@@ -80,8 +80,7 @@ describe('SwipeRow', () => {
 
     await touch(scroller, 'start')
     await act(async () => {
-      const scrolled = new Promise((resolve) =>
-        scroller.addEventListener('scroll', resolve, { once: true }),
+      const scrolled = new Promise((resolve) => { return scroller.addEventListener('scroll', resolve, { once: true }) },
       )
       scroller.scrollTo({ left: ACTION_WIDTH, behavior: 'instant' })
       await scrolled
