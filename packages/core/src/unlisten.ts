@@ -48,19 +48,37 @@ export class WriteableStore<T> {
 
 export function deriveStore<T, U>(
   store: Store<T>,
-  deriveFn: (value: T) => U,
+  derive: (value: T) => U,
   isEqual: (a: U, b: U) => boolean = Object.is,
 ): Store<U> {
-  let derived: U | undefined
+  let source: T
+  let derived: U
+  let initialized = false
 
   const get = (): U => {
-    const storeValue = store.get()
-    const newDerived = deriveFn(storeValue)
-    if (derived === undefined || !isEqual(derived, newDerived)) {
-      derived = newDerived
+    const next = store.get()
+    if (initialized && next === source) {
+      return derived
     }
+    const value = derive(next)
+    if (!initialized || !isEqual(derived, value)) {
+      derived = value
+    }
+    source = next
+    initialized = true
     return derived
   }
 
-  return { get, subscribe: store.subscribe }
+  const subscribe = (listener: () => void): Unlisten => {
+    let last = get()
+    return store.subscribe(() => {
+      const next = get()
+      if (next !== last) {
+        last = next
+        listener()
+      }
+    })
+  }
+
+  return { get, subscribe }
 }
