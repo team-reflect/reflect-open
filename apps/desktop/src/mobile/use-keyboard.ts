@@ -50,9 +50,7 @@ function readKeyboardOverlap(): number {
  * keyboard signal and no native event bridge is needed. The mobile shell root
  * sizes itself to `calc(100dvh - var(--keyboard-height))`, and `DrawerContent`
  * pads its bottom past it so drawers end above the keyboard.
- * The height is also published to the `KeyboardService` for non-layout
- * consumers (`KeyboardService.get` for the carousel's swipe guard,
- * {@link useKeyboardVisible} for the tab bar hiding).
+ * The height is also published to the `KeyboardService`.
  */
 export function useKeyboardHeightVar(): void {
   const { keyboard } = useAppServices()
