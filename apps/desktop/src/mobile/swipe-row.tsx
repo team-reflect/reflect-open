@@ -142,7 +142,7 @@ export function SwipeRow({
     <div
       ref={scrollerRef}
       data-slot="swipe-row"
-      // Marks a horizontal scroller, which keeps `touch-action: auto` inside a pager that pans with `pan-y`.
+      // Marks a horizontal scroller.
       data-scroll-x=""
       onPointerDown={onPointerDown}
       className={cn(
