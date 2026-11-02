@@ -9,10 +9,8 @@ import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 
 /**
  * The filter badge row (Plan 19): chips toggle or open pickers, everything
- * ANDs, and Reset clears the lot including the route tag. The drawer wrapper
- * needs browser APIs jsdom doesn't provide; as in
- * `note-actions-menu.test.tsx` it's mocked to a passthrough so picker rows
- * are always rendered and the state flow is what's exercised.
+ * ANDs, and Reset clears the lot including the route tag. The pickers open
+ * the real drawer; `swipeDrawerClosed` closes one the way a finger does.
  */
 
 const FACETS: NoteTagFacet[] = [
