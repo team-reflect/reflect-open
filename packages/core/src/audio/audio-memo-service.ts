@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
 import {
   AUDIO_MEMO_REMINDER_MS,
@@ -27,7 +28,7 @@ import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { AUDIO_MEMOS_DIR } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
-import { deriveStore, isShallowEqual, WritableStore, type Store } from '../store.ts'
+import { deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import {

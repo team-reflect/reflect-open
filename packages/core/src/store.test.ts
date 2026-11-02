@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { combineStores, deriveStore, isShallowEqual, WritableStore } from './store.ts'
+import { combineStores, deriveStore, WritableStore } from './store.ts'
 
 describe('WritableStore', () => {
   it('returns the value it holds', () => {
@@ -172,20 +172,5 @@ describe('combineStores', () => {
     unlisten()
     a.set(10)
     expect(listener).not.toHaveBeenCalled()
-  })
-})
-
-describe('isShallowEqual', () => {
-  it('compares own values with `Object.is`', () => {
-    const nested = { a: 1 }
-    expect(isShallowEqual({ x: 1, y: nested }, { x: 1, y: nested })).toBe(true)
-    expect(isShallowEqual({ x: 1, y: nested }, { x: 1, y: { a: 1 } })).toBe(false)
-    expect(isShallowEqual({ x: NaN }, { x: NaN })).toBe(true)
-  })
-
-  it('treats different keys as unequal', () => {
-    type Sparse = { x?: number | undefined; y?: number | undefined }
-    expect(isShallowEqual<Sparse>({ x: undefined }, { y: undefined })).toBe(false)
-    expect(isShallowEqual<Sparse>({ x: 1 }, { x: 1, y: 2 })).toBe(false)
   })
 })

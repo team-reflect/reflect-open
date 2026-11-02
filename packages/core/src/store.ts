@@ -51,21 +51,6 @@ export class WritableStore<T> implements Store<T> {
 }
 
 /**
- * Whether `a` and `b` have the same enumerable own string keys with
- * `Object.is`-equal values.
- */
-export function isShallowEqual<T extends object>(a: T, b: T): boolean {
-  if (Object.is(a, b)) {
-    return true
-  }
-  const keys = Object.keys(a) as (keyof T)[]
-  if (keys.length !== Object.keys(b).length) {
-    return false
-  }
-  return keys.every((key) => Object.hasOwn(b, key) && Object.is(a[key], b[key]))
-}
-
-/**
  * A {@link Store} of `derive(store.get())`. A new result that `isEqual` to the
  * previous one is dropped, so `get` keeps the previous reference and
  * subscribers are not notified.
