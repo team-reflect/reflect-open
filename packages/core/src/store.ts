@@ -93,3 +93,56 @@ export function deriveStore<T, U>(
 
   return { get, subscribe }
 }
+
+function isArrayShallowEqual<T>(a: T[], b: T[]): boolean {
+  if (a.length !== b.length) {
+    return false
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) {
+      return false
+    }
+  }
+  return true
+}
+
+export function combineStores<T extends unknown[], U>(
+  stores: { [K in keyof T]: Store<T[K]> },
+  derive: (...values: T) => U,
+  isEqual: (a: U, b: U) => boolean = Object.is,
+): Store<U> {
+  let sources: T | undefined
+  let derived: U
+
+  const get = (): U => {
+    const newSources: T = stores.map((store) => store.get()) as T
+    if (sources && isArrayShallowEqual(sources, newSources)) {
+      return derived
+    }
+    const newDrived: U = derive(...newSources)
+    if (!sources || !isEqual(derived, newDrived)) {
+      derived = newDrived
+    }
+    sources = newSources
+    return derived
+  }
+
+  const subscribe = (listener: VoidFunction): Unlisten => {
+    let last = get()
+    const onChange = () => {
+      const next = get()
+      if (next !== last) {
+        last = next
+        listener()
+      }
+    }
+    const unlistens = stores.map((store) => store.subscribe(onChange))
+    return () => {
+      for (const unlisten of unlistens) {
+        unlisten()
+      }
+    }
+  }
+
+  return { get, subscribe }
+}
