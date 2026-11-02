@@ -45,3 +45,22 @@ export class WriteableStore<T> {
     }
   }
 }
+
+export function deriveStore<T, U>(
+  store: Store<T>,
+  deriveFn: (value: T) => U,
+  isEqual: (a: U, b: U) => boolean = Object.is,
+): Store<U> {
+  let derived: U | undefined
+
+  const get = (): U => {
+    const storeValue = store.get()
+    const newDerived = deriveFn(storeValue)
+    if (derived === undefined || !isEqual(derived, newDerived)) {
+      derived = newDerived
+    }
+    return derived
+  }
+
+  return { get, subscribe: store.subscribe }
+}
