@@ -307,7 +307,6 @@ class ChatSessionImpl implements ChatSession {
     // Without a loaded embedding model the search tool must *say* it is
     // lexical, so the runtime status is kept fresh while the session lives.
     const stopEmbed = embeddingRuntime.subscribe(() => {})
-    void embeddingRuntime.status()
     return () => {
       stopEmbed()
       attempt.active = false

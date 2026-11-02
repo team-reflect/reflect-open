@@ -44,9 +44,9 @@ const vectorsSchema = z.array(z.array(z.number()))
  */
 export interface EmbeddingRuntimeService extends Store<EmbedStatus> {
   /**
-   * Poll the runtime status.
+   * Poll the runtime status. The first subscriber also starts one poll.
    */
-  status(): Promise<EmbedStatus>
+  refresh(): Promise<EmbedStatus>
   /**
    * Load (downloading on first use) the model. Resolves with the outcome, or
    * with `loading` when another caller's load is in flight.
@@ -102,7 +102,7 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
     this.#deps = deps
   }
 
-  async status(): Promise<EmbedStatus> {
+  async refresh(): Promise<EmbedStatus> {
     return this.#observe(await this.#deps.ipc.call('embed_status', {}, embedStatusSchema))
   }
 
@@ -128,7 +128,7 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
       // poll may then answer the status already held, which notifies nobody.
       void (this.#events?.registered ?? Promise.resolve()).then(async () => {
         try {
-          await this.status()
+          await this.refresh()
         } catch (cause) {
           logger.warn('failed to poll the embedding runtime status', cause)
         }
@@ -138,7 +138,7 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
   }
 
   async retry(): Promise<EmbedStatus> {
-    const current = await this.status()
+    const current = await this.refresh()
     if (current.status !== 'failed') {
       return current
     }
@@ -181,7 +181,8 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
     }
   }
 
-  // One native listener shared by every subscriber while any is attached.
+  // One native listener shared by every subscriber while any is attached. Once
+  // it is registered, one poll reads the status that no event reported yet.
   #startEvents(): StatusEvents {
     const { ipc, logger } = this.#deps
     let stopped = false
@@ -202,6 +203,16 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
         }
       }
     })()
+    void registered.then(async () => {
+      if (stopped) {
+        return
+      }
+      try {
+        await this.refresh()
+      } catch (cause) {
+        logger.warn('failed to poll the embedding runtime status', cause)
+      }
+    })
     return {
       registered,
       stop: () => {

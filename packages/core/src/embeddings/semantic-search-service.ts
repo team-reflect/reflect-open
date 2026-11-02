@@ -123,7 +123,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         if (source !== 'rebuild') {
           return
         }
-        const embed = await embeddingRuntime.status()
+        const embed = await embeddingRuntime.refresh()
         if (embed.status === 'ready') {
           await embeddingIndex.backfill({ generation, fileGeneration, modelId: embed.model })
         }
@@ -132,7 +132,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
   }
 
   start(): Unlisten {
-    const { embeddingRuntime, embeddingIndex, settings, graphSession, logger } = this.#deps
+    const { embeddingRuntime, embeddingIndex, settings, graphSession } = this.#deps
     if (this.#consumeLegacyOptIn()) {
       settings.update({ semanticSearchEnabled: true })
     }
@@ -193,10 +193,6 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
       embeddingRuntime.subscribe(react),
       graphSession.subscribe(react),
     ]
-    // A later start reads the last status the runtime observed; the first one polls.
-    embeddingRuntime.status().catch((cause: unknown) => {
-      logger.warn('failed to poll the embedding runtime status', cause)
-    })
     react()
 
     return () => {

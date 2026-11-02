@@ -21,7 +21,7 @@ describe('createEmbeddingRuntimeService', () => {
     ipc.onCommand('embed_ensure', () => READY)
     ipc.onCommand('embed_texts', () => [[0.5, 0.5]])
 
-    await expect(runtime.status()).resolves.toEqual({ status: 'uninitialized' })
+    await expect(runtime.refresh()).resolves.toEqual({ status: 'uninitialized' })
     await expect(runtime.ensure()).resolves.toEqual(READY)
     await expect(runtime.embedTexts(['hello'])).resolves.toEqual([[0.5, 0.5]])
     expect(ipc.calls().at(-1)).toEqual({ command: 'embed_texts', args: { texts: ['hello'] } })
@@ -36,7 +36,7 @@ describe('createEmbeddingRuntimeService', () => {
     const unlisten = runtime.subscribe(() => {
       seen.push(runtime.get())
     })
-    await runtime.status()
+    await runtime.refresh()
     ipc.emit('embed:status', READY)
     unlisten()
     ipc.emit('embed:status', { status: 'failed', message: 'offline' })
@@ -51,9 +51,9 @@ describe('createEmbeddingRuntimeService', () => {
     const listener = vi.fn()
     runtime.subscribe(listener)
 
-    await runtime.status()
+    await runtime.refresh()
     const first = runtime.get()
-    await runtime.status()
+    await runtime.refresh()
     ipc.emit('embed:status', { ...READY })
 
     expect(runtime.get()).toBe(first)
@@ -77,6 +77,22 @@ describe('createEmbeddingRuntimeService', () => {
     expect(stop).toHaveBeenCalledTimes(1)
   })
 
+  it('polls once when the first subscriber starts the events', async () => {
+    const { ipc, runtime } = setup()
+    ipc.onCommand('embed_status', () => READY)
+    const listener = vi.fn()
+
+    const first = runtime.subscribe(listener)
+    await vi.waitFor(() => expect(runtime.get()).toEqual(READY))
+    const second = runtime.subscribe(() => {})
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(ipc.calls().filter((call) => call.command === 'embed_status')).toHaveLength(1)
+    expect(listener).toHaveBeenCalledTimes(1)
+    first()
+    second()
+  })
+
   it('logs an invalid status event', () => {
     const { ipc, logger, runtime } = setup()
     runtime.subscribe(() => {})
@@ -88,10 +104,12 @@ describe('createEmbeddingRuntimeService', () => {
 
   it('logs a failed event subscription', async () => {
     const { ipc, logger } = setup()
+    ipc.onCommand('embed_status', () => READY)
     vi.spyOn(ipc, 'listen').mockRejectedValue(new Error('no events'))
     const runtime = createEmbeddingRuntimeService({ ipc, logger })
     runtime.subscribe(() => {})
-    await vi.waitFor(() => expect(logger.getWarnings()).toHaveLength(1))
+    await vi.waitFor(() => expect(runtime.get()).toEqual(READY))
+    expect(logger.getWarnings()).toHaveLength(1)
   })
 
   describe('awaitTerminalStatus', () => {
@@ -124,7 +142,7 @@ describe('createEmbeddingRuntimeService', () => {
     it('resolves when the re-poll answers the status already held', async () => {
       const { ipc, runtime } = setup()
       ipc.onCommand('embed_status', () => READY)
-      await runtime.status()
+      await runtime.refresh()
       await expect(runtime.awaitTerminalStatus(LOADING)).resolves.toEqual(READY)
     })
   })

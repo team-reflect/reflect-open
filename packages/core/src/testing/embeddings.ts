@@ -109,8 +109,8 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
     })
   }
 
-  status(): Promise<EmbedStatus> {
-    return this.#inner.status()
+  refresh(): Promise<EmbedStatus> {
+    return this.#inner.refresh()
   }
 
   ensure(): Promise<EmbedStatus> {

@@ -41,7 +41,7 @@ function newClient(): QueryClient {
 async function mount(path: string, client: QueryClient) {
   const embeddingRuntime = createTestEmbeddingRuntimeService({ status: embedStatus })
   // The runtime has reported before the mount, as on a second visit to a note.
-  await embeddingRuntime.status()
+  await embeddingRuntime.refresh()
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile,
