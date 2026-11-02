@@ -2,12 +2,12 @@ import type { ReactElement } from 'react'
 import { ArrowRight, Circle, CircleCheck, Trash2 } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
 import { TaskText } from '@/components/tasks/task-text.tsx'
-import { getTaskKey, type OpenTask, formatShortDate } from '@reflect/core'
+import { getTaskKey, type OpenTask, formatShortDate, type WritableStore } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
-import { type RevealedRowStore, useRevealedRow } from '@/mobile/revealed-row.ts'
+import { useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 
@@ -37,7 +37,7 @@ interface MobileTaskRowProps {
   /**
    * The list's one revealed row, keyed by `getTaskKey`.
    */
-  revealedRow: RevealedRowStore
+  revealedRow: WritableStore<string | null>
   /**
    * Navigate to the task's source note (the revealed Note action).
    */

@@ -3,6 +3,7 @@ import {
   type CoreServices,
   type FilteredSearchHit,
   type NoteDocumentService,
+  WritableStore,
 } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { createTestCoreServices } from '@reflect/core/testing'
@@ -17,7 +18,6 @@ import { act } from '@/test-utils/act.ts'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteRowList } from './note-row-list.tsx'
-import { RevealedRowStore } from './revealed-row.ts'
 import { SwipeableNoteRow, type NoteRowModel } from './swipeable-note-row.tsx'
 
 const commitNoteFrontmatter = vi.fn<NoteDocumentService['commitFrontmatter']>()
@@ -71,7 +71,7 @@ function row(overrides: Partial<NoteRowModel> = {}): NoteRowModel {
 }
 
 function SwipeHarness({ note = row() }: { note?: NoteRowModel }): ReactElement {
-  const [revealedRow] = useState(() => new RevealedRowStore())
+  const [revealedRow] = useState(() => new WritableStore<string | null>(null))
   return (
     <div style={{ width: 360 }}>
       <SwipeableNoteRow

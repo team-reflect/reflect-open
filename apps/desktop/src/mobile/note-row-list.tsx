@@ -1,7 +1,7 @@
+import { WritableStore } from '@reflect/core'
 import { useState, type ReactElement } from 'react'
 import { Virtualizer } from 'virtua'
 import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
-import { RevealedRowStore } from '@/mobile/revealed-row.ts'
 import {
   NOTE_ROW_HEIGHT,
   SwipeableNoteRow,
@@ -21,7 +21,7 @@ interface NoteRowListProps {
  */
 export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
   const { noteActions } = useCoreServices()
-  const [revealedRow] = useState(() => new RevealedRowStore())
+  const [revealedRow] = useState(() => new WritableStore<string | null>(null))
   const [deletePath, setDeletePath] = useState<string | null>(null)
 
   const togglePin = (row: NoteRowModel): void => {
@@ -34,7 +34,7 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
         // Keyboard avoidance is the shell root's job (it ends at the keyboard's
         // top); `pb-safe` only clears the home indicator when the keyboard is down.
         className="min-h-0 flex-1 overflow-y-auto px-safe pb-safe"
-        onScroll={() => revealedRow.setKey(null)}
+        onScroll={() => revealedRow.set(null)}
       >
         <Virtualizer as="ul" item="li" data={rows} itemSize={NOTE_ROW_HEIGHT} bufferSize={640}>
           {(row) => (
@@ -45,7 +45,7 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
               onOpen={() => onOpen(row.path)}
               onTogglePin={() => togglePin(row)}
               onDelete={() => {
-                revealedRow.setKey(null)
+                revealedRow.set(null)
                 setDeletePath(row.path)
               }}
             />

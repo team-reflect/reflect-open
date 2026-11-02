@@ -1,8 +1,8 @@
 import type { ReactElement, ReactNode } from 'react'
 import { Pin, PinOff, Trash2 } from 'lucide-react'
-import { type HighlightSegment, formatRecencyLabel } from '@reflect/core'
+import { type HighlightSegment, formatRecencyLabel, type WritableStore } from '@reflect/core'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
-import { type RevealedRowStore, useRevealedRow } from '@/mobile/revealed-row.ts'
+import { useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
 import { useDateFormat, useTimeFormat } from '@/providers/settings-provider.tsx'
 
@@ -28,7 +28,7 @@ interface SwipeableNoteRowProps {
   /**
    * The list's one revealed row, keyed by note path.
    */
-  revealedRow: RevealedRowStore
+  revealedRow: WritableStore<string | null>
   onOpen: () => void
   onTogglePin: () => void
   onDelete: () => void

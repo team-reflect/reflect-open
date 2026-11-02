@@ -6,13 +6,13 @@ import {
   type InsertTaskTarget,
   type OpenTask,
   type TaskGroup,
+  type WritableStore,
 } from '@reflect/core'
 import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
 import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation.tsx'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import type { RevealedRowStore } from '@/mobile/revealed-row.ts'
 import { MobileTaskRow } from '@/mobile/task-row.tsx'
 
 interface MobileTaskGroupProps {
@@ -48,7 +48,7 @@ interface MobileTaskGroupProps {
   /**
    * The one row whose swipe actions are showing, across all groups.
    */
-  revealedRow: RevealedRowStore
+  revealedRow: WritableStore<string | null>
 }
 
 /**
