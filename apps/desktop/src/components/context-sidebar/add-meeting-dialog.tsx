@@ -46,12 +46,10 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * are pre-filled from Apple Contacts by attendee email.
  */
 export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps): ReactElement {
-  const { settings } = useSettings()
   const { contacts, meetings, logger, graphSession } = useCoreServices()
   const [name, setName] = useState(event.title)
   const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [createNote, setCreateNote] = useState(event.recurring)
-
   const contactsEnabled = useSettingsField('contactsEnabled')
   const timeFormat = useSettingsField('timeFormat')
 
