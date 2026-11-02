@@ -37,7 +37,6 @@ class SystemClockImpl implements ClockService {
   readonly #timers = new Map<number, ReturnType<typeof globalThis.setTimeout>>()
   #nextId = 1
   readonly #today = new WritableStore(getIsoToday())
-  #watchers = 0
   #midnightTimer: ReturnType<typeof globalThis.setTimeout> | null = null
   #heartbeat: ReturnType<typeof globalThis.setInterval> | null = null
 
@@ -48,24 +47,19 @@ class SystemClockImpl implements ClockService {
   readonly today: Store<string> = {
     get: () => {
       // While nothing is subscribed, no timer keeps the cached date fresh.
-      if (this.#watchers === 0) {
+      if (!this.#today.subscribed()) {
         this.#syncToday()
       }
       return this.#today.get()
     },
     subscribe: (listener: VoidFunction): Unlisten => {
       const unlisten = this.#today.subscribe(listener)
-      if (++this.#watchers === 1) {
+      if (this.#heartbeat === null) {
         this.#start()
       }
-      let active = true
       return () => {
-        if (!active) {
-          return
-        }
-        active = false
         unlisten()
-        if (--this.#watchers === 0) {
+        if (!this.#today.subscribed()) {
           this.#stop()
         }
       }
