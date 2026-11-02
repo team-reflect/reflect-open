@@ -125,6 +125,7 @@ export {
   type UpdatedPreset,
 } from './search/all-notes-filters.ts'
 export { createDailyNoteService, type DailyNoteService } from './daily/daily-note-service.ts'
+export { createTodayService, type TodayService } from './daily/today-service.ts'
 export { type TemplateService } from './documents/template-service.ts'
 export {
   isOstensiblyEmptyNoteSource,
