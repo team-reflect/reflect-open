@@ -21,7 +21,7 @@ import {
   type MeetingAttendee,
   formatTimeOfDay,
 } from '@reflect/core'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 
@@ -46,11 +46,12 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * are pre-filled from Apple Contacts by attendee email.
  */
 export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps): ReactElement {
-  const { settings } = useSettings()
   const { contacts, meetings, logger, graphSession } = useCoreServices()
   const [name, setName] = useState(event.title)
   const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [createNote, setCreateNote] = useState(event.recurring)
+  const contactsEnabled = useSettingsField('contactsEnabled')
+  const timeFormat = useSettingsField('timeFormat')
 
   // Upgrade the prefilled chips once attendee resolution answers: an invite
   // email an existing note owns swaps the calendar's spelling for the note
@@ -73,7 +74,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
     return () => {
       cancelled = true
     }
-  }, [event, logger, meetings, settings.contactsEnabled])
+  }, [event, logger, meetings, contactsEnabled])
 
   const addAttendee = (attendee: MeetingAttendee): void => {
     setAttendees((current) => withAttendee(current, attendee))
@@ -107,7 +108,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
           attendees,
           backlinkMeeting: createNote,
           lookupContacts,
-          startTime: formatTimeOfDay(new Date(event.startsAt), settings.timeFormat),
+          startTime: formatTimeOfDay(new Date(event.startsAt), timeFormat),
         })
       } catch (cause) {
         return errorMessage(cause)
@@ -135,7 +136,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
         <DialogHeader>
           <DialogTitle>Add event</DialogTitle>
           <DialogDescription>
-            {formatTimeOfDay(new Date(event.startsAt), settings.timeFormat)}
+            {formatTimeOfDay(new Date(event.startsAt), timeFormat)}
           </DialogDescription>
         </DialogHeader>
         <form action={submitAction} className="space-y-4">

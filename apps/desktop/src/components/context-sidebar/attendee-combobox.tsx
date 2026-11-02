@@ -10,7 +10,7 @@ import { buildAutocompleteEntries, type AutocompleteEntry } from '@reflect/app'
 import { useContactsState } from '@/hooks/use-contacts-state.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const SUGGESTION_LIMIT = 6
@@ -62,11 +62,11 @@ function entryAttendee(entry: AutocompleteEntry): MeetingAttendee {
  */
 export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): ReactElement {
   const { graph } = useGraph()
-  const { settings } = useSettings()
+  const contactsEnabled = useSettingsField('contactsEnabled')
   const { contacts, meetings } = useCoreServices()
   // Re-render when the permission state changes; the gate reads it.
   useContactsState()
-  const contactsInMenu = contacts.canLookup(settings)
+  const contactsInMenu = contacts.canLookup({ contactsEnabled })
 
   const [query, setQuery] = useState('')
   const [dismissed, setDismissed] = useState(false)
