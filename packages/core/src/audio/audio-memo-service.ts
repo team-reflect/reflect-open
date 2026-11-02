@@ -216,10 +216,6 @@ export interface AudioMemoSessionOptions {
 export interface AudioMemoSessionState {
   readonly phase: AudioMemoPhase
   /**
-   * Live while recording.
-   */
-  readonly elapsedMs: number
-  /**
    * The live input stream, for the waveform.
    */
   readonly stream: MediaStream | null
@@ -256,12 +252,12 @@ export interface AudioMemoSessionState {
  * never outlive its UI invisibly: hiding the UI mid-recording stops and saves
  * instead of leaving a hidden hot microphone.
  */
-export interface AudioMemoSession {
+export interface AudioMemoSession extends Store<AudioMemoSessionState> {
   /**
-   * The current state. The same object until something changes.
+   * The recording's elapsed time, live while recording. Apart from the
+   * state, as it changes on every tick.
    */
-  getState: () => AudioMemoSessionState
-  subscribe(listener: () => void): Unlisten
+  readonly elapsedMs: Store<number>
   /**
    * Idle → start recording (revealing a hidden UI); recording → stop & save.
    */
@@ -587,14 +583,14 @@ class AudioMemoSessionImpl implements AudioMemoSession {
   readonly #deps: AudioMemoSessionDeps
   readonly #surface: AudioMemoSurface
   readonly #pipeline: AudioMemoPipeline
-  readonly #listeners = new Set<() => void>()
   readonly #unlisten: Unlisten[]
   #surfaceHidden: boolean
   /**
    * True from the stop click until the recorder hands over the blob.
    */
   #stopping = false
-  #elapsedMs = 0
+  readonly #elapsedMs = new WritableStore(0)
+  readonly elapsedMs: Store<number> = this.#elapsedMs
   #live: LiveSession | null = null
   /**
    * Re-entry guard for the stop click's await gap.
@@ -608,7 +604,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
    * Concurrent recorder stops share one result, so the final segment is handed over once.
    */
   #recorderStop: Promise<void> | null = null
-  #state: AudioMemoSessionState
+  readonly #state: WritableStore<AudioMemoSessionState>
 
   constructor(deps: AudioMemoSessionDeps, options: AudioMemoSessionOptions) {
     const { audioRecorder } = deps
@@ -620,7 +616,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     this.#pipeline = deps.openPipeline({
       isErrorSurfaceVisible: () => !this.#surfaceHidden,
     })
-    this.#state = this.#snapshot()
+    this.#state = new WritableStore(this.#snapshot(), isShallowEqual)
 
     this.#unlisten = [
       this.#pipeline.subscribe(() => {
@@ -628,13 +624,12 @@ class AudioMemoSessionImpl implements AudioMemoSession {
       }),
       audioRecorder.state.subscribe(() => {
         if (audioRecorder.state.get() !== 'recording') {
-          this.#elapsedMs = 0
+          this.#elapsedMs.set(0)
         }
         this.#publish()
       }),
       audioRecorder.subscribeLevel((event) => {
-        this.#elapsedMs = event.elapsedMs
-        this.#publish()
+        this.#elapsedMs.set(event.elapsedMs)
       }),
       audioRecorder.subscribeSegment((segment) => {
         this.#handleSegment(segment)
@@ -645,17 +640,8 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     ]
   }
 
-  readonly getState = (): AudioMemoSessionState => this.#state
-
-  subscribe(listener: () => void): Unlisten {
-    const entry = (): void => {
-      listener()
-    }
-    this.#listeners.add(entry)
-    return () => {
-      this.#listeners.delete(entry)
-    }
-  }
+  readonly get = (): AudioMemoSessionState => this.#state.get()
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#state.subscribe(listener)
 
   toggle(): void {
     const recorderState = this.#deps.audioRecorder.state.get()
@@ -754,7 +740,6 @@ class AudioMemoSessionImpl implements AudioMemoSession {
               : this.#stopping || pipelineState.pendingCount > 0 || pipelineState.transcribing
                 ? 'transcribing'
                 : 'idle',
-      elapsedMs: this.#elapsedMs,
       stream: audioRecorder.stream(),
       pendingCount: pipelineState.pendingCount,
       available: unavailableReason === null,
@@ -766,24 +751,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
   }
 
   #publish(): void {
-    const state = this.#state
-    const next = this.#snapshot()
-    if (
-      next.phase === state.phase &&
-      next.elapsedMs === state.elapsedMs &&
-      next.stream === state.stream &&
-      next.pendingCount === state.pendingCount &&
-      next.unavailableReason === state.unavailableReason &&
-      next.error === state.error &&
-      next.canRetry === state.canRetry &&
-      next.recorderState === state.recorderState
-    ) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(this.#snapshot())
   }
 
   #handleSegment(segment: AudioRecorderSegment): void {
