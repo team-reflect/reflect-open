@@ -51,7 +51,7 @@ import {
   formatFullDate,
 } from '@reflect/core'
 import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -117,7 +117,18 @@ export function MobileSettings(): ReactElement {
   const subscriptionControls = useSubscriptionControls()
   const { opener } = useAppServices()
   const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
-  const { settings, updateSettings } = useSettings()
+  const theme = useSettingsField('theme')
+  const editorTextSize = useSettingsField('editorTextSize')
+  const selectedDateFormat = useSettingsField('dateFormat')
+  const weekStartDay = useSettingsField('weekStartDay')
+  const timeFormat = useSettingsField('timeFormat')
+  const editorSmoothCaretAnimation = useSettingsField('editorSmoothCaretAnimation')
+  const editorDefaultBullet = useSettingsField('editorDefaultBullet')
+  const editorBulletAfterHeading = useSettingsField('editorBulletAfterHeading')
+  const chatSystemPrompt = useSettingsField('chatSystemPrompt')
+  const transcriptionFormat = useSettingsField('transcriptionFormat')
+  const transcriptionPrompt = useSettingsField('transcriptionPrompt')
+  const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
   const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
@@ -240,15 +251,15 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup header="Appearance">
             <SettingsSegmentedRow
               label="Theme"
-              value={settings.theme}
+              value={theme}
               options={THEME_OPTIONS}
-              onChange={(theme) => updateSettings({ theme })}
+              onChange={(theme) => settingsService.update({ theme })}
             />
             <SettingsSegmentedRow
               label="Text size"
-              value={settings.editorTextSize}
+              value={editorTextSize}
               options={TEXT_SIZE_OPTIONS}
-              onChange={(editorTextSize) => updateSettings({ editorTextSize })}
+              onChange={(editorTextSize) => settingsService.update({ editorTextSize })}
             />
           </SettingsGroup>
 
@@ -260,8 +271,8 @@ export function MobileSettings(): ReactElement {
               <SettingsSelectRow
                 key={dateFormat}
                 label={formatFullDate(today, dateFormat)}
-                selected={settings.dateFormat === dateFormat}
-                onPress={() => updateSettings({ dateFormat })}
+                selected={selectedDateFormat === dateFormat}
+                onPress={() => settingsService.update({ dateFormat })}
               />
             ))}
           </SettingsGroup>
@@ -269,36 +280,38 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup header="Week and time">
             <SettingsSegmentedRow
               label="Week start"
-              value={settings.weekStartDay}
+              value={weekStartDay}
               options={WEEK_START_OPTIONS}
-              onChange={(weekStartDay) => updateSettings({ weekStartDay })}
+              onChange={(weekStartDay) => settingsService.update({ weekStartDay })}
             />
             <SettingsSegmentedRow
               label="Time format"
-              value={settings.timeFormat}
+              value={timeFormat}
               options={TIME_FORMAT_OPTIONS}
-              onChange={(timeFormat) => updateSettings({ timeFormat })}
+              onChange={(timeFormat) => settingsService.update({ timeFormat })}
             />
           </SettingsGroup>
 
           <SettingsGroup header="Editor">
             <SettingsSwitchRow
               label="Smooth caret animation"
-              checked={settings.editorSmoothCaretAnimation}
+              checked={editorSmoothCaretAnimation}
               onCheckedChange={(editorSmoothCaretAnimation) => {
-                updateSettings({ editorSmoothCaretAnimation })
+                settingsService.update({ editorSmoothCaretAnimation })
               }}
             />
             <SettingsSwitchRow
               label="Start with a bullet"
-              checked={settings.editorDefaultBullet}
-              onCheckedChange={(editorDefaultBullet) => updateSettings({ editorDefaultBullet })}
+              checked={editorDefaultBullet}
+              onCheckedChange={(editorDefaultBullet) => {
+                return settingsService.update({ editorDefaultBullet })
+              }}
             />
             <SettingsSwitchRow
               label="Bullet after a heading"
-              checked={settings.editorBulletAfterHeading}
+              checked={editorBulletAfterHeading}
               onCheckedChange={(editorBulletAfterHeading) => {
-                updateSettings({ editorBulletAfterHeading })
+                settingsService.update({ editorBulletAfterHeading })
               }}
             />
           </SettingsGroup>
@@ -321,9 +334,7 @@ export function MobileSettings(): ReactElement {
             <SettingsActionRow label="Add AI provider" onPress={() => setAddProviderOpen(true)} />
             <SettingsNavRow
               label="System prompt"
-              value={
-                normalizeChatSystemPrompt(settings.chatSystemPrompt) === '' ? 'Default' : 'Custom'
-              }
+              value={normalizeChatSystemPrompt(chatSystemPrompt) === '' ? 'Default' : 'Custom'}
               onPress={() => setSystemPromptOpen(true)}
             />
           </SettingsGroup>
@@ -358,17 +369,15 @@ export function MobileSettings(): ReactElement {
           >
             <SettingsSwitchRow
               label="Transcription auto-format"
-              checked={settings.transcriptionFormat}
+              checked={transcriptionFormat}
               descriptionId={audioMemoDescriptionId}
-              onCheckedChange={(transcriptionFormat) => updateSettings({ transcriptionFormat })}
+              onCheckedChange={(transcriptionFormat) => {
+                return settingsService.update({ transcriptionFormat })
+              }}
             />
             <SettingsNavRow
               label="Helper text"
-              value={
-                normalizeTranscriptionPrompt(settings.transcriptionPrompt) === ''
-                  ? 'None'
-                  : 'Custom'
-              }
+              value={normalizeTranscriptionPrompt(transcriptionPrompt) === '' ? 'None' : 'Custom'}
               onPress={() => setTranscriptionPromptOpen(true)}
             />
           </SettingsGroup>
@@ -570,10 +579,10 @@ export function MobileSettings(): ReactElement {
         maxLength={CHAT_SYSTEM_PROMPT_MAX_LENGTH}
         rows={8}
         normalize={normalizeChatSystemPrompt}
-        value={settings.chatSystemPrompt}
+        value={chatSystemPrompt}
         open={systemPromptOpen}
         onOpenChange={setSystemPromptOpen}
-        onSave={(chatSystemPrompt) => updateSettings({ chatSystemPrompt })}
+        onSave={(chatSystemPrompt) => settingsService.update({ chatSystemPrompt })}
       />
       <TextSettingDrawer
         title="Transcription helper text"
@@ -583,10 +592,10 @@ export function MobileSettings(): ReactElement {
         maxLength={TRANSCRIPTION_PROMPT_MAX_LENGTH}
         rows={3}
         normalize={normalizeTranscriptionPrompt}
-        value={settings.transcriptionPrompt}
+        value={transcriptionPrompt}
         open={transcriptionPromptOpen}
         onOpenChange={setTranscriptionPromptOpen}
-        onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
+        onSave={(transcriptionPrompt) => settingsService.update({ transcriptionPrompt })}
       />
       <AiPromptDrawer
         prompt={editingPrompt}
