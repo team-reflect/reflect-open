@@ -373,6 +373,23 @@ describe('ChatSession persistence', () => {
     expect(session.get().draft).toBe('half-typed follow-up')
   })
 
+  it('keeps the open conversation when asked nothing, or with no model to ask', async () => {
+    const { session, chatEngine } = await setup()
+    await session.send('earlier question')
+    const earlierConversation = session.get().activeConversationId
+
+    await session.ask('   ')
+    expect(session.get().activeConversationId).toBe(earlierConversation)
+
+    const unconfigured = await setup({ settings: { aiProviders: [], defaultAiProviderId: null } })
+    const unconfiguredConversation = unconfigured.session.get().activeConversationId
+    await unconfigured.session.ask('what did I decide?')
+
+    expect(unconfigured.session.get().activeConversationId).toBe(unconfiguredConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual(['earlier question'])
+    expect(chatEngine.calls()).toHaveLength(1)
+  })
+
   it('rejects a second send while the first one is in flight', async () => {
     const { session, chatEngine } = await setup()
 

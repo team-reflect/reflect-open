@@ -106,7 +106,7 @@ function Harness(): ReactElement {
   )
 }
 
-async function renderHarness() {
+async function renderHarness(route: Route = { kind: 'today' }) {
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
@@ -116,6 +116,7 @@ async function renderHarness() {
   return await renderInApp(<Harness />, {
     core,
     graph: { ...GRAPH, indexGeneration: null },
+    route,
     settings: { aiProviders: settingsState.models, defaultAiProviderId: settingsState.defaultId },
   })
 }
@@ -130,7 +131,9 @@ describe('MobileChat', () => {
   })
 
   it('Back from a cold entry lands on today, as the back-swipe does', async () => {
-    await renderHarness()
+    // Chat is the first and only history entry: there is nothing to pop.
+    await renderHarness({ kind: 'chat' })
+    expect(probedRouteRef.current).toEqual({ kind: 'chat' })
 
     await page.getByRole('button', { name: 'Back' }).click()
 
@@ -181,7 +184,7 @@ describe('MobileChat', () => {
     await expect.element(page.getByText('sent question')).toBeVisible()
   })
 
-  it('focuses the composer when a focus arrival requests it (All’s Chat button)', async () => {
+  it('focuses the composer when a focus arrival requests it', async () => {
     configureModel()
     await renderHarness()
 

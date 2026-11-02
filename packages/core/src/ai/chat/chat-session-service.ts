@@ -149,7 +149,8 @@ export interface ChatSession extends Store<ChatSessionState> {
   /**
    * Start a fresh conversation with `question` as its first message. For
    * asking from outside the composer (mobile's search field), so the
-   * composer draft is left as it was.
+   * composer draft is left as it was. A blank question, or no chat model to
+   * send it to, changes nothing.
    */
   ask(question: string): Promise<void>
   /**
@@ -354,6 +355,10 @@ class ChatSessionImpl implements ChatSession {
   }
 
   async ask(question: string): Promise<void> {
+    // A question that can't be sent must not cost the open conversation.
+    if (question.trim() === '' || this.#deps.providerConfig.chatModel() === null) {
+      return
+    }
     this.newChat()
     await this.#send(question, { keepDraft: true })
   }
