@@ -38,7 +38,7 @@ function useSettingsService(): SettingsService {
   return useCoreServices().settings satisfies Store<Settings>
 }
 
-function useSettingsStore(): Settings {
+export function useSettingsStore(): Settings {
   const store = useSettingsService()
   return useStore(store)
 }
@@ -48,7 +48,7 @@ function useSettingsSelector<T>(selector: (settings: Settings) => T): T {
   return useSelector(store, selector)
 }
 
-function useSettingsField<K extends keyof Settings>(key: K): Settings[K] {
+export function useSettingsField<K extends keyof Settings>(key: K): Settings[K] {
   const selector = useCallback(
     (settings: Settings) => {
       return settings[key]
