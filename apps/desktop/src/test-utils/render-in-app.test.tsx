@@ -10,7 +10,7 @@ import {
   useIndexGeneration,
   useMaybeGraphInfo,
 } from '@/providers/graph-provider.tsx'
-import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
+import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
 import { useDateFormat, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -24,7 +24,7 @@ function Probe(): ReactElement {
   const indexGeneration = useIndexGeneration()
   const indexing = useGraphIndexing()
   const recents = useGraphRecents()
-  const { mobileStorageKind } = useMobileGraphBoot()
+  const mobileStorageKind = useMobileStorageKind()
   const dateFormat = useDateFormat()
   const settingsService = useSettingsService()
   const { route, navigate } = useRouter()
