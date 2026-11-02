@@ -133,7 +133,7 @@ describe('NoteRowList', () => {
     await swipeRow(surface, 136)
     await view.getByRole('button', { name: 'Pin Alpha', exact: true }).click()
     await vi.waitFor(() => {
-      expect(view.core.noteRows.getOverlay('notes/alpha.md')).toMatchObject({
+      expect(view.core.noteRows.get().get('notes/alpha.md')).toMatchObject({
         isPinned: true,
       })
     })

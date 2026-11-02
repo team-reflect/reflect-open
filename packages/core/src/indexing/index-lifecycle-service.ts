@@ -214,12 +214,6 @@ export interface IndexLifecycleService {
    */
   onMoved(listener: (from: string, to: string) => void): Unlisten
   /**
-   * Listen as a sync pass advances through the file listing (`done`,
-   * `total`, `worked`): the substrate for a "Preparing your notes… 400 of
-   * 3,000" surface during a first index. Superseded passes stop reporting.
-   */
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten
-  /**
    * Listen for iCloud-evicted notes whose content the index lacks (see
    * `IndexPassOptions.onStalePlaceholders`). The app requests targeted
    * downloads for exactly these paths.
@@ -294,7 +288,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   readonly #appliedListeners = new Set<(event: IndexAppliedEvent) => void>()
   readonly #reconciledListeners = new Set<(event: IndexReconciledEvent) => MaybePromise<void>>()
   readonly #movedListeners = new Set<(from: string, to: string) => void>()
-  readonly #fileProgressListeners = new Set<(done: number, total: number, worked: number) => void>()
   readonly #stalePlaceholderListeners = new Set<(paths: readonly string[]) => void>()
   readonly #indexer: NoteIndexer
   readonly #liveIndex: LiveIndex
@@ -382,9 +375,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
             passWorked = worked
             if (!isStale()) {
               this.#fileProgress.set({ done: progressDone, total, worked })
-              for (const listener of this.#fileProgressListeners) {
-                listener(progressDone, total, worked)
-              }
             }
           },
         })
@@ -593,10 +583,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   onMoved(listener: (from: string, to: string) => void): Unlisten {
     return attach(this.#movedListeners, listener)
-  }
-
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten {
-    return attach(this.#fileProgressListeners, listener)
   }
 
   onStalePlaceholders(listener: (paths: readonly string[]) => void): Unlisten {

@@ -32,7 +32,7 @@ export type MobileAudioMemoSessionStores = Pick<
   'get' | 'subscribe' | 'elapsedMs' | 'level'
 >
 
-export interface MobileAudioMemoContextValue extends Pick<
+interface MobileAudioMemoContextValue extends Pick<
   MobileAudioMemoSession,
   'toggle' | 'stopAndSave' | 'cancelRecording' | 'retry' | 'discard'
 > {

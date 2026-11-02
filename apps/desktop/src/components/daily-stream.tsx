@@ -15,7 +15,6 @@ import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useToday } from '@/lib/use-today.ts'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
 import { clamp } from '@ocavue/utils'
 
 /** The size guess virtua uses for a row it has not measured yet. */
@@ -57,14 +56,13 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // The window anchors at today-on-mount and only grows back, when an arrival
   // lands before it. (`dayWindow`, not `window` — shadowing the DOM global here was a
   // footgun.)
-  const { dailyNotes } = useCoreServices()
-  const [dayWindow, setDayWindow] = useState(() => createDayWindow(dailyNotes.today()))
+  const today = useToday()
+  const [dayWindow, setDayWindow] = useState(() => createDayWindow(today))
   // Per-row data is unused (the date is derived from the index); a stable array
   // of the window's length just tells virtua how many rows exist.
   const data = useMemo(() => Array.from({ length: dayWindow.count }), [dayWindow.count])
   const [scrollIndex, setScrollIndex] = useState<number>(dayWindow.anchorIndex)
   const [focusIndex, setFocusIndex] = useState<number>(dayWindow.anchorIndex)
-  const today = useToday()
   const targetDate = target.kind === 'today' ? today : target.date
   const dateFormat = useDateFormat()
 

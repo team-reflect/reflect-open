@@ -63,7 +63,7 @@ describe('useReorderPinnedNotes', () => {
     await act(() => hook.result.current('a.md', 'b.md'))
 
     // A dropped between two neighbours takes the midpoint.
-    expect(core.noteRows.getOverlay('a.md')).toEqual({ pinnedOrder: 2560 })
+    expect(core.noteRows.get().get('a.md')).toEqual({ pinnedOrder: 2560 })
     expect(reorderPinnedNotes).toHaveBeenCalledExactlyOnceWith([{ ...NOTE_A, pinnedOrder: 2560 }])
   })
 
@@ -88,6 +88,6 @@ describe('useReorderPinnedNotes', () => {
 
     await act(() => hook.result.current('a.md', 'b.md'))
 
-    await vi.waitFor(() => expect(core.noteRows.getOverlay('a.md')).toBeNull())
+    await vi.waitFor(() => expect(core.noteRows.get().get('a.md')).toBeUndefined())
   })
 })

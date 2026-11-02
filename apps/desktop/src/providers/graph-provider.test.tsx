@@ -3,7 +3,15 @@ import { act } from '@/test-utils/act.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { AppServices } from '@reflect/app'
 import { createTestDialogService } from '@reflect/app/testing'
-import type { AppPlatform, CoreServices, GraphInfo, GraphStatus, RecentGraph } from '@reflect/core'
+import type {
+  AppPlatform,
+  CoreServices,
+  GraphInfo,
+  GraphStatus,
+  MobileStorageInfo,
+  MobileStorageKind,
+  RecentGraph,
+} from '@reflect/core'
 import {
   createTestCoreServices,
   createTestGraphSessionService,
@@ -22,7 +30,12 @@ import {
   useGraphStatus,
   useIndexGeneration,
 } from './graph-provider.tsx'
-import { useMobileGraphBoot, type MobileGraphBoot } from './use-mobile-graph-boot.ts'
+import {
+  useMobileStorageInfo,
+  useMobileStorageKind,
+  useMobileStorageResolving,
+  useNeedsOnboarding,
+} from './use-mobile-graph-boot.ts'
 
 /**
  * The graph session, its boot flows and the mobile onboarding are covered in
@@ -40,7 +53,11 @@ const ICLOUD_ROOT = '/iCloud/Documents'
 /**
  * Every slice of the graph context, as one object.
  */
-interface GraphProbe extends ReturnType<typeof useGraphActions>, MobileGraphBoot {
+interface GraphProbe extends ReturnType<typeof useGraphActions> {
+  needsOnboarding: boolean
+  mobileStorageInfo: MobileStorageInfo | null
+  mobileStorageResolving: boolean
+  mobileStorageKind: MobileStorageKind | null
   status: GraphStatus
   graph: GraphInfo | null
   indexGeneration: number | null
@@ -63,7 +80,10 @@ async function renderGraph<Core extends CoreServices>(
   function Probe(): null {
     result.current = {
       ...useGraphActions(),
-      ...useMobileGraphBoot(),
+      needsOnboarding: useNeedsOnboarding(),
+      mobileStorageInfo: useMobileStorageInfo(),
+      mobileStorageResolving: useMobileStorageResolving(),
+      mobileStorageKind: useMobileStorageKind(),
       status: useGraphStatus(),
       graph: useGraphInfo(),
       indexGeneration: useIndexGeneration(),
@@ -248,7 +268,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(core.graphSession.get().graph).toBeNull()
   })
 
-  it('publishes the app’s mobile onboarding and passes completeOnboarding through', async () => {
+  it('publishes the app’s mobile onboarding after completeOnboarding', async () => {
     const { core, appServices, result } = await renderGraph(
       createTestCoreServices({
         database: createWasmTestDatabaseService(),
@@ -260,7 +280,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     await vi.waitFor(() => expect(result.current.mobileStorageResolving).toBe(false))
 
     await act(async () => {
-      await result.current.completeOnboarding('local')
+      await appServices.mobileOnboarding.completeOnboarding('local')
     })
 
     expect(result.current.status).toBe('ready')

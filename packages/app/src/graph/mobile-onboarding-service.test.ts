@@ -500,6 +500,24 @@ describe('MobileOnboardingService completeOnboarding', () => {
     expect(context.settings.saves()).toEqual([])
   })
 
+  it('does not notify when the sandbox root arrives after the full resolve', async () => {
+    const context = setup()
+    const local = Promise.withResolvers<string>()
+    vi.spyOn(context.storage, 'resolveLocal').mockReturnValue(local.promise)
+    context.service.boot()
+    await expect.poll(() => context.service.get().resolving).toBe(false)
+    const state = context.service.get()
+    let changes = 0
+    context.service.subscribe(() => {
+      changes += 1
+    })
+
+    local.resolve(MOBILE_ROOT)
+    await local.promise
+    expect(changes).toBe(0)
+    expect(context.service.get()).toBe(state)
+  })
+
   it('tells subscribers about every change', async () => {
     const context = setup()
     let changes = 0

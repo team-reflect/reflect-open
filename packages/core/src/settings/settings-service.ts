@@ -59,6 +59,14 @@ interface SettingsState {
   readonly status: SettingsStatus
 }
 
+function selectSettings(state: SettingsState): Settings {
+  return state.settings
+}
+
+function selectStatus(state: SettingsState): SettingsStatus {
+  return state.status
+}
+
 class SettingsServiceImpl implements SettingsService {
   readonly #deps: SettingsServiceDeps
   /**
@@ -68,8 +76,8 @@ class SettingsServiceImpl implements SettingsService {
     settings: DEFAULT_SETTINGS,
     status: 'loading',
   })
-  readonly #settings = deriveStore(this.#state, (state) => state.settings, isDeepEqual)
-  readonly status = deriveStore(this.#state, (state) => state.status)
+  readonly #settings = deriveStore(this.#state, selectSettings, isDeepEqual)
+  readonly status = deriveStore(this.#state, selectStatus)
   #loading: Promise<SettingsLoadOutcome> | undefined
   /**
    * Updates made while loading, replayed over the loaded document.

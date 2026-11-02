@@ -10,16 +10,11 @@ import type {
   WeekStartDay,
 } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useStore, useSelector } from '@/lib/use-store.ts'
+import { useSelector } from '@/lib/use-store.ts'
 import { isDeepEqual } from '@ocavue/utils'
 
 export function useSettingsService(): SettingsService {
   return useCoreServices().settings satisfies Store<Settings>
-}
-
-export function useSettingsStore(): Settings {
-  const store = useSettingsService()
-  return useStore(store)
 }
 
 function useSettingsSelector<T>(selector: (settings: Settings) => T): T {

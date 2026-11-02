@@ -213,7 +213,7 @@ describe('NoteActionsMenu', () => {
     await openActions()
     await view.getByRole('button', { name: 'Pin', exact: true }).click()
     await vi.waitFor(() => {
-      expect(view.core.noteRows.getOverlay('notes/meeting.md')).toMatchObject({
+      expect(view.core.noteRows.get().get('notes/meeting.md')).toMatchObject({
         isPinned: true,
       })
     })

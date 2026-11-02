@@ -281,7 +281,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                   // A stable key keeps the preview pane mounted as the highlight
                   // moves between results (↑/↓): the entry prop updates and the
                   // query refetches by its own path-scoped key, so an arrow-key
-                  // press no longer unmounts/remounts the whole preview subtree.
+                  // press does not remount the preview subtree.
                   <NotePreview key="note-preview" entry={selectedNote} />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-text-muted">

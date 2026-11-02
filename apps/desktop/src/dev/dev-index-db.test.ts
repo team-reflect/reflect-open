@@ -6,7 +6,6 @@ import {
   createIpcBridgeService,
   createSearchService,
   createSuggestionService,
-  createTodayService,
   createWikiResolverService,
   parseHighlights,
   parseNote,
@@ -130,7 +129,6 @@ function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServ
     dailyNotes: createDailyNoteService({
       database,
       clock,
-      today: createTodayService({ clock }),
       activity: createTestActivityPort(),
     }),
     wikiResolver,

@@ -71,10 +71,6 @@ export interface AiProviderConfigServiceDeps {
  */
 export interface AiProviderConfigService extends Store<AiProvidersState> {
   /**
-   * The configured entries, in display order. Stable until the list changes.
-   */
-  list: () => AiProviderConfig[]
-  /**
    * The entry AI features use by default (`null` only when the list is empty).
    */
   defaultProvider: () => AiProviderConfig | null
@@ -148,8 +144,6 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
       isDeepEqual,
     )
   }
-
-  readonly list = (): AiProviderConfig[] => this.#deps.settings.get().aiProviders
 
   readonly get = (): AiProvidersState => this.#store.get()
   readonly subscribe = (listener: () => void): Unlisten => this.#store.subscribe(listener)

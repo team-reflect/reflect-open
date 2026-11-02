@@ -328,7 +328,7 @@ describe('GistPublishService.publish', () => {
     const { service, noteRows } = setup()
     await service.publish(PATH)
 
-    expect(noteRows.getOverlay(PATH)).toMatchObject({
+    expect(noteRows.get().get(PATH)).toMatchObject({
       gistUrl: PUBLISHED.htmlUrl,
       gistStale: false,
     })
@@ -340,7 +340,7 @@ describe('GistPublishService.publish', () => {
     const { service, noteRows } = setup({ token: null })
     await service.publish(PATH)
 
-    expect(noteRows.getOverlay(PATH)).toBeNull()
+    expect(noteRows.get().get(PATH)).toBeUndefined()
   })
 
   it('surfaces failures and resolves null', async () => {
@@ -431,7 +431,7 @@ describe('GistPublishService.unpublish', () => {
 
     expect(progress.started()).toMatchObject([{ label: 'Unpublishing gist', ended: true }])
     expect(progress.get()).toEqual([])
-    expect(noteRows.getOverlay(PATH)).toMatchObject({ gistUrl: null, gistStale: false })
+    expect(noteRows.get().get(PATH)).toMatchObject({ gistUrl: null, gistStale: false })
   })
 
   it('surfaces failures and leaves no overlay', async () => {
@@ -445,7 +445,7 @@ describe('GistPublishService.unpublish', () => {
         message: expect.stringMatching(/connect github/i) as string,
       }),
     )
-    expect(noteRows.getOverlay(PATH)).toBeNull()
+    expect(noteRows.get().get(PATH)).toBeUndefined()
   })
 
   it('blocks publish or update while an unpublish is in flight for the same note', async () => {

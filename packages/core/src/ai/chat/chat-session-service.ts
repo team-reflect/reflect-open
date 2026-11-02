@@ -25,7 +25,7 @@ import {
   type ChatAttachment,
   type ChatTurn,
 } from './transcript.ts'
-import { isDeepEqual } from '@ocavue/utils'
+import { isDeepEqual, isShallowEqual } from '@ocavue/utils'
 
 /**
  * One chat session per open graph (Plan 10): the conversation lives here, not
@@ -211,15 +211,6 @@ interface LocalState {
   conversationId: string
 }
 
-function isLocalStateEqual(a: LocalState, b: LocalState): boolean {
-  return (
-    a.turns === b.turns &&
-    a.draft === b.draft &&
-    a.attachments === b.attachments &&
-    a.conversationId === b.conversationId
-  )
-}
-
 interface ChatSessionImplDeps extends ChatSessionServiceDeps {
   readonly emitConversationsChanged: () => void
 }
@@ -267,7 +258,7 @@ class ChatSessionImpl implements ChatSession {
         attachments: [],
         conversationId: deps.id.uuid(),
       },
-      isLocalStateEqual,
+      isShallowEqual,
     )
     const selection = deriveStore(
       deps.settings,

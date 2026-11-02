@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { PopoverContent } from '@/components/ui/popover.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { formatElapsed } from '@reflect/utils'
-import { useStore } from '@/lib/use-store.ts'
+import { useSelector } from '@/lib/use-store.ts'
 import {
   useAudioMemo,
   useAudioMemoCanRetry,
@@ -12,6 +12,10 @@ import {
   useAudioMemoPhase,
   useAudioMemoStream,
 } from '@/providers/audio-memo-provider.tsx'
+
+function selectElapsedSeconds(elapsedMs: number): number {
+  return Math.floor(elapsedMs / 1000)
+}
 
 /**
  * The floating panel beside the mic while a memo is in flight: waveform +
@@ -34,7 +38,7 @@ export function RecordingPopover({
   const error = useAudioMemoError()
   const canRetry = useAudioMemoCanRetry()
   const stream = useAudioMemoStream()
-  const elapsedMs = useStore(session.elapsedMs)
+  const elapsedSeconds = useSelector(session.elapsedMs, selectElapsedSeconds)
 
   return (
     <PopoverContent
@@ -67,7 +71,9 @@ export function RecordingPopover({
       ) : (
         <div className="flex items-center gap-3">
           {stream ? <RecordingWaveform stream={stream} /> : null}
-          <span className="text-sm font-medium tabular-nums">{formatElapsed(elapsedMs)}</span>
+          <span className="text-sm font-medium tabular-nums">
+            {formatElapsed(elapsedSeconds * 1000)}
+          </span>
         </div>
       )}
     </PopoverContent>

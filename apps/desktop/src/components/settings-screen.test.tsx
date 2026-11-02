@@ -586,6 +586,22 @@ describe('SettingsScreen', () => {
     })
   })
 
+  it('removes two filter tags clicked before a re-render', async () => {
+    stored = { allNotesFilterTags: ['book', 'person'] }
+    await renderScreen()
+    await expectLocatorToHaveCount(page.getByText('#link'), 0)
+    await expect.element(page.getByText('#book')).toBeInTheDocument()
+    const removeBook = page.getByRole('button', { name: 'Remove book' }).element()
+    const removePerson = page.getByRole('button', { name: 'Remove person' }).element()
+
+    removeBook.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    removePerson.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    await vi.waitFor(() => {
+      expect(saved().at(-1)).toEqual({ ...DEFAULT_SETTINGS, allNotesFilterTags: [] })
+    })
+  })
+
   it('enabling semantic search persists the opt-in', async () => {
     await renderScreen()
     const enable = page.getByRole('button', { name: /enable semantic search/i })
