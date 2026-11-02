@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import type { Unlisten } from '../unlisten.ts'
+import type { Store, Unlisten } from '../unlisten.ts'
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from './schema.ts'
 
 /**
@@ -19,12 +19,7 @@ type SettingsUpdater = (current: Settings) => Partial<Settings>
  * saves persisted one at a time. When the load fails, updates stay
  * session-only so a defaults-built save never overwrites the stored document.
  */
-export interface SettingsService {
-  /**
-   * The current settings, merged over `DEFAULT_SETTINGS`. Stable until the next change.
-   */
-  get: () => Settings
-  subscribe: (listener: () => void) => Unlisten
+export interface SettingsService extends Store<Settings> {
   /**
    * Merges `patch` now and persists the full document in the background.
    */
