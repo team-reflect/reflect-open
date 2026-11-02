@@ -1,17 +1,15 @@
 import { useDeferredValue, useMemo, useRef, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ChevronLeft, FileText, SearchX } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner.tsx'
 import {
   foldTag,
   parseHighlights,
   type DateFormat,
   type FilteredSearchHit,
   type NoteTagFacet,
+  formatDayLabel,
 } from '@reflect/core'
-import { Spinner } from '@/components/ui/spinner.tsx'
-import { formatDayLabel } from '@/lib/dates.ts'
-import { queryKeys } from '@/lib/query-client.ts'
-import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import {
   buildAllNotesSearch,
   pendingTagToken,
@@ -19,6 +17,8 @@ import {
   type AllNotesFilters,
   routeForPath,
 } from '@reflect/app'
+import { queryKeys } from '@/lib/query-client.ts'
+import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import { NoteRowList } from '@/mobile/note-row-list.tsx'
 import { SearchInput } from '@/mobile/search-input.tsx'
 import type { NoteRowModel } from '@/mobile/swipeable-note-row.tsx'
@@ -29,9 +29,9 @@ import {
   MobileTopBarScrollableRow,
 } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -92,7 +92,7 @@ export function MobileAllNotes({
   filters,
   onFiltersChange,
 }: MobileAllNotesProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { noteList, search } = useCoreServices()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
   const enabled = graph !== null

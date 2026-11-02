@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { monthLabel } from '@reflect/app'
+import { formatMonthLabel } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './month-title.css'
@@ -67,7 +67,7 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
             (outgoing.direction === 'up' ? 'month-title-enter-up' : 'month-title-enter-down'),
         )}
       >
-        {monthLabel(shown)}
+        {formatMonthLabel(shown)}
       </span>
       {outgoing ? (
         <span
@@ -82,7 +82,7 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
             outgoing.direction === 'up' ? 'month-title-exit-up' : 'month-title-exit-down',
           )}
         >
-          {monthLabel(outgoing.month)}
+          {formatMonthLabel(outgoing.month)}
         </span>
       ) : null}
     </span>

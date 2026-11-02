@@ -1,4 +1,4 @@
-import type { Unlisten } from '@reflect/core'
+import type { Store, Unlisten } from '@reflect/core'
 import { normalizeRoute, routesEqual, type Route } from './route.ts'
 
 /**
@@ -84,15 +84,10 @@ export interface NavigationState {
  */
 export type NavigationPosition = Pick<NavigationState, 'entryId' | 'route'>
 
-export interface NavigationService {
-  /**
-   * The current snapshot; the same object until the next change.
-   */
-  getState(): NavigationState
-  /**
-   * Hear every state change, synchronously. Scroll bookkeeping does not notify.
-   */
-  subscribe(listener: () => void): Unlisten
+/**
+ * Scroll bookkeeping and `reset` do not notify subscribers.
+ */
+export interface NavigationService extends Store<NavigationState> {
   navigate(route: Route, options?: NavigateOptions): void
   back(): void
   forward(): void
@@ -131,7 +126,7 @@ export interface NavigationService {
    * Start a fresh history on `initialRoute` (today by default), dropping every
    * entry and scroll offset: switching graphs must not carry the old graph's
    * history. The view tree that mounts for the new history calls this while it
-   * renders, so subscribers are not notified; read `getState()` afterwards.
+   * renders, so subscribers are not notified; read `get()` afterwards.
    */
   reset(initialRoute?: Route): void
   /**
@@ -189,6 +184,8 @@ class NavigationServiceImpl implements NavigationService {
    * Last offset per long-lived surface, independent of history entries.
    */
   readonly #scrollBySurface = new Map<string, number>()
+  // Not a `WritableStore`: `reset` replaces the state without notifying,
+  // because it runs while a view tree renders.
   readonly #listeners = new Set<() => void>()
   #state: NavigationState
 
@@ -196,11 +193,11 @@ class NavigationServiceImpl implements NavigationService {
     this.#state = this.#start(deps?.initialRoute ?? { kind: 'today' })
   }
 
-  getState(): NavigationState {
+  readonly get = (): NavigationState => {
     return this.#state
   }
 
-  subscribe(listener: () => void): Unlisten {
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
     this.#listeners.add(listener)
     return () => {
       this.#listeners.delete(listener)

@@ -348,6 +348,7 @@ describe('Sidebar', () => {
     getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
+    await expect.element(rust).toBeInTheDocument()
 
     // Right-click a known point inside the row: the iPad's menu points at it.
     const row = rust.element().getBoundingClientRect()

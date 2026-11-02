@@ -1,3 +1,4 @@
+import { addDaysToIsoDate, getIsoToday } from '@reflect/utils'
 /**
  * The demo graph the dev bridge boots with: enough daily notes, tagged notes,
  * wiki links, pins, tasks, and a private note that every mobile surface — the
@@ -8,12 +9,7 @@
 
 /** Local-time `YYYY-MM-DD` for `offsetDays` before today. */
 function isoDay(offsetDays: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() - offsetDays)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return addDaysToIsoDate(getIsoToday(), -offsetDays)
 }
 
 /** Frontmatter block for a seeded note. Ids are fixed Crockford-base32 ULIDs. */

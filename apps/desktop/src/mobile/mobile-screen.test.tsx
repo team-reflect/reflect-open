@@ -3,23 +3,22 @@ import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
-import {
-  type AppServices,
-  type Route,
-  monthLabel,
-  monthOf,
-  createWeekWindow,
-  weekOf,
-} from '@reflect/app'
 import { createTestAppServices } from '@reflect/app/testing'
-import type { DailyNoteService } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import {
   clearFormattingToolbar,
   publishFormattingToolbar,
 } from '@/editor/formatting-toolbar-store.ts'
 import { useRouter } from '@/routing/router.tsx'
-import { addDaysIso, formatDayLabel, todayIso } from '@/lib/dates.ts'
+import { addDaysToIsoDate, getYearMonth, getIsoToday } from '@reflect/utils'
+import { type DailyNoteService, formatDayLabel } from '@reflect/core'
+import {
+  type AppServices,
+  type Route,
+  createWeekWindow,
+  weekOf,
+  formatMonthLabel,
+} from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -241,13 +240,13 @@ function otherDayInWeek(date: string): string {
 
 describe('MobileShell', () => {
   it('renders today as the daily spine with its note content', async () => {
-    const today = todayIso()
+    const today = getIsoToday()
     core.noteFile.set(`daily/${today}.md`, 'captured on the go')
     const view = await mount({ kind: 'today' })
 
     // The header is the month; the carousel mounts today's slide (±1
     // neighbours), each carrying its formatted date as the note's subject.
-    expect(shownMonth(view)).toBe(monthLabel(monthOf(today)))
+    expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(today)))
     await expect.element(view.getByText(formatDayLabel(today, 'mdy'))).toBeVisible()
     await waitFor(() => {
       const editors = view.getByTestId('fake-editor').elements()
@@ -259,7 +258,7 @@ describe('MobileShell', () => {
 
   it('selects a day from the calendar strip and jumps back to today', async () => {
     const user = userEvent
-    const today = todayIso()
+    const today = getIsoToday()
     const other = otherDayInWeek(today)
     const view = await mount({ kind: 'today' })
 
@@ -295,7 +294,7 @@ describe('MobileShell', () => {
   })
 
   it('marks dates backed by daily notes across the pageable strip window', async () => {
-    const today = todayIso()
+    const today = getIsoToday()
     const week = weekOf(today, 'monday')
     const notedDay = week.find((day) => day !== today) ?? week[0]!
     const emptyDay = week.find((day) => day !== today && day !== notedDay) ?? week[1]!
@@ -316,39 +315,39 @@ describe('MobileShell', () => {
     const weekWindow = createWeekWindow(today, 'monday')
     expect(dailyDatesInRange).toHaveBeenCalledWith(
       weekWindow.start,
-      addDaysIso(weekWindow.start, weekWindow.count * 7 - 1),
+      addDaysToIsoDate(weekWindow.start, weekWindow.count * 7 - 1),
     )
   })
 
   it('selects a day in another week straight from the pageable strip', async () => {
-    const today = todayIso()
+    const today = getIsoToday()
     // Two weeks out: its cell lives on a different week slide of the strip,
     // which the strip renders (and Embla pages) rather than a single week.
-    const nextFortnight = addDaysIso(today, 14)
+    const nextFortnight = addDaysToIsoDate(today, 14)
     const view = await mount({ kind: 'today' })
 
     await fireClick(view.getByRole('button', { name: dayCellLabel(nextFortnight) }).element())
     await expect
       .element(view.getByRole('button', { name: dayCellLabel(nextFortnight) }))
       .toHaveAttribute('aria-current', 'date')
-    expect(shownMonth(view)).toBe(monthLabel(monthOf(nextFortnight)))
+    expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(nextFortnight)))
     await expect.element(view.getByRole('button', { name: 'Today' })).toBeVisible()
   })
 
   it('jumps to a picked month from the month title’s picker sheet', async () => {
     const user = userEvent
-    const today = todayIso()
+    const today = getIsoToday()
     const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: 'Change month' }))
     await user.click(view.getByRole('button', { name: 'Next year' }))
     // January next year: always a different month, and (unlike a fixed
     // offset) always the same distance shape from today — date-agnostic.
-    const pickedMonth = `${Number(monthOf(today).slice(0, 4)) + 1}-01`
-    await user.click(view.getByRole('button', { name: monthLabel(pickedMonth) }))
+    const pickedMonth = `${Number(getYearMonth(today).slice(0, 4)) + 1}-01`
+    await user.click(view.getByRole('button', { name: formatMonthLabel(pickedMonth) }))
 
     expect(view.getByTestId('drawer').query()).toBeNull()
-    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(pickedMonth)))
+    await waitFor(() => expect(shownMonth(view)).toBe(formatMonthLabel(pickedMonth)))
     const firstDay = `${pickedMonth}-01`
     expect(
       view
@@ -361,11 +360,11 @@ describe('MobileShell', () => {
 
   it('keeps the selection when its own month is picked from the sheet', async () => {
     const user = userEvent
-    const today = todayIso()
+    const today = getIsoToday()
     const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: 'Change month' }))
-    await user.click(view.getByRole('button', { name: monthLabel(monthOf(today)) }))
+    await user.click(view.getByRole('button', { name: formatMonthLabel(getYearMonth(today)) }))
 
     expect(view.getByTestId('drawer').query()).toBeNull()
     await waitFor(() => {
@@ -381,7 +380,7 @@ describe('MobileShell', () => {
 
   it('fires haptics from the Daily header Today and Settings buttons', async () => {
     const user = userEvent
-    const today = todayIso()
+    const today = getIsoToday()
     const other = otherDayInWeek(today)
     const view = await mount({ kind: 'today' })
 
@@ -400,12 +399,12 @@ describe('MobileShell', () => {
     const user = userEvent
     // Beyond the ±366-day window — only reachable as a date-link navigation,
     // which forces the carousel to rebuild its window around the day.
-    const farDay = addDaysIso(todayIso(), 400)
+    const farDay = addDaysToIsoDate(getIsoToday(), 400)
     core.noteFile.set(`daily/${farDay}.md`, 'far future plans')
     const view = await mount({ kind: 'today' }, { kind: 'daily', date: farDay })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(farDay))))
+    await waitFor(() => expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(farDay))))
     await waitFor(() => {
       const editors = view.getByTestId('fake-editor').elements()
       expect(editors.some((editor) => editor.textContent?.includes('far future plans'))).toBe(true)
@@ -421,7 +420,9 @@ describe('MobileShell', () => {
     await waitFor(() => expect(view.getByRole('heading').element().textContent).toBe('Edit note'))
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
+    await waitFor(() => {
+      return expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
+    })
   })
 
   it('never focuses the destination editor on navigation (keyboard stays down)', async () => {
@@ -458,7 +459,7 @@ describe('MobileShell', () => {
 
   it('switches tabs: All shows the searchable list, Daily returns to the last-open day', async () => {
     const user = userEvent
-    const today = todayIso()
+    const today = getIsoToday()
     const other = otherDayInWeek(today)
     const view = await mount({ kind: 'today' })
 
@@ -492,7 +493,7 @@ describe('MobileShell', () => {
 
   it('double-tapping Daily opens today and focuses the daily editor at its end', async () => {
     const user = userEvent
-    const today = todayIso()
+    const today = getIsoToday()
     const other = otherDayInWeek(today)
     const view = await mount({ kind: 'today' })
 
@@ -530,7 +531,7 @@ describe('MobileShell', () => {
   })
 
   it('double-tapping Daily while already on today focuses the editor at its end', async () => {
-    const today = todayIso()
+    const today = getIsoToday()
     core.noteFile.set(`daily/${today}.md`, 'first thought')
     const view = await mount({ kind: 'today' })
     await waitFor(() => {
@@ -555,7 +556,7 @@ describe('MobileShell', () => {
 
   it('does not jump to today on a single tap of the active Daily tab', async () => {
     const user = userEvent
-    const today = todayIso()
+    const today = getIsoToday()
     const other = otherDayInWeek(today)
     const view = await mount({ kind: 'daily', date: other })
 
@@ -704,7 +705,9 @@ describe('MobileShell', () => {
     })
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
+    await waitFor(() => {
+      return expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
+    })
   })
 })
 
@@ -745,7 +748,7 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(
       page.elementLocator(origin!).locate('h1').element().querySelector('[data-slot="month-title"]')
         ?.textContent,
-    ).toBe(monthLabel(monthOf(todayIso())))
+    ).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeTruthy()
 
     await finishAnimation(entering!)
@@ -762,7 +765,9 @@ describe('MobileStack transitions & back-swipe', () => {
 
     await user.click(view.getByRole('button', { name: 'Back' }))
     // Daily is current again immediately; the note lingers only to animate out.
-    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
+    await waitFor(() => {
+      return expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
+    })
     const exiting = stackLayers(view).at(-1)!
     expect(exiting.className).toContain('mobile-stack-slide-out')
     expect(exiting.getAttribute('aria-hidden')).toBe('true')
@@ -826,7 +831,9 @@ describe('MobileStack transitions & back-swipe', () => {
 
     await user.click(view.getByRole('button', { name: 'Back' }))
     // No exit animation: the note is gone the moment the route changes.
-    await waitFor(() => expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso()))))
+    await waitFor(() => {
+      return expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
+    })
     expect(stackLayers(view)).toHaveLength(1)
   })
 
@@ -856,7 +863,7 @@ describe('MobileStack transitions & back-swipe', () => {
 
     // ...and only then commits the pop.
     await finishTransition(card)
-    expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso())))
+    expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
     expect(stackLayers(view)).toHaveLength(1)
   })
 

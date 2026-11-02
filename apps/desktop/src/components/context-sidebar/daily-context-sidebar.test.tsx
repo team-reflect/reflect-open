@@ -1,10 +1,16 @@
-import type { MaybePromise } from '@reflect/utils'
+import { type MaybePromise, getYearMonth } from '@reflect/utils'
+import {
+  type DailyNoteService,
+  type NoteRow,
+  type RetrievalService,
+  formatDayLabel,
+} from '@reflect/core'
+import { deepLinkForRoute, formatMonthLabel } from '@reflect/app'
 import { createTestWindowService } from '@reflect/app/testing'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
-import type { DailyNoteService, NoteRow, RetrievalService } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestNoteFileService,
@@ -13,8 +19,6 @@ import {
   type TestNoteFileService,
   type TestStorageService,
 } from '@reflect/core/testing'
-import { formatDayLabel } from '@/lib/dates.ts'
-import { deepLinkForRoute, monthLabel, monthOf } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
@@ -152,19 +156,19 @@ describe('DailyContextSidebar calendar', () => {
 
   it('pages between months across year boundaries', async () => {
     await renderSidebar('2026-01-15')
-    await expect.element(page.getByText(monthLabel('2026-01'))).toBeVisible()
+    await expect.element(page.getByText(formatMonthLabel('2026-01'))).toBeVisible()
     await userEvent.click(page.getByRole('button', { name: 'Previous month' }))
-    await expect.element(page.getByText(monthLabel('2025-12'))).toBeVisible()
+    await expect.element(page.getByText(formatMonthLabel('2025-12'))).toBeVisible()
     await userEvent.click(page.getByRole('button', { name: 'Next month' }))
     await userEvent.click(page.getByRole('button', { name: 'Next month' }))
-    await expect.element(page.getByText(monthLabel('2026-02'))).toBeVisible()
+    await expect.element(page.getByText(formatMonthLabel('2026-02'))).toBeVisible()
   })
 
   it('re-anchors the visible month when the selected day changes', async () => {
     const view = await renderSidebar('2026-06-09')
-    await expect.element(page.getByText(monthLabel('2026-06'))).toBeVisible()
+    await expect.element(page.getByText(formatMonthLabel('2026-06'))).toBeVisible()
     await view.rerender(sidebar('2026-09-01'))
-    await expect.element(page.getByText(monthLabel('2026-09'))).toBeVisible()
+    await expect.element(page.getByText(formatMonthLabel('2026-09'))).toBeVisible()
   })
 })
 
@@ -229,7 +233,7 @@ describe('DailyContextSidebar sections', () => {
 
   it('the calendar is not collapsible', async () => {
     await renderSidebar('2026-06-09')
-    await expect.element(page.getByText(monthLabel(monthOf('2026-06-09')))).toBeVisible()
+    await expect.element(page.getByText(formatMonthLabel(getYearMonth('2026-06-09')))).toBeVisible()
     await expect.element(page.getByRole('button', { name: /^Calendar$/ })).not.toBeInTheDocument()
   })
 })

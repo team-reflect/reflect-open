@@ -1,16 +1,11 @@
+import { isIsoDate } from '@reflect/utils'
 import { z } from 'zod'
 import {
   markdownNoteReference,
   noteBasenameKey,
   wikiNoteReference,
 } from '../graph/note-reference.ts'
-import {
-  dateFromDailyPath,
-  foldGraphPath,
-  isCalendarDate,
-  isDaily,
-  isTemplatePath,
-} from '../graph/paths.ts'
+import { dateFromDailyPath, foldGraphPath, isDaily, isTemplatePath } from '../graph/paths.ts'
 import { hasSearchableChar } from '../lib/searchable-char.ts'
 import {
   canonicalEmail,
@@ -311,7 +306,7 @@ export function projectNoteClaims(
     }
   }
   const date = isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null
-  if (date !== null && isCalendarDate(date)) {
+  if (date !== null && isIsoDate(date)) {
     claim(date, CLAIM_TIER.dailyDate)
   }
   claim(foldKey(parsed.title), CLAIM_TIER.title)

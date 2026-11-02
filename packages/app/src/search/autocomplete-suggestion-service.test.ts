@@ -274,7 +274,7 @@ describe('AutocompleteSuggestionService.suggestLinks', () => {
     await settle()
 
     expect(created).toEqual([{ title: 'Business ideas', generation: 7 }])
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
     expect(logger.getErrors()).toEqual([])
   })
 

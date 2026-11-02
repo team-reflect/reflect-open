@@ -1,13 +1,12 @@
 import type { ReactElement } from 'react'
-import type { DateFormat } from '@reflect/core'
 import { Check, CircleAlert, Dot } from 'lucide-react'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import type { ClassicSignIn } from '@/mobile/use-classic-access.ts'
-import { formatFullDate } from '@/lib/dates.ts'
+import { type DateFormat, formatFullDate } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 
 type StepState = 'done' | 'active' | 'pending' | 'failed'
 

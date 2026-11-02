@@ -1,6 +1,4 @@
-import { differenceInCalendarDays } from 'date-fns'
-import { addDaysIso } from '@reflect/utils'
-import { parseIsoDate } from '@reflect/core'
+import { addDaysToIsoDate, getDaysBetweenIsoDates } from '@reflect/utils'
 
 /**
  * The daily surfaces' virtual window (Plan 06b / Plan 19): a chronological
@@ -62,7 +60,7 @@ export function createDayWindow(
   { past = PAST_DAYS, future = FUTURE_DAYS }: Partial<DayWindowRadius> = {},
 ): DayWindow {
   return {
-    start: addDaysIso(anchor, -past),
+    start: addDaysToIsoDate(anchor, -past),
     count: past + future + 1,
     anchorIndex: past,
   }
@@ -78,7 +76,7 @@ export function extendDayWindowBack(window: DayWindow, date: string): DayWindow 
   if (offsetOfDate(window, date) >= 0) {
     return window
   }
-  const start = addDaysIso(date, -PAST_DAYS)
+  const start = addDaysToIsoDate(date, -PAST_DAYS)
   const added = -offsetOfDate(window, start)
   return { start, count: window.count + added, anchorIndex: window.anchorIndex + added }
 }
@@ -87,14 +85,14 @@ export function extendDayWindowBack(window: DayWindow, date: string): DayWindow 
  * The ISO date at `index` (0 = oldest).
  */
 export function dateAtIndex(window: DayWindow, index: number): string {
-  return addDaysIso(window.start, index)
+  return addDaysToIsoDate(window.start, index)
 }
 
 /**
  * Signed offset of `date` from the window's first day (may fall out of range).
  */
 function offsetOfDate(window: DayWindow, date: string): number {
-  return differenceInCalendarDays(parseIsoDate(date), parseIsoDate(window.start))
+  return getDaysBetweenIsoDates(date, window.start)
 }
 
 /**

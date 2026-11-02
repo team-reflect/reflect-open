@@ -1,5 +1,5 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import { localIsoDate } from '../lib/dates.ts'
+import { formatIsoDate } from '@reflect/utils'
 
 /**
  * A {@link ClockService} whose time moves only when a test moves it.
@@ -63,7 +63,7 @@ class TestClockServiceImpl implements TestClockService {
   }
 
   today(): string {
-    return this.#pinnedToday ?? localIsoDate(new Date(this.#wallMs))
+    return this.#pinnedToday ?? formatIsoDate(new Date(this.#wallMs))
   }
 
   subscribeToday(listener: (today: string) => void): () => void {

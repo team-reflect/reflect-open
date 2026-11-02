@@ -1,13 +1,5 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useActionState, useEffect, useState, type ReactElement } from 'react'
 import { X } from 'lucide-react'
-import {
-  defaultAttendees,
-  errorMessage,
-  mergeAttendeeUpgrades,
-  withAttendee,
-  type CalendarEvent,
-  type MeetingAttendee,
-} from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Checkbox } from '@/components/ui/checkbox.tsx'
@@ -20,8 +12,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
-import { formatTimeOfDay } from '@/lib/dates.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  defaultAttendees,
+  errorMessage,
+  mergeAttendeeUpgrades,
+  withAttendee,
+  type CalendarEvent,
+  type MeetingAttendee,
+  formatTimeOfDay,
+} from '@reflect/core'
+import { useContactsEnabled, useTimeFormat } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 
@@ -46,13 +46,12 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * are pre-filled from Apple Contacts by attendee email.
  */
 export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps): ReactElement {
-  const { settings } = useSettings()
   const { contacts, meetings, logger, graphSession } = useCoreServices()
   const [name, setName] = useState(event.title)
   const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [createNote, setCreateNote] = useState(event.recurring)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const contactsEnabled = useContactsEnabled()
+  const timeFormat = useTimeFormat()
 
   // Upgrade the prefilled chips once attendee resolution answers: an invite
   // email an existing note owns swaps the calendar's spelling for the note
@@ -75,7 +74,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
     return () => {
       cancelled = true
     }
-  }, [event, logger, meetings, settings.contactsEnabled])
+  }, [event, logger, meetings, contactsEnabled])
 
   const addAttendee = (attendee: MeetingAttendee): void => {
     setAttendees((current) => withAttendee(current, attendee))
@@ -85,45 +84,50 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
     setAttendees((current) => current.filter((existing) => existing.name !== attendeeName))
   }
 
-  const canSubmit = name.trim() !== '' && !submitting
-
-  const submit = async (): Promise<void> => {
-    const { session } = graphSession.getState()
-    if (session === null) {
-      return
-    }
-    setSubmitting(true)
-    setError(null)
-    try {
-      // The permission state is re-read at submit time, not dialog mount: it
-      // may be stale after a System Settings trip, and a quick submit must
-      // not skip the pre-fill.
-      await contacts.refresh()
-      if (graphSession.getState().session !== session) {
-        onClose()
-        return
+  // The form action returns the inline error (or `null`), so a retry clears
+  // the previous one. Success closes the dialog from inside the action.
+  const [error, submitAction, submitting] = useActionState(
+    async (previous: string | null): Promise<string | null> => {
+      const { session } = graphSession.get()
+      if (session === null) {
+        return previous
       }
-      const lookupContacts = meetings.canLookupContacts()
-      await meetings.addMeetingToDaily({
-        date,
-        title: name,
-        attendees,
-        backlinkMeeting: createNote,
-        lookupContacts,
-        startTime: formatTimeOfDay(new Date(event.startsAt), settings.timeFormat),
-      })
+      try {
+        // The permission state is re-read at submit time, not dialog mount: it
+        // may be stale after a System Settings trip, and a quick submit must
+        // not skip the pre-fill.
+        await contacts.refresh()
+        if (graphSession.get().session !== session) {
+          onClose()
+          return null
+        }
+        const lookupContacts = meetings.canLookupContacts()
+        await meetings.addMeetingToDaily({
+          date,
+          title: name,
+          attendees,
+          backlinkMeeting: createNote,
+          lookupContacts,
+          startTime: formatTimeOfDay(new Date(event.startsAt), timeFormat),
+        })
+      } catch (cause) {
+        return errorMessage(cause)
+      }
       onClose()
-    } catch (cause) {
-      setError(errorMessage(cause))
-      setSubmitting(false)
-    }
-  }
+      return null
+    },
+    null,
+  )
+
+  const canSubmit = name.trim() !== '' && !submitting
 
   return (
     <Dialog
       open
       onOpenChange={(isOpen) => {
-        if (!isOpen) {
+        // Not while submitting: the in-flight submit still writes the meeting
+        // and calls `onClose` when it settles.
+        if (!isOpen && !submitting) {
           onClose()
         }
       }}
@@ -132,16 +136,10 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
         <DialogHeader>
           <DialogTitle>Add event</DialogTitle>
           <DialogDescription>
-            {formatTimeOfDay(new Date(event.startsAt), settings.timeFormat)}
+            {formatTimeOfDay(new Date(event.startsAt), timeFormat)}
           </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={(submitEvent) => {
-            submitEvent.preventDefault()
-            void submit()
-          }}
-          className="space-y-4"
-        >
+        <form action={submitAction} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="add-meeting-name" className={FIELD_LABEL_CLASS}>
               Meeting name
@@ -190,7 +188,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
           </label>
           {error !== null && <InlineAlert tone="error">{error}</InlineAlert>}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={!canSubmit}>

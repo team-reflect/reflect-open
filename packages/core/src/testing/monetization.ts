@@ -5,6 +5,7 @@ import type {
   ClassicSignInOptions,
   ClassicSignInResult,
 } from '../classic/classic-access-service.ts'
+import { WritableStore } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type {
   AppStoreEnvironment,
@@ -16,23 +17,6 @@ import type {
   SubscriptionService,
   SubscriptionState,
 } from '../monetization/subscription-service.ts'
-
-class Listeners {
-  readonly #listeners = new Set<() => void>()
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
-
-  notify(): void {
-    for (const listener of this.#listeners) {
-      listener()
-    }
-  }
-}
 
 export type ClassicAccessCall = 'read' | 'load' | 'signIn' | 'signOut' | 'start'
 
@@ -56,7 +40,7 @@ export interface TestClassicAccessService extends ClassicAccessService {
 }
 
 class TestClassicAccessServiceImpl implements TestClassicAccessService {
-  #current: ClassicAccessState
+  readonly #state: WritableStore<ClassicAccessState>
   #signIn: (options: ClassicSignInOptions) => Promise<ClassicSignInResult> = () => {
     return Promise.resolve({
       kind: 'cancelled',
@@ -64,24 +48,28 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
   }
   readonly #log: ClassicAccessCall[] = []
   readonly #signInLog: ClassicSignInOptions[] = []
-  readonly #listeners = new Listeners()
+  readonly get: () => ClassicAccessState
+  readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(state?: Partial<ClassicAccessState>) {
-    this.#current = { access: null, active: false, isLoading: false, ...state }
+    this.#state = new WritableStore<ClassicAccessState>({
+      access: null,
+      active: false,
+      isLoading: false,
+      ...state,
+    })
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
   }
-
-  readonly getState = (): ClassicAccessState => this.#current
-
-  readonly subscribe = this.#listeners.subscribe
 
   read(): ClassicAccess | null {
     this.#log.push('read')
-    return this.#current.access
+    return this.get().access
   }
 
   load(): ClassicAccess | null {
     this.#log.push('load')
-    return this.#current.access
+    return this.get().access
   }
 
   async signIn(options: ClassicSignInOptions): Promise<ClassicSignInResult> {
@@ -102,8 +90,7 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
   }
 
   setState(patch: Partial<ClassicAccessState>): void {
-    this.#current = { ...this.#current, ...patch }
-    this.#listeners.notify()
+    this.#state.set({ ...this.get(), ...patch })
   }
 
   setSignIn(handler: (options: ClassicSignInOptions) => Promise<ClassicSignInResult>): void {
@@ -144,26 +131,25 @@ export interface TestSubscriptionService extends SubscriptionService {
 }
 
 class TestSubscriptionServiceImpl implements TestSubscriptionService {
-  #current: SubscriptionState
+  readonly #state: WritableStore<SubscriptionState>
   readonly #log: SubscriptionCall[] = []
-  readonly #listeners = new Listeners()
+  readonly get: () => SubscriptionState
+  readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(state?: Partial<SubscriptionState>) {
-    this.#current = { value: null, isLoading: false, isError: false, ...state }
+    this.#state = new WritableStore({ value: null, isLoading: false, isError: false, ...state })
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
   }
-
-  readonly getState = (): SubscriptionState => this.#current
-
-  readonly subscribe = this.#listeners.subscribe
 
   activeSubscription(): Promise<ActiveSubscription> {
     this.#log.push('activeSubscription')
-    return Promise.resolve(this.#current.value)
+    return Promise.resolve(this.get().value)
   }
 
   readonly refetch = (): Promise<ActiveSubscription> => {
     this.#log.push('refetch')
-    return Promise.resolve(this.#current.value)
+    return Promise.resolve(this.get().value)
   }
 
   readonly invalidate = (): void => {
@@ -171,8 +157,7 @@ class TestSubscriptionServiceImpl implements TestSubscriptionService {
   }
 
   setState(patch: Partial<SubscriptionState>): void {
-    this.#current = { ...this.#current, ...patch }
-    this.#listeners.notify()
+    this.#state.set({ ...this.get(), ...patch })
   }
 
   calls(): readonly SubscriptionCall[] {
@@ -203,21 +188,24 @@ export interface TestAppStoreEnvironmentService extends AppStoreEnvironmentServi
 }
 
 class TestAppStoreEnvironmentServiceImpl implements TestAppStoreEnvironmentService {
-  #current: AppStoreEnvironmentState
+  readonly #state: WritableStore<AppStoreEnvironmentState>
   readonly #log: AppStoreEnvironmentCall[] = []
-  readonly #listeners = new Listeners()
+  readonly get: () => AppStoreEnvironmentState
+  readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(env: AppStoreEnvironment) {
-    this.#current = { value: env, isLoading: false, isError: false }
+    this.#state = new WritableStore<AppStoreEnvironmentState>({
+      value: env,
+      isLoading: false,
+      isError: false,
+    })
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
   }
-
-  readonly getState = (): AppStoreEnvironmentState => this.#current
-
-  readonly subscribe = this.#listeners.subscribe
 
   environment(): Promise<AppStoreEnvironment> {
     this.#log.push('environment')
-    return Promise.resolve(this.#current.value)
+    return Promise.resolve(this.get().value)
   }
 
   readonly invalidate = (): void => {
@@ -225,8 +213,7 @@ class TestAppStoreEnvironmentServiceImpl implements TestAppStoreEnvironmentServi
   }
 
   setState(patch: Partial<AppStoreEnvironmentState>): void {
-    this.#current = { ...this.#current, ...patch }
-    this.#listeners.notify()
+    this.#state.set({ ...this.get(), ...patch })
   }
 
   calls(): readonly AppStoreEnvironmentCall[] {

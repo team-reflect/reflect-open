@@ -17,7 +17,7 @@ import {
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore } from '@/lib/use-store.ts'
 
 /**
  * The desktop React surface for audio memos: a thin shell over the
@@ -30,6 +30,10 @@ import { useServiceState } from '@/services/use-service-state.ts'
 
 export type AudioMemoContextValue = AudioMemoSessionState &
   Pick<AudioMemoSession, 'cancel' | 'retry' | 'discard'> & {
+    /**
+     * Live while recording.
+     */
+    elapsedMs: number
     /**
      * Idle → start recording (expanding a collapsed sidebar); recording → stop & save.
      */
@@ -49,7 +53,6 @@ const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
  */
 const CLOSED_STATE: AudioMemoSessionState = {
   phase: 'idle',
-  elapsedMs: 0,
   stream: null,
   pendingCount: 0,
   available: false,
@@ -59,12 +62,16 @@ const CLOSED_STATE: AudioMemoSessionState = {
   recorderState: 'idle',
 }
 
-/** Why the iPad's mic is off where there is no native recorder, in the desktop's words. */
+/**
+ * Why the iPad's mic is off where there is no native recorder, in the
+ * desktop's words.
+ */
 const NATIVE_RECORDER_MISSING = 'Audio recording is not supported on this platform'
 
-const CLOSED_SESSION = {
+const CLOSED_SESSION: Pick<AudioMemoSession, 'get' | 'subscribe' | 'elapsedMs'> = {
+  get: () => CLOSED_STATE,
   subscribe: () => () => {},
-  getState: () => CLOSED_STATE,
+  elapsedMs: { get: () => 0, subscribe: () => () => {} },
 }
 
 interface AudioMemoProviderProps {
@@ -148,7 +155,8 @@ function WebviewAudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   }, [audioMemo, graph.generation])
 
   const store = session ?? CLOSED_SESSION
-  const state = useServiceState(store, store.getState)
+  const state = useStore(store)
+  const elapsedMs = useStore(store.elapsedMs)
 
   // The mic button (and its popover) unmount with the sidebar. The session
   // decides what a hidden surface means for a live recording or a pending
@@ -168,8 +176,8 @@ function WebviewAudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     [session],
   )
   const value = useMemo<AudioMemoContextValue>(
-    () => ({ ...state, ...controls, presentation: 'popover' }),
-    [state, controls],
+    () => ({ ...state, elapsedMs, ...controls, presentation: 'popover' }),
+    [state, elapsedMs, controls],
   )
 
   return <AudioMemoContext value={value}>{children}</AudioMemoContext>

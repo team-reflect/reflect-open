@@ -4,24 +4,24 @@ import { createNavigationService } from './navigation-service.ts'
 describe('NavigationService', () => {
   it('starts on today with no history', () => {
     const navigation = createNavigationService()
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
-    expect(navigation.getState().canBack).toBe(false)
-    expect(navigation.getState().canForward).toBe(false)
+    expect(navigation.get().route).toEqual({ kind: 'today' })
+    expect(navigation.get().canBack).toBe(false)
+    expect(navigation.get().canForward).toBe(false)
   })
 
   it('navigate pushes; back and forward traverse the stack', () => {
     const navigation = createNavigationService()
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    expect(navigation.getState().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
 
     navigation.back()
-    expect(navigation.getState().route).toEqual({ kind: 'daily', date: '2026-06-08' })
-    expect(navigation.getState().canForward).toBe(true)
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
+    expect(navigation.get().canForward).toBe(true)
 
     navigation.forward()
-    expect(navigation.getState().route).toEqual({ kind: 'note', path: 'notes/a.md' })
-    expect(navigation.getState().canForward).toBe(false)
+    expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(navigation.get().canForward).toBe(false)
   })
 
   it('navigating from a back position truncates the forward branch', () => {
@@ -30,9 +30,9 @@ describe('NavigationService', () => {
     navigation.navigate({ kind: 'daily', date: '2026-06-07' })
     navigation.back()
     navigation.navigate({ kind: 'search', query: 'x' })
-    expect(navigation.getState().canForward).toBe(false)
+    expect(navigation.get().canForward).toBe(false)
     navigation.back()
-    expect(navigation.getState().route).toEqual({ kind: 'daily', date: '2026-06-08' })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
   })
 
   it('re-navigating to the current route is a no-op (no stack growth)', () => {
@@ -40,16 +40,16 @@ describe('NavigationService', () => {
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })
     navigation.back()
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
-    expect(navigation.getState().canBack).toBe(false)
+    expect(navigation.get().route).toEqual({ kind: 'today' })
+    expect(navigation.get().canBack).toBe(false)
   })
 
   it('back/forward at the edges are no-ops', () => {
     const navigation = createNavigationService()
     navigation.back()
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
+    expect(navigation.get().route).toEqual({ kind: 'today' })
     navigation.forward()
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
+    expect(navigation.get().route).toEqual({ kind: 'today' })
   })
 
   it('advances the synchronous navigation revision for every navigation intent', () => {
@@ -101,25 +101,25 @@ describe('NavigationService', () => {
 
   it('can clear the active entry scroll offset without changing routes', () => {
     const navigation = createNavigationService()
-    const entryId = navigation.getState().entryId
-    const arrivals = navigation.getState().arrivalSeq
+    const entryId = navigation.get().entryId
+    const arrivals = navigation.get().arrivalSeq
     navigation.saveScrollState(120)
 
     navigation.clearScrollState()
 
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
-    expect(navigation.getState().entryId).toBe(entryId)
-    expect(navigation.getState().arrivalSeq).toBe(arrivals)
+    expect(navigation.get().route).toEqual({ kind: 'today' })
+    expect(navigation.get().entryId).toBe(entryId)
+    expect(navigation.get().arrivalSeq).toBe(arrivals)
     expect(navigation.savedScroll()).toBeNull()
   })
 
   it('re-navigating to the current route clears its saved scroll (re-anchor intent)', () => {
     const navigation = createNavigationService()
-    const seqBefore = navigation.getState().arrivalSeq
+    const seqBefore = navigation.get().arrivalSeq
     navigation.saveScrollState(500) // user scrolled away on today
     navigation.navigate({ kind: 'today' }) // ⌘D while on today
     expect(navigation.savedScroll()).toBeNull() // re-anchor, don't restore
-    expect(navigation.getState().arrivalSeq).toBe(seqBefore + 1) // views are notified
+    expect(navigation.get().arrivalSeq).toBe(seqBefore + 1) // views are notified
   })
 
   it('can restore the daily surface scroll when a tab switch returns to today', () => {
@@ -128,7 +128,7 @@ describe('NavigationService', () => {
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
     navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
 
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
+    expect(navigation.get().route).toEqual({ kind: 'today' })
     expect(navigation.savedScroll()).toBe(500)
   })
 
@@ -181,73 +181,73 @@ describe('NavigationService', () => {
 
   it('carries the focusEditor intent on the arrival that asked for it, one-shot', () => {
     const navigation = createNavigationService()
-    expect(navigation.getState().arrivalFocusEditor).toBe(false)
+    expect(navigation.get().arrivalFocusEditor).toBe(false)
 
     navigation.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true })
-    expect(navigation.getState().arrivalFocusEditor).toBe(true)
+    expect(navigation.get().arrivalFocusEditor).toBe(true)
 
     // The next arrival overwrites the intent — it can never leak onto a
     // later, unrelated visit (the staleness class a keyed request store had).
     navigation.navigate({ kind: 'note', path: 'notes/b.md' })
-    expect(navigation.getState().arrivalFocusEditor).toBe(false)
+    expect(navigation.get().arrivalFocusEditor).toBe(false)
   })
 
   it('clears the focusEditor intent on history moves', () => {
     const navigation = createNavigationService()
     navigation.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true })
     navigation.back()
-    expect(navigation.getState().arrivalFocusEditor).toBe(false)
+    expect(navigation.get().arrivalFocusEditor).toBe(false)
 
     navigation.forward()
-    expect(navigation.getState().route).toEqual({ kind: 'note', path: 'notes/a.md' })
-    expect(navigation.getState().arrivalFocusEditor).toBe(false)
+    expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(navigation.get().arrivalFocusEditor).toBe(false)
   })
 
   it('entryId is stable per entry and changes across back/forward', () => {
     const navigation = createNavigationService()
-    const todayId = navigation.getState().entryId
+    const todayId = navigation.get().entryId
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    const noteId = navigation.getState().entryId
+    const noteId = navigation.get().entryId
     expect(noteId).not.toBe(todayId)
     navigation.back()
-    expect(navigation.getState().entryId).toBe(todayId)
+    expect(navigation.get().entryId).toBe(todayId)
     navigation.forward()
-    expect(navigation.getState().entryId).toBe(noteId)
+    expect(navigation.get().entryId).toBe(noteId)
   })
 
   it('exposes the route back() would land on (the mobile stack peeks it)', () => {
     const navigation = createNavigationService()
-    expect(navigation.getState().backRoute).toBeNull()
+    expect(navigation.get().backRoute).toBeNull()
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    expect(navigation.getState().backRoute).toEqual({ kind: 'today' })
+    expect(navigation.get().backRoute).toEqual({ kind: 'today' })
     navigation.navigate({ kind: 'note', path: 'notes/b.md' })
-    expect(navigation.getState().backRoute).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(navigation.get().backRoute).toEqual({ kind: 'note', path: 'notes/a.md' })
     navigation.back()
-    expect(navigation.getState().backRoute).toEqual({ kind: 'today' })
+    expect(navigation.get().backRoute).toEqual({ kind: 'today' })
     navigation.back()
-    expect(navigation.getState().backRoute).toBeNull()
+    expect(navigation.get().backRoute).toBeNull()
   })
 
   it('normalizes a malformed daily date to the today route on navigate', () => {
     const navigation = createNavigationService()
     // 2026-02-31 is well-formed but impossible — dailyPath would throw on it.
     navigation.navigate({ kind: 'daily', date: '2026-02-31' })
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
+    expect(navigation.get().route).toEqual({ kind: 'today' })
     // Normalization happens before the no-op check: re-navigating doesn't push.
-    expect(navigation.getState().canBack).toBe(false)
+    expect(navigation.get().canBack).toBe(false)
   })
 
   it('normalizes a malformed daily initial route to today', () => {
     const navigation = createNavigationService({
       initialRoute: { kind: 'daily', date: 'not-a-date' },
     })
-    expect(navigation.getState().route).toEqual({ kind: 'today' })
+    expect(navigation.get().route).toEqual({ kind: 'today' })
   })
 
   it('keeps a real daily date intact', () => {
     const navigation = createNavigationService()
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })
-    expect(navigation.getState().route).toEqual({ kind: 'daily', date: '2026-06-08' })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
   })
 
   it('drops scroll offsets for a truncated forward branch', () => {
@@ -267,25 +267,25 @@ describe('NavigationService', () => {
       navigation.navigate({ kind: 'note', path: 'notes/01abc.md' })
       navigation.navigate({ kind: 'allNotes', tag: null })
       navigation.navigate({ kind: 'note', path: 'notes/01abc.md' })
-      const arrivalsBefore = navigation.getState().arrivalSeq
-      const entryBefore = navigation.getState().entryId
+      const arrivalsBefore = navigation.get().arrivalSeq
+      const entryBefore = navigation.get().entryId
       const revisionBefore = navigation.navigationRevision()
 
       navigation.noteMoved('notes/01abc.md', 'notes/meeting-notes.md')
 
       // The current entry followed the file — a rewrite, not an arrival, on
       // the same entry (views keep their scroll; nothing re-anchors).
-      expect(navigation.getState().route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
-      expect(navigation.getState().arrivalSeq).toBe(arrivalsBefore)
-      expect(navigation.getState().entryId).toBe(entryBefore)
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
+      expect(navigation.get().arrivalSeq).toBe(arrivalsBefore)
+      expect(navigation.get().entryId).toBe(entryBefore)
       expect(navigation.navigationRevision()).toBe(revisionBefore + 1)
 
       // The earlier history entry followed too: back over the rename lands
       // on the file's real home, never the dead path.
       navigation.back()
-      expect(navigation.getState().route).toEqual({ kind: 'allNotes', tag: null })
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: null })
       navigation.back()
-      expect(navigation.getState().route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
     })
 
     it('leaves unrelated routes untouched', () => {
@@ -294,7 +294,7 @@ describe('NavigationService', () => {
 
       navigation.noteMoved('notes/01abc.md', 'notes/meeting-notes.md')
 
-      expect(navigation.getState().route).toEqual({ kind: 'note', path: 'notes/other.md' })
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/other.md' })
     })
   })
 
@@ -303,16 +303,16 @@ describe('NavigationService', () => {
       const navigation = createNavigationService()
       const seen: string[] = []
       const unsubscribe = navigation.subscribe(() => {
-        seen.push(navigation.getState().route.kind)
+        seen.push(navigation.get().route.kind)
       })
-      const initial = navigation.getState()
+      const initial = navigation.get()
 
       navigation.navigate({ kind: 'tasks' })
       navigation.navigate({ kind: 'tasks' }) // a same-route arrival still bumps arrivalSeq
       navigation.back()
       navigation.forward()
       expect(seen).toEqual(['tasks', 'tasks', 'today', 'tasks'])
-      expect(navigation.getState()).not.toBe(initial)
+      expect(navigation.get()).not.toBe(initial)
 
       unsubscribe()
       navigation.back()
@@ -325,7 +325,7 @@ describe('NavigationService', () => {
       navigation.subscribe(() => {
         notified += 1
       })
-      const initial = navigation.getState()
+      const initial = navigation.get()
 
       navigation.back() // history boundaries
       navigation.forward()
@@ -334,13 +334,13 @@ describe('NavigationService', () => {
       navigation.noteMoved('notes/absent.md', 'notes/elsewhere.md')
 
       expect(notified).toBe(0)
-      expect(navigation.getState()).toBe(initial)
+      expect(navigation.get()).toBe(initial)
     })
   })
 
   it('keeps scroll bookkeeping on the position a view passes', () => {
     const navigation = createNavigationService()
-    const today = navigation.getState()
+    const today = navigation.get()
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
 
     // A view still showing today (its transition is pending) reports a scroll.
@@ -359,7 +359,7 @@ describe('NavigationService', () => {
       navigation.saveScrollState(500)
       navigation.navigate({ kind: 'note', path: 'notes/a.md' })
       navigation.saveScrollState(40)
-      const before = navigation.getState()
+      const before = navigation.get()
       let notified = 0
       navigation.subscribe(() => {
         notified += 1
@@ -367,7 +367,7 @@ describe('NavigationService', () => {
 
       navigation.forgetScrollStates()
 
-      expect(navigation.getState()).toEqual(before)
+      expect(navigation.get()).toEqual(before)
       expect(navigation.savedScroll()).toBeNull()
       expect(notified).toBe(0)
       navigation.back()
@@ -387,7 +387,7 @@ describe('NavigationService', () => {
 
       navigation.reset({ kind: 'tasks' })
 
-      expect(navigation.getState()).toEqual({
+      expect(navigation.get()).toEqual({
         route: { kind: 'tasks' },
         entryId: 0,
         arrivalSeq: 0,
@@ -405,9 +405,9 @@ describe('NavigationService', () => {
     it('defaults to today and normalizes a malformed daily route', () => {
       const navigation = createNavigationService({ initialRoute: { kind: 'tasks' } })
       navigation.reset()
-      expect(navigation.getState().route).toEqual({ kind: 'today' })
+      expect(navigation.get().route).toEqual({ kind: 'today' })
       navigation.reset({ kind: 'daily', date: 'not-a-date' })
-      expect(navigation.getState().route).toEqual({ kind: 'today' })
+      expect(navigation.get().route).toEqual({ kind: 'today' })
     })
 
     it('advances the navigation revision without notifying subscribers', () => {

@@ -402,7 +402,7 @@ describe('MobileSettings', () => {
       const methods = view.gitSync.calls().map((call) => call.method)
       expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
     })
-    expect(view.core.githubAuth.getState().connected).toBe(true)
+    expect(view.core.githubAuth.get().connected).toBe(true)
   })
 
   it('signs in to and out of GitHub from the account group, on any graph', async () => {
@@ -415,7 +415,7 @@ describe('MobileSettings', () => {
     await act(() => view.core.githubAuth.save({ kind: 'pat', token: 'ghp_test' }))
     await userEvent.click(page.getByRole('button', { name: 'Sign out of GitHub' }))
 
-    await vi.waitFor(() => expect(view.core.githubAuth.getState().connected).toBe(false))
+    await vi.waitFor(() => expect(view.core.githubAuth.get().connected).toBe(false))
     await expect.element(page.getByRole('button', { name: 'Sign in to GitHub' })).toBeVisible()
   })
 
@@ -502,7 +502,7 @@ describe('MobileSettings', () => {
       username: 'alex',
       secret: 'glpat-1',
     })
-    expect(view.core.githubAuth.getState().connected).toBe(true)
+    expect(view.core.githubAuth.get().connected).toBe(true)
   })
 
   it('offers to update the sign-in of a host remote the host refused', async () => {
@@ -668,6 +668,25 @@ describe('MobileSettings subscription', () => {
     await vi.waitFor(() => {
       expect(view.appStore.calls()).toContain('presentOfferCodeRedeemSheet')
     })
+  })
+
+  it('keeps a restore that fails after a redeem started from replacing the message', async () => {
+    const view = await mount({ ios: true })
+    const pendingSync = Promise.withResolvers<void>()
+    vi.spyOn(view.appStore, 'sync').mockImplementation(() => pendingSync.promise)
+
+    await userEvent.click(page.getByRole('button', { name: 'Restore Purchases' }))
+    await expect.element(page.getByRole('button', { name: 'Restore Purchases' })).toBeDisabled()
+    await userEvent.click(page.getByRole('button', { name: 'Redeem Code' }))
+    pendingSync.reject(new Error('offline'))
+
+    // The redeem waits for the restore in the shared IAP scope.
+    await vi.waitFor(() => {
+      expect(view.appStore.calls()).toContain('presentOfferCodeRedeemSheet')
+    })
+    await expect.element(page.getByRole('button', { name: 'Redeem Code' })).not.toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Restore Purchases' })).not.toBeDisabled()
+    expect(page.getByText(/Restore failed/).query()).toBeNull()
   })
 
   it('opens the terms of use', async () => {

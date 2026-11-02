@@ -12,7 +12,7 @@ import {
 } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { ThemeEffect, useTheme } from './theme-provider.tsx'
+import { ThemeEffect } from './theme-provider.tsx'
 
 /**
  * Covers the startup-flash contract: `public/theme-init.js` paints the cached
@@ -52,20 +52,8 @@ function install(stored: Partial<Settings>, options: { gateLoad?: boolean } = {}
 /**
  * Mount the effect over the services of the last `install`, without awaiting the settings load.
  */
-async function renderTheme() {
-  const result = {} as { current: ReturnType<typeof useTheme> }
-  function Probe(): null {
-    result.current = useTheme()
-    return null
-  }
-  await renderInApp(
-    <>
-      <ThemeEffect />
-      <Probe />
-    </>,
-    { core, appServices: { theme }, servicesOnly: true },
-  )
-  return { result }
+async function renderTheme(): Promise<void> {
+  await renderInApp(<ThemeEffect />, { core, appServices: { theme }, servicesOnly: true })
 }
 
 /**
@@ -112,24 +100,25 @@ describe('ThemeEffect', () => {
     expect(document.documentElement.style.colorScheme).toBe('light')
   })
 
-  it('exposes the loaded preference and its resolved theme', async () => {
+  it('exposes the resolved theme of the loaded preference', async () => {
     install({ theme: 'system' })
 
-    const { result } = await renderTheme()
+    await renderTheme()
     await settleLoad()
-    expect(result.current.theme).toBe('system')
-    expect(result.current.resolvedTheme).toBe('light')
+    expect(theme.get().preference).toBe('system')
+    expect(theme.get().resolved).toBe('light')
+    expect(document.documentElement.style.colorScheme).toBe('light')
   })
 
   it('applies and persists a preference chosen during the session', async () => {
     install({ theme: 'light' })
 
-    const { result } = await renderTheme()
+    await renderTheme()
     await settleLoad()
     await act(() => {
-      result.current.setTheme('dark')
+      theme.setPreference('dark')
     })
-    expect(result.current.theme).toBe('dark')
+    expect(theme.get().resolved).toBe('dark')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(settings.get().theme).toBe('dark')
     expect(storage.local.get(THEME_PREFERENCE_CACHE_KEY)).toBe('dark')
@@ -142,12 +131,12 @@ describe('ThemeEffect', () => {
     install({})
     settings.failLoad()
 
-    const { result } = await renderTheme()
+    await renderTheme()
     await settleLoad()
     expect(document.documentElement.style.colorScheme).toBe('light')
 
     await act(() => {
-      result.current.setTheme('dark')
+      theme.setPreference('dark')
     })
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })

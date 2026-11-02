@@ -9,11 +9,11 @@ import {
   type RefObject,
 } from 'react'
 import { act } from '@/test-utils/act.ts'
-import { createSystemClock, type ClockService } from '@reflect/core'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
-import { formatDayLabel, todayIso } from '@/lib/dates.ts'
+import { getIsoToday } from '@reflect/utils'
+import { createSystemClock, type ClockService, formatDayLabel } from '@reflect/core'
 import {
   createDayWindow,
   dateAtIndex,
@@ -114,7 +114,7 @@ function RouterProbe({
 
 describe('DailyStream', () => {
   it('anchors its first scroll to today, with no top-of-window flicker', async () => {
-    const today = todayIso()
+    const today = getIsoToday()
     const view = await renderStream(<DailyStream target={{ kind: 'today' }} />)
 
     const stream = page.getByTestId('daily-stream')
@@ -151,7 +151,7 @@ describe('DailyStream', () => {
       routerRef.current?.back()
     })
 
-    const extended = extendDayWindowBack(createDayWindow(todayIso()), '2003-05-01')
+    const extended = extendDayWindowBack(createDayWindow(getIsoToday()), '2003-05-01')
     const addedPastHeight = (extended.anchorIndex - PAST_DAYS) * ESTIMATED_DAY_HEIGHT
     await vi.waitFor(() => {
       expect(stream.element().scrollTop).toBeCloseTo(4321 + addedPastHeight, -1)
@@ -247,7 +247,7 @@ describe('DailyStream', () => {
   })
 
   it('reports the focused day so the sidebar can follow it within the stream', async () => {
-    const today = todayIso()
+    const today = getIsoToday()
     const dayWindow = createDayWindow(today)
     const focusedRef: RefObject<string | null> = createRef()
     function FocusProbe(): null {

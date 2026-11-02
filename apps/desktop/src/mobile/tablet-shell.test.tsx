@@ -75,8 +75,8 @@ describe('TabletShell', () => {
     await act(() => resize('compact'))
     await expect.element(view.getByTestId('phone-shell')).toBeInTheDocument()
 
-    expect(navigation.getState().route).toEqual({ kind: 'note', path: 'notes/a.md' })
-    expect(navigation.getState().canBack).toBe(true)
+    expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(navigation.get().canBack).toBe(true)
     expect(navigation.savedScroll()).toBeNull()
   })
 })

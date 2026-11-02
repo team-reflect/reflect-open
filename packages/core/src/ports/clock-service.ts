@@ -1,4 +1,4 @@
-import { todayIso } from '../lib/dates.ts'
+import { getIsoToday } from '@reflect/utils'
 
 /**
  * An opaque timer handle owned by a {@link ClockService}.
@@ -38,13 +38,13 @@ const MIDNIGHT_PAD_MS = 250
 class SystemClockImpl implements ClockService {
   readonly #timers = new Map<number, ReturnType<typeof globalThis.setTimeout>>()
   #nextId = 1
-  #today = todayIso()
+  #today = getIsoToday()
   readonly #listeners = new Set<(today: string) => void>()
   #midnightTimer: ReturnType<typeof globalThis.setTimeout> | null = null
   #heartbeat: ReturnType<typeof globalThis.setInterval> | null = null
 
   readonly #syncToday = (): void => {
-    const next = todayIso()
+    const next = getIsoToday()
     if (next === this.#today) {
       return
     }
@@ -65,7 +65,7 @@ class SystemClockImpl implements ClockService {
   today(): string {
     // While nothing is subscribed, no timer keeps the cached date fresh.
     if (this.#listeners.size === 0) {
-      this.#today = todayIso()
+      this.#today = getIsoToday()
     }
     return this.#today
   }

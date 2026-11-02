@@ -1,4 +1,4 @@
-import { type MaybePromise, safeParseJson, sha256Hex } from '@reflect/utils'
+import { formatIsoDate, type MaybePromise, safeParseJson, sha256Hex } from '@reflect/utils'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import {
   inboxEnvelopeSchema,
@@ -8,7 +8,6 @@ import {
 import {
   captureFromPath,
   captureIdentity,
-  captureLocalDate,
   captureSpoolName,
   type CaptureIdentity,
 } from './capture-identity.ts'
@@ -196,7 +195,7 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
                 createArchivedPost(envelope.data, envelope.capturedAt),
               )
             }
-            const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
+            const daily = dailyPath(formatIsoDate(new Date(envelope.capturedAt)))
             await input.writeXPost(envelope, daily)
             await captureInbox.remove(name, input.generation)
             drained += 1
@@ -358,7 +357,7 @@ class CaptureDrainServiceImpl implements CaptureDrainService {
    */
   async #drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<void> {
     const { noteFile, logger } = this.#deps
-    const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
+    const daily = dailyPath(formatIsoDate(new Date(envelope.capturedAt)))
     const dailySource = await noteSource(noteFile, daily, generation)
     // `task` is Reflect's round `+` checkbox, the only marker the Tasks
     // projection reads, and lands in the `## Tasks` section; `checkbox` is the

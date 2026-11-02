@@ -16,6 +16,7 @@ import {
   useClassicSignIn,
 } from '@/mobile/use-classic-access.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
+import { useIapRestoreRedeem } from '@/mobile/use-iap-restore-redeem.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 type PurchasePlan = 'monthly' | 'yearly'
@@ -55,16 +56,8 @@ export function PaywallScreen(): ReactElement {
     scope: { id: mutationScopeIds.iapAction },
     mutationFn: (variables: PurchaseVariables) => paywall.purchase(variables.productId),
   })
-  const restoreMutation = useMutation({
-    mutationKey: mutationKeys.iap.restore,
-    scope: { id: mutationScopeIds.iapAction },
-    mutationFn: () => paywall.restore(),
-  })
-  const redeemMutation = useMutation({
-    mutationKey: mutationKeys.iap.redeem,
-    scope: { id: mutationScopeIds.iapAction },
-    mutationFn: () => paywall.redeemCode(),
-  })
+  const iap = useIapRestoreRedeem()
+  const { restoreMutation, redeemMutation, restoreFeedback, redeemFeedback } = iap
   const classicAccess = useClassicAccess()
   const classicSignIn = useClassicSignIn()
   const classicMessage = classicAccessMessage(classicAccess)
@@ -75,14 +68,6 @@ export function PaywallScreen(): ReactElement {
     classicSignIn.mutation.isPending
   const purchasingPlan = purchaseMutation.isPending
     ? (purchaseMutation.variables?.plan ?? null)
-    : null
-  const restoreFeedback = restoreMutation.isError
-    ? 'Restore failed. Check your connection and try again.'
-    : restoreMutation.data === null
-      ? 'No previous purchase found for this Apple account.'
-      : null
-  const redeemFeedback = redeemMutation.isError
-    ? 'Could not open the redemption sheet. Try again.'
     : null
 
   const subscribe = () => {
@@ -96,16 +81,14 @@ export function PaywallScreen(): ReactElement {
 
   const restore = () => {
     purchaseMutation.reset()
-    redeemMutation.reset()
     classicSignIn.mutation.reset()
-    restoreMutation.mutate()
+    iap.restore()
   }
 
   const redeem = () => {
     purchaseMutation.reset()
-    restoreMutation.reset()
     classicSignIn.mutation.reset()
-    redeemMutation.mutate()
+    iap.redeem()
   }
 
   const verifyClassic = () => {

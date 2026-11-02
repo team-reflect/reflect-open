@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -12,7 +13,8 @@ import { SettingsSection } from './section.tsx'
  * mounts this section only there (see use-visible-settings-sections).
  */
 export function GraphSection(): ReactElement {
-  const { graph, mobileStorageKind } = useGraph()
+  const graph = useGraphInfo()
+  const { mobileStorageKind } = useMobileGraphBoot()
   const { navigate } = useRouter()
   const storage =
     mobileStorageKind === 'icloud'

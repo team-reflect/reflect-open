@@ -1,8 +1,9 @@
+import { formatIsoDate } from '@reflect/utils'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { XPostEnvelope } from './bookmark-envelope.ts'
 import type { TextCaptureEnvelope } from './capture-envelope.ts'
-import { captureIdentity, captureLocalDate } from './capture-identity.ts'
+import { captureIdentity } from './capture-identity.ts'
 import { captureNoteSource } from './capture-note.ts'
 import { createBackgroundReconcilerFactory } from '../reconcile/background-reconciler.ts'
 import { AppError } from '../errors.ts'
@@ -33,7 +34,7 @@ import {
 import { createCaptureService } from './capture-service.ts'
 
 const CAPTURED_AT = new Date(2026, 5, 11, 15, 30, 22, 845)
-const DAILY = dailyPath(captureLocalDate(CAPTURED_AT))
+const DAILY = dailyPath(formatIsoDate(CAPTURED_AT))
 
 const TEXT: TextCaptureEnvelope = {
   version: 1,
@@ -228,7 +229,7 @@ describe('CaptureService (shared-inbox relay)', () => {
     session.schedule()
     await flush()
     expect(kit.drains).toHaveBeenCalledTimes(2)
-    expect(kit.progress.getAll()).toHaveLength(1)
+    expect(kit.progress.get()).toHaveLength(1)
     session.dispose()
   })
 
@@ -242,7 +243,7 @@ describe('CaptureService (shared-inbox relay)', () => {
     expect(kit.relays).not.toHaveBeenCalled()
     expect(kit.drains).toHaveBeenCalledTimes(1)
     expect(kit.enrichments).toHaveBeenCalledTimes(2)
-    expect(kit.progress.getAll()).toEqual([])
+    expect(kit.progress.get()).toEqual([])
     session.dispose()
   })
 

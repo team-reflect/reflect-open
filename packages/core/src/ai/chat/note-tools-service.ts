@@ -126,7 +126,7 @@ export const listRecentNotesInput = z.object({
     ),
 })
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'an ISO date, YYYY-MM-DD')
+const isoDate = z.iso.date()
 
 export const listDailyNotesInput = z.object({
   start: isoDate.describe('First day of the range, inclusive (YYYY-MM-DD)'),

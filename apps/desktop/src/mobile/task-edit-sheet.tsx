@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { ArrowRight, CalendarDays, Check, CircleCheck, List, Trash2, Undo2, X } from 'lucide-react'
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
-import { getTaskDueDate, type OpenTask, withDraftDueDate } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
 import { markModeFromSyntax } from '@/editor/mark-mode.ts'
@@ -11,14 +10,21 @@ import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
 import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
 import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
-import { addDaysIso, formatDayLabel } from '@/lib/dates.ts'
+import { addDaysToIsoDate } from '@reflect/utils'
+import { getTaskDueDate, type OpenTask, withDraftDueDate, formatDayLabel } from '@reflect/core'
 import type { TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { TaskScheduleGrid } from '@/mobile/task-schedule-grid.tsx'
 import { useTaskSheetFinalizer } from '@/mobile/use-task-sheet-finalizer.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useTimeFormat,
+} from '@/providers/settings-provider.tsx'
 
 interface MobileTaskEditSheetProps {
   /** The task being edited. Remount (key by task) to reseed the draft. */
@@ -63,7 +69,11 @@ export function MobileTaskEditSheet({
   autoFocusEditor = false,
 }: MobileTaskEditSheetProps): ReactElement {
   const { haptics } = useMobileServices()
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
+  const timeFormat = useTimeFormat()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
   const navigateWikiLink = useWikiLinkNavigation()
   const onLinkClick = useMarkdownLinkClick(null)
   const navigateTag = useTagNavigation()
@@ -224,10 +234,10 @@ export function MobileTaskEditSheet({
               initialContent={draft}
               singleParagraph
               onChange={handleChange}
-              markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
-              spellCheck={settings.editorSpellCheck}
-              smoothCaretAnimation={settings.editorSmoothCaretAnimation}
-              timeFormat={settings.timeFormat}
+              markMode={markModeFromSyntax(editorMarkdownSyntax)}
+              spellCheck={editorSpellCheck}
+              smoothCaretAnimation={editorSmoothCaretAnimation}
+              timeFormat={timeFormat}
               // A one-line editor has nothing to reorder, so keep the gutter grip off.
               blockHandle={false}
               onWikiLinkClick={openWikiLink}
@@ -249,16 +259,16 @@ export function MobileTaskEditSheet({
             />
             <ScheduleChip
               label="Tomorrow"
-              active={dueDate === addDaysIso(today, 1)}
-              onClick={() => schedule(addDaysIso(today, 1))}
+              active={dueDate === addDaysToIsoDate(today, 1)}
+              onClick={() => schedule(addDaysToIsoDate(today, 1))}
             />
             <ScheduleChip
               label="Next week"
-              active={dueDate === addDaysIso(today, 7)}
-              onClick={() => schedule(addDaysIso(today, 7))}
+              active={dueDate === addDaysToIsoDate(today, 7)}
+              onClick={() => schedule(addDaysToIsoDate(today, 7))}
             />
             <ScheduleChip
-              label={dueDate !== null ? formatDayLabel(dueDate, settings.dateFormat) : 'Pick date'}
+              label={dueDate !== null ? formatDayLabel(dueDate, dateFormat) : 'Pick date'}
               icon={<CalendarDays aria-hidden className="size-3.5" />}
               active={showCalendar}
               onClick={toggleCalendar}

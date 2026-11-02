@@ -1,10 +1,16 @@
+import type { V1ImportState } from '@reflect/core'
 import type { ReactElement } from 'react'
 import { FileArchive } from 'lucide-react'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { SettingsSection } from '@/components/settings/section.tsx'
 import { Button } from '@/components/ui/button.tsx'
+import { useSelector } from '@/lib/use-store.ts'
 import { useV1Import } from '@/providers/v1-import-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
+
+function selectRunning(state: V1ImportState): boolean {
+  return state.phase === 'running'
+}
 
 /**
  * Settings -> Import: pick a Reflect V1 export zip and hand it to the
@@ -13,9 +19,9 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * navigating away from settings doesn't interrupt it.
  */
 export function ImportSection(): ReactElement {
-  const { state, startImport } = useV1Import()
+  const { service, startImport } = useV1Import()
   const { dialog } = useAppServices()
-  const running = state.phase === 'running'
+  const running = useSelector(service, selectRunning)
 
   async function chooseAndImport(): Promise<void> {
     const picked = await dialog.pickFiles({

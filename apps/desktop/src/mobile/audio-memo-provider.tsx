@@ -7,9 +7,14 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import type { GraphInfo, MobileAudioMemoSession, MobileAudioMemoSessionState } from '@reflect/core'
+import type {
+  GraphInfo,
+  MobileAudioMemoSession,
+  MobileAudioMemoSessionState,
+  Store,
+} from '@reflect/core'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore } from '@/lib/use-store.ts'
 
 /**
  * The mobile React surface for audio memos: a thin shell over the
@@ -25,6 +30,14 @@ export type MobileAudioMemoContextValue = MobileAudioMemoSessionState &
     'toggle' | 'stopAndSave' | 'cancelRecording' | 'retry' | 'discard'
   > & {
     /**
+     * Live while recording.
+     */
+    elapsedMs: number
+    /**
+     * Latest input level 0…1, for the waveform.
+     */
+    level: number
+    /**
      * Drawer dismissal: a live recording stops-and-saves, never silently drops.
      */
     onDrawerOpenChange: (open: boolean) => void
@@ -37,8 +50,6 @@ const MobileAudioMemoContext = createContext<MobileAudioMemoContextValue | null>
  */
 const CLOSED_STATE: MobileAudioMemoSessionState = {
   phase: 'idle',
-  elapsedMs: 0,
-  level: 0,
   pendingCount: 0,
   available: false,
   hasTranscriptionConfig: false,
@@ -47,9 +58,13 @@ const CLOSED_STATE: MobileAudioMemoSessionState = {
   drawerOpen: false,
 }
 
-const CLOSED_SESSION = {
+const CLOSED_TICK: Store<number> = { get: () => 0, subscribe: () => () => {} }
+
+const CLOSED_SESSION: Pick<MobileAudioMemoSession, 'get' | 'subscribe' | 'elapsedMs' | 'level'> = {
+  get: () => CLOSED_STATE,
   subscribe: () => () => {},
-  getState: () => CLOSED_STATE,
+  elapsedMs: CLOSED_TICK,
+  level: CLOSED_TICK,
 }
 
 interface MobileAudioMemoProviderProps {
@@ -76,7 +91,9 @@ export function MobileAudioMemoProvider({
   }, [mobileAudioMemo, graph.generation])
 
   const store = session ?? CLOSED_SESSION
-  const state = useServiceState(store, store.getState)
+  const state = useStore(store)
+  const elapsedMs = useStore(store.elapsedMs)
+  const level = useStore(store.level)
 
   const controls = useMemo(
     () => ({
@@ -90,8 +107,8 @@ export function MobileAudioMemoProvider({
     [session],
   )
   const value = useMemo<MobileAudioMemoContextValue>(
-    () => ({ ...state, ...controls }),
-    [state, controls],
+    () => ({ ...state, elapsedMs, level, ...controls }),
+    [state, elapsedMs, level, controls],
   )
 
   return <MobileAudioMemoContext value={value}>{children}</MobileAudioMemoContext>

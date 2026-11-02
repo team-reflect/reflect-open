@@ -321,7 +321,7 @@ describe('GistPublishService.publish', () => {
     })
 
     expect(progress.started()).toMatchObject([{ label: 'Publishing gist', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('records the published url in the optimistic overlay, stamped with the generation', async () => {
@@ -430,7 +430,7 @@ describe('GistPublishService.unpublish', () => {
     await expect(service.unpublish(PATH)).resolves.toEqual({ url: null, stale: false })
 
     expect(progress.started()).toMatchObject([{ label: 'Unpublishing gist', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
     expect(noteRows.getOverlay(PATH)).toMatchObject({ gistUrl: null, gistStale: false })
   })
 
@@ -484,6 +484,6 @@ describe('with no graph open', () => {
     await expect(service.unpublish(PATH)).resolves.toBeNull()
 
     expect(http.requests()).toEqual([])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 })

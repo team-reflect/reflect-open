@@ -52,6 +52,7 @@ export function useDeviceFlowAuth(): DeviceFlowAuth {
   async function signIn(): Promise<boolean> {
     setError(null)
     setBusy(true)
+    let signedIn = false
     try {
       const signal = abortRef.current?.signal
       const auth = await githubAuth.runDeviceFlow({
@@ -60,14 +61,15 @@ export function useDeviceFlowAuth(): DeviceFlowAuth {
           setView({ view: 'code', userCode: code.userCode, verificationUri: code.verificationUri })
         },
       })
-      return auth !== null
+      signedIn = auth !== null
     } catch (caught: unknown) {
       setView({ view: 'idle' })
       setError(errorMessage(caught))
-      return false
-    } finally {
-      setBusy(false)
     }
+    // The catch swallows everything, so this always runs. No `finally`: the
+    // React Compiler skips any function that has one.
+    setBusy(false)
+    return signedIn
   }
 
   return { view, busy, error, signIn }

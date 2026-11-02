@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { isDeepEqual } from '@ocavue/utils'
 
 /**
 
@@ -36,9 +38,11 @@ const vectorsSchema = z.array(z.array(z.number()))
 
 /**
  * The local embedding model (Plan 09): download, load, status, and text
- * vectors. Platforms without a runtime answer `unsupported`.
+ * vectors. Platforms without a runtime answer `unsupported`. As a store, it
+ * holds the last observed status (events and polls), `uninitialized` before
+ * the first one; it listens for status events only while subscribed.
  */
-export interface EmbeddingRuntimeService {
+export interface EmbeddingRuntimeService extends Store<EmbedStatus> {
   /**
    * Poll the runtime status.
    */
@@ -62,14 +66,6 @@ export interface EmbeddingRuntimeService {
    * Embed `texts` into 384-dim vectors. Rejects unless the status is `ready`.
    */
   embedTexts(texts: readonly string[]): Promise<number[][]>
-  /**
-   * Call `listener` with every status this service observes (events and polls).
-   */
-  subscribe(listener: (status: EmbedStatus) => void): Unlisten
-  /**
-   * The last observed status; `uninitialized` before the first one.
-   */
-  lastStatus(): EmbedStatus
 }
 
 const STATUS_EVENT = 'embed:status'
@@ -99,8 +95,7 @@ export interface EmbeddingRuntimeServiceDeps {
 
 class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
   readonly #deps: EmbeddingRuntimeServiceDeps
-  readonly #listeners = new Set<(status: EmbedStatus) => void>()
-  #last = UNINITIALIZED
+  readonly #status = new WritableStore<EmbedStatus>(UNINITIALIZED, isDeepEqual)
   #events: StatusEvents | null = null
 
   constructor(deps: EmbeddingRuntimeServiceDeps) {
@@ -121,19 +116,23 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
       return initial
     }
     return await new Promise((resolve) => {
-      const unsubscribe = this.subscribe((next) => {
+      const check = (): void => {
+        const next = this.#status.get()
         if (isTerminalStatus(next)) {
           unsubscribe()
           resolve(next)
         }
-      })
-      // The terminal event may have fired before the listener registered.
+      }
+      const unsubscribe = this.subscribe(check)
+      // The terminal event may have fired before the listener registered. The
+      // poll may then answer the status already held, which notifies nobody.
       void (this.#events?.registered ?? Promise.resolve()).then(async () => {
         try {
           await this.status()
         } catch (cause) {
           logger.warn('failed to poll the embedding runtime status', cause)
         }
+        check()
       })
     })
   }
@@ -154,36 +153,22 @@ class EmbeddingRuntimeServiceImpl implements EmbeddingRuntimeService {
     return this.#deps.ipc.call('embed_texts', { texts: [...texts] }, vectorsSchema)
   }
 
-  subscribe(listener: (status: EmbedStatus) => void): Unlisten {
-    // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (status: EmbedStatus): void => {
-      listener(status)
-    }
-    this.#listeners.add(deliver)
+  readonly get = this.#status.get
+
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    const unlisten = this.#status.subscribe(listener)
     this.#events ??= this.#startEvents()
-    let attached = true
     return () => {
-      if (!attached) {
-        return
-      }
-      attached = false
-      this.#listeners.delete(deliver)
-      if (this.#listeners.size === 0) {
+      unlisten()
+      if (!this.#status.subscribed()) {
         this.#events?.stop()
         this.#events = null
       }
     }
   }
 
-  lastStatus(): EmbedStatus {
-    return this.#last
-  }
-
   #observe(status: EmbedStatus): EmbedStatus {
-    this.#last = status
-    for (const listener of this.#listeners) {
-      listener(status)
-    }
+    this.#status.set(status)
     return status
   }
 

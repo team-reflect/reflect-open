@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils.ts'
 import { NewGraphDrawer } from '@/mobile/new-graph-drawer.tsx'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
@@ -34,7 +35,8 @@ interface MobileGraphsProps {
  */
 export function MobileGraphs({ safeAreaInsets = true }: MobileGraphsProps): ReactElement {
   const { back, canBack, navigate } = useRouter()
-  const { graph, completeOnboarding } = useGraph()
+  const graph = useGraphInfo()
+  const { completeOnboarding } = useMobileGraphBoot()
   const [pendingRoot, setPendingRoot] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)

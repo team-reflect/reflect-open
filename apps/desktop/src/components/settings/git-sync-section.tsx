@@ -15,8 +15,8 @@ import { ConnectRepositoryDialog } from '@/components/settings/connect-repositor
 import { SettingsField } from '@/components/settings/field.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
-import { useGitSync } from '@/providers/sync-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /** Which dialog is open: the host chooser, or one host's own flow. */
@@ -66,13 +66,17 @@ function githubRepoBrowserUrl(repo: GithubRepoRef): string {
  * product language, sync on demand, and stop.
  */
 export function GitSyncSettingsField(): ReactElement {
-  const { state, disconnectGraph, syncNow } = useGitSync()
-  const { graph } = useGraph()
+  const state = useGitSyncState()
+  const { disconnectGraph, syncNow } = useGitSyncActions()
+  const graph = useGraphInfo()
   const { opener } = useAppServices()
   const { platform } = useCoreServices()
   const [dialog, setDialog] = useState<OpenDialog | null>(null)
   const openRepoAttemptRef = useRef(0)
   const action = useAsyncAction()
+  // Opening the repository in the browser is separate from sync/disconnect,
+  // so neither clears the other's message.
+  const [openError, setOpenError] = useState<string | null>(null)
 
   const hosted = graph !== null && isICloudRoot(graph.root)
   // The iOS app (the iPad's desktop workspace) connects a repository only to
@@ -96,17 +100,17 @@ export function GitSyncSettingsField(): ReactElement {
     const url = githubRepoBrowserUrl(repo)
     const attempt = openRepoAttemptRef.current + 1
     openRepoAttemptRef.current = attempt
-    action.setError(null)
+    setOpenError(null)
     void opener
       .openUrl(url)
       .then(() => {
         if (openRepoAttemptRef.current === attempt) {
-          action.setError(null)
+          setOpenError(null)
         }
       })
       .catch(() => {
         if (openRepoAttemptRef.current === attempt) {
-          action.setError(`Couldn’t open the browser — visit ${url} yourself.`)
+          setOpenError(`Couldn’t open the browser — visit ${url} yourself.`)
         }
       })
   }
@@ -116,6 +120,7 @@ export function GitSyncSettingsField(): ReactElement {
       variant="ghost"
       size="sm"
       title="This graph stops syncing; its history and your sign-ins stay"
+      disabled={action.pending}
       onClick={() => void action.run(disconnectGraph)}
     >
       Stop syncing
@@ -220,6 +225,10 @@ export function GitSyncSettingsField(): ReactElement {
 
           {action.error !== null ? (
             <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
+          ) : null}
+          {/* Only while the repository it names is still connected. */}
+          {openError !== null && repo !== null ? (
+            <p className="text-xs text-red-700 dark:text-red-300">{openError}</p>
           ) : null}
         </div>
       </SettingsField>

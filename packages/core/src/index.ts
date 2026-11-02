@@ -16,6 +16,7 @@ export {
   type IpcBridgeService,
 } from './ipc/ipc-service.ts'
 export type { Unlisten } from './unlisten.ts'
+export { combineStores, deriveStore, type Store, WritableStore } from './store.ts'
 
 export { type HapticsService } from './ipc/haptics-service.ts'
 export { type AudioRecorderFinalSegment } from './audio/audio-recorder-service.ts'
@@ -25,7 +26,11 @@ export {
   type MobileStorageKind,
   type MobileStorageService,
 } from './ipc/mobile-storage-service.ts'
-export { githubAppInstallUrl, type GithubAuthService } from './sync/github-auth-service.ts'
+export {
+  githubAppInstallUrl,
+  type GithubAuthService,
+  type GithubAuthState,
+} from './sync/github-auth-service.ts'
 export { newRepoUrl, parseRepoInput } from './sync/github-repo-service.ts'
 export type { GithubRepoRef } from './sync/types.ts'
 export { type GitSyncService, type GitSyncState } from './sync/git-sync-service.ts'
@@ -48,10 +53,8 @@ export { type GistPublishService } from './sync/gist-publish-service.ts'
 export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'
 export { createSystemClock, type ClockService, type TimerHandle } from './ports/clock-service.ts'
 export { type IdService } from './ports/id-service.ts'
-export { localIsoDate, parseIsoDate, todayIso } from './lib/dates.ts'
-export { formatDayLabel, formatMonthDay, formatShortDate } from './lib/date-labels.ts'
 export { type BuildPlatform, type PlatformFacts } from './ports/platform-facts.ts'
-export { type FileSrcConverter } from './ports/file-src.ts'
+export { appleFileSrc, type FileSrcConverter, type FileSrcSource } from './ports/file-src.ts'
 
 export {
   createPathService,
@@ -211,11 +214,11 @@ export {
   dailyPath,
   notePath,
   assetPath,
+  pickFreeAssetPath,
   isDaily,
   isNotePath,
   dateFromDailyPath,
   foldGraphPath,
-  isCalendarDate,
 } from './graph/paths.ts'
 export { noteBasenameKey } from './graph/note-reference.ts'
 export {
@@ -259,10 +262,13 @@ export {
   clampSidebarWidth,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeTranscriptionPrompt,
+  TIME_FORMATS,
   timeFormatSchema,
+  DATE_FORMATS,
   dateFormatSchema,
   weekStartDaySchema,
-  weekStartDow,
+  getWeekStartWeekday,
+  getUserWeekStart,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
@@ -284,6 +290,15 @@ export {
   type AiPromptMode,
 } from './settings/schema.ts'
 export { type SettingsLoadOutcome, type SettingsService } from './settings/settings-service.ts'
+export {
+  formatDayLabel,
+  formatFullDate,
+  formatMonthDay,
+  formatRecencyLabel,
+  formatShortDate,
+  formatTimeOfDay,
+  type DateTimePrefs,
+} from './lib/date-labels.ts'
 export { type ContactsAuthorization, type ContactMatch } from './contacts/commands.ts'
 export {
   contactsCanLookup,
@@ -320,6 +335,7 @@ export {
   type IapService,
 } from './ipc/iap-service.ts'
 export { createAppStoreService, type AppStoreService } from './ipc/app-store-service.ts'
+export { createAssetStoreService } from './graph/asset-store-service.ts'
 export {
   sizeClassChangedEvent,
   sizeClassCommand,
@@ -460,6 +476,7 @@ export { previousTaskKey, todaysDailyTarget } from './tasks/task-navigation.ts'
 export { withDraftDueDate } from './tasks/task-schedule-content.ts'
 export {
   withoutReopenedTasks,
+  type RecentlyCompleted,
   type TaskAction,
   type TaskService,
   type TaskWriteResult,

@@ -14,7 +14,8 @@ import {
 } from '@/mobile/use-keyboard.ts'
 import { usePaywallGate } from '@/mobile/use-paywall-gate.ts'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphError, useGraphInfo, useGraphStatus } from '@/providers/graph-provider.tsx'
+import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 import { RouterProvider } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -35,7 +36,10 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
 export function MobileApp(): ReactElement {
   const { quitPolicy } = useAppServices()
   const { platform } = useCoreServices()
-  const { status, graph, error, needsOnboarding } = useGraph()
+  const status = useGraphStatus()
+  const graph = useGraphInfo()
+  const error = useGraphError()
+  const { needsOnboarding } = useMobileGraphBoot()
   const paywallGate = usePaywallGate()
   useKeyboardHeightVar()
   useKeyboardFieldReveal()

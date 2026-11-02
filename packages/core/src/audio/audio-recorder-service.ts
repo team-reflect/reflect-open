@@ -1,4 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
+import type { Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type {
   RecordingLevelEvent,
@@ -86,11 +87,7 @@ export interface AudioRecorderService {
    * True when the host exposes the recording APIs.
    */
   isSupported(): boolean
-  state(): AudioRecorderState
-  /**
-   * Calls `listener` on every {@link state} change.
-   */
-  subscribeState(listener: (state: AudioRecorderState) => void): Unlisten
+  readonly state: Store<AudioRecorderState>
   /**
    * The live input stream for a waveform, or `null` when none is exposed.
    */

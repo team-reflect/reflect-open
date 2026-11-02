@@ -1,5 +1,6 @@
-import type { GraphSessionSource } from '../graph/graph-session.ts'
+import type { GraphSession } from '../graph/graph-session.ts'
 import type { NoteRow, PinnedNote } from '../indexing/index-query-service.ts'
+import type { Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { isValidPinOrder } from './pin-order.ts'
 
@@ -314,7 +315,7 @@ function retireAgreeing(overlay: NoteRowOverlay, row: NoteRowFacts): MutableNote
 }
 
 export interface NoteRowServiceDeps {
-  readonly graphSession: GraphSessionSource & { subscribe: (listener: () => void) => Unlisten }
+  readonly graphSession: Store<{ readonly session: GraphSession | null }>
 }
 
 class NoteRowServiceImpl implements NoteRowService {
@@ -460,7 +461,7 @@ class NoteRowServiceImpl implements NoteRowService {
   }
 
   #openGeneration(): number | null {
-    return this.#deps.graphSession.getState().session?.generation ?? null
+    return this.#deps.graphSession.get().session?.generation ?? null
   }
 
   #collect(generation: number): ReadonlyMap<string, NoteRowOverlay> {
