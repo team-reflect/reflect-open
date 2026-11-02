@@ -707,7 +707,7 @@ describe('MobileShell', () => {
 
   /**
    * The All tab over services with one configured AI provider, whose chat
-   * engine answers every turn with `reply`.
+   * engine (returned for its call log) answers every turn with `reply`.
    */
   async function mountAllWithChatProvider(reply: string) {
     const model: AiProviderConfig = {
@@ -716,20 +716,22 @@ describe('MobileShell', () => {
       model: 'gpt-5.1',
       keyHint: '12345',
     }
+    const chatEngine = createTestChatEngineService([
+      { type: 'text-delta', text: reply },
+      { type: 'complete', messages: [{ role: 'assistant', content: reply }] },
+    ])
     core = createTestCoreServices({
       database: createWasmTestDatabaseService(),
       secretStore: createTestSecretStoreService({ [aiKeySecretName(model.id)]: 'sk-test' }),
-      chatEngine: createTestChatEngineService([
-        { type: 'text-delta', text: reply },
-        { type: 'complete', messages: [{ role: 'assistant', content: reply }] },
-      ]),
+      chatEngine,
     })
     appServices = createTestAppServices(core)
     core.clock.setNow(Date.now())
     core.platform.setReducedMotion(true)
-    return await mount({ kind: 'allNotes', tag: null }, undefined, {
+    const view = await mount({ kind: 'allNotes', tag: null }, undefined, {
       settings: { aiProviders: [model], defaultAiProviderId: model.id },
     })
+    return { view, chatEngine }
   }
 
   /** Wait for the lazy Chat screen to become the visible layer. */
@@ -741,7 +743,7 @@ describe('MobileShell', () => {
 
   it('asks the search text from All: Chat opens over All, Back returns to the results', async () => {
     const user = userEvent
-    const view = await mountAllWithChatProvider('You kept one plan.')
+    const { view, chatEngine } = await mountAllWithChatProvider('You kept one plan.')
 
     const box = view.getByRole('searchbox', { name: 'Search notes' })
     await expect.element(box).toBeVisible()
@@ -753,6 +755,12 @@ describe('MobileShell', () => {
 
     await waitForChatLayer(view)
     const chat = page.elementLocator(visibleLayer(view))
+    // The typed text is the question sent, not just a trigger for any turn.
+    await expect.element(chat.getByText('pricing', { exact: true })).toBeVisible()
+    expect(chatEngine.calls()[0]?.messages.at(-1)).toMatchObject({
+      role: 'user',
+      content: 'pricing',
+    })
     await expect.element(chat.getByText('You kept one plan.')).toBeVisible()
     // Pushed over All, like a note: the All tab stays the current one.
     expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
@@ -771,7 +779,7 @@ describe('MobileShell', () => {
 
   it('opens an empty Chat from All’s Chat button with the composer focused', async () => {
     const user = userEvent
-    const view = await mountAllWithChatProvider('unused')
+    const { view } = await mountAllWithChatProvider('unused')
     // No conversation yet, so nothing to mark as in progress.
     expect(view.getByTestId('chat-in-progress').query()).toBeNull()
 
