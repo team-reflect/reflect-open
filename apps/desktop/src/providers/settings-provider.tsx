@@ -1,6 +1,7 @@
-import type { Settings, SettingsLoadOutcome } from '@reflect/core'
+import type { Settings, SettingsLoadOutcome, SettingsService, Store } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore, useSelector } from '@/lib/use-store.ts'
 
 interface SettingsValue {
   settings: Settings
@@ -30,4 +31,18 @@ export function useSettings(): SettingsValue {
     updateSettingsWith: service.updateWith,
     whenSettingsLoaded: service.whenLoaded,
   }
+}
+
+function useSettingsService(): SettingsService {
+  return useCoreServices().settings satisfies Store<Settings>
+}
+
+function useSettingsStore(): Settings {
+  const store = useSettingsService()
+  return useStore(store)
+}
+
+function useSettingsSelector<T>(selector: (settings: Settings) => T): T {
+  const store = useSettingsService()
+  return useSelector(store, selector)
 }
