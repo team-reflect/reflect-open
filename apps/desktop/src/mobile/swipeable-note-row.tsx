@@ -4,7 +4,7 @@ import { type HighlightSegment, formatRecencyLabel } from '@reflect/core'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { type RevealedRowStore, useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 
 /** V1's fixed row height (px) — placeholder resolution never causes jumps. */
 export const NOTE_ROW_HEIGHT = 64
@@ -58,7 +58,8 @@ export function SwipeableNoteRow({
   onTogglePin,
   onDelete,
 }: SwipeableNoteRowProps): ReactElement {
-  const { settings } = useSettings()
+  const dateFormat = useSettingsField('dateFormat')
+  const timeFormat = useSettingsField('timeFormat')
   const { revealed, reveal, close, beginInteraction } = useRevealedRow(revealedRow, row.path)
   const actionWidth = SWIPE_ACTION_WIDTH * (row.canDelete ? 2 : 1)
   const title = row.titleSegments.map((segment) => segment.text).join('')
@@ -122,7 +123,7 @@ export function SwipeableNoteRow({
               {renderHighlightedSegments(row.titleSegments)}
             </span>
             <span className="shrink-0 text-xs text-text-muted">
-              {formatRecencyLabel(row.mtime, settings)}
+              {formatRecencyLabel(row.mtime, { dateFormat, timeFormat })}
             </span>
           </span>
           {row.snippet.length > 0 ? (

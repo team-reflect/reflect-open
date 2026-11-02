@@ -9,7 +9,7 @@ import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { type RevealedRowStore, useRevealedRow } from '@/mobile/revealed-row.ts'
 import { SwipeRow } from '@/mobile/swipe-row.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 
 /**
  * Total width of the two actions (open note, delete) under every task row.
@@ -69,7 +69,7 @@ export function MobileTaskRow({
   onDelete,
 }: MobileTaskRowProps): ReactElement {
   const { haptics } = useMobileServices()
-  const { settings } = useSettings()
+  const dateFormat = useSettingsField('dateFormat')
   const key = getTaskKey(task)
   const { revealed, reveal, close, beginInteraction } = useRevealedRow(revealedRow, key)
   const label = task.text || 'Empty task'
@@ -175,7 +175,7 @@ export function MobileTaskRow({
               // The compact date, not desktop's long day label — a phone row can't
               // spare "Mon, June 1st, 2026" (V1 mobile's small gray source label).
               <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-text-muted">
-                {formatShortDate(task.dailyDate, settings.dateFormat)}
+                {formatShortDate(task.dailyDate, dateFormat)}
               </span>
             ) : null}
           </div>

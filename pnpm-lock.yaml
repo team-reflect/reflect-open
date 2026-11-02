@@ -70,8 +70,8 @@ importers:
         specifier: ^0.78.0
         version: 0.78.0(typescript@6.0.3)
       '@meowdown/react':
-        specifier: ^0.82.2
-        version: 0.82.2(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)
+        specifier: ^0.82.3
+        version: 0.82.3(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)
       '@ocavue/utils':
         specifier: ^1.9.0
         version: 1.9.0
@@ -1338,8 +1338,8 @@ packages:
   '@meowdown/markdown@0.78.0':
     resolution: {integrity: sha512-Ca8UTMbUm+349u9Duudm9bOyGfu/kHHuAPu1d/zJsHc6eDVu3VgXVQsDbiJS4B1p1sE87W4z757n06ziSMtmsA==}
 
-  '@meowdown/react@0.82.2':
-    resolution: {integrity: sha512-P1CP6Do767O3YNNRAje9fFxvVxdEMbFGBTpAVXVkFKHDrixTXDJFKnAV3U6ckzGxuig4OmwykQ5X7VqqKlXxvw==}
+  '@meowdown/react@0.82.3':
+    resolution: {integrity: sha512-xNZzVF+tjQuxa4QnmEPoyWexBNVrfrW9OJXX5uh3qSpoHBIg4IFZ3IfuHq2KmFAXFAf7NVkXUidFYybWgHuKEQ==}
     peerDependencies:
       react: ^19.3.0
       react-dom: ^19.3.0
@@ -7789,7 +7789,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@meowdown/react@0.82.2(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)':
+  '@meowdown/react@0.82.3(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.1)(react@19.3.1)
       '@meowdown/core': 0.83.0(@lezer/common@1.5.4)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(supports-color@8.1.1)(typescript@6.0.3)
