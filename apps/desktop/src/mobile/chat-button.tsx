@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 import { useHasChatTurns } from '@/providers/chat-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 
 /**
  * The All tab's way into Chat when there is nothing typed to ask: it resumes
@@ -12,7 +12,7 @@ import { useRouter } from '@/routing/router.tsx'
  */
 export function MobileChatButton(): ReactElement {
   const hasTurns = useHasChatTurns()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
 
   return (
     <MobileTopBarIconButton
