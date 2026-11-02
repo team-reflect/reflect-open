@@ -17,38 +17,38 @@ const MIDNIGHT_PAD_MS = 250
 
 class TodayServiceImpl implements TodayService {
   readonly #deps: TodayServiceDeps
-  readonly #today: WritableStore<string>
+  readonly #store: WritableStore<string>
   #midnightTimer: TimerHandle | null = null
   #heartbeat: TimerHandle | null = null
 
   constructor(deps: TodayServiceDeps) {
     this.#deps = deps
-    this.#today = new WritableStore(this.#readToday())
+    this.#store = new WritableStore(this.#readToday())
   }
 
   readonly get = (): string => {
     // While nothing is subscribed, no timer keeps the cached date fresh.
-    if (!this.#today.subscribed()) {
+    if (!this.#store.subscribed()) {
       this.#syncToday()
     }
-    return this.#today.get()
+    return this.#store.get()
   }
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
-    const unlisten = this.#today.subscribe(listener)
+    const unlisten = this.#store.subscribe(listener)
     if (this.#heartbeat === null) {
       this.#start()
     }
     return () => {
       unlisten()
-      if (!this.#today.subscribed()) {
+      if (!this.#store.subscribed()) {
         this.#stop()
       }
     }
   }
 
   readonly #syncToday = (): void => {
-    this.#today.set(this.#readToday())
+    this.#store.set(this.#readToday())
   }
 
   #readToday(): string {
