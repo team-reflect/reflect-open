@@ -80,16 +80,16 @@ export function useChatActions(): ChatActions {
   const session = useChat()
   return useMemo(
     (): ChatActions => ({
-      selectModel: (selection) => session.selectModel(selection),
-      setDraft: (text) => session.setDraft(text),
-      attachImages: (files) => session.attachImages(files),
-      removeAttachment: (id) => session.removeAttachment(id),
-      send: (text) => session.send(text),
-      stop: () => session.stop(),
-      newChat: () => session.newChat(),
-      ask: (question) => session.ask(question),
-      openConversation: (id) => session.openConversation(id),
-      deleteConversation: (id) => session.deleteConversation(id),
+      selectModel: session.selectModel,
+      setDraft: session.setDraft,
+      attachImages: session.attachImages,
+      removeAttachment: session.removeAttachment,
+      send: session.send,
+      stop: session.stop,
+      newChat: session.newChat,
+      ask: session.ask,
+      openConversation: session.openConversation,
+      deleteConversation: session.deleteConversation,
     }),
     [session],
   )
