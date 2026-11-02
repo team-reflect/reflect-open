@@ -94,9 +94,11 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
    */
   readonly #fileProgress: WritableStore<IndexFileProgress | null>
   readonly fileProgress: Store<IndexFileProgress | null>
+  readonly progress: Store<IndexLifecycleProgress>
 
   constructor(inner: IndexLifecycleService, graphSession: IndexLifecycleDeps['graphSession']) {
     this.#inner = inner
+    this.progress = inner.progress
     this.#graphSession = graphSession
     this.#fileProgress = new WritableStore(inner.fileProgress.get())
     this.fileProgress = this.#fileProgress
@@ -143,10 +145,6 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
 
   followActivity(): Unlisten {
     return this.#inner.followActivity()
-  }
-
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten {
-    return this.#inner.onProgress(listener)
   }
 
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten {

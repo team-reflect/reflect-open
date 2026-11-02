@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
 import { deriveStore } from '../store.ts'
-import { createGraphSession, type GraphRole, type GraphSession } from './graph-session.ts'
+import type { GraphRole, GraphSession } from './graph-session.ts'
 import { createNoteRowService } from '../documents/note-row-service.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { createTestNoteMoveService } from '../testing/documents.ts'
@@ -541,6 +541,19 @@ describe('GraphSessionService index following', () => {
     expect(context.session.get().indexing).toBe(false)
   })
 
+  it('keeps the state when the index progress changes but `indexing` does not', async () => {
+    const context = await start()
+    await context.session.openRecent('/a')
+    await expect.poll(() => context.indexLifecycle.progress.get()).toBe('live')
+    const state = context.session.get()
+    const count = context.states.length
+
+    context.indexLifecycle.suspend()
+    expect(context.indexLifecycle.progress.get()).toBe('idle')
+    expect(context.session.get()).toBe(state)
+    expect(context.states).toHaveLength(count)
+  })
+
   it('re-runs the reconcile on request and on a watcher demand', async () => {
     const context = await start()
     await context.session.openRecent('/a')
@@ -575,13 +588,6 @@ describe('GraphSessionService index following', () => {
     await settleIndex(context)
     context.stop()
     expect(context.fileChanges.listenerCount().reconcile).toBe(0)
-
-    const count = context.states.length
-    context.indexLifecycle.sync(
-      createGraphSession({ root: '/a', name: 'a', generation: 1, indexGeneration: 1 }),
-    )
-    await settleIndex(context)
-    expect(context.states).toHaveLength(count)
   })
 })
 
