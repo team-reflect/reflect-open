@@ -1,5 +1,5 @@
 import { Fragment, type MouseEvent, type ReactElement, type ReactNode } from 'react'
-import { CalendarDays, FileText, History, Paperclip, Search } from 'lucide-react'
+import { CalendarDays, FileText, History, Paperclip, Search, TextSearch } from 'lucide-react'
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
@@ -100,6 +100,44 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
       <ChipFrame pending={pending} icon={<Search aria-hidden className="size-3.5" />}>
         Searched “{call.query}”{result !== null ? countSuffix(result.hits.length, 'note') : ''}
         {result !== null ? <NoteLinks notes={result.hits} onOpen={openNote} /> : null}
+      </ChipFrame>
+    )
+  }
+
+  if (call.tool === 'find') {
+    const result = part.result?.tool === 'find' ? part.result : null
+    const groups = call.groups
+      .map((group) => {
+        const words = group.map((word) => `“${word}”`).join(' or ')
+        return call.groups.length > 1 && group.length > 1 ? `(${words})` : words
+      })
+      .join(' and ')
+    const range =
+      call.from !== null || call.to !== null
+        ? ` in ${call.from !== null ? formatShortDate(call.from, dateFormat) : '…'} – ${
+            call.to !== null ? formatShortDate(call.to, dateFormat) : '…'
+          }`
+        : ''
+    const linked = call.linksTo !== null ? ` linking to ${call.linksTo}` : ''
+    // A thrown call (part.error) or a refusal (result.error) shows its reason
+    // instead of a count, so a failed search never reads as an empty one.
+    const failure = part.error ?? result?.error ?? null
+    return (
+      // Outcome, then what was searched, then the note links: the links can run
+      // long, so they go last, where the truncation falls.
+      <ChipFrame pending={pending} icon={<TextSearch aria-hidden className="size-3.5" />}>
+        {failure !== null
+          ? `Couldn't find ${groups}${range}${linked} — ${failure}`
+          : `${
+              result !== null
+                ? `Found ${result.notes.length} note${result.notes.length === 1 ? '' : 's'}${
+                    result.truncated ? ' (more matched)' : ''
+                  }`
+                : 'Finding'
+            } for ${groups}${range}${linked}`}
+        {result !== null && failure === null ? (
+          <NoteLinks notes={result.notes} onOpen={openNote} />
+        ) : null}
       </ChipFrame>
     )
   }

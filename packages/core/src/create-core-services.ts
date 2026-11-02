@@ -1056,6 +1056,7 @@ export function composeCoreServices(
   const retrieval = create.retrieval({
     database,
     search,
+    wikiResolver,
     embeddingRuntime,
     logger,
   })

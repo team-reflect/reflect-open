@@ -133,6 +133,36 @@ describe('createChatHistoryService', () => {
     expect(turns).toEqual([turn, { ...turn, id: 'turn-2' }])
   })
 
+  it('round-trips a find_in_notes chip with its range and truncation', async () => {
+    const { history, insertConversation, insertMessage } = setup()
+    const parts: ChatTurn['parts'] = [
+      {
+        kind: 'tool',
+        call: {
+          tool: 'find',
+          toolCallId: 'tool-1',
+          groups: [['Andy', 'Bob'], ['beets']],
+          from: '2026-06-01',
+          to: null,
+          linksTo: null,
+        },
+        result: {
+          tool: 'find',
+          toolCallId: 'tool-1',
+          notes: [{ path: 'daily/2026-07-14.md', title: '2026-07-14' }],
+          truncated: true,
+          error: null,
+        },
+        error: null,
+      },
+    ]
+    await insertConversation(conversation)
+    await insertMessage(0, { parts: JSON.stringify(parts) })
+
+    const [restored] = await history.loadConversation('conv-1')
+    expect(restored?.parts).toEqual(parts)
+  })
+
   it('drops an unreadable row but keeps the rest', async () => {
     const { logger, history, insertConversation, insertMessage } = setup()
     await insertConversation(conversation)

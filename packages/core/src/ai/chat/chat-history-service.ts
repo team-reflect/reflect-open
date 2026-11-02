@@ -50,6 +50,14 @@ const readNoteSummarySchema = z.object({
 
 const toolCallSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('search'), toolCallId: z.string(), query: z.string() }),
+  z.object({
+    tool: z.literal('find'),
+    toolCallId: z.string(),
+    groups: z.array(z.array(z.string())),
+    from: z.string().nullable(),
+    to: z.string().nullable(),
+    linksTo: z.string().nullable(),
+  }),
   z.object({ tool: z.literal('read'), toolCallId: z.string(), paths: z.array(z.string()) }),
   z.object({ tool: z.literal('recents'), toolCallId: z.string(), tag: z.string().nullable() }),
   z.object({
@@ -66,6 +74,13 @@ const toolResultSchema = z.discriminatedUnion('tool', [
     toolCallId: z.string(),
     query: z.string(),
     hits: z.array(hitSummarySchema),
+  }),
+  z.object({
+    tool: z.literal('find'),
+    toolCallId: z.string(),
+    notes: z.array(hitSummarySchema),
+    truncated: z.boolean(),
+    error: z.string().nullable(),
   }),
   z.object({
     tool: z.literal('read'),

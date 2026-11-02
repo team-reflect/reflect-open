@@ -45,6 +45,39 @@ const DEFAULT_SEARCH_LIMIT = 8
 const MAX_SEARCH_LIMIT = 20
 
 /**
+ * Notes one `find_in_notes` call returns; past it the model narrows the search.
+ */
+export const MAX_FIND_NOTES = 30
+
+/**
+ * Most groups one `find_in_notes` call takes; every group must match, so more
+ * only narrows.
+ */
+const MAX_FIND_GROUPS = 4
+
+/**
+ * Most alternatives in one `find_in_notes` group: names, synonyms, word forms.
+ */
+const MAX_FIND_ALTERNATIVES = 12
+
+/**
+ * The refusal for a `linksTo` that names no note, read by model and chip alike.
+ */
+export const UNKNOWN_LINK_TARGET_ERROR =
+  'No note has this title — check the spelling, or omit linksTo.'
+
+/**
+ * The refusal when a group has no searchable word (punctuation only).
+ */
+export const UNSEARCHABLE_WORDS_ERROR =
+  'A group has no searchable word — use letters or digits, e.g. names or topics.'
+
+/**
+ * The refusal for a date range that ends before it starts.
+ */
+export const REVERSED_RANGE_ERROR = '“from” is after “to” — swap them.'
+
+/**
  * Default and ceiling for recent-note listings per call.
  */
 const DEFAULT_RECENT_LIMIT = 10
@@ -109,6 +142,54 @@ export const searchNotesInput = z.object({
     .describe(`How many notes to return (default ${DEFAULT_SEARCH_LIMIT})`),
 })
 
+const isoDate = z.iso.date()
+
+/**
+ * `schema`, also accepting `null` or an empty string as "not given": local
+ * models often send either for a parameter they leave unused.
+ */
+function optionalInput<T extends z.ZodType>(schema: T) {
+  return z.preprocess((value) => (value === '' ? null : value), schema.nullish())
+}
+
+/**
+ * The find_in_notes input: groups of alternative words, plus optional filters.
+ */
+export const findInNotesInput = z.object({
+  groups: z
+    .array(z.array(z.string().min(1)).min(1).max(MAX_FIND_ALTERNATIVES))
+    .min(1)
+    .max(MAX_FIND_GROUPS)
+    .describe(
+      'Groups of alternative words. A note matches when it contains at least one word from ' +
+        'every group, e.g. [["Andy", "Bob"], ["beets", "bears", "battle", "galactica"]] ' +
+        'finds notes mentioning Andy or Bob and any of those topics. Each word matches at a ' +
+        'word start, so a stem like "battle" finds "battlestar" and "battleship".',
+    ),
+  from: optionalInput(isoDate).describe(
+    'Only daily notes dated on or after this day (YYYY-MM-DD); excludes other notes',
+  ),
+  to: optionalInput(isoDate).describe(
+    'Only daily notes dated on or before this day (YYYY-MM-DD); excludes other notes',
+  ),
+  linksTo: optionalInput(z.string()).describe(
+    'Only notes that link to the note with this exact title, e.g. "Andy"',
+  ),
+})
+
+/**
+ * The find_in_notes output: the matching notes, or a refusal for a link
+ * target that names no note or words that cannot be searched.
+ */
+export type FindInNotesOutput =
+  | {
+      ok: true
+      hits: CloudSafe<CloudSearchHit>[]
+      /** Older matches exist — narrow the range or add a word. */
+      truncated: boolean
+    }
+  | { ok: false; error: string }
+
 export const listRecentNotesInput = z.object({
   limit: z
     .number()
@@ -125,8 +206,6 @@ export const listRecentNotesInput = z.object({
         'Omit, or pass null, to list all recent notes.',
     ),
 })
-
-const isoDate = z.iso.date()
 
 export const listDailyNotesInput = z.object({
   start: isoDate.describe('First day of the range, inclusive (YYYY-MM-DD)'),
@@ -219,6 +298,42 @@ class NoteToolsServiceImpl implements NoteToolsService {
             excludePrivateContent: true,
           })
           return { hits: await privacy.cloudSafeSearchHits(hits) }
+        },
+      },
+
+      find_in_notes: {
+        description:
+          'Find every note that matches the word groups — not just the best few — most ' +
+          'recent first, each with a snippet around its matches. Use it for people, ' +
+          'conversations, and meetings. from/to limit it to daily notes in that range, so ' +
+          'leave them out when the note may not be a daily note. Returns at most ' +
+          `${MAX_FIND_NOTES} notes — when truncated, older matches exist: narrow the range ` +
+          'or add a word. Call read_notes when a snippet is not enough. Private notes are ' +
+          'excluded.',
+        inputSchema: findInNotesInput,
+        execute: async ({ groups, from, to, linksTo }): Promise<FindInNotesOutput> => {
+          const result = await retrieval.findAll(groups, {
+            limit: MAX_FIND_NOTES,
+            from: from ?? null,
+            to: to ?? null,
+            linksTo: linksTo ?? null,
+          })
+          if (!result.ok) {
+            return {
+              ok: false,
+              error:
+                result.reason === 'unresolvedLink'
+                  ? UNKNOWN_LINK_TARGET_ERROR
+                  : result.reason === 'reversedRange'
+                    ? REVERSED_RANGE_ERROR
+                    : UNSEARCHABLE_WORDS_ERROR,
+            }
+          }
+          return {
+            ok: true,
+            hits: await privacy.cloudSafeSearchHits(result.hits),
+            truncated: result.truncated,
+          }
         },
       },
 
@@ -324,6 +439,7 @@ type PromiseTool<I, O> = {
  */
 export type NoteTools = {
   search_notes: PromiseTool<z.infer<typeof searchNotesInput>, SearchNotesOutput>
+  find_in_notes: PromiseTool<z.infer<typeof findInNotesInput>, FindInNotesOutput>
   list_recent_notes: PromiseTool<z.infer<typeof listRecentNotesInput>, ListRecentNotesOutput>
   list_daily_notes: PromiseTool<z.infer<typeof listDailyNotesInput>, ListDailyNotesOutput>
   read_notes: PromiseTool<z.infer<typeof readNotesInput>, ReadNotesOutput>
@@ -363,6 +479,14 @@ export interface ReadAssetSummary {
  */
 export type NoteToolCall =
   | { tool: 'search'; toolCallId: string; query: string }
+  | {
+      tool: 'find'
+      toolCallId: string
+      groups: string[][]
+      from: string | null
+      to: string | null
+      linksTo: string | null
+    }
   | { tool: 'read'; toolCallId: string; paths: string[] }
   | { tool: 'assets'; toolCallId: string; paths: string[] }
   | { tool: 'recents'; toolCallId: string; tag: string | null }
@@ -373,6 +497,14 @@ export type NoteToolCall =
  */
 export type NoteToolResult =
   | { tool: 'search'; toolCallId: string; query: string; hits: NoteHitSummary[] }
+  | {
+      tool: 'find'
+      toolCallId: string
+      notes: NoteHitSummary[]
+      truncated: boolean
+      /** The refusal text when the call was refused, else `null`. */
+      error: string | null
+    }
   | { tool: 'read'; toolCallId: string; notes: ReadNoteSummary[] }
   | { tool: 'assets'; toolCallId: string; assets: ReadAssetSummary[] }
   | {
@@ -394,6 +526,15 @@ export function noteToolCall(part: TypedToolCall<NoteTools>): NoteToolCall | nul
   switch (part.toolName) {
     case 'search_notes':
       return { tool: 'search', toolCallId: part.toolCallId, query: part.input.query }
+    case 'find_in_notes':
+      return {
+        tool: 'find',
+        toolCallId: part.toolCallId,
+        groups: part.input.groups,
+        from: part.input.from ?? null,
+        to: part.input.to ?? null,
+        linksTo: part.input.linksTo ?? null,
+      }
     case 'read_notes':
       return { tool: 'read', toolCallId: part.toolCallId, paths: part.input.paths }
     case 'read_assets':
@@ -432,6 +573,24 @@ export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult
         query: part.input.query,
         hits: part.output.hits.map((hit) => ({ path: hit.path, title: hit.title })),
       }
+    case 'find_in_notes': {
+      const output = part.output
+      return output.ok
+        ? {
+            tool: 'find',
+            toolCallId: part.toolCallId,
+            notes: output.hits.map((hit) => ({ path: hit.path, title: hit.title })),
+            truncated: output.truncated,
+            error: null,
+          }
+        : {
+            tool: 'find',
+            toolCallId: part.toolCallId,
+            notes: [],
+            truncated: false,
+            error: output.error,
+          }
+    }
     case 'read_notes':
       return {
         tool: 'read',

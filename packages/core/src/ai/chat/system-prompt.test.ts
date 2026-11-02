@@ -44,6 +44,7 @@ describe('chatSystemPrompt', () => {
     expect(prompt).toContain('raise its “limit” (up to 20) in one call')
     expect(prompt).toContain('pass all their paths to read_notes in one call')
     expect(prompt).toContain('limited number of tool rounds')
+    expect(prompt).toContain('start with find_in_notes')
   })
 
   it('points attachment links at read_assets', () => {

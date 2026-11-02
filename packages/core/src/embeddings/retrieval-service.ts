@@ -2,7 +2,10 @@ import { sql } from 'kysely'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import { literalSearchQuery } from '../indexing/filter-query.ts'
+import { buildFtsGroupsMatch } from '../indexing/search-query.ts'
+import { HIGHLIGHT_END, HIGHLIGHT_START } from '../indexing/search.ts'
 import type { SearchService } from '../indexing/search-service.ts'
+import type { WikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import type { EmbeddingRuntimeService } from './embedding-runtime-service.ts'
 
 /**
@@ -36,7 +39,50 @@ export interface RetrieveOptions {
   excludePrivateContent?: boolean
 }
 
+/**
+ * What {@link RetrievalService.findAll} matches within.
+ */
+export interface FindAllOptions {
+  /** Most notes returned; one more is fetched to tell whether more matched. */
+  limit: number
+  /** Only daily notes dated on or after this ISO day. */
+  from?: string | null
+  /** Only daily notes dated on or before this ISO day. */
+  to?: string | null
+  /** Only notes linking to the note with this title, alias, or date (`[[…]]` allowed). */
+  linksTo?: string | null
+}
+
+/**
+ * The notes {@link RetrievalService.findAll} matched, or why it could not search.
+ */
+export type FindAllResult =
+  | {
+      ok: true
+      /**
+       * Most recent first: a daily note by its date, any other note by its
+       * last edit. Each snippet is the stretch with the most matching words.
+       */
+      hits: RetrievalHit[]
+      /** Older matches exist past `limit`. */
+      truncated: boolean
+    }
+  /**
+   * `linksTo` names no public note, a group has no searchable word, or `from`
+   * is after `to`. Matching nothing
+   * would read as "no such note"; a private target is refused like a missing
+   * one, so the reply never reveals it exists.
+   */
+  | { ok: false; reason: 'unresolvedLink' | 'unsearchableWords' | 'reversedRange' }
+
 const KNN_CANDIDATES = 24
+
+/**
+ * Snippet length for {@link RetrievalService.findAll}, in tokens: FTS5's
+ * maximum, so one stretch carries a meeting bullet, where search's short
+ * snippet only identifies the note.
+ */
+const FIND_SNIPPET_TOKENS = 64
 
 /**
  * Neighbors farther than this cosine distance are noise, not matches: KNN
@@ -176,11 +222,22 @@ export interface RetrievalService {
    * instead of wrong ones.
    */
   relatedNotes(path: string, limit?: number): Promise<RetrievalHit[]>
+  /**
+   * Every note that matches at least one alternative of each group (each word
+   * at a word start, like the lexical leg), most recent first rather than a
+   * ranked few: `[["Andy", "Bob"], ["beets", "battle"]]` is grep's
+   * `(Andy|Bob)` then `(beets|battle)`. Built for outbound (AI) callers,
+   * so notes indexed as private are left out entirely, before the limit: they
+   * cannot surface through `truncated` either. Callers still re-check each
+   * hit live before sending it.
+   */
+  findAll(groups: readonly (readonly string[])[], options: FindAllOptions): Promise<FindAllResult>
 }
 
 export interface RetrievalServiceDeps {
   readonly database: DatabaseService
   readonly search: SearchService
+  readonly wikiResolver: WikiResolverService
   readonly embeddingRuntime: EmbeddingRuntimeService
   readonly logger: LoggerService
 }
@@ -245,6 +302,80 @@ class RetrievalServiceImpl implements RetrievalService {
       }),
     )
     return bestChunkPerNote(mergeNearestFirst(neighborLists), limit, path)
+  }
+
+  async findAll(
+    groups: readonly (readonly string[])[],
+    options: FindAllOptions,
+  ): Promise<FindAllResult> {
+    const { database } = this.#deps
+    if (options.from != null && options.to != null && options.from > options.to) {
+      return { ok: false, reason: 'reversedRange' }
+    }
+    const conditions = [sql`n.is_private = 0`, sql`n.kind != 'template'`]
+    if (options.linksTo != null) {
+      const target = await this.#publicNotePath(options.linksTo)
+      if (target === null) {
+        return { ok: false, reason: 'unresolvedLink' }
+      }
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM backlinks b WHERE b.source_path = n.path AND b.target_path = ${target})`,
+      )
+    }
+    const match = buildFtsGroupsMatch(groups)
+    if (match === null) {
+      return { ok: false, reason: 'unsearchableWords' }
+    }
+    if (options.from != null) {
+      conditions.push(sql`n.daily_date >= ${options.from}`)
+    }
+    if (options.to != null) {
+      conditions.push(sql`n.daily_date <= ${options.to}`)
+    }
+    // `mtime` is epoch ms; a daily note sorts by its own date, which can
+    // differ from the day it was last edited.
+    const found = await sql<{ path: string; title: string; snippet: string }>`
+      SELECT n.path, n.title,
+             snippet(search_fts, 2, ${HIGHLIGHT_START}, ${HIGHLIGHT_END}, '…', ${FIND_SNIPPET_TOKENS}) AS snippet
+      FROM search_fts
+      JOIN notes n ON n.path = search_fts.path
+      WHERE search_fts MATCH ${match} AND ${sql.join(conditions, sql` AND `)}
+      ORDER BY coalesce(n.daily_date, date(n.mtime / 1000, 'unixepoch', 'localtime')) DESC,
+               n.mtime DESC, n.path
+      LIMIT ${options.limit + 1}
+    `.execute(database.db)
+    return {
+      ok: true,
+      hits: found.rows.slice(0, options.limit).map((row, index) => ({
+        path: row.path,
+        title: row.title,
+        score: 1 / (1 + index), // recency order, not relevance
+        // An unmarked snippet is a body fragment of a title-only match, not
+        // evidence; search drops it for the same reason.
+        snippet: row.snippet.includes(HIGHLIGHT_START) ? row.snippet : '',
+        heading: null,
+        isPrivate: false,
+      })),
+      truncated: found.rows.length > options.limit,
+    }
+  }
+
+  /**
+   * The path `title` resolves to, or `null` when it names no public note.
+   * `[[Title]]` is accepted as well: models copy targets the way notes spell them.
+   */
+  async #publicNotePath(title: string): Promise<string | null> {
+    const bare = title.trim().replace(/^\[\[(.*)\]\]$/, '$1')
+    const target = await this.#deps.wikiResolver.resolveWikiTarget(bare)
+    if (target.kind !== 'resolved') {
+      return null
+    }
+    const note = await this.#deps.database.db
+      .selectFrom('notes')
+      .where('path', '=', target.ref)
+      .select('isPrivate')
+      .executeTakeFirst()
+    return note?.isPrivate === 0 ? target.ref : null
   }
 
   async #semanticHits(query: string, limit: number): Promise<RetrievalHit[]> {

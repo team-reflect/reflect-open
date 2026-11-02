@@ -2,7 +2,12 @@ import { createTestGraphSessionService } from '../../testing/graph-session.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../../errors.ts'
 import type { ToolExecutionOptions } from '@reflect/modules/ai'
-import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieval-service.ts'
+import type {
+  FindAllOptions,
+  FindAllResult,
+  RetrievalHit,
+  RetrieveOptions,
+} from '../../embeddings/retrieval-service.ts'
 import type { DailyNoteRow, DailyNotesRange } from '../../daily/daily-note-service.ts'
 import {
   createNoteListService,
@@ -30,6 +35,12 @@ import {
   createNoteToolsService,
   INVALID_TAG_ERROR,
   MAX_DAILY_NOTE_DAYS,
+  MAX_FIND_NOTES,
+  UNKNOWN_LINK_TARGET_ERROR,
+  UNSEARCHABLE_WORDS_ERROR,
+  REVERSED_RANGE_ERROR,
+  findInNotesInput,
+  type FindInNotesOutput,
   type ListDailyNotesOutput,
   type ListRecentNotesOutput,
   type NoteTools,
@@ -41,6 +52,10 @@ import {
  */
 interface ToolEffects {
   retrieveFn?: (query: string, options?: RetrieveOptions) => Promise<RetrievalHit[]>
+  findAllFn?: (
+    groups: readonly (readonly string[])[],
+    options: FindAllOptions,
+  ) => Promise<FindAllResult>
   readNoteFn?: (path: string) => Promise<string>
   listRecentNotesFn?: (options: RecentNotesOptions) => Promise<RecentNoteRow[]>
   listDailyNotesFn?: (range: DailyNotesRange) => Promise<DailyNoteRow[]>
@@ -63,6 +78,9 @@ function buildNoteTools(effects: ToolEffects = {}): NoteTools {
   const retrieval = createTestRetrievalService()
   vi.spyOn(retrieval, 'retrieve').mockImplementation(
     effects.retrieveFn ?? (() => Promise.resolve([])),
+  )
+  vi.spyOn(retrieval, 'findAll').mockImplementation(
+    effects.findAllFn ?? (() => Promise.resolve({ ok: true, hits: [], truncated: false })),
   )
   const noteList = createNoteListService({ database: createNodeTestDatabaseService() })
   vi.spyOn(noteList, 'listRecentNotes').mockImplementation(
@@ -267,6 +285,105 @@ describe('search_notes', () => {
     })
     await runSearch(tools, { query: 'atlas', limit: 3 })
     expect(seen[0]?.limit).toBe(3)
+  })
+})
+
+/** Execute `find_in_notes` directly. */
+async function runFind(
+  tools: NoteTools,
+  input: Parameters<NoteTools['find_in_notes']['execute']>[0],
+): Promise<FindInNotesOutput> {
+  return await tools.find_in_notes.execute(input, CALL)
+}
+
+describe('find_in_notes', () => {
+  it('passes the groups, the note cap and the filters to retrieval', async () => {
+    const seen: Array<{ groups: readonly (readonly string[])[]; options: FindAllOptions }> = []
+    const tools = buildNoteTools({
+      findAllFn: (groups, options) => {
+        seen.push({ groups, options })
+        return Promise.resolve({ ok: true, hits: [], truncated: false })
+      },
+    })
+    await runFind(tools, { groups: [['Andy', 'Bob'], ['beets']], from: '2026-06-01', to: null })
+    expect(seen).toEqual([
+      {
+        groups: [['Andy', 'Bob'], ['beets']],
+        options: { limit: MAX_FIND_NOTES, from: '2026-06-01', to: null, linksTo: null },
+      },
+    ])
+  })
+
+  it('treats null and empty strings as unused optional inputs, as local models send them', () => {
+    expect(findInNotesInput.parse({ groups: [['Andy']], from: '', to: null, linksTo: '' })).toEqual(
+      { groups: [['Andy']], from: null, to: null, linksTo: null },
+    )
+  })
+
+  it('returns the gated hits with their snippets and the truncation flag', async () => {
+    const tools = buildNoteTools({
+      findAllFn: () => Promise.resolve({ ok: true, hits: [hit({})], truncated: true }),
+      readNoteFn: () => Promise.resolve('a public body\n'),
+    })
+    await expect(runFind(tools, { groups: [['Andy']] })).resolves.toEqual({
+      ok: true,
+      hits: [
+        {
+          path: 'notes/public.md',
+          title: 'Public note',
+          snippet: 'a public snippet',
+          heading: null,
+        },
+      ],
+      truncated: true,
+    })
+  })
+
+  it('drops a hit whose live frontmatter turned private before reindex (TOCTOU)', async () => {
+    const tools = buildNoteTools({
+      findAllFn: () => {
+        return Promise.resolve({
+          ok: true,
+          hits: [hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE, snippet: PRIVATE_BODY })],
+          truncated: false,
+        })
+      },
+      readNoteFn: () => Promise.resolve('---\nprivate: true\n---\n# Diary\n'),
+    })
+    const output = await runFind(tools, { groups: [['diary']] })
+    expect(output).toEqual({ ok: true, hits: [], truncated: false })
+    const payload = JSON.stringify(output)
+    expect(payload).not.toContain(PRIVATE_TITLE)
+    expect(payload).not.toContain(PRIVATE_BODY)
+  })
+
+  it('refuses a link target that names no note', async () => {
+    const tools = buildNoteTools({
+      findAllFn: () => Promise.resolve({ ok: false, reason: 'unresolvedLink' }),
+    })
+    await expect(runFind(tools, { groups: [['Bob']], linksTo: 'Andrew' })).resolves.toEqual({
+      ok: false,
+      error: UNKNOWN_LINK_TARGET_ERROR,
+    })
+  })
+
+  it('refuses a reversed date range', async () => {
+    const tools = buildNoteTools({
+      findAllFn: () => Promise.resolve({ ok: false, reason: 'reversedRange' }),
+    })
+    await expect(
+      runFind(tools, { groups: [['Andy']], from: '2026-10-31', to: '2026-06-01' }),
+    ).resolves.toEqual({ ok: false, error: REVERSED_RANGE_ERROR })
+  })
+
+  it('refuses words that cannot be searched', async () => {
+    const tools = buildNoteTools({
+      findAllFn: () => Promise.resolve({ ok: false, reason: 'unsearchableWords' }),
+    })
+    await expect(runFind(tools, { groups: [['--']] })).resolves.toEqual({
+      ok: false,
+      error: UNSEARCHABLE_WORDS_ERROR,
+    })
   })
 })
 
