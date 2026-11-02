@@ -2,55 +2,47 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TestCoreServices } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { DailyCaptureMenu } from './daily-capture-menu.tsx'
-import type { MobileAudioMemoSessionState } from '@reflect/core'
-import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
-import type { Mutable } from '@reflect/utils'
+import { WritableStore, type MobileAudioMemoSessionState } from '@reflect/core'
+import { MobileAudioMemoContext } from '@/mobile/audio-memo-provider.tsx'
+import { act } from '@/test-utils/act.ts'
 
-type MemoMock = Mutable<
-  MobileAudioMemoSessionState &
-    Omit<MobileAudioMemoContextValue, 'session'> & { elapsedMs: number; level: number }
->
-
-const memo = vi.hoisted((): MemoMock => ({
+const INITIAL: MobileAudioMemoSessionState = {
   phase: 'idle',
-  elapsedMs: 0,
-  level: 0,
   pendingCount: 0,
   available: true,
   hasTranscriptionConfig: true,
   error: null,
   canRetry: false,
   drawerOpen: false,
+}
+
+const state = new WritableStore(INITIAL)
+const tick = new WritableStore(0)
+const actions = {
   toggle: vi.fn(),
   stopAndSave: vi.fn(),
   cancelRecording: vi.fn(),
   onDrawerOpenChange: vi.fn(),
   retry: vi.fn(),
   discard: vi.fn(),
-}))
+}
+const session = { get: state.get, subscribe: state.subscribe, elapsedMs: tick, level: tick }
 
-vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
-  useMobileAudioMemo: (): MobileAudioMemoContextValue => ({
-    ...memo,
-    session: {
-      get: () => memo,
-      subscribe: () => () => {},
-      elapsedMs: { get: () => memo.elapsedMs, subscribe: () => () => {} },
-      level: { get: () => memo.level, subscribe: () => () => {} },
-    },
-  }),
-  useMobileAudioMemoField: <K extends keyof MobileAudioMemoSessionState>(key: K) => memo[key],
-}))
+function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
+  state.set({ ...state.get(), ...patch })
+}
 
 function renderMenu(): Promise<InAppRenderResult<TestCoreServices>> {
-  return renderInApp(<DailyCaptureMenu />)
+  return renderInApp(
+    <MobileAudioMemoContext value={{ session, ...actions }}>
+      <DailyCaptureMenu />
+    </MobileAudioMemoContext>,
+  )
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  memo.phase = 'idle'
-  memo.available = true
-  memo.error = null
+  state.set(INITIAL)
 })
 
 describe('DailyCaptureMenu', () => {
@@ -131,7 +123,7 @@ describe('DailyCaptureMenu', () => {
 
     await view.getByRole('button', { name: 'Record audio memo' }).click()
 
-    expect(memo.toggle).toHaveBeenCalledTimes(1)
+    expect(actions.toggle).toHaveBeenCalledTimes(1)
     await expect
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')
@@ -140,23 +132,25 @@ describe('DailyCaptureMenu', () => {
   it('shows the current recording, processing, and error states when reopened', async () => {
     const view = await renderMenu()
 
-    memo.phase = 'recording'
-    await view.rerender(<DailyCaptureMenu />)
+    await act(() => {
+      setMemo({ phase: 'recording' })
+    })
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await expect.element(view.getByRole('button', { name: 'Stop recording' })).toBeInTheDocument()
     await view.getByRole('button', { name: 'Hide capture actions' }).click()
 
-    memo.phase = 'transcribing'
-    await view.rerender(<DailyCaptureMenu />)
+    await act(() => {
+      setMemo({ phase: 'transcribing' })
+    })
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await expect
       .element(view.getByRole('button', { name: 'Record audio memo' }).getByTestId('spinner'))
       .toBeInTheDocument()
     await view.getByRole('button', { name: 'Hide capture actions' }).click()
 
-    memo.phase = 'error'
-    memo.error = 'disk full'
-    await view.rerender(<DailyCaptureMenu />)
+    await act(() => {
+      setMemo({ phase: 'error', error: 'disk full' })
+    })
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await expect
       .element(view.getByRole('button', { name: 'Show audio memo error' }))
@@ -164,7 +158,7 @@ describe('DailyCaptureMenu', () => {
   })
 
   it('reveals only New note when native audio is unavailable', async () => {
-    memo.available = false
+    setMemo({ available: false })
     const view = await renderMenu()
 
     await view.getByRole('button', { name: 'Show capture actions' }).click()
