@@ -185,7 +185,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
 
   // Re-anchor on every explicit arrival (`arrivalSeq` bumps even when ⌘D is
   // pressed while already on today — the router clears the entry's saved
-  // offset for that case; `entryId` covers back/forward between entries whose
+  // position for that case; `entryId` covers back/forward between entries whose
   // routes resolve to the same day). A back/forward-restored entry carries its
   // saved day; a fresh navigation anchors to the target day.
   //
@@ -228,7 +228,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
   }, [arrivalSeq, entryId, dayWindow, savedScroll])
 
-  // Save the top day, not a pixel offset, which goes stale as rows measure.
+  // Save the day at the viewport top and how far into it the viewport starts.
   const saveDayScroll = useCallback(
     (scrollTop: number) => {
       const virtualizer = virtualizerRef.current

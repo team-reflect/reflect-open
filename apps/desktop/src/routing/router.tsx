@@ -57,7 +57,7 @@ interface RouterValue {
   /** Record the active view's scroll position on the current history entry. */
   saveScrollState: (position: ScrollPosition) => void
   /**
-   * Discard the current view's saved scroll offsets — the active history
+   * Discard the current view's saved scroll positions — the active history
    * entry's and, when the route belongs to a long-lived surface, the surface's
    * too — so the view re-anchors when revisited through **any** door (⌘[ back
    * or a `restoreSurfaceScroll` nav-tab return alike).
@@ -101,7 +101,7 @@ export function RouterProvider({
   // Written during render, not in an effect: descendant scroll-restoration
   // effects read this (through saveScrollState/savedScroll) on the same
   // commit, and React runs effects child-before-parent — so updating it in an
-  // effect here would lag a frame and restore or save the wrong entry's offset.
+  // effect here would lag a frame and restore or save the wrong entry's position.
   renderedRef.current = state
 
   useEffect(() => {

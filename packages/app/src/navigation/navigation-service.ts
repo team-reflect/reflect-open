@@ -7,13 +7,13 @@ import { normalizeRoute, routesEqual, type Route } from './route.ts'
  * no URL, no dependency. `navigate` pushes (truncating any forward entries,
  * like a browser), `back`/`forward` move the cursor.
  *
- * Each history entry can carry a **scroll offset** (Plan 06b): views report
+ * Each history entry can carry a **scroll position** (Plan 06b): views report
  * theirs via `saveScrollState` (never notifies subscribers — safe from scroll
  * handlers) and read `savedScroll()` after a back/forward restores an entry.
  * Plain views save a pixel offset; the daily stream saves a {@link DayScrollPosition}.
  *
  * Long-lived surfaces (the daily stream, shared by the today/daily routes)
- * additionally keep a **surface offset** — the last reported position,
+ * additionally keep a **surface position** — the last reported position,
  * independent of any history entry — so a nav-tab return can resume the stream
  * where the user left it (`restoreSurfaceScroll`) even though it lands on a
  * fresh entry.
@@ -112,7 +112,7 @@ export interface NavigationService extends Store<NavigationState> {
    */
   saveScrollState(position: ScrollPosition, at?: NavigationPosition): void
   /**
-   * Discard a view's saved scroll offsets — its history entry's and, when the
+   * Discard a view's saved scroll positions — its history entry's and, when the
    * route belongs to a long-lived surface, the surface's too — so the view
    * re-anchors when revisited through **any** door (⌘[ back or a
    * `restoreSurfaceScroll` nav-tab return alike).
@@ -125,13 +125,13 @@ export interface NavigationService extends Store<NavigationState> {
   /**
    * A note file moved (Plan 17): rewrite every history entry that points at
    * the old path — the current route follows the file without an arrival
-   * (same entry ids, so scroll offsets and back/forward stay intact), and a
+   * (same entry ids, so scroll positions and back/forward stay intact), and a
    * back-nav can never land on a path that no longer exists.
    */
   noteMoved(from: string, to: string): void
   /**
    * Start a fresh history on `initialRoute` (today by default), dropping every
-   * entry and scroll offset: switching graphs must not carry the old graph's
+   * entry and scroll position: switching graphs must not carry the old graph's
    * history. The view tree that mounts for the new history calls this while it
    * renders, so subscribers are not notified; read `get()` afterwards.
    */
@@ -176,11 +176,11 @@ class NavigationServiceImpl implements NavigationService {
   #nextId = 0
   #revision = 0
   /**
-   * Scroll offsets by entry id.
+   * Scroll positions by entry id.
    */
   readonly #scrollById = new Map<number, ScrollPosition>()
   /**
-   * Last offset per long-lived surface, independent of history entries.
+   * Last position per long-lived surface, independent of history entries.
    */
   readonly #scrollBySurface = new Map<string, ScrollPosition>()
   // Not a `WritableStore`: `reset` replaces the state without notifying,
@@ -217,7 +217,7 @@ class NavigationServiceImpl implements NavigationService {
       scrollSurfaceForRoute(currentEntry.route) !== surface
     const restored = returning ? this.#scrollBySurface.get(surface) : undefined
     if (surface !== null && restored === undefined) {
-      // An explicit arrival re-anchors the surface, making its saved offset
+      // An explicit arrival re-anchors the surface, making its saved position
       // stale — drop it so a later nav-tab return re-anchors too instead of
       // resurrecting the pre-arrival position. Scrolling after the arrival
       // repopulates it.
@@ -228,18 +228,18 @@ class NavigationServiceImpl implements NavigationService {
         this.#scrollById.set(currentEntry.id, restored)
       } else {
         // No stack growth — but this is still an explicit arrival: forget the
-        // entry's saved offset so the view re-anchors to its target instead of
+        // entry's saved position so the view re-anchors to its target instead of
         // restoring the old scroll position.
         this.#scrollById.delete(currentEntry.id)
       }
     } else {
       const dropped = this.#stack.slice(this.#index + 1)
       for (const entry of dropped) {
-        this.#scrollById.delete(entry.id) // truncated branch — free its offsets
+        this.#scrollById.delete(entry.id) // truncated branch — free its positions
       }
       const id = this.#nextId++
       if (restored !== undefined) {
-        this.#scrollById.set(id, restored) // seed the fresh entry with the surface offset
+        this.#scrollById.set(id, restored) // seed the fresh entry with the surface position
       }
       this.#stack = [...this.#stack.slice(0, this.#index + 1), { id, route: target }]
       this.#index = this.#stack.length - 1
