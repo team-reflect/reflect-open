@@ -19,7 +19,7 @@ import { useGraphColors } from '@/hooks/use-graph-colors.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'
 import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
@@ -76,7 +76,9 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
   const { logger } = useCoreServices()
   const { opener, window: appWindow } = useAppServices()
-  const { recents, indexing, openRecent, chooseGraph } = useGraph()
+  const recents = useGraphRecents()
+  const indexing = useGraphIndexing()
+  const { openRecent, chooseGraph } = useGraphActions()
   const { colorFor } = useGraphColors()
   const { state } = useGitSync()
   const { route } = useRouter()

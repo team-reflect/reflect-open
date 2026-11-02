@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { parseSearchQuery } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import type { PaletteSections } from './entries.ts'
@@ -25,7 +25,7 @@ export interface PaletteResults {
 }
 
 export function usePaletteResults(open: boolean, query: string): PaletteResults {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { paletteSearch } = useAppServices()
   // Hybrid needs both halves of the opt-in: the setting on *and* the model
   // ready. The setting gate makes disabling immediate — the model stays loaded

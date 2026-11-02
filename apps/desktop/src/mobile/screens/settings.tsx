@@ -30,7 +30,8 @@ import {
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
 import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import {
   aiProvider,
@@ -112,7 +113,9 @@ function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
  */
 export function MobileSettings(): ReactElement {
   const { back, canBack, navigate } = useRouter()
-  const { graph, mobileStorageKind, platform } = useGraph()
+  const graph = useGraphInfo()
+  const { platform } = useGraphActions()
+  const { mobileStorageKind } = useMobileGraphBoot()
   const isIos = platform === 'ios'
   const subscriptionControls = useSubscriptionControls()
   const { opener } = useAppServices()

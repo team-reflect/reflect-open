@@ -5,7 +5,7 @@ import { getIsoToday } from '@reflect/utils'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo, useGraphRecents } from '@/providers/graph-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
@@ -55,7 +55,9 @@ export function useAppShortcuts(): CommandContext {
   const { commands, nativeMenu } = appServices
   const focusedDailyDate = useFocusedDailyDate()
   const { resolvedTheme, setTheme } = useTheme()
-  const { graph, recents, openRecent } = useGraph()
+  const graph = useGraphInfo()
+  const recents = useGraphRecents()
+  const { openRecent } = useGraphActions()
   const { openPalette, open: paletteOpen } = usePalette()
   const { openShortcuts, closeShortcuts, open: shortcutsOpen } = useShortcuts()
   const {

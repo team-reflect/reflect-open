@@ -27,7 +27,7 @@ import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview.tsx'
 import { useXPostPreload } from '@/editor/use-x-post-preload.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useNoteSearchQuery, useNoteSearchReport } from '@/providers/note-find-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -125,7 +125,7 @@ export function NotePaneComponent({
   registerHandle,
   onExitBoundary,
 }: NotePaneProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { settings } = useSettings()
   const { noteCreation, platform } = useCoreServices()
   const graphKey = graph?.root ?? null

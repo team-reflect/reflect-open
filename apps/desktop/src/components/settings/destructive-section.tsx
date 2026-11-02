@@ -2,13 +2,14 @@ import { useCallback, useState, type ReactElement } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
 import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 
 export function DestructiveSection(): ReactElement {
-  const { graph, forget } = useGraph()
+  const graph = useGraphInfo()
+  const { forget } = useGraphActions()
   const [confirming, setConfirming] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const graphRoot = graph?.root ?? null
@@ -89,7 +90,7 @@ function DeleteGraphDialog({
   name: string
   onClose: () => void
 }): ReactElement {
-  const { deleteGraph } = useGraph()
+  const { deleteGraph } = useGraphActions()
   const [typedName, setTypedName] = useState('')
   // GitHub-style guard: the delete button stays dead until the typed name
   // matches the graph's folder name exactly.

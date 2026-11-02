@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ContactMatch } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useContactsState } from './use-contacts-state.ts'
@@ -23,7 +23,7 @@ import { useContactsState } from './use-contacts-state.ts'
  * this — the card hides through the same file-is-truth loop as everything else.
  */
 export function useSuggestedContact(path: string): ContactMatch | null {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { settings } = useSettings()
   // Re-render when the permission state changes; the gate reads it.
   useContactsState()

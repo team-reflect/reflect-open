@@ -3,7 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import type { BacklinkContext, BacklinkContextPage, BacklinkSourceCursor } from '@reflect/core'
 import { groupBacklinksBySource, type BacklinkSource } from '@/lib/group-backlinks.ts'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const BACKLINK_SOURCES_PER_PAGE = 10
@@ -64,7 +64,7 @@ function groupLoadedBacklinks(pages: readonly BacklinkContextPage[]): BacklinkSo
  * @param path graph-relative path of the note whose inbound links to load.
  */
 export function useBacklinkSources(path: string): BacklinkSources {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { backlinks } = useCoreServices()
   const {
     data,

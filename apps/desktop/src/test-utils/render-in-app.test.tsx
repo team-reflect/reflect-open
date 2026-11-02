@@ -2,7 +2,15 @@ import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { createTestCoreServices } from '@reflect/core/testing'
-import { useGraph, useMaybeGraph } from '@/providers/graph-provider.tsx'
+import {
+  useGraphIndexing,
+  useGraphInfo,
+  useGraphRecents,
+  useGraphStatus,
+  useIndexGeneration,
+  useMaybeGraphInfo,
+} from '@/providers/graph-provider.tsx'
+import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -11,7 +19,12 @@ import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MOBILE_PLATFORM, renderHookInApp, renderInApp } from './render-in-app.tsx'
 
 function Probe(): ReactElement {
-  const { status, graph, indexGeneration, indexing, recents, mobileStorageKind } = useGraph()
+  const status = useGraphStatus()
+  const graph = useGraphInfo()
+  const indexGeneration = useIndexGeneration()
+  const indexing = useGraphIndexing()
+  const recents = useGraphRecents()
+  const { mobileStorageKind } = useMobileGraphBoot()
   const { settings, updateSettings } = useSettings()
   const { route, navigate } = useRouter()
   const sync = useGitSyncContext()
@@ -119,7 +132,7 @@ describe('renderInApp', () => {
   })
 
   it('mounts only the services with `servicesOnly`, and registers the app commands', async () => {
-    const { result, appServices: appLayer } = await renderHookInApp(() => useMaybeGraph(), {
+    const { result, appServices: appLayer } = await renderHookInApp(() => useMaybeGraphInfo(), {
       servicesOnly: true,
     })
 
@@ -130,7 +143,7 @@ describe('renderInApp', () => {
 
 describe('renderHookInApp', () => {
   it('runs the hook inside the same providers', async () => {
-    const { result, core } = await renderHookInApp(() => useGraph().graph?.root ?? null, {
+    const { result, core } = await renderHookInApp(() => useGraphInfo()?.root ?? null, {
       graph: { root: '/g' },
     })
     expect(result.current).toBe('/g')
