@@ -161,7 +161,7 @@ async function createService(
     keyValidation: createTestAiKeyValidationService(),
     id: createTestIdService(),
   })
-  providerConfig.list()
+  providerConfig.get()
   await settings.whenLoaded()
   const languageModel = createTestLanguageModelService(
     options.model ??
