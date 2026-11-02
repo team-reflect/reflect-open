@@ -17,7 +17,7 @@ export interface Store<T> {
 /**
  * A {@link Store} that holds its value and notifies on {@link set}.
  */
-export class WriteableStore<T> implements Store<T> {
+export class WritableStore<T> implements Store<T> {
   #value: T
   readonly #listeners = new Set<() => void>()
   readonly #isEqual: (a: T, b: T) => boolean
@@ -32,32 +32,21 @@ export class WriteableStore<T> implements Store<T> {
   }
 
   /**
-   * Replace the value. An identical value is ignored. With
-   * `emit: false` the caller must call {@link emit} itself, for example to
-   * notify once after other state changed as well.
+   * Replaces the value and notifies the listeners. An equal value is ignored.
    */
-  readonly set = (value: T, emit: boolean = true): void => {
+  readonly set = (value: T): void => {
     if (this.#isEqual(this.#value, value)) {
       return
     }
     this.#value = value
-    if (emit) {
-      this.emit()
+    for (const listener of this.#listeners) {
+      listener()
     }
   }
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
     this.#listeners.add(listener)
     return () => this.#listeners.delete(listener)
-  }
-
-  /**
-   * Call every listener, whether or not the value changed.
-   */
-  readonly emit = (): void => {
-    for (const listener of this.#listeners) {
-      listener()
-    }
   }
 }
 

@@ -5,7 +5,7 @@ import {
   createTestStorageService,
   type TestStorageService,
 } from '@reflect/core/testing'
-import type { Settings } from '@reflect/core'
+import type { Settings, ThemePreference } from '@reflect/core'
 import { createThemeService, THEME_PREFERENCE_CACHE_KEY } from './theme-service.ts'
 
 function setup(stored: Partial<Settings> = {}, options: { gateLoad?: boolean } = {}) {
@@ -57,12 +57,12 @@ describe('createThemeService', () => {
 
   it('notifies subscribers when the load settles', async () => {
     const { theme } = setup({ theme: 'dark' })
-    let calls = 0
+    const seen: [ThemePreference, boolean][] = []
     theme.subscribe(() => {
-      calls += 1
+      seen.push([theme.preference(), theme.settled()])
     })
     await theme.whenSettled()
-    expect(calls).toBe(1)
+    expect(seen.at(-1)).toEqual(['dark', true])
   })
 
   it('caches `system` verbatim rather than the theme it resolved to', async () => {

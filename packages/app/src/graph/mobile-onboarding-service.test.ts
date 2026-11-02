@@ -337,7 +337,7 @@ describe('MobileOnboardingService boot', () => {
     context.activity.emitFocus()
 
     await expect.poll(() => context.service.getState().needsOnboarding).toBe(true)
-    expect(context.settings.status()).toBe('loaded')
+    expect(context.settings.status.get()).toBe('loaded')
   })
 
   it('reloads failed settings when the app turns visible, then opens the graph', async () => {
@@ -390,7 +390,7 @@ describe('MobileOnboardingService boot', () => {
     context.activity.emitFocus()
     await context.clock.advance(0)
 
-    expect(context.settings.status()).toBe('failed')
+    expect(context.settings.status.get()).toBe('failed')
   })
 
   it('opens nothing once the boot is stopped', async () => {

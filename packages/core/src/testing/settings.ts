@@ -1,5 +1,6 @@
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { AppError } from '../errors.ts'
+import type { Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { Settings } from '../settings/schema.ts'
 import {
@@ -68,6 +69,7 @@ class TestSettingsServiceImpl implements TestSettingsService {
       },
     })
     this.#inner = createSettingsService({ ipc: this.ipc, progress })
+    this.status = this.#inner.status
   }
 
   readonly get = (): Settings => this.#inner.get()
@@ -88,7 +90,7 @@ class TestSettingsServiceImpl implements TestSettingsService {
 
   readonly flush = (): Promise<void> => this.#inner.flush()
 
-  readonly status = (): SettingsStatus => this.#inner.status()
+  readonly status: Store<SettingsStatus>
 
   saves(): Settings[] {
     return [...this.#saved]

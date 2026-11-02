@@ -16,7 +16,7 @@ export {
   type IpcBridgeService,
 } from './ipc/ipc-service.ts'
 export type { Unlisten } from './unlisten.ts'
-export { deriveStore, type Store, type WriteableStore } from './store.ts'
+export { deriveStore, type Store, type WritableStore } from './store.ts'
 
 export { type HapticsService } from './ipc/haptics-service.ts'
 export { type AudioRecorderFinalSegment } from './audio/audio-recorder-service.ts'

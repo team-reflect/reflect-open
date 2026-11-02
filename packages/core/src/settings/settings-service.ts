@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import { WriteableStore, type Store } from '../store.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from './schema.ts'
 import { isDeepEqual } from '@ocavue/utils'
@@ -41,7 +41,10 @@ export interface SettingsService extends Store<Settings> {
    * Waits for pending saves and resubmits settings that no save confirmed. Never rejects.
    */
   flush: () => Promise<void>
-  status: () => SettingsStatus
+  /**
+   * Whether the stored document is loaded. Changes after the settings it brings.
+   */
+  readonly status: Store<SettingsStatus>
 }
 
 const voidSchema = z.null()
@@ -53,8 +56,8 @@ export interface SettingsServiceDeps {
 
 class SettingsServiceImpl implements SettingsService {
   readonly #deps: SettingsServiceDeps
-  readonly #store = new WriteableStore(DEFAULT_SETTINGS)
-  #status: SettingsStatus = 'loading'
+  readonly #store = new WritableStore(DEFAULT_SETTINGS)
+  readonly #status = new WritableStore<SettingsStatus>('loading')
   #loading: Promise<SettingsLoadOutcome> | undefined
   /**
    * Updates made while loading, replayed over the loaded document.
@@ -87,7 +90,7 @@ class SettingsServiceImpl implements SettingsService {
   readonly updateWith = (updater: SettingsUpdater): void => {
     const previous = this.get()
     this.#store.set(mergeSettings(previous, updater(previous)))
-    if (this.#status === 'loading') {
+    if (this.#status.get() === 'loading') {
       this.#pending.push(updater)
     }
     this.#save()
@@ -96,8 +99,8 @@ class SettingsServiceImpl implements SettingsService {
   readonly whenLoaded = (): Promise<SettingsLoadOutcome> => this.#load()
 
   readonly reload = (): Promise<SettingsLoadOutcome> => {
-    if (this.#status === 'failed') {
-      this.#status = 'loading'
+    if (this.#status.get() === 'failed') {
+      this.#status.set('loading')
       this.#loading = undefined
     }
     return this.#load()
@@ -109,7 +112,7 @@ class SettingsServiceImpl implements SettingsService {
     await this.#drain()
   }
 
-  readonly status = (): SettingsStatus => this.#status
+  readonly status: Store<SettingsStatus> = this.#status
 
   #load(): Promise<SettingsLoadOutcome> {
     const { ipc, progress } = this.#deps
@@ -132,19 +135,18 @@ class SettingsServiceImpl implements SettingsService {
   }
 
   #settle(status: SettingsLoadOutcome, settings: Settings): SettingsLoadOutcome {
-    this.#status = status
     this.#pending = []
-    // The status changed too, so notify even if the settings did not.
-    this.#store.set(settings, false)
+    // Settings first, so a status listener reads the settings that came with it.
+    this.#store.set(settings)
+    this.#status.set(status)
     this.#save()
-    this.#store.emit()
     return status
   }
 
   #save(): void {
     const { ipc, progress } = this.#deps
     const settings = this.#store.get()
-    if (this.#status !== 'loaded' || settings === this.#saved) {
+    if (this.#status.get() !== 'loaded' || settings === this.#saved) {
       return
     }
     this.#saving = this.#saving.then(async () => {
