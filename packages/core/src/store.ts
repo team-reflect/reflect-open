@@ -77,6 +77,15 @@ function isArrayShallowEqual<T>(a: T[], b: T[]): boolean {
   return true
 }
 
+/**
+ * A {@link Store} of `derive(...values)`, where `values` are the current
+ * values of `stores`. A new result that `isEqual` to the previous one is
+ * dropped, so `get` keeps the previous reference and subscribers are not
+ * notified.
+ *
+ * `derive` runs again only when one of `stores` returns a new reference. The
+ * combined store subscribes to `stores` only while it has subscribers.
+ */
 export function combineStores<T extends unknown[], U>(
   stores: { [K in keyof T]: Store<T[K]> },
   derive: (...values: T) => U,
@@ -90,9 +99,9 @@ export function combineStores<T extends unknown[], U>(
     if (sources && isArrayShallowEqual(sources, newSources)) {
       return derived
     }
-    const newDrived: U = derive(...newSources)
-    if (!sources || !isEqual(derived, newDrived)) {
-      derived = newDrived
+    const newDerived: U = derive(...newSources)
+    if (!sources || !isEqual(derived, newDerived)) {
+      derived = newDerived
     }
     sources = newSources
     return derived
