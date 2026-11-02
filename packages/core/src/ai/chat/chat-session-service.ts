@@ -216,7 +216,7 @@ class ChatSessionImpl implements ChatSession {
   readonly #pendingSaves = new Map<string, Promise<void>>()
   #local: LocalState
   // The chat model selection, the only settings key the state reads besides
-  // the provider entries.
+  // the provider state (`providerConfig`).
   readonly #selection: Store<ChatModelSelection | null>
   #stopConfig: Unlisten | null = null
   // The published state, rebuilt lazily: `null` after a local change, and
