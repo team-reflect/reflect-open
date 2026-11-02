@@ -4,6 +4,7 @@ import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import { WriteableStore, type Store, type Unlisten } from '../unlisten.ts'
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from './schema.ts'
+import { isDeepEqual } from '@ocavue/utils'
 
 /**
  * How the initial settings load ended; `failed` means session-only updates.
@@ -205,8 +206,7 @@ class SettingsServiceImpl implements SettingsService {
     const previous = this.#store.get()
     const merged = { ...previous, ...updater(previous) }
     if (this.#state === 'failed') {
-      this.#current = merged
-      this.#emit()
+      this.#update(merged)
       return
     }
     const next = replaceEqualDeep(previous, merged)
@@ -217,6 +217,14 @@ class SettingsServiceImpl implements SettingsService {
     if (this.#dirty || next !== previous) {
       this.#submit(next)
     }
+  }
+
+  #update(newSettings: Settings): void {
+    const current = this.#store.get()
+    if (isDeepEqual(current, newSettings)) {
+      return
+    }
+    this.#store.set(newSettings)
   }
 
   async #drain(): Promise<void> {
@@ -245,6 +253,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * Returns `next`, reusing every part of `previous` that is deeply equal to it.
  */
 function replaceEqualDeep<T>(previous: T, next: T): T {
+  // FIXME: this function "replaceEqualDeep" is useless because of isDeepEqual. we can remove "replaceEqualDeep"
   if (previous === next) {
     return previous
   }
