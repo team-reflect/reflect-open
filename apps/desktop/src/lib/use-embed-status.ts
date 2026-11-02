@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useSyncExternalStore } from 'react'
-import type { EmbedStatus, Unlisten } from '@reflect/core'
+import { useEffect } from 'react'
+import type { EmbedStatus } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -9,16 +10,9 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export function useEmbedStatus(): EmbedStatus {
   const { embeddingRuntime } = useCoreServices()
-  const subscribe = useCallback(
-    (onChange: () => void): Unlisten => embeddingRuntime.subscribe(onChange),
-    [embeddingRuntime],
-  )
-
-  const getSnapshot = useCallback(() => embeddingRuntime.lastStatus(), [embeddingRuntime])
-
   useEffect(() => {
     void embeddingRuntime.status()
   }, [embeddingRuntime])
 
-  return useSyncExternalStore(subscribe, getSnapshot)
+  return useStore(embeddingRuntime)
 }

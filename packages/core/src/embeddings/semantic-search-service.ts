@@ -144,7 +144,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         return
       }
       const enabled = settings.get().semanticSearchEnabled && this.#mainWindow
-      const status = embeddingRuntime.lastStatus()
+      const status = embeddingRuntime.get()
 
       const nextLoadGate = `${enabled} ${status.status}`
       if (nextLoadGate !== loadGate) {

@@ -129,13 +129,9 @@ class TestEmbeddingRuntimeServiceImpl implements TestEmbeddingRuntimeService {
     return this.#inner.embedTexts(texts)
   }
 
-  subscribe(listener: (status: EmbedStatus) => void): Unlisten {
-    return this.#inner.subscribe(listener)
-  }
+  readonly get = (): EmbedStatus => this.#inner.get()
 
-  lastStatus(): EmbedStatus {
-    return this.#inner.lastStatus()
-  }
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#inner.subscribe(listener)
 
   setStatus(next: EmbedStatus): void {
     this.#status = next
