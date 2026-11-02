@@ -81,13 +81,19 @@ function SaveScrollProbe({ position }: { position: DayScrollPosition }): ReactEl
 /**
  * Resolves once the stream's layout has held still for longer than virtua's
  * 150ms window, during which it re-applies an arrival's scroll target as rows
- * measure (and so would undo a scroll made inside it).
+ * measure (and so would undo a scroll made inside it). Rejects if it never
+ * holds still within 5s.
  */
 async function waitForLayoutToSettle(element: Element): Promise<void> {
   const quietMs = 250
+  const timeoutMs = 5000
+  const startedAt = performance.now()
   let layout = ''
-  let changedAt = performance.now()
+  let changedAt = startedAt
   while (performance.now() - changedAt < quietMs) {
+    if (performance.now() - startedAt > timeoutMs) {
+      throw new Error(`Layout did not hold still for ${quietMs}ms within ${timeoutMs}ms`)
+    }
     await new Promise((resolve) => requestAnimationFrame(resolve))
     const next = `${element.scrollTop}:${element.scrollHeight}`
     if (next !== layout) {
