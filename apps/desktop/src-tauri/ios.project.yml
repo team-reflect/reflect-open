@@ -163,8 +163,9 @@ targets:
         # Rendered by Tauri from `version` in tauri.conf.json (the prerelease
         # tag is stripped — Apple requires three dot-separated integers), so the
         # version lives in one place and never drifts. Do not hardcode a literal.
-        CFBundleShortVersionString: { { apple.bundle-version-short } }
-        CFBundleVersion: { { apple.bundle-version } }
+        # Quoted so the formatter does not split the braces into YAML maps.
+        CFBundleShortVersionString: '{{apple.bundle-version-short}}'
+        CFBundleVersion: '{{apple.bundle-version}}'
     # Entitlements are hand-maintained files, one per flavor, selected by the
     # per-config CODE_SIGN_ENTITLEMENTS in settingGroups: the release file
     # (reflect-open_iOS.entitlements) carries iCloud Drive document storage
