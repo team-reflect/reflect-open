@@ -82,21 +82,13 @@ class TestSettingsServiceImpl implements TestSettingsService {
     this.#inner.updateWith(updater)
   }
 
-  readonly whenLoaded = (): Promise<SettingsLoadOutcome> => {
-    return this.#inner.whenLoaded()
-  }
+  readonly whenLoaded = (): Promise<SettingsLoadOutcome> => this.#inner.whenLoaded()
 
-  reload(): Promise<SettingsLoadOutcome> {
-    return this.#inner.reload()
-  }
+  readonly reload = (): Promise<SettingsLoadOutcome> => this.#inner.reload()
 
-  flush(): Promise<void> {
-    return this.#inner.flush()
-  }
+  readonly flush = (): Promise<void> => this.#inner.flush()
 
-  status(): SettingsStatus {
-    return this.#inner.status()
-  }
+  readonly status = (): SettingsStatus => this.#inner.status()
 
   saves(): Settings[] {
     return [...this.#saved]

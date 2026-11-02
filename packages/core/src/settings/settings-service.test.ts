@@ -252,7 +252,7 @@ describe('createSettingsService', () => {
     expect(settings.get().aiProviders).toEqual([])
   })
 
-  it('merges disk, preload patches, and queued updaters in order', async () => {
+  it('replays updates racing the initial load over the loaded document in order', async () => {
     const persisted: AiProviderConfig = {
       id: 'a',
       provider: 'openai',
@@ -274,7 +274,7 @@ describe('createSettingsService', () => {
       aiProviders: current.aiProviders.filter((provider) => provider.id !== persisted.id),
     }))
     expect(settings.get().editorMarkdownSyntax).toBe('show')
-    expect(settings.get().aiProviders).toEqual([])
+    expect(settings.get().aiProviders).toEqual([added])
 
     await releaseLoad()
     await settings.whenLoaded()
@@ -306,7 +306,7 @@ describe('createSettingsService', () => {
     disk.gateLoad = true
 
     settings.updateWith((current) => ({ aiProviders: [...current.aiProviders, added] }))
-    expect(settings.get().aiProviders).toEqual([])
+    expect(settings.get().aiProviders).toEqual([added])
     expect(disk.attempts).toEqual([])
 
     await releaseLoad()

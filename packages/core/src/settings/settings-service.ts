@@ -17,7 +17,7 @@ export type SettingsStatus = 'loading' | SettingsLoadOutcome
 type SettingsUpdater = (current: Settings) => Partial<Settings>
 
 /**
- * The global settings document: loaded once, patches visible immediately,
+ * The global settings document: loaded once, updates visible immediately,
  * saves persisted one at a time. When the load fails, updates stay
  * session-only so a defaults-built save never overwrites the stored document.
  */
@@ -27,20 +27,21 @@ export interface SettingsService extends Store<Settings> {
    */
   update: (patch: Partial<Settings>) => void
   /**
-   * Computes a patch from the latest settings; calls made before the load replay over the loaded document.
+   * Merges the patch that `updater` builds from the latest settings. Calls made
+   * while loading replay over the loaded document, so `updater` must be pure.
    */
   updateWith: (updater: SettingsUpdater) => void
   whenLoaded: () => Promise<SettingsLoadOutcome>
   /**
-   * After a failed load, load the stored document again; on success it
+   * After a failed load, loads the stored document again; on success it
    * replaces the session-only settings. Otherwise answers {@link whenLoaded}.
    */
-  reload(): Promise<SettingsLoadOutcome>
+  reload: () => Promise<SettingsLoadOutcome>
   /**
-   * Drains pending saves and resubmits a document that no save has confirmed. Never rejects.
+   * Waits for pending saves and resubmits settings that no save confirmed. Never rejects.
    */
-  flush(): Promise<void>
-  status(): SettingsStatus
+  flush: () => Promise<void>
+  status: () => SettingsStatus
 }
 
 const voidSchema = z.null()
@@ -52,171 +53,116 @@ export interface SettingsServiceDeps {
 
 class SettingsServiceImpl implements SettingsService {
   readonly #deps: SettingsServiceDeps
-  readonly #store = new WriteableStore(DEFAULT_SETTINGS, isDeepEqual)
-
-  #state: SettingsStatus = 'loading'
-  #started = false
-
-  #preloadPatch: Partial<Settings> = {}
-  #pendingUpdaters: SettingsUpdater[] = []
-
-  #dirty = false
-  #lastSubmission: Promise<void> = Promise.resolve()
-
-  #resolveLoad: (outcome: SettingsLoadOutcome) => void = () => {}
-  #loaded = new Promise<SettingsLoadOutcome>((resolve) => {
-    this.#resolveLoad = resolve
-  })
-  #reloading: Promise<SettingsLoadOutcome> | null = null
+  readonly #store = new WriteableStore(DEFAULT_SETTINGS)
+  #status: SettingsStatus = 'loading'
+  #loading: Promise<SettingsLoadOutcome> | undefined
+  /**
+   * Updates made while loading, replayed over the loaded document.
+   */
+  #pending: SettingsUpdater[] = []
+  /**
+   * The settings that the disk holds, as far as this service knows.
+   */
+  #saved?: Settings
+  #saving: Promise<void> = Promise.resolve()
 
   constructor(deps: SettingsServiceDeps) {
     this.#deps = deps
   }
 
   readonly get = (): Settings => {
-    this.#start()
+    void this.#load()
     return this.#store.get()
   }
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#start()
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    void this.#load()
     return this.#store.subscribe(listener)
   }
 
   readonly update = (patch: Partial<Settings>): void => {
-    this.#start()
-    if (this.#state === 'loading') {
-      this.#preloadPatch = { ...this.#preloadPatch, ...patch }
-      this.#store.set({ ...DEFAULT_SETTINGS, ...this.#preloadPatch })
-      return
-    }
-    this.#apply(() => patch)
+    this.updateWith(() => patch)
   }
 
   readonly updateWith = (updater: SettingsUpdater): void => {
-    this.#start()
-    if (this.#state === 'loading') {
-      this.#pendingUpdaters.push(updater)
+    const previous = this.get()
+    this.#store.set(mergeSettings(previous, updater(previous)))
+    if (this.#status === 'loading') {
+      this.#pending.push(updater)
+    }
+    this.#save()
+  }
+
+  readonly whenLoaded = (): Promise<SettingsLoadOutcome> => this.#load()
+
+  readonly reload = (): Promise<SettingsLoadOutcome> => {
+    if (this.#status === 'failed') {
+      this.#status = 'loading'
+      this.#loading = undefined
+    }
+    return this.#load()
+  }
+
+  readonly flush = async (): Promise<void> => {
+    await this.#drain()
+    this.#save()
+    await this.#drain()
+  }
+
+  readonly status = (): SettingsStatus => this.#status
+
+  #load(): Promise<SettingsLoadOutcome> {
+    const { ipc, progress } = this.#deps
+    this.#loading ??= ipc.call('settings_load', {}, settingsSchema).then(
+      (document) => {
+        this.#saved = document
+        const settings = this.#pending.reduce(
+          (s, updater) => mergeSettings(s, updater(s)),
+          document,
+        )
+        return this.#settle('loaded', settings)
+      },
+      (error: unknown) => {
+        progress.fail('Loading settings', errorMessage(error))
+        // Every pending update is already visible.
+        return this.#settle('failed', this.#store.get())
+      },
+    )
+    return this.#loading
+  }
+
+  #settle(status: SettingsLoadOutcome, settings: Settings): SettingsLoadOutcome {
+    this.#status = status
+    this.#pending = []
+    // The status changed too, so notify even if the settings did not.
+    this.#store.set(settings, false)
+    this.#save()
+    this.#store.emit()
+    return status
+  }
+
+  #save(): void {
+    const { ipc, progress } = this.#deps
+    const settings = this.#store.get()
+    if (this.#status !== 'loaded' || settings === this.#saved) {
       return
     }
-    this.#apply(updater)
-  }
-
-  readonly whenLoaded = (): Promise<SettingsLoadOutcome> => {
-    this.#start()
-    return this.#loaded
-  }
-
-  reload(): Promise<SettingsLoadOutcome> {
-    const { ipc, progress } = this.#deps
-    if (this.#state !== 'failed') {
-      this.#start()
-      return this.#loaded
-    }
-    this.#reloading ??= ipc
-      .call('settings_load', {}, settingsSchema)
-      .then(
-        (document): SettingsLoadOutcome => {
-          this.#state = 'loaded'
-          // The status changed too, so notify even if the document did not.
-          this.#store.set(document, false)
-          this.#loaded = Promise.resolve('loaded')
-          this.#store.emit()
-          return 'loaded'
-        },
-        (error: unknown): SettingsLoadOutcome => {
-          progress.fail('Loading settings', errorMessage(error))
-          return 'failed'
-        },
-      )
-      .finally(() => {
-        this.#reloading = null
-      })
-    return this.#reloading
-  }
-
-  async flush(): Promise<void> {
-    await this.#drain()
-    if (this.#dirty && this.#state === 'loaded') {
-      this.#submit(this.#store.get())
-      await this.#drain()
-    }
-  }
-
-  status(): SettingsStatus {
-    return this.#state
-  }
-
-  #submit(target: Settings): void {
-    const { ipc, progress } = this.#deps
-    this.#dirty = true
-    this.#lastSubmission = this.#lastSubmission.then(async () => {
+    this.#saving = this.#saving.then(async () => {
       try {
-        await ipc.call('settings_save', { settings: target }, voidSchema)
-        if (this.#store.get() === target) {
-          this.#dirty = false
-        }
+        await ipc.call('settings_save', { settings }, voidSchema)
+        this.#saved = settings
       } catch (error) {
         progress.fail('Saving settings', errorMessage(error))
       }
     })
   }
 
-  #hydrate(outcome: SettingsLoadOutcome, document: Settings): void {
-    let next: Settings = { ...document, ...this.#preloadPatch }
-    const queued = this.#pendingUpdaters
-    this.#pendingUpdaters = []
-    this.#preloadPatch = {}
-    for (const updater of queued) {
-      next = { ...next, ...updater(next) }
-    }
-    this.#state = outcome
-    if (outcome === 'loaded') {
-      next = document
-    }
-    // The status changed too, so notify even if the document did not.
-    this.#store.set(next, false)
-    if (outcome === 'loaded' && next !== document) {
-      this.#submit(next)
-    }
-    this.#resolveLoad(outcome)
-    this.#store.emit()
-  }
-
-  #start(): void {
-    const { ipc, progress } = this.#deps
-    if (this.#started) {
-      return
-    }
-    this.#started = true
-    ipc.call('settings_load', {}, settingsSchema).then(
-      (document) => this.#hydrate('loaded', document),
-      (error: unknown) => {
-        progress.fail('Loading settings', errorMessage(error))
-        this.#hydrate('failed', DEFAULT_SETTINGS)
-      },
-    )
-  }
-
-  #apply(updater: SettingsUpdater): void {
-    const previous = this.#store.get()
-    const next = mergeSettings(previous, updater(previous))
-    this.#store.set(next)
-    if (this.#state === 'failed') {
-      return
-    }
-    if (this.#dirty || next !== previous) {
-      this.#submit(next)
-    }
-  }
-
   async #drain(): Promise<void> {
-    let submission = this.#lastSubmission
-    await submission
-    while (submission !== this.#lastSubmission) {
-      submission = this.#lastSubmission
-      await submission
-    }
+    let saving: Promise<void>
+    do {
+      saving = this.#saving
+      await saving
+    } while (saving !== this.#saving)
   }
 }
 
