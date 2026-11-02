@@ -1,6 +1,4 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import { WritableStore, type Store } from '../store.ts'
-import { formatIsoDate } from '@reflect/utils'
 
 /**
  * A {@link ClockService} whose time moves only when a test moves it.
@@ -14,10 +12,6 @@ export interface TestClockService extends ClockService {
    * Sets the wall clock without running timers or moving the monotonic clock.
    */
   setNow(epochMs: number): void
-  /**
-   * Pins `today` to `isoDate` and notifies its subscribers.
-   */
-  setToday(isoDate: string): void
   /**
    * The number of scheduled timeouts and intervals.
    */
@@ -42,18 +36,12 @@ async function settle(): Promise<void> {
 class TestClockServiceImpl implements TestClockService {
   #wallMs: number
   #monotonicMs = 0
-  #pinnedToday: string | null
   readonly #timers = new Map<number, ScheduledTimer>()
   #nextId = 1
   #nextOrder = 0
-  readonly #today: WritableStore<string>
-  readonly today: Store<string>
 
-  constructor(options: { now?: number; today?: string } | undefined) {
+  constructor(options: { now?: number } | undefined) {
     this.#wallMs = options?.now ?? 0
-    this.#pinnedToday = options?.today ?? null
-    this.#today = new WritableStore(this.#readToday())
-    this.today = this.#today
   }
 
   now(): number {
@@ -108,24 +96,10 @@ class TestClockServiceImpl implements TestClockService {
 
   setNow(epochMs: number): void {
     this.#wallMs = epochMs
-    this.#notifyToday()
-  }
-
-  setToday(isoDate: string): void {
-    this.#pinnedToday = isoDate
-    this.#notifyToday()
   }
 
   pendingTimers(): number {
     return this.#timers.size
-  }
-
-  #readToday(): string {
-    return this.#pinnedToday ?? formatIsoDate(new Date(this.#wallMs))
-  }
-
-  #notifyToday(): void {
-    this.#today.set(this.#readToday())
   }
 
   #schedule(fn: () => void, ms: number, interval: number | null): TimerHandle {
@@ -160,17 +134,12 @@ class TestClockServiceImpl implements TestClockService {
   #moveTo(monotonicTarget: number): void {
     this.#wallMs += monotonicTarget - this.#monotonicMs
     this.#monotonicMs = monotonicTarget
-    this.#notifyToday()
   }
 }
 
 /**
- * Without `today`, the `today` store follows the local date of `now()`. `setToday`
- * pins it until the next `setToday`.
+ * Creates a {@link TestClockService} whose wall clock starts at `now` (default `0`).
  */
-export function createTestClockService(options?: {
-  now?: number
-  today?: string
-}): TestClockService {
+export function createTestClockService(options?: { now?: number }): TestClockService {
   return new TestClockServiceImpl(options)
 }

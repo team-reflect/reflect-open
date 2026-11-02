@@ -1,5 +1,6 @@
 import { isNotNullish } from '@ocavue/utils'
 import type { ClockService } from '../ports/clock-service.ts'
+import type { TodayService } from './today-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -41,6 +42,7 @@ export interface DailyNotesRange {
 export interface DailyNoteServiceDeps {
   readonly database: DatabaseService
   readonly clock: ClockService
+  readonly today: TodayService
   readonly activity: ActivityPort
 }
 
@@ -50,7 +52,7 @@ export interface DailyNoteServiceDeps {
  */
 export interface DailyNoteService {
   /**
-   * Today's local calendar date as `YYYY-MM-DD` (the clock's live date).
+   * Today's local calendar date as `YYYY-MM-DD`.
    */
   today(): string
   /**
@@ -68,12 +70,12 @@ export interface DailyNoteService {
   /**
    * V1's wake-to-today: calls `listener` with the new date when the app
    * returns to the foreground on a later calendar date than it was last seen
-   * on. An app left open across midnight rolls over through the clock's
-   * `today` store instead, so this only reports the backgrounded case. The
+   * on. An app left open across midnight rolls over through
+   * `TodayService` instead, so this only reports the backgrounded case. The
    * caller navigates; this service does not.
    *
    * The date is read from the wall clock (`now()`) at each visibility change,
-   * not from `today`: the clock refreshes its cached date on the same
+   * not from `TodayService`: it refreshes its cached date on the same
    * visibility event, and listener order must not decide the result.
    */
   subscribeWakeOnNewDay(listener: (today: string) => void): Unlisten
@@ -87,7 +89,7 @@ class DailyNoteServiceImpl implements DailyNoteService {
   }
 
   today(): string {
-    return this.#deps.clock.today.get()
+    return this.#deps.today.get()
   }
 
   async dailyDatesInRange(start: string, end: string): Promise<string[]> {
