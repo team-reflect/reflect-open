@@ -428,7 +428,7 @@ class ChatSessionImpl implements ChatSession {
         config,
         apiKey,
         messages,
-        today: clock.today(),
+        today: clock.today.get(),
         // A stray enabled flag must lose to the runtime here.
         semanticSearchEnabled:
           settings.get().semanticSearchEnabled && embeddingRuntime.get().status === 'ready',

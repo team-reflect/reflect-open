@@ -15,9 +15,9 @@ describe('createSystemClock', () => {
     vi.setSystemTime(new Date(2026, 5, 9, 12, 0, 0))
     const clock = createSystemClock()
     expect(clock.now()).toBe(new Date(2026, 5, 9, 12, 0, 0).getTime())
-    expect(clock.today()).toBe('2026-06-09')
+    expect(clock.today.get()).toBe('2026-06-09')
     vi.setSystemTime(new Date(2026, 5, 10, 8, 0, 0))
-    expect(clock.today()).toBe('2026-06-10')
+    expect(clock.today.get()).toBe('2026-06-10')
   })
 
   it('reads a monotonic clock', () => {
@@ -69,14 +69,14 @@ describe('createSystemClock', () => {
     vi.setSystemTime(new Date(2026, 5, 9, 23, 59, 0))
     const clock = createSystemClock()
     const seen: string[] = []
-    const unsubscribe = clock.subscribeToday((today) => {
-      seen.push(today)
+    const unsubscribe = clock.today.subscribe(() => {
+      seen.push(clock.today.get())
     })
 
     vi.advanceTimersByTime(2 * 60 * 1000)
-    expect(clock.today()).toBe('2026-06-10')
+    expect(clock.today.get()).toBe('2026-06-10')
     vi.advanceTimersByTime(24 * 60 * 60 * 1000)
-    expect(clock.today()).toBe('2026-06-11')
+    expect(clock.today.get()).toBe('2026-06-11')
     expect(seen).toEqual(['2026-06-10', '2026-06-11'])
     unsubscribe()
   })
@@ -85,8 +85,8 @@ describe('createSystemClock', () => {
     vi.setSystemTime(new Date(2026, 5, 9, 23, 59, 0))
     const clock = createSystemClock()
     const seen: string[] = []
-    const unsubscribe = clock.subscribeToday((today) => {
-      seen.push(today)
+    const unsubscribe = clock.today.subscribe(() => {
+      seen.push(clock.today.get())
     })
 
     vi.setSystemTime(new Date(2026, 5, 10, 9, 0, 0))
@@ -101,8 +101,8 @@ describe('createSystemClock', () => {
     vi.setSystemTime(new Date(2026, 5, 9, 23, 59, 0))
     const clock = createSystemClock()
     const seen: string[] = []
-    const unsubscribe = clock.subscribeToday((today) => {
-      seen.push(today)
+    const unsubscribe = clock.today.subscribe(() => {
+      seen.push(clock.today.get())
     })
 
     vi.setSystemTime(new Date(2026, 5, 10, 9, 0, 0))
@@ -118,13 +118,25 @@ describe('createSystemClock', () => {
   it('subscribers share one timer set, released by the last unsubscribe', () => {
     vi.setSystemTime(new Date(2026, 5, 9, 12, 0, 0))
     const clock = createSystemClock()
-    const first = clock.subscribeToday(() => {})
-    const second = clock.subscribeToday(() => {})
+    const first = clock.today.subscribe(() => {})
+    const second = clock.today.subscribe(() => {})
     expect(vi.getTimerCount()).toBe(2)
     first()
     expect(vi.getTimerCount()).toBe(2)
     second()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('reads the current date while nothing is subscribed', () => {
+    vi.setSystemTime(new Date(2026, 5, 9, 12, 0, 0))
+    const clock = createSystemClock()
+    const unsubscribe = clock.today.subscribe(() => {})
+    unsubscribe()
+    unsubscribe()
+    expect(vi.getTimerCount()).toBe(0)
+
+    vi.setSystemTime(new Date(2026, 5, 10, 12, 0, 0))
+    expect(clock.today.get()).toBe('2026-06-10')
   })
 })
 describe('createTestClockService', () => {
@@ -211,15 +223,15 @@ describe('createTestClockService', () => {
     expect(fired).toBe(false)
   })
 
-  it('`setToday` notifies `subscribeToday` listeners', () => {
+  it('`setToday` notifies `today` subscribers', () => {
     const clock = createTestClockService({ today: '2026-06-09' })
     const seen: string[] = []
-    const unsubscribe = clock.subscribeToday((today) => {
-      seen.push(today)
+    const unsubscribe = clock.today.subscribe(() => {
+      seen.push(clock.today.get())
     })
     clock.setToday('2026-06-09')
     clock.setToday('2026-06-10')
-    expect(clock.today()).toBe('2026-06-10')
+    expect(clock.today.get()).toBe('2026-06-10')
     unsubscribe()
     clock.setToday('2026-06-11')
     expect(seen).toEqual(['2026-06-10'])
@@ -228,10 +240,10 @@ describe('createTestClockService', () => {
   it('follows the local date of `now` until `setToday` pins it', async () => {
     const clock = createTestClockService({ now: new Date(2026, 5, 9, 23, 59, 0).getTime() })
     const seen: string[] = []
-    clock.subscribeToday((today) => {
-      seen.push(today)
+    clock.today.subscribe(() => {
+      seen.push(clock.today.get())
     })
-    expect(clock.today()).toBe('2026-06-09')
+    expect(clock.today.get()).toBe('2026-06-09')
 
     await clock.advance(2 * 60 * 1000)
     clock.setNow(new Date(2026, 5, 12, 9, 0, 0).getTime())
@@ -239,7 +251,7 @@ describe('createTestClockService', () => {
 
     clock.setToday('2026-01-01')
     await clock.advance(24 * 60 * 60 * 1000)
-    expect(clock.today()).toBe('2026-01-01')
+    expect(clock.today.get()).toBe('2026-01-01')
   })
 
   it('`setNow` moves the wall clock only', () => {

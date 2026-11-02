@@ -69,11 +69,11 @@ export interface DailyNoteService {
    * V1's wake-to-today: calls `listener` with the new date when the app
    * returns to the foreground on a later calendar date than it was last seen
    * on. An app left open across midnight rolls over through the clock's
-   * `subscribeToday` instead, so this only reports the backgrounded case. The
+   * `today` store instead, so this only reports the backgrounded case. The
    * caller navigates; this service does not.
    *
    * The date is read from the wall clock (`now()`) at each visibility change,
-   * not from `today()`: the clock refreshes its cached date on the same
+   * not from `today`: the clock refreshes its cached date on the same
    * visibility event, and listener order must not decide the result.
    */
   subscribeWakeOnNewDay(listener: (today: string) => void): Unlisten
@@ -87,7 +87,7 @@ class DailyNoteServiceImpl implements DailyNoteService {
   }
 
   today(): string {
-    return this.#deps.clock.today()
+    return this.#deps.clock.today.get()
   }
 
   async dailyDatesInRange(start: string, end: string): Promise<string[]> {

@@ -142,7 +142,7 @@ describe('subscribeWakeOnNewDay', () => {
     expect(days).toEqual(['2026-06-13'])
   })
 
-  it('reads the wall clock, so a stale cached `today()` cannot hide the new day', () => {
+  it('reads the wall clock, so a stale cached `today` cannot hide the new day', () => {
     const clock = createTestClockService({ now: evening, today: '2026-06-12' })
     const activity = createTestActivityPort()
     const dailyNotes = createTestDailyNoteService({ clock, activity })

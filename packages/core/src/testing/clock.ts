@@ -1,4 +1,5 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import { formatIsoDate } from '@reflect/utils'
 
 /**
@@ -14,7 +15,7 @@ export interface TestClockService extends ClockService {
    */
   setNow(epochMs: number): void
   /**
-   * Pins `today()` to `isoDate` and notifies `subscribeToday` listeners.
+   * Pins `today` to `isoDate` and notifies its subscribers.
    */
   setToday(isoDate: string): void
   /**
@@ -42,16 +43,17 @@ class TestClockServiceImpl implements TestClockService {
   #wallMs: number
   #monotonicMs = 0
   #pinnedToday: string | null
-  readonly #listeners = new Set<(today: string) => void>()
   readonly #timers = new Map<number, ScheduledTimer>()
   #nextId = 1
   #nextOrder = 0
-  #lastToday: string
+  readonly #today: WritableStore<string>
+  readonly today: Store<string>
 
   constructor(options: { now?: number; today?: string } | undefined) {
     this.#wallMs = options?.now ?? 0
     this.#pinnedToday = options?.today ?? null
-    this.#lastToday = this.today()
+    this.#today = new WritableStore(this.#readToday())
+    this.today = this.#today
   }
 
   now(): number {
@@ -60,17 +62,6 @@ class TestClockServiceImpl implements TestClockService {
 
   monotonicNow(): number {
     return this.#monotonicMs
-  }
-
-  today(): string {
-    return this.#pinnedToday ?? formatIsoDate(new Date(this.#wallMs))
-  }
-
-  subscribeToday(listener: (today: string) => void): () => void {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
   }
 
   setTimeout(fn: () => void, ms: number): TimerHandle {
@@ -129,15 +120,12 @@ class TestClockServiceImpl implements TestClockService {
     return this.#timers.size
   }
 
+  #readToday(): string {
+    return this.#pinnedToday ?? formatIsoDate(new Date(this.#wallMs))
+  }
+
   #notifyToday(): void {
-    const next = this.today()
-    if (next === this.#lastToday) {
-      return
-    }
-    this.#lastToday = next
-    for (const listener of this.#listeners) {
-      listener(next)
-    }
+    this.#today.set(this.#readToday())
   }
 
   #schedule(fn: () => void, ms: number, interval: number | null): TimerHandle {
@@ -177,7 +165,7 @@ class TestClockServiceImpl implements TestClockService {
 }
 
 /**
- * Without `today`, `today()` follows the local date of `now()`. `setToday`
+ * Without `today`, the `today` store follows the local date of `now()`. `setToday`
  * pins it until the next `setToday`.
  */
 export function createTestClockService(options?: {

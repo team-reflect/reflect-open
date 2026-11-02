@@ -1,4 +1,6 @@
 import { getIsoToday } from '@reflect/utils'
+import { WritableStore, type Store } from '../store.ts'
+import type { Unlisten } from '../unlisten.ts'
 
 /**
  * An opaque timer handle owned by a {@link ClockService}.
@@ -18,13 +20,9 @@ export interface ClockService {
    */
   monotonicNow(): number
   /**
-   * The local calendar date as `YYYY-MM-DD`.
+   * The local calendar date as `YYYY-MM-DD`. Subscribers are notified whenever it changes.
    */
-  today(): string
-  /**
-   * Calls `listener` with the new date whenever the local date changes.
-   */
-  subscribeToday(listener: (today: string) => void): () => void
+  readonly today: Store<string>
   setTimeout(fn: () => void, ms: number): TimerHandle
   clearTimeout(handle: TimerHandle): void
   setInterval(fn: () => void, ms: number): TimerHandle
@@ -38,20 +36,40 @@ const MIDNIGHT_PAD_MS = 250
 class SystemClockImpl implements ClockService {
   readonly #timers = new Map<number, ReturnType<typeof globalThis.setTimeout>>()
   #nextId = 1
-  #today = getIsoToday()
-  readonly #listeners = new Set<(today: string) => void>()
+  readonly #today = new WritableStore(getIsoToday())
+  #watchers = 0
   #midnightTimer: ReturnType<typeof globalThis.setTimeout> | null = null
   #heartbeat: ReturnType<typeof globalThis.setInterval> | null = null
 
   readonly #syncToday = (): void => {
-    const next = getIsoToday()
-    if (next === this.#today) {
-      return
-    }
-    this.#today = next
-    for (const listener of this.#listeners) {
-      listener(next)
-    }
+    this.#today.set(getIsoToday())
+  }
+
+  readonly today: Store<string> = {
+    get: () => {
+      // While nothing is subscribed, no timer keeps the cached date fresh.
+      if (this.#watchers === 0) {
+        this.#syncToday()
+      }
+      return this.#today.get()
+    },
+    subscribe: (listener: VoidFunction): Unlisten => {
+      const unlisten = this.#today.subscribe(listener)
+      if (++this.#watchers === 1) {
+        this.#start()
+      }
+      let active = true
+      return () => {
+        if (!active) {
+          return
+        }
+        active = false
+        unlisten()
+        if (--this.#watchers === 0) {
+          this.#stop()
+        }
+      }
+    },
   }
 
   now(): number {
@@ -60,30 +78,6 @@ class SystemClockImpl implements ClockService {
 
   monotonicNow(): number {
     return performance.now()
-  }
-
-  today(): string {
-    // While nothing is subscribed, no timer keeps the cached date fresh.
-    if (this.#listeners.size === 0) {
-      this.#today = getIsoToday()
-    }
-    return this.#today
-  }
-
-  subscribeToday(listener: (today: string) => void): () => void {
-    const first = this.#listeners.size === 0
-    this.#listeners.add(listener)
-    if (first) {
-      this.#start()
-    }
-    return () => {
-      if (!this.#listeners.delete(listener)) {
-        return
-      }
-      if (this.#listeners.size === 0) {
-        this.#stop()
-      }
-    }
   }
 
   setTimeout(fn: () => void, ms: number): TimerHandle {
