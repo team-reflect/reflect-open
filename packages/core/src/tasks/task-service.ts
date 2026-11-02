@@ -1,10 +1,5 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import {
-  requireGraphSession,
-  type GraphRole,
-  type GraphSession,
-  type GraphSessionSource,
-} from '../graph/graph-session.ts'
+import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { NoteBusyError, type NoteDocumentService } from '../documents/note-document-service.ts'
@@ -14,6 +9,7 @@ import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.
 import { INDEX_WRITTEN_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
 import { decodeTaskBreadcrumbs } from '../indexing/indexed-note.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
+import type { Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import {
   applyTaskEdits,
@@ -44,7 +40,7 @@ export interface TaskServiceDeps {
   readonly progress: ProgressPort
   readonly clock: ClockService
   readonly logger: LoggerService
-  readonly graphSession: GraphSessionSource & { subscribe: (listener: () => void) => Unlisten }
+  readonly graphSession: Store<{ readonly session: GraphSession | null }>
   readonly indexLifecycle: IndexLifecycleService
   /**
    * Which window this webview is; only a note window follows {@link INDEX_WRITTEN_EVENT}.
@@ -750,7 +746,7 @@ class TaskServiceImpl implements TaskService {
     notePath: string,
     task: { locator: TaskLocator; checked: boolean },
   ): Promise<void> {
-    if (this.#deps.graphSession.getState().session === null) {
+    if (this.#deps.graphSession.get().session === null) {
       return
     }
     try {
@@ -927,7 +923,7 @@ class TaskServiceImpl implements TaskService {
    * Drop the rows of a graph that is no longer open; `true` when they were dropped.
    */
   #adoptSession(): boolean {
-    const key = sessionKey(this.#deps.graphSession.getState().session)
+    const key = sessionKey(this.#deps.graphSession.get().session)
     if (key === this.#sessionKey) {
       return false
     }
@@ -1096,7 +1092,7 @@ class TaskServiceImpl implements TaskService {
    * The session key of the open graph.
    */
   #currentKey(): string | null {
-    return sessionKey(this.#deps.graphSession.getState().session)
+    return sessionKey(this.#deps.graphSession.get().session)
   }
 
   /**

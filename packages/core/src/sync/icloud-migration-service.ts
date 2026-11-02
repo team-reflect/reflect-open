@@ -62,7 +62,7 @@ class ICloudMigrationServiceImpl implements ICloudMigrationService {
     onCopied,
   }: MoveGraphToICloudOptions): Promise<string | null> {
     const { icloudNative, graphSession } = this.#deps
-    const { session } = graphSession.getState()
+    const { session } = graphSession.get()
     if (session === null) {
       return 'No graph is open.'
     }

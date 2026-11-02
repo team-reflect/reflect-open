@@ -200,7 +200,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
   }
 
   async togglePinned(path: string): Promise<NoteActionOutcome<NotePinResult>> {
-    const session = this.#deps.graphSession.getState().session
+    const session = this.#deps.graphSession.get().session
     if (session === null) {
       return NO_GRAPH
     }
@@ -211,7 +211,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
   }
 
   async unpin(path: string): Promise<NoteActionOutcome<NotePinResult>> {
-    const session = this.#deps.graphSession.getState().session
+    const session = this.#deps.graphSession.get().session
     if (session === null) {
       return NO_GRAPH
     }
@@ -225,7 +225,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
     notes: ReadonlyArray<Pick<PinnedNote, 'path' | 'pinnedOrder'>>,
   ): Promise<NotePinOrderWrite[]> {
     const { noteRows, graphSession } = this.#deps
-    const session = graphSession.getState().session
+    const session = graphSession.get().session
     if (session === null) {
       return []
     }
@@ -245,7 +245,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
   }
 
   async togglePrivate(path: string): Promise<NoteActionOutcome<{ readonly isPrivate: boolean }>> {
-    const session = this.#deps.graphSession.getState().session
+    const session = this.#deps.graphSession.get().session
     if (session === null) {
       return NO_GRAPH
     }

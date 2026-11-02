@@ -57,14 +57,14 @@ export function createGraphSession(
  * Where a service reads the open graph's {@link GraphSession} from (`GraphSessionService`).
  */
 export interface GraphSessionSource {
-  getState: () => { readonly session: GraphSession | null }
+  get: () => { readonly session: GraphSession | null }
 }
 
 /**
  * The open graph's session; throws `No graph is open.` when none is open.
  */
 export function requireGraphSession(graphSession: GraphSessionSource): GraphSession {
-  const { session } = graphSession.getState()
+  const { session } = graphSession.get()
   if (session === null) {
     throw new AppError('noGraph', 'No graph is open.')
   }
@@ -80,7 +80,7 @@ export function writeGenerationFor(
   graphSession: GraphSessionSource,
   captured: GraphSession,
 ): number {
-  const { session } = graphSession.getState()
+  const { session } = graphSession.get()
   return session !== null && session.root === captured.root
     ? session.generation
     : captured.generation

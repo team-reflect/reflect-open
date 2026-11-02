@@ -122,7 +122,7 @@ describe('GraphProvider', () => {
     expect(result.current.status).toBe('ready')
     expect(result.current.graph).toEqual({ root: '/a', name: 'a', generation: 1 })
     expect(result.current.indexGeneration).toBe(1)
-    expect(core.graphSession.getState().graph?.root).toBe('/a')
+    expect(core.graphSession.get().graph?.root).toBe('/a')
   })
 
   it('provides the open session’s graph services', async () => {
@@ -155,7 +155,7 @@ describe('GraphProvider', () => {
     await screen.getByRole('button', { name: 'Open' }).click()
 
     await expect.element(screen.getByText('main /a')).toBeVisible()
-    expect(core.graphSession.getState().session?.signal.aborted).toBe(false)
+    expect(core.graphSession.get().session?.signal.aborted).toBe(false)
   })
 })
 
@@ -180,7 +180,7 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
     expect(result.current.graph).toBeNull()
     await vi.waitFor(() => expect(result.current.mobileStorageInfo).toEqual(storage))
     expect(result.current.mobileStorageResolving).toBe(false)
-    expect(core.graphSession.getState().graph).toBeNull()
+    expect(core.graphSession.get().graph).toBeNull()
   })
 
   it('publishes the app’s mobile onboarding and passes completeOnboarding through', async () => {

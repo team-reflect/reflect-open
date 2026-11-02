@@ -171,8 +171,8 @@ describe('MobileOnboardingService boot', () => {
   it('defers opening the fixed roots and shows onboarding on a fresh install', async () => {
     const context = await bootFreshInstall()
 
-    expect(context.graphSession.getState().status).toBe('choosing')
-    expect(context.graphSession.getState().graph).toBeNull()
+    expect(context.graphSession.get().status).toBe('choosing')
+    expect(context.graphSession.get().graph).toBeNull()
     expect(context.service.getState().storageInfo).toEqual(STORAGE)
     // The roots must stay untouched until the user chooses — the GitHub clone
     // path needs the local one empty (`git_clone` refuses a non-empty
@@ -251,9 +251,9 @@ describe('MobileOnboardingService boot', () => {
     const context = setup({ settings: { mobileOnboarded: true } })
     context.service.boot()
 
-    await expect.poll(() => context.graphSession.getState().status).toBe('ready')
+    await expect.poll(() => context.graphSession.get().status).toBe('ready')
     expect(context.service.getState().needsOnboarding).toBe(false)
-    expect(context.graphSession.getState().graph?.root).toBe(MOBILE_ROOT)
+    expect(context.graphSession.get().graph?.root).toBe(MOBILE_ROOT)
     expect(context.service.getState().kind).toBe('local')
     // The full storage info resolves in the background for the switcher.
     await expect.poll(() => context.service.getState().storageInfo).toEqual(STORAGE)
@@ -266,8 +266,8 @@ describe('MobileOnboardingService boot', () => {
     })
     context.service.boot()
 
-    await expect.poll(() => context.graphSession.getState().status).toBe('ready')
-    expect(context.graphSession.getState().graph?.root).toBe(ICLOUD_GRAPH)
+    await expect.poll(() => context.graphSession.get().status).toBe('ready')
+    expect(context.graphSession.get().graph?.root).toBe(ICLOUD_GRAPH)
     expect(context.service.getState().kind).toBe('icloud')
   })
 
@@ -278,8 +278,8 @@ describe('MobileOnboardingService boot', () => {
     })
     context.service.boot()
 
-    await expect.poll(() => context.graphSession.getState().status).toBe('ready')
-    expect(context.graphSession.getState().graph?.root).toBe(`${ICLOUD_ROOT}/Work`)
+    await expect.poll(() => context.graphSession.get().status).toBe('ready')
+    expect(context.graphSession.get().graph?.root).toBe(`${ICLOUD_ROOT}/Work`)
   })
 
   it('retries the head-start resolve once before opening an iCloud graph', async () => {
@@ -295,9 +295,9 @@ describe('MobileOnboardingService boot', () => {
     context.service.warm()
     context.service.boot()
 
-    await expect.poll(() => context.graphSession.getState().status).toBe('ready')
+    await expect.poll(() => context.graphSession.get().status).toBe('ready')
     expect(context.resolveCalls()).toBe(2)
-    expect(context.graphSession.getState().graph?.root).toBe(ICLOUD_GRAPH)
+    expect(context.graphSession.get().graph?.root).toBe(ICLOUD_GRAPH)
   })
 
   it('parks on an honest error when the iCloud graph is unreachable (signed out)', async () => {
@@ -307,11 +307,11 @@ describe('MobileOnboardingService boot', () => {
     })
     context.service.boot()
 
-    await expect.poll(() => context.graphSession.getState().status).toBe('choosing')
+    await expect.poll(() => context.graphSession.get().status).toBe('choosing')
     // No silent fallback to the empty local root — that would look like the
     // user's notes vanished. The error names the fix instead.
     expect(context.service.getState().needsOnboarding).toBe(false)
-    expect(context.graphSession.getState().error).toMatch(/iCloud isn’t available/)
+    expect(context.graphSession.get().error).toMatch(/iCloud isn’t available/)
     expect(context.opened).toEqual([])
   })
 
@@ -320,8 +320,8 @@ describe('MobileOnboardingService boot', () => {
     context.settings.failLoad()
     context.service.boot()
 
-    await expect.poll(() => context.graphSession.getState().status).toBe('choosing')
-    expect(context.graphSession.getState().error).toBe('Couldn’t load your settings.')
+    await expect.poll(() => context.graphSession.get().status).toBe('choosing')
+    expect(context.graphSession.get().error).toBe('Couldn’t load your settings.')
     expect(context.service.getState().needsOnboarding).toBe(false)
   })
 
@@ -329,9 +329,7 @@ describe('MobileOnboardingService boot', () => {
     const context = setup()
     context.settings.failLoad()
     context.service.boot()
-    await expect
-      .poll(() => context.graphSession.getState().error)
-      .toBe('Couldn’t load your settings.')
+    await expect.poll(() => context.graphSession.get().error).toBe('Couldn’t load your settings.')
 
     context.settings.ipc.onCommand('settings_load', () => ({}))
     context.activity.emitFocus()
@@ -344,9 +342,7 @@ describe('MobileOnboardingService boot', () => {
     const context = setup()
     context.settings.failLoad()
     context.service.boot()
-    await expect
-      .poll(() => context.graphSession.getState().error)
-      .toBe('Couldn’t load your settings.')
+    await expect.poll(() => context.graphSession.get().error).toBe('Couldn’t load your settings.')
 
     context.settings.ipc.onCommand('settings_load', () => ({
       mobileOnboarded: true,
@@ -374,16 +370,14 @@ describe('MobileOnboardingService boot', () => {
     context.activity.emitFocus()
     await expect.poll(context.focusSubscriptions).toBe(3)
     expect(loads()).toBe(3)
-    expect(context.graphSession.getState().error).toBe('Couldn’t load your settings.')
+    expect(context.graphSession.get().error).toBe('Couldn’t load your settings.')
   })
 
   it('stops retrying failed settings once the boot is stopped', async () => {
     const context = setup()
     context.settings.failLoad()
     const stop = context.service.boot()
-    await expect
-      .poll(() => context.graphSession.getState().error)
-      .toBe('Couldn’t load your settings.')
+    await expect.poll(() => context.graphSession.get().error).toBe('Couldn’t load your settings.')
     stop()
 
     context.settings.ipc.onCommand('settings_load', () => ({}))
@@ -401,7 +395,7 @@ describe('MobileOnboardingService boot', () => {
     await context.settings.whenLoaded()
     await context.clock.advance(0)
     expect(context.opened).toEqual([])
-    expect(context.graphSession.getState().status).toBe('loading')
+    expect(context.graphSession.get().status).toBe('loading')
   })
 })
 
@@ -411,9 +405,9 @@ describe('MobileOnboardingService completeOnboarding', () => {
 
     await context.service.completeOnboarding('local')
 
-    expect(context.graphSession.getState().status).toBe('ready')
+    expect(context.graphSession.get().status).toBe('ready')
     expect(context.service.getState().needsOnboarding).toBe(false)
-    expect(context.graphSession.getState().graph?.root).toBe(MOBILE_ROOT)
+    expect(context.graphSession.get().graph?.root).toBe(MOBILE_ROOT)
     expect(context.service.getState().kind).toBe('local')
     // The gate is persisted so later launches open the root directly.
     await context.settings.flush()
@@ -429,8 +423,8 @@ describe('MobileOnboardingService completeOnboarding', () => {
 
     await context.service.completeOnboarding('icloud')
 
-    expect(context.graphSession.getState().status).toBe('ready')
-    expect(context.graphSession.getState().graph?.root).toBe(ICLOUD_GRAPH)
+    expect(context.graphSession.get().status).toBe('ready')
+    expect(context.graphSession.get().graph?.root).toBe(ICLOUD_GRAPH)
     expect(context.service.getState().kind).toBe('icloud')
     expect(context.storage.createdGraphs()).toEqual([ICLOUD_GRAPH])
     await context.settings.flush()
@@ -449,8 +443,8 @@ describe('MobileOnboardingService completeOnboarding', () => {
 
     await context.service.completeOnboarding('icloud', `${ICLOUD_ROOT}/Work`)
 
-    expect(context.graphSession.getState().status).toBe('ready')
-    expect(context.graphSession.getState().graph?.root).toBe(`${ICLOUD_ROOT}/Work`)
+    expect(context.graphSession.get().status).toBe('ready')
+    expect(context.graphSession.get().graph?.root).toBe(`${ICLOUD_ROOT}/Work`)
     expect(context.storage.createdGraphs()).toEqual([])
     await context.settings.flush()
     expect(context.settings.saves().at(-1)?.mobileGraphName).toBe('Work')
@@ -464,7 +458,7 @@ describe('MobileOnboardingService completeOnboarding', () => {
 
     await context.service.completeOnboarding('icloud', journalRoot)
 
-    expect(context.graphSession.getState().status).toBe('ready')
+    expect(context.graphSession.get().status).toBe('ready')
     expect(context.storage.createdGraphs()).toEqual([journalRoot])
     await context.settings.flush()
     expect(context.settings.saves().at(-1)?.mobileGraphName).toBe('Journal')
@@ -502,7 +496,7 @@ describe('MobileOnboardingService completeOnboarding', () => {
     // for an in-app retry, and the flag is never persisted — no way to get
     // stranded past onboarding on a broken open.
     expect(context.service.getState().needsOnboarding).toBe(true)
-    expect(context.graphSession.getState().graph).toBeNull()
+    expect(context.graphSession.get().graph).toBeNull()
     expect(context.settings.saves()).toEqual([])
   })
 

@@ -596,7 +596,7 @@ class AssetDescriptionServiceImpl implements AssetDescriptionService {
   }
 
   backfillVisibly(): Promise<ReconcileAssetDescriptionsOutcome> {
-    const { session } = this.#deps.graphSession.getState()
+    const { session } = this.#deps.graphSession.get()
     if (session === null) {
       return Promise.resolve({
         pending: 0,

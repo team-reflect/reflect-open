@@ -39,7 +39,7 @@ export function AgentsSection(): ReactElement | null {
     mutationKey: mutationKeys.agentSkill.write(graph?.root),
     scope: { id: mutationScopeIds.agentSkillWrite(graph?.root) },
     mutationFn: async (variables: AgentSkillAction): Promise<AgentSkillStatus> => {
-      if (graphSession.getState().session?.generation !== variables.generation) {
+      if (graphSession.get().session?.generation !== variables.generation) {
         throw new Error('The graph changed before the agent skill write ran')
       }
       return variables.action === 'uninstall'
