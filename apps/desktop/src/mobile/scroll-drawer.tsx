@@ -58,10 +58,9 @@ export interface DrawerProps {
  */
 export function Drawer({ open, onOpenChange, children }: DrawerProps): ReactElement {
   const contextValue = useMemo(() => ({ open, onOpenChange }), [open, onOpenChange])
-  const handleOpenChange = useCallback((next: boolean) => onOpenChange(next), [onOpenChange])
   return (
     <DrawerContext value={contextValue}>
-      <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
+      <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
         {children}
       </DialogPrimitive.Root>
     </DrawerContext>
