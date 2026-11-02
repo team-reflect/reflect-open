@@ -8,11 +8,12 @@ export async function collectGarbage(): Promise<void> {
     if (round === 300) {
       throw new Error('The garbage collector did not run')
     }
+    // A new task: `deref()` keeps the probe alive until the current one ends.
+    await new Promise((resolve) => setTimeout(resolve, 100))
     let junk: object[] | undefined = []
     for (let i = 0; i < 200_000; i++) {
       junk.push({ i })
     }
     junk = undefined
-    await new Promise((resolve) => setTimeout(resolve, 100))
   }
 }
