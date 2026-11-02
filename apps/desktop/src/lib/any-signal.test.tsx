@@ -1,18 +1,5 @@
 import { expect, it } from 'vitest'
-
-/**
- * Allocates enough to run the garbage collector a few times.
- */
-async function collectGarbage(): Promise<void> {
-  for (let round = 0; round < 30; round++) {
-    let junk: object[] | undefined = []
-    for (let i = 0; i < 200_000; i++) {
-      junk.push({ i })
-    }
-    junk = undefined
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
-}
+import { collectGarbage } from '@/test-utils/gc.ts'
 
 const RUNS = Array.from({ length: 20 }, (_, index) => index + 1)
 

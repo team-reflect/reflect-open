@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
+import { collectGarbage } from '@/test-utils/gc.ts'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
 
 /**
@@ -336,6 +337,23 @@ describe('watchScrollSettle', () => {
       expect(watch.isTouching()).toBe(false)
       expect(element.style.scrollSnapType).toBe('')
       await mouse.up()
+    })
+
+    it('lets a click through after a press that spans a garbage collection', async () => {
+      const element = mountSnapScroller()
+      const onClick = vi.fn()
+      element.addEventListener('click', onClick)
+      watchScrollSettle({ element, onSettle: vi.fn(), signal: listeners.controller.signal })
+
+      await mouseTo(element, 50)
+      await mouse.down()
+      await collectGarbage()
+      await mouse.up()
+      await mouseTo(element, 90)
+      await mouse.down()
+      await mouse.up()
+
+      expect(onClick).toHaveBeenCalledTimes(2)
     })
 
     it('stops following the mouse once the button is up', async () => {
