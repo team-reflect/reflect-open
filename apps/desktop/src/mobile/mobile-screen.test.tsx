@@ -1092,8 +1092,14 @@ describe('MobileStack transitions & back pager', () => {
     await pushProbeNote(view)
 
     const scroller = pager(view)
+    // The drag must move the pager, so a drag that is ignored cannot pass.
+    let lowest = scroller.scrollLeft
+    scroller.addEventListener('scroll', () => {
+      lowest = Math.min(lowest, scroller.scrollLeft)
+    })
     await mouseDragFromStrip(view, 60)
     await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
+    expect(lowest).toBeLessThan(scroller.clientWidth - 30)
     await new Promise((resolve) => setTimeout(resolve, 200))
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     expect(stackLayers(view)).toHaveLength(2)
