@@ -36,8 +36,8 @@ describe('createNativeAudioRecorder', () => {
   it('start passes the segment and reminder lengths and moves to recording', async () => {
     const { ipc, recorder } = setup()
     const states: AudioRecorderState[] = []
-    recorder.subscribeState((state) => {
-      states.push(state)
+    recorder.state.subscribe(() => {
+      states.push(recorder.state.get())
     })
 
     await expect(recorder.start(START_OPTIONS)).resolves.toEqual({
@@ -60,7 +60,7 @@ describe('createNativeAudioRecorder', () => {
     await expect(recorder.start(START_OPTIONS)).rejects.toMatchObject({
       message: 'microphone access denied',
     })
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
   })
 
   it('stop claims the final segment and returns to idle', async () => {
@@ -78,7 +78,7 @@ describe('createNativeAudioRecorder', () => {
       durationMs: 4000,
     })
     expect(recorder.isStagedClaimed(path)).toBe(true)
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
   })
 
   it('concurrent stops share one native stop', async () => {
@@ -162,7 +162,9 @@ describe('createNativeAudioRecorder', () => {
     const path = '/staging/native-stop.m4a'
     const first: AudioRecorderStopped[] = []
     const second: AudioRecorderStopped[] = []
+    const statesAtStop: AudioRecorderState[] = []
     recorder.subscribeStopped((stopped) => {
+      statesAtStop.push(recorder.state.get())
       first.push(stopped)
     })
     recorder.subscribeStopped((stopped) => {
@@ -178,7 +180,7 @@ describe('createNativeAudioRecorder', () => {
       reason: 'interruption',
     })
 
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
     expect(first).toEqual([
       {
         segment: {
@@ -193,6 +195,7 @@ describe('createNativeAudioRecorder', () => {
       },
     ])
     expect(second).toEqual(first)
+    expect(statesAtStop).toEqual(['idle'])
     expect(recorder.isStagedClaimed(path)).toBe(true)
   })
 
@@ -228,7 +231,7 @@ describe('createNativeAudioRecorder', () => {
     recorder.subscribeStopped(() => {})
 
     const starting = recorder.start(START_OPTIONS)
-    expect(recorder.state()).toBe('requesting')
+    expect(recorder.state.get()).toBe('requesting')
     await Promise.resolve()
     ipc.emitPlugin('recording', 'recordingStopped', {
       path: '/staging/stop-during-start.m4a',
@@ -240,7 +243,27 @@ describe('createNativeAudioRecorder', () => {
     pendingStart.resolve({ sessionStartedMs: SESSION_STARTED_MS })
     await starting
 
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
+  })
+
+  it('state notifies only on a change, until unsubscribed', async () => {
+    const { ipc, recorder } = setup()
+    ipc.onCommand('plugin:recording|cancel_recording', () => null)
+    let notified = 0
+    const unsubscribe = recorder.state.subscribe(() => {
+      notified++
+    })
+
+    await recorder.cancel()
+    expect(notified).toBe(0)
+
+    await recorder.start(START_OPTIONS)
+    expect(notified).toBe(2)
+
+    unsubscribe()
+    await recorder.cancel()
+    expect(notified).toBe(2)
+    expect(recorder.state.get()).toBe('idle')
   })
 
   it('cancel discards the session and returns to idle', async () => {
@@ -250,7 +273,7 @@ describe('createNativeAudioRecorder', () => {
 
     await recorder.cancel()
 
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
     expect(commands(ipc)).toContain('plugin:recording|cancel_recording')
   })
 

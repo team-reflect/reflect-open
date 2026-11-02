@@ -19,7 +19,12 @@ import {
   useTaskEditorFinalizer,
   type TaskEditorApi,
 } from '@/lib/tasks/use-task-editor-finalizer.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useTimeFormat,
+} from '@/providers/settings-provider.tsx'
 
 /**
  * The inline task editor (Plan 18, V1 parity): the sole-selected task swaps its
@@ -161,7 +166,10 @@ export function TaskEditor({
   checkboxToggleControllerRef,
   convertControllerRef,
 }: TaskEditorProps): ReactElement {
-  const { settings } = useSettings()
+  const timeFormat = useTimeFormat()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
   const navigate = useWikiLinkNavigation()
   const onLinkClick = useMarkdownLinkClick(null)
   const onTagClick = useTagNavigation()
@@ -216,10 +224,10 @@ export function TaskEditor({
         initialContent={initial}
         singleParagraph
         onChange={onChange}
-        markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
-        spellCheck={settings.editorSpellCheck}
-        smoothCaretAnimation={settings.editorSmoothCaretAnimation}
-        timeFormat={settings.timeFormat}
+        markMode={markModeFromSyntax(editorMarkdownSyntax)}
+        spellCheck={editorSpellCheck}
+        smoothCaretAnimation={editorSmoothCaretAnimation}
+        timeFormat={timeFormat}
         // A one-line editor has nothing to reorder, so keep the gutter grip off.
         blockHandle={false}
         onWikiLinkClick={navigate}

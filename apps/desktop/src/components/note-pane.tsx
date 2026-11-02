@@ -27,9 +27,17 @@ import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview.tsx'
 import { useXPostPreload } from '@/editor/use-x-post-preload.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useNoteSearchQuery, useNoteSearchReport } from '@/providers/note-find-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useTimeFormat,
+} from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface NotePaneProps {
@@ -125,8 +133,14 @@ export function NotePaneComponent({
   registerHandle,
   onExitBoundary,
 }: NotePaneProps): ReactElement {
-  const { graph } = useGraph()
-  const { settings } = useSettings()
+  const graph = useGraphInfo()
+  const dateFormat = useDateFormat()
+  const timeFormat = useTimeFormat()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
   const { noteCreation, platform } = useCoreServices()
   const graphKey = graph?.root ?? null
   const dailyNote = isDaily(path)
@@ -166,7 +180,7 @@ export function NotePaneComponent({
     saveError,
   } = useAssetPersistence(path)
   const renderWikilinkHoverCard = useWikiLinkHoverPreview({
-    dateFormat: settings.dateFormat,
+    dateFormat,
   })
   const onWikiLinkClick = useWikiLinkNavigation()
   const onLinkClick = useMarkdownLinkClick(path)
@@ -276,10 +290,7 @@ export function NotePaneComponent({
   // setting is on (old Reflect's every-note default). The seed only changes what
   // the editor shows; persistence is untouched, so a not-yet-created daily
   // placeholder stays uncreated until the user types — see `default-bullet.ts`.
-  const editorSeed = editorBodyWithDefaultBullet(
-    document.initialContent,
-    settings.editorDefaultBullet,
-  )
+  const editorSeed = editorBodyWithDefaultBullet(document.initialContent, editorDefaultBullet)
 
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
@@ -300,13 +311,13 @@ export function NotePaneComponent({
         key={document.sessionEpoch}
         initialContent={editorSeed}
         onChange={document.onEditorChange}
-        markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
-        spellCheck={settings.editorSpellCheck}
+        markMode={markModeFromSyntax(editorMarkdownSyntax)}
+        spellCheck={editorSpellCheck}
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
-        smoothCaretAnimation={settings.editorSmoothCaretAnimation}
-        timeFormat={settings.timeFormat}
-        bulletAfterHeading={settings.editorBulletAfterHeading}
+        smoothCaretAnimation={editorSmoothCaretAnimation}
+        timeFormat={timeFormat}
+        bulletAfterHeading={editorBulletAfterHeading}
         backspaceDeletesEmptyFirstBlock={dailyNote}
         // The grip drag-reorders blocks and the "+" inserts a paragraph below.
         blockHandle={true}

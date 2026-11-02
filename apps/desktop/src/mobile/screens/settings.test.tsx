@@ -393,7 +393,7 @@ describe('MobileSettings', () => {
       const methods = view.gitSync.calls().map((call) => call.method)
       expect(methods.filter((method) => method === 'disconnectGraph')).toHaveLength(1)
     })
-    expect(view.core.githubAuth.getState().connected).toBe(true)
+    expect(view.core.githubAuth.get().connected).toBe(true)
   })
 
   it('signs in to and out of GitHub from the account group, on any graph', async () => {
@@ -407,7 +407,7 @@ describe('MobileSettings', () => {
     await swipeDrawerClosed()
     await userEvent.click(page.getByRole('button', { name: 'Sign out of GitHub' }))
 
-    await vi.waitFor(() => expect(view.core.githubAuth.getState().connected).toBe(false))
+    await vi.waitFor(() => expect(view.core.githubAuth.get().connected).toBe(false))
     await expect.element(page.getByRole('button', { name: 'Sign in to GitHub' })).toBeVisible()
   })
 
@@ -494,7 +494,7 @@ describe('MobileSettings', () => {
       username: 'alex',
       secret: 'glpat-1',
     })
-    expect(view.core.githubAuth.getState().connected).toBe(true)
+    expect(view.core.githubAuth.get().connected).toBe(true)
   })
 
   it('offers to update the sign-in of a host remote the host refused', async () => {

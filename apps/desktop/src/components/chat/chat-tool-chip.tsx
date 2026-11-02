@@ -5,7 +5,7 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 import {
   isTagName,

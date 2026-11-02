@@ -220,10 +220,10 @@ describe('signIn', () => {
     const classic = service()
 
     await classic.signIn({ ephemeral: false })
-    expect(classic.getState()).toEqual({ access: null, active: false, isLoading: true })
+    expect(classic.get()).toEqual({ access: null, active: false, isLoading: true })
 
     await classic.read()
-    expect(classic.getState()).toMatchObject({ active: true, isLoading: false })
+    expect(classic.get()).toMatchObject({ active: true, isLoading: false })
   })
 
   it('uses the last paid period for an account that stopped paying', async () => {
@@ -388,15 +388,15 @@ describe('read', () => {
 
     await expect(classic.read()).resolves.toEqual(access)
     expect(paths()).toEqual([])
-    expect(classic.getState()).toEqual({ access, active: true, isLoading: false })
+    expect(classic.get()).toEqual({ access, active: true, isLoading: false })
   })
 
   it('is null without a stored record', async () => {
     const classic = service()
-    expect(classic.getState().isLoading).toBe(true)
+    expect(classic.get().isLoading).toBe(true)
 
     await expect(classic.read()).resolves.toBeNull()
-    expect(classic.getState()).toEqual({ access: null, active: false, isLoading: false })
+    expect(classic.get()).toEqual({ access: null, active: false, isLoading: false })
   })
 
   it('reports an expired record as inactive by the clock', async () => {
@@ -406,7 +406,23 @@ describe('read', () => {
     clock.setNow(NOW + 2 * DAY_MS)
 
     await classic.read()
-    expect(classic.getState().active).toBe(false)
+    expect(classic.get().active).toBe(false)
+  })
+
+  it('keeps the state reference until the next read and stops notifying after unsubscribe', async () => {
+    const classic = service()
+    const state = classic.get()
+    expect(classic.get()).toBe(state)
+    const listener = vi.fn()
+    const unsubscribe = classic.subscribe(listener)
+
+    await classic.read()
+    expect(classic.get()).not.toBe(state)
+    expect(listener).toHaveBeenCalledOnce()
+
+    unsubscribe()
+    await classic.read()
+    expect(listener).toHaveBeenCalledOnce()
   })
 
   it('stops loading and rethrows when the keychain fails', async () => {
@@ -415,7 +431,7 @@ describe('read', () => {
     const classic = service()
     const notified: boolean[] = []
     classic.subscribe(() => {
-      notified.push(classic.getState().isLoading)
+      notified.push(classic.get().isLoading)
     })
 
     await expect(classic.read()).rejects.toThrow('locked')
@@ -468,7 +484,7 @@ describe('load', () => {
     await expect(classic.load()).resolves.toEqual(expected)
     expect(paths()).toEqual(['/api/users/me'])
     expect(stored()).toEqual(expected)
-    expect(classic.getState()).toEqual({ access: expected, active: true, isLoading: false })
+    expect(classic.get()).toEqual({ access: expected, active: true, isLoading: false })
   })
 
   it('shares one recheck between overlapping calls', async () => {
@@ -530,7 +546,7 @@ describe('signOut', () => {
     await classic.signOut()
 
     expect(secrets.snapshot()).toEqual({})
-    expect(classic.getState()).toEqual({ access: null, active: false, isLoading: false })
+    expect(classic.get()).toEqual({ access: null, active: false, isLoading: false })
     expect(notified).toBe(1)
   })
 })
@@ -547,7 +563,7 @@ describe('start', () => {
 
     classic.start()
     await vi.waitFor(() => expect(paths()).toEqual(['/api/users/me']))
-    expect(classic.getState().access?.checkedAt).toBe(NOW)
+    expect(classic.get().access?.checkedAt).toBe(NOW)
 
     await clock.advance(DAY_MS)
     activity.emitVisible()
@@ -559,7 +575,7 @@ describe('start', () => {
     const classic = service()
 
     classic.start()
-    await vi.waitFor(() => expect(classic.getState().isLoading).toBe(false))
+    await vi.waitFor(() => expect(classic.get().isLoading).toBe(false))
     const reads = vi.spyOn(secrets, 'get')
     activity.emitVisible()
 

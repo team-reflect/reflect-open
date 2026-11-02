@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { ThemePreference } from '@reflect/core'
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsService, useThemeSetting } from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsOptionCard } from './option-card.tsx'
 import { SettingsSection } from './section.tsx'
@@ -25,14 +25,15 @@ const THEME_OPTIONS: ThemeOption[] = [
  * this section needs no theme context of its own.
  */
 export function AppearanceSection(): ReactElement {
-  const { settings, updateSettings } = useSettings()
+  const theme = useThemeSetting()
+  const settingsService = useSettingsService()
 
   return (
     <SettingsSection id="appearance">
       <SettingsField legend="Theme" description="System follows your OS appearance.">
         <div className="mt-3 grid grid-cols-3 gap-2">
           {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
-            const selected = settings.theme === value
+            const selected = theme === value
             return (
               <SettingsOptionCard
                 key={value}
@@ -47,7 +48,7 @@ export function AppearanceSection(): ReactElement {
                   name="theme"
                   value={value}
                   checked={selected}
-                  onChange={() => updateSettings({ theme: value })}
+                  onChange={() => settingsService.update({ theme: value })}
                   className="sr-only"
                 />
                 <Icon aria-hidden strokeWidth={1.75} className="size-4" />

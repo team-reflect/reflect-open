@@ -114,7 +114,7 @@ class LinkPreviewServiceImpl implements LinkPreviewService {
     currentSession: () => LinkPreviewSession | null,
   ): LinkPreviewResolver {
     const { noteDocuments, privacy, webFetch, parseMetadata, graphSession } = this.#deps
-    const graph = graphSession.getState().session
+    const graph = graphSession.get().session
     const cache = new Map<string, Promise<LinkPreviewResolution>>()
 
     async function authorizeOutboundUrls(

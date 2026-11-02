@@ -21,6 +21,8 @@ export {
   getWeekday,
   getYear,
   type Weekday,
+  startOfDay,
+  addDays,
 } from './dates.ts'
 export { formatDurationInWords, formatElapsed } from './durations.ts'
 export { sha256Hex } from './sha256.ts'

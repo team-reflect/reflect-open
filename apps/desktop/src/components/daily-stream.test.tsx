@@ -212,9 +212,11 @@ describe('DailyStream', () => {
     )
 
     // Simulated sleep: the wall clock jumps but no timer fires (DOM timers
-    // run on a monotonic clock that pauses while the machine sleeps).
+    // run on a monotonic clock that pauses while the machine sleeps). Waking
+    // fires `visibilitychange`.
     await act(() => {
       clock.setNow(new Date(2026, 5, 28, 9, 0, 0).getTime())
+      document.dispatchEvent(new Event('visibilitychange'))
     })
     await act(() => {
       navigateToday()

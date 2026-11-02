@@ -10,8 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx'
 import { createChatConversationsQueryOptions } from '@/lib/query-options.ts'
-import { useChatSession } from '@/providers/chat-provider.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useActiveConversationId, useChatActions } from '@/providers/chat-provider.tsx'
+import { useGraphInfo, useIndexGeneration } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -21,9 +21,11 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  * save and delete, so the list updates while a new conversation streams.
  */
 export function ChatHistoryMenu(): ReactElement | null {
-  const { graph, indexGeneration } = useGraph()
+  const graph = useGraphInfo()
+  const indexGeneration = useIndexGeneration()
   const { chatHistory } = useCoreServices()
-  const { activeConversationId, openConversation, deleteConversation } = useChatSession()
+  const activeConversationId = useActiveConversationId()
+  const { openConversation, deleteConversation } = useChatActions()
 
   const enabled = indexGeneration !== null
   const { data: conversations } = useQuery({

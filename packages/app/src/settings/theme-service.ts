@@ -1,4 +1,12 @@
-import type { SettingsService, StorageService, ThemePreference, Unlisten } from '@reflect/core'
+import {
+  deriveStore,
+  WritableStore,
+  type SettingsService,
+  type StorageService,
+  type Store,
+  type ThemePreference,
+  type Unlisten,
+} from '@reflect/core'
 import type { ColorScheme, PlatformService } from '../app/platform-service.ts'
 
 /**
@@ -14,24 +22,30 @@ export type ResolvedTheme = ColorScheme
 export const THEME_PREFERENCE_CACHE_KEY = 'reflect.theme.preference'
 
 /**
+ * The theme preference and the concrete theme it resolves to.
+ */
+export interface ThemeState {
+  readonly preference: ThemePreference
+  readonly resolved: ResolvedTheme
+  /**
+   * True once the settings load has ended, successfully or not.
+   */
+  readonly settled: boolean
+}
+
+/**
  * The app theme: the `theme` setting resolved against the system color
  * scheme. After a successful settings load, the preference (not the resolved
  * theme) is mirrored into local storage so the next launch can paint it
  * before the settings arrive. After a failed load nothing is mirrored,
  * because changes are session-only.
  */
-export interface ThemeService {
-  preference: () => ThemePreference
-  resolved: () => ResolvedTheme
-  /**
-   * True once the settings load has ended, successfully or not.
-   */
-  settled: () => boolean
+export interface ThemeService extends Store<ThemeState> {
   setPreference: (preference: ThemePreference) => void
   /**
-   * Calls `listener` after the preference, the resolved theme, or `settled()` changes.
+   * Sets the preference to the opposite of the resolved theme.
    */
-  subscribe: (listener: () => void) => Unlisten
+  toggleTheme: () => void
   /**
    * Resolves once the settings load has ended, successfully or not.
    */
@@ -44,32 +58,47 @@ export interface ThemeServiceDeps {
   readonly platform: PlatformService
 }
 
+interface ThemeSourceState {
+  readonly preference: ThemePreference
+  readonly system: ColorScheme
+  readonly settled: boolean
+}
+
+function resolveTheme(state: ThemeSourceState): ThemeState {
+  return {
+    preference: state.preference,
+    resolved: state.preference === 'system' ? state.system : state.preference,
+    settled: state.settled,
+  }
+}
+
+function isThemeStateEqual(a: ThemeState, b: ThemeState): boolean {
+  return a.preference === b.preference && a.resolved === b.resolved && a.settled === b.settled
+}
+
 class ThemeServiceImpl implements ThemeService {
   readonly #deps: ThemeServiceDeps
-  readonly #listeners = new Set<() => void>()
+  readonly #state = new WritableStore<ThemeSourceState>({
+    preference: 'system',
+    system: 'light',
+    settled: false,
+  })
+  readonly #theme = deriveStore(this.#state, resolveTheme, isThemeStateEqual)
   #started = false
-  #system: ColorScheme = 'light'
-  #preference: ThemePreference = 'system'
-  #isSettled = false
   #mirrored: ThemePreference | null = null
 
   constructor(deps: ThemeServiceDeps) {
     this.#deps = deps
   }
 
-  readonly preference = (): ThemePreference => {
+  readonly get = (): ThemeState => {
     this.#start()
-    return this.#preference
+    return this.#theme.get()
   }
 
-  readonly resolved = (): ResolvedTheme => {
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
     this.#start()
-    return this.#resolve()
-  }
-
-  readonly settled = (): boolean => {
-    this.#start()
-    return this.#isSettled
+    return this.#theme.subscribe(listener)
   }
 
   readonly setPreference = (preference: ThemePreference): void => {
@@ -77,12 +106,8 @@ class ThemeServiceImpl implements ThemeService {
     this.#deps.settings.update({ theme: preference })
   }
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#start()
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
+  readonly toggleTheme = (): void => {
+    this.setPreference(this.get().resolved === 'dark' ? 'light' : 'dark')
   }
 
   async whenSettled(): Promise<void> {
@@ -90,37 +115,19 @@ class ThemeServiceImpl implements ThemeService {
     await this.#deps.settings.whenLoaded()
   }
 
-  #resolve(): ResolvedTheme {
-    return this.#preference === 'system' ? this.#system : this.#preference
-  }
-
-  #notify(): void {
-    for (const listener of this.#listeners) {
-      listener()
-    }
+  #setState(patch: Partial<ThemeSourceState>): void {
+    this.#state.set({ ...this.#state.get(), ...patch })
   }
 
   #sync(): void {
     const { settings, storage } = this.#deps
-    const previous = {
-      preference: this.#preference,
-      resolved: this.#resolve(),
-      settled: this.#isSettled,
+    const preference = settings.get().theme
+    const status = settings.status.get()
+    if (status === 'loaded' && this.#mirrored !== preference) {
+      this.#mirrored = preference
+      storage.local.set(THEME_PREFERENCE_CACHE_KEY, preference)
     }
-    this.#preference = settings.get().theme
-    const status = settings.status()
-    this.#isSettled = status !== 'loading'
-    if (status === 'loaded' && this.#mirrored !== this.#preference) {
-      this.#mirrored = this.#preference
-      storage.local.set(THEME_PREFERENCE_CACHE_KEY, this.#preference)
-    }
-    if (
-      previous.preference !== this.#preference ||
-      previous.resolved !== this.#resolve() ||
-      previous.settled !== this.#isSettled
-    ) {
-      this.#notify()
-    }
+    this.#setState({ preference, settled: status !== 'loading' })
   }
 
   #start(): void {
@@ -129,18 +136,14 @@ class ThemeServiceImpl implements ThemeService {
       return
     }
     this.#started = true
-    this.#system = platform.colorScheme()
-    platform.subscribeColorScheme((value) => {
-      if (value === this.#system) {
-        return
-      }
-      const before = this.#resolve()
-      this.#system = value
-      if (this.#resolve() !== before) {
-        this.#notify()
-      }
+    this.#setState({ system: platform.colorScheme() })
+    platform.subscribeColorScheme((system) => {
+      this.#setState({ system })
     })
     settings.subscribe(() => {
+      this.#sync()
+    })
+    settings.status.subscribe(() => {
       this.#sync()
     })
     this.#sync()

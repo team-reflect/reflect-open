@@ -3,6 +3,7 @@ import {
   errorMessage,
   graphNameFromRoot,
   isMobilePlatform,
+  WritableStore,
   type ActivityPort,
   type ClockService,
   type GraphSessionService,
@@ -13,6 +14,7 @@ import {
   type PlatformFacts,
   type SettingsLoadOutcome,
   type SettingsService,
+  type Store,
   type TimerHandle,
   type Unlisten,
 } from '@reflect/core'
@@ -96,9 +98,7 @@ export interface MobileOnboardingState {
  * persisted, with absolute paths derived fresh every launch. Members are
  * function properties so surfaces can pass them around unbound.
  */
-export interface MobileOnboardingService {
-  getState: () => MobileOnboardingState
-  subscribe: (listener: () => void) => Unlisten
+export interface MobileOnboardingService extends Store<MobileOnboardingState> {
   /**
    * Boot-time head start for the storage resolve (idempotent). Resolving the
    * iCloud container (`URLForUbiquityContainerIdentifier` plus the graph
@@ -146,27 +146,21 @@ export interface MobileOnboardingServiceDeps {
 
 class MobileOnboardingServiceImpl implements MobileOnboardingService {
   readonly #deps: MobileOnboardingServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #state: MobileOnboardingState = {
+  readonly #state = new WritableStore<MobileOnboardingState>({
     needsOnboarding: false,
     storageInfo: null,
     resolving: false,
     kind: null,
-  }
+  })
   #warmed: Promise<MobileStorageInfo> | null = null
 
   constructor(deps: MobileOnboardingServiceDeps) {
     this.#deps = deps
   }
 
-  readonly getState = (): MobileOnboardingState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   /**
    * Rejections are handled by whoever takes the promise; the guard here only
@@ -273,7 +267,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
               (localRoot) => {
                 if (active) {
                   this.#setState({
-                    storageInfo: this.#state.storageInfo ?? {
+                    storageInfo: this.#state.get().storageInfo ?? {
                       localRoot,
                       icloudDocumentsRoot: null,
                       icloudGraphRoots: [],
@@ -370,7 +364,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
 
   async completeOnboarding(kind: MobileStorageKind, chosenRoot?: string): Promise<void> {
     const { mobileStorage, settings: settingsService, graphSession } = this.#deps
-    const storageInfo = this.#state.storageInfo
+    const storageInfo = this.#state.get().storageInfo
     // An explicit root comes from the onboarding graph list or the settings
     // switcher (open THIS container graph / create one with this name);
     // without one, fall back to the kind's default root — the local path
@@ -415,10 +409,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
   }
 
   #setState(patch: Partial<MobileOnboardingState>): void {
-    this.#state = { ...this.#state, ...patch }
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set({ ...this.#state.get(), ...patch })
   }
 
   /**

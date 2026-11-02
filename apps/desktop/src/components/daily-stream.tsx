@@ -12,7 +12,7 @@ import {
   PAST_DAYS,
 } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useToday } from '@/lib/use-today.ts'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -72,7 +72,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const [focusIndex, setFocusIndex] = useState<number>(dayWindow.anchorIndex)
   const today = useToday()
   const targetDate = target.kind === 'today' ? today : target.date
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
 
   // targetDate is read at arrival time, not reacted to. On the `today` route
   // it follows this component's live clock — the same value that paints the
@@ -301,7 +301,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
                 )}
                 onClick={() => handleSubjectClick(date)}
               >
-                {formatDayLabel(date, settings.dateFormat)}
+                {formatDayLabel(date, dateFormat)}
               </h2>
               <NotePane
                 path={dailyPath(date)}
