@@ -97,7 +97,7 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
  * render cycle. Returns a detach.
  */
 export function attachUpdateToasts(update: UpdateService, logger: LoggerService): () => void {
-  const sync = (): void => showUpdateToast(update.getState(), update, logger)
+  const sync = (): void => showUpdateToast(update.get(), update, logger)
   sync()
   return update.subscribe(sync)
 }
