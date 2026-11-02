@@ -780,7 +780,7 @@ describe('trashMany', () => {
     })
 
     expect(files.trashed()).toEqual(['notes/a.md', 'notes/b.md'])
-    expect([...noteRows.getOverlays().keys()]).toEqual(['notes/a.md', 'notes/b.md'])
+    expect([...noteRows.get().keys()]).toEqual(['notes/a.md', 'notes/b.md'])
     expect(progress.started()).toMatchObject([{ label: 'Trashing notes', ended: true }])
     expect(progress.get()).toEqual([])
   })
@@ -813,7 +813,7 @@ describe('trashMany', () => {
     ])
     expect(files.trashed()).toEqual(['notes/a.md', 'notes/c.md'])
     // A note that failed stays listed.
-    expect([...noteRows.getOverlays().keys()]).toEqual(['notes/a.md', 'notes/c.md'])
+    expect([...noteRows.get().keys()]).toEqual(['notes/a.md', 'notes/c.md'])
     expect(progress.snapshot()).toMatchObject([
       { label: 'Trashing notes', status: 'failed', message: 'Daily notes cannot be deleted' },
     ])
