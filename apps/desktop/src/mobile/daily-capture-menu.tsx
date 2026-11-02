@@ -7,7 +7,11 @@ import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { cn } from '@/lib/utils.ts'
-import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
+import {
+  useMobileAudioMemo,
+  useMobileAudioMemoAvailable,
+  useMobileAudioMemoPhase,
+} from '@/mobile/audio-memo-provider.tsx'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
@@ -33,16 +37,14 @@ export function DailyCaptureMenu(): ReactElement {
   const { haptics } = useMobileServices()
   const { noteCreation } = useCoreServices()
   const [expanded, setExpanded] = useState(false)
-  const memo = useMobileAudioMemo()
+  const { toggle } = useMobileAudioMemo()
+  const phase = useMobileAudioMemoPhase()
+  const available = useMobileAudioMemoAvailable()
   const newTask = useNewTaskSheet()
   const { navigate } = useRouter()
-  const recording = memo.phase === 'recording' || memo.phase === 'requesting'
+  const recording = phase === 'recording' || phase === 'requesting'
   const audioLabel =
-    memo.phase === 'error'
-      ? 'Show audio memo error'
-      : recording
-        ? 'Stop recording'
-        : 'Record audio memo'
+    phase === 'error' ? 'Show audio memo error' : recording ? 'Stop recording' : 'Record audio memo'
 
   const close = (): void => {
     setExpanded(false)
@@ -65,7 +67,7 @@ export function DailyCaptureMenu(): ReactElement {
 
   const toggleAudioMemo = (): void => {
     close()
-    memo.toggle()
+    toggle()
   }
 
   return (
@@ -133,7 +135,7 @@ export function DailyCaptureMenu(): ReactElement {
             </Button>
           </div>
 
-          {memo.available ? (
+          {available ? (
             <div
               data-slot="audio-memo-action"
               className={cn(
@@ -145,13 +147,13 @@ export function DailyCaptureMenu(): ReactElement {
             >
               <Button
                 size="icon"
-                variant={recording || memo.phase === 'error' ? 'destructive' : 'secondary'}
+                variant={recording || phase === 'error' ? 'destructive' : 'secondary'}
                 aria-label={audioLabel}
                 tabIndex={expanded ? 0 : -1}
                 className={cn('size-12 rounded-full shadow-lg', ACTION_BUTTON_MOTION)}
                 onClick={toggleAudioMemo}
               >
-                {memo.phase === 'transcribing' ? (
+                {phase === 'transcribing' ? (
                   <Spinner className="size-5" />
                 ) : recording ? (
                   <Square aria-hidden fill="currentColor" className="size-4" />

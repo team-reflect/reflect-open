@@ -2,6 +2,7 @@ import type { ClockService } from '../../ports/clock-service.ts'
 import type { IdService } from '../../ports/id-service.ts'
 import type { ImageCodecService } from '../../ports/image-codec-service.ts'
 import type { LoggerService } from '../../ports/logger-service.ts'
+import type { TodayService } from '../../daily/today-service.ts'
 import type { EmbeddingRuntimeService } from '../../embeddings/embedding-runtime-service.ts'
 import { errorMessage } from '../../errors.ts'
 import type { GraphSession } from '../../graph/graph-session.ts'
@@ -171,6 +172,7 @@ export interface ChatSessionServiceDeps {
   readonly embeddingRuntime: EmbeddingRuntimeService
   readonly settings: SettingsService
   readonly clock: ClockService
+  readonly today: TodayService
   readonly id: IdService
   readonly imageCodec: ImageCodecService
   readonly logger: LoggerService
@@ -344,7 +346,7 @@ class ChatSessionImpl implements ChatSession {
   async send(text: string): Promise<void> {
     const { chatEngine, chatGraphContext, providerConfig, credentials, embeddingRuntime } =
       this.#deps
-    const { settings, clock, id, logger } = this.#deps
+    const { settings, clock, today, id, logger } = this.#deps
     const trimmed = text.trim()
     const attached = this.#local.get().attachments
     const config = providerConfig.chatModel()
@@ -428,7 +430,7 @@ class ChatSessionImpl implements ChatSession {
         config,
         apiKey,
         messages,
-        today: clock.today(),
+        today: today.get(),
         // A stray enabled flag must lose to the runtime here.
         semanticSearchEnabled:
           settings.get().semanticSearchEnabled && embeddingRuntime.get().status === 'ready',
