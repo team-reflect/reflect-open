@@ -52,6 +52,8 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
   const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [createNote, setCreateNote] = useState(event.recurring)
 
+  const { contactsEnabled, timeFormat } = settings
+
   // Upgrade the prefilled chips once attendee resolution answers: an invite
   // email an existing note owns swaps the calendar's spelling for the note
   // title, so the chip shows exactly what submit will link. Chips are merged
@@ -73,7 +75,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
     return () => {
       cancelled = true
     }
-  }, [event, logger, meetings, settings.contactsEnabled])
+  }, [event, logger, meetings, contactsEnabled])
 
   const addAttendee = (attendee: MeetingAttendee): void => {
     setAttendees((current) => withAttendee(current, attendee))
@@ -107,7 +109,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
           attendees,
           backlinkMeeting: createNote,
           lookupContacts,
-          startTime: formatTimeOfDay(new Date(event.startsAt), settings.timeFormat),
+          startTime: formatTimeOfDay(new Date(event.startsAt), timeFormat),
         })
       } catch (cause) {
         return errorMessage(cause)
@@ -135,7 +137,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
         <DialogHeader>
           <DialogTitle>Add event</DialogTitle>
           <DialogDescription>
-            {formatTimeOfDay(new Date(event.startsAt), settings.timeFormat)}
+            {formatTimeOfDay(new Date(event.startsAt), timeFormat)}
           </DialogDescription>
         </DialogHeader>
         <form action={submitAction} className="space-y-4">
