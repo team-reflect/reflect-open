@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import type { ClassicAccess, ClassicSignInResult } from '@reflect/core'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore } from '@/lib/use-store.ts'
 
 /**
  * This device's Reflect Classic access as stored in the keychain. Loading
@@ -17,7 +17,7 @@ export function useClassicAccess(): {
 } {
   const { classicAccess: classic, platform } = useCoreServices()
   const enabled = platform.appPlatform === 'ios'
-  const state = useServiceState(classic, classic.getState)
+  const state = useStore(classic)
 
   useEffect(() => classic.start(), [classic])
 

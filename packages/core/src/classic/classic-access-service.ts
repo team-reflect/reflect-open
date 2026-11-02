@@ -9,6 +9,7 @@ import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { AppError, isAppError } from '../errors.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { WebAuthService } from '../ipc/web-auth-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
@@ -97,9 +98,7 @@ export interface ClassicAccessServiceDeps {
 /**
  * Reflect Open access through a paid Reflect Classic account.
  */
-export interface ClassicAccessService {
-  getState: () => ClassicAccessState
-  subscribe: (listener: () => void) => Unlisten
+export interface ClassicAccessService extends Store<ClassicAccessState> {
   /**
    * This device's stored access, without contacting Reflect Classic.
    */
@@ -178,22 +177,20 @@ export function classicAccessUntil(
 
 class ClassicAccessServiceImpl implements ClassicAccessService {
   readonly #deps: ClassicAccessServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #state: ClassicAccessState = { access: null, active: false, isLoading: true }
+  readonly #state = new WritableStore<ClassicAccessState>({
+    access: null,
+    active: false,
+    isLoading: true,
+  })
   #pendingLoad: Promise<ClassicAccess | null> | null = null
 
   constructor(deps: ClassicAccessServiceDeps) {
     this.#deps = deps
   }
 
-  readonly getState = (): ClassicAccessState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   read(): Promise<ClassicAccess | null> {
     return this.#settle(this.#readStored())
@@ -258,7 +255,7 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
     })
     let stopRechecks: Unlisten | null = null
     const followToken = (): void => {
-      const hasToken = this.#state.access?.token != null
+      const hasToken = this.get().access?.token != null
       if (hasToken && stopRechecks === null) {
         const recheckNow = (): void => {
           this.load().catch((error: unknown) => {
@@ -281,14 +278,11 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
   }
 
   #publish(access: ClassicAccess | null): void {
-    this.#state = {
+    this.#state.set({
       access,
       active: access !== null && isClassicAccessActive(access, this.#deps.clock.now()),
       isLoading: false,
-    }
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    })
   }
 
   async #send(path: string, init: RequestInit): Promise<Response> {
@@ -420,11 +414,9 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
       this.#publish(access)
       return access
     } catch (error) {
-      if (this.#state.isLoading) {
-        this.#state = { ...this.#state, isLoading: false }
-        for (const listener of this.#listeners) {
-          listener()
-        }
+      const state = this.get()
+      if (state.isLoading) {
+        this.#state.set({ ...state, isLoading: false })
       }
       throw error
     }

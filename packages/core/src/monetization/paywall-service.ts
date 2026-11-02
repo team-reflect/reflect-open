@@ -90,7 +90,7 @@ class PaywallServiceImpl implements PaywallService {
       return 'hide'
     }
     const active = subscription.get()
-    const classic = classicAccess.getState()
+    const classic = classicAccess.get()
     if (active.value !== null || classic.active) {
       return 'hide'
     }
