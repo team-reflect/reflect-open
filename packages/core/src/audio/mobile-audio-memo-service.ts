@@ -6,10 +6,14 @@ import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { errorMessage } from '../errors.ts'
-import { WritableStore, type Store } from '../store.ts'
+import { combineStores, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { HapticsService } from '../ipc/haptics-service.ts'
-import type { AudioMemoPhase, AudioMemoService } from './audio-memo-service.ts'
+import type {
+  AudioMemoPhase,
+  AudioMemoPipelineState,
+  AudioMemoService,
+} from './audio-memo-service.ts'
 import type {
   AudioRecorderSegment,
   AudioRecorderService,
@@ -179,6 +183,17 @@ interface LiveSession {
   cancelled: boolean
 }
 
+/**
+ * The mutable state of a {@link MobileAudioMemoSession}.
+ */
+interface MobileAudioMemoSessionFields {
+  readonly drawerOpen: boolean
+  /**
+   * True from the stop tap until the recorder hands over the file.
+   */
+  readonly stopping: boolean
+}
+
 function toStagedPart(segment: AudioRecorderSegment): StagedPart {
   if (segment.audio.kind !== 'staged') {
     throw new Error('the native audio recorder produced an unstaged segment')
@@ -203,11 +218,10 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
   readonly #pipeline: ReturnType<AudioMemoService['openPipeline']>
   readonly #available: boolean
   readonly #unlisten: Unlisten[]
-  #drawerOpen = false
-  /**
-   * True from the stop tap until the recorder hands over the file.
-   */
-  #stopping = false
+  readonly #fields = new WritableStore<MobileAudioMemoSessionFields>(
+    { drawerOpen: false, stopping: false },
+    isShallowEqual,
+  )
   readonly #elapsedMs = new WritableStore(0)
   readonly elapsedMs: Store<number> = this.#elapsedMs
   readonly #level = new WritableStore(0)
@@ -229,28 +243,28 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
    */
   #scanning = false
   #disposed = false
-  readonly #state: WritableStore<MobileAudioMemoSessionState>
+  readonly #state: Store<MobileAudioMemoSessionState>
 
   constructor(deps: MobileAudioMemoServiceDeps) {
     const { audioMemo, audioRecorder, nativeAction, activity, platform } = deps
     this.#deps = deps
     // The pump consults the drawer the instant a capture fails.
     this.#pipeline = audioMemo.openPipeline({
-      isErrorSurfaceVisible: () => this.#drawerOpen,
+      isErrorSurfaceVisible: () => this.#fields.get().drawerOpen,
     })
     this.#available = platform.isNativeShell
-    this.#state = new WritableStore(this.#snapshot(), isShallowEqual)
+    this.#state = combineStores(
+      [this.#fields, this.#pipeline, audioRecorder.state],
+      (fields, pipelineState, recorderState) => this.#derive(fields, pipelineState, recorderState),
+      isShallowEqual,
+    )
 
     this.#unlisten = [
-      this.#pipeline.subscribe(() => {
-        this.#publish()
-      }),
       audioRecorder.state.subscribe(() => {
         if (audioRecorder.state.get() !== 'recording') {
           this.#elapsedMs.set(0)
           this.#level.set(0)
         }
-        this.#publish()
       }),
       audioRecorder.subscribeLevel((event) => {
         this.#level.set(event.level)
@@ -370,20 +384,22 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
     this.#pipeline.dispose()
   }
 
-  #snapshot(): MobileAudioMemoSessionState {
-    const recorderState: AudioRecorderState = this.#deps.audioRecorder.state.get()
-    const pipelineState = this.#pipeline.get()
+  #derive(
+    fields: MobileAudioMemoSessionFields,
+    pipelineState: AudioMemoPipelineState,
+    recorderState: AudioRecorderState,
+  ): MobileAudioMemoSessionState {
     return {
       // A live capture owns the surface. A background save's failure parks and
       // shows after the stop, never yanking the waveform mid-recording.
       phase:
-        recorderState === 'recording' && !this.#stopping
+        recorderState === 'recording' && !fields.stopping
           ? 'recording'
           : recorderState === 'requesting'
             ? 'requesting'
             : pipelineState.error !== null
               ? 'error'
-              : this.#stopping || pipelineState.pendingCount > 0 || pipelineState.transcribing
+              : fields.stopping || pipelineState.pendingCount > 0 || pipelineState.transcribing
                 ? 'transcribing'
                 : 'idle',
       pendingCount: pipelineState.pendingCount,
@@ -391,22 +407,16 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
       hasTranscriptionConfig: pipelineState.hasTranscriptionConfig,
       error: pipelineState.error,
       canRetry: pipelineState.canRetry,
-      drawerOpen: this.#drawerOpen,
+      drawerOpen: fields.drawerOpen,
     }
   }
 
-  #publish(): void {
-    this.#state.set(this.#snapshot())
-  }
-
   #setDrawerOpen(open: boolean): void {
-    this.#drawerOpen = open
-    this.#publish()
+    this.#fields.set({ ...this.#fields.get(), drawerOpen: open })
   }
 
   #setStopping(next: boolean): void {
-    this.#stopping = next
-    this.#publish()
+    this.#fields.set({ ...this.#fields.get(), stopping: next })
   }
 
   #hapticImpactLight(): void {

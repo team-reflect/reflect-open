@@ -28,7 +28,7 @@ import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { AUDIO_MEMOS_DIR } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
-import { deriveStore, WritableStore, type Store } from '../store.ts'
+import { combineStores, deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import {
@@ -372,12 +372,48 @@ interface AudioMemoPipelineDeps {
   ) => Promise<CaptureAudioMemoOutcome>
 }
 
+/**
+ * The mutable state of an {@link AudioMemoPipeline}.
+ */
+interface AudioMemoPipelineFields {
+  readonly pendingCount: number
+  readonly error: string | null
+  /**
+   * The failed capture a retry should re-run. While parked, the queue holds,
+   * memo order in the graph must survive the failure. Taken synchronously:
+   * a rapid double Retry must see the first click's take, or two pipelines
+   * write the recording twice.
+   */
+  readonly parked: PendingAudioCapture | null
+}
+
+/**
+ * The `transcribing` source of a pipeline without a transcription lifecycle.
+ */
+const NEVER_TRANSCRIBING: Store<boolean> = new WritableStore(false)
+
+function derivePipelineState(
+  fields: AudioMemoPipelineFields,
+  transcribing: boolean,
+  hasTranscriptionConfig: boolean,
+): AudioMemoPipelineState {
+  return {
+    pendingCount: fields.pendingCount,
+    transcribing,
+    hasTranscriptionConfig,
+    error: fields.error,
+    canRetry: fields.parked !== null,
+  }
+}
+
 class AudioMemoPipelineImpl implements AudioMemoPipeline {
   readonly #deps: AudioMemoPipelineDeps
   readonly #generation: number
   readonly #isErrorSurfaceVisible: () => boolean
-  #pendingCount = 0
-  #error: string | null = null
+  readonly #fields = new WritableStore<AudioMemoPipelineFields>(
+    { pendingCount: 0, error: null, parked: null },
+    isShallowEqual,
+  )
   /**
    * Committed recordings waiting their turn; the pump owns the head.
    */
@@ -386,17 +422,8 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
    * Single-drainer guard: one pump loop at a time, one capture at a time.
    */
   #pumping = false
-  /**
-   * The failed capture a retry should re-run. While parked, the queue holds,
-   * memo order in the graph must survive the failure. Taken synchronously:
-   * a rapid double Retry must see the first click's take, or two pipelines
-   * write the recording twice.
-   */
-  #parked: PendingAudioCapture | null = null
-  readonly #hasTranscriptionConfig: Store<boolean>
   #reconciler: AudioMemoTranscriptionSession | null
-  readonly #state: WritableStore<AudioMemoPipelineState>
-  readonly #stopTranscribing: Unlisten | undefined
+  readonly #state: Store<AudioMemoPipelineState>
   readonly #stopConfig: Unlisten
 
   constructor(deps: AudioMemoPipelineDeps, generation: number, options: AudioMemoPipelineOptions) {
@@ -408,15 +435,14 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
       aiProviderConfig,
       (state) => pickTranscriptionConfig(state) !== null,
     )
-    this.#hasTranscriptionConfig = hasTranscriptionConfig
     // One lifecycle per graph session. It owns the launch pass and all retry
     // triggers; the pump only schedules. Main window only.
     this.#reconciler = deps.reconciler
-    this.#state = new WritableStore(this.#snapshot(), isShallowEqual)
-
-    this.#stopTranscribing = this.#reconciler?.subscribe(() => {
-      this.#publish()
-    })
+    this.#state = combineStores(
+      [this.#fields, deps.reconciler ?? NEVER_TRANSCRIBING, hasTranscriptionConfig],
+      derivePipelineState,
+      isShallowEqual,
+    )
     this.#reconciler?.start()
 
     // Passes gate on a configured model before any IO. When the user adds the
@@ -425,7 +451,6 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
       if (hasTranscriptionConfig.get()) {
         this.#reconciler?.schedule()
       }
-      this.#publish()
     })
   }
 
@@ -434,34 +459,28 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
 
   enqueue(capture: PendingAudioCapture): void {
     this.#queue.push(capture)
-    this.#pendingCount += 1
-    this.#publish()
+    this.#setFields({ pendingCount: this.#fields.get().pendingCount + 1 })
     void this.#pump()
   }
 
   reportError(message: string): void {
-    this.#error = message
-    this.#publish()
+    this.#setFields({ error: message })
   }
 
   retry(): void {
-    const failed = this.#parked
+    const fields = this.#fields.get()
+    const failed = fields.parked
     if (failed === null) {
       return
     }
-    this.#parked = null
-    this.#error = null
     this.#queue.unshift(failed)
-    this.#pendingCount += 1
-    this.#publish()
+    this.#setFields({ parked: null, error: null, pendingCount: fields.pendingCount + 1 })
     void this.#pump()
   }
 
   discard(): void {
-    const failed = this.#parked
-    this.#parked = null
-    this.#error = null
-    this.#publish()
+    const failed = this.#fields.get().parked
+    this.#setFields({ parked: null, error: null })
     if (failed !== null) {
       void (async () => {
         try {
@@ -487,23 +506,12 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
 
   dispose(): void {
     this.#stopConfig()
-    this.#stopTranscribing?.()
     this.#reconciler?.dispose()
     this.#reconciler = null
   }
 
-  #snapshot(): AudioMemoPipelineState {
-    return {
-      pendingCount: this.#pendingCount,
-      transcribing: this.#reconciler?.get() ?? false,
-      hasTranscriptionConfig: this.#hasTranscriptionConfig.get(),
-      error: this.#error,
-      canRetry: this.#parked !== null,
-    }
-  }
-
-  #publish(): void {
-    this.#state.set(this.#snapshot())
+  #setFields(patch: Partial<AudioMemoPipelineFields>): void {
+    this.#fields.set({ ...this.#fields.get(), ...patch })
   }
 
   async #pump(): Promise<void> {
@@ -514,7 +522,7 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
     this.#pumping = true
     let captured = false
     try {
-      while (this.#parked === null) {
+      while (this.#fields.get().parked === null) {
         const capture = this.#queue.shift()
         if (capture === undefined) {
           break
@@ -534,8 +542,7 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
         } catch (cause) {
           outcome = { ok: false, message: errorMessage(cause) }
         } finally {
-          this.#pendingCount -= 1
-          this.#publish()
+          this.#setFields({ pendingCount: this.#fields.get().pendingCount - 1 })
         }
         if (outcome.ok) {
           captured = true
@@ -549,9 +556,7 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
         } else {
           // Park the queue behind the failure: the capture is the one step
           // that can lose audio, and memo order in the graph must survive.
-          this.#parked = capture
-          this.#error = outcome.message
-          this.#publish()
+          this.#setFields({ parked: capture, error: outcome.message })
           if (!this.#isErrorSurfaceVisible()) {
             // The error UI is off screen, the failure must still surface
             // somewhere.
@@ -588,7 +593,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
   /**
    * True from the stop click until the recorder hands over the blob.
    */
-  #stopping = false
+  readonly #stopping = new WritableStore(false)
   readonly #elapsedMs = new WritableStore(0)
   readonly elapsedMs: Store<number> = this.#elapsedMs
   #live: LiveSession | null = null
@@ -604,7 +609,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
    * Concurrent recorder stops share one result, so the final segment is handed over once.
    */
   #recorderStop: Promise<void> | null = null
-  readonly #state: WritableStore<AudioMemoSessionState>
+  readonly #state: Store<AudioMemoSessionState>
 
   constructor(deps: AudioMemoSessionDeps, options: AudioMemoSessionOptions) {
     const { audioRecorder } = deps
@@ -616,17 +621,19 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     this.#pipeline = deps.openPipeline({
       isErrorSurfaceVisible: () => !this.#surfaceHidden,
     })
-    this.#state = new WritableStore(this.#snapshot(), isShallowEqual)
+    this.#state = combineStores(
+      [this.#stopping, this.#pipeline, audioRecorder.state],
+      (stopping, pipelineState, recorderState) => {
+        return this.#derive(stopping, pipelineState, recorderState)
+      },
+      isShallowEqual,
+    )
 
     this.#unlisten = [
-      this.#pipeline.subscribe(() => {
-        this.#publish()
-      }),
       audioRecorder.state.subscribe(() => {
         if (audioRecorder.state.get() !== 'recording') {
           this.#elapsedMs.set(0)
         }
-        this.#publish()
       }),
       audioRecorder.subscribeLevel((event) => {
         this.#elapsedMs.set(event.elapsedMs)
@@ -718,10 +725,12 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     this.#pipeline.dispose()
   }
 
-  #snapshot(): AudioMemoSessionState {
+  #derive(
+    stopping: boolean,
+    pipelineState: AudioMemoPipelineState,
+    recorderState: AudioRecorderState,
+  ): AudioMemoSessionState {
     const { audioRecorder } = this.#deps
-    const recorderState = audioRecorder.state.get()
-    const pipelineState = this.#pipeline.get()
     const unavailableReason = !audioRecorder.isSupported()
       ? UNSUPPORTED_REASON
       : !pipelineState.hasTranscriptionConfig
@@ -731,13 +740,13 @@ class AudioMemoSessionImpl implements AudioMemoSession {
       // A live capture owns the surface. A background save's failure parks and
       // shows after the stop, never yanking the waveform mid-recording.
       phase:
-        recorderState === 'recording' && !this.#stopping
+        recorderState === 'recording' && !stopping
           ? 'recording'
           : recorderState === 'requesting'
             ? 'requesting'
             : pipelineState.error !== null
               ? 'error'
-              : this.#stopping || pipelineState.pendingCount > 0 || pipelineState.transcribing
+              : stopping || pipelineState.pendingCount > 0 || pipelineState.transcribing
                 ? 'transcribing'
                 : 'idle',
       stream: audioRecorder.stream(),
@@ -748,10 +757,6 @@ class AudioMemoSessionImpl implements AudioMemoSession {
       canRetry: pipelineState.canRetry,
       recorderState,
     }
-  }
-
-  #publish(): void {
-    this.#state.set(this.#snapshot())
   }
 
   #handleSegment(segment: AudioRecorderSegment): void {
@@ -834,8 +839,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     // The stop click commits the memo: flip to 'transcribing' before the stop
     // settles, so an Esc landing in the await gap can't read a lingering
     // 'recording' phase and cancel a recording the user just saved.
-    this.#stopping = true
-    this.#publish()
+    this.#stopping.set(true)
     const settled = (async (): Promise<void> => {
       try {
         // Segments (including the final one) flow through the segment
@@ -843,8 +847,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
         await this.#stopRecorder()
       } finally {
         this.#stopGuard = false
-        this.#stopping = false
-        this.#publish()
+        this.#stopping.set(false)
       }
     })()
     this.#stopSettled = settled
