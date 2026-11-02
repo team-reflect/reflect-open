@@ -13,6 +13,6 @@ describe('createTestAttachmentService', () => {
   it('loads the catalog while a graph session is open', async () => {
     const attachments = createTestAttachmentService()
 
-    await expect(attachments.loadCatalog()).resolves.toBe(attachments.peekCatalog())
+    await expect(attachments.loadCatalog()).resolves.toBe(attachments.catalog.get())
   })
 })
