@@ -90,7 +90,9 @@ export function MobileOnboardingScreen(): ReactElement {
               busy={action.pending}
               pendingChoice={pendingChoice}
               onOpen={(root) => {
-                runChoice(root, () => mobileOnboarding.completeOnboarding('icloud', root))
+                runChoice(root, () => {
+                  return mobileOnboarding.completeOnboarding('icloud', root)
+                })
               }}
               onCreate={(root) => {
                 runChoice('icloud-create', () => {
