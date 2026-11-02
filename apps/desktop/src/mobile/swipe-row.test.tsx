@@ -117,17 +117,7 @@ describe('SwipeRow', () => {
     await expect.element(view.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
-  it('keeps its position while a finger is down', async () => {
-    const view = await mount(<Harness initiallyRevealed />)
-    const scroller = getScroller(view.getByText('Row').element())
-
-    await touch(scroller, 'start')
-    await view.getByRole('button', { name: 'Toggle' }).click()
-
-    expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
-  })
-
-  it('applies a close that came under a finger once the finger lifts without moving the row', async () => {
+  it('keeps its position while a finger is down, and applies the change once it lifts', async () => {
     const view = await mount(<Harness initiallyRevealed />)
     const scroller = getScroller(view.getByText('Row').element())
 
@@ -135,6 +125,7 @@ describe('SwipeRow', () => {
     await view.getByRole('button', { name: 'Toggle' }).click()
     expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
 
+    // The finger did not move the row, so no settle report follows.
     await touch(scroller, 'end')
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
   })

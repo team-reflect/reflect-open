@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -64,6 +65,8 @@ export function SwipeRow({
   const positionedRef = useRef(false)
   // Where the row was when a finger held back a placement, or `null`.
   const heldAtRef = useRef<number | null>(null)
+  // Bumped when a still finger lifts, so the placement below runs again.
+  const [lifts, setLifts] = useState(0)
 
   const reportSettled = useEffectEvent((scroller: HTMLElement) => {
     const open = scroller.scrollLeft >= actionWidth / 2
@@ -74,8 +77,41 @@ export function SwipeRow({
     }
   })
 
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    if (scroller === null) {
+      return
+    }
+    const controller = new AbortController()
+    watchRef.current = watchScrollSettle({
+      element: scroller,
+      onSettle: () => reportSettled(scroller),
+      signal: controller.signal,
+    })
+    // A finger that lifts without moving the row leaves no settle report, so
+    // the placement it held back runs again. These listeners run after the
+    // watch's own, so `isTouching` is already up to date.
+    const placeHeld = (): void => {
+      if (heldAtRef.current === scroller.scrollLeft) {
+        setLifts((count) => count + 1)
+      }
+    }
+    scroller.addEventListener('touchend', placeHeld, { passive: true })
+    scroller.addEventListener('touchcancel', placeHeld, { passive: true })
+    return () => {
+      scroller.removeEventListener('touchend', placeHeld)
+      scroller.removeEventListener('touchcancel', placeHeld)
+      controller.abort()
+      watchRef.current = null
+    }
+  }, [])
+
   // A finger on the row owns its position; the settle report reconciles later.
-  const place = useEffectEvent((scroller: HTMLElement): void => {
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    if (scroller === null) {
+      return
+    }
     if (watchRef.current?.isTouching() === true) {
       heldAtRef.current = scroller.scrollLeft
       return
@@ -89,42 +125,7 @@ export function SwipeRow({
     }
     // The first placement runs before paint, so a remounted open row never animates in.
     scroller.scrollTo({ left, behavior: first || reducedMotion ? 'instant' : 'smooth' })
-  })
-
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current
-    if (scroller === null) {
-      return
-    }
-    const controller = new AbortController()
-    const { signal } = controller
-    watchRef.current = watchScrollSettle({
-      element: scroller,
-      onSettle: () => reportSettled(scroller),
-      signal,
-    })
-    // A finger that lifts without moving the row leaves no settle report, so
-    // the placement it held back runs now. These listeners run after the
-    // watch's own, so `isTouching` is already up to date.
-    const placeHeld = (): void => {
-      if (heldAtRef.current === scroller.scrollLeft) {
-        place(scroller)
-      }
-    }
-    scroller.addEventListener('touchend', placeHeld, { passive: true, signal })
-    scroller.addEventListener('touchcancel', placeHeld, { passive: true, signal })
-    return () => {
-      controller.abort()
-      watchRef.current = null
-    }
-  }, [])
-
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current
-    if (scroller !== null) {
-      place(scroller)
-    }
-  }, [revealed, actionWidth, reducedMotion])
+  }, [revealed, actionWidth, reducedMotion, lifts])
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>): void => {
