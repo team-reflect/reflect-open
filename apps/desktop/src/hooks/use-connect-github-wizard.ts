@@ -8,7 +8,7 @@ import {
 } from '@reflect/app'
 import type { GithubUser } from '@reflect/core'
 import { useStore } from '@/lib/use-store.ts'
-import { useGitSync } from '@/providers/sync-provider.tsx'
+import { useGitSyncActions } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export interface ConnectGithubWizard {
@@ -63,14 +63,14 @@ export interface ConnectGithubWizard {
  * polls and the public-repo consent gate). Desktop's dialog and mobile's
  * drawer drive the identical flow through it.
  *
- * The connect actions are the ones of {@link useGitSync}.
+ * The connect actions are the ones of {@link useGitSyncActions}.
  */
 export function useConnectGithubWizard({
   suggestedRepoName,
   onClose,
   pollIntervalMs = 3000,
 }: ConnectGithubWizardOptions): ConnectGithubWizard {
-  const sync = useGitSync()
+  const sync = useGitSyncActions()
   const { githubAuth, clock } = useCoreServices()
   const { opener, lifecycle } = useAppServices()
   // The wizard lives as long as the surface; it always calls the latest

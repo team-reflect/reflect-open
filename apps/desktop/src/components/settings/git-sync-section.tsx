@@ -16,7 +16,7 @@ import { SettingsField } from '@/components/settings/field.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useGitSync } from '@/providers/sync-provider.tsx'
+import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /** Which dialog is open: the host chooser, or one host's own flow. */
@@ -66,7 +66,8 @@ function githubRepoBrowserUrl(repo: GithubRepoRef): string {
  * product language, sync on demand, and stop.
  */
 export function GitSyncSettingsField(): ReactElement {
-  const { state, disconnectGraph, syncNow } = useGitSync()
+  const state = useGitSyncState()
+  const { disconnectGraph, syncNow } = useGitSyncActions()
   const graph = useGraphInfo()
   const { opener } = useAppServices()
   const [dialog, setDialog] = useState<OpenDialog | null>(null)
