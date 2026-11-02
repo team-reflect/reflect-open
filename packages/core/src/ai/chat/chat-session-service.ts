@@ -5,11 +5,13 @@ import type { LoggerService } from '../../ports/logger-service.ts'
 import type { EmbeddingRuntimeService } from '../../embeddings/embedding-runtime-service.ts'
 import { errorMessage } from '../../errors.ts'
 import type { GraphSession } from '../../graph/graph-session.ts'
+import { deriveStore, type Store } from '../../store.ts'
 import type { Unlisten } from '../../unlisten.ts'
-import type { AiProviderConfig, ChatModelSelection, Settings } from '../../settings/schema.ts'
+import type { AiProviderConfig, ChatModelSelection } from '../../settings/schema.ts'
 import type { SettingsService } from '../../settings/settings-service.ts'
 import type { AiCredentialService } from '../ai-credential-service.ts'
 import type { AiProviderConfigService } from '../ai-provider-config-service.ts'
+import type { AiProvidersState } from '../provider-config.ts'
 import { readChatAttachment } from './chat-attachments.ts'
 import type { ChatEngineService, ChatStreamEvent } from './chat-engine-service.ts'
 import type { ChatGraphContextService } from './chat-graph-context-service.ts'
@@ -22,6 +24,7 @@ import {
   type ChatAttachment,
   type ChatTurn,
 } from './transcript.ts'
+import { isDeepEqual } from '@ocavue/utils'
 
 /**
  * One chat session per open graph (Plan 10): the conversation lives here, not
@@ -212,10 +215,17 @@ class ChatSessionImpl implements ChatSession {
   // two independent IPC commands carry no ordering guarantee in Rust.
   readonly #pendingSaves = new Map<string, Promise<void>>()
   #local: LocalState
-  #stopSettings: Unlisten | null = null
+  // The chat model selection, the only settings key the state reads besides
+  // the provider entries.
+  readonly #selection: Store<ChatModelSelection | null>
+  #stopConfig: Unlisten | null = null
   // The published state, rebuilt lazily: `null` after a local change, and
-  // stale once the settings document it was derived from is replaced.
-  #snapshot: { state: ChatSessionState; settings: Settings } | null = null
+  // stale once the provider entries or the chat model selection change.
+  #snapshot: {
+    state: ChatSessionState
+    providers: AiProvidersState
+    selection: ChatModelSelection | null
+  } | null = null
   #modelOptions: { providers: AiProviderConfig[]; options: ChatModelOption[] } | null = null
   // The in-flight send, tracked synchronously — the no-concurrent-sends
   // guard can't ride on published state. `session` ties a send to its
@@ -240,19 +250,26 @@ class ChatSessionImpl implements ChatSession {
       attachments: [],
       conversationId: deps.id.uuid(),
     }
+    this.#selection = deriveStore(
+      deps.settings,
+      (settings) => settings.chatModelSelection,
+      isDeepEqual,
+    )
   }
 
   readonly getState = (): ChatSessionState => {
-    const { settings, providerConfig } = this.#deps
-    const currentSettings = settings.get()
-    if (this.#snapshot?.settings !== currentSettings) {
-      const providers = providerConfig.list()
+    const { providerConfig } = this.#deps
+    const providersState = providerConfig.get()
+    const selection = this.#selection.get()
+    if (this.#snapshot?.providers !== providersState || this.#snapshot.selection !== selection) {
+      const providers = providersState.providers
       if (this.#modelOptions?.providers !== providers) {
         this.#modelOptions = { providers, options: providerConfig.chatModelOptions() }
       }
       const local = this.#local
       this.#snapshot = {
-        settings: currentSettings,
+        providers: providersState,
+        selection,
         state: {
           turns: local.turns,
           status: local.turns.at(-1)?.status === 'streaming' ? 'streaming' : 'idle',
@@ -276,14 +293,25 @@ class ChatSessionImpl implements ChatSession {
       listener()
     }
     this.#listeners.add(deliver)
-    this.#stopSettings ??= this.#deps.settings.subscribe(() => {
-      this.#notify()
-    })
+    if (this.#stopConfig === null) {
+      const notify = (): void => {
+        this.#notify()
+      }
+      const unlistens = [
+        this.#deps.providerConfig.subscribe(notify),
+        this.#selection.subscribe(notify),
+      ]
+      this.#stopConfig = () => {
+        for (const unlisten of unlistens) {
+          unlisten()
+        }
+      }
+    }
     return () => {
       this.#listeners.delete(deliver)
       if (this.#listeners.size === 0) {
-        this.#stopSettings?.()
-        this.#stopSettings = null
+        this.#stopConfig?.()
+        this.#stopConfig = null
       }
     }
   }

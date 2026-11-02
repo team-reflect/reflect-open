@@ -582,6 +582,21 @@ describe('ChatSession state', () => {
     stop()
   })
 
+  it('keeps the state and stays silent when unrelated settings change', async () => {
+    const { session, settings } = await setup()
+    let notified = 0
+    const stop = session.subscribe(() => {
+      notified += 1
+    })
+    const first = session.getState()
+
+    settings.update({ editorFullWidth: true })
+
+    expect(notified).toBe(0)
+    expect(session.getState()).toBe(first)
+    stop()
+  })
+
   it('starts on the persisted model selection', async () => {
     const { session } = await setup({
       settings: { chatModelSelection: { configId: 'm1', modelId: 'gpt-5.5' } },
