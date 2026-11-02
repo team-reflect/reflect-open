@@ -59,92 +59,135 @@ function classicRecord(expiresAt: number) {
 
 describe('PaywallService.gate', () => {
   it('shows the paywall on an App Store install with no subscription', () => {
-    expect(service().gate()).toBe('show')
+    expect(service().gate.get()).toBe('show')
   })
 
   it('hides it for a TestFlight or development install while StoreKit is pending', () => {
     appStoreEnvironment.setState({ value: 'Sandbox' })
     subscription.setState({ isLoading: true })
-    expect(service().gate()).toBe('hide')
+    expect(service().gate.get()).toBe('hide')
   })
 
   it('hides it for a StoreKit-configuration run', () => {
     appStoreEnvironment.setState({ value: 'Xcode' })
-    expect(service().gate()).toBe('hide')
+    expect(service().gate.get()).toBe('hide')
   })
 
   it('treats an unknown channel as an App Store install', () => {
     appStoreEnvironment.setState({ value: null, isError: true })
-    expect(service().gate()).toBe('show')
+    expect(service().gate.get()).toBe('show')
   })
 
   it('never waits for the probe', () => {
     appStoreEnvironment.setState({ value: null, isLoading: true })
-    expect(service().gate()).toBe('show')
+    expect(service().gate.get()).toBe('show')
   })
 
   it('honors an explicit request outside the App Store', () => {
     appStoreEnvironment.setState({ value: 'Sandbox' })
     const paywall = service()
-    expect(paywall.gate()).toBe('hide')
+    expect(paywall.gate.get()).toBe('hide')
 
     paywall.setRequested(true)
 
-    expect(paywall.requested()).toBe(true)
+    expect(paywall.requested.get()).toBe(true)
     expect(storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY)).toBe('true')
-    expect(paywall.gate()).toBe('show')
+    expect(paywall.gate.get()).toBe('show')
   })
 
   it('lets a subscriber through in every channel', () => {
     subscription.setState({ value: 'yearly' })
-    expect(service().gate()).toBe('hide')
+    expect(service().gate.get()).toBe('hide')
   })
 
   it('lets a verified Reflect Classic subscriber through', () => {
     classicAccess.setState({ access: classicRecord(1), active: true })
-    expect(service().gate()).toBe('hide')
+    expect(service().gate.get()).toBe('hide')
   })
 
   it('shows the paywall once the Reflect Classic access has ended', () => {
     classicAccess.setState({ access: classicRecord(1), active: false })
-    expect(service().gate()).toBe('show')
+    expect(service().gate.get()).toBe('show')
   })
 
   it('keeps the app visible while the subscription is being checked', () => {
     subscription.setState({ isLoading: true })
-    expect(service().gate()).toBe('hide')
+    expect(service().gate.get()).toBe('hide')
   })
 
   it('keeps the app visible while the keychain is still being read', () => {
     classicAccess.setState({ isLoading: true })
-    expect(service().gate()).toBe('hide')
+    expect(service().gate.get()).toBe('hide')
   })
 
   it('shows the paywall after a failed subscription check', () => {
     subscription.setState({ isError: true })
-    expect(service().gate()).toBe('show')
+    expect(service().gate.get()).toBe('show')
   })
 
   it('stays out of the way off iOS', () => {
-    expect(service('desktop').gate()).toBe('hide')
+    expect(service('desktop').gate.get()).toBe('hide')
   })
 
-  it('notifies on every input that can move the gate', () => {
+  it('notifies only when the gate changes', () => {
     const paywall = service()
-    let notified = 0
-    const unsubscribe = paywall.subscribe(() => {
-      notified += 1
-    })
+    const listener = vi.fn()
+    const unsubscribe = paywall.gate.subscribe(listener)
 
     subscription.setState({ value: 'monthly' })
+    expect(paywall.gate.get()).toBe('hide')
+    expect(listener).toHaveBeenCalledOnce()
+
     classicAccess.setState({ active: true })
     appStoreEnvironment.setState({ value: 'Sandbox' })
     paywall.setRequested(true)
-    expect(notified).toBe(4)
+    expect(listener).toHaveBeenCalledOnce()
 
     unsubscribe()
     subscription.setState({ value: null })
-    expect(notified).toBe(4)
+    classicAccess.setState({ active: false })
+    expect(paywall.gate.get()).toBe('show')
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('subscribes to its inputs only while the gate has subscribers', () => {
+    let watchers = 0
+    const subscribe = subscription.subscribe
+    vi.spyOn(subscription, 'subscribe').mockImplementation((listener) => {
+      watchers += 1
+      const unlisten = subscribe(listener)
+      return () => {
+        watchers -= 1
+        unlisten()
+      }
+    })
+    const paywall = service()
+    paywall.gate.get()
+    expect(watchers).toBe(0)
+
+    const first = paywall.gate.subscribe(() => {})
+    const second = paywall.gate.subscribe(() => {})
+    expect(watchers).toBe(2)
+
+    first()
+    second()
+    expect(watchers).toBe(0)
+  })
+})
+
+describe('PaywallService.requested', () => {
+  it('notifies only when the request changes', () => {
+    const paywall = service()
+    const listener = vi.fn()
+    paywall.requested.subscribe(listener)
+
+    paywall.setRequested(false)
+    expect(listener).not.toHaveBeenCalled()
+
+    paywall.setRequested(true)
+    paywall.setRequested(true)
+    expect(paywall.requested.get()).toBe(true)
+    expect(listener).toHaveBeenCalledOnce()
   })
 })
 
