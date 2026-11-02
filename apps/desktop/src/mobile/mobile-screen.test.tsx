@@ -3,7 +3,7 @@ import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
-import { createTestAppServices } from '@reflect/app/testing'
+import { createTestAppServices, type TestAppServices } from '@reflect/app/testing'
 import {
   createTestChatEngineService,
   createTestCoreServices,
@@ -23,13 +23,7 @@ import {
   aiKeySecretName,
   formatDayLabel,
 } from '@reflect/core'
-import {
-  type AppServices,
-  type Route,
-  createWeekWindow,
-  weekOf,
-  formatMonthLabel,
-} from '@reflect/app'
+import { type Route, createWeekWindow, weekOf, formatMonthLabel } from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
@@ -122,7 +116,7 @@ const GRAPH: GraphInfo = { root: '/g', name: 'g', generation: 1 }
 
 // The services of the running test: the graph's files live in `core.noteFile`.
 let core: TestCoreServices
-let appServices: AppServices
+let appServices: TestAppServices
 let dailyDatesInRange: MockInstance<DailyNoteService['dailyDatesInRange']>
 
 beforeEach(async () => {
@@ -131,8 +125,8 @@ beforeEach(async () => {
   appServices = createTestAppServices(core)
   // The tests compute dates from the real clock.
   core.clock.setNow(Date.now())
-  // The browser context prefers reduced motion; the test platform says the same.
-  core.platform.setReducedMotion(true)
+  // The browser context prefers reduced motion; the test preferences say the same.
+  appServices.systemPreferences.reducedMotion.set(true)
   dailyDatesInRange = vi.spyOn(core.dailyNotes, 'dailyDatesInRange').mockResolvedValue([])
   editorProbe.focusCalls = 0
   editorProbe.selectionCalls = []
@@ -727,7 +721,7 @@ describe('MobileShell', () => {
     })
     appServices = createTestAppServices(core)
     core.clock.setNow(Date.now())
-    core.platform.setReducedMotion(true)
+    appServices.systemPreferences.reducedMotion.set(true)
     const view = await mount({ kind: 'allNotes', tag: null }, undefined, {
       settings: { aiProviders: [model], defaultAiProviderId: model.id },
     })
@@ -823,12 +817,12 @@ describe('MobileShell', () => {
  * it. Tests drive the `animationend` / `transitionend` completions by hand.
  */
 describe('MobileStack transitions & back-swipe', () => {
-  // The file's platform prefers reduced motion, as the test browser does, which
+  // The file's preferences prefer reduced motion, as the test browser does, which
   // turns the stack's animations off. These tests are about the animated path,
   // so they report the animating preference; the reduced-motion test below
   // sets the other answer for itself.
   beforeEach(() => {
-    core.platform.setReducedMotion(false)
+    appServices.systemPreferences.reducedMotion.set(false)
   })
 
   /** Navigate to the probe note and complete the push animation. */
@@ -924,7 +918,7 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('cuts instantly under prefers-reduced-motion', async () => {
-    core.platform.setReducedMotion(true)
+    appServices.systemPreferences.reducedMotion.set(true)
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })

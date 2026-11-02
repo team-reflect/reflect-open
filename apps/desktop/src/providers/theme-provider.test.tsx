@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act } from '@/test-utils/act.ts'
 import { createThemeService, THEME_PREFERENCE_CACHE_KEY, type ThemeService } from '@reflect/app'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import type { CoreServices, Settings } from '@reflect/core'
 import {
   createTestCoreServices,
-  createTestPlatformService,
   createTestSettingsService,
   createTestStorageService,
   type TestSettingsService,
@@ -39,13 +39,12 @@ function install(stored: Partial<Settings>, options: { gateLoad?: boolean } = {}
     })
   }
   storage = createTestStorageService()
-  const platform = createTestPlatformService({ colorScheme: 'light' })
-  theme = createThemeService({ settings, storage, platform })
+  const systemPreferences = createTestSystemPreferencesService({ colorScheme: 'light' })
+  theme = createThemeService({ settings, storage, systemPreferences })
   core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     settings,
     storage,
-    platform,
   })
 }
 

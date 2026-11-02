@@ -4,7 +4,8 @@ import {
   type FilteredSearchHit,
   type NoteDocumentService,
 } from '@reflect/core'
-import { createTestCoreServices, createTestPlatformService } from '@reflect/core/testing'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
+import { createTestCoreServices } from '@reflect/core/testing'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useQuery } from '@tanstack/react-query'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
@@ -25,7 +26,6 @@ function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
   const readSource = (): Promise<string> => Promise.resolve('# A\n')
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
-    platform: createTestPlatformService({ reducedMotion: true }),
     noteDocuments: {
       readSource,
       readExisting: readSource,
@@ -36,6 +36,7 @@ function mount(ui: ReactNode): Promise<InAppRenderResult<CoreServices>> {
   })
   return renderInApp(ui, {
     core,
+    appServices: { systemPreferences: createTestSystemPreferencesService({ reducedMotion: true }) },
     graph: { root: '/g', name: 'g', generation: 1 },
     settings: { dateFormat: 'mdy', timeFormat: '12h' },
   })
