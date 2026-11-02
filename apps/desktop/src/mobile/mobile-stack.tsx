@@ -9,7 +9,7 @@ import {
 } from 'react'
 import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
-import type { AllNotesFilters, Route } from '@reflect/app'
+import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import { RouterFreeze, useRouter } from '@/routing/router.tsx'
@@ -78,11 +78,18 @@ function layerKey(route: Route): string {
 /**
  * The animation an arrival deserves, V1 semantics: entering the note stack
  * slides in, leaving it slides out, moving within it follows history order,
- * and root-to-root moves (tab switches, date links) stay instant.
+ * and root-to-root moves (tab switches, date links) stay instant. Only a card
+ * pushed onto the screen being left slides in; one that lands over any other
+ * screen (the All tab returning to its open Chat or note, with All's list put
+ * beneath it, or Back from another tab into a card) is a tab switch too, so
+ * it appears in place.
+ *
+ * @param below The screen the arriving route sits on (what its Back reveals).
  */
 function transitionFor(
   from: { route: Route; entryId: number },
   to: { route: Route; entryId: number },
+  below: Route,
 ): StackTransition {
   const fromStacked = isStacked(from.route)
   const toStacked = isStacked(to.route)
@@ -91,7 +98,7 @@ function transitionFor(
     exiting: { key: layerKey(from.route), route: from.route },
   }
   if (toStacked && !fromStacked) {
-    return { kind: 'push' }
+    return routesEqual(below, from.route) ? { kind: 'push' } : { kind: 'none' }
   }
   if (!toStacked && fromStacked) {
     return pop
@@ -252,7 +259,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     setTransition(
       poppedByGesture || reducedMotion
         ? { kind: 'none' }
-        : transitionFor(arrival, { route, entryId }),
+        : transitionFor(arrival, { route, entryId }, backRoute ?? { kind: 'today' }),
     )
   } else if (route !== arrival.route) {
     // Same entry, new route object: a note move rewrote the history in

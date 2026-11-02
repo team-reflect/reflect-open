@@ -777,6 +777,88 @@ describe('MobileShell', () => {
     await waitFor(() => expect(document.activeElement).toBe(composer.element()))
   })
 
+  it('tapping All from another tab returns to the Chat it was left on, over the list', async () => {
+    const user = userEvent
+    const { view, chatEngine } = await mountAllWithChatProvider('You kept one plan.')
+    await user.fill(view.getByRole('searchbox', { name: 'Search notes' }), 'pricing')
+    await user.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+    await waitForChatLayer(view)
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitForChatLayer(view)
+    const chat = page.elementLocator(visibleLayer(view))
+    await expect.element(chat.getByText('You kept one plan.')).toBeVisible()
+    // A return, not a second ask, and the restored card belongs to All.
+    expect(chatEngine.calls()).toHaveLength(1)
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+
+    // All's list sits underneath, so Back lands there rather than on Daily.
+    await user.click(chat.getByRole('button', { name: 'Back' }))
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect(visibleLayer(view).contains(box.element())).toBe(true)
+      expect((box.element() as HTMLInputElement).value).toBe('pricing')
+    })
+  })
+
+  it('double-tapping All from another tab goes back to the list, search focused', async () => {
+    const user = userEvent
+    const { view } = await mountAllWithChatProvider('You kept one plan.')
+    await user.fill(view.getByRole('searchbox', { name: 'Search notes' }), 'pricing')
+    await user.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+    await waitForChatLayer(view)
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+
+    let fakeNow = 1_000
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
+    try {
+      fakeNow = 2_000
+      fireEvent.click(view.getByRole('button', { name: 'All' }))
+      // The first tap returns to Chat; the second, within the window, still
+      // pairs with it even though that return left All's list.
+      await waitForChatLayer(view)
+      fakeNow = 2_100
+      fireEvent.click(view.getByRole('button', { name: 'All' }))
+    } finally {
+      now.mockRestore()
+    }
+
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect(visibleLayer(view).contains(box.element())).toBe(true)
+      expect(document.activeElement).toBe(box.element())
+    })
+  })
+
+  it('returns to a note opened from All at its new path after the file moves', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/01abc.md', 'old path')
+    const view = await mount(
+      { kind: 'allNotes', tag: null },
+      { kind: 'note', path: 'notes/01abc.md' },
+    )
+    await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    await expect.element(view.getByRole('heading', { name: 'Edit note' })).toBeVisible()
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    core.noteFile.set('notes/meeting-notes.md', 'moved agenda')
+    await act(() => core.noteMove.followHealedMove('notes/01abc.md', 'notes/meeting-notes.md'))
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => {
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('moved agenda')
+    })
+  })
+
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
@@ -883,6 +965,45 @@ describe('MobileStack transitions & back pager', () => {
     expect(layers).toHaveLength(1)
     expect(layers[0]!.className).not.toContain('mobile-stack-slide-in')
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeNull()
+  })
+
+  it('returns to All’s open note in place, over the list, like any tab switch', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount(
+      { kind: 'allNotes', tag: null },
+      { kind: 'note', path: 'notes/meeting-notes.md' },
+    )
+    // All is lazy: let its list mount before pushing the note over it.
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await pushProbeNote(view)
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await finishAnimation(stackLayers(view).at(-1)!)
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(1))
+
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
+    const [below, current] = stackLayers(view)
+    expect(current!.className).not.toContain('mobile-stack-slide-in')
+    // Hidden and inert beneath the note, so read the DOM, not the a11y tree.
+    expect(below!.querySelector('input[aria-label="Search notes"]')).not.toBeNull()
+    await waitFor(() => {
+      expect(
+        page.elementLocator(current!).getByTestId('fake-editor').element().textContent,
+      ).toContain('agenda')
+    })
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+
+    // Tapping All again, on its card, pops back to the list.
+    await user.click(view.getByRole('button', { name: 'All' }))
+    await finishAnimation(stackLayers(view).at(-1)!)
+    await waitFor(() => {
+      expect(stackLayers(view)).toHaveLength(1)
+      expect(stackLayers(view)[0]!.querySelector('input[aria-label="Search notes"]')).not.toBeNull()
+    })
   })
 
   it('follows history direction within a note chain: wiki-link pushes, back pops', async () => {
