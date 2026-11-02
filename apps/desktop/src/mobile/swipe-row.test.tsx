@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
+import { act } from '@/test-utils/act.ts'
 import { pointer } from '@/test-utils/swipe.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
@@ -71,6 +72,28 @@ describe('SwipeRow', () => {
 
     await scrollElement({ element: scroller, left: 0, touch: true })
     await vi.waitFor(() => expect(view.getByRole('button', { name: 'Delete' }).query()).toBeNull())
+  })
+
+  it('keeps the actions hidden until the finger lifts and the scroll settles', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    await touch(scroller, 'start')
+    await act(async () => {
+      const scrolled = new Promise((resolve) =>
+        scroller.addEventListener('scroll', resolve, { once: true }),
+      )
+      scroller.scrollTo({ left: ACTION_WIDTH, behavior: 'instant' })
+      await scrolled
+    })
+    expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
+    expect(view.getByRole('button', { name: 'Delete' }).query()).toBeNull()
+
+    await touch(scroller, 'end')
+    await act(() => {
+      scroller.dispatchEvent(new Event('scrollend'))
+    })
+    await expect.element(view.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
   it('scrolls itself when `revealed` changes from outside', async () => {
