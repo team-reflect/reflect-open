@@ -191,7 +191,7 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
   }
 
   rebuildVisibly(): Promise<void> {
-    const generation = this.#graphSession.getState().session?.indexGeneration ?? null
+    const generation = this.#graphSession.get().session?.indexGeneration ?? null
     if (generation !== null) {
       this.#rebuildLog.push(generation)
     }
@@ -244,7 +244,7 @@ export function createTestIndexLifecycleService(
   const database = options?.database ?? createNodeTestDatabaseService()
   const clock = options?.clock ?? createTestClockService()
   const graphSession = options?.graphSession ?? {
-    getState: () => ({ session: null }),
+    get: () => ({ session: null }),
     subscribe: () => () => {},
   }
   const inner = createIndexLifecycleService({

@@ -153,7 +153,7 @@ class NoteSessionImpl implements NoteSession {
     this.#applyContent = options.applyContent
     this.#onContent = options.onContent
     this.#reconcilePendingEditorInput = options.reconcilePendingEditorInput
-    const graph = graphSession.getState().session
+    const graph = graphSession.get().session
     this.#io = {
       read: async (forPath) => {
         if (graph === null) {

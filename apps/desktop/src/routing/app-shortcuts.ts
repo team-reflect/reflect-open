@@ -5,10 +5,10 @@ import { getIsoToday } from '@reflect/utils'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo, useGraphRecents } from '@/providers/graph-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsService } from '@/providers/settings-provider.tsx'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useTheme } from '@/providers/theme-provider.tsx'
@@ -55,7 +55,9 @@ export function useAppShortcuts(): CommandContext {
   const { commands, nativeMenu } = appServices
   const focusedDailyDate = useFocusedDailyDate()
   const { resolvedTheme, setTheme } = useTheme()
-  const { graph, recents, openRecent } = useGraph()
+  const graph = useGraphInfo()
+  const recents = useGraphRecents()
+  const { openRecent } = useGraphActions()
   const { openPalette, open: paletteOpen } = usePalette()
   const { openShortcuts, closeShortcuts, open: shortcutsOpen } = useShortcuts()
   const {
@@ -71,7 +73,7 @@ export function useAppShortcuts(): CommandContext {
   const newChat = useCallback(() => {
     chat?.newChat()
   }, [chat])
-  const { updateSettings } = useSettings()
+  const settingsService = useSettingsService()
   const {
     openForPath: openNoteFindForPath,
     next: findNextInNote,
@@ -165,7 +167,7 @@ export function useAppShortcuts(): CommandContext {
       openTemplatePicker,
       openTemplateCreate,
       enableSemanticSearch: () => {
-        updateSettings({ semanticSearchEnabled: true })
+        settingsService.update({ semanticSearchEnabled: true })
         // EmbeddingsSync loads an untouched runtime; a `failed` one only
         // retries on an explicit action like this command.
         void semanticSearch.retryFailedModel()
@@ -190,7 +192,7 @@ export function useAppShortcuts(): CommandContext {
       findNextInNote,
       findPreviousInNote,
       toggleAudioMemo,
-      updateSettings,
+      settingsService,
       semanticSearch,
     ],
   )

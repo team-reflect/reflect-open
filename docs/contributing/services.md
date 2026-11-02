@@ -152,7 +152,7 @@ writes carry `indexGeneration` the same way.
   `NoteFileService` is the model: `write(path, contents, generation)`.
 - **User-facing services** take `graphSession: GraphSessionSource` in `deps`
   and read the session once, at the entry of each public method
-  (`graphSession.getState().session`, or `requireGraphSession(graphSession)` in
+  (`graphSession.get().session`, or `requireGraphSession(graphSession)` in
   `packages/core/src/graph/graph-session.ts`). Pass its generations to every
   lower call. Do not read the session again after an `await`.
 - **Background loops** get the `GraphSession` from `createGraphServices` (§10).

@@ -4,9 +4,9 @@ import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createAgentSkillService } from './agent-skill-service.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 
-function graphAt(generation: number): { getState: () => { session: GraphSession | null } } {
+function graphAt(generation: number): { get: () => { session: GraphSession | null } } {
   const session = createGraphSession({ root: '/g', name: 'g', generation, indexGeneration: 1 })
-  return { getState: () => ({ session }) }
+  return { get: () => ({ session }) }
 }
 
 const STATUS = {
@@ -40,7 +40,7 @@ describe('createAgentSkillService', () => {
     const ipc = createTestIpcBridgeService({ commands: {} })
     const skill = createAgentSkillService({
       ipc,
-      graphSession: { getState: () => ({ session: null }) },
+      graphSession: { get: () => ({ session: null }) },
     })
 
     await expect(skill.install()).rejects.toThrow('No graph is open.')

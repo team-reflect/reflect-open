@@ -7,7 +7,7 @@ import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useSuggestedContact } from '@/hooks/use-suggested-contact.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface SuggestedContactCardProps {
@@ -29,7 +29,7 @@ export function SuggestedContactCard({
   path,
   className,
 }: SuggestedContactCardProps): ReactElement | null {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const queryClient = useQueryClient()
   const { contactSuggestions } = useCoreServices()
   const contact = useSuggestedContact(path)

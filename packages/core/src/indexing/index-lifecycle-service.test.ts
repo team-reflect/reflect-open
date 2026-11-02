@@ -144,7 +144,7 @@ function setup(options?: {
     logger,
     progress: operations,
     graphSession: {
-      getState: () => graph,
+      get: () => graph,
       subscribe: (listener) => {
         graphListeners.add(listener)
         return () => {
@@ -880,7 +880,7 @@ describe('rebuildVisibly', () => {
   it('a test lifecycle records the requested generations', async () => {
     const session = sessionAt(7)
     const index = createTestIndexLifecycleService({
-      graphSession: { getState: () => ({ session }), subscribe: () => () => {} },
+      graphSession: { get: () => ({ session }), subscribe: () => () => {} },
     })
     await index.rebuildVisibly()
     expect(index.rebuilds()).toEqual([7])

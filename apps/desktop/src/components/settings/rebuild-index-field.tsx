@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useIndexGeneration } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { SettingsField } from './field.tsx'
 
@@ -15,7 +15,7 @@ import { SettingsField } from './field.tsx'
  * with the palette command.
  */
 export function RebuildIndexField(): ReactElement {
-  const { indexGeneration } = useGraph()
+  const indexGeneration = useIndexGeneration()
   const { indexLifecycle } = useCoreServices()
   const rebuild = useAsyncAction()
 

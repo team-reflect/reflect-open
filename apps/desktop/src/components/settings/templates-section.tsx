@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { createTemplatesQueryOptions } from '@/lib/query-options.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { ConfirmActionDialog } from '@/components/confirm-action-dialog.tsx'
@@ -30,7 +30,7 @@ import { isModEvent } from '@meowdown/core'
  * to the trash. "New template" shares the palette command's dialog.
  */
 export function TemplatesSection(): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { indexQuery } = useCoreServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const { openTemplateCreate } = useNoteTemplates()

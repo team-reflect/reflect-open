@@ -21,7 +21,7 @@ import {
   type MeetingAttendee,
   formatTimeOfDay,
 } from '@reflect/core'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useContactsEnabled, useTimeFormat } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 
@@ -50,8 +50,8 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
   const [name, setName] = useState(event.title)
   const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [createNote, setCreateNote] = useState(event.recurring)
-  const contactsEnabled = useSettingsField('contactsEnabled')
-  const timeFormat = useSettingsField('timeFormat')
+  const contactsEnabled = useContactsEnabled()
+  const timeFormat = useTimeFormat()
 
   // Upgrade the prefilled chips once attendee resolution answers: an invite
   // email an existing note owns swaps the calendar's spelling for the note
@@ -88,7 +88,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
   // the previous one. Success closes the dialog from inside the action.
   const [error, submitAction, submitting] = useActionState(
     async (previous: string | null): Promise<string | null> => {
-      const { session } = graphSession.getState()
+      const { session } = graphSession.get()
       if (session === null) {
         return previous
       }
@@ -97,7 +97,7 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
         // may be stale after a System Settings trip, and a quick submit must
         // not skip the pre-fill.
         await contacts.refresh()
-        if (graphSession.getState().session !== session) {
+        if (graphSession.get().session !== session) {
           onClose()
           return null
         }

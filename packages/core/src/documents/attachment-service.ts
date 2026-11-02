@@ -591,7 +591,7 @@ class AttachmentServiceImpl implements AttachmentService {
   }
 
   #openGeneration(): number | null {
-    return this.#deps.graphSession.getState().session?.generation ?? null
+    return this.#deps.graphSession.get().session?.generation ?? null
   }
 
   #entryFor(generation: number): CatalogEntry {

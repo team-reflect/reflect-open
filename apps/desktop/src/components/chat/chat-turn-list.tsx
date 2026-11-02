@@ -7,7 +7,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller.tsx'
-import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useChatTurns } from '@/providers/chat-provider.tsx'
 import { ChatTurn } from './chat-turn.tsx'
 
 /**
@@ -15,7 +15,7 @@ import { ChatTurn } from './chat-turn.tsx'
  * scroller, which owns scroll anchoring while a response streams.
  */
 export function ChatTurnList(): ReactElement {
-  const { turns } = useChatSession()
+  const turns = useChatTurns()
 
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="end">
