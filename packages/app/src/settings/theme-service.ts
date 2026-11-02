@@ -1,5 +1,5 @@
 import {
-  deriveStore,
+  combineStores,
   WritableStore,
   type SettingsService,
   type StorageService,
@@ -7,7 +7,7 @@ import {
   type ThemePreference,
   type Unlisten,
 } from '@reflect/core'
-import type { ColorScheme, PlatformService } from '../app/platform-service.ts'
+import type { ColorScheme, SystemPreferencesService } from '../app/system-preferences-service.ts'
 
 /**
  * The concrete theme applied to the document.
@@ -55,19 +55,18 @@ export interface ThemeService extends Store<ThemeState> {
 export interface ThemeServiceDeps {
   readonly settings: SettingsService
   readonly storage: StorageService
-  readonly platform: PlatformService
+  readonly systemPreferences: SystemPreferencesService
 }
 
 interface ThemeSourceState {
   readonly preference: ThemePreference
-  readonly system: ColorScheme
   readonly settled: boolean
 }
 
-function resolveTheme(state: ThemeSourceState): ThemeState {
+function resolveTheme(state: ThemeSourceState, system: ColorScheme): ThemeState {
   return {
     preference: state.preference,
-    resolved: state.preference === 'system' ? state.system : state.preference,
+    resolved: state.preference === 'system' ? system : state.preference,
     settled: state.settled,
   }
 }
@@ -80,15 +79,19 @@ class ThemeServiceImpl implements ThemeService {
   readonly #deps: ThemeServiceDeps
   readonly #state = new WritableStore<ThemeSourceState>({
     preference: 'system',
-    system: 'light',
     settled: false,
   })
-  readonly #theme = deriveStore(this.#state, resolveTheme, isThemeStateEqual)
+  readonly #theme: Store<ThemeState>
   #started = false
   #mirrored: ThemePreference | null = null
 
   constructor(deps: ThemeServiceDeps) {
     this.#deps = deps
+    this.#theme = combineStores(
+      [this.#state, deps.systemPreferences.colorScheme],
+      resolveTheme,
+      isThemeStateEqual,
+    )
   }
 
   readonly get = (): ThemeState => {
@@ -131,15 +134,11 @@ class ThemeServiceImpl implements ThemeService {
   }
 
   #start(): void {
-    const { settings, platform } = this.#deps
+    const { settings } = this.#deps
     if (this.#started) {
       return
     }
     this.#started = true
-    this.#setState({ system: platform.colorScheme() })
-    platform.subscribeColorScheme((system) => {
-      this.#setState({ system })
-    })
     settings.subscribe(() => {
       this.#sync()
     })
