@@ -127,5 +127,7 @@ describe('ScrollDrawer', () => {
     await view.rerender(<Harness rows={8} />)
 
     await vi.waitFor(() => expect(scroller.scrollTop).toBe(openTop(scroller)))
+    // A detached scroller would also read 0 for both.
+    await expect.element(page.getByRole('dialog')).toBeInTheDocument()
   })
 })
