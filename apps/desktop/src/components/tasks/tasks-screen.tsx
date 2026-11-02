@@ -9,7 +9,6 @@ import {
 } from 'react'
 import { Archive, CalendarClock, List, Search } from 'lucide-react'
 import {
-  composeVisibleTaskGroups,
   getTaskKey,
   isSameTask,
   type InsertTaskTarget,
@@ -19,18 +18,15 @@ import {
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
 import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
+import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
-import { useStore } from '@/lib/use-store.ts'
 import { routeForPath } from '@reflect/app'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
 import { TaskGroupSection } from './task-group-section.tsx'
@@ -73,8 +69,6 @@ function focusedSelectedKey(
  * "show archived" filter, which reveals the whole completed history.
  */
 export function TasksScreen(): ReactElement {
-  const graph = useGraphInfo()
-  const { tasks: taskService } = useCoreServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
@@ -83,33 +77,9 @@ export function TasksScreen(): ReactElement {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { open, completed, openFailed, completedFailed } = useStore(taskService)
-  useEffect(
-    () => (filters.archived ? taskService.includeCompleted() : undefined),
-    [taskService, filters.archived],
-  )
-
-  // Either read failing surfaces the alert — a failed completed read must not
-  // leave `ready` stuck (and the list blank) just because its data never arrived.
-  // The completed error only counts while archived is on: the service keeps the
-  // last error of a list it no longer reads, so turning archived off must clear it.
-  const isError = openFailed || (filters.archived && completedFailed)
-  // When archived is on, the list merges open + completed, so the empty state
-  // must wait for both — else a graph with only completed tasks flashes "No
-  // tasks to show." while the completed query is still loading.
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
-  const { onScroll } = useScrollRestoration(scrollElement, ready)
-
-  // This session's completed tasks, still showing struck until archived —
-  // reconciled against the open read so a task reopened at its source note
-  // sheds its struck shadow instead of masking the live row.
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
-
   const needle = query.trim().toLowerCase()
-  const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
-    [open, completed, recentlyCompleted, filters, needle, today],
-  )
+  const { groups, recentlyCompleted, isError, ready } = useVisibleTaskGroups(filters, needle, today)
+  const { onScroll } = useScrollRestoration(scrollElement, ready)
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])

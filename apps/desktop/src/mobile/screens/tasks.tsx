@@ -1,7 +1,6 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
 import {
-  composeVisibleTaskGroups,
   getTaskKey,
   todaysDailyTarget,
   WritableStore,
@@ -10,9 +9,9 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
+import { useVisibleTaskGroups } from '@/lib/tasks/use-visible-task-groups.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
@@ -25,14 +24,12 @@ import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
 import { useRouter } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
-import { useStore } from '@/lib/use-store.ts'
 
 /**
  * The Tasks tab (V1 mobile's third tab over Plan 18's shipped data layer): every
  * open task across the graph in desktop's exact groups — Current / Overdue /
  * Upcoming, then per-note — via the same task rows, grouping
- * ({@link composeVisibleTaskGroups}) and optimistic writes
+ * ({@link useVisibleTaskGroups}) and optimistic writes
  * ({@link useTaskActions}) the desktop view uses; this screen adds only the
  * touch surface. Task taps, toggles, adds, filters, scheduling, and archival
  * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
@@ -45,7 +42,6 @@ import { useStore } from '@/lib/use-store.ts'
  */
 export function MobileTasks(): ReactElement {
   const { haptics } = useMobileServices()
-  const { tasks: taskService } = useCoreServices()
   const graph = useGraphInfo()
   const { navigate, arrivalSeq, arrivalFocusEditor } = useRouter()
   const today = useToday()
@@ -73,15 +69,6 @@ export function MobileTasks(): ReactElement {
     selectText: true,
   })
 
-  const { open, completed, openFailed, completedFailed } = useStore(taskService)
-  useEffect(
-    () => (filters.archived ? taskService.includeCompleted() : undefined),
-    [taskService, filters.archived],
-  )
-  const isError = openFailed || (filters.archived && completedFailed)
-  const ready = open !== undefined && (!filters.archived || completed !== undefined)
-
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
   const actions = useTaskActions()
 
   // Defer the needle like the All tab defers its query: fast typing coalesces
@@ -90,10 +77,7 @@ export function MobileTasks(): ReactElement {
   // not keep hiding that row while it catches up.
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
-  const groups = useMemo(
-    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
-    [open, completed, recentlyCompleted, filters, needle, today],
-  )
+  const { groups, recentlyCompleted, isError, ready } = useVisibleTaskGroups(filters, needle, today)
 
   // The sheet edits the task's *live* row, not the snapshot taken when it
   // opened: a mutation or reindex can rewrite the row (raw, checked) while
