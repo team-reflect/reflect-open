@@ -34,8 +34,18 @@ function useDrawer(): DrawerContextValue {
   return context
 }
 
+/**
+ * The props of {@link Drawer}. The drawer is always controlled.
+ */
 export interface DrawerProps {
+  /**
+   * Whether the drawer is open.
+   */
   open: boolean
+  /**
+   * Called when a swipe, a tap above the sheet, or Escape asks to close, and
+   * when a trigger asks to open. The owner may keep the drawer open.
+   */
   onOpenChange: (open: boolean) => void
   children?: ReactNode | undefined
 }
@@ -58,10 +68,17 @@ export function Drawer({ open, onOpenChange, children }: DrawerProps): ReactElem
   )
 }
 
+/**
+ * A button that opens the drawer.
+ */
 export function DrawerTrigger(props: DialogPrimitive.Trigger.Props): ReactElement {
   return <DialogPrimitive.Trigger data-slot="drawer-trigger" {...props} />
 }
 
+/**
+ * The props of {@link DrawerContent}. `initialFocus` defaults to the sheet
+ * itself, so opening never raises the keyboard.
+ */
 export type DrawerContentProps = Pick<
   DialogPrimitive.Popup.Props,
   'aria-label' | 'initialFocus'
@@ -69,6 +86,10 @@ export type DrawerContentProps = Pick<
   children?: ReactNode | undefined
 }
 
+/**
+ * The sheet, its backdrop, and its scroller, in a portal. Children render in
+ * the panel under the grab handle.
+ */
 export function DrawerContent({
   children,
   initialFocus,
@@ -168,6 +189,9 @@ function DrawerSheet({
   )
 }
 
+/**
+ * The drawer's heading. It names the dialog.
+ */
 export function DrawerTitle({ className, ...props }: DialogPrimitive.Title.Props): ReactElement {
   return (
     <DialogPrimitive.Title
@@ -195,6 +219,9 @@ export function DrawerBody({ className, ...props }: ComponentProps<'div'>): Reac
   )
 }
 
+/**
+ * Muted text that describes the dialog.
+ */
 export function DrawerDescription({
   className,
   ...props
