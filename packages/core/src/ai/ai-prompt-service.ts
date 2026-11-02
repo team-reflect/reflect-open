@@ -1,7 +1,7 @@
 import type { IdService } from '../ports/id-service.ts'
 import { deriveStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { AiPrompt, AiPromptMode } from '../settings/schema.ts'
+import type { AiPrompt, AiPromptMode, Settings } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import { isDeepEqual } from '@ocavue/utils'
 
@@ -35,13 +35,17 @@ export interface AiPromptService extends Store<AiPrompt[]> {
   remove(id: string): void
 }
 
+function selectAiPrompts(settings: Settings): AiPrompt[] {
+  return settings.aiPrompts
+}
+
 class AiPromptServiceImpl implements AiPromptService {
   readonly #deps: AiPromptServiceDeps
   readonly #store: Store<AiPrompt[]>
 
   constructor(deps: AiPromptServiceDeps) {
     this.#deps = deps
-    this.#store = deriveStore(deps.settings, (settings) => settings.aiPrompts, isDeepEqual)
+    this.#store = deriveStore(deps.settings, selectAiPrompts, isDeepEqual)
   }
 
   readonly get = (): AiPrompt[] => this.#store.get()
