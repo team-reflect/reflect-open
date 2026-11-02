@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import type { Store, Unlisten } from '../unlisten.ts'
+import { WriteableStore, type Store, type Unlisten } from '../unlisten.ts'
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from './schema.ts'
 
 /**
@@ -50,11 +50,11 @@ export interface SettingsServiceDeps {
 
 class SettingsServiceImpl implements SettingsService {
   readonly #deps: SettingsServiceDeps
-  readonly #listeners = new Set<() => void>()
+  readonly #store = new WriteableStore(DEFAULT_SETTINGS)
 
   #state: SettingsStatus = 'loading'
   #started = false
-  #current: Settings = DEFAULT_SETTINGS
+
   #preloadPatch: Partial<Settings> = {}
   #pendingUpdaters: SettingsUpdater[] = []
 
@@ -73,22 +73,19 @@ class SettingsServiceImpl implements SettingsService {
 
   readonly get = (): Settings => {
     this.#start()
-    return this.#current
+    return this.#store.get()
   }
 
   readonly subscribe = (listener: () => void): Unlisten => {
     this.#start()
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
+    return this.#store.subscribe(listener)
   }
 
   readonly update = (patch: Partial<Settings>): void => {
     this.#start()
     if (this.#state === 'loading') {
       this.#preloadPatch = { ...this.#preloadPatch, ...patch }
-      this.#current = { ...DEFAULT_SETTINGS, ...this.#preloadPatch }
+      this.#store.set({ ...DEFAULT_SETTINGS, ...this.#preloadPatch })
       this.#emit()
       return
     }
@@ -120,7 +117,7 @@ class SettingsServiceImpl implements SettingsService {
       .then(
         (document): SettingsLoadOutcome => {
           this.#state = 'loaded'
-          this.#current = document
+          this.#store.set(document)
           this.#loaded = Promise.resolve('loaded')
           this.#emit()
           return 'loaded'
@@ -207,7 +204,7 @@ class SettingsServiceImpl implements SettingsService {
   }
 
   #apply(updater: SettingsUpdater): void {
-    const previous = this.#current
+    const previous = this.#store.get()
     const merged = { ...previous, ...updater(previous) }
     if (this.#state === 'failed') {
       this.#current = merged
