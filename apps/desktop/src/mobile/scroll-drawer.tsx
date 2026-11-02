@@ -123,6 +123,7 @@ function DrawerSheet({
   const scrollerRef = useRef<HTMLDivElement>(null)
   const slideRef = useRef<HTMLDivElement>(null)
   const tintRef = useRef<HTMLDivElement>(null)
+  const handleRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef<ScrollDrawerController | null>(null)
   // Bumped by each swipe close. A render that still has `open` means the owner refused.
   const [closeRequests, setCloseRequests] = useState(0)
@@ -145,13 +146,15 @@ function DrawerSheet({
     const scroller = scrollerRef.current
     const slide = slideRef.current
     const tint = tintRef.current
-    if (scroller === null || slide === null || tint === null) {
+    const handle = handleRef.current
+    if (scroller === null || slide === null || tint === null || handle === null) {
       return
     }
     const controller = attachScrollDrawer({
       scroller,
       slide,
       tint,
+      handle,
       popup: () => popupRef.current,
       requestClose,
       prefersReducedMotion,
@@ -182,6 +185,9 @@ function DrawerSheet({
             <DialogPrimitive.Close className="sr-only">Close</DialogPrimitive.Close>
             {children}
           </div>
+          {/* The mouse drags the sheet only from its top edge (the grab
+              handle), so a mouse press in the content can select text. */}
+          <div ref={handleRef} aria-hidden className="absolute inset-x-0 top-0 h-6" />
         </div>
       </div>
     </>
@@ -238,6 +244,10 @@ interface ScrollDrawerOptions {
   scroller: HTMLElement
   slide: HTMLElement
   tint: HTMLElement
+  /**
+   * Where a mouse drag may start.
+   */
+  handle: HTMLElement
   popup: () => HTMLElement | null
   /**
    * Asks the owner to close. The owner may keep the drawer open.
@@ -263,6 +273,7 @@ function attachScrollDrawer({
   scroller,
   slide,
   tint,
+  handle,
   popup,
   requestClose,
   prefersReducedMotion,
@@ -285,6 +296,7 @@ function attachScrollDrawer({
     element: scroller,
     signal,
     isSettled: isClosed,
+    dragHandle: handle,
     onSettle: () => {
       if (!isClosed()) {
         return

@@ -36,6 +36,7 @@ function Harness({
       <DrawerContent>
         <DrawerTitle>Test drawer</DrawerTitle>
         <DrawerBody>
+          <p className="select-text">Code ABCD-1234</p>
           {Array.from({ length: rows }, (_, index) => (
             <button key={index} type="button">
               Row {index}
@@ -111,6 +112,21 @@ describe('ScrollDrawer', () => {
 
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('lets a mouse select text in the body', async () => {
+    await renderInApp(<Harness />)
+    await openScroller()
+    const text = page.getByText('Code ABCD-1234').element().getBoundingClientRect()
+    const y = text.top + text.height / 2
+
+    await mouse.move(text.left + 1, y)
+    await mouse.down()
+    await mouse.move(text.right - 1, y, { steps: 5 })
+    await mouse.up()
+
+    expect(window.getSelection()?.toString()).toContain('ABCD-1234')
+    await expect.element(page.getByRole('dialog')).toBeVisible()
   })
 
   it('closes on a tap above the sheet', async () => {
