@@ -1,6 +1,6 @@
 import type { IdService } from '../ports/id-service.ts'
 import { AppError } from '../errors.ts'
-import type { Unlisten } from '../unlisten.ts'
+import type { Store, Unlisten } from '../unlisten.ts'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -63,9 +63,10 @@ export interface AiProviderConfigServiceDeps {
  * (entries and default id) with the OS keychain (the key itself), so the
  * "settings entry and keychain entry" invariant has one owner.
  */
-export interface AiProviderConfigService {
+export interface AiProviderConfigService extends Store<AiProvidersState> {
   /**
    * Calls `listener` after any settings change.
+   * FIXME: remove this subscribe method here because we already have it in Store<AiProvidersState>
    */
   subscribe: (listener: () => void) => Unlisten
   /**
@@ -74,6 +75,7 @@ export interface AiProviderConfigService {
   list: () => AiProviderConfig[]
   /**
    * The entries and the default id, as the pure transforms take them.
+   * FIXME: remove this state() method because we already have get() in Store<AiProvidersState>
    */
   state(): AiProvidersState
   /**
