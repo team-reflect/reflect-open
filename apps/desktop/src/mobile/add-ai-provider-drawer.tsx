@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select.tsx'
 import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit.ts'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useReportPending } from '@/hooks/use-report-pending.ts'
 import { AiProviderConsent } from '@/mobile/ai-provider-consent.tsx'
 
 interface AddAiProviderDrawerProps {
@@ -41,17 +42,32 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * inline rejection / save-anyway downgrade → persist. Hosted providers use
  * the curated model list; OpenAI-compatible endpoints expose free-form
  * endpoint and model inputs. The sheet body mounts per open cycle, so a
- * dismissed half-typed key never leaks into the next open.
+ * dismissed half-typed key never leaks into the next open. A swipe cannot
+ * dismiss it while a submit is running, since the provider would still land.
  */
 export function AddAiProviderDrawer({
   open,
   onOpenChange,
   onAdd,
 }: AddAiProviderDrawerProps): ReactElement {
+  const [pending, setPending] = useState(false)
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer
+      open={open}
+      onOpenChange={(next) => {
+        if (next || !pending) {
+          onOpenChange(next)
+        }
+      }}
+    >
       <DrawerContent aria-label="Add AI provider">
-        {open ? <AddAiProviderSheet onAdd={onAdd} onClose={() => onOpenChange(false)} /> : null}
+        {open ? (
+          <AddAiProviderSheet
+            onAdd={onAdd}
+            onClose={() => onOpenChange(false)}
+            onPendingChange={setPending}
+          />
+        ) : null}
       </DrawerContent>
     </Drawer>
   )
@@ -61,9 +77,11 @@ export function AddAiProviderDrawer({
 function AddAiProviderSheet({
   onAdd,
   onClose,
+  onPendingChange,
 }: {
   onAdd: (draft: NewAiProvider) => Promise<void>
   onClose: () => void
+  onPendingChange: (pending: boolean) => void
 }): ReactElement {
   const [providerId, setProviderId] = useState<AiProviderId>(AI_PROVIDERS[0].id)
   const [model, setModel] = useState(AI_PROVIDERS[0].models[0].id)
@@ -77,6 +95,7 @@ function AddAiProviderSheet({
   })
   // `submit` reports its own failures and never rejects, so only `pending` is used.
   const { run, pending: submitting } = useAsyncAction()
+  useReportPending(submitting, onPendingChange)
   const provider = aiProvider(providerId)
   const isOpenAICompatible = provider.id === 'openai-compatible'
   const apiKeyRequired = aiProviderRequiresApiKey(provider.id)

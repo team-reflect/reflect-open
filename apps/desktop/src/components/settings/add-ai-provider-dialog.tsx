@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactElement } from 'react'
+import { lazy, Suspense, useState, type ReactElement } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -23,14 +23,16 @@ const AddAiProviderForm = lazy(async () => {
  * The "Add AI provider" modal: pick a provider, pick its default model, paste
  * an API key, optionally mark it as the app default. The key goes to the OS
  * keychain, never into the settings document, and a failure keeps the dialog
- * open with the typed key intact for a retry.
+ * open with the typed key intact for a retry. It cannot be dismissed while a
+ * submit is running, since the provider would still be added.
  */
 export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps): ReactElement {
+  const [pending, setPending] = useState(false)
   return (
     <Dialog
       open
       onOpenChange={(isOpen) => {
-        if (!isOpen) onClose()
+        if (!isOpen && !pending) onClose()
       }}
     >
       <Suspense>
@@ -42,7 +44,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
             </DialogDescription>
           </DialogHeader>
 
-          <AddAiProviderForm onAdd={onAdd} onClose={onClose} />
+          <AddAiProviderForm onAdd={onAdd} onClose={onClose} onPendingChange={setPending} />
         </DialogContent>
       </Suspense>
     </Dialog>
