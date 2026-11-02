@@ -71,6 +71,8 @@ pub enum EmbedStatus {
     Ready { model: String },
     /// Load failed; semantic search is unavailable (lexical still works).
     Failed { message: String },
+    /// This CPU cannot run ONNX Runtime (see `cpu_supported`).
+    Unsupported,
 }
 
 #[derive(Default)]
@@ -89,6 +91,19 @@ enum Runtime {
 /// Process-wide embedding runtime state.
 #[derive(Default)]
 pub struct EmbedState(Mutex<Runtime>);
+
+/// ort's prebuilt x86_64 ONNX Runtime requires AVX2. Without it, runtime init
+/// dies with SIGILL, which no error path can catch, so check before any ort
+/// call and report `unsupported` instead.
+#[cfg(target_arch = "x86_64")]
+fn cpu_supported() -> bool {
+    std::is_x86_feature_detected!("avx2")
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn cpu_supported() -> bool {
+    true
+}
 
 fn lock_state<'a>(state: &'a EmbedState) -> AppResult<std::sync::MutexGuard<'a, Runtime>> {
     state.0.lock().map_err(|err| {
@@ -251,6 +266,9 @@ fn download_model_files(app: &AppHandle, cache_dir: &Path) -> Result<(), String>
 /// `embed:status` events).
 #[tauri::command]
 pub fn embed_status(state: State<EmbedState>) -> AppResult<EmbedStatus> {
+    if !cpu_supported() {
+        return Ok(EmbedStatus::Unsupported);
+    }
     Ok(status_of(&*lock_state(&state)?))
 }
 
@@ -260,6 +278,9 @@ pub fn embed_status(state: State<EmbedState>) -> AppResult<EmbedStatus> {
 /// even when cached, and the first run downloads.
 #[tauri::command]
 pub async fn embed_ensure(app: AppHandle, state: State<'_, EmbedState>) -> AppResult<EmbedStatus> {
+    if !cpu_supported() {
+        return Ok(EmbedStatus::Unsupported);
+    }
     // Resolve the cache dir BEFORE flipping to Loading: it's the only step
     // here that may fail without a guaranteed state transition afterwards.
     let cache_dir = app
