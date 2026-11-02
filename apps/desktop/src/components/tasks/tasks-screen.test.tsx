@@ -229,7 +229,7 @@ beforeEach(() => {
   noteWindows = createTestWindowService()
   operations = core.progress
   storage = core.storage
-  core.clock.setToday('2026-06-14')
+  core.clock.setNow(new Date(2026, 5, 14, 12, 0, 0).getTime())
   const tasks = core.tasks
   getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])
   getCompletedTasks = vi.spyOn(tasks, 'getCompletedTasks').mockResolvedValue([])

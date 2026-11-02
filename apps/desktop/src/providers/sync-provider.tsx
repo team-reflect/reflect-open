@@ -5,14 +5,12 @@ import {
   type GitSyncService,
   type GitSyncState,
   type GitHostConnector,
+  type Store,
 } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 import { useMaybeGraphServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
 
-type GitSyncContextValue = { state: GitSyncState } & Pick<
-  GitSyncService,
-  'disconnectGraph' | 'syncNow'
-> &
+type GitSyncActions = Pick<GitSyncService, 'disconnectGraph' | 'syncNow'> &
   Pick<GithubConnector, 'connectNewRepo' | 'connectExistingRepo'> &
   Pick<GitHostConnector, 'connectGitHost' | 'updateGitHostSignIn'>
 
@@ -21,25 +19,37 @@ const LOADING: GitSyncState = { phase: 'loading' }
 /**
  * What the surface reads where the graph runs no git sync service.
  */
-const NO_GIT_SYNC = {
+const NO_GIT_SYNC: Store<GitSyncState> = {
   subscribe: () => () => {},
-  getState: (): GitSyncState => LOADING,
+  get: () => LOADING,
 }
 
 /**
- * Git sync state + actions of the open graph's `GitSyncService` and its
- * connectors. A note window runs none: its state stays 'loading' (the note
- * window edits, main syncs).
+ * The git sync state of the open graph's `GitSyncService`. A note window runs
+ * none: its state stays 'loading' (the note window edits, main syncs).
  */
-export function useGitSync(): GitSyncContextValue {
+export function useGitSyncStore(): Store<GitSyncState> {
+  return useMaybeGraphServices()?.gitSync ?? NO_GIT_SYNC
+}
+
+/**
+ * The whole value of {@link useGitSyncStore}.
+ */
+export function useGitSyncState(): GitSyncState {
+  return useStore(useGitSyncStore())
+}
+
+/**
+ * The actions of the open graph's `GitSyncService` and its connectors. They
+ * throw where the graph runs no git sync service.
+ */
+export function useGitSyncActions(): GitSyncActions {
   const graph = useMaybeGraphServices()
   const controller = graph?.gitSync ?? null
   const githubConnector = graph?.githubConnector ?? null
   const gitHostConnector = graph?.gitHostConnector ?? null
-  const store = controller ?? NO_GIT_SYNC
-  const state = useServiceState(store, store.getState)
 
-  return useMemo<GitSyncContextValue>(() => {
+  return useMemo<GitSyncActions>(() => {
     const require = <Service,>(service: Service | null): Service => {
       if (service === null) {
         throw new AppError('io', 'git sync is still initializing')
@@ -47,7 +57,6 @@ export function useGitSync(): GitSyncContextValue {
       return service
     }
     return {
-      state,
       connectNewRepo: (name) => require(githubConnector).connectNewRepo(name),
       connectExistingRepo: (ref, options) => {
         return require(githubConnector).connectExistingRepo(ref, options)
@@ -57,16 +66,5 @@ export function useGitSync(): GitSyncContextValue {
       disconnectGraph: () => require(controller).disconnectGraph(),
       syncNow: () => require(controller).syncNow(),
     }
-  }, [controller, githubConnector, gitHostConnector, state])
-}
-
-/**
- * Like {@link useGitSync}, but `null` where the graph runs no git sync service:
- * no graph session is open (the mobile settings sheet in the plain-browser
- * dev harness and in screen tests), and those surfaces hide their sync rows.
- */
-export function useGitSyncContext(): GitSyncContextValue | null {
-  const sync = useGitSync()
-  const gitSync = useMaybeGraphServices()?.gitSync ?? null
-  return gitSync === null ? null : sync
+  }, [controller, githubConnector, gitHostConnector])
 }

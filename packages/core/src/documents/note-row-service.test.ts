@@ -272,7 +272,7 @@ describe('reconcileRows', () => {
       { path: 'notes/b.md', isPinned: false },
     ])
 
-    expect(noteRows.getOverlays().size).toBe(0)
+    expect(noteRows.get().size).toBe(0)
     expect(listener).toHaveBeenCalledOnce()
   })
 
@@ -306,21 +306,50 @@ describe('dropOverlay', () => {
   })
 })
 
-describe('getOverlays', () => {
+describe('get', () => {
   it("returns the open graph's overlays as a snapshot that changes only with them", () => {
     const { noteRows } = createRows()
     noteRows.setOverlay('notes/a.md', GEN, { isPinned: true })
     noteRows.setOverlay('notes/b.md', GEN + 1, { isPinned: true })
 
-    const snapshot = noteRows.getOverlays()
+    const snapshot = noteRows.get()
     expect([...snapshot]).toEqual([['notes/a.md', { isPinned: true }]])
-    expect(noteRows.getOverlays()).toBe(snapshot)
+    expect(noteRows.get()).toBe(snapshot)
     expect(noteRows.getOverlaysOn(GEN)).toBe(snapshot)
     expect([...noteRows.getOverlaysOn(GEN + 1)]).toEqual([['notes/b.md', { isPinned: true }]])
-    expect(noteRows.getOverlays()).toBe(snapshot)
+    expect(noteRows.get()).toBe(snapshot)
 
     noteRows.setOverlay('notes/a.md', GEN, { isPrivate: true })
-    expect(noteRows.getOverlays()).not.toBe(snapshot)
+    expect(noteRows.get()).not.toBe(snapshot)
+  })
+
+  it('keeps the snapshot and does not notify on a write that changes no overlay on the open graph', () => {
+    const { noteRows, graph } = createRows()
+    noteRows.setOverlay('notes/a.md', GEN, { isPinned: true })
+    const snapshot = noteRows.get()
+    const listener = vi.fn()
+    noteRows.subscribe(listener)
+
+    noteRows.setOverlay('notes/b.md', GEN + 1, { isPinned: true })
+    noteRows.setOverlay('notes/a.md', GEN - 1, { isPrivate: true })
+    noteRows.dropOverlay('notes/a.md', GEN, { isPrivate: true })
+    noteRows.reconcile('notes/a.md', { isPrivate: false })
+    graph.setGraph({ generation: GEN })
+
+    expect(noteRows.get()).toBe(snapshot)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('stops notifying after unsubscribe', () => {
+    const { noteRows } = createRows()
+    const listener = vi.fn()
+    const unlisten = noteRows.subscribe(listener)
+
+    noteRows.setOverlay('notes/a.md', GEN, { isPinned: true })
+    expect(listener).toHaveBeenCalledOnce()
+    unlisten()
+    noteRows.setOverlay('notes/b.md', GEN, { isPinned: true })
+    expect(listener).toHaveBeenCalledOnce()
   })
 
   it('reads nothing while no graph is open and notifies when the graph changes', () => {
@@ -331,7 +360,7 @@ describe('getOverlays', () => {
 
     graph.setGraph(null)
     expect(listener).toHaveBeenCalled()
-    expect(noteRows.getOverlays().size).toBe(0)
+    expect(noteRows.get().size).toBe(0)
     noteRows.reconcileRows([], { complete: true })
     expect(noteRows.getOverlaysOn(GEN).size).toBe(1)
   })

@@ -18,9 +18,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
+import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'
-import { useGitSync } from '@/providers/sync-provider.tsx'
+import { useGitSyncStore } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -32,12 +33,18 @@ function graphSwitchBindingFor(index: number): string | null {
   return keybindingFor(`graph.switch${index + 1}`)
 }
 
+type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
+
+function selectConnectedStatus(state: GitSyncState): SyncStatus | null {
+  return state.phase === 'connected' ? state.status : null
+}
+
 /** The quiet git sync indicator: a dot and a screen-reader label, nothing when idle. */
-function GitSyncDot({ state }: { state: GitSyncState }): ReactElement | null {
-  if (state.phase !== 'connected' || state.status.state === 'idle') {
+function GitSyncDot(): ReactElement | null {
+  const status = useSelector(useGitSyncStore(), selectConnectedStatus)
+  if (status === null || status.state === 'idle') {
     return null
   }
-  const status = state.status
   const { className, label } = {
     syncing: { className: 'bg-accent motion-safe:animate-pulse', label: 'Syncing' },
     waiting: { className: 'bg-text-muted', label: 'Sync scheduled' },
@@ -80,7 +87,6 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
   const indexing = useGraphIndexing()
   const { openRecent, chooseGraph } = useGraphActions()
   const { colorFor } = useGraphColors()
-  const { state } = useGitSync()
   const { route } = useRouter()
   const settingsActive = route.kind === 'settings'
 
@@ -106,7 +112,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
                     <span className="min-w-0 truncate text-xs font-medium text-text-secondary transition-colors duration-100 group-hover:text-text">
                       {graph.name}
                     </span>
-                    <GitSyncDot state={state} />
+                    <GitSyncDot />
                     {indexing ? (
                       <span role="status" className="sr-only">
                         Indexing

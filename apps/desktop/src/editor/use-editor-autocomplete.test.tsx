@@ -111,7 +111,7 @@ describe('useEditorAutocomplete', () => {
     items[0]!.onSelect?.()
 
     await vi.waitFor(() => expect(created).toEqual([{ title: 'Business ideas', generation: 7 }]))
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
   })
 
   it('reports an ambiguous background create instead of silently doing nothing', async () => {

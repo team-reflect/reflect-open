@@ -1,18 +1,22 @@
+import { useEffect } from 'react'
 import type { PaywallGate } from '@reflect/core'
-import { useActiveSubscription } from '@/mobile/use-active-subscription.ts'
-import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
-import { useClassicAccess } from '@/mobile/use-classic-access.ts'
+import { useStore } from '@/lib/use-store.ts'
+import { useSubscriptionLookups } from '@/mobile/use-active-subscription.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * Whether to render the paywall. Mounting starts the subscription, Reflect
- * Classic, and install-channel checks that the gate reads.
+ * Classic, and install-channel checks that the gate reads. It re-renders only
+ * when the gate changes.
  */
 export function usePaywallGate(): PaywallGate {
-  useActiveSubscription()
-  useClassicAccess()
-  useAppStoreEnvironment()
-  const { paywall } = useMobileServices()
-  return useServiceState(paywall, paywall.gate)
+  const { classicAccess } = useCoreServices()
+  const { paywall, appStoreEnvironment } = useMobileServices()
+  useSubscriptionLookups()
+  useEffect(() => classicAccess.start(), [classicAccess])
+  useEffect(() => {
+    void appStoreEnvironment.environment()
+  }, [appStoreEnvironment])
+  return useStore(paywall.gate)
 }

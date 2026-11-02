@@ -33,6 +33,7 @@ export {
   THEME_PREFERENCE_CACHE_KEY,
   type ResolvedTheme,
   type ThemeService,
+  type ThemeState,
 } from './settings/theme-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {

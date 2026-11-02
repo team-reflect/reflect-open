@@ -229,7 +229,7 @@ describe('CaptureService (shared-inbox relay)', () => {
     session.schedule()
     await flush()
     expect(kit.drains).toHaveBeenCalledTimes(2)
-    expect(kit.progress.getAll()).toHaveLength(1)
+    expect(kit.progress.get()).toHaveLength(1)
     session.dispose()
   })
 
@@ -243,7 +243,7 @@ describe('CaptureService (shared-inbox relay)', () => {
     expect(kit.relays).not.toHaveBeenCalled()
     expect(kit.drains).toHaveBeenCalledTimes(1)
     expect(kit.enrichments).toHaveBeenCalledTimes(2)
-    expect(kit.progress.getAll()).toEqual([])
+    expect(kit.progress.get()).toEqual([])
     session.dispose()
   })
 

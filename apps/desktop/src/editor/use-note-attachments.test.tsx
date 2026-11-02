@@ -54,7 +54,6 @@ describe('useNoteAttachments', () => {
 
     await act(() => {
       services.attachments.setCatalog([{ path: 'attachments/garden-budget.png', size: 1 }])
-      services.attachments.emitCatalogChanged()
     })
 
     expect(renders).toBeGreaterThan(rendersBefore)
@@ -70,7 +69,7 @@ describe('useNoteAttachments', () => {
       },
       { graph: { generation: 3 } },
     )
-    core.attachments.setCatalog([{ path: 'assets/cat.png', size: 1 }])
+    await act(() => core.attachments.setCatalog([{ path: 'assets/cat.png', size: 1 }]))
     const before = attachments
 
     await act(() => core.graphSession.setGraph({ generation: 4 }))

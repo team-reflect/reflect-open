@@ -19,18 +19,36 @@ describe('createContactsService', () => {
     const contacts = createContactsService({ ipc, logger: createTestLoggerService() })
     const listener = vi.fn()
     contacts.subscribe(listener)
-    expect(contacts.getState()).toEqual({ authorization: null })
+    expect(contacts.get()).toEqual({ authorization: null })
 
     await contacts.refresh()
-    const first = contacts.getState()
+    const first = contacts.get()
     expect(first).toEqual({ authorization: 'notDetermined' })
     await contacts.refresh()
-    expect(contacts.getState()).toBe(first)
+    expect(contacts.get()).toBe(first)
     status = 'authorized'
     await contacts.refresh()
 
-    expect(contacts.getState()).toEqual({ authorization: 'authorized' })
+    expect(contacts.get()).toEqual({ authorization: 'authorized' })
     expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops notifying after unsubscribe', async () => {
+    let status = 'notDetermined'
+    const ipc = createTestIpcBridgeService({
+      commands: { contacts_authorization_status: () => status },
+    })
+    const contacts = createContactsService({ ipc, logger: createTestLoggerService() })
+    const listener = vi.fn()
+    const unlisten = contacts.subscribe(listener)
+
+    await contacts.refresh()
+    unlisten()
+    status = 'authorized'
+    await contacts.refresh()
+
+    expect(contacts.get()).toEqual({ authorization: 'authorized' })
+    expect(listener).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the last state and warns when a refresh fails', async () => {
@@ -40,7 +58,7 @@ describe('createContactsService', () => {
 
     await expect(contacts.refresh()).resolves.toBeUndefined()
 
-    expect(contacts.getState()).toEqual({ authorization: null })
+    expect(contacts.get()).toEqual({ authorization: null })
     expect(logger.getWarnings().map((entry) => entry.message)).toEqual([
       'failed to read the contacts permission',
     ])
@@ -61,7 +79,7 @@ describe('createContactsService', () => {
 
     await expect(contacts.requestAccess()).resolves.toBe(false)
 
-    expect(contacts.getState()).toEqual({ authorization: 'denied' })
+    expect(contacts.get()).toEqual({ authorization: 'denied' })
   })
 
   it('opens the lookup gate only when enabled and readable', async () => {
