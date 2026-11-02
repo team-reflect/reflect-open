@@ -830,6 +830,6 @@ describe('AudioMemoService.openSession', () => {
     session.dispose()
 
     expect(recorder.calls()).toContainEqual({ method: 'cancel' })
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
   })
 })
