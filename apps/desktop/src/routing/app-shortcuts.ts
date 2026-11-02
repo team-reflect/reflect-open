@@ -11,7 +11,7 @@ import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { useSettingsService } from '@/providers/settings-provider.tsx'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
-import { useTheme } from '@/providers/theme-provider.tsx'
+import { useResolvedTheme } from '@/providers/theme-provider.tsx'
 import {
   useAppServices,
   useCoreServices,
@@ -54,7 +54,7 @@ export function useAppShortcuts(): CommandContext {
   const { platform, semanticSearch } = services
   const { commands, nativeMenu } = appServices
   const focusedDailyDate = useFocusedDailyDate()
-  const { resolvedTheme, setTheme } = useTheme()
+  const resolvedTheme = useResolvedTheme()
   const graph = useGraphInfo()
   const recents = useGraphRecents()
   const { openRecent } = useGraphActions()
@@ -144,7 +144,9 @@ export function useAppShortcuts(): CommandContext {
       back,
       forward,
       clearScrollState,
-      toggleTheme: () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'),
+      toggleTheme: () => {
+        appServices.theme.setPreference(resolvedTheme === 'dark' ? 'light' : 'dark')
+      },
       toggleSidebar,
       newChat,
       openNoteFind: () => {
@@ -181,7 +183,6 @@ export function useAppShortcuts(): CommandContext {
       forward,
       clearScrollState,
       resolvedTheme,
-      setTheme,
       openPalette,
       openShortcuts,
       openTemplatePicker,
