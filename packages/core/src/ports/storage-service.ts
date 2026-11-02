@@ -1,8 +1,7 @@
 import type { ZodType } from 'zod'
 import { safeParseJson } from '@reflect/utils'
-import type { LoggerService } from './logger-service.ts'
-import { DefaultMap } from '@ocavue/utils'
 import { WritableStore } from '../store.ts'
+import type { LoggerService } from './logger-service.ts'
 
 /**
  * One string-valued key-value area whose keys can be observed.
@@ -39,10 +38,7 @@ class WebKeyValueStore implements KeyValueStore {
   readonly #logger: LoggerService
   readonly #name: string
   readonly #storage: Storage | null
-  readonly #stores = new DefaultMap<string, WritableStore<string | null>>(
-    () => new WritableStore<string | null>(null),
-  )
-
+  readonly #stores = new Map<string, WritableStore<string | null>>()
   #warned = false
 
   constructor(logger: LoggerService, name: string, storage: Storage | null) {
@@ -52,28 +48,11 @@ class WebKeyValueStore implements KeyValueStore {
   }
 
   get(key: string): string | null {
-    const store = this.#stores.get(key)
-    const cached = store.get()
-    if (cached != null) {
-      return cached
-    }
-
-    let value: string | null = null
-    try {
-      value = this.#storage?.getItem(key) ?? null
-    } catch (error) {
-      this.#warn('reading', key, error)
-    }
-    store.set(value)
-    return value
+    return this.#store(key).get()
   }
 
   set(key: string, value: string | null): void {
     const storage = this.#storage
-    const store = this.#stores.get(key)
-
-    store.set(value)
-
     // Writes go through even when unchanged, since other windows share the area.
     try {
       if (value === null) {
@@ -84,11 +63,26 @@ class WebKeyValueStore implements KeyValueStore {
     } catch (error) {
       this.#warn('writing', key, error)
     }
+    this.#store(key).set(value)
   }
 
   subscribe(key: string, listener: () => void): () => void {
-    const store = this.#stores.get(key)
-    return store.subscribe(listener)
+    return this.#store(key).subscribe(listener)
+  }
+
+  #store(key: string): WritableStore<string | null> {
+    let store = this.#stores.get(key)
+    if (!store) {
+      let value: string | null = null
+      try {
+        value = this.#storage?.getItem(key) ?? null
+      } catch (error) {
+        this.#warn('reading', key, error)
+      }
+      store = new WritableStore(value)
+      this.#stores.set(key, store)
+    }
+    return store
   }
 
   #warn(action: string, key: string, error: unknown): void {
