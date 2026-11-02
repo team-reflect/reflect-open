@@ -2,17 +2,18 @@ import type { Unlisten } from './unlisten.ts'
 
 /**
  * A value that changes over time, and a way to hear about the changes.
- *
- * `get` must return the same reference until the value changes: React's
- * `useSyncExternalStore` compares results with `Object.is`, and a new object
- * on every call re-renders on every check or loops forever.
- *
- * Both functions must work detached from the object (`const { get } = store`),
- * because hooks pass them on as plain functions.
  */
 export interface Store<T> {
+  /**
+   * Returns the current value.
+   * `get` must return the same reference until the value changes.
+   */
   get: () => T
-  subscribe: (onChange: VoidFunction) => Unlisten
+  /**
+   * Subscribe to changes. The listener is called after the value changed.
+   * Returns an `Unlisten` function to tear down the subscription.
+   */
+  subscribe: (listener: VoidFunction) => Unlisten
 }
 
 /**
