@@ -92,7 +92,7 @@ describe('insertTemplate', () => {
     await templates.insertTemplate('templates/journal.md', editor)
     expect(editor.inserted).toEqual(['# Journal\n\nMood:\n'])
     expect(editor.focused).toBe(1)
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('fails loud when there is no editor to insert into', async () => {

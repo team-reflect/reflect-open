@@ -51,7 +51,7 @@ describe('DeepLinkRouter.handle', () => {
     void handle('reflect://daily/2026-07-01')
     expect(navigate).toHaveBeenCalledWith({ kind: 'daily', date: '2026-07-01' })
     expect(resolveNoteTarget).not.toHaveBeenCalled()
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
   })
 
   it('resolves a note target and navigates to its route', async () => {
@@ -98,7 +98,7 @@ describe('DeepLinkRouter.handle', () => {
     await pending
 
     expect(navigate).not.toHaveBeenCalled()
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
   })
 
   it('spools a capture link without navigating', async () => {
@@ -183,7 +183,7 @@ describe('DeepLinkRouter.serve', () => {
     await Promise.resolve()
 
     expect(navigate).not.toHaveBeenCalled()
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
   })
 
   it('drops a note resolution that finished after the graph session ended', async () => {
@@ -198,7 +198,7 @@ describe('DeepLinkRouter.serve', () => {
     await Promise.resolve()
 
     expect(navigate).not.toHaveBeenCalled()
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
   })
 
   it.each(['reflect://today', 'reflect://note/y'])(

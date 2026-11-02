@@ -120,7 +120,7 @@ describe('saveFile', () => {
     expect(warning?.message).toMatch(/100 MB/)
 
     await attachments.saveFile(fileOf('small.pdf', 'application/pdf'))
-    expect(progress.getAll().filter((operation) => operation.status === 'warning')).toHaveLength(1)
+    expect(progress.get().filter((operation) => operation.status === 'warning')).toHaveLength(1)
   })
 
   it('reports failures keyed by how the file was named, never rejecting', async () => {
@@ -640,7 +640,7 @@ describe('openOrReveal', () => {
 
     expect(assetStore.opened()).toEqual(['assets/q3-report.pdf'])
     expect(assetStore.revealed()).toEqual([])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('degrades a refused file type to a reveal, with a status-line note', async () => {
