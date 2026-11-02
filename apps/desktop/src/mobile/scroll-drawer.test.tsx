@@ -133,6 +133,7 @@ describe('ScrollDrawer', () => {
   it('closes on a tap above the sheet', async () => {
     await renderInApp(<Harness />)
     await openScroller()
+
     // Clicks whatever is at the point, in place: a locator click is unreliable in WebKit CI.
     const dialog = page.getByRole('dialog').element().getBoundingClientRect()
     const target = document.elementFromPoint(dialog.left + 20, dialog.top + 20)
