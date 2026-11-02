@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { ImageUrlResolver, WikiEmbedResolver } from '@meowdown/core'
 import type { AttachmentService, GraphInfo, GraphSessionService } from '@reflect/core'
 import { useStore } from '@/lib/use-store.ts'
-import { useMaybeGraphInfo } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -60,7 +60,7 @@ export function createNoteAttachments(
  * The caller re-renders whenever the catalog changes.
  */
 export function useNoteAttachments(notePath: string): NoteAttachments {
-  const graph = useMaybeGraphInfo()
+  const graph = useGraphInfo()
   const { attachments, graphSession } = useCoreServices()
   useStore(attachments.catalog)
   return useMemo(
