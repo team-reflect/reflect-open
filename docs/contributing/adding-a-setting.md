@@ -87,7 +87,7 @@ Build sections from the shared primitives: `SettingsSection` (`section.tsx`),
 controls and overlays, use the shadcn primitives in
 `apps/desktop/src/components/ui/` (`Switch`, `Select`, `Dialog`, …).
 
-`onChange` calls `updateSettings` or `updateSettingsWith` directly (see
+`onChange` calls `settingsService.update` or `settingsService.updateWith` directly (see
 `appearance-section.tsx`, `editor-section.tsx`, `all-notes-section.tsx`). Test
 at the narrowest useful level, always with `renderInApp` and never by mocking
 providers (see [testing.md](testing.md)):
@@ -103,7 +103,7 @@ providers (see [testing.md](testing.md)):
 - [ ] Value schema with `.catch(default)` added to `settingsSchema`
 - [ ] New types exported from `packages/core/src/index.ts`
 - [ ] Schema tests: missing → default, invalid → default, valid round-trips
-- [ ] Control built from the shared primitives, wired to `updateSettings`
+- [ ] Control built from the shared primitives, wired to `settingsService.update`
 - [ ] New group registered in `settings/sections.ts` and rendered from
       `settings-screen.tsx`
 - [ ] `renderInApp` test asserting `core.settings`
