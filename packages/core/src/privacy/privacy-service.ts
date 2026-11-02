@@ -388,7 +388,7 @@ class PrivacyServiceImpl implements PrivacyService {
   }
 
   #generation(): number | null {
-    return this.#deps.graphSession.getState().session?.generation ?? null
+    return this.#deps.graphSession.get().session?.generation ?? null
   }
 
   async #isPrivateAt(path: string, generation: number | null): Promise<boolean> {

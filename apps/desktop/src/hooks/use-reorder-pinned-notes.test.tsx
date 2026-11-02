@@ -44,7 +44,7 @@ describe('useReorderPinnedNotes', () => {
     await act(() => hook.result.current('a.md', 'a.md'))
 
     expect(reorderPinnedNotes).not.toHaveBeenCalled()
-    expect(core.noteRows.getOverlays().size).toBe(0)
+    expect(core.noteRows.get().size).toBe(0)
   })
 
   it('writes nothing without a graph', async () => {

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRef, useLayoutEffect, type ReactElement, type RefObject } from 'react'
-import { aiKeySecretName, type AiProviderConfig, type ChatTurn, type Settings } from '@reflect/core'
+import {
+  aiKeySecretName,
+  type AiProviderConfig,
+  type ChatSessionState,
+  type ChatTurn,
+  type Settings,
+} from '@reflect/core'
 import {
   createTestCoreServices,
   createTestChatEngineService,
@@ -10,12 +16,20 @@ import {
   type TestChatConversation,
   type TestOpenGraph,
 } from '@reflect/core/testing'
-import { useChatSession, type ChatContextValue } from '@/providers/chat-provider.tsx'
+import {
+  useActiveConversationId,
+  useChatActions,
+  useChatDraft,
+  useChatModels,
+  useChatStatus,
+  useChatTurns,
+  type ChatActions,
+} from '@/providers/chat-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 /**
- * The hook as a shell over the open graph's chat session: it publishes the
+ * The hooks as a shell over the open graph's chat session: they publish the
  * session state and controls. The session's own lifecycle is covered by
  * `chat-session-service.test.ts`, and its creation by
  * `create-graph-services.test.ts`.
@@ -34,17 +48,25 @@ const RESTORED_TURN: ChatTurn = {
   status: 'done',
 }
 
-const sessionRef: RefObject<ChatContextValue | null> = createRef()
+type ProbedChat = ChatActions &
+  Pick<ChatSessionState, 'turns' | 'status' | 'draft' | 'activeConversationId' | 'activeModel'>
+
+const sessionRef: RefObject<ProbedChat | null> = createRef()
 
 function SessionProbe(): ReactElement | null {
-  const session = useChatSession()
+  const actions = useChatActions()
+  const turns = useChatTurns()
+  const status = useChatStatus()
+  const draft = useChatDraft()
+  const activeConversationId = useActiveConversationId()
+  const { activeModel } = useChatModels()
 
   useLayoutEffect(() => {
-    sessionRef.current = session
+    sessionRef.current = { ...actions, turns, status, draft, activeConversationId, activeModel }
     return () => {
       sessionRef.current = null
     }
-  }, [session])
+  }, [actions, turns, status, draft, activeConversationId, activeModel])
 
   return null
 }
@@ -78,7 +100,7 @@ async function renderProvider(options?: {
   return { view, core, chatHistory, chatEngine }
 }
 
-describe('useChatSession', () => {
+describe('chat hooks', () => {
   it('resumes the latest conversation of the graph on mount', async () => {
     await renderProvider({
       conversations: [

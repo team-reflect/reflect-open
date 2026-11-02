@@ -4,8 +4,9 @@ import {
   type ContactsService,
   type ContactsState,
 } from '../contacts/contacts-service.ts'
-import type { ContactMatch, ContactsAuthorization } from '../contacts/commands.ts'
 import type { Unlisten } from '../unlisten.ts'
+import type { ContactMatch, ContactsAuthorization } from '../contacts/commands.ts'
+import { WritableStore } from '../store.ts'
 import type { Settings } from '../settings/schema.ts'
 
 export interface TestContactsServiceOptions {
@@ -47,29 +48,23 @@ function words(text: string): string[] {
 class TestContactsServiceImpl implements TestContactsService {
   readonly #grantAccess: boolean
   readonly #log: ContactsLookup[] = []
-  readonly #listeners = new Set<() => void>()
   #status: ContactsAuthorization
   #contacts: ContactMatch[]
   #requests = 0
-  #state: ContactsState
+  readonly #state: WritableStore<ContactsState>
+  readonly get: () => ContactsState
+  readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(options?: TestContactsServiceOptions) {
     this.#status = options?.status ?? 'authorized'
     this.#contacts = [...(options?.contacts ?? [])]
     this.#grantAccess = options?.grantAccess ?? true
-    this.#state = { authorization: this.#status }
-  }
-
-  readonly getState = (): ContactsState => this.#state
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    const deliver = (): void => {
-      listener()
-    }
-    this.#listeners.add(deliver)
-    return () => {
-      this.#listeners.delete(deliver)
-    }
+    this.#state = new WritableStore<ContactsState>(
+      { authorization: this.#status },
+      (a, b) => a.authorization === b.authorization,
+    )
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
   }
 
   refresh(): Promise<void> {
@@ -90,7 +85,7 @@ class TestContactsServiceImpl implements TestContactsService {
   }
 
   canLookup(settings: Pick<Settings, 'contactsEnabled'>): boolean {
-    return contactsCanLookup(this.#state, settings)
+    return contactsCanLookup(this.#state.get(), settings)
   }
 
   lookupPeople(query: string): Promise<ContactMatch[]> {
@@ -138,19 +133,13 @@ class TestContactsServiceImpl implements TestContactsService {
   }
 
   #adoptStatus(): void {
-    if (this.#state.authorization === this.#status) {
-      return
-    }
-    this.#state = { authorization: this.#status }
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set({ authorization: this.#status })
   }
 }
 
 /**
  * An in-memory {@link ContactsService} over a fixed address book. Its state
- * starts read: `getState` answers `status` at once.
+ * starts read: `get` answers `status` at once.
  * `lookupByEmail` matches an address case-insensitively; `lookupByName`
  * matches when every query word is a prefix of a word in a contact's names.
  * Like the OS, `requestAccess` prompts only while the status is

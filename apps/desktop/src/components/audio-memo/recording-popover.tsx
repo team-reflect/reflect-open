@@ -4,7 +4,14 @@ import { Button } from '@/components/ui/button.tsx'
 import { PopoverContent } from '@/components/ui/popover.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { formatElapsed } from '@reflect/utils'
-import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import {
+  useAudioMemo,
+  useAudioMemoCanRetry,
+  useAudioMemoError,
+  useAudioMemoPhase,
+  useAudioMemoStream,
+} from '@/providers/audio-memo-provider.tsx'
 
 /**
  * The floating panel beside the mic while a memo is in flight: waveform +
@@ -22,7 +29,12 @@ export function RecordingPopover({
 }: {
   anchor?: ComponentProps<typeof PopoverContent>['anchor']
 }): ReactElement {
-  const memo = useAudioMemo()
+  const { session, retry, discard } = useAudioMemo()
+  const phase = useAudioMemoPhase()
+  const error = useAudioMemoError()
+  const canRetry = useAudioMemoCanRetry()
+  const stream = useAudioMemoStream()
+  const elapsedMs = useStore(session.elapsedMs)
 
   return (
     <PopoverContent
@@ -33,29 +45,29 @@ export function RecordingPopover({
       className="w-auto px-3 py-2"
       initialFocus={false}
     >
-      {memo.phase === 'error' ? (
+      {phase === 'error' ? (
         <div className="flex max-w-72 flex-col gap-2">
-          <p className="text-xs text-destructive">{memo.error}</p>
+          <p className="text-xs text-destructive">{error}</p>
           <div className="flex gap-1.5">
-            {memo.canRetry ? (
-              <Button size="xs" variant="secondary" onClick={() => memo.retry()}>
+            {canRetry ? (
+              <Button size="xs" variant="secondary" onClick={() => retry()}>
                 Retry
               </Button>
             ) : null}
-            <Button size="xs" variant="ghost" onClick={() => memo.discard()}>
+            <Button size="xs" variant="ghost" onClick={() => discard()}>
               Discard
             </Button>
           </div>
         </div>
-      ) : memo.phase === 'transcribing' ? (
+      ) : phase === 'transcribing' ? (
         <div className="flex items-center gap-2 text-sm text-text-muted">
           <Spinner />
           Transcribing…
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          {memo.stream ? <RecordingWaveform stream={memo.stream} /> : null}
-          <span className="text-sm font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
+          {stream ? <RecordingWaveform stream={stream} /> : null}
+          <span className="text-sm font-medium tabular-nums">{formatElapsed(elapsedMs)}</span>
         </div>
       )}
     </PopoverContent>

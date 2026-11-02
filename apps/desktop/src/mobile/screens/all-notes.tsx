@@ -18,6 +18,8 @@ import {
   routeForPath,
 } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
+import { MobileAskRow } from '@/mobile/ask-row.tsx'
+import { MobileChatButton } from '@/mobile/chat-button.tsx'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import { NoteRowList } from '@/mobile/note-row-list.tsx'
 import { SearchInput } from '@/mobile/search-input.tsx'
@@ -29,9 +31,9 @@ import {
   MobileTopBarScrollableRow,
 } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -84,6 +86,10 @@ interface MobileAllNotesProps {
  * tag matching (V1): suggestions replace the badge row until the tag is
  * picked or the token completed. The route's tag (a tag tap landed here)
  * rides along as a badge with a back affordance.
+ *
+ * All is also where Chat lives (there is no Chat tab): the search text can be
+ * asked as a question from the Ask row above the results, and the header's
+ * Chat button resumes the current conversation.
  */
 export function MobileAllNotes({
   query,
@@ -92,7 +98,7 @@ export function MobileAllNotes({
   filters,
   onFiltersChange,
 }: MobileAllNotesProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { noteList, search } = useCoreServices()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
   const enabled = graph !== null
@@ -154,11 +160,12 @@ export function MobileAllNotes({
           )}
           <SearchInput
             ref={searchInputRef}
-            placeholder="Search anything…"
+            placeholder="Search or ask…"
             aria-label="Search notes"
             value={query}
             onValueChange={onQueryChange}
           />
+          <MobileChatButton />
         </MobileTopBarRow>
         <MobileTopBarScrollableRow>
           {pending !== null ? (
@@ -177,6 +184,8 @@ export function MobileAllNotes({
           )}
         </MobileTopBarScrollableRow>
       </MobileTopBar>
+      {/* A half-typed `#…` token is a tag being picked, not a question. */}
+      {pending === null ? <MobileAskRow query={query} /> : null}
       {/* Undefined hits mean "still fetching" only while the query can run —
           with no bridge/graph it never will, and the empty state is honest. */}
       {enabled && hits === undefined ? (

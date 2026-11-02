@@ -3,7 +3,7 @@ import { safeParseJson } from '@reflect/utils'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
 import { isAppError, AppError } from '../errors.ts'
-import type { Unlisten } from '../unlisten.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import type { GitCredential } from './git-repository-service.ts'
 import { apiHeaders, JSON_HEADERS, readJson } from './github-api.ts'
@@ -175,8 +175,7 @@ export interface GithubAuthState {
 /**
  * The one GitHub sign-in of this machine (not graph-scoped), kept in the keychain.
  */
-export interface GithubAuthService {
-  getState: () => GithubAuthState
+export interface GithubAuthService extends Store<GithubAuthState> {
   /**
    * The stored credential, or `null` when absent or unreadable (re-connect). Updates the state.
    */
@@ -189,10 +188,6 @@ export interface GithubAuthService {
    * Removes the stored credential and notifies subscribers.
    */
   clear(): Promise<void>
-  /**
-   * Called after the state changes.
-   */
-  subscribe: (listener: () => void) => Unlisten
   /**
    * The token for git/API calls, silently refreshing app tokens near expiry.
    * `null` means not connected — or the refresh token lapsed and the user must
@@ -243,8 +238,10 @@ export interface GithubAuthServiceDeps {
 
 class GithubAuthServiceImpl implements GithubAuthService {
   readonly #deps: GithubAuthServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #state: GithubAuthState = { connected: null }
+  readonly #state = new WritableStore<GithubAuthState>(
+    { connected: null },
+    (a, b) => a.connected === b.connected,
+  )
   // Bumped by every save and clear, so a read that started before one does not
   // overwrite its answer.
   #writes = 0
@@ -253,7 +250,8 @@ class GithubAuthServiceImpl implements GithubAuthService {
     this.#deps = deps
   }
 
-  readonly getState = (): GithubAuthState => this.#state
+  readonly get = this.#state.get
+  readonly subscribe = this.#state.subscribe
 
   async load(): Promise<GithubAuth | null> {
     const before = this.#writes
@@ -274,17 +272,6 @@ class GithubAuthServiceImpl implements GithubAuthService {
     this.#writes += 1
     await this.#deps.secretStore.delete(GITHUB_AUTH_SECRET)
     this.#setConnected(false)
-  }
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (): void => {
-      listener()
-    }
-    this.#listeners.add(deliver)
-    return () => {
-      this.#listeners.delete(deliver)
-    }
   }
 
   async getToken(): Promise<string | null> {
@@ -456,18 +443,8 @@ class GithubAuthServiceImpl implements GithubAuthService {
     }
   }
 
-  #notify(): void {
-    for (const listener of this.#listeners) {
-      listener()
-    }
-  }
-
   #setConnected(connected: boolean): void {
-    if (this.#state.connected === connected) {
-      return
-    }
-    this.#state = { connected }
-    this.#notify()
+    this.#state.set({ connected })
   }
 
   async #store(auth: GithubAuth): Promise<void> {

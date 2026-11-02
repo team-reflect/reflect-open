@@ -58,7 +58,7 @@ class NotePreviewServiceImpl implements NotePreviewService {
 
   async previewWikiTarget(target: string): Promise<NotePreview | null> {
     const { noteLinkResolver, noteDocuments, attachments, graphSession } = this.#deps
-    const session = graphSession.getState().session
+    const session = graphSession.get().session
     if (session === null) {
       return null
     }

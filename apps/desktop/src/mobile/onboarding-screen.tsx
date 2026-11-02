@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header.tsx'
 import { OnboardingIcloudSection } from '@/mobile/onboarding-icloud-section.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 
 /** Which control kicked off the in-flight choice, so only that one shows the
  * spinner/pending label (every button still disables). Container graph roots
@@ -32,7 +32,7 @@ type PendingChoice = string | null
  * once the lookup finished.
  */
 export function MobileOnboardingScreen(): ReactElement {
-  const { mobileStorageInfo, mobileStorageResolving, completeOnboarding } = useGraph()
+  const { mobileStorageInfo, mobileStorageResolving, completeOnboarding } = useMobileGraphBoot()
   const action = useAsyncAction()
   const [pendingChoice, setPendingChoice] = useState<PendingChoice>(null)
 

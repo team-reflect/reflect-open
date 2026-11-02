@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { withoutReopenedTasks, type OpenTask } from '@reflect/core'
+import { useCallback, useEffect, useMemo } from 'react'
+import { withoutReopenedTasks, type OpenTask, type RecentlyCompleted } from '@reflect/core'
+import { useSelector } from '@/lib/use-store.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
+
+const NO_TASKS: readonly OpenTask[] = []
 
 /**
  * The React view of `TaskService`'s "recently completed" set (Plan 18) — V1's
@@ -30,8 +33,11 @@ export function useRecentlyCompleted(
       tasks.reconcileRecentlyCompleted(root, open)
     }
   }, [tasks, root, open])
-  const getSnapshot = useCallback(() => tasks.getRecentlyCompleted(root), [tasks, root])
-  const struck = useSyncExternalStore(tasks.subscribeRecentlyCompleted, getSnapshot)
+  const selectStruck = useCallback(
+    (state: RecentlyCompleted) => (state.root === root ? state.tasks : NO_TASKS),
+    [root],
+  )
+  const struck = useSelector(tasks.recentlyCompleted, selectStruck)
   return useMemo(
     () => (open === undefined ? struck : withoutReopenedTasks(struck, open)),
     [struck, open],

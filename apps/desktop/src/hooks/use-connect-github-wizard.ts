@@ -7,9 +7,9 @@ import {
   type ConnectWizardStep,
 } from '@reflect/app'
 import type { GithubUser } from '@reflect/core'
-import { useGitSync } from '@/providers/sync-provider.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { useGitSyncActions } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
 
 export interface ConnectGithubWizard {
   step: ConnectWizardStep
@@ -63,14 +63,14 @@ export interface ConnectGithubWizard {
  * polls and the public-repo consent gate). Desktop's dialog and mobile's
  * drawer drive the identical flow through it.
  *
- * The connect actions are the ones of {@link useGitSync}.
+ * The connect actions are the ones of {@link useGitSyncActions}.
  */
 export function useConnectGithubWizard({
   suggestedRepoName,
   onClose,
   pollIntervalMs = 3000,
 }: ConnectGithubWizardOptions): ConnectGithubWizard {
-  const sync = useGitSync()
+  const sync = useGitSyncActions()
   const { githubAuth, clock } = useCoreServices()
   const { opener, lifecycle } = useAppServices()
   // The wizard lives as long as the surface; it always calls the latest
@@ -101,7 +101,7 @@ export function useConnectGithubWizard({
   // The repo-existence poll only runs while the surface is mounted.
   useEffect(() => wizard.attach(), [wizard])
 
-  const state = useServiceState(wizard, wizard.getState)
+  const state = useStore(wizard)
 
   const actions = useMemo(
     () => ({

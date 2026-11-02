@@ -93,7 +93,7 @@ export function RouterProvider({
   // React state rather than `useSyncExternalStore`: a store read through that
   // hook always updates synchronously, which would drop the transition and
   // flash the loading fallback of every lazily loaded screen.
-  const [state, setState] = useState(() => navigation.getState())
+  const [state, setState] = useState(() => navigation.get())
   /**
    * The state on screen, readable from scroll handlers without re-rendering.
    */
@@ -105,7 +105,7 @@ export function RouterProvider({
   renderedRef.current = state
 
   useEffect(() => {
-    const sync = (): void => setState(navigation.getState())
+    const sync = (): void => setState(navigation.get())
     const unsubscribe = navigation.subscribe(sync)
     // A descendant's effect may have navigated before this subscription.
     startTransition(sync)

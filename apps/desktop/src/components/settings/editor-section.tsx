@@ -1,7 +1,16 @@
 import type { ReactElement } from 'react'
 import type { EditorMarkdownSyntax, EditorTextSize } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorFullWidth,
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useEditorTextSize,
+  useSettingsService,
+} from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { KeyboardShortcutsField } from './keyboard-shortcuts-field.tsx'
 import { SettingsOptionCard } from './option-card.tsx'
@@ -57,7 +66,14 @@ const TEXT_SIZE_OPTIONS: TextSizeOption[] = [
 ]
 
 export function EditorSection(): ReactElement {
-  const { settings, updateSettings } = useSettings()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorTextSize = useEditorTextSize()
+  const editorFullWidth = useEditorFullWidth()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const settingsService = useSettingsService()
 
   return (
     <SettingsSection id="editor">
@@ -68,7 +84,7 @@ export function EditorSection(): ReactElement {
         <div className="mt-3 @container">
           <div className="grid grid-cols-1 gap-2 @xl:grid-cols-3">
             {MARKDOWN_SYNTAX_OPTIONS.map((option) => {
-              const selected = settings.editorMarkdownSyntax === option.value
+              const selected = editorMarkdownSyntax === option.value
               return (
                 <SettingsOptionCard
                   key={option.value}
@@ -93,7 +109,7 @@ export function EditorSection(): ReactElement {
                     name="editor-markdown-syntax"
                     value={option.value}
                     checked={selected}
-                    onChange={() => updateSettings({ editorMarkdownSyntax: option.value })}
+                    onChange={() => settingsService.update({ editorMarkdownSyntax: option.value })}
                     className="mt-0.5 shrink-0 accent-accent"
                   />
                 </SettingsOptionCard>
@@ -107,7 +123,7 @@ export function EditorSection(): ReactElement {
         <div className="mt-3 @container">
           <div className="grid grid-cols-1 gap-2 @xl:grid-cols-3">
             {TEXT_SIZE_OPTIONS.map((option) => {
-              const selected = settings.editorTextSize === option.value
+              const selected = editorTextSize === option.value
               return (
                 <SettingsOptionCard
                   key={option.value}
@@ -132,7 +148,7 @@ export function EditorSection(): ReactElement {
                     name="editor-text-size"
                     value={option.value}
                     checked={selected}
-                    onChange={() => updateSettings({ editorTextSize: option.value })}
+                    onChange={() => settingsService.update({ editorTextSize: option.value })}
                     className="mt-0.5 shrink-0 accent-accent"
                   />
                 </SettingsOptionCard>
@@ -145,36 +161,38 @@ export function EditorSection(): ReactElement {
       <SettingsSwitchField
         legend="Full-width notes"
         description="Stretch note text across the window with a small edge margin."
-        checked={settings.editorFullWidth}
-        onCheckedChange={(checked) => updateSettings({ editorFullWidth: checked })}
+        checked={editorFullWidth}
+        onCheckedChange={(checked) => settingsService.update({ editorFullWidth: checked })}
       />
 
       <SettingsSwitchField
         legend="Spell check"
         description="Underline misspelled words while you type."
-        checked={settings.editorSpellCheck}
-        onCheckedChange={(checked) => updateSettings({ editorSpellCheck: checked })}
+        checked={editorSpellCheck}
+        onCheckedChange={(checked) => settingsService.update({ editorSpellCheck: checked })}
       />
 
       <SettingsSwitchField
         legend="Start with a bullet"
         description="New and empty notes open with a single bullet point, ready to type."
-        checked={settings.editorDefaultBullet}
-        onCheckedChange={(checked) => updateSettings({ editorDefaultBullet: checked })}
+        checked={editorDefaultBullet}
+        onCheckedChange={(checked) => settingsService.update({ editorDefaultBullet: checked })}
       />
 
       <SettingsSwitchField
         legend="Bullet after a heading"
         description="Pressing Return at the end of a heading starts a new bullet."
-        checked={settings.editorBulletAfterHeading}
-        onCheckedChange={(checked) => updateSettings({ editorBulletAfterHeading: checked })}
+        checked={editorBulletAfterHeading}
+        onCheckedChange={(checked) => settingsService.update({ editorBulletAfterHeading: checked })}
       />
 
       <SettingsSwitchField
         legend="Smooth caret animation"
         description="Animate the text cursor as it moves while editing."
-        checked={settings.editorSmoothCaretAnimation}
-        onCheckedChange={(checked) => updateSettings({ editorSmoothCaretAnimation: checked })}
+        checked={editorSmoothCaretAnimation}
+        onCheckedChange={(checked) => {
+          return settingsService.update({ editorSmoothCaretAnimation: checked })
+        }}
       />
 
       <KeyboardShortcutsField />

@@ -197,8 +197,7 @@ class DeepLinkIntakeServiceImpl implements DeepLinkIntakeService {
   async resolve(url: string, options?: DeepLinkResolveOptions): Promise<DeepLinkTarget> {
     const { indexQuery, captureInbox, progress, id, clock, graphSession } = this.#deps
     const isStale = options?.isStale
-    const session =
-      options?.session === undefined ? graphSession.getState().session : options.session
+    const session = options?.session === undefined ? graphSession.get().session : options.session
     const link = parseDeepLink(url)
     if (link === null) {
       progress.fail('Opening link', `Unrecognized link: ${truncate(url)}`)

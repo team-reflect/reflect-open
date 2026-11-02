@@ -1,41 +1,109 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TestCoreServices } from '@reflect/core/testing'
+import { page, userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { createTestCoreServices, makeOpenTask, type TestCoreServices } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyCaptureMenu } from './daily-capture-menu.tsx'
-import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
-import type { Mutable } from '@reflect/utils'
+import {
+  WritableStore,
+  type MobileAudioMemoSessionState,
+  type TaskService,
+  type TaskWriteResult,
+} from '@reflect/core'
+import { MobileAudioMemoContext } from '@/mobile/audio-memo-provider.tsx'
+import { act } from '@/test-utils/act.ts'
 
-const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
+const INITIAL: MobileAudioMemoSessionState = {
   phase: 'idle',
-  elapsedMs: 0,
-  level: 0,
   pendingCount: 0,
   available: true,
   hasTranscriptionConfig: true,
   error: null,
   canRetry: false,
   drawerOpen: false,
+}
+
+const state = new WritableStore(INITIAL)
+const tick = new WritableStore(0)
+const actions = {
   toggle: vi.fn(),
   stopAndSave: vi.fn(),
   cancelRecording: vi.fn(),
   onDrawerOpenChange: vi.fn(),
   retry: vi.fn(),
   discard: vi.fn(),
-}))
+}
+const session = { get: state.get, subscribe: state.subscribe, elapsedMs: tick, level: tick }
 
-vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
-  useMobileAudioMemo: () => ({ ...memo }),
-}))
+function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
+  state.set({ ...state.get(), ...patch })
+}
+
+/**
+ * The result of a write that changed nothing the cache needs to re-address.
+ */
+const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
+
+/**
+ * The empty task `insertTask` writes at the top of today's note.
+ */
+const INSERTED: Awaited<ReturnType<TaskService['insertTask']>> = {
+  created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+  moved: [],
+  updatedAt: 0,
+}
+
+let core: TestCoreServices
+let getOpenTasks: MockInstance<TaskService['getOpenTasks']>
+let insertTask: MockInstance<TaskService['insertTask']>
+let writeTask: MockInstance<TaskService['writeTask']>
+
+/**
+ * The quick-edit sheet, which the drawer portals outside the menu.
+ */
+const sheet = page.getByRole('dialog', { name: 'Edit task' })
+
+/**
+ * The open sheet's editor, once it has focus, so typing lands in it.
+ */
+function focusedSheetEditor(): Promise<HTMLElement> {
+  return vi.waitFor(() => {
+    const editor = document.querySelector<HTMLElement>('[role="dialog"] [contenteditable="true"]')
+    if (editor === null) {
+      throw new Error('the sheet editor is not mounted')
+    }
+    expect(editor.contains(document.activeElement)).toBe(true)
+    return editor
+  })
+}
+
+/**
+ * The `+` toggle, read directly: an open modal sheet hides it from the accessibility tree.
+ */
+function captureToggle(view: InAppRenderResult<TestCoreServices>): HTMLButtonElement | null {
+  return view.container.querySelector<HTMLButtonElement>(
+    'button[aria-controls="daily-capture-actions"]',
+  )
+}
 
 function renderMenu(): Promise<InAppRenderResult<TestCoreServices>> {
-  return renderInApp(<DailyCaptureMenu />)
+  return renderInApp(
+    <MobileAudioMemoContext value={{ session, ...actions }}>
+      <DailyCaptureMenu />
+    </MobileAudioMemoContext>,
+    { core },
+  )
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  memo.phase = 'idle'
-  memo.available = true
-  memo.error = null
+  state.set(INITIAL)
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  // Today is 2026-06-14.
+  core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
+  getOpenTasks = vi.spyOn(core.tasks, 'getOpenTasks').mockResolvedValue([])
+  insertTask = vi.spyOn(core.tasks, 'insertTask').mockResolvedValue(INSERTED)
+  writeTask = vi.spyOn(core.tasks, 'writeTask').mockResolvedValue(WRITTEN)
 })
 
 describe('DailyCaptureMenu', () => {
@@ -46,19 +114,19 @@ describe('DailyCaptureMenu', () => {
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')
     expect(view.getByRole('button', { name: 'New note' }).query()).toBeNull()
+    expect(view.getByRole('button', { name: 'New task' }).query()).toBeNull()
     expect(view.getByRole('button', { name: 'Record audio memo' }).query()).toBeNull()
 
-    const newNote = view.container.querySelector<HTMLButtonElement>('button[aria-label="New note"]')
-    const audioMemo = view.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Record audio memo"]',
-    )
-    expect(newNote?.tabIndex).toBe(-1)
-    expect(audioMemo?.tabIndex).toBe(-1)
-    expect(newNote?.parentElement?.classList.contains('pointer-events-none')).toBe(true)
-    expect(audioMemo?.parentElement?.classList.contains('pointer-events-none')).toBe(true)
+    for (const label of ['New note', 'New task', 'Record audio memo']) {
+      const action = view.container.querySelector<HTMLButtonElement>(
+        `button[aria-label="${CSS.escape(label)}"]`,
+      )
+      expect(action?.tabIndex).toBe(-1)
+      expect(action?.parentElement?.classList.contains('pointer-events-none')).toBe(true)
+    }
   })
 
-  it('reveals both actions on the first tap and hides them on the second', async () => {
+  it('reveals every action on the first tap and hides them on the second', async () => {
     const view = await renderMenu()
 
     await view.getByRole('button', { name: 'Show capture actions' }).click()
@@ -68,6 +136,7 @@ describe('DailyCaptureMenu', () => {
       .element(view.getByRole('button', { name: 'Hide capture actions' }))
       .toHaveAttribute('aria-expanded', 'true')
     await expect.element(view.getByRole('button', { name: 'New note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'New task' })).toBeInTheDocument()
     await expect
       .element(view.getByRole('button', { name: 'Record audio memo' }))
       .toBeInTheDocument()
@@ -79,6 +148,7 @@ describe('DailyCaptureMenu', () => {
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')
     expect(view.getByRole('button', { name: 'New note' }).query()).toBeNull()
+    expect(view.getByRole('button', { name: 'New task' }).query()).toBeNull()
     expect(view.getByRole('button', { name: 'Record audio memo' }).query()).toBeNull()
   })
 
@@ -110,13 +180,151 @@ describe('DailyCaptureMenu', () => {
       .toHaveAttribute('aria-expanded', 'false')
   })
 
+  it("adds a task to today's daily note and Enter saves what was typed into its sheet", async () => {
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    await vi.waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
+    expect(captureToggle(view)?.getAttribute('aria-expanded')).toBe('false')
+    // The task is brand new, so the editor has focus and typing starts at once.
+    await focusedSheetEditor()
+
+    await userEvent.keyboard('buy oat milk')
+    await userEvent.keyboard('{Enter}')
+
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(expect.objectContaining({ markdown: '' }), [
+      { kind: 'setMarkdown', markdown: 'buy oat milk' },
+    ])
+    await expect.element(sheet).not.toBeInTheDocument()
+  })
+
+  it('edits the live row when a reindex rewrites the task while its sheet is open', async () => {
+    const view = await renderMenu()
+    // The Daily screen leaves the graph's task rows alone until a sheet needs them.
+    core.indexLifecycle.emitApplied(null, 1)
+    expect(getOpenTasks).not.toHaveBeenCalled()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await focusedSheetEditor()
+
+    // Another device rewrites the task in place; the reindex re-reads the rows.
+    const readsBefore = getOpenTasks.mock.calls.length
+    getOpenTasks.mockResolvedValue([
+      makeOpenTask({
+        notePath: 'daily/2026-06-14.md',
+        dailyDate: '2026-06-14',
+        astPath: [0],
+        markdown: 'synced from another device',
+      }),
+    ])
+    core.indexLifecycle.emitApplied(null, 1)
+    await vi.waitFor(() => expect(getOpenTasks).toHaveBeenCalledTimes(readsBefore + 1))
+    await act(async () => {
+      await getOpenTasks.mock.results.at(-1)?.value
+    })
+
+    await userEvent.keyboard('buy oat milk')
+    await userEvent.keyboard('{Escape}')
+
+    // The write addresses the row as it is now, so the guard matches it.
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(
+      expect.objectContaining({ markdown: 'synced from another device' }),
+      [{ kind: 'setMarkdown', markdown: 'buy oat milk' }],
+    )
+  })
+
+  it('removes the new task when its sheet is dismissed untyped', async () => {
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await focusedSheetEditor()
+
+    await userEvent.keyboard('{Escape}')
+
+    // V1's empty-task rule: a change of heart leaves no bare `+ [ ]` behind.
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
+  })
+
+  it('adds one task when New task is tapped again before the first lands', async () => {
+    const pending = Promise.withResolvers<typeof INSERTED>()
+    insertTask.mockReturnValue(pending.promise)
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    pending.resolve(INSERTED)
+
+    await expect.element(sheet).toBeInTheDocument()
+    expect(insertTask).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes a task that lands after the menu has gone', async () => {
+    const pending = Promise.withResolvers<typeof INSERTED>()
+    insertTask.mockReturnValue(pending.promise)
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    await view.unmount()
+    pending.resolve(INSERTED)
+
+    // No sheet will ever show it, so it must not stay behind as a bare `+ [ ]`.
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
+  })
+
+  it('removes a late task even while an earlier sheet’s delete is still pending', async () => {
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await focusedSheetEditor()
+    // The first sheet is dismissed untyped; its empty-task delete stays in flight.
+    const firstDelete = Promise.withResolvers<TaskWriteResult>()
+    writeTask.mockReturnValueOnce(firstDelete.promise)
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    await expect.element(sheet).not.toBeInTheDocument()
+
+    const pending = Promise.withResolvers<typeof INSERTED>()
+    insertTask.mockReturnValueOnce(pending.promise)
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await view.unmount()
+    pending.resolve({ ...INSERTED, created: { ...INSERTED.created, astPath: [1] } })
+
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(2))
+    expect(writeTask).toHaveBeenLastCalledWith(expect.objectContaining({ astPath: [1] }), [
+      { kind: 'remove' },
+    ])
+    firstDelete.resolve(WRITTEN)
+  })
+
+  it('opens no sheet when adding the task fails', async () => {
+    insertTask.mockRejectedValue(new Error('disk full'))
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    await vi.waitFor(() => expect(insertTask).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(core.progress.findByLabel('Adding task')?.status).toBe('failed'))
+    expect(sheet.query()).toBeNull()
+  })
+
   it('starts the audio memo and collapses', async () => {
     const view = await renderMenu()
     await view.getByRole('button', { name: 'Show capture actions' }).click()
 
     await view.getByRole('button', { name: 'Record audio memo' }).click()
 
-    expect(memo.toggle).toHaveBeenCalledTimes(1)
+    expect(actions.toggle).toHaveBeenCalledTimes(1)
     await expect
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')
@@ -125,36 +333,39 @@ describe('DailyCaptureMenu', () => {
   it('shows the current recording, processing, and error states when reopened', async () => {
     const view = await renderMenu()
 
-    memo.phase = 'recording'
-    await view.rerender(<DailyCaptureMenu />)
+    await act(() => {
+      setMemo({ phase: 'recording' })
+    })
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await expect.element(view.getByRole('button', { name: 'Stop recording' })).toBeInTheDocument()
     await view.getByRole('button', { name: 'Hide capture actions' }).click()
 
-    memo.phase = 'transcribing'
-    await view.rerender(<DailyCaptureMenu />)
+    await act(() => {
+      setMemo({ phase: 'transcribing' })
+    })
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await expect
       .element(view.getByRole('button', { name: 'Record audio memo' }).getByTestId('spinner'))
       .toBeInTheDocument()
     await view.getByRole('button', { name: 'Hide capture actions' }).click()
 
-    memo.phase = 'error'
-    memo.error = 'disk full'
-    await view.rerender(<DailyCaptureMenu />)
+    await act(() => {
+      setMemo({ phase: 'error', error: 'disk full' })
+    })
     await view.getByRole('button', { name: 'Show capture actions' }).click()
     await expect
       .element(view.getByRole('button', { name: 'Show audio memo error' }))
       .toBeInTheDocument()
   })
 
-  it('reveals only New note when native audio is unavailable', async () => {
-    memo.available = false
+  it('reveals New note and New task when native audio is unavailable', async () => {
+    setMemo({ available: false })
     const view = await renderMenu()
 
     await view.getByRole('button', { name: 'Show capture actions' }).click()
 
     await expect.element(view.getByRole('button', { name: 'New note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'New task' })).toBeInTheDocument()
     expect(view.container.querySelector('[data-slot="audio-memo-action"]')).toBeNull()
   })
 })

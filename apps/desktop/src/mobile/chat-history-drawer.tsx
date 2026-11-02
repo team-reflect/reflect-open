@@ -4,8 +4,8 @@ import { formatTimeAgo } from '@reflect/utils'
 import { Check, Trash2 } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
 import { createChatConversationsQueryOptions } from '@/lib/query-options.ts'
-import { useChatSession } from '@/providers/chat-provider.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useActiveConversationId, useChatActions } from '@/providers/chat-provider.tsx'
+import { useGraphInfo, useIndexGeneration } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface ChatHistoryDrawerProps {
@@ -21,9 +21,11 @@ interface ChatHistoryDrawerProps {
  * come from the session, this is only the touch shell.
  */
 export function ChatHistoryDrawer({ open, onOpenChange }: ChatHistoryDrawerProps): ReactElement {
-  const { graph, indexGeneration } = useGraph()
+  const graph = useGraphInfo()
+  const indexGeneration = useIndexGeneration()
   const { chatHistory } = useCoreServices()
-  const { activeConversationId, openConversation, deleteConversation } = useChatSession()
+  const activeConversationId = useActiveConversationId()
+  const { openConversation, deleteConversation } = useChatActions()
 
   const enabled = indexGeneration !== null
   const { data: conversations } = useQuery({

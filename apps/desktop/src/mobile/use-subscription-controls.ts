@@ -8,7 +8,7 @@ import {
   useClassicAccess,
   useClassicSignOut,
 } from '@/mobile/use-classic-access.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -48,7 +48,7 @@ export function useSubscriptionControls(): SubscriptionControls {
   const classicAccess = useClassicAccess()
   const classicSignOut = useClassicSignOut()
   const { opener } = useAppServices()
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
   const [, setPaywallRequested] = usePaywallRequested()
   const iap = useIapRestoreRedeem()
 
@@ -58,7 +58,7 @@ export function useSubscriptionControls(): SubscriptionControls {
       : subscription.value === 'yearly'
         ? 'Yearly'
         : classicAccess.active && classicAccess.value !== null
-          ? `Reflect Classic, until ${formatFullDate(new Date(classicAccess.value.expiresAt), settings.dateFormat)}`
+          ? `Reflect Classic, until ${formatFullDate(new Date(classicAccess.value.expiresAt), dateFormat)}`
           : subscription.isLoading || classicAccess.isLoading
             ? 'Checking…'
             : 'Not subscribed'
