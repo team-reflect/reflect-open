@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
 import { isCaptureSpoolPath } from '../capture/capture-identity.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
@@ -598,13 +599,6 @@ function sameState(a: GitSyncState, b: GitSyncState): boolean {
   return (
     a.remoteUrl === b.remoteUrl &&
     a.isPrimaryChannel === b.isPrimaryChannel &&
-    sameStatus(a.status, b.status)
+    isShallowEqual(a.status, b.status)
   )
-}
-
-function sameStatus(a: SyncStatus, b: SyncStatus): boolean {
-  const left: Record<string, unknown> = a
-  const right: Record<string, unknown> = b
-  const keys = Object.keys(left)
-  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key])
 }

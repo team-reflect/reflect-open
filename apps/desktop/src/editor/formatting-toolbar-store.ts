@@ -1,3 +1,4 @@
+import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
 import { useSelector } from '@/lib/use-store.ts'
 
@@ -70,41 +71,13 @@ interface ActiveFormattingToolbar {
 }
 
 /**
- * Module-scope store for "the focused editor's toolbar", in the same
- * external-store shape as `use-keyboard.ts`. The daily carousel keeps up to
- * three editors mounted at once, so ownership is claimed per bridge instance
- * (an opaque token) on focus and released on blur — a stale release from a
- * blurring editor can never clobber the one that just took focus, because
- * focusout always precedes the next editor's focusin.
+ * Module-scope store for "the focused editor's toolbar". The daily carousel
+ * keeps up to three editors mounted at once, so ownership is claimed per
+ * bridge instance (an opaque token) on focus and released on blur — a stale
+ * release from a blurring editor can never clobber the one that just took
+ * focus, because focusout always precedes the next editor's focusin.
  */
-const active = new WritableStore<ActiveFormattingToolbar | null>(null, activeEqual)
-
-function capabilitiesEqual(
-  left: FormattingToolbarCapabilities,
-  right: FormattingToolbarCapabilities,
-): boolean {
-  return (
-    left.canIndent === right.canIndent &&
-    left.canDedent === right.canDedent &&
-    left.canMoveUp === right.canMoveUp &&
-    left.canMoveDown === right.canMoveDown &&
-    left.canAttachFiles === right.canAttachFiles
-  )
-}
-
-function activeEqual(
-  left: ActiveFormattingToolbar | null,
-  right: ActiveFormattingToolbar | null,
-): boolean {
-  if (left === null || right === null) {
-    return left === right
-  }
-  return (
-    left.owner === right.owner &&
-    left.toolbar.commands === right.toolbar.commands &&
-    capabilitiesEqual(left.toolbar.capabilities, right.toolbar.capabilities)
-  )
-}
+const active = new WritableStore<ActiveFormattingToolbar | null>(null, isDeepEqual)
 
 /**
  * Claim (or refresh) the active toolbar for `owner`. A refresh with equal
