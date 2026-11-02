@@ -1,10 +1,10 @@
 import { page, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
 import { createTestCoreServices, type TestAiKeyValidationService } from '@reflect/core/testing'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { AddAiProviderDrawer } from './add-ai-provider-drawer.tsx'
 
 /**
  * The mobile add-provider sheet over the shared submit flow: a verified key
@@ -12,17 +12,6 @@ import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
  * stores nothing, an unreachable provider downgrades to save-anyway — the
  * same contract the desktop dialog proves through the settings-section tests.
  */
-
-// Keep the sheet content inline so this suite exercises its state flow
-// without depending on the drawer's drag and animation behavior.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
-
-const { AddAiProviderDrawer } = await import('./add-ai-provider-drawer.tsx')
 
 const onAdd = vi.fn<(draft: unknown) => Promise<void>>()
 const onOpenChange = vi.fn<(open: boolean) => void>()

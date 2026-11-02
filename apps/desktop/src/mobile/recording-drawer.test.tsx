@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -33,15 +32,6 @@ const session = { get: state.get, subscribe: state.subscribe, elapsedMs, level }
 function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
   state.set({ ...state.get(), ...patch })
 }
-
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) => {
-    return open ? <div data-testid="drawer">{children}</div> : null
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
 
 const { RecordingDrawer } = await import('./recording-drawer.tsx')
 

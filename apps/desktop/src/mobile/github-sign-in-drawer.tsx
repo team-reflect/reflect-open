@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { GithubAuthStep } from '@/components/settings/github-auth-step.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 
 interface GithubSignInDrawerProps {
   open: boolean
