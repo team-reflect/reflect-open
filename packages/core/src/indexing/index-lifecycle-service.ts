@@ -6,7 +6,7 @@ import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage } from '../errors.ts'
 import { isNotePath } from '../graph/paths.ts'
-import type { Store } from '../store.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { FileChange, FileChangeService } from './file-change-service.ts'
 import { createNoteIndexer, type IndexingDeps, type NoteIndexer } from './indexer.ts'
@@ -231,11 +231,7 @@ export interface IndexLifecycleService {
    * on purpose: ticks arrive several times a second during a first index, and
    * only the status pill should re-render per tick.
    */
-  fileProgress: () => IndexFileProgress | null
-  /**
-   * Subscribe to {@link IndexLifecycleService.fileProgress} changes.
-   */
-  subscribeFileProgress: (listener: () => void) => Unlisten
+  readonly fileProgress: Store<IndexFileProgress | null>
   /**
    * Full index rebuild with user-visible status: wipe and re-derive the SQLite
    * projection from the markdown files, then report
@@ -300,10 +296,13 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   readonly #movedListeners = new Set<(from: string, to: string) => void>()
   readonly #fileProgressListeners = new Set<(done: number, total: number, worked: number) => void>()
   readonly #stalePlaceholderListeners = new Set<(paths: readonly string[]) => void>()
-  readonly #fileProgressStoreListeners = new Set<() => void>()
   readonly #indexer: NoteIndexer
   readonly #liveIndex: LiveIndex
-  #currentFileProgress: IndexFileProgress | null = null
+  readonly #fileProgress = new WritableStore<IndexFileProgress | null>(
+    null,
+    (a, b) => a?.done === b?.done && a?.total === b?.total && a?.worked === b?.worked,
+  )
+  readonly fileProgress: Store<IndexFileProgress | null> = this.#fileProgress
   #abort: AbortController | null = null
   #done: Promise<void> = Promise.resolve()
   #suspended = false
@@ -382,7 +381,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
             passTotal = total
             passWorked = worked
             if (!isStale()) {
-              this.#setFileProgress({ done: progressDone, total, worked })
+              this.#fileProgress.set({ done: progressDone, total, worked })
               for (const listener of this.#fileProgressListeners) {
                 listener(progressDone, total, worked)
               }
@@ -604,12 +603,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     return attach(this.#stalePlaceholderListeners, listener)
   }
 
-  readonly fileProgress = (): IndexFileProgress | null => this.#currentFileProgress
-
-  readonly subscribeFileProgress = (listener: () => void): Unlisten => {
-    return attach(this.#fileProgressStoreListeners, listener)
-  }
-
   rebuildVisibly(): Promise<void> {
     const { session } = this.#deps.graphSession.get()
     const generation = session?.indexGeneration ?? null
@@ -653,24 +646,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     }
   }
 
-  #setFileProgress(progress: IndexFileProgress | null): void {
-    const current = this.#currentFileProgress
-    if (
-      progress?.done === current?.done &&
-      progress?.total === current?.total &&
-      progress?.worked === current?.worked
-    ) {
-      return
-    }
-    this.#currentFileProgress = progress
-    for (const listener of this.#fileProgressStoreListeners) {
-      listener()
-    }
-  }
-
   #emitProgress(progress: IndexLifecycleProgress): void {
     if (progress !== 'reconciling') {
-      this.#setFileProgress(null) // the pass finished (or went idle): clear the pill
+      this.#fileProgress.set(null) // the pass finished (or went idle): clear the pill
     }
     for (const listener of this.#progressListeners) {
       listener(progress)
