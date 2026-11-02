@@ -181,9 +181,9 @@ export interface SidebarResize {
 export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
   const { side, settingsKey, cssVariable, range, otherAsideLabel } = PANEL_SPECS[panel]
   const settingsService = useSettingsService()
-  const settingsWidth = useSettingsField(settingsKey)
   const sidebarWidth = useSettingsField('sidebarWidth')
   const contextSidebarWidth = useSettingsField('contextSidebarWidth')
+  const settingsWidth = settingsKey === 'sidebarWidth' ? sidebarWidth : contextSidebarWidth
   const dragRef = useRef<DragState | null>(null)
   const [dragWidth, setDragWidth] = useState<number | null>(null)
 
