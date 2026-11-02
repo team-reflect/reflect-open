@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button.tsx'
 import { Popover } from '@/components/ui/popover.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/utils.ts'
-import { useAudioMemo, useAudioMemoField } from '@/providers/audio-memo-provider.tsx'
+import {
+  useAudioMemo,
+  useAudioMemoAvailable,
+  useAudioMemoPhase,
+  useAudioMemoUnavailableReason,
+} from '@/providers/audio-memo-provider.tsx'
 
 /**
  * The microphone beside the sidebar search box. Idle it starts a memo;
@@ -18,9 +23,9 @@ import { useAudioMemo, useAudioMemoField } from '@/providers/audio-memo-provider
  */
 export function AudioMemoButton(): ReactElement {
   const { toggle, cancel, discard } = useAudioMemo()
-  const phase = useAudioMemoField('phase') // FIXME: const phase = useAudioMemoPhase()
-  const available = useAudioMemoField('available') // FIXME: const available = useAudioMemoAvailable()
-  const unavailableReason = useAudioMemoField('unavailableReason') // FIXME: const unavailableReason = useAudioMemoUnavailableReason()
+  const phase = useAudioMemoPhase()
+  const available = useAudioMemoAvailable()
+  const unavailableReason = useAudioMemoUnavailableReason()
   const anchorRef = useRef<HTMLButtonElement>(null)
 
   // Esc cancels a live recording and dismisses an error. Other close

@@ -4,7 +4,14 @@ import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
 import { formatElapsed } from '@reflect/utils'
 import { useStore } from '@/lib/use-store.ts'
-import { useMobileAudioMemo, useMobileAudioMemoField } from '@/mobile/audio-memo-provider.tsx'
+import {
+  useMobileAudioMemo,
+  useMobileAudioMemoCanRetry,
+  useMobileAudioMemoDrawerOpen,
+  useMobileAudioMemoError,
+  useMobileAudioMemoHasTranscriptionConfig,
+  useMobileAudioMemoPhase,
+} from '@/mobile/audio-memo-provider.tsx'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -22,10 +29,10 @@ import { useRouter } from '@/routing/router.tsx'
  */
 export function RecordingDrawer(): ReactElement {
   const memo = useMobileAudioMemo()
-  const drawerOpen = useMobileAudioMemoField('drawerOpen')
-  const error = useMobileAudioMemoField('error')
-  const canRetry = useMobileAudioMemoField('canRetry')
-  const hasTranscriptionConfig = useMobileAudioMemoField('hasTranscriptionConfig')
+  const drawerOpen = useMobileAudioMemoDrawerOpen()
+  const error = useMobileAudioMemoError()
+  const canRetry = useMobileAudioMemoCanRetry()
+  const hasTranscriptionConfig = useMobileAudioMemoHasTranscriptionConfig()
 
   return (
     <Drawer open={drawerOpen} onOpenChange={memo.onDrawerOpenChange}>
@@ -83,7 +90,7 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
 }
 
 function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {
-  const phase = useMobileAudioMemoField('phase')
+  const phase = useMobileAudioMemoPhase()
   const level = useStore(memo.session.level)
   const elapsedMs = useStore(memo.session.elapsedMs)
   const [discardArmed, setDiscardArmed] = useState(false)

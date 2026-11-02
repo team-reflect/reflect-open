@@ -1,7 +1,6 @@
 import {
   createContext,
   use,
-  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -44,7 +43,10 @@ export interface AudioMemoContextValue extends Pick<
   toggle: () => void
 }
 
-const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
+/**
+ * The audio-memo session and its actions.
+ */
+export const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
 
 /**
  * What the surface shows before the session opens.
@@ -68,6 +70,32 @@ const CLOSED_SESSION: AudioMemoSessionStores = {
 
 function selectRecorderState(state: AudioMemoSessionState): AudioMemoSessionState['recorderState'] {
   return state.recorderState
+}
+
+function selectPhase(state: AudioMemoSessionState): AudioMemoSessionState['phase'] {
+  return state.phase
+}
+
+function selectAvailable(state: AudioMemoSessionState): AudioMemoSessionState['available'] {
+  return state.available
+}
+
+function selectUnavailableReason(
+  state: AudioMemoSessionState,
+): AudioMemoSessionState['unavailableReason'] {
+  return state.unavailableReason
+}
+
+function selectError(state: AudioMemoSessionState): AudioMemoSessionState['error'] {
+  return state.error
+}
+
+function selectCanRetry(state: AudioMemoSessionState): AudioMemoSessionState['canRetry'] {
+  return state.canRetry
+}
+
+function selectStream(state: AudioMemoSessionState): AudioMemoSessionState['stream'] {
+  return state.stream
 }
 
 interface AudioMemoProviderProps {
@@ -134,7 +162,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
 /**
  * Access the audio-memo session and its actions. Use within an
  * AudioMemoProvider. Reading the context does not subscribe to the state:
- * read fields with {@link useAudioMemoField}, and the elapsed time with
+ * read fields with the `useAudioMemo*` field hooks, and the elapsed time with
  * `useStore(session.elapsedMs)`.
  */
 export function useAudioMemo(): AudioMemoContextValue {
@@ -145,13 +173,30 @@ export function useAudioMemo(): AudioMemoContextValue {
   return context
 }
 
-/**
- * One field of the audio-memo state, re-rendered only when that field changes.
- */
-export function useAudioMemoField<K extends keyof AudioMemoSessionState>(
-  key: K,
-): AudioMemoSessionState[K] {
-  // FIXME: delete useAudioMemoField. use separate hook for each field. Like what we did in settings-provider.tsx
-  const selector = useCallback((state: AudioMemoSessionState) => state[key], [key])
+function useAudioMemoSelector<T>(selector: (state: AudioMemoSessionState) => T): T {
   return useSelector(useAudioMemo().session, selector)
+}
+
+export function useAudioMemoPhase(): AudioMemoSessionState['phase'] {
+  return useAudioMemoSelector(selectPhase)
+}
+
+export function useAudioMemoAvailable(): AudioMemoSessionState['available'] {
+  return useAudioMemoSelector(selectAvailable)
+}
+
+export function useAudioMemoUnavailableReason(): AudioMemoSessionState['unavailableReason'] {
+  return useAudioMemoSelector(selectUnavailableReason)
+}
+
+export function useAudioMemoError(): AudioMemoSessionState['error'] {
+  return useAudioMemoSelector(selectError)
+}
+
+export function useAudioMemoCanRetry(): AudioMemoSessionState['canRetry'] {
+  return useAudioMemoSelector(selectCanRetry)
+}
+
+export function useAudioMemoStream(): AudioMemoSessionState['stream'] {
+  return useAudioMemoSelector(selectStream)
 }

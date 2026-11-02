@@ -19,7 +19,7 @@ import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { AudioMemoProvider, useAudioMemo, useAudioMemoField } from './audio-memo-provider.tsx'
+import { AudioMemoProvider, useAudioMemo, useAudioMemoPhase } from './audio-memo-provider.tsx'
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 3 }
 
@@ -69,7 +69,7 @@ const onPhaseRender = vi.fn()
 const onElapsedRender = vi.fn()
 
 function PhaseProbe(): null {
-  onPhaseRender(useAudioMemoField('phase'))
+  onPhaseRender(useAudioMemoPhase())
   return null
 }
 

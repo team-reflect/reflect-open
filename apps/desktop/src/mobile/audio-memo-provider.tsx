@@ -1,7 +1,6 @@
 import {
   createContext,
   use,
-  useCallback,
   useLayoutEffect,
   useMemo,
   useState,
@@ -44,7 +43,10 @@ export interface MobileAudioMemoContextValue extends Pick<
   onDrawerOpenChange: (open: boolean) => void
 }
 
-const MobileAudioMemoContext = createContext<MobileAudioMemoContextValue | null>(null)
+/**
+ * The mobile audio-memo session and its actions.
+ */
+export const MobileAudioMemoContext = createContext<MobileAudioMemoContextValue | null>(null)
 
 /**
  * What the surface shows before the session opens.
@@ -57,6 +59,38 @@ const CLOSED_STATE: MobileAudioMemoSessionState = {
   error: null,
   canRetry: false,
   drawerOpen: false,
+}
+
+function selectPhase(state: MobileAudioMemoSessionState): MobileAudioMemoSessionState['phase'] {
+  return state.phase
+}
+
+function selectAvailable(
+  state: MobileAudioMemoSessionState,
+): MobileAudioMemoSessionState['available'] {
+  return state.available
+}
+
+function selectDrawerOpen(
+  state: MobileAudioMemoSessionState,
+): MobileAudioMemoSessionState['drawerOpen'] {
+  return state.drawerOpen
+}
+
+function selectError(state: MobileAudioMemoSessionState): MobileAudioMemoSessionState['error'] {
+  return state.error
+}
+
+function selectCanRetry(
+  state: MobileAudioMemoSessionState,
+): MobileAudioMemoSessionState['canRetry'] {
+  return state.canRetry
+}
+
+function selectHasTranscriptionConfig(
+  state: MobileAudioMemoSessionState,
+): MobileAudioMemoSessionState['hasTranscriptionConfig'] {
+  return state.hasTranscriptionConfig
 }
 
 const CLOSED_TICK: Store<number> = { get: () => 0, subscribe: () => () => {} }
@@ -110,7 +144,7 @@ export function MobileAudioMemoProvider({
 /**
  * Access the mobile audio-memo session and its actions. Use within
  * MobileAudioMemoProvider. Reading the context does not subscribe to the
- * state: read fields with {@link useMobileAudioMemoField}, and the per-tick
+ * state: read fields with the `useMobileAudioMemo*` field hooks, and the per-tick
  * values with `useStore(session.elapsedMs)` and `useStore(session.level)`.
  */
 export function useMobileAudioMemo(): MobileAudioMemoContextValue {
@@ -121,13 +155,30 @@ export function useMobileAudioMemo(): MobileAudioMemoContextValue {
   return context
 }
 
-/**
- * One field of the mobile audio-memo state, re-rendered only when that field changes.
- */
-export function useMobileAudioMemoField<K extends keyof MobileAudioMemoSessionState>(
-  key: K,
-): MobileAudioMemoSessionState[K] {
-  // FIXME: same comment
-  const selector = useCallback((state: MobileAudioMemoSessionState) => state[key], [key])
+function useMobileAudioMemoSelector<T>(selector: (state: MobileAudioMemoSessionState) => T): T {
   return useSelector(useMobileAudioMemo().session, selector)
+}
+
+export function useMobileAudioMemoPhase(): MobileAudioMemoSessionState['phase'] {
+  return useMobileAudioMemoSelector(selectPhase)
+}
+
+export function useMobileAudioMemoAvailable(): MobileAudioMemoSessionState['available'] {
+  return useMobileAudioMemoSelector(selectAvailable)
+}
+
+export function useMobileAudioMemoDrawerOpen(): MobileAudioMemoSessionState['drawerOpen'] {
+  return useMobileAudioMemoSelector(selectDrawerOpen)
+}
+
+export function useMobileAudioMemoError(): MobileAudioMemoSessionState['error'] {
+  return useMobileAudioMemoSelector(selectError)
+}
+
+export function useMobileAudioMemoCanRetry(): MobileAudioMemoSessionState['canRetry'] {
+  return useMobileAudioMemoSelector(selectCanRetry)
+}
+
+export function useMobileAudioMemoHasTranscriptionConfig(): MobileAudioMemoSessionState['hasTranscriptionConfig'] {
+  return useMobileAudioMemoSelector(selectHasTranscriptionConfig)
 }

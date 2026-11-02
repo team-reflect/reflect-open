@@ -5,7 +5,13 @@ import { PopoverContent } from '@/components/ui/popover.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { formatElapsed } from '@reflect/utils'
 import { useStore } from '@/lib/use-store.ts'
-import { useAudioMemo, useAudioMemoField } from '@/providers/audio-memo-provider.tsx'
+import {
+  useAudioMemo,
+  useAudioMemoCanRetry,
+  useAudioMemoError,
+  useAudioMemoPhase,
+  useAudioMemoStream,
+} from '@/providers/audio-memo-provider.tsx'
 
 /**
  * The floating panel beside the mic while a memo is in flight: waveform +
@@ -24,10 +30,10 @@ export function RecordingPopover({
   anchor?: ComponentProps<typeof PopoverContent>['anchor']
 }): ReactElement {
   const { session, retry, discard } = useAudioMemo()
-  const phase = useAudioMemoField('phase')
-  const error = useAudioMemoField('error')
-  const canRetry = useAudioMemoField('canRetry')
-  const stream = useAudioMemoField('stream')
+  const phase = useAudioMemoPhase()
+  const error = useAudioMemoError()
+  const canRetry = useAudioMemoCanRetry()
+  const stream = useAudioMemoStream()
   const elapsedMs = useStore(session.elapsedMs)
 
   return (

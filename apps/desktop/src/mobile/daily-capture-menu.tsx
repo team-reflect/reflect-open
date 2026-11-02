@@ -5,7 +5,11 @@ import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { cn } from '@/lib/utils.ts'
-import { useMobileAudioMemo, useMobileAudioMemoField } from '@/mobile/audio-memo-provider.tsx'
+import {
+  useMobileAudioMemo,
+  useMobileAudioMemoAvailable,
+  useMobileAudioMemoPhase,
+} from '@/mobile/audio-memo-provider.tsx'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useRouter } from '@/routing/router.tsx'
@@ -28,8 +32,8 @@ export function DailyCaptureMenu(): ReactElement {
   const { noteCreation } = useCoreServices()
   const [expanded, setExpanded] = useState(false)
   const { toggle } = useMobileAudioMemo()
-  const phase = useMobileAudioMemoField('phase')
-  const available = useMobileAudioMemoField('available')
+  const phase = useMobileAudioMemoPhase()
+  const available = useMobileAudioMemoAvailable()
   const { navigate } = useRouter()
   const recording = phase === 'recording' || phase === 'requesting'
   const audioLabel =
