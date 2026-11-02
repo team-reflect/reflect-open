@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   errorMessage,
   isSameTask,
@@ -7,8 +7,16 @@ import {
   type Unlisten,
 } from '@reflect/core'
 import { useTaskActions, type TaskActions } from '@/lib/tasks/use-task-actions.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+
+/**
+ * Subscribes to nothing: the store of a closed sheet never notifies.
+ */
+function subscribeNothing(): Unlisten {
+  return () => {}
+}
 
 /**
  * The Daily capture menu's new-task sheet state; see {@link useNewTaskSheet}.
@@ -65,12 +73,13 @@ export function useNewTaskSheet(): NewTaskSheet {
 
   // Follow the task rows only while the sheet is up: a subscription reads
   // every open task in the graph and re-reads on each index change, which the
-  // Daily screen otherwise has no use for.
-  const subscribe = useCallback(
-    (listener: VoidFunction): Unlisten => (open ? taskService.subscribe(listener) : () => {}),
+  // Daily screen otherwise has no use for. Closed, the store still reads
+  // `taskService.get`, so the exit animation shows the last live rows.
+  const store = useMemo(
+    () => (open ? taskService : { get: taskService.get, subscribe: subscribeNothing }),
     [taskService, open],
   )
-  const rows = useSyncExternalStore(subscribe, taskService.get, taskService.get).open
+  const rows = useStore(store).open
   // The sheet edits the task's live row, like the Tasks tab: a reindex can
   // rewrite the row while the sheet is up, and acting on the stale copy would
   // trip the write-back guard needlessly. Fall back to the created row while
