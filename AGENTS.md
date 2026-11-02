@@ -153,6 +153,9 @@ The short version:
   and the platform roots.
 - React reads `useCoreServices()` and `useAppServices()`; commands read
   `CommandContext.services` and `.app`.
+- Service state is a `Store`. Read the module comment of
+  [packages/core/src/store.ts](packages/core/src/store.ts) before you add or change
+  service state or a React read of it.
 - Rust-boundary wrappers (`NoteFileService`) take an explicit `generation`. User-facing
   services read the `GraphSession` once at method entry and pass its generations down.
 - Tests build services over `@reflect/core/testing` and `@reflect/app/testing`;
