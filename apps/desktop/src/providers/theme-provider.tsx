@@ -40,10 +40,3 @@ export function ThemeEffect(): null {
 
   return null
 }
-
-/**
- * The concrete theme applied to the document.
- */
-export function useResolvedTheme(): ResolvedTheme {
-  return useSelector(useAppServices().theme, selectResolvedTheme)
-}

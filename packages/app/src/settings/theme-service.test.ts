@@ -87,6 +87,17 @@ describe('createThemeService', () => {
     expect(settings.saves().at(-1)?.theme).toBe('dark')
   })
 
+  it('toggles the preference to the opposite of the resolved theme', async () => {
+    const { theme, platform } = setup({ theme: 'system' })
+    platform.setColorScheme('dark')
+    await theme.whenSettled()
+
+    theme.toggleTheme()
+    expect(theme.get().preference).toBe('light')
+    theme.toggleTheme()
+    expect(theme.get().preference).toBe('dark')
+  })
+
   it('applies but does not cache a preference after a failed load', async () => {
     const { theme, settings, storage } = setup()
     settings.failLoad()

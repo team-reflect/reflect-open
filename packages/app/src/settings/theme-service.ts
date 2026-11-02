@@ -43,6 +43,10 @@ export interface ThemeState {
 export interface ThemeService extends Store<ThemeState> {
   setPreference: (preference: ThemePreference) => void
   /**
+   * Sets the preference to the opposite of the resolved theme.
+   */
+  toggleTheme: () => void
+  /**
    * Resolves once the settings load has ended, successfully or not.
    */
   whenSettled(): Promise<void>
@@ -100,6 +104,10 @@ class ThemeServiceImpl implements ThemeService {
   readonly setPreference = (preference: ThemePreference): void => {
     this.#start()
     this.#deps.settings.update({ theme: preference })
+  }
+
+  readonly toggleTheme = (): void => {
+    this.setPreference(this.get().resolved === 'dark' ? 'light' : 'dark')
   }
 
   async whenSettled(): Promise<void> {
