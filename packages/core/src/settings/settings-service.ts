@@ -52,7 +52,7 @@ export interface SettingsServiceDeps {
 
 class SettingsServiceImpl implements SettingsService {
   readonly #deps: SettingsServiceDeps
-  readonly #store = new WriteableStore(DEFAULT_SETTINGS)
+  readonly #store = new WriteableStore(DEFAULT_SETTINGS, isDeepEqual)
 
   #state: SettingsStatus = 'loading'
   #started = false
