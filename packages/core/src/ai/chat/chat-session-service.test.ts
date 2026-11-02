@@ -633,12 +633,14 @@ describe('ChatSession state', () => {
       notified += 1
     })
     expect(session.get().activeModel).toEqual(MODEL)
+    const { modelOptions } = session.get()
 
     session.selectModel({ configId: 'm1', modelId: 'gpt-5.5' })
 
     expect(settings.get().chatModelSelection).toEqual({ configId: 'm1', modelId: 'gpt-5.5' })
     expect(notified).toBe(1)
     expect(session.get().activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
+    expect(session.get().modelOptions).toBe(modelOptions)
   })
 
   it('falls back to the default model when the persisted selection dangles', async () => {

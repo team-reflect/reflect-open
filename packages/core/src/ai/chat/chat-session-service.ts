@@ -262,11 +262,18 @@ class ChatSessionImpl implements ChatSession {
       (settings) => settings.chatModelSelection,
       isDeepEqual,
     )
+    const modelOptions = deriveStore(deps.providerConfig, (providers) => {
+      return chatModelOptions(providers.providers)
+    })
     const models = combineStores(
-      [deps.providerConfig, selection],
-      (providers: AiProvidersState, selected: ChatModelSelection | null): ChatModels => ({
+      [deps.providerConfig, modelOptions, selection],
+      (
+        providers: AiProvidersState,
+        options: ChatModelOption[],
+        selected: ChatModelSelection | null,
+      ): ChatModels => ({
         providers: providers.providers,
-        modelOptions: chatModelOptions(providers.providers),
+        modelOptions: options,
         // The picker's choice lives in the settings document, not session
         // state, so the model used last is the one the next session starts on.
         activeModel: resolveChatModel(providers, selected),
