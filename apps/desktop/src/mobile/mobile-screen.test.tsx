@@ -11,7 +11,11 @@ import {
 } from '@/editor/formatting-toolbar-store.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { addDaysToIsoDate, getYearMonth, getIsoToday } from '@reflect/utils'
-import { type DailyNoteService, formatDayLabel } from '@reflect/core'
+import {
+  type DailyNoteService,
+  type MobileAudioMemoSessionState,
+  formatDayLabel,
+} from '@reflect/core'
 import {
   type AppServices,
   type Route,
@@ -108,24 +112,30 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
 
 // The daily spine renders the capture menu; this suite is about screens,
 // not recording — an unavailable memo surface keeps its mic action out.
-vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
-  useMobileAudioMemo: () => ({
+vi.mock('@/mobile/audio-memo-provider.tsx', () => {
+  const state: MobileAudioMemoSessionState = {
     phase: 'idle',
-    elapsedMs: 0,
-    level: 0,
     pendingCount: 0,
     available: false,
+    hasTranscriptionConfig: false,
     error: null,
     canRetry: false,
     drawerOpen: false,
-    toggle: () => {},
-    stopAndSave: () => {},
-    cancelRecording: () => {},
-    onDrawerOpenChange: () => {},
-    retry: () => {},
-    discard: () => {},
-  }),
-}))
+  }
+  const tick = { get: () => 0, subscribe: () => () => {} }
+  return {
+    useMobileAudioMemo: () => ({
+      session: { get: () => state, subscribe: () => () => {}, elapsedMs: tick, level: tick },
+      toggle: () => {},
+      stopAndSave: () => {},
+      cancelRecording: () => {},
+      onDrawerOpenChange: () => {},
+      retry: () => {},
+      discard: () => {},
+    }),
+    useMobileAudioMemoField: <K extends keyof MobileAudioMemoSessionState>(key: K) => state[key],
+  }
+})
 
 // The services of the running test: the graph's files live in `core.noteFile`.
 let core: TestCoreServices

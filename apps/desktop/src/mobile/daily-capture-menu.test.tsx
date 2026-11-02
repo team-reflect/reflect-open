@@ -2,10 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TestCoreServices } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { DailyCaptureMenu } from './daily-capture-menu.tsx'
+import type { MobileAudioMemoSessionState } from '@reflect/core'
 import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
 import type { Mutable } from '@reflect/utils'
 
-const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
+type MemoMock = Mutable<
+  MobileAudioMemoSessionState &
+    Omit<MobileAudioMemoContextValue, 'session'> & { elapsedMs: number; level: number }
+>
+
+const memo = vi.hoisted((): MemoMock => ({
   phase: 'idle',
   elapsedMs: 0,
   level: 0,
@@ -24,7 +30,16 @@ const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
 }))
 
 vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
-  useMobileAudioMemo: () => ({ ...memo }),
+  useMobileAudioMemo: (): MobileAudioMemoContextValue => ({
+    ...memo,
+    session: {
+      get: () => memo,
+      subscribe: () => () => {},
+      elapsedMs: { get: () => memo.elapsedMs, subscribe: () => () => {} },
+      level: { get: () => memo.level, subscribe: () => () => {} },
+    },
+  }),
+  useMobileAudioMemoField: <K extends keyof MobileAudioMemoSessionState>(key: K) => memo[key],
 }))
 
 function renderMenu(): Promise<InAppRenderResult<TestCoreServices>> {

@@ -2,10 +2,15 @@ import type { RenderResult } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import type { AudioMemoSessionState } from '@reflect/core'
 import type { AudioMemoContextValue } from '@/providers/audio-memo-provider.tsx'
 import type { Mutable } from '@reflect/utils'
 
-const memo = vi.hoisted((): Mutable<AudioMemoContextValue> => ({
+type MemoMock = Mutable<
+  AudioMemoSessionState & Omit<AudioMemoContextValue, 'session'> & { elapsedMs: number }
+>
+
+const memo = vi.hoisted((): MemoMock => ({
   phase: 'idle',
   elapsedMs: 0,
   stream: null,
@@ -22,7 +27,15 @@ const memo = vi.hoisted((): Mutable<AudioMemoContextValue> => ({
 }))
 
 vi.mock('@/providers/audio-memo-provider.tsx', () => ({
-  useAudioMemo: () => ({ ...memo }),
+  useAudioMemo: (): AudioMemoContextValue => ({
+    ...memo,
+    session: {
+      get: () => memo,
+      subscribe: () => () => {},
+      elapsedMs: { get: () => memo.elapsedMs, subscribe: () => () => {} },
+    },
+  }),
+  useAudioMemoField: <K extends keyof AudioMemoSessionState>(key: K) => memo[key],
 }))
 
 const { AudioMemoButton } = await import('./audio-memo-button.tsx')

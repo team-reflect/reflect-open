@@ -1,6 +1,7 @@
 import {
   createContext,
   use,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useState,
@@ -14,7 +15,7 @@ import type {
   Store,
 } from '@reflect/core'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useStore } from '@/lib/use-store.ts'
+import { useSelector } from '@/lib/use-store.ts'
 
 /**
  * The mobile React surface for audio memos: a thin shell over the
@@ -24,24 +25,24 @@ import { useStore } from '@/lib/use-store.ts'
  * it is a bottom drawer plus the mic action in the Daily capture menu.
  */
 
-export type MobileAudioMemoContextValue = MobileAudioMemoSessionState &
-  Pick<
-    MobileAudioMemoSession,
-    'toggle' | 'stopAndSave' | 'cancelRecording' | 'retry' | 'discard'
-  > & {
-    /**
-     * Live while recording.
-     */
-    elapsedMs: number
-    /**
-     * Latest input level 0…1, for the waveform.
-     */
-    level: number
-    /**
-     * Drawer dismissal: a live recording stops-and-saves, never silently drops.
-     */
-    onDrawerOpenChange: (open: boolean) => void
-  }
+/**
+ * The session's stores: the state, and the per-tick values apart from it.
+ */
+export type MobileAudioMemoSessionStores = Pick<
+  MobileAudioMemoSession,
+  'get' | 'subscribe' | 'elapsedMs' | 'level'
+>
+
+export interface MobileAudioMemoContextValue extends Pick<
+  MobileAudioMemoSession,
+  'toggle' | 'stopAndSave' | 'cancelRecording' | 'retry' | 'discard'
+> {
+  readonly session: MobileAudioMemoSessionStores
+  /**
+   * Drawer dismissal: a live recording stops-and-saves, never silently drops.
+   */
+  onDrawerOpenChange: (open: boolean) => void
+}
 
 const MobileAudioMemoContext = createContext<MobileAudioMemoContextValue | null>(null)
 
@@ -60,7 +61,7 @@ const CLOSED_STATE: MobileAudioMemoSessionState = {
 
 const CLOSED_TICK: Store<number> = { get: () => 0, subscribe: () => () => {} }
 
-const CLOSED_SESSION: Pick<MobileAudioMemoSession, 'get' | 'subscribe' | 'elapsedMs' | 'level'> = {
+const CLOSED_SESSION: MobileAudioMemoSessionStores = {
   get: () => CLOSED_STATE,
   subscribe: () => () => {},
   elapsedMs: CLOSED_TICK,
@@ -90,13 +91,9 @@ export function MobileAudioMemoProvider({
     }
   }, [mobileAudioMemo, graph.generation])
 
-  const store = session ?? CLOSED_SESSION
-  const state = useStore(store)
-  const elapsedMs = useStore(store.elapsedMs)
-  const level = useStore(store.level)
-
-  const controls = useMemo(
+  const value = useMemo<MobileAudioMemoContextValue>(
     () => ({
+      session: session ?? CLOSED_SESSION,
       toggle: () => session?.toggle(),
       stopAndSave: () => session?.stopAndSave(),
       cancelRecording: () => session?.cancelRecording(),
@@ -106,16 +103,15 @@ export function MobileAudioMemoProvider({
     }),
     [session],
   )
-  const value = useMemo<MobileAudioMemoContextValue>(
-    () => ({ ...state, elapsedMs, level, ...controls }),
-    [state, elapsedMs, level, controls],
-  )
 
   return <MobileAudioMemoContext value={value}>{children}</MobileAudioMemoContext>
 }
 
 /**
- * Access the mobile audio-memo surface. Use within MobileAudioMemoProvider.
+ * Access the mobile audio-memo session and its actions. Use within
+ * MobileAudioMemoProvider. Reading the context does not subscribe to the
+ * state: read fields with {@link useMobileAudioMemoField}, and the per-tick
+ * values with `useStore(session.elapsedMs)` and `useStore(session.level)`.
  */
 export function useMobileAudioMemo(): MobileAudioMemoContextValue {
   const context = use(MobileAudioMemoContext)
@@ -123,4 +119,14 @@ export function useMobileAudioMemo(): MobileAudioMemoContextValue {
     throw new Error('useMobileAudioMemo must be used within a MobileAudioMemoProvider')
   }
   return context
+}
+
+/**
+ * One field of the mobile audio-memo state, re-rendered only when that field changes.
+ */
+export function useMobileAudioMemoField<K extends keyof MobileAudioMemoSessionState>(
+  key: K,
+): MobileAudioMemoSessionState[K] {
+  const selector = useCallback((state: MobileAudioMemoSessionState) => state[key], [key])
+  return useSelector(useMobileAudioMemo().session, selector)
 }

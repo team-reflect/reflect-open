@@ -4,10 +4,16 @@ import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import type { MobileAudioMemoSessionState } from '@reflect/core'
 import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
 import type { Mutable } from '@reflect/utils'
 
-const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
+type MemoMock = Mutable<
+  MobileAudioMemoSessionState &
+    Omit<MobileAudioMemoContextValue, 'session'> & { elapsedMs: number; level: number }
+>
+
+const memo = vi.hoisted((): MemoMock => ({
   phase: 'recording',
   elapsedMs: 65_000,
   level: 0.4,
@@ -35,7 +41,16 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
 }))
 
 vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
-  useMobileAudioMemo: () => ({ ...memo }),
+  useMobileAudioMemo: (): MobileAudioMemoContextValue => ({
+    ...memo,
+    session: {
+      get: () => memo,
+      subscribe: () => () => {},
+      elapsedMs: { get: () => memo.elapsedMs, subscribe: () => () => {} },
+      level: { get: () => memo.level, subscribe: () => () => {} },
+    },
+  }),
+  useMobileAudioMemoField: <K extends keyof MobileAudioMemoSessionState>(key: K) => memo[key],
 }))
 
 const { RecordingDrawer } = await import('./recording-drawer.tsx')
