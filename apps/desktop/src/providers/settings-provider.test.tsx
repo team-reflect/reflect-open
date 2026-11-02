@@ -4,18 +4,28 @@ import { StrictMode, type ReactNode } from 'react'
 import { createTestCoreServices, createTestSettingsService } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { useEditorFullWidth, useSettingsStore } from './settings-provider.tsx'
+import {
+  useEditorFullWidth,
+  useEditorMarkdownSyntax,
+  useEditorTextSize,
+} from './settings-provider.tsx'
 
-describe('useSettingsStore', () => {
-  it('renders the settings of the app services and follows updates', async () => {
+describe('settings field hooks', () => {
+  it('render the settings of the app services and follow updates', async () => {
     const settings = createTestSettingsService({ editorMarkdownSyntax: 'show' })
     const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
-    const { result } = await renderHookInApp(() => useSettingsStore(), { core })
+    const { result } = await renderHookInApp(
+      () => ({
+        editorMarkdownSyntax: useEditorMarkdownSyntax(),
+        editorFullWidth: useEditorFullWidth(),
+        editorTextSize: useEditorTextSize(),
+      }),
+      { core },
+    )
 
     await act(async () => {
       await expect(settings.whenLoaded()).resolves.toBe('loaded')
     })
-    expect(result.current).toBe(settings.get())
     expect(result.current.editorMarkdownSyntax).toBe('show')
 
     await act(() => {
@@ -36,7 +46,7 @@ describe('useSettingsStore', () => {
   it('loads once in StrictMode', async () => {
     const settings = createTestSettingsService()
     const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
-    await renderHookInApp(() => useSettingsStore(), {
+    await renderHookInApp(() => useEditorFullWidth(), {
       core,
       wrapper: (children: ReactNode) => <StrictMode>{children}</StrictMode>,
     })

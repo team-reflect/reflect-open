@@ -26,7 +26,7 @@ export type ChatActions = Omit<ChatSession, 'get' | 'subscribe' | 'attach'>
 /**
  * The model fields of the chat session state.
  */
-export type ChatModels = Pick<ChatSessionState, 'providers' | 'modelOptions' | 'activeModel'>
+type ChatModels = Pick<ChatSessionState, 'providers' | 'modelOptions' | 'activeModel'>
 
 function selectTurns(state: ChatSessionState): ChatTurn[] {
   return state.turns
