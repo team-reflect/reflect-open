@@ -1,3 +1,4 @@
+import { isDeepEqual } from '@ocavue/utils'
 import type {
   ClassicAccess,
   ClassicAccessService,
@@ -132,7 +133,10 @@ class TestSubscriptionServiceImpl implements TestSubscriptionService {
   readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(state?: Partial<SubscriptionState>) {
-    this.#state = new WritableStore({ value: null, isLoading: false, isError: false, ...state })
+    this.#state = new WritableStore<SubscriptionState>(
+      { value: null, isLoading: false, isError: false, ...state },
+      isDeepEqual,
+    )
     this.get = this.#state.get
     this.subscribe = this.#state.subscribe
   }
@@ -189,11 +193,14 @@ class TestAppStoreEnvironmentServiceImpl implements TestAppStoreEnvironmentServi
   readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(env: AppStoreEnvironment) {
-    this.#state = new WritableStore<AppStoreEnvironmentState>({
-      value: env,
-      isLoading: false,
-      isError: false,
-    })
+    this.#state = new WritableStore<AppStoreEnvironmentState>(
+      {
+        value: env,
+        isLoading: false,
+        isError: false,
+      },
+      isDeepEqual,
+    )
     this.get = this.#state.get
     this.subscribe = this.#state.subscribe
   }

@@ -589,7 +589,10 @@ function isForbidden(status: SyncStatus): boolean {
   return isSyncError(status) && status.errorKind === 'auth' && status.message.includes('403')
 }
 
-function sameState(a: GitSyncState, b: GitSyncState): boolean {
+/**
+ * Whether two states are equal for the subscribers of a {@link GitSyncService}.
+ */
+export function sameState(a: GitSyncState, b: GitSyncState): boolean {
   if (a.phase === 'needsCredential' && b.phase === 'needsCredential') {
     return a.remoteUrl === b.remoteUrl
   }
