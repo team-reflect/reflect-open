@@ -121,31 +121,31 @@ export interface ChatSession extends Store<ChatSessionState> {
    * document), so later sessions start on it; null returns to the app
    * default.
    */
-  selectModel(selection: ChatModelSelection | null): void
+  readonly selectModel: (selection: ChatModelSelection | null) => void
   /**
    * Replace the composer draft.
    */
-  setDraft(text: string): void
+  readonly setDraft: (text: string) => void
   /**
    * Queue image files for the next message.
    */
-  attachImages(files: File[]): Promise<void>
+  readonly attachImages: (files: File[]) => Promise<void>
   /**
    * Drop one queued image.
    */
-  removeAttachment(id: string): void
+  readonly removeAttachment: (id: string) => void
   /**
    * Send one user message (text, queued images, or both) and stream the turn.
    */
-  send(text: string): Promise<void>
+  readonly send: (text: string) => Promise<void>
   /**
    * Abort the in-flight turn (partial text stays in the transcript).
    */
-  stop(): void
+  readonly stop: () => void
   /**
    * Leave the conversation in the history and start a fresh one.
    */
-  newChat(): void
+  readonly newChat: () => void
   /**
    * Start a fresh conversation with `question` as its first message. For
    * asking from outside the composer (mobile's search field), so the
@@ -154,15 +154,15 @@ export interface ChatSession extends Store<ChatSessionState> {
    * the open conversation already began with this question and no images
    * (asking again reopens that answer rather than paying for it twice).
    */
-  ask(question: string): Promise<void>
+  readonly ask: (question: string) => Promise<void>
   /**
    * Load a past conversation from the history.
    */
-  openConversation(id: string): Promise<void>
+  readonly openConversation: (id: string) => Promise<void>
   /**
    * Delete a conversation; deleting the active one starts a fresh chat.
    */
-  deleteConversation(id: string): Promise<void>
+  readonly deleteConversation: (id: string) => Promise<void>
 }
 
 export interface ChatSessionOptions {
@@ -315,15 +315,15 @@ class ChatSessionImpl implements ChatSession {
     }
   }
 
-  selectModel(selection: ChatModelSelection | null): void {
+  readonly selectModel = (selection: ChatModelSelection | null): void => {
     this.#deps.providerConfig.selectChatModel(selection)
   }
 
-  setDraft(text: string): void {
+  readonly setDraft = (text: string): void => {
     this.#update({ draft: text })
   }
 
-  async attachImages(files: File[]): Promise<void> {
+  readonly attachImages = async (files: File[]): Promise<void> => {
     const { imageCodec, id } = this.#deps
     // Reading files is async: a drop still in flight when New chat clears
     // the session must not land in the fresh composer afterwards.
@@ -337,18 +337,18 @@ class ChatSessionImpl implements ChatSession {
     this.#update({ attachments: [...this.#local.get().attachments, ...queued] })
   }
 
-  removeAttachment(attachmentId: string): void {
+  readonly removeAttachment = (attachmentId: string): void => {
     const { attachments } = this.#local.get()
     this.#update({
       attachments: attachments.filter((attachment) => attachment.id !== attachmentId),
     })
   }
 
-  async send(text: string): Promise<void> {
+  readonly send = async (text: string): Promise<void> => {
     await this.#send(text, { fromComposer: true })
   }
 
-  async ask(question: string): Promise<void> {
+  readonly ask = async (question: string): Promise<void> => {
     const trimmed = question.trim()
     // A question that can't be sent must not cost the open conversation.
     if (trimmed === '' || this.#deps.providerConfig.chatModel() === null) {
@@ -497,15 +497,15 @@ class ChatSessionImpl implements ChatSession {
     }
   }
 
-  stop(): void {
+  readonly stop = (): void => {
     this.#activeSend?.controller.abort()
   }
 
-  newChat(): void {
+  readonly newChat = (): void => {
     this.#startConversation({ attachments: [] })
   }
 
-  async openConversation(conversationId: string): Promise<void> {
+  readonly openConversation = async (conversationId: string): Promise<void> => {
     const { chatHistory, logger } = this.#deps
     if (conversationId === this.#local.get().conversationId) {
       return
@@ -532,7 +532,7 @@ class ChatSessionImpl implements ChatSession {
     }
   }
 
-  async deleteConversation(conversationId: string): Promise<void> {
+  readonly deleteConversation = async (conversationId: string): Promise<void> => {
     const { chatHistory, logger, emitConversationsChanged } = this.#deps
     this.#deletedConversations.add(conversationId)
     const deleteGeneration = this.#generation
