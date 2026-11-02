@@ -45,7 +45,7 @@ describe('router', () => {
     expect(result.current.arrivalSeq).toBe(2)
     expect(result.current.arrivalFocusEditor).toBe(true)
     expect(result.current.backRoute).toEqual({ kind: 'daily', date: '2026-06-08' })
-    expect(appServices.navigation.getState().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(appServices.navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
 
     await act(() => result.current.back())
     expect(result.current.route).toEqual({ kind: 'daily', date: '2026-06-08' })
