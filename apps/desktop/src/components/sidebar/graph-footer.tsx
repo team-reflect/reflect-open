@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactElement } from 'react'
-import type { GraphInfo, GitSyncState } from '@reflect/core'
+import type { GraphInfo } from '@reflect/core'
 import { FolderOpen, GraduationCap, LocateFixed, PanelsTopLeft, Settings } from 'lucide-react'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { GraphSwatch } from '@/components/graph-swatch.tsx'
@@ -18,10 +18,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
-import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'
-import { useGitSyncStore } from '@/providers/sync-provider.tsx'
+import { useGitSyncStatus } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -33,15 +32,9 @@ function graphSwitchBindingFor(index: number): string | null {
   return keybindingFor(`graph.switch${index + 1}`)
 }
 
-type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
-
-function selectConnectedStatus(state: GitSyncState): SyncStatus | null {
-  return state.phase === 'connected' ? state.status : null
-}
-
 /** The quiet git sync indicator: a dot and a screen-reader label, nothing when idle. */
 function GitSyncDot(): ReactElement | null {
-  const status = useSelector(useGitSyncStore(), selectConnectedStatus)
+  const status = useGitSyncStatus()
   if (status === null || status.state === 'idle') {
     return null
   }

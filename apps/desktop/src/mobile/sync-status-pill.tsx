@@ -1,15 +1,6 @@
 import type { ReactElement } from 'react'
-import { getMobileSyncStatus, type MobileSyncStatus } from '@reflect/app'
-import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGitSyncStore } from '@/providers/sync-provider.tsx'
-
-/**
- * Whether two statuses render the same pill: it shows only the label and the tone.
- */
-function isSamePill(a: MobileSyncStatus | null, b: MobileSyncStatus | null): boolean {
-  return a === b || (a !== null && b !== null && a.label === b.label && a.tone === b.tone)
-}
+import { useMobileSyncStatus } from '@/providers/sync-provider.tsx'
 
 /**
  * The sync-status pill (Plan 19, step 10): a small chip that appears only
@@ -19,7 +10,7 @@ function isSamePill(a: MobileSyncStatus | null, b: MobileSyncStatus | null): boo
  * the tab bar belongs to {@link MobileStatusLayer}.
  */
 export function SyncStatusPill(): ReactElement | null {
-  const status = useSelector(useGitSyncStore(), getMobileSyncStatus, isSamePill)
+  const status = useMobileSyncStatus()
 
   if (status === null || status.tone === 'ok') {
     return null

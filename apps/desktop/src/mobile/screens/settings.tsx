@@ -51,7 +51,7 @@ import {
   DATE_FORMATS,
   formatFullDate,
 } from '@reflect/core'
-import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
+import { remoteLabel, type MobileSyncDetail } from '@reflect/app'
 import {
   useChatSystemPrompt,
   useDateFormat,
@@ -67,7 +67,11 @@ import {
   useWeekStartDay,
 } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
-import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
+import {
+  useGitSyncActions,
+  useGitSyncState,
+  useMobileSyncStatus,
+} from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
@@ -188,7 +192,7 @@ export function MobileSettings(): ReactElement {
     enabled: graph !== null,
   })
 
-  const status = getMobileSyncStatus(gitSync)
+  const status = useMobileSyncStatus()
   // A graph with a remote, connected or waiting for its sign-in.
   const remote =
     gitSync.phase === 'connected' || gitSync.phase === 'needsCredential' ? gitSync : null

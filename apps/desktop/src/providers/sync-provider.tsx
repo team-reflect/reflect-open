@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { getMobileSyncStatus, type MobileSyncStatus } from '@reflect/app'
 import {
   AppError,
   type GithubConnector,
@@ -7,8 +8,11 @@ import {
   type GitHostConnector,
   type Store,
 } from '@reflect/core'
-import { useStore } from '@/lib/use-store.ts'
+import { isDeepEqual } from '@ocavue/utils'
+import { useSelector, useStore } from '@/lib/use-store.ts'
 import { useMaybeGraphServices } from '@/services/services-provider.tsx'
+
+type SyncStatus = Extract<GitSyncState, { phase: 'connected' }>['status']
 
 type GitSyncActions = Pick<GitSyncService, 'disconnectGraph' | 'syncNow'> &
   Pick<GithubConnector, 'connectNewRepo' | 'connectExistingRepo'> &
@@ -28,8 +32,16 @@ const NO_GIT_SYNC: Store<GitSyncState> = {
  * The git sync state of the open graph's `GitSyncService`. A note window runs
  * none: its state stays 'loading' (the note window edits, main syncs).
  */
-export function useGitSyncStore(): Store<GitSyncState> {
+function useGitSyncStore(): Store<GitSyncState> {
   return useMaybeGraphServices()?.gitSync ?? NO_GIT_SYNC
+}
+
+function selectGitSyncConnected(state: GitSyncState): boolean {
+  return state.phase === 'connected'
+}
+
+function selectGitSyncStatus(state: GitSyncState): SyncStatus | null {
+  return state.phase === 'connected' ? state.status : null
 }
 
 /**
@@ -37,6 +49,27 @@ export function useGitSyncStore(): Store<GitSyncState> {
  */
 export function useGitSyncState(): GitSyncState {
   return useStore(useGitSyncStore())
+}
+
+/**
+ * Whether the graph's git sync is connected to a remote.
+ */
+export function useGitSyncConnected(): boolean {
+  return useSelector(useGitSyncStore(), selectGitSyncConnected)
+}
+
+/**
+ * The sync cycle status of a connected graph, or `null` when it is not connected.
+ */
+export function useGitSyncStatus(): SyncStatus | null {
+  return useSelector(useGitSyncStore(), selectGitSyncStatus)
+}
+
+/**
+ * The mobile sync status: its label, tone, and detail.
+ */
+export function useMobileSyncStatus(): MobileSyncStatus | null {
+  return useSelector(useGitSyncStore(), getMobileSyncStatus, isDeepEqual)
 }
 
 /**

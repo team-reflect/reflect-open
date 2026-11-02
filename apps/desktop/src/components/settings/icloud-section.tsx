@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { isICloudRoot, type GitSyncState } from '@reflect/core'
+import { isICloudRoot } from '@reflect/core'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -16,16 +16,11 @@ import {
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useSelector } from '@/lib/use-store.ts'
 import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useGitSyncActions, useGitSyncStore } from '@/providers/sync-provider.tsx'
+import { useGitSyncActions, useGitSyncConnected } from '@/providers/sync-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const PENDING_NOTES_REFETCH_MS = 5_000
-
-function selectGitSyncConnected(state: GitSyncState): boolean {
-  return state.phase === 'connected'
-}
 
 function pendingNotesLine(count: number): string {
   return count === 1
@@ -48,7 +43,7 @@ function pendingNotesLine(count: number): string {
 export function IcloudSettingsField(): ReactElement | null {
   const graph = useGraphInfo()
   const { openRecent } = useGraphActions()
-  const gitSyncConnected = useSelector(useGitSyncStore(), selectGitSyncConnected)
+  const gitSyncConnected = useGitSyncConnected()
   const { disconnectGraph } = useGitSyncActions()
   const { icloudMigration: migration, icloudNative, platform } = useCoreServices()
   const [confirmOpen, setConfirmOpen] = useState(false)
