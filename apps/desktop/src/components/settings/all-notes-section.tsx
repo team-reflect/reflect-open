@@ -40,14 +40,18 @@ export function AllNotesSection(): ReactElement {
       return
     }
     setDraft('')
-    if (tags.some((existing) => foldTag(existing) === tag)) {
-      return
-    }
-    settingsService.update({ allNotesFilterTags: [...tags, tag] })
+    settingsService.updateWith((current) => {
+      if (current.allNotesFilterTags.some((existing) => foldTag(existing) === tag)) {
+        return {}
+      }
+      return { allNotesFilterTags: [...current.allNotesFilterTags, tag] }
+    })
   }
 
   const removeTag = (tag: string): void => {
-    settingsService.update({ allNotesFilterTags: tags.filter((existing) => existing !== tag) })
+    settingsService.updateWith((current) => ({
+      allNotesFilterTags: current.allNotesFilterTags.filter((existing) => existing !== tag),
+    }))
   }
 
   return (
