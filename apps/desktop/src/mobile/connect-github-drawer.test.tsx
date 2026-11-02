@@ -24,14 +24,6 @@ import { ConnectGithubDrawer } from './connect-github-drawer.tsx'
  * open/close lifecycle, and a fresh wizard per open.
  */
 
-// Keep the sheet content inline so this suite can focus on the wizard state.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
-
 /**
  * Render the sheet over a scripted backup, which connects every repository
  * unless `script` says otherwise.

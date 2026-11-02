@@ -1,19 +1,10 @@
 import { page } from 'vitest/browser'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiProviderConfig } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { AiProviderActionsDrawer } from './ai-provider-actions-drawer.tsx'
 
 /** The per-provider management sheet: make-default and remove wiring. */
-
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
-
-const { AiProviderActionsDrawer } = await import('./ai-provider-actions-drawer.tsx')
 
 const PROVIDER: AiProviderConfig = {
   id: 'p1',
@@ -27,11 +18,17 @@ const onSetDefaultModel = vi.fn<(id: string, model: string) => void>()
 const onRemove = vi.fn<(id: string) => Promise<void>>()
 const onOpenChange = vi.fn<(open: boolean) => void>()
 
-beforeEach(() => {
+// The sheet has no scrolling body, so it needs a phone-tall window to show every row.
+beforeEach(async () => {
+  await page.viewport(390, 844)
   onMakeDefault.mockReset()
   onSetDefaultModel.mockReset()
   onRemove.mockReset().mockResolvedValue(undefined)
   onOpenChange.mockReset()
+})
+
+afterEach(async () => {
+  await page.viewport(900, 600)
 })
 
 async function renderSheet(isDefault = false) {

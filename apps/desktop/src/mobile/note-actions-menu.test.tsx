@@ -11,7 +11,6 @@ import {
 } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import type { ReactElement, ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -30,75 +29,6 @@ const noteSource = { value: '# A\n' }
 let core: TestCoreServices
 let trash: MockInstance<NoteActionsService['trashOne']>
 let noteContent: MockInstance<ShareService['noteContent']>
-
-/**
- * The mobile note actions drawer: pin/share/delete already live here; this
- * suite adds privacy parity coverage against mocked index state and canonical
- * toggle helpers so close/reopen and failure rollback are exercised directly.
- * Delete routes through the shared {@link NoteDeleteDrawer}; the graph comes
- * from a mutable store so the no-graph failure path can be exercised too.
- *
- * The real drawer's drag/animation is covered elsewhere and on-device. This
- * mock honours `open` and the trigger contract so the tests can verify that
- * actions close the sheet and that reopened content reflects bridged state.
- */
-vi.mock('@/components/ui/drawer.tsx', async () => {
-  const React = await import('react')
-  const DrawerContext = React.createContext<{
-    open: boolean
-    onOpenChange: ((open: boolean) => void) | undefined
-  }>({ open: false, onOpenChange: undefined })
-
-  function useDrawerContext() {
-    return React.use(DrawerContext)
-  }
-
-  return {
-    Drawer: ({
-      open = false,
-      onOpenChange,
-      children,
-    }: {
-      open?: boolean
-      onOpenChange?: (open: boolean) => void
-      children?: ReactNode
-    }) => <DrawerContext value={{ open, onOpenChange }}>{children}</DrawerContext>,
-    DrawerTrigger: ({ children, render }: { children?: ReactNode; render?: ReactElement }) => {
-      const { onOpenChange } = useDrawerContext()
-      if (
-        render !== undefined &&
-        React.isValidElement<{ 'aria-label'?: string; className?: string }>(render)
-      ) {
-        return (
-          <button
-            type="button"
-            aria-label={render.props['aria-label']}
-            className={render.props.className}
-            onClick={() => onOpenChange?.(true)}
-          >
-            {children}
-          </button>
-        )
-      }
-      return (
-        <button type="button" onClick={() => onOpenChange?.(true)}>
-          {children}
-        </button>
-      )
-    },
-    DrawerContent: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => {
-      const { open } = useDrawerContext()
-      return open ? (
-        <div role="dialog" data-slot="drawer-content" {...props}>
-          {children}
-        </div>
-      ) : null
-    },
-    DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    DrawerDescription: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
-    DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-  }
-})
 
 let currentNoteRow: NoteRow | null
 let currentNoteRowSettled: boolean
@@ -164,6 +94,13 @@ async function openActions(): Promise<void> {
   await page.getByRole('button', { name: 'Note actions' }).click()
 }
 
+/**
+ * The mobile note actions drawer: pin/share/delete already live here; this
+ * suite adds privacy parity coverage against mocked index state and canonical
+ * toggle helpers so close/reopen and failure rollback are exercised directly.
+ * Delete routes through the shared {@link NoteDeleteDrawer}; the graph comes
+ * from a mutable store so the no-graph failure path can be exercised too.
+ */
 describe('NoteActionsMenu', () => {
   it('offers Lock note for a public note, toggles canonically, and closes the drawer', async () => {
     const { view } = await mount()

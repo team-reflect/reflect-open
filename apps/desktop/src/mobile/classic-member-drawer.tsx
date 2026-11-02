@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 
 const TITLE = 'Reflect Classic member?'
 
