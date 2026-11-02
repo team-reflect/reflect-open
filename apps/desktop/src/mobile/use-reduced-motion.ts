@@ -1,4 +1,6 @@
-import { useCallback, useSyncExternalStore } from 'react'
+import type { Store } from '@reflect/core'
+import { useMemo } from 'react'
+import { useStore } from '@/lib/use-store.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -7,10 +9,12 @@ import { useAppServices } from '@/services/services-provider.tsx'
  */
 export function usePrefersReducedMotion(): boolean {
   const { platform } = useAppServices()
-  const subscribe = useCallback(
-    (onChange: () => void) => platform.subscribeReducedMotion(onChange),
+  const reducedMotion: Store<boolean> = useMemo(
+    () => ({
+      get: () => platform.prefersReducedMotion(),
+      subscribe: (listener) => platform.subscribeReducedMotion(listener),
+    }),
     [platform],
   )
-  const getSnapshot = useCallback(() => platform.prefersReducedMotion(), [platform])
-  return useSyncExternalStore(subscribe, getSnapshot)
+  return useStore(reducedMotion)
 }
