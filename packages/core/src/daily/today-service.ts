@@ -59,13 +59,14 @@ class TodayServiceImpl implements TodayService {
   // visibility listener catch a midnight that this timer misses.
   #scheduleMidnightRollover(): void {
     const now: number = this.#deps.clock.now()
-    const midnight: Date = addDays(startOfDay(now), 1)
+    const midnight: number = addDays(startOfDay(now), 1).getTime()
+
     this.#midnightTimer = this.#deps.clock.setTimeout(
       () => {
         this.#syncToday()
         this.#scheduleMidnightRollover()
       },
-      midnight.getTime() - now + MIDNIGHT_PAD_MS,
+      midnight - now + MIDNIGHT_PAD_MS,
     )
   }
 
