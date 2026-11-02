@@ -66,6 +66,9 @@ export function deriveStore<T, U>(
 }
 
 function isArrayShallowEqual<T>(a: T[], b: T[]): boolean {
+  if (a === b) {
+    return true
+  }
   if (a.length !== b.length) {
     return false
   }
