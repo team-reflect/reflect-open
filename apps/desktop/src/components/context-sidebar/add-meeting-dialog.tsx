@@ -21,7 +21,7 @@ import {
   type MeetingAttendee,
   formatTimeOfDay,
 } from '@reflect/core'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useContactsEnabled, useTimeFormat } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 
@@ -50,8 +50,8 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
   const [name, setName] = useState(event.title)
   const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [createNote, setCreateNote] = useState(event.recurring)
-  const contactsEnabled = useSettingsField('contactsEnabled')
-  const timeFormat = useSettingsField('timeFormat')
+  const contactsEnabled = useContactsEnabled()
+  const timeFormat = useTimeFormat()
 
   // Upgrade the prefilled chips once attendee resolution answers: an invite
   // email an existing note owns swaps the calendar's spelling for the note

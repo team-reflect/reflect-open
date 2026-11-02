@@ -19,7 +19,12 @@ import {
   useTaskEditorFinalizer,
   type TaskEditorApi,
 } from '@/lib/tasks/use-task-editor-finalizer.ts'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import {
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useTimeFormat,
+} from '@/providers/settings-provider.tsx'
 
 /**
  * The inline task editor (Plan 18, V1 parity): the sole-selected task swaps its
@@ -161,10 +166,10 @@ export function TaskEditor({
   checkboxToggleControllerRef,
   convertControllerRef,
 }: TaskEditorProps): ReactElement {
-  const timeFormat = useSettingsField('timeFormat')
-  const editorMarkdownSyntax = useSettingsField('editorMarkdownSyntax')
-  const editorSpellCheck = useSettingsField('editorSpellCheck')
-  const editorSmoothCaretAnimation = useSettingsField('editorSmoothCaretAnimation')
+  const timeFormat = useTimeFormat()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
   const navigate = useWikiLinkNavigation()
   const onLinkClick = useMarkdownLinkClick(null)
   const onTagClick = useTagNavigation()

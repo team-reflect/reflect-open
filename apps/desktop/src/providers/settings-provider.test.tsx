@@ -4,7 +4,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { createTestCoreServices, createTestSettingsService } from '@reflect/core/testing'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { useSettingsField, useSettingsStore } from './settings-provider.tsx'
+import { useEditorFullWidth, useSettingsStore } from './settings-provider.tsx'
 
 describe('useSettingsStore', () => {
   it('renders the settings of the app services and follows updates', async () => {
@@ -48,7 +48,7 @@ describe('useSettingsStore', () => {
   })
 })
 
-describe('useSettingsField', () => {
+describe('useEditorFullWidth', () => {
   it('re-renders only when its field changes', async () => {
     const settings = createTestSettingsService()
     const core = createTestCoreServices({ database: createWasmTestDatabaseService(), settings })
@@ -56,7 +56,7 @@ describe('useSettingsField', () => {
     const { result } = await renderHookInApp(
       () => {
         renders += 1
-        return useSettingsField('editorFullWidth')
+        return useEditorFullWidth()
       },
       { core },
     )

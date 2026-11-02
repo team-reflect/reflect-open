@@ -9,8 +9,8 @@ across graphs and must survive graph deletion.
 - **`@reflect/core`** owns the keys, defaults and validation
   (`packages/core/src/settings/schema.ts`) and the runtime document
   (`SettingsService`, `CoreServices.settings`).
-- **The desktop app** reads settings with `useSettingsField(key)`
-  (`apps/desktop/src/providers/settings-provider.tsx`) and renders controls in
+- **The desktop app** reads each setting through its own hook, such as
+  `useTimeFormat()` (`apps/desktop/src/providers/settings-provider.tsx`), and renders controls in
   `apps/desktop/src/components/settings/`.
 
 ## 1. Declare the key in the schema
@@ -41,14 +41,28 @@ Export new value types from `packages/core/src/index.ts`. Cover the key in
 
 ## 2. Consume it
 
+In `settings-provider.tsx`, add a selector and a hook next to the others:
+
 ```tsx
-const yourNewSetting = useSettingsField('yourNewSetting')
+function selectYourNewSetting(settings: Settings): YourNewSetting {
+  return settings.yourNewSetting
+}
+
+export function useYourNewSetting(): YourNewSetting {
+  return useSettingsSelector(selectYourNewSetting)
+}
+```
+
+Then read it in a component:
+
+```tsx
+const yourNewSetting = useYourNewSetting()
 const settingsService = useSettingsService()
 // write scalar: settingsService.update({ yourNewSetting: value })
 // write derived/list value: settingsService.updateWith((current) => ({ yourList: nextList(current) }))
 ```
 
-`useSettingsField` re-renders only when its key changes. Use
+A setting hook re-renders only when its key changes. Use
 `useSettingsStore()` only where a component needs the whole document.
 
 Outside React, use the service (`settings.get()`, `update`, `updateWith`,

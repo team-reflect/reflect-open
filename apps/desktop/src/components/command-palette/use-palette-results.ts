@@ -4,7 +4,11 @@ import { parseSearchQuery } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useSemanticSearchEnabled,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import type { PaletteSections } from './entries.ts'
 
@@ -32,9 +36,9 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // for the session, but its results must not. Plain-text queries blend
   // semantic hits via RRF and degrade invisibly to lexical without either.
   // Filtered queries stay constraint-based — filters are exact by nature.
-  const semanticSearchEnabled = useSettingsField('semanticSearchEnabled')
-  const dateFormat = useSettingsField('dateFormat')
-  const weekStartDay = useSettingsField('weekStartDay')
+  const semanticSearchEnabled = useSemanticSearchEnabled()
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
   const embed = useEmbedStatus()
   const hybrid = semanticSearchEnabled && embed.status === 'ready'
 

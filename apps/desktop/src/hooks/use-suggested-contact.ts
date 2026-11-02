@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { ContactMatch } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useContactsEnabled } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useContactsState } from './use-contacts-state.ts'
 
@@ -24,7 +24,7 @@ import { useContactsState } from './use-contacts-state.ts'
  */
 export function useSuggestedContact(path: string): ContactMatch | null {
   const graph = useGraphInfo()
-  const contactsEnabled = useSettingsField('contactsEnabled')
+  const contactsEnabled = useContactsEnabled()
   // Re-render when the permission state changes; the gate reads it.
   useContactsState()
   const { contactSuggestions } = useCoreServices()

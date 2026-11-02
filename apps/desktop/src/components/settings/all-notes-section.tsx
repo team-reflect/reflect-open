@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { foldTag, isTagName } from '@reflect/core'
 import { X } from 'lucide-react'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import { useAllNotesFilterTags, useSettingsService } from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -23,7 +23,7 @@ export function AllNotesSection(): ReactElement {
   const settingsService = useSettingsService()
   const [draft, setDraft] = useState('')
   const [draftError, setDraftError] = useState<string | null>(null)
-  const tags = useSettingsField('allNotesFilterTags')
+  const tags = useAllNotesFilterTags()
 
   const addTag = (): void => {
     const tag = normalizeTagInput(draft)

@@ -16,7 +16,12 @@ import {
   DATE_FORMATS,
   formatFullDate,
 } from '@reflect/core'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useSettingsService,
+  useTimeFormat,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -50,9 +55,9 @@ const WEEK_START_OPTIONS: WeekStartOption[] = [
  * timestamps or daily-note keys.
  */
 export function DateTimeSection(): ReactElement {
-  const dateFormat = useSettingsField('dateFormat')
-  const weekStartDay = useSettingsField('weekStartDay')
-  const timeFormat = useSettingsField('timeFormat')
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
   const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
 

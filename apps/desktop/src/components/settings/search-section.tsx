@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { Sparkles } from 'lucide-react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import { useSemanticSearchEnabled, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { DescribeAssetsField } from './describe-assets-field.tsx'
 import { SettingsField } from './field.tsx'
@@ -18,7 +18,7 @@ import { SettingsSection } from './section.tsx'
  * events carry byte counts).
  */
 export function SearchSection(): ReactElement {
-  const semanticSearchEnabled = useSettingsField('semanticSearchEnabled')
+  const semanticSearchEnabled = useSemanticSearchEnabled()
   const settingsService = useSettingsService()
   const status = useEmbedStatus()
   const { semanticSearch } = useCoreServices()

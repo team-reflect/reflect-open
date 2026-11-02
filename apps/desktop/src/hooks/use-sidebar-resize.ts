@@ -13,7 +13,11 @@ import {
   type SidebarWidthRange,
 } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import {
+  useContextSidebarWidth,
+  useSettingsService,
+  useSidebarWidth,
+} from '@/providers/settings-provider.tsx'
 
 /** How far one arrow-key press moves the divider, in CSS pixels. */
 const KEYBOARD_STEP_PX = 16
@@ -181,8 +185,8 @@ export interface SidebarResize {
 export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
   const { side, settingsKey, cssVariable, range, otherAsideLabel } = PANEL_SPECS[panel]
   const settingsService = useSettingsService()
-  const sidebarWidth = useSettingsField('sidebarWidth')
-  const contextSidebarWidth = useSettingsField('contextSidebarWidth')
+  const sidebarWidth = useSidebarWidth()
+  const contextSidebarWidth = useContextSidebarWidth()
   const settingsWidth = settingsKey === 'sidebarWidth' ? sidebarWidth : contextSidebarWidth
   const dragRef = useRef<DragState | null>(null)
   const [dragWidth, setDragWidth] = useState<number | null>(null)

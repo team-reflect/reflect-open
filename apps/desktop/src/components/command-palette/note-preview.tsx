@@ -6,7 +6,7 @@ import { splitFrontmatter, formatDayLabel } from '@reflect/core'
 import type { NoteEntry } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useSettingsField } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -25,7 +25,7 @@ interface NotePreviewProps {
 
 export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   const graph = useGraphInfo()
-  const dateFormat = useSettingsField('dateFormat')
+  const dateFormat = useDateFormat()
   const { noteDocuments } = useCoreServices()
   const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(entry.path)
   const { data, isError } = useQuery({

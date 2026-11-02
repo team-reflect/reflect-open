@@ -52,7 +52,20 @@ import {
   formatFullDate,
 } from '@reflect/core'
 import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
-import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
+import {
+  useChatSystemPrompt,
+  useDateFormat,
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorSmoothCaretAnimation,
+  useEditorTextSize,
+  useSettingsService,
+  useThemeSetting,
+  useTimeFormat,
+  useTranscriptionFormat,
+  useTranscriptionPrompt,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -120,17 +133,17 @@ export function MobileSettings(): ReactElement {
   const subscriptionControls = useSubscriptionControls()
   const { opener } = useAppServices()
   const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
-  const theme = useSettingsField('theme')
-  const editorTextSize = useSettingsField('editorTextSize')
-  const selectedDateFormat = useSettingsField('dateFormat')
-  const weekStartDay = useSettingsField('weekStartDay')
-  const timeFormat = useSettingsField('timeFormat')
-  const editorSmoothCaretAnimation = useSettingsField('editorSmoothCaretAnimation')
-  const editorDefaultBullet = useSettingsField('editorDefaultBullet')
-  const editorBulletAfterHeading = useSettingsField('editorBulletAfterHeading')
-  const chatSystemPrompt = useSettingsField('chatSystemPrompt')
-  const transcriptionFormat = useSettingsField('transcriptionFormat')
-  const transcriptionPrompt = useSettingsField('transcriptionPrompt')
+  const theme = useThemeSetting()
+  const editorTextSize = useEditorTextSize()
+  const selectedDateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
+  const chatSystemPrompt = useChatSystemPrompt()
+  const transcriptionFormat = useTranscriptionFormat()
+  const transcriptionPrompt = useTranscriptionPrompt()
   const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
   const version = useAppVersion()
