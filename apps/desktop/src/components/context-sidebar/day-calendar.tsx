@@ -12,7 +12,7 @@ import { formatDayLabel } from '@reflect/core'
 import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -43,7 +43,7 @@ const HEADER_BUTTON_CLASS =
 export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactElement {
   const { navigate } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation(selectedDate)
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { dailyNotes } = useCoreServices()
   const dateFormat = useSettingsField('dateFormat')
   const weekStartDay = useSettingsField('weekStartDay')

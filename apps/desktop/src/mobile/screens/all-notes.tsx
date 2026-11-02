@@ -29,7 +29,7 @@ import {
   MobileTopBarScrollableRow,
 } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useDateFormat } from '@/hooks/use-date-format.ts'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
@@ -92,7 +92,7 @@ export function MobileAllNotes({
   filters,
   onFiltersChange,
 }: MobileAllNotesProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { noteList, search } = useCoreServices()
   const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
   const enabled = graph !== null

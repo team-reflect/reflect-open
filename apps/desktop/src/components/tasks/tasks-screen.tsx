@@ -28,7 +28,7 @@ import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 import { routeForPath } from '@reflect/app'
@@ -73,7 +73,7 @@ function focusedSelectedKey(
  * "show archived" filter, which reveals the whole completed history.
  */
 export function TasksScreen(): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { tasks: taskService } = useCoreServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()

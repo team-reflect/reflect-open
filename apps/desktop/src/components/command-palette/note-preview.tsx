@@ -5,7 +5,7 @@ import { useNoteAttachments } from '@/editor/use-note-attachments.ts'
 import { splitFrontmatter, formatDayLabel } from '@reflect/core'
 import type { NoteEntry } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
@@ -24,7 +24,7 @@ interface NotePreviewProps {
 }
 
 export function NotePreview({ entry }: NotePreviewProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const dateFormat = useSettingsField('dateFormat')
   const { noteDocuments } = useCoreServices()
   const { resolveImageUrl, resolveWikiEmbed } = useNoteAttachments(entry.path)

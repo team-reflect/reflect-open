@@ -16,7 +16,7 @@ import {
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useGitSync } from '@/providers/sync-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
@@ -41,7 +41,8 @@ function pendingNotesLine(count: number): string {
  * storage in onboarding.
  */
 export function IcloudSettingsField(): ReactElement | null {
-  const { graph, openRecent } = useGraph()
+  const graph = useGraphInfo()
+  const { openRecent } = useGraphActions()
   const { state, disconnectGraph } = useGitSync()
   const { icloudMigration: migration, icloudNative, platform } = useCoreServices()
   const [confirmOpen, setConfirmOpen] = useState(false)

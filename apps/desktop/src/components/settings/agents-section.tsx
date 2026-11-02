@@ -6,7 +6,7 @@ import { SettingsField } from '@/components/settings/field.tsx'
 import { SettingsSection } from '@/components/settings/section.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface AgentSkillAction {
@@ -26,7 +26,7 @@ interface AgentSkillAction {
  * hides the entry through the same gate (see use-visible-settings-sections).
  */
 export function AgentsSection(): ReactElement | null {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { agentSkill, platform, graphSession } = useCoreServices()
   const queryClient = useQueryClient()
   const queryKey = queryKeys.agentSkill.status(graph?.root)
