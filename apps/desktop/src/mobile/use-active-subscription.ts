@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { focusManager } from '@tanstack/react-query'
 import type { ActiveSubscription } from '@reflect/core'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore } from '@/lib/use-store.ts'
 
 /**
  * The live or startup-seeded active subscription. Mounting looks it up unless
@@ -16,7 +16,7 @@ export function useActiveSubscription(): {
   refetch: () => Promise<ActiveSubscription>
 } {
   const { subscription } = useMobileServices()
-  const state = useServiceState(subscription, subscription.getState)
+  const state = useStore(subscription)
 
   useEffect(() => {
     void subscription.activeSubscription()

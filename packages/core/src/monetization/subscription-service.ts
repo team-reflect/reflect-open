@@ -1,9 +1,11 @@
+import { isDeepEqual } from '@ocavue/utils'
 import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { getJson, setJson, type StorageService } from '../ports/storage-service.ts'
 import { IAP_PRODUCT_IDS, type IapService } from '../ipc/iap-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { toAppError } from '../errors.ts'
 
@@ -51,13 +53,11 @@ export interface SubscriptionState {
 /**
  * The current App Store subscription, seeded from the last launch.
  */
-export interface SubscriptionService {
-  getState: () => SubscriptionState
-  subscribe: (listener: () => void) => Unlisten
+export interface SubscriptionService extends Store<SubscriptionState> {
   /**
    * The subscription, looked up in StoreKit unless a live answer is less than
    * a minute old. A failed lookup resolves the current value and shows in
-   * `getState().isError`.
+   * `get().isError`.
    */
   activeSubscription(): Promise<ActiveSubscription>
   /**
@@ -115,7 +115,8 @@ export interface SubscriptionServiceDeps {
 class SubscriptionServiceImpl implements SubscriptionService {
   readonly #deps: SubscriptionServiceDeps
   readonly #enabled: boolean
-  readonly #listeners = new Set<() => void>()
+  readonly #state = new WritableStore<SubscriptionState>(IDLE_STATE, isDeepEqual)
+  #watchers = 0
   readonly #pendingEntitlementLookups = new Map<string, Promise<boolean>>()
   #value: ActiveSubscription = null
   /**
@@ -127,7 +128,6 @@ class SubscriptionServiceImpl implements SubscriptionService {
   #fetching = false
   #failed = false
   #pendingRun: Promise<ActiveSubscription> | null = null
-  #state: SubscriptionState = IDLE_STATE
 
   constructor(deps: SubscriptionServiceDeps) {
     this.#deps = deps
@@ -142,17 +142,22 @@ class SubscriptionServiceImpl implements SubscriptionService {
       if (seed !== undefined && clock.now() - seed.updatedAt <= ACTIVE_SUBSCRIPTION_MAX_AGE_MS) {
         this.#value = seed.value
       }
-      this.#state = this.#computeState()
+      this.#state.set(this.#computeState())
       iap.subscribePurchaseUpdated(this.invalidate)
     }
   }
 
-  readonly getState = (): SubscriptionState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    const unlisten = this.#state.subscribe(listener)
+    this.#watchers += 1
+    let active = true
     return () => {
-      this.#listeners.delete(listener)
+      if (!active) return
+      active = false
+      unlisten()
+      this.#watchers -= 1
     }
   }
 
@@ -179,7 +184,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
 
   readonly invalidate = (): void => {
     this.#answeredAt = null
-    if (this.#listeners.size > 0) {
+    if (this.#watchers > 0) {
       void this.refetch()
     }
   }
@@ -189,22 +194,6 @@ class SubscriptionServiceImpl implements SubscriptionService {
       value: this.#value,
       isLoading: this.#value === null && !this.#hasLiveAnswer && (this.#fetching || !this.#settled),
       isError: this.#failed && this.#value === null,
-    }
-  }
-
-  #publish(): void {
-    const next = this.#computeState()
-    const state = this.#state
-    if (
-      next.value === state.value &&
-      next.isLoading === state.isLoading &&
-      next.isError === state.isError
-    ) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
     }
   }
 
@@ -270,7 +259,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
   async #run(): Promise<ActiveSubscription> {
     const { storage, clock, logger } = this.#deps
     this.#fetching = true
-    this.#publish()
+    this.#state.set(this.#computeState())
     try {
       const next = await this.#lookupWithRetry()
       this.#value = next
@@ -287,7 +276,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
     } finally {
       this.#fetching = false
       this.#settled = true
-      this.#publish()
+      this.#state.set(this.#computeState())
     }
     return this.#value
   }
