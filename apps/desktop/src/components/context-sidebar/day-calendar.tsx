@@ -13,7 +13,7 @@ import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app
 import { createDailyDatesQueryOptions } from '@/lib/query-options.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
@@ -45,7 +45,8 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   const navigateNoteLink = useNoteLinkNavigation(selectedDate)
   const { graph } = useGraph()
   const { dailyNotes } = useCoreServices()
-  const { settings } = useSettings()
+  const dateFormat = useSettingsField('dateFormat')
+  const weekStartDay = useSettingsField('weekStartDay')
 
   const [month, setMonth] = useState(() => getYearMonth(selectedDate))
   // Render-time state adjustment (not an effect): navigating to another day
@@ -56,7 +57,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
     setMonth(getYearMonth(selectedDate))
   }
 
-  const grid = buildMonthGrid(month, settings.weekStartDay)
+  const grid = buildMonthGrid(month, weekStartDay)
   const { data: notedDates } = useQuery({
     ...createDailyDatesQueryOptions(dailyNotes, graph?.root, grid.start, grid.end),
     enabled: graph !== null,
@@ -113,7 +114,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
 
       <div>
         <div className="grid grid-cols-7 border-b border-black/5 px-4 text-center dark:border-white/10">
-          {getWeekdayLabels(settings.weekStartDay).map((weekday) => (
+          {getWeekdayLabels(weekStartDay).map((weekday) => (
             <div key={weekday} className="py-2 text-xs font-medium text-text">
               {weekday}
             </div>
@@ -130,7 +131,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                   <button
                     key={cell.date}
                     type="button"
-                    aria-label={formatDayLabel(cell.date, settings.dateFormat)}
+                    aria-label={formatDayLabel(cell.date, dateFormat)}
                     aria-current={isToday ? 'date' : undefined}
                     aria-pressed={isSelected}
                     onClick={(event) => {

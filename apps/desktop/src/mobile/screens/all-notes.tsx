@@ -31,7 +31,7 @@ import {
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -105,7 +105,7 @@ export function MobileAllNotes({
   // Defer the query the index sees (desktop's search debounce): fast typing
   // coalesces while the input stays live, and a seeded query (a `search`
   // history entry) catches up within a frame instead of a fixed delay.
-  const dateFormat = useDateFormat()
+  const dateFormat = useSettingsField('dateFormat')
   const deferredQuery = useDeferredValue(query)
   const pending = pendingTagToken(query)
   const parsed = useMemo(

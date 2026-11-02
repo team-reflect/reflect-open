@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { WikilinkResolver } from '@meowdown/core'
 import { isIsoDate } from '@reflect/utils'
 import { displayNoteTitle, type DateFormat, formatDayLabel } from '@reflect/core'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 
 /**
  * The wiki-link chip rule shared by every meowdown surface: `[[target|alias]]`
@@ -37,6 +37,6 @@ export function createWikilinkResolver(dateFormat: DateFormat): WikilinkResolver
  * identity makes meowdown resolve every chip again.
  */
 export function useWikilinkResolver(): WikilinkResolver {
-  const dateFormat = useDateFormat()
+  const dateFormat = useSettingsField('dateFormat')
   return useMemo(() => createWikilinkResolver(dateFormat), [dateFormat])
 }

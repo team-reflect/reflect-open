@@ -3,7 +3,7 @@ import { Pin, PinOff, Trash2 } from 'lucide-react'
 import { type HighlightSegment, formatRecencyLabel } from '@reflect/core'
 import { SWIPE_ACTION_WIDTH, SwipeActionButton } from '@/mobile/swipe-action-button.tsx'
 import { useRowSwipe } from '@/mobile/use-row-swipe.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 
 /** V1's fixed row height (px) — placeholder resolution never causes jumps. */
 export const NOTE_ROW_HEIGHT = 64
@@ -60,7 +60,8 @@ export function SwipeableNoteRow({
   onTogglePin,
   onDelete,
 }: SwipeableNoteRowProps): ReactElement {
-  const { settings } = useSettings()
+  const dateFormat = useSettingsField('dateFormat')
+  const timeFormat = useSettingsField('timeFormat')
   const actionWidth = SWIPE_ACTION_WIDTH * (row.canDelete ? 2 : 1)
   const title = row.titleSegments.map((segment) => segment.text).join('')
   const swipe = useRowSwipe({
@@ -133,7 +134,7 @@ export function SwipeableNoteRow({
             {renderHighlightedSegments(row.titleSegments)}
           </span>
           <span className="shrink-0 text-xs text-text-muted">
-            {formatRecencyLabel(row.mtime, settings)}
+            {formatRecencyLabel(row.mtime, { dateFormat, timeFormat })}
           </span>
         </span>
         {row.snippet.length > 0 ? (
