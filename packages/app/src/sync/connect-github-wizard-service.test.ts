@@ -136,6 +136,7 @@ describe('createConnectGithubWizardService', () => {
     wizard.setRepoName('other')
     expect(listener).toHaveBeenCalledOnce()
     expect(wizard.get()).not.toBe(before)
+    expect(wizard.get().finishView).toBe(before.finishView)
 
     unsubscribe()
     wizard.setRepoName('again')
@@ -190,7 +191,7 @@ describe('createConnectGithubWizardService', () => {
     scriptExisting('notFound', 'notFound', 'connected')
     connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
-    const detach = wizard.attach()
+    const unsubscribe = wizard.subscribe(() => {})
     await signIn(wizard)
 
     expect(wizard.get().finishView).toEqual({
@@ -214,7 +215,7 @@ describe('createConnectGithubWizardService', () => {
     // Connected: the loop ended for good.
     await advance(POLL_MS * 3)
     expect(existingCalls()).toHaveLength(3)
-    detach()
+    unsubscribe()
   })
 
   it('opens the prefilled github.com/new page for the chosen name', async () => {
@@ -244,7 +245,7 @@ describe('createConnectGithubWizardService', () => {
   it('an app sign-in that cannot see the repo lands on grant access and polls', async () => {
     scriptExisting('notFound', 'connected')
     const wizard = createWizard(APP)
-    const detach = wizard.attach()
+    const unsubscribe = wizard.subscribe(() => {})
     wizard.setMode('existing')
     wizard.setExistingRepo('team/notes')
     await signIn(wizard)
@@ -258,13 +259,13 @@ describe('createConnectGithubWizardService', () => {
 
     await advance(POLL_MS)
     expect(onClose).toHaveBeenCalledOnce()
-    detach()
+    unsubscribe()
   })
 
   it('a PAT sign-in that cannot see the repo gets token-scope guidance, no poll', async () => {
     scriptExisting('notFound')
     const wizard = createWizard(PAT)
-    const detach = wizard.attach()
+    const unsubscribe = wizard.subscribe(() => {})
     wizard.setMode('existing')
     wizard.setExistingRepo('team/notes')
     await signIn(wizard)
@@ -276,7 +277,7 @@ describe('createConnectGithubWizardService', () => {
     await advance(POLL_MS * 2)
     expect(existingCalls()).toHaveLength(1)
     expect(clock.pendingTimers()).toBe(0)
-    detach()
+    unsubscribe()
   })
 
   it('demands explicit consent before connecting a public repo', async () => {
@@ -304,7 +305,7 @@ describe('createConnectGithubWizardService', () => {
     scriptExisting('notFound', 'needsPublicConfirm')
     connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
-    const detach = wizard.attach()
+    const unsubscribe = wizard.subscribe(() => {})
     await signIn(wizard)
 
     await advance(POLL_MS)
@@ -313,14 +314,14 @@ describe('createConnectGithubWizardService', () => {
     await advance(POLL_MS * 3)
     expect(existingCalls()).toHaveLength(2)
     expect(clock.pendingTimers()).toBe(0)
-    detach()
+    unsubscribe()
   })
 
   it('back to the repo step clears every parked handoff', async () => {
     scriptExisting('notFound')
     connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
-    const detach = wizard.attach()
+    const unsubscribe = wizard.subscribe(() => {})
     await signIn(wizard)
     expect(wizard.get().finishView).toMatchObject({ kind: 'createGuide' })
 
@@ -332,7 +333,7 @@ describe('createConnectGithubWizardService', () => {
     })
     await advance(POLL_MS * 2)
     expect(existingCalls()).toHaveLength(1)
-    detach()
+    unsubscribe()
   })
 
   it('captures a failed connect as a display message', async () => {
@@ -360,16 +361,16 @@ describe('createConnectGithubWizardService', () => {
       return wizard
     }
 
-    it('runs only while the wizard is attached', async () => {
+    it('runs only while the wizard has a subscriber', async () => {
       const wizard = await parkOnCreateGuide()
       await advance(POLL_MS * 2)
       expect(existingCalls()).toHaveLength(1)
 
-      const detach = wizard.attach()
+      const unsubscribe = wizard.subscribe(() => {})
       await advance(POLL_MS)
       expect(existingCalls()).toHaveLength(2)
 
-      detach()
+      unsubscribe()
       await advance(POLL_MS * 2)
       expect(existingCalls()).toHaveLength(2)
       expect(clock.pendingTimers()).toBe(0)
@@ -379,7 +380,7 @@ describe('createConnectGithubWizardService', () => {
       const wizard = await parkOnCreateGuide()
       const gate = Promise.withResolvers<ConnectExistingResult>()
       connector.onConnectExistingRepo(() => gate.promise)
-      const detach = wizard.attach()
+      const unsubscribe = wizard.subscribe(() => {})
 
       await advance(POLL_MS)
       expect(existingCalls()).toHaveLength(2)
@@ -390,25 +391,25 @@ describe('createConnectGithubWizardService', () => {
       await flush()
       await advance(POLL_MS)
       expect(existingCalls()).toHaveLength(3)
-      detach()
+      unsubscribe()
     })
 
     it('a failing tick keeps the loop alive', async () => {
       const wizard = await parkOnCreateGuide()
       connector.onConnectExistingRepo(() => Promise.reject(new AppError('network', 'offline')))
-      const detach = wizard.attach()
+      const unsubscribe = wizard.subscribe(() => {})
 
       await advance(POLL_MS)
       await advance(POLL_MS)
       expect(existingCalls()).toHaveLength(3)
       // A poll failure is silent: the handoff stays on screen.
       expect(wizard.get()).toMatchObject({ error: null, finishView: { kind: 'createGuide' } })
-      detach()
+      unsubscribe()
     })
 
     it('pauses while hidden and resumes with an immediate tick on return', async () => {
       const wizard = await parkOnCreateGuide()
-      const detach = wizard.attach()
+      const unsubscribe = wizard.subscribe(() => {})
 
       lifecycle.emitHidden()
       await advance(POLL_MS * 3)
@@ -416,24 +417,24 @@ describe('createConnectGithubWizardService', () => {
 
       lifecycle.emitVisible()
       expect(existingCalls()).toHaveLength(2)
-      detach()
+      unsubscribe()
     })
 
     it('does not start a wait while hidden', async () => {
       lifecycle.setHidden(true)
       const wizard = await parkOnCreateGuide()
-      const detach = wizard.attach()
+      const unsubscribe = wizard.subscribe(() => {})
       expect(clock.pendingTimers()).toBe(0)
 
       lifecycle.emitVisible()
       expect(existingCalls()).toHaveLength(2)
-      detach()
+      unsubscribe()
     })
 
     it("a tick's stop ends the loop for good, across hide and show", async () => {
       const wizard = await parkOnCreateGuide()
       scriptExisting('connected')
-      const detach = wizard.attach()
+      const unsubscribe = wizard.subscribe(() => {})
       await advance(POLL_MS)
       expect(existingCalls()).toHaveLength(2)
 
@@ -441,7 +442,7 @@ describe('createConnectGithubWizardService', () => {
       lifecycle.emitVisible()
       await advance(POLL_MS * 2)
       expect(existingCalls()).toHaveLength(2)
-      detach()
+      unsubscribe()
     })
   })
 })

@@ -98,9 +98,6 @@ export function useConnectGithubWizard({
     )
   })
 
-  // The repo-existence poll only runs while the surface is mounted.
-  useEffect(() => wizard.attach(), [wizard])
-
   const state = useStore(wizard)
 
   const actions = useMemo(

@@ -1,3 +1,4 @@
+import { isDeepEqual } from '@ocavue/utils'
 import {
   errorMessage,
   githubAppInstallUrl,
@@ -98,14 +99,11 @@ export interface ConnectGithubWizardState {
  * step is skipped whenever the repo is already visible, so a graph whose repo
  * the install already covers connects with no detour. PAT users reach repos
  * by token scope, not an installation, so they get token-scope guidance.
+ *
+ * The repo-existence poll runs only while the wizard has a subscriber.
+ * Unsubscribing cancels future ticks but not one already in flight.
  */
 export interface ConnectGithubWizardService extends Store<ConnectGithubWizardState> {
-  /**
-   * Mount the wizard: the repo-existence poll only runs between this call
-   * and the returned function. Detaching cancels future ticks but not one
-   * already in flight.
-   */
-  attach(): Unlisten
   setMode(mode: 'create' | 'existing'): void
   setRepoName(name: string): void
   setExistingRepo(value: string): void
@@ -169,7 +167,6 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
   readonly #pollIntervalMs: number
   #fields: WizardFields
   readonly #state: WritableStore<ConnectGithubWizardState>
-  #attached = 0
   #stopPoll: (() => void) | null = null
 
   constructor(deps: ConnectGithubWizardDeps, options: ConnectGithubWizardOptions) {
@@ -189,29 +186,19 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
       pending: false,
       error: null,
     }
-    this.#state = new WritableStore(this.#derive())
+    this.#state = new WritableStore(this.#derive(null))
   }
 
   readonly get = (): ConnectGithubWizardState => this.#state.get()
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
-    // Wrapped for identity, so one function added twice detaches independently.
-    return this.#state.subscribe(() => {
-      listener()
-    })
-  }
-
-  attach(): Unlisten {
-    this.#attached += 1
+    const unlisten = this.#state.subscribe(listener)
     this.#syncPoll()
-    let detached = false
     return () => {
-      if (detached) {
-        return
+      unlisten()
+      if (!this.#state.subscribed()) {
+        this.#syncPoll()
       }
-      detached = true
-      this.#attached -= 1
-      this.#syncPoll()
     }
   }
 
@@ -299,12 +286,16 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
       : null
   }
 
-  #derive(): ConnectGithubWizardState {
+  /**
+   * Build the state from the fields, keeping `previous` when the finish view
+   * is unchanged.
+   */
+  #derive(previous: ConnectFinishView | null): ConnectGithubWizardState {
     const fields = this.#fields
     const target = this.#targetForUser()
     // The parked handoffs outrank the transient states: a consent question or
     // an open poll must never be painted over by "Connecting…".
-    const finishView: ConnectFinishView =
+    const next: ConnectFinishView =
       fields.publicConfirm !== null
         ? { kind: 'publicConfirm', repo: fields.publicConfirm }
         : fields.showCreateGuide && fields.user !== null
@@ -314,6 +305,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
             : fields.pending
               ? { kind: 'connecting' }
               : { kind: 'idle' }
+    const finishView = previous !== null && isDeepEqual(previous, next) ? previous : next
     return {
       step: fields.step,
       mode: fields.mode,
@@ -426,10 +418,10 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
   }
 
   /**
-   * Start or cancel the poll to match the mounted state and the poll target.
+   * Start or cancel the poll to match the subscribers and the poll target.
    */
   #syncPoll(): void {
-    const enabled = this.#attached > 0 && this.#pollTarget() !== null
+    const enabled = this.#state.subscribed() && this.#pollTarget() !== null
     if (enabled && this.#stopPoll === null) {
       this.#stopPoll = this.#startPoll()
     } else if (!enabled && this.#stopPoll !== null) {
@@ -440,7 +432,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
 
   #patch(next: Partial<WizardFields>): void {
     this.#fields = { ...this.#fields, ...next }
-    const state = this.#derive()
+    const state = this.#derive(this.#state.get().finishView)
     this.#syncPoll()
     this.#state.set(state)
   }
