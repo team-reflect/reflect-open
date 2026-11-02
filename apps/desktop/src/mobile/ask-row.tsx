@@ -12,7 +12,9 @@ interface MobileAskRowProps {
  * The All tab's Ask row: the search text, offered as a question to Chat. It
  * sits above the results while there is text to ask and an AI provider to
  * ask it of. Tapping starts a fresh conversation with the question already
- * sent and pushes Chat over All, so Back returns to the same results.
+ * sent (or reopens the open one if it began with this question, so a second
+ * tap after Back shows the same answer) and pushes Chat over All, so Back
+ * returns to the same results.
  */
 export function MobileAskRow({ query }: MobileAskRowProps): ReactElement | null {
   const providers = useChatProviders()

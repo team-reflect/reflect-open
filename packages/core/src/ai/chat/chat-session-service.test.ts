@@ -358,19 +358,44 @@ describe('ChatSession persistence', () => {
     expect(session.get().turns.at(-1)?.userText).toBe('half-typed question')
   })
 
-  it('asks in a fresh conversation and leaves the composer draft alone', async () => {
-    const { session } = await setup()
+  it('asks in a fresh conversation and leaves the composer draft and images alone', async () => {
+    const { session, chatEngine } = await setup()
     await session.send('earlier question')
     const earlierConversation = session.get().activeConversationId
     session.setDraft('half-typed follow-up')
+    await session.attachImages([
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'cat.png', { type: 'image/png' }),
+    ])
+    const queued = session.get().attachments
 
     await session.ask('what did I decide about pricing?')
 
     expect(session.get().activeConversationId).not.toBe(earlierConversation)
+    expect(session.get().turns).toMatchObject([
+      { userText: 'what did I decide about pricing?', attachments: [] },
+    ])
+    expect(chatEngine.calls().at(-1)?.messages.at(-1)).toEqual({
+      role: 'user',
+      content: 'what did I decide about pricing?',
+    })
+    expect(session.get().draft).toBe('half-typed follow-up')
+    expect(session.get().attachments).toEqual(queued)
+  })
+
+  it('reopens the open conversation when asked the question it began with', async () => {
+    const { session, chatEngine } = await setup()
+    await session.ask('what did I decide about pricing?')
+    await session.send('and the student discount?')
+    const askedConversation = session.get().activeConversationId
+
+    await session.ask('  what did I decide about pricing?  ')
+
+    expect(session.get().activeConversationId).toBe(askedConversation)
     expect(session.get().turns.map((turn) => turn.userText)).toEqual([
       'what did I decide about pricing?',
+      'and the student discount?',
     ])
-    expect(session.get().draft).toBe('half-typed follow-up')
+    expect(chatEngine.calls()).toHaveLength(2)
   })
 
   it('keeps the open conversation when asked nothing, or with no model to ask', async () => {

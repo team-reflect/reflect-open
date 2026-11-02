@@ -149,8 +149,10 @@ export interface ChatSession extends Store<ChatSessionState> {
   /**
    * Start a fresh conversation with `question` as its first message. For
    * asking from outside the composer (mobile's search field), so the
-   * composer draft is left as it was. A blank question, or no chat model to
-   * send it to, changes nothing.
+   * composer's draft text and queued images stay as they were. Changes
+   * nothing for a blank question, with no chat model to send it to, or when
+   * the open conversation already began with this question (asking again
+   * reopens that answer rather than paying for it twice).
    */
   ask(question: string): Promise<void>
   /**
@@ -351,24 +353,32 @@ class ChatSessionImpl implements ChatSession {
   }
 
   async send(text: string): Promise<void> {
-    await this.#send(text, { keepDraft: false })
+    await this.#send(text, { fromComposer: true })
   }
 
   async ask(question: string): Promise<void> {
+    const trimmed = question.trim()
     // A question that can't be sent must not cost the open conversation.
-    if (question.trim() === '' || this.#deps.providerConfig.chatModel() === null) {
+    if (trimmed === '' || this.#deps.providerConfig.chatModel() === null) {
       return
     }
-    this.newChat()
-    await this.#send(question, { keepDraft: true })
+    if (this.#local.get().turns[0]?.userText === trimmed) {
+      return
+    }
+    this.#startConversation()
+    await this.#send(trimmed, { fromComposer: false })
   }
 
-  async #send(text: string, { keepDraft }: { keepDraft: boolean }): Promise<void> {
+  /**
+   * `fromComposer`: the message is the composer's, so its queued images go
+   * with it and the draft and queue clear; otherwise both are left alone.
+   */
+  async #send(text: string, { fromComposer }: { fromComposer: boolean }): Promise<void> {
     const { chatEngine, chatGraphContext, providerConfig, credentials, embeddingRuntime } =
       this.#deps
     const { settings, clock, today, id, logger } = this.#deps
     const trimmed = text.trim()
-    const attached = this.#local.get().attachments
+    const attached = fromComposer ? this.#local.get().attachments : []
     const config = providerConfig.chatModel()
     if (
       (trimmed === '' && attached.length === 0) ||
@@ -378,7 +388,9 @@ class ChatSessionImpl implements ChatSession {
       return
     }
     const turnsBefore = this.#local.get().turns
-    this.#update(keepDraft ? { attachments: [] } : { draft: '', attachments: [] })
+    if (fromComposer) {
+      this.#update({ draft: '', attachments: [] })
+    }
 
     const turnId = id.uuid()
     const messages = [...buildHistory(turnsBefore), userMessage(trimmed, attached)]
@@ -492,9 +504,7 @@ class ChatSessionImpl implements ChatSession {
   }
 
   newChat(): void {
-    this.#activeSend?.controller.abort()
-    this.#sessionCounter += 1
-    this.#update({ turns: [], attachments: [], conversationId: this.#deps.id.uuid() })
+    this.#startConversation({ attachments: [] })
   }
 
   async openConversation(conversationId: string): Promise<void> {
@@ -543,6 +553,16 @@ class ChatSessionImpl implements ChatSession {
     if (conversationId === this.#local.get().conversationId) {
       this.newChat()
     }
+  }
+
+  /**
+   * Abort the in-flight turn and open a fresh, empty conversation, applying
+   * `patch` in the same update.
+   */
+  #startConversation(patch: Partial<LocalState> = {}): void {
+    this.#activeSend?.controller.abort()
+    this.#sessionCounter += 1
+    this.#update({ turns: [], conversationId: this.#deps.id.uuid(), ...patch })
   }
 
   #update(patch: Partial<LocalState>): void {

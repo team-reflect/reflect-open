@@ -775,6 +775,12 @@ describe('MobileShell', () => {
     })
     // The header's Chat button now resumes that conversation.
     await expect.element(view.getByTestId('chat-in-progress')).toBeInTheDocument()
+
+    // A second tap on the same Ask reopens that answer instead of paying for
+    // the question twice.
+    await user.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+    await waitForChatLayer(view)
+    expect(chatEngine.calls()).toHaveLength(1)
   })
 
   it('opens an empty Chat from All’s Chat button with the composer focused', async () => {
