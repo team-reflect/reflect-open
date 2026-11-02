@@ -18,9 +18,9 @@ import { useAudioMemo, useAudioMemoField } from '@/providers/audio-memo-provider
  */
 export function AudioMemoButton(): ReactElement {
   const { toggle, cancel, discard } = useAudioMemo()
-  const phase = useAudioMemoField('phase')
-  const available = useAudioMemoField('available')
-  const unavailableReason = useAudioMemoField('unavailableReason')
+  const phase = useAudioMemoField('phase') // FIXME: const phase = useAudioMemoPhase()
+  const available = useAudioMemoField('available') // FIXME: const available = useAudioMemoAvailable()
+  const unavailableReason = useAudioMemoField('unavailableReason') // FIXME: const unavailableReason = useAudioMemoUnavailableReason()
   const anchorRef = useRef<HTMLButtonElement>(null)
 
   // Esc cancels a live recording and dismisses an error. Other close

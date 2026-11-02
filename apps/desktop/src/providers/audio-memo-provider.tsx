@@ -151,6 +151,7 @@ export function useAudioMemo(): AudioMemoContextValue {
 export function useAudioMemoField<K extends keyof AudioMemoSessionState>(
   key: K,
 ): AudioMemoSessionState[K] {
+  // FIXME: delete useAudioMemoField. use separate hook for each field. Like what we did in settings-provider.tsx
   const selector = useCallback((state: AudioMemoSessionState) => state[key], [key])
   return useSelector(useAudioMemo().session, selector)
 }
