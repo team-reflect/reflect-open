@@ -87,6 +87,7 @@ export function useChatActions(): ChatActions {
       send: (text) => session.send(text),
       stop: () => session.stop(),
       newChat: () => session.newChat(),
+      ask: (question) => session.ask(question),
       openConversation: (id) => session.openConversation(id),
       deleteConversation: (id) => session.deleteConversation(id),
     }),

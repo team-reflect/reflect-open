@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { pointer } from '@/test-utils/swipe.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
@@ -38,7 +39,11 @@ function Harness({ initiallyRevealed = false }: { initiallyRevealed?: boolean })
 }
 
 function mount(ui: ReactElement): ReturnType<typeof renderInApp> {
-  return renderInApp(ui, { platform: { ...MOBILE_PLATFORM, reducedMotion: true }, route: null })
+  return renderInApp(ui, {
+    platform: MOBILE_PLATFORM,
+    appServices: { systemPreferences: createTestSystemPreferencesService({ reducedMotion: true }) },
+    route: null,
+  })
 }
 
 function getScroller(element: Element): HTMLElement {
