@@ -1,6 +1,6 @@
 import type { IdService } from '../ports/id-service.ts'
 import { AppError } from '../errors.ts'
-import type { Store, Unlisten } from '../unlisten.ts'
+import { deriveStore, type Store, type Unlisten } from '../unlisten.ts'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -21,6 +21,7 @@ import {
   type TranscriptionMiss,
   type TranscriptionTarget,
 } from './provider-config.ts'
+import { isDeepEqual } from '@ocavue/utils'
 
 /**
  * What the add-provider dialog collects; the key goes to the keychain only.
@@ -139,9 +140,18 @@ export interface AiProviderConfigService extends Store<AiProvidersState> {
 
 class AiProviderConfigServiceImpl implements AiProviderConfigService {
   readonly #deps: AiProviderConfigServiceDeps
+  readonly #store: Store<AiProvidersState>
 
   constructor(deps: AiProviderConfigServiceDeps) {
     this.#deps = deps
+    this.#store = deriveStore(
+      deps.settings,
+      (settings) => ({
+        providers: settings.aiProviders,
+        defaultProviderId: settings.defaultAiProviderId,
+      }),
+      isDeepEqual,
+    )
   }
 
   readonly subscribe = (listener: () => void): Unlisten => this.#deps.settings.subscribe(listener)
