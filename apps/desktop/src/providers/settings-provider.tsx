@@ -34,7 +34,7 @@ export function useSettings(): SettingsValue {
   }
 }
 
-function useSettingsService(): SettingsService {
+export function useSettingsService(): SettingsService {
   return useCoreServices().settings satisfies Store<Settings>
 }
 
