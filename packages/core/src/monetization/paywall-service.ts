@@ -107,10 +107,11 @@ class PaywallServiceImpl implements PaywallService {
   constructor(deps: PaywallServiceDeps) {
     this.#deps = deps
     const { subscription, classicAccess, appStoreEnvironment, platform, storage } = deps
-    this.requested = deriveStore(
-      storage.session.store(PAYWALL_REQUESTED_STORAGE_KEY),
-      (value) => value === 'true',
-    )
+    const stored: Store<string | null> = {
+      get: () => storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY),
+      subscribe: (listener) => storage.session.subscribe(PAYWALL_REQUESTED_STORAGE_KEY, listener),
+    }
+    this.requested = deriveStore(stored, (value) => value === 'true')
     this.gate = combineStores(
       [subscription, classicAccess, appStoreEnvironment, this.requested],
       (active, classic, environment, requested) => {
