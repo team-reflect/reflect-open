@@ -42,10 +42,10 @@ describe('AppStoreEnvironmentService', () => {
   it('names the channel the probe reports', async () => {
     probe = () => Promise.resolve('Xcode')
     const environment = service()
-    expect(environment.getState()).toEqual({ value: null, isLoading: true, isError: false })
+    expect(environment.get()).toEqual({ value: null, isLoading: true, isError: false })
 
     await expect(environment.environment()).resolves.toBe('Xcode')
-    expect(environment.getState()).toEqual({ value: 'Xcode', isLoading: false, isError: false })
+    expect(environment.get()).toEqual({ value: 'Xcode', isLoading: false, isError: false })
   })
 
   it('reads an unrecognized channel as unknown', async () => {
@@ -58,7 +58,7 @@ describe('AppStoreEnvironmentService', () => {
     const environment = service()
 
     await expect(environment.environment()).resolves.toBeNull()
-    expect(environment.getState()).toEqual({ value: null, isLoading: false, isError: true })
+    expect(environment.get()).toEqual({ value: null, isLoading: false, isError: true })
   })
 
   it('retries a failed probe once', async () => {
@@ -71,7 +71,7 @@ describe('AppStoreEnvironmentService', () => {
 
     await expect(environment.environment()).resolves.toBe('Xcode')
     expect(probes).toBe(2)
-    expect(environment.getState()).toEqual({ value: 'Xcode', isLoading: false, isError: false })
+    expect(environment.get()).toEqual({ value: 'Xcode', isLoading: false, isError: false })
   })
 
   it('probes once per launch', async () => {
@@ -93,7 +93,7 @@ describe('AppStoreEnvironmentService', () => {
     expect(remembered()).toBe(JSON.stringify('Sandbox'))
 
     probe = () => new Promise(() => {})
-    expect(service().getState()).toEqual({ value: 'Sandbox', isLoading: false, isError: false })
+    expect(service().get()).toEqual({ value: 'Sandbox', isLoading: false, isError: false })
   })
 
   it('keeps a remembered channel when the live probe fails', async () => {
@@ -103,7 +103,7 @@ describe('AppStoreEnvironmentService', () => {
     probe = () => Promise.reject(new Error('no app transaction'))
     const environment = service()
     await environment.environment()
-    expect(environment.getState()).toEqual({ value: 'Sandbox', isLoading: false, isError: true })
+    expect(environment.get()).toEqual({ value: 'Sandbox', isLoading: false, isError: true })
   })
 
   it('corrects a remembered Sandbox once the build reaches the App Store', async () => {
@@ -113,7 +113,7 @@ describe('AppStoreEnvironmentService', () => {
     probe = () => Promise.resolve('Production')
     const environment = service()
     await environment.environment()
-    expect(environment.getState().value).toBe('Production')
+    expect(environment.get().value).toBe('Production')
     expect(remembered()).toBeNull()
   })
 
@@ -124,12 +124,12 @@ describe('AppStoreEnvironmentService', () => {
     await service().environment()
 
     expect(remembered()).toBeNull()
-    expect(service().getState().value).toBeNull()
+    expect(service().get().value).toBeNull()
   })
 
   it('does not answer from a channel an older build remembered as Production', () => {
     storage.local.set(APP_STORE_ENVIRONMENT_STORAGE_KEY, JSON.stringify('Production'))
-    expect(service().getState().value).toBeNull()
+    expect(service().get().value).toBeNull()
   })
 
   it('probes again after `invalidate` while subscribed', async () => {
@@ -146,10 +146,37 @@ describe('AppStoreEnvironmentService', () => {
     await expect(environment.environment()).resolves.toBe('Sandbox')
   })
 
+  it('keeps the state reference and stays quiet when a probe repeats the answer', async () => {
+    const environment = service()
+    await environment.environment()
+    const state = environment.get()
+    const listener = vi.fn()
+    environment.subscribe(listener)
+
+    environment.invalidate()
+    await environment.environment()
+
+    expect(probes).toBe(2)
+    expect(environment.get()).toBe(state)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('stops probing on `invalidate` once the last subscriber leaves', async () => {
+    const environment = service()
+    await environment.environment()
+    const unsubscribe = environment.subscribe(() => {})
+
+    unsubscribe()
+    unsubscribe()
+    environment.invalidate()
+
+    expect(probes).toBe(1)
+  })
+
   it('stays out of the way off iOS', async () => {
     storage.local.set(APP_STORE_ENVIRONMENT_STORAGE_KEY, JSON.stringify('Sandbox'))
     const environment = service('desktop')
-    expect(environment.getState()).toEqual({ value: null, isLoading: false, isError: false })
+    expect(environment.get()).toEqual({ value: null, isLoading: false, isError: false })
     await expect(environment.environment()).resolves.toBeNull()
     expect(probes).toBe(0)
   })

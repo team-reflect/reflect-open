@@ -202,21 +202,24 @@ export interface TestAppStoreEnvironmentService extends AppStoreEnvironmentServi
 }
 
 class TestAppStoreEnvironmentServiceImpl implements TestAppStoreEnvironmentService {
-  #current: AppStoreEnvironmentState
+  readonly #state: WritableStore<AppStoreEnvironmentState>
   readonly #log: AppStoreEnvironmentCall[] = []
-  readonly #listeners = new Listeners()
+  readonly get: () => AppStoreEnvironmentState
+  readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(env: AppStoreEnvironment) {
-    this.#current = { value: env, isLoading: false, isError: false }
+    this.#state = new WritableStore<AppStoreEnvironmentState>({
+      value: env,
+      isLoading: false,
+      isError: false,
+    })
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
   }
-
-  readonly getState = (): AppStoreEnvironmentState => this.#current
-
-  readonly subscribe = this.#listeners.subscribe
 
   environment(): Promise<AppStoreEnvironment> {
     this.#log.push('environment')
-    return Promise.resolve(this.#current.value)
+    return Promise.resolve(this.get().value)
   }
 
   readonly invalidate = (): void => {
@@ -224,8 +227,7 @@ class TestAppStoreEnvironmentServiceImpl implements TestAppStoreEnvironmentServi
   }
 
   setState(patch: Partial<AppStoreEnvironmentState>): void {
-    this.#current = { ...this.#current, ...patch }
-    this.#listeners.notify()
+    this.#state.set({ ...this.get(), ...patch })
   }
 
   calls(): readonly AppStoreEnvironmentCall[] {
