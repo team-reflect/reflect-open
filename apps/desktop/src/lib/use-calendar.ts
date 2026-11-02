@@ -8,7 +8,7 @@ import {
 } from '@reflect/core'
 import { showsDayEvents } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 
@@ -79,13 +79,14 @@ export function useCalendars(enabled: boolean): CalendarsResult {
  * EventKit change subscription (below) invalidates on real changes.
  */
 export function useDayEvents(date: string): CalendarEvent[] {
-  const { settings } = useSettings()
+  const calendarEnabled = useSettingsField('calendarEnabled')
+  const calendarIds = useSettingsField('calendarIds')
   const { calendarEvents } = useAppServices()
   const available = useCalendarAvailable()
-  const enabled = showsDayEvents(settings) && available
+  const enabled = showsDayEvents({ calendarEnabled, calendarIds }) && available
   const query = useQuery({
-    queryKey: queryKeys.calendar.events(date, settings.calendarIds),
-    queryFn: () => calendarEvents.listDayEvents(date, settings.calendarIds),
+    queryKey: queryKeys.calendar.events(date, calendarIds),
+    queryFn: () => calendarEvents.listDayEvents(date, calendarIds),
     enabled,
     staleTime: 60_000,
   })

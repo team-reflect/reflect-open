@@ -511,7 +511,7 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
   #snapshot(): AudioMemoPipelineState {
     return {
       pendingCount: this.#pendingCount,
-      transcribing: this.#reconciler?.getTranscribing() ?? false,
+      transcribing: this.#reconciler?.get() ?? false,
       hasTranscriptionConfig: this.#hasTranscriptionConfig,
       error: this.#error,
       canRetry: this.#parked !== null,
@@ -652,8 +652,8 @@ class AudioMemoSessionImpl implements AudioMemoSession {
       this.#pipeline.subscribe(() => {
         this.#publish()
       }),
-      audioRecorder.subscribeState((next) => {
-        if (next !== 'recording') {
+      audioRecorder.state.subscribe(() => {
+        if (audioRecorder.state.get() !== 'recording') {
           this.#elapsedMs = 0
         }
         this.#publish()
@@ -684,7 +684,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
   }
 
   toggle(): void {
-    const recorderState = this.#deps.audioRecorder.state()
+    const recorderState = this.#deps.audioRecorder.state.get()
     if (recorderState === 'recording') {
       if (this.#stopGuard) {
         // The click landed in the stop's await gap, where the button already
@@ -741,7 +741,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     if (!hidden) {
       return
     }
-    const recorderState = this.#deps.audioRecorder.state()
+    const recorderState = this.#deps.audioRecorder.state.get()
     if (recorderState === 'recording') {
       void this.#stopAndSave()
     } else if (recorderState === 'requesting') {
@@ -760,7 +760,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
 
   #snapshot(): AudioMemoSessionState {
     const { audioRecorder } = this.#deps
-    const recorderState = audioRecorder.state()
+    const recorderState = audioRecorder.state.get()
     const pipelineState = this.#pipeline.getState()
     const unavailableReason = !audioRecorder.isSupported()
       ? UNSUPPORTED_REASON

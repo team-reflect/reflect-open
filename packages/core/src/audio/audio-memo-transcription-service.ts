@@ -35,7 +35,7 @@ import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { AUDIO_MEMOS_DIR, dailyPath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
-import type { Unlisten } from '../unlisten.ts'
+import { WritableStore, type Store } from '../store.ts'
 import { wikiLinkSafe } from '../markdown/edit.ts'
 import { appendListItem } from '../markdown/task-ast.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -112,9 +112,9 @@ export interface AudioMemoTranscriptionServiceDeps {
  * descriptions): the single-flight loop, focus/online retries, and teardown live
  * there; this adds the transcription pass, the config gate (no IO without a
  * transcription-capable model), and the `transcribing` flag the mic spinner
- * reads.
+ * reads: true while a pass has memos to transcribe.
  */
-export interface AudioMemoTranscriptionSession {
+export interface AudioMemoTranscriptionSession extends Store<boolean> {
   /**
    * Attach the triggers (focus, online, visible, file changes) and run the launch pass.
    */
@@ -123,14 +123,6 @@ export interface AudioMemoTranscriptionSession {
    * Request a pass; coalesces while one runs (at most one follow-up).
    */
   schedule(): void
-  /**
-   * True while a pass has memos to transcribe, drives the mic spinner.
-   */
-  getTranscribing(): boolean
-  /**
-   * Subscribe to `transcribing` changes.
-   */
-  subscribe(listener: () => void): Unlisten
   /**
    * Tear down triggers and abort an in-flight pass at its next gate.
    */
@@ -281,8 +273,7 @@ interface AudioMemoTranscriptionSessionDeps {
 class AudioMemoTranscriptionSessionImpl implements AudioMemoTranscriptionSession {
   readonly #deps: AudioMemoTranscriptionSessionDeps
   readonly #generation: number
-  #transcribing = false
-  readonly #listeners = new Set<() => void>()
+  readonly #transcribing = new WritableStore(false)
   /**
    * Last surfaced stop message. Focus/online retries must not re-toast it.
    */
@@ -298,7 +289,7 @@ class AudioMemoTranscriptionSessionImpl implements AudioMemoTranscriptionSession
     this.#loop = deps.reconcilers.create({
       pass: (isStale) => this.#pass(isStale),
       onSettled: () => {
-        this.#setTranscribing(false)
+        this.#transcribing.set(false)
       },
     })
   }
@@ -311,9 +302,6 @@ class AudioMemoTranscriptionSessionImpl implements AudioMemoTranscriptionSession
     }
     loop.schedule() // the launch pass: memos left pending by earlier sessions
     loop.retryOnWake() // the network's natural retry signals (focus/online)
-    loop.onDispose(() => {
-      this.#listeners.clear()
-    })
     // Foregrounding on iOS doesn't reliably fire `focus`/`online` on the
     // webview, becoming visible does. A memo captured (or its
     // transcription failed offline) while backgrounded gets its retry when
@@ -339,32 +327,11 @@ class AudioMemoTranscriptionSessionImpl implements AudioMemoTranscriptionSession
     this.#loop.schedule()
   }
 
-  getTranscribing(): boolean {
-    return this.#transcribing
-  }
-
-  subscribe(listener: () => void): Unlisten {
-    const entry = (): void => {
-      listener()
-    }
-    this.#listeners.add(entry)
-    return () => {
-      this.#listeners.delete(entry)
-    }
-  }
+  readonly get = this.#transcribing.get
+  readonly subscribe = this.#transcribing.subscribe
 
   dispose(): void {
     this.#loop.dispose()
-  }
-
-  #setTranscribing(next: boolean): void {
-    if (this.#transcribing === next) {
-      return
-    }
-    this.#transcribing = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
   }
 
   #surfaceStop(stopped: ReconcileStop | null): void {
@@ -401,7 +368,7 @@ class AudioMemoTranscriptionSessionImpl implements AudioMemoTranscriptionSession
       transcriptionPrompt: current.transcriptionPrompt,
       isStale,
       onPending: (count) => {
-        this.#setTranscribing(count > 0)
+        this.#transcribing.set(count > 0)
       },
     })
     this.#surfaceStop(outcome.stopped)

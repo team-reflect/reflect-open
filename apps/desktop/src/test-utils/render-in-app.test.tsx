@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { useGraph, useMaybeGraph } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useGitSyncContext } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
@@ -12,7 +12,8 @@ import { MOBILE_PLATFORM, renderHookInApp, renderInApp } from './render-in-app.t
 
 function Probe(): ReactElement {
   const { status, graph, indexGeneration, indexing, recents, mobileStorageKind } = useGraph()
-  const { settings, updateSettings } = useSettings()
+  const dateFormat = useSettingsField('dateFormat')
+  const settingsService = useSettingsService()
   const { route, navigate } = useRouter()
   const sync = useGitSyncContext()
   return (
@@ -21,10 +22,10 @@ function Probe(): ReactElement {
         {status} {graph?.root ?? 'none'} {graph?.generation ?? '-'} {indexGeneration ?? '-'}{' '}
         {indexing ? 'indexing' : 'idle'} {recents.length} {mobileStorageKind ?? '-'}
       </output>
-      <output data-testid="settings">{settings.dateFormat}</output>
+      <output data-testid="settings">{dateFormat}</output>
       <output data-testid="route">{JSON.stringify(route)}</output>
       <output data-testid="git-sync">{sync?.state.phase ?? 'no sync'}</output>
-      <button type="button" onClick={() => updateSettings({ dateFormat: 'iso' })}>
+      <button type="button" onClick={() => settingsService.update({ dateFormat: 'iso' })}>
         iso
       </button>
       <button type="button" onClick={() => navigate({ kind: 'tasks' })}>
