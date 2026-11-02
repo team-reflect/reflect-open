@@ -145,8 +145,8 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
    >   sent as the first message (`ChatSession.ask`, which leaves the
    >   composer's draft and queued images alone and does nothing for a blank
    >   question or a missing model). Asking the question the open
-   >   conversation began with reopens it instead of asking again, so a
-   >   second tap after Back costs no duplicate model call.
+   >   conversation began with (text only, no photo) reopens it instead of
+   >   asking again, so a second tap after Back costs no duplicate model call.
    >   The model runs its own `search_notes`; the visible results are not
    >   passed in, so results-grounded chat is still the later wave.
    > - The All header's Chat button resumes the current conversation (a dot

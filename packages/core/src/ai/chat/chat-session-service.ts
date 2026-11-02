@@ -151,8 +151,8 @@ export interface ChatSession extends Store<ChatSessionState> {
    * asking from outside the composer (mobile's search field), so the
    * composer's draft text and queued images stay as they were. Changes
    * nothing for a blank question, with no chat model to send it to, or when
-   * the open conversation already began with this question (asking again
-   * reopens that answer rather than paying for it twice).
+   * the open conversation already began with this question and no images
+   * (asking again reopens that answer rather than paying for it twice).
    */
   ask(question: string): Promise<void>
   /**
@@ -249,11 +249,12 @@ class ChatSessionImpl implements ChatSession {
   // successor's slot.
   #sessionCounter = 0
   #activeSend: { controller: AbortController; session: number } | null = null
-  // The session of the most recent send — unlike `activeSend` this is not
+  // The session in which the user last chose the on-screen conversation: a
+  // send into it, or an Ask that reopened it. Unlike `activeSend` this is not
   // cleared when the turn settles, so a pending conversation switch can tell
-  // that the on-screen conversation received a message even after the stream
+  // the user stayed with the on-screen conversation even after the stream
   // finished.
-  #lastSendSession = -1
+  #anchoredSession = -1
 
   constructor(deps: ChatSessionImplDeps, options: ChatSessionOptions) {
     this.#deps = deps
@@ -362,7 +363,13 @@ class ChatSessionImpl implements ChatSession {
     if (trimmed === '' || this.#deps.providerConfig.chatModel() === null) {
       return
     }
-    if (this.#local.get().turns[0]?.userText === trimmed) {
+    // Asking again what the open conversation began with reopens it. Only a
+    // text-only opening counts: the same words about a photo are a different
+    // question. Reopening also abandons a history switch still loading, as a
+    // send would, so the conversation asked for is the one that stays.
+    const opening = this.#local.get().turns[0]
+    if (opening?.userText === trimmed && opening.attachments.length === 0) {
+      this.#anchoredSession = this.#sessionCounter
       return
     }
     this.#startConversation()
@@ -438,7 +445,7 @@ class ChatSessionImpl implements ChatSession {
     const controller = new AbortController()
     const sending = { controller, session: this.#sessionCounter }
     this.#activeSend = sending
-    this.#lastSendSession = sending.session
+    this.#anchoredSession = sending.session
 
     try {
       // The graph overview degrades to null (prompt without the block)
@@ -518,13 +525,14 @@ class ChatSessionImpl implements ChatSession {
     this.#update({ attachments: [] })
     try {
       const restored = await chatHistory.loadConversation(conversationId)
-      // Superseded by another switch or New chat — or by a send: a message
-      // composed while the rows loaded belongs to the conversation that was
-      // on screen, so the user's turn must not be swapped out from under it.
-      // Checked via the last send's session (not the in-flight slot, which
-      // is cleared on settle) — a turn that finished streaming before the
-      // rows arrived still anchors the switch to the conversation it's in.
-      if (session !== this.#sessionCounter || this.#lastSendSession === session) {
+      // Superseded by another switch or New chat — or by a send (or an Ask
+      // that reopened the on-screen conversation): a message composed while
+      // the rows loaded belongs to the conversation that was on screen, so
+      // the user's turn must not be swapped out from under it. Checked via
+      // the anchored session (not the in-flight slot, which is cleared on
+      // settle) — a turn that finished streaming before the rows arrived
+      // still anchors the switch to the conversation it's in.
+      if (session !== this.#sessionCounter || this.#anchoredSession === session) {
         return
       }
       this.#update({ conversationId, turns: restored })
