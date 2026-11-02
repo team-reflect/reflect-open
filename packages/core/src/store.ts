@@ -5,13 +5,11 @@ import type { Unlisten } from './unlisten.ts'
  */
 export interface Store<T> {
   /**
-   * Returns the current value.
-   * `get` must return the same reference until the value changes.
+   * Returns the current value. It must return the same reference until the value changes.
    */
   get: () => T
   /**
-   * Subscribe to changes. The listener is called after the value changed.
-   * Returns an `Unlisten` function to tear down the subscription.
+   * Subscribes to changes. Returns an `Unlisten` function to tear down the subscription.
    */
   subscribe: (listener: VoidFunction) => Unlisten
 }
