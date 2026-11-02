@@ -3,6 +3,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphSessionState } from '../graph/graph-session-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
+import { deriveStore } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import type { EmbeddingIndexService } from './embedding-index-service.ts'
@@ -186,7 +187,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     }
 
     const unlisteners = [
-      settings.subscribe(react),
+      deriveStore(settings, (value) => value.semanticSearchEnabled).subscribe(react),
       embeddingRuntime.subscribe(react),
       graphSession.subscribe(react),
     ]
