@@ -1,6 +1,5 @@
 import { isNotNullish } from '@ocavue/utils'
 import type { ClockService } from '../ports/clock-service.ts'
-import type { TodayService } from './today-service.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { Unlisten } from '../unlisten.ts'
@@ -42,19 +41,14 @@ export interface DailyNotesRange {
 export interface DailyNoteServiceDeps {
   readonly database: DatabaseService
   readonly clock: ClockService
-  readonly today: TodayService
   readonly activity: ActivityPort
 }
 
 /**
- * The date questions about notes: today, which days have a daily note, and
- * the wake onto a new day.
+ * The date questions about notes: which days have a daily note, and the wake
+ * onto a new day.
  */
 export interface DailyNoteService {
-  /**
-   * Today's local calendar date as `YYYY-MM-DD`.
-   */
-  today(): string
   /**
    * ISO dates within `[start, end]` (inclusive) whose daily note has content,
    * ascending: the calendar's day markers.
@@ -86,10 +80,6 @@ class DailyNoteServiceImpl implements DailyNoteService {
 
   constructor(deps: DailyNoteServiceDeps) {
     this.#deps = deps
-  }
-
-  today(): string {
-    return this.#deps.today.get()
   }
 
   async dailyDatesInRange(start: string, end: string): Promise<string[]> {
