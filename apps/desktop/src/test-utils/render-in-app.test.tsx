@@ -8,7 +8,6 @@ import {
   useGraphRecents,
   useGraphStatus,
   useIndexGeneration,
-  useMaybeGraphInfo,
 } from '@/providers/graph-provider.tsx'
 import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
 import { useDateFormat, useSettingsService } from '@/providers/settings-provider.tsx'
@@ -133,7 +132,7 @@ describe('renderInApp', () => {
   })
 
   it('mounts only the services with `servicesOnly`, and registers the app commands', async () => {
-    const { result, appServices: appLayer } = await renderHookInApp(() => useMaybeGraphInfo(), {
+    const { result, appServices: appLayer } = await renderHookInApp(() => useGraphInfo(), {
       servicesOnly: true,
     })
 
