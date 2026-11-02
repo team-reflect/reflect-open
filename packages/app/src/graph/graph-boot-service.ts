@@ -105,7 +105,7 @@ class GraphBootServiceImpl implements GraphBootService {
         if (list.length > 0) {
           await this.openRecent(list[0]!.root)
         } else {
-          graphSession.park(graphSession.getState().error)
+          graphSession.park(graphSession.get().error)
         }
       })()
     } else if (!this.#isMobile()) {
@@ -209,7 +209,7 @@ class GraphBootServiceImpl implements GraphBootService {
     try {
       selected = await dialog.pickFolder({
         title: 'Choose a graph folder',
-        ...(await this.#pickerDefaultPath(graphSession.getState().recents.length > 0)),
+        ...(await this.#pickerDefaultPath(graphSession.get().recents.length > 0)),
       })
     } catch (err) {
       graphSession.reportError(errorMessage(err))
@@ -233,7 +233,7 @@ class GraphBootServiceImpl implements GraphBootService {
 
   async forgetRecent(root: string): Promise<void> {
     const { graphSession } = this.#deps
-    if (graphSession.getState().graph?.root === root) {
+    if (graphSession.get().graph?.root === root) {
       // Forgetting the ACTIVE graph ends the session its note windows
       // adopted: same close-first rule as switch/delete.
       await this.#closeSecondaryWindows()
@@ -243,7 +243,7 @@ class GraphBootServiceImpl implements GraphBootService {
 
   async deleteGraph(): Promise<void> {
     const { graphSession, window } = this.#deps
-    if (window.isMainWindow() && graphSession.getState().graph !== null) {
+    if (window.isMainWindow() && graphSession.get().graph !== null) {
       await this.#closeSecondaryWindows() // before the delete invalidates the session
     }
     await graphSession.deleteGraph()

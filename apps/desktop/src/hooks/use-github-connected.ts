@@ -1,6 +1,11 @@
+import type { GithubAuthState } from '@reflect/core'
 import { useEffect } from 'react'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useSelector } from '@/lib/use-store.ts'
+
+function selectConnected(state: GithubAuthState): boolean | null {
+  return state.connected
+}
 
 /**
  * Whether a GitHub credential is stored on this machine (keychain presence,
@@ -10,10 +15,10 @@ import { useServiceState } from '@/services/use-service-state.ts'
  */
 export function useGithubConnected(): boolean {
   const { githubAuth, logger } = useCoreServices()
-  const { connected } = useServiceState(githubAuth, githubAuth.getState)
+  const connected = useSelector(githubAuth, selectConnected)
 
   useEffect(() => {
-    if (githubAuth.getState().connected !== null) {
+    if (githubAuth.get().connected !== null) {
       return
     }
     githubAuth

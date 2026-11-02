@@ -1,4 +1,5 @@
-import { useSyncExternalStore, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
+import { useStore } from '@/lib/use-store.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -26,10 +27,7 @@ const MIN_WORKED = 100
  */
 export function IndexProgressPill(): ReactElement | null {
   const { indexLifecycle } = useCoreServices()
-  const progress = useSyncExternalStore(
-    indexLifecycle.subscribeFileProgress,
-    indexLifecycle.fileProgress,
-  )
+  const progress = useStore(indexLifecycle.fileProgress)
 
   if (progress === null || progress.total < MIN_TOTAL || progress.worked < MIN_WORKED) {
     return null

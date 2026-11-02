@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { foldTag, type NoteTagFacet } from '@reflect/core'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useAllNotesFilterTags } from '@/providers/settings-provider.tsx'
 import { CustomFilterMenu } from './custom-filter-menu.tsx'
 import { FilterTab } from './filter-tab.tsx'
 
@@ -19,13 +19,13 @@ interface AllNotesFiltersProps {
  * case-insensitive throughout, same as the `#tag` search token.
  */
 export function AllNotesFilters({ tag, facets, onSelect }: AllNotesFiltersProps): ReactElement {
-  const { settings } = useSettings()
+  const allNotesFilterTags = useAllNotesFilterTags()
 
   // The setting is user-edited JSON — dedupe case-insensitively and drop
   // blanks so a hand-edited document can't render twin or empty tabs.
   const pinned: string[] = []
   const pinnedKeys = new Set<string>()
-  for (const entry of settings.allNotesFilterTags) {
+  for (const entry of allNotesFilterTags) {
     const trimmed = entry.trim()
     const key = foldTag(trimmed)
     if (key !== '' && !pinnedKeys.has(key)) {

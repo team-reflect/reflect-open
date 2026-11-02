@@ -1,8 +1,9 @@
+import { isDeepEqual } from '@ocavue/utils'
 import { z } from 'zod'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { getJson, setJson, type StorageService } from '../ports/storage-service.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
-import type { Unlisten } from '../unlisten.ts'
+import { WritableStore, type Store } from '../store.ts'
 
 const appStoreEnvironmentSchema = z.enum(['Production', 'Sandbox', 'Xcode']).nullable()
 
@@ -38,12 +39,10 @@ export interface AppStoreEnvironmentState {
 /**
  * The App Store install channel, probed once per launch.
  */
-export interface AppStoreEnvironmentService {
-  getState: () => AppStoreEnvironmentState
-  subscribe: (listener: () => void) => Unlisten
+export interface AppStoreEnvironmentService extends Store<AppStoreEnvironmentState> {
   /**
    * This launch's channel, probed unless this launch already answered. A
-   * failed probe keeps the remembered channel and shows in `getState().isError`.
+   * failed probe keeps the remembered channel and shows in `get().isError`.
    */
   environment(): Promise<AppStoreEnvironment>
   /**
@@ -63,14 +62,13 @@ export interface AppStoreEnvironmentServiceDeps {
 class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
   readonly #deps: AppStoreEnvironmentServiceDeps
   readonly #enabled: boolean
-  readonly #listeners = new Set<() => void>()
+  readonly #state = new WritableStore<AppStoreEnvironmentState>(IDLE_STATE, isDeepEqual)
   #value: AppStoreEnvironment = null
   #answered = false
   #settled = false
   #probing = false
   #failed = false
   #pendingProbe: Promise<AppStoreEnvironment> | null = null
-  #state: AppStoreEnvironmentState = IDLE_STATE
 
   constructor(deps: AppStoreEnvironmentServiceDeps) {
     this.#deps = deps
@@ -82,18 +80,13 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
           APP_STORE_ENVIRONMENT_STORAGE_KEY,
           rememberedEnvironmentSchema,
         ) ?? null
-      this.#state = this.#computeState()
+      this.#state.set(this.#computeState())
     }
   }
 
-  readonly getState = (): AppStoreEnvironmentState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   environment(): Promise<AppStoreEnvironment> {
     if (!this.#enabled) {
@@ -114,7 +107,7 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
 
   readonly invalidate = (): void => {
     this.#answered = false
-    if (this.#listeners.size > 0) {
+    if (this.#state.subscribed()) {
       void this.environment()
     }
   }
@@ -124,22 +117,6 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
       value: this.#value,
       isLoading: this.#value === null && (this.#probing || !this.#settled),
       isError: this.#failed,
-    }
-  }
-
-  #publish(): void {
-    const next = this.#computeState()
-    const state = this.#state
-    if (
-      next.value === state.value &&
-      next.isLoading === state.isLoading &&
-      next.isError === state.isError
-    ) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
     }
   }
 
@@ -160,7 +137,7 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
 
   async #probe(): Promise<AppStoreEnvironment> {
     this.#probing = true
-    this.#publish()
+    this.#state.set(this.#computeState())
     try {
       let raw: string
       try {
@@ -178,7 +155,7 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
     } finally {
       this.#probing = false
       this.#settled = true
-      this.#publish()
+      this.#state.set(this.#computeState())
     }
     return this.#value
   }

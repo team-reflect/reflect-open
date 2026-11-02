@@ -4,7 +4,7 @@ import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
 import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useDateFormat, useWeekStartDay } from '@/providers/settings-provider.tsx'
 
 interface TaskScheduleGridProps {
   /** Today's live ISO date — anchors the opening month and marks "today". */
@@ -23,11 +23,12 @@ interface TaskScheduleGridProps {
  * Reuses {@link buildMonthGrid}, so it shares the daily calendar's math.
  */
 export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridProps): ReactElement {
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
   // Open on the due date's month when there is one — that's the date being
   // rescheduled — else today's.
   const [month, setMonth] = useState(() => getYearMonth(selected ?? today))
-  const grid = buildMonthGrid(month, settings.weekStartDay)
+  const grid = buildMonthGrid(month, weekStartDay)
 
   return (
     <div aria-label="Pick a date">
@@ -53,7 +54,7 @@ export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridPr
         </nav>
       </header>
       <div className="grid grid-cols-7 text-center">
-        {getWeekdayLabels(settings.weekStartDay).map((weekday) => (
+        {getWeekdayLabels(weekStartDay).map((weekday) => (
           <div key={weekday} className="py-1 text-xs font-medium text-text-muted">
             {weekday}
           </div>
@@ -70,7 +71,7 @@ export function TaskScheduleGrid({ today, selected, onPick }: TaskScheduleGridPr
               <button
                 key={cell.date}
                 type="button"
-                aria-label={formatDayLabel(cell.date, settings.dateFormat)}
+                aria-label={formatDayLabel(cell.date, dateFormat)}
                 aria-current={isToday ? 'date' : undefined}
                 aria-pressed={isSelected}
                 onClick={() => onPick(cell.date)}

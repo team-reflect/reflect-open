@@ -8,7 +8,7 @@ import {
 } from '@reflect/core'
 import { useNoteRowOverlays } from '@/hooks/note-row-overlay.ts'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const EMPTY: readonly PinnedNote[] = []
@@ -26,7 +26,7 @@ function titleFromPath(path: string): string {
  * one query key, so both consumers ride a single fetch.
  */
 export function usePinnedNotes(): readonly PinnedNote[] {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const root = graph?.root
   const { indexQuery, noteRows } = useCoreServices()
   const queryClient = useQueryClient()

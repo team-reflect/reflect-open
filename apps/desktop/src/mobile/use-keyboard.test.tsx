@@ -10,7 +10,7 @@ import { useKeyboardHeightVar, useKeyboardVisible } from './use-keyboard.ts'
  * The `KeyboardService` behind `--keyboard-height`, as the app reads it:
  * imperative consumers (the day carousel's drag guard fires at drag start,
  * outside React) read the last published overlap through
- * `KeyboardService.getHeight`; reactive ones (the shell hiding the tab bar)
+ * `KeyboardService.get`; reactive ones (the shell hiding the tab bar)
  * subscribe through {@link useKeyboardVisible}.
  */
 describe('keyboard height', () => {
@@ -18,11 +18,11 @@ describe('keyboard height', () => {
     const { keyboard } = createTestAppServices(
       createTestCoreServices({ database: createWasmTestDatabaseService() }),
     )
-    expect(keyboard.getHeight()).toBe(0)
+    expect(keyboard.get()).toBe(0)
     keyboard.publish(316)
-    expect(keyboard.getHeight()).toBe(316)
+    expect(keyboard.get()).toBe(316)
     keyboard.publish(0)
-    expect(keyboard.getHeight()).toBe(0)
+    expect(keyboard.get()).toBe(0)
   })
 
   it('exposes visibility as reactive state', async () => {
@@ -88,14 +88,14 @@ describe('useKeyboardHeightVar', () => {
     await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
-    expect(keyboard.getHeight()).toBe(336)
+    expect(keyboard.get()).toBe(336)
     expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('336px')
 
     viewport.height = 800
     await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
-    expect(keyboard.getHeight()).toBe(0)
+    expect(keyboard.get()).toBe(0)
     await view.unmount()
   })
 
@@ -108,7 +108,7 @@ describe('useKeyboardHeightVar', () => {
     await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
-    expect(keyboard.getHeight()).toBe(0)
+    expect(keyboard.get()).toBe(0)
     await view.unmount()
   })
 
@@ -121,7 +121,7 @@ describe('useKeyboardHeightVar', () => {
     await act(() => {
       viewport.dispatchEvent(new Event('resize'))
     })
-    expect(keyboard.getHeight()).toBe(336)
+    expect(keyboard.get()).toBe(336)
 
     // iOS 26.0: the keyboard closed, but the viewport still reports 464.
     vi.useFakeTimers()
@@ -131,7 +131,7 @@ describe('useKeyboardHeightVar', () => {
     await act(() => {
       vi.advanceTimersByTime(1750)
     })
-    expect(keyboard.getHeight()).toBe(0)
+    expect(keyboard.get()).toBe(0)
     vi.useRealTimers()
     await view.unmount()
   })

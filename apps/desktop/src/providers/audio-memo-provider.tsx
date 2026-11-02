@@ -9,7 +9,13 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import type { AudioMemoSession, AudioMemoSessionState, GraphInfo } from '@reflect/core'
+import {
+  deriveStore,
+  type AudioMemoSession,
+  type AudioMemoSessionState,
+  type GraphInfo,
+  type MobileAudioMemoSessionState,
+} from '@reflect/core'
 import {
   dismissRecordingReminder,
   showRecordingReminder,
@@ -17,7 +23,7 @@ import {
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useSelector } from '@/lib/use-store.ts'
 
 /**
  * The desktop React surface for audio memos: a thin shell over the
@@ -28,28 +34,38 @@ import { useServiceState } from '@/services/use-service-state.ts'
  * session stops and saves instead of leaving a hidden hot microphone.
  */
 
-export type AudioMemoContextValue = AudioMemoSessionState &
-  Pick<AudioMemoSession, 'cancel' | 'retry' | 'discard'> & {
-    /**
-     * Idle → start recording (expanding a collapsed sidebar); recording → stop & save.
-     */
-    toggle: () => void
-    /**
-     * Where a live recording shows. `popover`: the desktop panel anchored to
-     * the mic. `sheet`: the iOS app's recording sheet, which owns the
-     * recording UI while the mic only starts and stops it.
-     */
-    presentation: 'popover' | 'sheet'
-  }
+/**
+ * The session's stores: the state, and the elapsed time apart from it.
+ */
+export type AudioMemoSessionStores = Pick<AudioMemoSession, 'get' | 'subscribe' | 'elapsedMs'>
 
-const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
+export interface AudioMemoContextValue extends Pick<
+  AudioMemoSession,
+  'cancel' | 'retry' | 'discard'
+> {
+  readonly session: AudioMemoSessionStores
+  /**
+   * Idle → start recording (expanding a collapsed sidebar); recording → stop & save.
+   */
+  toggle: () => void
+  /**
+   * Where a live recording shows. `popover`: the desktop panel anchored to
+   * the mic. `sheet`: the iOS app's recording sheet, which owns the
+   * recording UI while the mic only starts and stops it.
+   */
+  presentation: 'popover' | 'sheet'
+}
+
+/**
+ * The audio-memo session and its actions.
+ */
+export const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
 
 /**
  * What the surface shows before the session opens.
  */
 const CLOSED_STATE: AudioMemoSessionState = {
   phase: 'idle',
-  elapsedMs: 0,
   stream: null,
   pendingCount: 0,
   available: false,
@@ -65,9 +81,60 @@ const CLOSED_STATE: AudioMemoSessionState = {
  */
 const NATIVE_RECORDER_MISSING = 'Audio recording is not supported on this platform'
 
-const CLOSED_SESSION = {
+const CLOSED_SESSION: AudioMemoSessionStores = {
+  get: () => CLOSED_STATE,
   subscribe: () => () => {},
-  getState: () => CLOSED_STATE,
+  elapsedMs: { get: () => 0, subscribe: () => () => {} },
+}
+
+function selectRecorderState(state: AudioMemoSessionState): AudioMemoSessionState['recorderState'] {
+  return state.recorderState
+}
+
+function selectPhase(state: AudioMemoSessionState): AudioMemoSessionState['phase'] {
+  return state.phase
+}
+
+function selectAvailable(state: AudioMemoSessionState): AudioMemoSessionState['available'] {
+  return state.available
+}
+
+function selectUnavailableReason(
+  state: AudioMemoSessionState,
+): AudioMemoSessionState['unavailableReason'] {
+  return state.unavailableReason
+}
+
+function selectError(state: AudioMemoSessionState): AudioMemoSessionState['error'] {
+  return state.error
+}
+
+function selectCanRetry(state: AudioMemoSessionState): AudioMemoSessionState['canRetry'] {
+  return state.canRetry
+}
+
+function selectStream(state: AudioMemoSessionState): AudioMemoSessionState['stream'] {
+  return state.stream
+}
+
+/**
+ * The desktop's view of the iOS app's recording session.
+ */
+function toAudioMemoState(state: MobileAudioMemoSessionState): AudioMemoSessionState {
+  return {
+    phase: state.phase,
+    stream: null,
+    pendingCount: state.pendingCount,
+    // The sheet explains a missing transcription model itself, so the mic
+    // opens it rather than going inert; only a missing native recorder (a
+    // plain browser) disables it.
+    available: state.available,
+    unavailableReason: state.available ? null : NATIVE_RECORDER_MISSING,
+    error: state.error,
+    canRetry: state.canRetry,
+    recorderState:
+      state.phase === 'recording' || state.phase === 'requesting' ? state.phase : 'idle',
+  }
 }
 
 interface AudioMemoProviderProps {
@@ -90,21 +157,14 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
 
 function NativeAudioMemoBridge({ children }: { children: ReactNode }): ReactElement {
   const memo = useMobileAudioMemo()
+  const mobileSession = memo.session
+  const session = useMemo<AudioMemoSessionStores>(() => {
+    const state = deriveStore(mobileSession, toAudioMemoState)
+    return { get: state.get, subscribe: state.subscribe, elapsedMs: mobileSession.elapsedMs }
+  }, [mobileSession])
   const value = useMemo<AudioMemoContextValue>(
     () => ({
-      phase: memo.phase,
-      elapsedMs: memo.elapsedMs,
-      stream: null,
-      pendingCount: memo.pendingCount,
-      // The sheet explains a missing transcription model itself, so the mic
-      // opens it rather than going inert; only a missing native recorder (a
-      // plain browser) disables it.
-      available: memo.available,
-      unavailableReason: memo.available ? null : NATIVE_RECORDER_MISSING,
-      error: memo.error,
-      canRetry: memo.canRetry,
-      recorderState:
-        memo.phase === 'recording' || memo.phase === 'requesting' ? memo.phase : 'idle',
+      session,
       toggle: memo.toggle,
       cancel: () => {
         void memo.cancelRecording()
@@ -113,7 +173,7 @@ function NativeAudioMemoBridge({ children }: { children: ReactNode }): ReactElem
       discard: memo.discard,
       presentation: 'sheet',
     }),
-    [memo],
+    [session, memo],
   )
   return <AudioMemoContext value={value}>{children}</AudioMemoContext>
 }
@@ -151,35 +211,35 @@ function WebviewAudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   }, [audioMemo, graph.generation])
 
   const store = session ?? CLOSED_SESSION
-  const state = useServiceState(store, store.getState)
 
   // The mic button (and its popover) unmount with the sidebar. The session
   // decides what a hidden surface means for a live recording or a pending
   // permission request; it needs the answer again after each recorder change.
-  const recorderState = state.recorderState
+  const recorderState = useSelector(store, selectRecorderState)
   useEffect(() => {
     session?.setSurfaceHidden(collapsed)
   }, [session, collapsed, recorderState])
 
-  const controls = useMemo(
+  const value = useMemo<AudioMemoContextValue>(
     () => ({
+      session: store,
       toggle: () => session?.toggle(),
       cancel: () => session?.cancel(),
       retry: () => session?.retry(),
       discard: () => session?.discard(),
+      presentation: 'popover',
     }),
-    [session],
-  )
-  const value = useMemo<AudioMemoContextValue>(
-    () => ({ ...state, ...controls, presentation: 'popover' }),
-    [state, controls],
+    [session, store],
   )
 
   return <AudioMemoContext value={value}>{children}</AudioMemoContext>
 }
 
 /**
- * Access the audio-memo surface. Use within an AudioMemoProvider.
+ * Access the audio-memo session and its actions. Use within an
+ * AudioMemoProvider. Reading the context does not subscribe to the state:
+ * read fields with the `useAudioMemo*` field hooks, and the elapsed time with
+ * `useStore(session.elapsedMs)`.
  */
 export function useAudioMemo(): AudioMemoContextValue {
   const context = use(AudioMemoContext)
@@ -187,4 +247,32 @@ export function useAudioMemo(): AudioMemoContextValue {
     throw new Error('useAudioMemo must be used within an AudioMemoProvider')
   }
   return context
+}
+
+function useAudioMemoSelector<T>(selector: (state: AudioMemoSessionState) => T): T {
+  return useSelector(useAudioMemo().session, selector)
+}
+
+export function useAudioMemoPhase(): AudioMemoSessionState['phase'] {
+  return useAudioMemoSelector(selectPhase)
+}
+
+export function useAudioMemoAvailable(): AudioMemoSessionState['available'] {
+  return useAudioMemoSelector(selectAvailable)
+}
+
+export function useAudioMemoUnavailableReason(): AudioMemoSessionState['unavailableReason'] {
+  return useAudioMemoSelector(selectUnavailableReason)
+}
+
+export function useAudioMemoError(): AudioMemoSessionState['error'] {
+  return useAudioMemoSelector(selectError)
+}
+
+export function useAudioMemoCanRetry(): AudioMemoSessionState['canRetry'] {
+  return useAudioMemoSelector(selectCanRetry)
+}
+
+export function useAudioMemoStream(): AudioMemoSessionState['stream'] {
+  return useAudioMemoSelector(selectStream)
 }

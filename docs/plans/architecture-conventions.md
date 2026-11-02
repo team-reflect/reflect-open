@@ -173,7 +173,7 @@ State is split **by kind**, not funneled through one store:
   projection, it never holds a second copy.**
 - **Service-owned state** (settings, theme, active graph, history, backup status,
   operations, chat) → lives **in the service** as a snapshot + `subscribe()`, read with
-  `useServiceState`. Not mirrored into a query cache or store.
+  `useStore` / `useSelector`. Not mirrored into a query cache or store.
 - **Editor state** → owned by meowdown/ProseMirror (the `<Editor>` is uncontrolled).
 - **Shared UI state** → **React context + hooks by default**. **Zustand** is available
   when a slice outgrows context (frequent updates re-rendering too widely, or state needed

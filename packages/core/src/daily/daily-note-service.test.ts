@@ -3,23 +3,26 @@ import { createTestClockService } from '../testing/clock.ts'
 import { createNodeTestDatabaseService, seedNotes } from '../testing/database.ts'
 import { createTestActivityPort } from '../testing/shell.ts'
 import { createDailyNoteService, type DailyNoteService } from './daily-note-service.ts'
+import { createTodayService } from './today-service.ts'
 
 function createTestDailyNoteService(
   deps?: Partial<Parameters<typeof createDailyNoteService>[0]>,
 ): DailyNoteService {
+  const clock = deps?.clock ?? createTestClockService()
   return createDailyNoteService({
     database: deps?.database ?? createNodeTestDatabaseService(),
-    clock: deps?.clock ?? createTestClockService(),
+    clock,
+    today: deps?.today ?? createTodayService({ clock }),
     activity: deps?.activity ?? createTestActivityPort(),
   })
 }
 
 describe('today', () => {
   it('follows the clock', () => {
-    const clock = createTestClockService({ today: '2026-06-12' })
+    const clock = createTestClockService({ now: new Date(2026, 5, 12, 12, 0, 0).getTime() })
     const dailyNotes = createTestDailyNoteService({ clock })
     expect(dailyNotes.today()).toBe('2026-06-12')
-    clock.setToday('2026-06-13')
+    clock.setNow(new Date(2026, 5, 13, 12, 0, 0).getTime())
     expect(dailyNotes.today()).toBe('2026-06-13')
   })
 })
@@ -142,18 +145,22 @@ describe('subscribeWakeOnNewDay', () => {
     expect(days).toEqual(['2026-06-13'])
   })
 
-  it('reads the wall clock, so a stale cached `today()` cannot hide the new day', () => {
-    const clock = createTestClockService({ now: evening, today: '2026-06-12' })
+  it('reads the wall clock, so a stale cached `today` cannot hide the new day', () => {
+    const clock = createTestClockService({ now: evening })
     const activity = createTestActivityPort()
-    const dailyNotes = createTestDailyNoteService({ clock, activity })
+    const today = createTodayService({ clock })
+    const unsubscribeToday = today.subscribe(() => {})
+    const dailyNotes = createTestDailyNoteService({ clock, today, activity })
     const days: string[] = []
-    dailyNotes.subscribeWakeOnNewDay((today) => {
-      days.push(today)
+    dailyNotes.subscribeWakeOnNewDay((day) => {
+      days.push(day)
     })
     activity.emitHidden()
     clock.setNow(new Date(2026, 5, 13, 8, 0, 0).getTime())
+    expect(today.get()).toBe('2026-06-12')
     activity.emitVisible()
     expect(days).toEqual(['2026-06-13'])
+    unsubscribeToday()
   })
 
   it('stops after unsubscribing', () => {

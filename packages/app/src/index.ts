@@ -33,6 +33,7 @@ export {
   THEME_PREFERENCE_CACHE_KEY,
   type ResolvedTheme,
   type ThemeService,
+  type ThemeState,
 } from './settings/theme-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
@@ -170,11 +171,11 @@ export {
   type PickFolderOptions,
 } from './app/dialog-service.ts'
 export {
-  createPlatformService,
+  createSystemPreferencesService,
   type ColorScheme,
   type PlatformMedia,
-  type PlatformService,
-} from './app/platform-service.ts'
+  type SystemPreferencesService,
+} from './app/system-preferences-service.ts'
 export { type GraphBootService } from './graph/graph-boot-service.ts'
 export {
   type MobileOnboardingService,

@@ -3,13 +3,13 @@ import { page, userEvent, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
   createTestCoreServices,
-  createTestPlatformService,
   makeOpenTask as task,
   type TestCoreServices,
   type TestHapticsService,
   type TestStorageService,
 } from '@reflect/core/testing'
 import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { useRouter } from '@/routing/router.tsx'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -173,6 +173,10 @@ function renderScreen() {
     </>,
     {
       core,
+      // Reduced motion: an instant settle, so row transforms can be asserted synchronously.
+      appServices: {
+        systemPreferences: createTestSystemPreferencesService({ reducedMotion: true }),
+      },
       graph: { root: '/g', name: 'g', generation: 1 },
       settings: {
         dateFormat: 'mdy',
@@ -235,8 +239,6 @@ beforeEach(async () => {
   // A fresh service per test, so its recently-completed set starts empty.
   core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
-    // Reduced motion: an instant settle, so row transforms can be asserted synchronously.
-    platform: createTestPlatformService({ reducedMotion: true }),
   })
   const { tasks } = core
   getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([])

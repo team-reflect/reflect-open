@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createPlatformService } from '@reflect/app'
 import { detectPlatformFacts } from './detect-platform.ts'
 
 const DESKTOP_SURFACE = { touchEditor: false, mobileApp: false }
@@ -65,10 +64,8 @@ describe('detectPlatformFacts', () => {
     expect(facts.surface).toEqual(DESKTOP_SURFACE)
   })
 
-  it('gives the app platform its mobile surface at boot, so the mobile root sets nothing', () => {
+  it('gives the platform its mobile surface at boot, so the mobile root sets nothing', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', 'ios')
-    // What `boot.ts` builds `appServices.platform` from, before any root loads.
-    const platform = createPlatformService({ facts: detectPlatformFacts(true) })
-    expect(platform.surface).toEqual(MOBILE_SURFACE)
+    expect(detectPlatformFacts(true).surface).toEqual(MOBILE_SURFACE)
   })
 })

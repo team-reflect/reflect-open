@@ -766,7 +766,7 @@ describe('trashMany', () => {
 
     await expect(actions.trashMany([])).resolves.toEqual({ succeeded: [], failed: [] })
 
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('trashes every note in order under one operation', async () => {
@@ -780,9 +780,9 @@ describe('trashMany', () => {
     })
 
     expect(files.trashed()).toEqual(['notes/a.md', 'notes/b.md'])
-    expect([...noteRows.getOverlays().keys()]).toEqual(['notes/a.md', 'notes/b.md'])
+    expect([...noteRows.get().keys()]).toEqual(['notes/a.md', 'notes/b.md'])
     expect(progress.started()).toMatchObject([{ label: 'Trashing notes', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('keeps going past a failure and fails the operation with the last error', async () => {
@@ -813,7 +813,7 @@ describe('trashMany', () => {
     ])
     expect(files.trashed()).toEqual(['notes/a.md', 'notes/c.md'])
     // A note that failed stays listed.
-    expect([...noteRows.getOverlays().keys()]).toEqual(['notes/a.md', 'notes/c.md'])
+    expect([...noteRows.get().keys()]).toEqual(['notes/a.md', 'notes/c.md'])
     expect(progress.snapshot()).toMatchObject([
       { label: 'Trashing notes', status: 'failed', message: 'Daily notes cannot be deleted' },
     ])
@@ -942,7 +942,7 @@ describe('with no graph open', () => {
     ).resolves.toEqual([])
 
     expect(files.writes()).toEqual([])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('rejects a trash and fails a batch trash with the reason', async () => {

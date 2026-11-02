@@ -291,7 +291,7 @@ describe('GithubAuthService.getSignedInUser', () => {
     http.on('GET', USER_URL, jsonResponse({ login: 'alex' }))
 
     expect(await auth.getSignedInUser()).toEqual({ login: 'alex', avatarUrl: null })
-    expect(auth.getState().connected).toBe(true)
+    expect(auth.get().connected).toBe(true)
   })
 
   it('does not mark the machine connected when a sign-out landed during the probe', async () => {
@@ -304,7 +304,7 @@ describe('GithubAuthService.getSignedInUser', () => {
     })
 
     expect(await auth.getSignedInUser()).toEqual({ login: 'alex', avatarUrl: null })
-    expect(auth.getState().connected).toBe(false)
+    expect(auth.get().connected).toBe(false)
   })
 
   it('returns null without network when nothing is stored', async () => {
@@ -359,17 +359,17 @@ describe('GithubAuthService.load', () => {
   it('returns null (not a crash) for unreadable stored credentials', async () => {
     const { auth } = setup({ secrets: { 'github-auth': 'not json' } })
     expect(await auth.load()).toBeNull()
-    expect(auth.getState().connected).toBe(false)
+    expect(auth.get().connected).toBe(false)
   })
 
   it('publishes whether a credential is stored, unknown until the first read', async () => {
     const { auth } = setup({
       secrets: { 'github-auth': JSON.stringify({ kind: 'pat', token: 'ghp_abc' }) },
     })
-    expect(auth.getState().connected).toBeNull()
+    expect(auth.get().connected).toBeNull()
 
     await auth.load()
-    expect(auth.getState().connected).toBe(true)
+    expect(auth.get().connected).toBe(true)
   })
 
   it('keeps a save that lands while a read is in flight', async () => {
@@ -378,7 +378,7 @@ describe('GithubAuthService.load', () => {
     await auth.save({ kind: 'pat', token: 'ghp_abc' })
     await read
 
-    expect(auth.getState().connected).toBe(true)
+    expect(auth.get().connected).toBe(true)
   })
 })
 
@@ -390,15 +390,30 @@ describe('GithubAuthService change notification', () => {
 
     await auth.save({ kind: 'pat', token: 'ghp_abc' })
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(auth.getState().connected).toBe(true)
+    expect(auth.get().connected).toBe(true)
 
     await auth.clear()
     expect(listener).toHaveBeenCalledTimes(2)
-    expect(auth.getState().connected).toBe(false)
+    expect(auth.get().connected).toBe(false)
 
     unsubscribe()
     await auth.save({ kind: 'pat', token: 'ghp_abc' })
     expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the state reference when the connection does not change', async () => {
+    const { auth } = setup()
+    await auth.save({ kind: 'pat', token: 'ghp_abc' })
+    const state = auth.get()
+    expect(auth.get()).toBe(state)
+
+    const listener = vi.fn()
+    auth.subscribe(listener)
+    await auth.save({ kind: 'pat', token: 'ghp_def' })
+    await auth.load()
+
+    expect(listener).not.toHaveBeenCalled()
+    expect(auth.get()).toBe(state)
   })
 })
 

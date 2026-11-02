@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { type NoteRow, applyNoteRowOverlay } from '@reflect/core'
 import { useNoteRowOverlay } from '@/hooks/note-row-overlay.ts'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 export interface NoteRowState {
@@ -24,7 +24,7 @@ export interface NoteRowState {
  * row, and the overlay retires once the index agrees.
  */
 export function useNoteRowState(path: string): NoteRowState {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { indexQuery, noteRows } = useCoreServices()
   const { data, isFetched } = useQuery({
     queryKey: queryKeys.index.note(graph?.root, path),

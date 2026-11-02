@@ -47,8 +47,8 @@ interface MobileScreenProps {
 /**
  * The mobile route switch (Plan 19): the same typed `Route` history desktop
  * uses, one screen per route — the daily spine, notes, the All
- * tab (which also hosts `search` entries), the Tasks and Chat tabs, and the
- * pushed Settings / Graphs cards. Today is `useToday()`'s **live** date, so
+ * tab (which also hosts `search` entries), the Tasks tab, and the pushed
+ * Chat / Settings / Graphs cards. Today is `useToday()`'s **live** date, so
  * an app left open overnight rolls to the new day's note at midnight instead
  * of editing yesterday's.
  */
