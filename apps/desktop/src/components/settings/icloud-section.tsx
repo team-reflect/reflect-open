@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { isICloudRoot } from '@reflect/core'
+import { isICloudRoot, type GitSyncState } from '@reflect/core'
 import { SettingsField } from '@/components/settings/field.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -17,10 +17,15 @@ import { InlineAlert } from '@/components/inline-alert.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
-import { useGitSync } from '@/providers/sync-provider.tsx'
+import { useSelector } from '@/lib/use-store.ts'
+import { useGitSyncActions, useGitSyncStore } from '@/providers/sync-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const PENDING_NOTES_REFETCH_MS = 5_000
+
+function selectGitSyncConnected(state: GitSyncState): boolean {
+  return state.phase === 'connected'
+}
 
 function pendingNotesLine(count: number): string {
   return count === 1
@@ -42,7 +47,8 @@ function pendingNotesLine(count: number): string {
  */
 export function IcloudSettingsField(): ReactElement | null {
   const { graph, openRecent } = useGraph()
-  const { state, disconnectGraph } = useGitSync()
+  const gitSyncConnected = useSelector(useGitSyncStore(), selectGitSyncConnected)
+  const { disconnectGraph } = useGitSyncActions()
   const { icloudMigration: migration, icloudNative, platform } = useCoreServices()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const move = useAsyncAction()
@@ -72,7 +78,6 @@ export function IcloudSettingsField(): ReactElement | null {
   if (!platform.isMacosDesktop || graph === null) {
     return null
   }
-  const gitSyncConnected = state.phase === 'connected'
 
   async function moveToICloud(): Promise<void> {
     setError(null)

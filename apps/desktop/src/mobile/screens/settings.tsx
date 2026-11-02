@@ -53,7 +53,7 @@ import {
 import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
 import { useSettings } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
-import { useGitSyncContext } from '@/providers/sync-provider.tsx'
+import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
@@ -128,7 +128,8 @@ export function MobileSettings(): ReactElement {
   const showPrerelease =
     platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
   const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
-  const sync = useGitSyncContext()
+  const gitSync = useGitSyncState()
+  const { disconnectGraph } = useGitSyncActions()
   const githubConnected = useGithubConnected()
   const disconnectAction = useAsyncAction()
   const signOutAction = useAsyncAction()
@@ -160,13 +161,10 @@ export function MobileSettings(): ReactElement {
     enabled: graph !== null,
   })
 
-  const gitSync = sync?.state ?? null
   const status = getMobileSyncStatus(gitSync)
   // A graph with a remote, connected or waiting for its sign-in.
   const remote =
-    gitSync !== null && (gitSync.phase === 'connected' || gitSync.phase === 'needsCredential')
-      ? gitSync
-      : null
+    gitSync.phase === 'connected' || gitSync.phase === 'needsCredential' ? gitSync : null
   // A host remote that waits for its sign-in can get one here. Plain HTTP
   // cannot: the resolver never sends a sign-in in the clear.
   const canAddSignIn =
@@ -183,17 +181,14 @@ export function MobileSettings(): ReactElement {
   // are mutually exclusive per graph, Plan 21) and wait out the controller's
   // `loading` phase so the rows never flash on a graph that turns out to be
   // connected.
-  const canConnect = mobileStorageKind === 'local' && gitSync?.phase === 'disconnected'
+  const canConnect = mobileStorageKind === 'local' && gitSync.phase === 'disconnected'
 
   // Stop syncing this graph: drop its remote. The local clone and every
   // sign-in stay; the controller restarts into its disconnected state.
   async function disconnect(): Promise<void> {
-    if (sync === null) {
-      return
-    }
     await disconnectAction.run(async () => {
       try {
-        await sync.disconnectGraph()
+        await disconnectGraph()
       } catch (err) {
         logger.error('stop syncing failed:', errorMessage(err))
       }

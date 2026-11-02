@@ -4,7 +4,7 @@ import { page } from 'vitest/browser'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { useGraph, useMaybeGraph } from '@/providers/graph-provider.tsx'
 import { useSettings } from '@/providers/settings-provider.tsx'
-import { useGitSyncContext } from '@/providers/sync-provider.tsx'
+import { useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -14,7 +14,7 @@ function Probe(): ReactElement {
   const { status, graph, indexGeneration, indexing, recents, mobileStorageKind } = useGraph()
   const { settings, updateSettings } = useSettings()
   const { route, navigate } = useRouter()
-  const sync = useGitSyncContext()
+  const sync = useGitSyncState()
   return (
     <div>
       <output data-testid="graph">
@@ -23,7 +23,7 @@ function Probe(): ReactElement {
       </output>
       <output data-testid="settings">{settings.dateFormat}</output>
       <output data-testid="route">{JSON.stringify(route)}</output>
-      <output data-testid="git-sync">{sync?.state.phase ?? 'no sync'}</output>
+      <output data-testid="git-sync">{sync.phase}</output>
       <button type="button" onClick={() => updateSettings({ dateFormat: 'iso' })}>
         iso
       </button>
