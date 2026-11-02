@@ -18,9 +18,10 @@ export function useSelector<T, U>(
   selector: (state: T) => U,
   isEqual?: (a: U, b: U) => boolean,
 ): U {
-  const derivedStore: Store<U> = useMemo(() => {
-    return deriveStore(store, selector, isEqual)
-  }, [store, selector, isEqual])
+  const derivedStore: Store<U> = useMemo(
+    () => deriveStore(store, selector, isEqual),
+    [store, selector, isEqual],
+  )
 
   return useStore(derivedStore)
 }
