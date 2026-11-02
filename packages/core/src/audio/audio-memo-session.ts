@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import { z } from 'zod'
 import { safeParseJson } from '@reflect/utils'
 
@@ -90,14 +91,9 @@ export interface AudioMemoSession {
 
 /** Group parsed parts into sessions, oldest session first. */
 export function groupAudioMemoSessions(parts: AudioMemoPart[]): AudioMemoSession[] {
-  const byBase = new Map<string, AudioMemoPart[]>()
+  const byBase = new DefaultMap<string, AudioMemoPart[]>(() => [])
   for (const part of parts) {
-    const group = byBase.get(part.memo.base)
-    if (group === undefined) {
-      byBase.set(part.memo.base, [part])
-    } else {
-      group.push(part)
-    }
+    byBase.get(part.memo.base).push(part)
   }
   return [...byBase]
     .sort(([first], [second]) => first.localeCompare(second))

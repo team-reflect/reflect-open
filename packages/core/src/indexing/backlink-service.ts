@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import type { Database } from '@reflect/db'
 import { sql, type Selectable } from 'kysely'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
@@ -230,17 +231,12 @@ class BacklinkServiceImpl implements BacklinkService {
       .execute()
 
     const selectedSourcePaths = new Set(pageSources.map((source) => source.sourcePath))
-    const positionsBySource = new Map<string, number[]>()
+    const positionsBySource = new DefaultMap<string, number[]>(() => [])
     for (const row of rows) {
       if (!selectedSourcePaths.has(row.sourcePath)) {
         continue
       }
-      const positions = positionsBySource.get(row.sourcePath)
-      if (positions === undefined) {
-        positionsBySource.set(row.sourcePath, [row.posFrom])
-      } else {
-        positions.push(row.posFrom)
-      }
+      positionsBySource.get(row.sourcePath).push(row.posFrom)
     }
 
     // Every spelling that resolves to the target (title, aliases, daily date),
@@ -273,7 +269,10 @@ class BacklinkServiceImpl implements BacklinkService {
     for (const pageSource of pageSources) {
       const source = sources.get(pageSource.sourcePath)
       const seenSnippets = new Set<string>()
-      for (const posFrom of positionsBySource.get(pageSource.sourcePath) ?? []) {
+      const positions = positionsBySource.has(pageSource.sourcePath)
+        ? positionsBySource.get(pageSource.sourcePath)
+        : []
+      for (const posFrom of positions) {
         const context =
           source == null
             ? { text: '', lineOrigins: [] }

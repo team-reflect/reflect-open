@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createTestLoggerService } from './logger.ts'
 import { AppError } from '../errors.ts'
@@ -44,8 +45,10 @@ export interface TestIpcBridgeServiceOptions {
 class TestIpcTransport implements IpcBridge {
   readonly #commands: Map<string, CommandHandler>
   readonly #binaryCommands = new Map<string, BinaryCommandHandler>()
-  readonly #eventHandlers = new Map<string, Set<(payload: unknown) => void>>()
-  readonly #pluginHandlers = new Map<string, Set<(payload: unknown) => void>>()
+  readonly #eventHandlers = new DefaultMap<string, Set<(payload: unknown) => void>>(() => new Set())
+  readonly #pluginHandlers = new DefaultMap<string, Set<(payload: unknown) => void>>(
+    () => new Set(),
+  )
   readonly #log: { command: string; args: Record<string, unknown> }[] = []
 
   readonly invokeBinary?: (
@@ -113,15 +116,11 @@ class TestIpcTransport implements IpcBridge {
   }
 
   #addHandler(
-    registry: Map<string, Set<(payload: unknown) => void>>,
+    registry: DefaultMap<string, Set<(payload: unknown) => void>>,
     key: string,
     handler: (payload: unknown) => void,
   ): Unlisten {
-    let handlers = registry.get(key)
-    if (handlers === undefined) {
-      handlers = new Set()
-      registry.set(key, handlers)
-    }
+    const handlers = registry.get(key)
     // Wrapped for identity, so registering one function twice detaches independently.
     const deliver = (payload: unknown): void => {
       handler(payload)
@@ -133,11 +132,14 @@ class TestIpcTransport implements IpcBridge {
   }
 
   #dispatch(
-    registry: Map<string, Set<(payload: unknown) => void>>,
+    registry: DefaultMap<string, Set<(payload: unknown) => void>>,
     key: string,
     payload: unknown,
   ): void {
-    for (const handler of registry.get(key) ?? []) {
+    if (!registry.has(key)) {
+      return
+    }
+    for (const handler of registry.get(key)) {
       handler(payload)
     }
   }

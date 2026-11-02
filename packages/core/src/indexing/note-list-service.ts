@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import { sql } from 'kysely'
 import { foldTag } from '../markdown/index.ts'
 import type { DatabaseService } from './database-service.ts'
@@ -183,14 +184,9 @@ class NoteListServiceImpl implements NoteListService {
             .distinct()
             .orderBy('tags.tagKey')
             .execute()
-    const tagsByPath = new Map<string, string[]>()
+    const tagsByPath = new DefaultMap<string, string[]>(() => [])
     for (const row of tagRows) {
-      const tags = tagsByPath.get(row.notePath)
-      if (tags === undefined) {
-        tagsByPath.set(row.notePath, [row.tag])
-      } else {
-        tags.push(row.tag)
-      }
+      tagsByPath.get(row.notePath).push(row.tag)
     }
 
     return rows.map((row) => ({
@@ -198,7 +194,7 @@ class NoteListServiceImpl implements NoteListService {
       title: row.title,
       mtime: row.mtime,
       snippet: row.preview,
-      tags: tagsByPath.get(row.path) ?? [],
+      tags: tagsByPath.has(row.path) ? tagsByPath.get(row.path) : [],
       isPinned: row.isPinned !== 0,
     }))
   }

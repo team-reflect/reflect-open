@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
 import type { Unlisten, WindowBootstrap } from '@reflect/core'
 import {
@@ -60,7 +61,9 @@ class TestWindowServiceImpl implements TestWindowService {
   readonly #emittedEvents: { label: string; event: string; payload: unknown }[] = []
   readonly #navigate = new Listeners<[url: string]>()
   readonly #indexWritten = new Listeners()
-  readonly #windowEvents = new Map<string, Listeners<[payload: unknown]>>()
+  readonly #windowEvents = new DefaultMap<string, Listeners<[payload: unknown]>>(
+    () => new Listeners<[payload: unknown]>(),
+  )
   readonly #closeHandlers = new Set<CloseRequestedHandler>()
   #closeCalls = 0
   #currentTitle: string | null = null
@@ -109,12 +112,7 @@ class TestWindowServiceImpl implements TestWindowService {
   }
 
   subscribeWindowEvent(event: string, listener: (payload: unknown) => void): Unlisten {
-    let listeners = this.#windowEvents.get(event)
-    if (listeners === undefined) {
-      listeners = new Listeners<[payload: unknown]>()
-      this.#windowEvents.set(event, listeners)
-    }
-    return listeners.add(listener)
+    return this.#windowEvents.get(event).add(listener)
   }
 
   focusedWindowLabel(): string | null {
@@ -161,7 +159,9 @@ class TestWindowServiceImpl implements TestWindowService {
   }
 
   emitWindowEvent(event: string, payload: unknown): void {
-    this.#windowEvents.get(event)?.emit(payload)
+    if (this.#windowEvents.has(event)) {
+      this.#windowEvents.get(event).emit(payload)
+    }
   }
 
   emitted(): readonly { label: string; event: string; payload: unknown }[] {

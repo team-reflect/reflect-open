@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import {
   attachmentReferenceCandidates,
   isAttachmentEmbedTarget,
@@ -46,18 +47,12 @@ const IMAGE_EXTENSIONS = new Set(['avif', 'bmp', 'gif', 'jpeg', 'jpg', 'png', 's
 
 class AttachmentCatalogImpl implements AttachmentCatalog {
   readonly #sizes = new Map<string, number>()
-  readonly #byName = new Map<string, string[]>()
+  readonly #byName = new DefaultMap<string, string[]>(() => [])
 
   constructor(files: readonly Pick<FileMeta, 'path' | 'size'>[]) {
     for (const { path, size } of files) {
       this.#sizes.set(path, size)
-      const name = filename(path)
-      const named = this.#byName.get(name)
-      if (named === undefined) {
-        this.#byName.set(name, [path])
-      } else {
-        named.push(path)
-      }
+      this.#byName.get(filename(path)).push(path)
     }
   }
 
@@ -70,7 +65,7 @@ class AttachmentCatalogImpl implements AttachmentCatalog {
   }
 
   named(filename: string): readonly string[] {
-    return this.#byName.get(filename) ?? []
+    return this.#byName.has(filename) ? this.#byName.get(filename) : []
   }
 }
 

@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { isNotNullish } from '@ocavue/utils'
+import { DefaultMap, isNotNullish } from '@ocavue/utils'
 import { isIsoDate } from '@reflect/utils'
 import { sql } from 'kysely'
 import { dailyPath } from '../graph/paths.ts'
@@ -202,7 +202,7 @@ class IndexQueryServiceImpl implements IndexQueryService {
       .map((row) => row.id)
       .filter(isNotNullish)
       .sort()
-    const groups = new Map<string, string[]>()
+    const groups = new DefaultMap<string, string[]>(() => [])
     for (const chunk of inClauseChunks(ids)) {
       const rows = await db
         .selectFrom('notes')
@@ -215,9 +215,7 @@ class IndexQueryServiceImpl implements IndexQueryService {
         if (row.id === null) {
           continue
         }
-        const paths = groups.get(row.id) ?? []
-        paths.push(row.path)
-        groups.set(row.id, paths)
+        groups.get(row.id).push(row.path)
       }
     }
     return [...groups].map(([id, paths]) => ({ id, paths }))

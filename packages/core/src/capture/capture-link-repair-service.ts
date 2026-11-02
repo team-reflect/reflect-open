@@ -1,3 +1,4 @@
+import { DefaultMap } from '@ocavue/utils'
 import { addDays, formatIsoDate } from '@reflect/utils'
 import { captureFromPath, type CaptureIdentity } from './capture-identity.ts'
 import { captureNoteMeta, displayTitle, noteSource } from './capture-note.ts'
@@ -134,7 +135,9 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
   ): Promise<Map<string, Map<string, CaptureLinkRepair>>> {
     const { noteFile, clock } = this.#deps
     const cutoff = formatIsoDate(addDays(clock.now(), -CAPTURE_LINK_REPAIR_WINDOW_DAYS))
-    const repairsByDailyPath = new Map<string, Map<string, CaptureLinkRepair>>()
+    const repairsByDailyPath = new DefaultMap<string, Map<string, CaptureLinkRepair>>(
+      () => new Map(),
+    )
     for (const file of await noteFile.listNotes(generation)) {
       const identity = captureFromPath(file.path)
       // ISO dates compare in calendar order as strings.
@@ -147,9 +150,7 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
         continue
       }
       const path = dailyPath(identity.date)
-      const repairs = repairsByDailyPath.get(path) ?? new Map<string, CaptureLinkRepair>()
-      repairs.set(identity.base, repair)
-      repairsByDailyPath.set(path, repairs)
+      repairsByDailyPath.get(path).set(identity.base, repair)
     }
     return repairsByDailyPath
   }
