@@ -766,7 +766,7 @@ describe('trashMany', () => {
 
     await expect(actions.trashMany([])).resolves.toEqual({ succeeded: [], failed: [] })
 
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('trashes every note in order under one operation', async () => {
@@ -782,7 +782,7 @@ describe('trashMany', () => {
     expect(files.trashed()).toEqual(['notes/a.md', 'notes/b.md'])
     expect([...noteRows.getOverlays().keys()]).toEqual(['notes/a.md', 'notes/b.md'])
     expect(progress.started()).toMatchObject([{ label: 'Trashing notes', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('keeps going past a failure and fails the operation with the last error', async () => {
@@ -942,7 +942,7 @@ describe('with no graph open', () => {
     ).resolves.toEqual([])
 
     expect(files.writes()).toEqual([])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('rejects a trash and fails a batch trash with the reason', async () => {

@@ -228,7 +228,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     kit.activity.emitWake()
     await flush()
     expect(kit.transcription.calls()).toHaveLength(2)
-    expect(kit.progress.getAll()).toHaveLength(1)
+    expect(kit.progress.get()).toHaveLength(1)
   })
 
   it('keeps expected stops silent — offline heals on the next trigger', async () => {
@@ -239,7 +239,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     await flush()
 
     expect(kit.transcription.calls()).toHaveLength(1)
-    expect(kit.progress.getAll()).toEqual([])
+    expect(kit.progress.get()).toEqual([])
   })
 
   it('dispose detaches every trigger and flips the pass abort gate', async () => {

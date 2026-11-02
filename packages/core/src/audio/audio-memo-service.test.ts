@@ -723,7 +723,7 @@ describe('AudioMemoService.openSession', () => {
     await flush()
 
     expect(phase()).toBe('error')
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('a parked error never invisibly blocks recording: toggle surfaces, then clears it', async () => {

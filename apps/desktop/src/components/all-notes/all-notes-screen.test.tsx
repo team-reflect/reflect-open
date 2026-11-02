@@ -566,7 +566,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await vi.waitFor(() => {
       expect(
         view.core.progress
-          .getAll()
+          .get()
           .map((operation) => `${operation.status}:${operation.message ?? ''}`),
       ).toContain('failed:disk on fire')
     })

@@ -411,7 +411,7 @@ describe('createSettingsService', () => {
     disk.failSaves = true
 
     settings.update({ editorMarkdownSyntax: 'show' })
-    await vi.waitFor(() => expect(progress.getAll()).toHaveLength(1))
+    await vi.waitFor(() => expect(progress.get()).toHaveLength(1))
     expect(disk.saved).toEqual([])
 
     disk.failSaves = false
@@ -450,7 +450,7 @@ describe('createSettingsService', () => {
     disk.failSaves = true
 
     settings.update({ editorMarkdownSyntax: 'show' })
-    await vi.waitFor(() => expect(progress.getAll()).toHaveLength(1))
+    await vi.waitFor(() => expect(progress.get()).toHaveLength(1))
     expect(disk.saved).toEqual([])
 
     disk.failSaves = false
@@ -519,7 +519,7 @@ describe('createTestSettingsService', () => {
     settings.update({ editorMarkdownSyntax: 'show' })
     await settings.flush()
     expect(settings.saves()).toHaveLength(1)
-    expect(progress.getAll()).toMatchObject([{ label: 'Saving settings', status: 'failed' }])
+    expect(progress.get()).toMatchObject([{ label: 'Saving settings', status: 'failed' }])
   })
 
   it('fails the load', async () => {

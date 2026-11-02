@@ -1,28 +1,22 @@
-import type {
-  ClockService,
-  Operation,
-  OperationHandle,
-  OperationOptions,
-  ProgressPort,
-  Unlisten,
+import {
+  WritableStore,
+  type ClockService,
+  type Operation,
+  type OperationHandle,
+  type OperationOptions,
+  type ProgressPort,
+  type Store,
 } from '@reflect/core'
 
 /**
- * The app-wide list of visible background operations.
+ * The app-wide list of visible background operations, newest last.
+ * Listeners run synchronously inside the mutation that caused them.
  */
-export interface OperationsService extends ProgressPort {
+export interface OperationsService extends ProgressPort, Store<readonly Operation[]> {
   /**
    * Removes an operation by id.
    */
   dismiss(id: number): void
-  /**
-   * Listeners run synchronously inside the mutation that caused them.
-   */
-  subscribe(listener: () => void): Unlisten
-  /**
-   * The current operations, newest last. The array changes identity on every change.
-   */
-  getAll(): readonly Operation[]
 }
 
 /**
@@ -98,8 +92,7 @@ class OperationHandleImpl implements OperationHandle {
 class OperationsServiceImpl implements OperationsService {
   readonly #deps: OperationsServiceDeps
   #nextId = 1
-  #operations: readonly Operation[] = []
-  readonly #listeners = new Set<() => void>()
+  readonly #operations = new WritableStore<readonly Operation[]>([])
 
   constructor(deps: OperationsServiceDeps) {
     this.#deps = deps
@@ -113,8 +106,8 @@ class OperationsServiceImpl implements OperationsService {
     const { clock } = this.#deps
     const id = this.#nextId++
     const persistent = options?.persistent ?? false
-    this.#operations = [
-      ...this.#operations,
+    this.#operations.set([
+      ...this.#operations.get(),
       {
         id,
         label,
@@ -125,33 +118,25 @@ class OperationsServiceImpl implements OperationsService {
         action: options?.action ?? null,
         message: null,
       },
-    ]
-    this.#emit()
+    ])
     return new OperationHandleImpl(this, clock, id, persistent)
   }
 
+  readonly get = this.#operations.get
+
+  readonly subscribe = this.#operations.subscribe
+
   dismiss(id: number): void {
-    const before = this.#operations.length
-    this.#operations = this.#operations.filter((operation) => operation.id !== id)
-    if (this.#operations.length !== before) {
-      this.#emit()
+    const operations = this.#operations.get()
+    const remaining = operations.filter((operation) => operation.id !== id)
+    if (remaining.length !== operations.length) {
+      this.#operations.set(remaining)
     }
-  }
-
-  subscribe(listener: () => void): Unlisten {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
-
-  getAll(): readonly Operation[] {
-    return this.#operations
   }
 
   patch(id: number, change: Partial<Operation>): void {
     let changed = false
-    this.#operations = this.#operations.map((operation) => {
+    const operations = this.#operations.get().map((operation) => {
       if (operation.id !== id) {
         return operation
       }
@@ -159,13 +144,7 @@ class OperationsServiceImpl implements OperationsService {
       return { ...operation, ...change }
     })
     if (changed) {
-      this.#emit()
-    }
-  }
-
-  #emit(): void {
-    for (const listener of this.#listeners) {
-      listener()
+      this.#operations.set(operations)
     }
   }
 }
