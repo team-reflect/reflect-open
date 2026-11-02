@@ -10,12 +10,11 @@ import { useServiceState } from '@/services/use-service-state.ts'
  * attachments, sending, and persistence.
  */
 
-export type ChatContextValue = ChatSessionState &
-  Omit<ChatSession, 'getState' | 'subscribe' | 'attach'>
+export type ChatContextValue = ChatSessionState & Omit<ChatSession, 'get' | 'subscribe' | 'attach'>
 
 const NO_CHAT = {
   subscribe: () => () => {},
-  getState: (): ChatSessionState | null => null,
+  get: (): ChatSessionState | null => null,
 }
 
 /**
@@ -35,7 +34,7 @@ export function useChatSession(): ChatContextValue {
 export function useMaybeChatSession(): ChatContextValue | null {
   const session = useMaybeGraphServices()?.chat ?? null
   const store = session ?? NO_CHAT
-  const state = useServiceState<ChatSessionState | null>(store, store.getState)
+  const state = useServiceState<ChatSessionState | null>(store, store.get)
   const value = useMemo((): ChatContextValue | null => {
     return session === null || state === null
       ? null
