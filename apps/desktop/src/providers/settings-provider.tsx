@@ -3,6 +3,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 import { useServiceState } from '@/services/use-service-state.ts'
 import { useStore, useSelector } from '@/lib/use-store.ts'
 import { useCallback } from 'react'
+import { isDeepEqual } from '@ocavue/utils'
 
 interface SettingsValue {
   settings: Settings
@@ -45,7 +46,7 @@ export function useSettingsStore(): Settings {
 
 function useSettingsSelector<T>(selector: (settings: Settings) => T): T {
   const store = useSettingsService()
-  return useSelector(store, selector)
+  return useSelector(store, selector, isDeepEqual)
 }
 
 export function useSettingsField<K extends keyof Settings>(key: K): Settings[K] {
