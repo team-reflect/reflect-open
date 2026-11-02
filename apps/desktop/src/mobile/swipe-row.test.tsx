@@ -142,6 +142,15 @@ describe('SwipeRow', () => {
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
   })
 
+  it('snaps a scroll that stops past halfway to the open position', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    scroller.scrollTo({ left: ACTION_WIDTH - 26, behavior: 'instant' })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ACTION_WIDTH))
+  })
+
   it('reports the start of every interaction, a tap included', async () => {
     const view = await mount(<Harness />)
 

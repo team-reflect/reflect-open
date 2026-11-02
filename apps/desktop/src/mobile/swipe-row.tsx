@@ -161,7 +161,7 @@ export function SwipeRow({
       >
         {actions}
       </div>
-      <span aria-hidden className="w-0 flex-none snap-end" />
+      <span aria-hidden className="-ml-px w-px flex-none snap-end" />
     </div>
   )
 }
