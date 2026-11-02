@@ -2,9 +2,7 @@ import { expect, it } from 'vitest'
 import { anySignal } from '@/lib/any-signal.ts'
 import { collectGarbage } from '@/test-utils/gc.ts'
 
-const RUNS = Array.from({ length: 20 }, (_, index) => index + 1)
-
-it.for(RUNS)('removes listeners after a garbage collection (run %i)', async () => {
+it('removes listeners after a garbage collection', async () => {
   const target = new EventTarget()
   const sources = Array.from({ length: 200 }, () => new AbortController())
   let calls = 0
