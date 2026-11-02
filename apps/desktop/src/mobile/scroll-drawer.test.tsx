@@ -134,12 +134,13 @@ describe('ScrollDrawer', () => {
     await renderInApp(<Harness />)
     await openScroller()
 
-    // Clicks whatever is at the point, in place: a locator click is unreliable in WebKit CI.
+    // Clicks the element at the point, in place: a locator click is unreliable in WebKit CI.
     const dialog = page.getByRole('dialog').element().getBoundingClientRect()
     const target = document.elementFromPoint(dialog.left + 20, dialog.top + 20)
     if (!(target instanceof HTMLElement)) {
       throw new TypeError('Nothing to tap above the sheet.')
     }
+    expect(target.classList.contains('scroll-drawer-spacer')).toBe(true)
     await act(() => {
       target.click()
     })
