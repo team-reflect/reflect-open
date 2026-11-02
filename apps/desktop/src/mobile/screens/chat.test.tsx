@@ -16,11 +16,11 @@ import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileChat } from './chat.tsx'
 
 /**
- * The Chat tab over a faked engine (the desktop chat-screen harness, mobile
+ * The Chat screen over a faked engine (the desktop chat-screen harness, mobile
  * shell): the no-provider call-to-action into Settings, a full send through
- * the mobile composer, and the Plan 23 contract that the draft and turns
- * survive the screen unmounting — the session holds them, tab switches only
- * unmount the screen.
+ * the mobile composer, Back, and the Plan 23 contract that the draft and
+ * turns survive the screen unmounting — the session holds them, leaving the
+ * screen only unmounts it.
  */
 
 // The settings document each test starts from.
@@ -75,7 +75,7 @@ function FocusChatProbe(): ReactElement {
 }
 
 /**
- * The screen over the graph's chat session, unmountable like a tab switch.
+ * The screen over the graph's chat session, unmountable like leaving it.
  */
 function Harness(): ReactElement {
   const [showScreen, setShowScreen] = useState(true)
@@ -84,14 +84,14 @@ function Harness(): ReactElement {
       <RouteProbe />
       <FocusChatProbe />
       <button type="button" onClick={() => setShowScreen((shown) => !shown)}>
-        switch tab
+        leave screen
       </button>
       {showScreen ? <MobileChat /> : null}
     </>
   )
 }
 
-async function renderHarness() {
+async function renderHarness(route: Route = { kind: 'today' }) {
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
@@ -101,6 +101,7 @@ async function renderHarness() {
   return await renderInApp(<Harness />, {
     core,
     graph: { ...GRAPH, indexGeneration: null },
+    route,
     settings: { aiProviders: settingsState.models, defaultAiProviderId: settingsState.defaultId },
   })
 }
@@ -112,6 +113,16 @@ describe('MobileChat', () => {
     await page.getByRole('button', { name: 'Add an AI provider' }).click()
 
     expect(probedRouteRef.current).toEqual({ kind: 'settings' })
+  })
+
+  it('Back from a cold entry lands on today, as the back-swipe does', async () => {
+    // Chat is the first and only history entry: there is nothing to pop.
+    await renderHarness({ kind: 'chat' })
+    expect(probedRouteRef.current).toEqual({ kind: 'chat' })
+
+    await page.getByRole('button', { name: 'Back' }).click()
+
+    expect(probedRouteRef.current).toEqual({ kind: 'today' })
   })
 
   it('sends the draft from the composer and renders the streamed turn', async () => {
@@ -132,7 +143,7 @@ describe('MobileChat', () => {
     await expect.element(composer).toHaveValue('')
   })
 
-  it('keeps the draft and the conversation across a screen unmount (tab switch)', async () => {
+  it('keeps the draft and the conversation across a screen unmount (leaving it)', async () => {
     configureModel()
     scriptTurn([
       { type: 'text-delta', text: 'Kept.' },
@@ -150,15 +161,15 @@ describe('MobileChat', () => {
       target: { value: 'half-typed follow-up' },
     })
 
-    await page.getByRole('button', { name: 'switch tab' }).click()
+    await page.getByRole('button', { name: 'leave screen' }).click()
     await expect.element(page.getByLabelText('Chat message')).not.toBeInTheDocument()
-    await page.getByRole('button', { name: 'switch tab' }).click()
+    await page.getByRole('button', { name: 'leave screen' }).click()
 
     await expect.element(page.getByLabelText('Chat message')).toHaveValue('half-typed follow-up')
     await expect.element(page.getByText('sent question')).toBeVisible()
   })
 
-  it('focuses the composer when a chat tab capture arrival requests it', async () => {
+  it('focuses the composer when a focus arrival requests it', async () => {
     configureModel()
     await renderHarness()
 
