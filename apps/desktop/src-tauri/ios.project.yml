@@ -264,9 +264,6 @@ targets:
       properties:
         # The share sheet's row label (the icon comes from the host app).
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        # Must match the host app's. Tauri only rewrites the app's Info.plist,
-        # so `pnpm build:ios` passes these from the build environment. Builds
-        # without them (`tauri ios dev`, Xcode) get the placeholder default.
         CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
         CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
@@ -340,9 +337,6 @@ targets:
       path: RecordingWidget/Info.plist
       properties:
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        # Must match the host app's. Tauri only rewrites the app's Info.plist,
-        # so `pnpm build:ios` passes these from the build environment. Builds
-        # without them (`tauri ios dev`, Xcode) get the placeholder default.
         CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
         CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
