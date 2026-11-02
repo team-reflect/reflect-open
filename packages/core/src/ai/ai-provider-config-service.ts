@@ -154,18 +154,16 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
     )
   }
 
-  readonly subscribe = (listener: () => void): Unlisten => this.#deps.settings.subscribe(listener)
-
   readonly list = (): AiProviderConfig[] => this.#deps.settings.get().aiProviders
 
   state(): AiProvidersState {
+    // FIXME: remove this store() method
     const current = this.#deps.settings.get()
     return { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId }
   }
 
-  readonly get: () => AiProvidersState = () => {
-    return this.#store.get()
-  }
+  readonly get = (): AiProvidersState => this.#store.get()
+  readonly subscribe = (listener: () => void): Unlisten => this.#store.subscribe(listener)
 
   readonly defaultProvider = (): AiProviderConfig | null => defaultAiProvider(this.state())
 
