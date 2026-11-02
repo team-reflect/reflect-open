@@ -4,7 +4,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useContactsEnabled } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useContactsState } from './use-contacts-state.ts'
+import { useContactsCanLookup } from './use-contacts-state.ts'
 
 /**
  * The Apple Contact this note's title exactly matches, or `null` — the
@@ -25,8 +25,8 @@ import { useContactsState } from './use-contacts-state.ts'
 export function useSuggestedContact(path: string): ContactMatch | null {
   const graph = useGraphInfo()
   const contactsEnabled = useContactsEnabled()
-  // Re-render when the permission state changes; the gate reads it.
-  useContactsState()
+  // Re-render when the contacts gate changes; `showsSuggestionFor` reads it.
+  useContactsCanLookup()
   const { contactSuggestions } = useCoreServices()
   const enabled = graph !== null && contactSuggestions.showsSuggestionFor({ contactsEnabled }, path)
   const { data } = useQuery({
