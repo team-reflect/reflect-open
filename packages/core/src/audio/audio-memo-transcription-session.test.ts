@@ -170,7 +170,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
   })
 
   it('exposes the transcribing flag while a pass has memos, and notifies subscribers', async () => {
-    const { kit, subject } = await open()
+    const { kit, subject, passes } = await open()
     kit.addRecording(MEMO.audioPath)
     const provider = Promise.withResolvers<string>()
     kit.transcription.setResult(() => provider.promise)
@@ -188,8 +188,10 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     expect(notifications).toHaveBeenCalledTimes(2)
 
     // A pass with nothing to transcribe leaves the flag at false: no notification.
+    const passesBefore = passes()
     subject.schedule()
     await flush()
+    expect(passes()).toBe(passesBefore + 1)
     expect(notifications).toHaveBeenCalledTimes(2)
   })
 
