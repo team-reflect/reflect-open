@@ -194,7 +194,12 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
 
   readonly get = (): ConnectGithubWizardState => this.#state.get()
 
-  readonly subscribe = (listener: VoidFunction): Unlisten => this.#state.subscribe(listener)
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    // Wrapped for identity, so one function added twice detaches independently.
+    return this.#state.subscribe(() => {
+      listener()
+    })
+  }
 
   attach(): Unlisten {
     this.#attached += 1
