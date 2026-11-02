@@ -52,6 +52,14 @@ export interface DayWindow {
 }
 
 /**
+ * A daily-stream scroll position: the day at the viewport top, and pixels into it.
+ */
+export interface DayScrollPosition {
+  readonly date: string
+  readonly offset: number
+}
+
+/**
  * Build the window around `anchor`, reaching `past` days back and `future` days
  * forward (defaulting to the desktop stream's asymmetric reach).
  */

@@ -8,7 +8,6 @@ import {
   dateAtIndex,
   extendDayWindowBack,
   indexOfDate,
-  isDayScrollPosition,
   neighborDate,
 } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
@@ -197,7 +196,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   useLayoutEffect(() => {
     const target = targetDateRef.current
     const saved = savedScroll()
-    const restored = isDayScrollPosition(saved) ? saved : null
+    const restored = typeof saved === 'object' ? saved : null
     const extended = extendDayWindowBack(dayWindow, restored?.date ?? target)
     if (extended !== dayWindow) {
       // An arrival or restored day before the window grows it; the effect

@@ -1,4 +1,5 @@
 import type { Store, Unlisten } from '@reflect/core'
+import type { DayScrollPosition } from '../daily/day-window.ts'
 import { normalizeRoute, routesEqual, type Route } from './route.ts'
 
 /**
@@ -18,21 +19,10 @@ import { normalizeRoute, routesEqual, type Route } from './route.ts'
  * fresh entry.
  */
 
-/** A daily-stream scroll position: the day at the viewport top, and pixels into it. */
-export interface DayScrollPosition {
-  readonly date: string
-  readonly offset: number
-}
-
-/** A view's saved scroll position: a pixel offset, or a daily-stream day. */
+/**
+ * A view's saved scroll position: a pixel offset, or a daily-stream day.
+ */
 export type ScrollPosition = number | DayScrollPosition
-
-/** Is `position` a daily-stream day rather than a pixel offset? */
-export function isDayScrollPosition(
-  position: ScrollPosition | null,
-): position is DayScrollPosition {
-  return position !== null && typeof position === 'object'
-}
 
 export interface NavigateOptions {
   /**
