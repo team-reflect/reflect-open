@@ -70,13 +70,12 @@ describe('usePaywallGate', () => {
     expect(renders).toBe(settled)
   })
 
-  it('starts the subscription, Reflect Classic, and install-channel checks', async () => {
+  it('starts the subscription and install-channel checks', async () => {
     const services = iosServices()
     await renderHookInApp(() => usePaywallGate(), { core: services })
 
     await vi.waitFor(() => {
       expect(services.mobile.subscription.calls()).toContain('activeSubscription')
-      expect(services.classicAccess.calls()).toContain('start')
       expect(services.mobile.appStoreEnvironment.calls()).toContain('environment')
     })
   })
