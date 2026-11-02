@@ -6,6 +6,7 @@ import {
   createIpcBridgeService,
   createSearchService,
   createSuggestionService,
+  createTodayService,
   createWikiResolverService,
   parseHighlights,
   parseNote,
@@ -123,11 +124,13 @@ function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServ
   })
   const database = createDatabaseService({ ipc })
   const wikiResolver = createWikiResolverService({ database })
+  const clock = createTestClockService()
   return {
     search: createSearchService({ database, wikiResolver }),
     dailyNotes: createDailyNoteService({
       database,
-      clock: createTestClockService(),
+      clock,
+      today: createTodayService({ clock }),
       activity: createTestActivityPort(),
     }),
     wikiResolver,

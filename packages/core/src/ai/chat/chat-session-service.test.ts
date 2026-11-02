@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { formatIsoDate } from '@reflect/utils'
+import { createTodayService } from '../../daily/today-service.ts'
 import { createGraphSession } from '../../graph/graph-session.ts'
 import type { EmbedStatus } from '../../embeddings/embedding-runtime-service.ts'
 import type { GraphInfo } from '../../graph/schemas.ts'
@@ -121,7 +123,7 @@ async function setup(options: SetupOptions = {}) {
     options.embedStatus === undefined ? {} : { status: options.embedStatus },
   )
   const logger = createTestLoggerService()
-  const clock = createTestClockService({ now: NOW, today: '2026-10-13' })
+  const clock = createTestClockService({ now: NOW })
   const service = createChatSessionService({
     chatEngine,
     chatHistory: options.history?.(chatHistory) ?? chatHistory,
@@ -136,6 +138,7 @@ async function setup(options: SetupOptions = {}) {
     embeddingRuntime,
     settings,
     clock,
+    today: createTodayService({ clock }),
     id,
     imageCodec: createTestImageCodec(),
     logger,
@@ -289,7 +292,7 @@ describe('ChatSession persistence', () => {
     expect(chatEngine.calls()[0]).toMatchObject({
       config: MODEL,
       apiKey: 'sk-test',
-      today: '2026-10-13',
+      today: formatIsoDate(new Date(NOW)),
       context: { graphName: 'test-graph' },
       messages: [
         { role: 'user', content: 'what did I write yesterday?' },

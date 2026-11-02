@@ -19,6 +19,7 @@ import { addDaysToIsoDate, getYearMonth, getIsoToday } from '@reflect/utils'
 import {
   type AiProviderConfig,
   type DailyNoteService,
+  type GraphInfo,
   aiKeySecretName,
   formatDayLabel,
 } from '@reflect/core'
@@ -33,6 +34,7 @@ import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
 import { MobileShell } from './mobile-shell.tsx'
 
 const waitFor = vi.waitFor
@@ -116,26 +118,7 @@ vi.mock('@/components/ui/drawer.tsx', () => ({
   DrawerTrigger: ({ children }: { children?: import('react').ReactNode }) => <>{children}</>,
 }))
 
-// The daily spine renders the capture menu; this suite is about screens,
-// not recording — an unavailable memo surface keeps its mic action out.
-vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
-  useMobileAudioMemo: () => ({
-    phase: 'idle',
-    elapsedMs: 0,
-    level: 0,
-    pendingCount: 0,
-    available: false,
-    error: null,
-    canRetry: false,
-    drawerOpen: false,
-    toggle: () => {},
-    stopAndSave: () => {},
-    cancelRecording: () => {},
-    onDrawerOpenChange: () => {},
-    retry: () => {},
-    discard: () => {},
-  }),
-}))
+const GRAPH: GraphInfo = { root: '/g', name: 'g', generation: 1 }
 
 // The services of the running test: the graph's files live in `core.noteFile`.
 let core: TestCoreServices
@@ -161,17 +144,17 @@ function mount(
   options?: { strict?: boolean; settings?: RenderInAppOptions['settings'] },
 ) {
   const tree = (
-    <>
+    <MobileAudioMemoProvider graph={GRAPH}>
       <MobileShell />
       {probeRoute ? <NavProbe to={probeRoute} /> : null}
-    </>
+    </MobileAudioMemoProvider>
   )
   // The app runs under StrictMode (main.tsx); opt in where a test guards
   // against impure updaters (dev double-invocation caught a double-pop once).
   return renderInApp(options?.strict ? <StrictMode>{tree}</StrictMode> : tree, {
     core,
     appServices,
-    graph: { root: '/g', name: 'g', generation: 1 },
+    graph: GRAPH,
     route: initialRoute,
     settings: {
       editorMarkdownSyntax: 'hide',
