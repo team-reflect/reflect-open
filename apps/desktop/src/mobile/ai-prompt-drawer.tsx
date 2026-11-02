@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import type { AiPrompt, AiPromptMode, AiPromptDraft } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import {
   Select,

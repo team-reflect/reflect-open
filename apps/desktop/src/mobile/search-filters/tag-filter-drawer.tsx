@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { Check } from 'lucide-react'
 import { foldTag, type NoteTagFacet } from '@reflect/core'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { cn } from '@/lib/utils.ts'
 
 interface TagFilterDrawerProps {
