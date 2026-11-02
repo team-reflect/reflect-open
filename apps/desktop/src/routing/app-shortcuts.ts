@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
-import { getIsoToday } from '@reflect/utils'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
@@ -117,12 +116,16 @@ export function useAppShortcuts(): CommandContext {
       // the same day the context sidebar shows (see `effectiveDailyDate`); off
       // the daily views it falls back to the routed note.
       notePath: () => {
-        return focusedNotePathForRoute(routeRef.current, getIsoToday(), focusedDailyDateRef.current)
+        return focusedNotePathForRoute(
+          routeRef.current,
+          services.today.get(),
+          focusedDailyDateRef.current,
+        )
       },
       togglePin: async () => {
         const path = focusedNotePathForRoute(
           routeRef.current,
-          getIsoToday(),
+          services.today.get(),
           focusedDailyDateRef.current,
         )
         if (path !== null) {
@@ -132,7 +135,7 @@ export function useAppShortcuts(): CommandContext {
       togglePrivate: async () => {
         const path = focusedNotePathForRoute(
           routeRef.current,
-          getIsoToday(),
+          services.today.get(),
           focusedDailyDateRef.current,
         )
         if (path !== null) {
@@ -147,7 +150,11 @@ export function useAppShortcuts(): CommandContext {
       newChat,
       openNoteFind: () => {
         openNoteFindForPath(
-          focusedNotePathForRoute(routeRef.current, getIsoToday(), focusedDailyDateRef.current),
+          focusedNotePathForRoute(
+            routeRef.current,
+            services.today.get(),
+            focusedDailyDateRef.current,
+          ),
         )
       },
       findNextInNote,
