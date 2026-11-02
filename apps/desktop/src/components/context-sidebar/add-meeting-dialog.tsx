@@ -21,7 +21,7 @@ import {
   type MeetingAttendee,
   formatTimeOfDay,
 } from '@reflect/core'
-import { useSettings, useSettingsField } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
 

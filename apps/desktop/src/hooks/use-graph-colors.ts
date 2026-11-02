@@ -1,10 +1,6 @@
 import { useCallback } from 'react'
 import type { GraphColor } from '@reflect/core'
-import {
-  useSettings,
-  useSettingsField,
-  useSettingsService,
-} from '@/providers/settings-provider.tsx'
+import { useSettingsField, useSettingsService } from '@/providers/settings-provider.tsx'
 
 interface GraphColorsValue {
   /** The color chosen for `root`, or `undefined` if it's on the default. */
@@ -27,7 +23,7 @@ export function useGraphColors(): GraphColorsValue {
   const setColor = useCallback(
     (root: string, color: GraphColor) => {
       // Read-modify-write of a record: compose over the latest settings, not a
-      // render-time snapshot (see updateSettingsWith). // FIXME: is this comment still correct?
+      // render-time snapshot (see `SettingsService.updateWith`).
       settingsService.updateWith((current) => ({
         graphColors: { ...current.graphColors, [root]: color },
       }))

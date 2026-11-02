@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import { WriteableStore, type Store, type Unlisten } from '../unlisten.ts'
+import { WriteableStore, type Store } from '../store.ts'
+import type { Unlisten } from '../unlisten.ts'
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from './schema.ts'
 import { isDeepEqual } from '@ocavue/utils'
 
@@ -87,7 +88,6 @@ class SettingsServiceImpl implements SettingsService {
     if (this.#state === 'loading') {
       this.#preloadPatch = { ...this.#preloadPatch, ...patch }
       this.#store.set({ ...DEFAULT_SETTINGS, ...this.#preloadPatch })
-      this.#emit()
       return
     }
     this.#apply(() => patch)
@@ -118,9 +118,10 @@ class SettingsServiceImpl implements SettingsService {
       .then(
         (document): SettingsLoadOutcome => {
           this.#state = 'loaded'
-          this.#store.set(document)
+          // The status changed too, so notify even if the document did not.
+          this.#store.set(document, false)
           this.#loaded = Promise.resolve('loaded')
-          this.#emit()
+          this.#store.emit()
           return 'loaded'
         },
         (error: unknown): SettingsLoadOutcome => {
@@ -137,7 +138,7 @@ class SettingsServiceImpl implements SettingsService {
   async flush(): Promise<void> {
     await this.#drain()
     if (this.#dirty && this.#state === 'loaded') {
-      this.#submit(this.#current)
+      this.#submit(this.#store.get())
       await this.#drain()
     }
   }
@@ -146,17 +147,13 @@ class SettingsServiceImpl implements SettingsService {
     return this.#state
   }
 
-  #emit(): void {
-    this.#store.emit()
-  }
-
   #submit(target: Settings): void {
     const { ipc, progress } = this.#deps
     this.#dirty = true
     this.#lastSubmission = this.#lastSubmission.then(async () => {
       try {
         await ipc.call('settings_save', { settings: target }, voidSchema)
-        if (this.#current === target) {
+        if (this.#store.get() === target) {
           this.#dirty = false
         }
       } catch (error) {
@@ -174,17 +171,16 @@ class SettingsServiceImpl implements SettingsService {
       next = { ...next, ...updater(next) }
     }
     this.#state = outcome
-    if (outcome === 'loaded') {
-      next = replaceEqualDeep(document, next)
-      this.#current = next
-      if (next !== document) {
-        this.#submit(next)
-      }
-    } else {
-      this.#current = next
+    if (outcome === 'loaded' && isDeepEqual(document, next)) {
+      next = document
+    }
+    // The status changed too, so notify even if the document did not.
+    this.#store.set(next, false)
+    if (outcome === 'loaded' && next !== document) {
+      this.#submit(next)
     }
     this.#resolveLoad(outcome)
-    this.#emit()
+    this.#store.emit()
   }
 
   #start(): void {
@@ -204,9 +200,7 @@ class SettingsServiceImpl implements SettingsService {
 
   #apply(updater: SettingsUpdater): void {
     const previous = this.#store.get()
-    const merged = { ...previous, ...updater(previous) }
-    const next = isDeepEqual(previous, merged) ? previous : merged
-
+    const next = mergeSettings(previous, updater(previous))
     this.#store.set(next)
     if (this.#state === 'failed') {
       return
@@ -230,47 +224,14 @@ export function createSettingsService(deps: SettingsServiceDeps): SettingsServic
   return new SettingsServiceImpl(deps)
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const prototype: unknown = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
-}
-
 /**
- * Returns `next`, reusing every part of `previous` that is deeply equal to it.
+ * `previous` with `patch` applied. A patched field deeply equal to its current
+ * value keeps the current reference, so a reader of only that field sees no
+ * change. Returns `previous` itself when no field changed.
  */
-function replaceEqualDeep<T>(previous: T, next: T): T {
-  // FIXME: this function "replaceEqualDeep" is useless because of isDeepEqual. we can remove "replaceEqualDeep"
-  if (previous === next) {
-    return previous
-  }
-  if (Array.isArray(previous) && Array.isArray(next)) {
-    const before: readonly unknown[] = previous
-    const after: readonly unknown[] = next
-    let equal = before.length === after.length
-    const copy = after.map((item, i) => {
-      const shared = replaceEqualDeep(before[i], item)
-      if (shared !== before[i]) {
-        equal = false
-      }
-      return shared
-    })
-    return equal ? previous : (copy as T)
-  }
-  if (isPlainObject(previous) && isPlainObject(next)) {
-    const keys = Object.keys(next)
-    let equal = keys.length === Object.keys(previous).length
-    const copy: Record<string, unknown> = {}
-    for (const key of keys) {
-      const shared = replaceEqualDeep(previous[key], next[key])
-      if (shared !== previous[key] || !Object.hasOwn(previous, key)) {
-        equal = false
-      }
-      copy[key] = shared
-    }
-    return equal ? previous : (copy as T)
-  }
-  return next
+function mergeSettings(previous: Settings, patch: Partial<Settings>): Settings {
+  const changed = Object.entries(patch).filter(([key, value]) => {
+    return !isDeepEqual(previous[key], value)
+  })
+  return changed.length === 0 ? previous : { ...previous, ...Object.fromEntries(changed) }
 }

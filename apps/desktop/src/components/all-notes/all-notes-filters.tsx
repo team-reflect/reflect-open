@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { foldTag, type NoteTagFacet } from '@reflect/core'
-import { useSettings, useSettingsField } from '@/providers/settings-provider.tsx'
+import { useSettingsField } from '@/providers/settings-provider.tsx'
 import { CustomFilterMenu } from './custom-filter-menu.tsx'
 import { FilterTab } from './filter-tab.tsx'
 
@@ -19,7 +19,6 @@ interface AllNotesFiltersProps {
  * case-insensitive throughout, same as the `#tag` search token.
  */
 export function AllNotesFilters({ tag, facets, onSelect }: AllNotesFiltersProps): ReactElement {
-  const { settings } = useSettings()
   const allNotesFilterTags = useSettingsField('allNotesFilterTags')
 
   // The setting is user-edited JSON — dedupe case-insensitively and drop

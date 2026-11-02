@@ -1,6 +1,7 @@
 import type { IdService } from '../ports/id-service.ts'
 import { AppError } from '../errors.ts'
-import { deriveStore, type Store, type Unlisten } from '../unlisten.ts'
+import { deriveStore, type Store } from '../store.ts'
+import type { Unlisten } from '../unlisten.ts'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
@@ -63,22 +64,16 @@ export interface AiProviderConfigServiceDeps {
  * feature uses. This service owns the pairing of the settings document
  * (entries and default id) with the OS keychain (the key itself), so the
  * "settings entry and keychain entry" invariant has one owner.
+ *
+ * As a {@link Store}, its value is the entries and the default id, as the pure
+ * transforms take them. It notifies only when those change, not when
+ * `chatModelSelection` does.
  */
 export interface AiProviderConfigService extends Store<AiProvidersState> {
-  /**
-   * Calls `listener` after any settings change.
-   * FIXME: remove this subscribe method here because we already have it in Store<AiProvidersState>
-   */
-  subscribe: (listener: () => void) => Unlisten
   /**
    * The configured entries, in display order. Stable until the list changes.
    */
   list: () => AiProviderConfig[]
-  /**
-   * The entries and the default id, as the pure transforms take them.
-   * FIXME: remove this state() method because we already have get() in Store<AiProvidersState>
-   */
-  state(): AiProvidersState
   /**
    * The entry AI features use by default (`null` only when the list is empty).
    */
@@ -156,16 +151,10 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
 
   readonly list = (): AiProviderConfig[] => this.#deps.settings.get().aiProviders
 
-  state(): AiProvidersState {
-    // FIXME: remove this store() method
-    const current = this.#deps.settings.get()
-    return { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId }
-  }
-
   readonly get = (): AiProvidersState => this.#store.get()
   readonly subscribe = (listener: () => void): Unlisten => this.#store.subscribe(listener)
 
-  readonly defaultProvider = (): AiProviderConfig | null => defaultAiProvider(this.state())
+  readonly defaultProvider = (): AiProviderConfig | null => defaultAiProvider(this.get())
 
   // Every write goes through `updateWith` so the state is rebuilt from the
   // settings as they are when the update applies, not from a snapshot. The
@@ -297,7 +286,7 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
   }
 
   chatModel(): AiProviderConfig | null {
-    return resolveChatModel(this.state(), this.#deps.settings.get().chatModelSelection)
+    return resolveChatModel(this.get(), this.#deps.settings.get().chatModelSelection)
   }
 
   selectChatModel(selection: ChatModelSelection | null): void {
@@ -305,20 +294,20 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
   }
 
   transcriptionConfig(): TranscriptionConfig | null {
-    return pickTranscriptionConfig(this.state())
+    return pickTranscriptionConfig(this.get())
   }
 
   async resolveTranscriptionTarget(
     getKey?: AiKeyReader,
   ): Promise<TranscriptionTarget | TranscriptionMiss> {
     return await resolveTranscriptionTarget(
-      this.state(),
+      this.get(),
       getKey ?? this.#deps.credentials.createPassReader(),
     )
   }
 
   audioMemoEnrichmentConfig(): AiProviderConfig | null {
-    return pickAudioMemoEnrichmentConfig(this.state())
+    return pickAudioMemoEnrichmentConfig(this.get())
   }
 }
 

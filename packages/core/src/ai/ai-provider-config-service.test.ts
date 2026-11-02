@@ -61,7 +61,7 @@ describe('AiProviderConfigService', () => {
 
     expect(service.list()).toEqual([A, B])
     expect(service.defaultProvider()).toEqual(B)
-    expect(service.state()).toEqual({ providers: [A, B], defaultProviderId: 'b' })
+    expect(service.get()).toEqual({ providers: [A, B], defaultProviderId: 'b' })
   })
 
   it('falls back to the first entry when the default id dangles', async () => {
