@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { imageFilesFrom } from '@/lib/chat-attachments.ts'
-import { useChatActions, useChatModels } from '@/providers/chat-provider.tsx'
+import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { ChatInput } from './chat-input.tsx'
 import { ChatTurnList } from './chat-turn-list.tsx'
@@ -19,7 +19,7 @@ import { ChatTurnList } from './chat-turn-list.tsx'
  * shouldn't be required — and queues them as the next message's attachments.
  */
 export function ChatScreen(): ReactElement {
-  const { providers } = useChatModels()
+  const providers = useChatProviders()
   const { attachImages } = useChatActions()
   const { navigate } = useRouter()
 

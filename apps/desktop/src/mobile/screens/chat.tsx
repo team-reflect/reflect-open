@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
-import { useChatActions, useChatModels, useHasChatTurns } from '@/providers/chat-provider.tsx'
+import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
 /**
@@ -18,7 +18,7 @@ import { useRouter } from '@/routing/router.tsx'
  * call-to-action into Settings, where keys are added per device.
  */
 export function MobileChat(): ReactElement {
-  const { providers } = useChatModels()
+  const providers = useChatProviders()
   const hasTurns = useHasChatTurns()
   const { newChat } = useChatActions()
   const { navigate } = useRouter()

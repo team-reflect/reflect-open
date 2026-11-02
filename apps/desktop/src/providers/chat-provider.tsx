@@ -107,6 +107,13 @@ export function useChatStatus(): ChatStatus {
 }
 
 /**
+ * The configured provider entries (empty means the add-a-provider call to action).
+ */
+export function useChatProviders(): ChatModels['providers'] {
+  return useSelector(useChat(), selectProviders)
+}
+
+/**
  * The configured providers, the picker's model options, and the active model.
  */
 export function useChatModels(): ChatModels {
