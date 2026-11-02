@@ -87,7 +87,6 @@ export function SwipeableNoteRow({
               icon={row.isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
               label={row.isPinned ? 'Unpin' : 'Pin'}
               ariaLabel={`${row.isPinned ? 'Unpin' : 'Pin'} ${title}`}
-              revealed={revealed}
               className="bg-accent"
               onClick={() => {
                 close()
@@ -99,7 +98,6 @@ export function SwipeableNoteRow({
                 icon={<Trash2 className="size-4" />}
                 label="Delete"
                 ariaLabel={`Delete ${title}`}
-                revealed={revealed}
                 className="bg-destructive"
                 onClick={onDelete}
               />

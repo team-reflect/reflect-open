@@ -90,7 +90,6 @@ export function MobileTaskRow({
               icon={<ArrowRight className="size-4" />}
               label="Note"
               ariaLabel={`Open note: ${label}`}
-              revealed={revealed}
               className="bg-accent"
               onClick={() => {
                 hapticImpactLight(haptics)
@@ -102,7 +101,6 @@ export function MobileTaskRow({
               icon={<Trash2 className="size-4" />}
               label="Delete"
               ariaLabel={`Delete: ${label}`}
-              revealed={revealed}
               className="bg-destructive"
               onClick={() => {
                 hapticImpactLight(haptics)
