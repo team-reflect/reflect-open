@@ -205,26 +205,15 @@ class SettingsServiceImpl implements SettingsService {
   #apply(updater: SettingsUpdater): void {
     const previous = this.#store.get()
     const merged = { ...previous, ...updater(previous) }
+    const next = isDeepEqual(previous, merged) ? previous : merged
+
+    this.#store.set(next)
     if (this.#state === 'failed') {
-      this.#update(merged)
       return
     }
-    const next = replaceEqualDeep(previous, merged)
-    this.#current = next
-    if (next !== previous) {
-      this.#emit()
-    }
-    if (this.#dirty) {
+    if (this.#dirty || next !== previous) {
       this.#submit(next)
     }
-  }
-
-  #update(newSettings: Settings): void {
-    const current = this.#store.get()
-    if (isDeepEqual(current, newSettings)) {
-      return
-    }
-    this.#store.set(newSettings)
   }
 
   async #drain(): Promise<void> {
