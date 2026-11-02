@@ -80,8 +80,9 @@ describe('SwipeRow', () => {
 
     await touch(scroller, 'start')
     await act(async () => {
-      const scrolled = new Promise((resolve) => { return scroller.addEventListener('scroll', resolve, { once: true }) },
-      )
+      const scrolled = new Promise((resolve) => {
+        return scroller.addEventListener('scroll', resolve, { once: true })
+      })
       scroller.scrollTo({ left: ACTION_WIDTH, behavior: 'instant' })
       await scrolled
     })
@@ -124,6 +125,18 @@ describe('SwipeRow', () => {
     await view.getByRole('button', { name: 'Toggle' }).click()
 
     expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
+  })
+
+  it('applies a close that came under a finger once the finger lifts without moving the row', async () => {
+    const view = await mount(<Harness initiallyRevealed />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    await touch(scroller, 'start')
+    await view.getByRole('button', { name: 'Toggle' }).click()
+    expect(scroller.scrollLeft).toBe(ACTION_WIDTH)
+
+    await touch(scroller, 'end')
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
   })
 
   it('reports the start of every interaction, a tap included', async () => {
