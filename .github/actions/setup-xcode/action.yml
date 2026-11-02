@@ -13,7 +13,10 @@ runs:
       shell: bash
       run: |
         for app in /Applications/Xcode*.app; do
-          echo "$app $(realpath "$app") $(plutil -extract ProductBuildVersion raw "$app/Contents/version.plist")"
+          echo "======="
+          echo "$app"
+          realpath "$app"
+          plutil -extract ProductBuildVersion raw "$app/Contents/version.plist"
         done
 
     - name: Print the Xcode version before
