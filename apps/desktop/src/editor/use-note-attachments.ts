@@ -55,16 +55,18 @@ export function createNoteAttachments(
 }
 
 /**
- * {@link createNoteAttachments} memoized per note and open graph: an image
- * URL carries the graph's generation, so a reopened graph gets new resolvers.
- * The caller re-renders whenever the catalog changes.
+ * {@link createNoteAttachments} memoized per note, open graph, and catalog: an
+ * image URL carries the graph's generation, so a reopened graph gets new
+ * resolvers, and a changed catalog gets new resolvers too.
  */
 export function useNoteAttachments(notePath: string): NoteAttachments {
   const graph = useMaybeGraphInfo()
   const { attachments, graphSession } = useCoreServices()
-  useStore(attachments.catalog)
+  const catalog = useStore(attachments.catalog)
   return useMemo(
     () => createNoteAttachments(graph, notePath, attachments, graphSession),
-    [attachments, graph, graphSession, notePath],
+    // `catalog` is a dependency so the resolvers change identity when the catalog changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps, @eslint-react/exhaustive-deps
+    [attachments, graph, graphSession, notePath, catalog],
   )
 }

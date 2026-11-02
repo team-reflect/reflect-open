@@ -50,6 +50,7 @@ describe('useNoteAttachments', () => {
       { graph: { generation: 3 } },
     )
     const rendersBefore = renders
+    const before = attachments
     expect(attachments?.resolveImageUrl('garden-budget.png')).toBe(assetUrl(3, 'garden-budget.png'))
 
     await act(() => {
@@ -57,6 +58,7 @@ describe('useNoteAttachments', () => {
     })
 
     expect(renders).toBeGreaterThan(rendersBefore)
+    expect(attachments).not.toBe(before)
     expect(attachments?.resolveImageUrl('garden-budget.png')).toBe(
       assetUrl(3, 'attachments/garden-budget.png'),
     )
