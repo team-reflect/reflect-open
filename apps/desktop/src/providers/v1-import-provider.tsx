@@ -12,16 +12,13 @@ import { V1ImportDialog } from '@/components/v1-import-dialog.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
-type V1ImportContextValue = { service: V1ImportService } & Pick<V1ImportService, 'dismiss'> & {
-    /**
-     * `V1ImportService.start`.
-     */
-    startImport: V1ImportService['start']
-    /**
-     * `V1ImportService.cancel`.
-     */
-    cancelImport: V1ImportService['cancel']
-  }
+interface V1ImportContextValue {
+  service: V1ImportService
+  /**
+   * `V1ImportService.start`.
+   */
+  startImport: V1ImportService['start']
+}
 
 const V1ImportContext = createContext<V1ImportContextValue | null>(null)
 
@@ -49,9 +46,7 @@ export function V1ImportProvider({ children }: V1ImportProviderProps): ReactElem
   const value = useMemo<V1ImportContextValue>(
     () => ({
       service,
-      dismiss: () => service.dismiss(),
       startImport: (zipPath) => service.start(zipPath),
-      cancelImport: () => service.cancel(),
     }),
     [service],
   )

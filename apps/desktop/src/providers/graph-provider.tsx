@@ -26,26 +26,25 @@ import {
 type GraphContextValue = Pick<
   GraphBootService,
   'pickAndOpen' | 'chooseGraph' | 'openRecent' | 'deleteGraph'
-> &
-  Pick<GraphSessionService, 'refreshIndex'> & {
-    /**
-     * The active graph session of this webview.
-     */
-    graphSession: GraphSessionService<GraphServices>
-    /**
-     * `GraphBootService.createGraphAt`.
-     */
-    createAt: GraphBootService['createGraphAt']
-    /**
-     * `GraphBootService.forgetRecent`.
-     */
-    forget: GraphBootService['forgetRecent']
-    /**
-     * Which UI family the shell was built for (Plan 19's root gate), fixed at
-     * boot; gates platform-only surfaces like the iOS subscription paywall.
-     */
-    platform: AppPlatform
-  }
+> & {
+  /**
+   * The active graph session of this webview.
+   */
+  graphSession: GraphSessionService<GraphServices>
+  /**
+   * `GraphBootService.createGraphAt`.
+   */
+  createAt: GraphBootService['createGraphAt']
+  /**
+   * `GraphBootService.forgetRecent`.
+   */
+  forget: GraphBootService['forgetRecent']
+  /**
+   * Which UI family the shell was built for (Plan 19's root gate), fixed at
+   * boot; gates platform-only surfaces like the iOS subscription paywall.
+   */
+  platform: AppPlatform
+}
 
 type State = GraphSessionState<GraphServices>
 
@@ -106,8 +105,7 @@ const GraphContext = createContext<GraphContextValue | null>(null)
  * sandbox `Documents/` — and only the *kind* is persisted. Absolute paths are
  * **derived fresh every launch** because iOS container paths change across
  * restore/update, so a persisted recent would point at a dead path.
- * `platform` selects the bootstrap; everything downstream of the open is
- * shared.
+ * Everything downstream of the open is shared.
  */
 export function GraphProvider({
   children,
@@ -136,7 +134,6 @@ export function GraphProvider({
       chooseGraph: () => graphBoot.chooseGraph(),
       openRecent: (root) => graphBoot.openRecent(root),
       deleteGraph: () => graphBoot.deleteGraph(),
-      refreshIndex: () => session.refreshIndex(),
       createAt: (root) => graphBoot.createGraphAt(root),
       forget: (root) => graphBoot.forgetRecent(root),
       platform,
