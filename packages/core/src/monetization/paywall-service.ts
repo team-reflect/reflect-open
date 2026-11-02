@@ -99,6 +99,10 @@ export interface PaywallServiceDeps {
   readonly storage: StorageService
 }
 
+function selectIsRequested(value: string | null): boolean {
+  return value === 'true'
+}
+
 class PaywallServiceImpl implements PaywallService {
   readonly #deps: PaywallServiceDeps
   readonly gate: Store<PaywallGate>
@@ -107,11 +111,10 @@ class PaywallServiceImpl implements PaywallService {
   constructor(deps: PaywallServiceDeps) {
     this.#deps = deps
     const { subscription, classicAccess, appStoreEnvironment, platform, storage } = deps
-    const stored: Store<string | null> = {
-      get: () => storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY),
-      subscribe: (listener) => storage.session.subscribe(PAYWALL_REQUESTED_STORAGE_KEY, listener),
-    }
-    this.requested = deriveStore(stored, (value) => value === 'true')
+    this.requested = deriveStore(
+      storage.session.store(PAYWALL_REQUESTED_STORAGE_KEY),
+      selectIsRequested,
+    )
     this.gate = combineStores(
       [subscription, classicAccess, appStoreEnvironment, this.requested],
       (active, classic, environment, requested) => {

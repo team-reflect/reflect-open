@@ -56,8 +56,8 @@ describe('createWebStorageService', () => {
     })
     const listener = vi.fn()
     const other = vi.fn()
-    const unsubscribe = storage.local.subscribe('key', listener)
-    storage.local.subscribe('other', other)
+    const unsubscribe = storage.local.store('key').subscribe(listener)
+    storage.local.store('other').subscribe(other)
 
     storage.local.set('key', 'written')
     storage.local.set('key', 'written')
@@ -76,7 +76,7 @@ describe('createWebStorageService', () => {
       sessionStorage: null,
     })
     const listener = vi.fn()
-    storage.local.subscribe('key', listener)
+    storage.local.store('key').subscribe(listener)
 
     storage.local.set('key', 'stored')
     expect(listener).not.toHaveBeenCalled()
