@@ -4,7 +4,6 @@ import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { getJson, setJson, type StorageService } from '../ports/storage-service.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
 import { WritableStore, type Store } from '../store.ts'
-import type { Unlisten } from '../unlisten.ts'
 
 const appStoreEnvironmentSchema = z.enum(['Production', 'Sandbox', 'Xcode']).nullable()
 
@@ -64,7 +63,6 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
   readonly #deps: AppStoreEnvironmentServiceDeps
   readonly #enabled: boolean
   readonly #state = new WritableStore<AppStoreEnvironmentState>(IDLE_STATE, isDeepEqual)
-  #watchers = 0
   #value: AppStoreEnvironment = null
   #answered = false
   #settled = false
@@ -88,17 +86,7 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
 
   readonly get = this.#state.get
 
-  readonly subscribe = (listener: VoidFunction): Unlisten => {
-    const unlisten = this.#state.subscribe(listener)
-    this.#watchers += 1
-    let active = true
-    return () => {
-      if (!active) return
-      active = false
-      unlisten()
-      this.#watchers -= 1
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   environment(): Promise<AppStoreEnvironment> {
     if (!this.#enabled) {
@@ -119,7 +107,7 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
 
   readonly invalidate = (): void => {
     this.#answered = false
-    if (this.#watchers > 0) {
+    if (this.#state.subscribed()) {
       void this.environment()
     }
   }
