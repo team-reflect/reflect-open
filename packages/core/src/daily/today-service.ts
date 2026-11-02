@@ -19,7 +19,7 @@ class TodayServiceImpl implements TodayService {
   readonly #deps: TodayServiceDeps
   readonly #store: WritableStore<string>
   #midnightTimer: TimerHandle | null = null
-  #heartbeat: TimerHandle | null = null
+  #stop: Unlisten | null = null
 
   constructor(deps: TodayServiceDeps) {
     this.#deps = deps
@@ -36,13 +36,12 @@ class TodayServiceImpl implements TodayService {
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
     const unlisten = this.#store.subscribe(listener)
-    if (this.#heartbeat === null) {
-      this.#start()
-    }
+    this.#stop ??= this.#start()
     return () => {
       unlisten()
       if (!this.#store.subscribed()) {
-        this.#stop()
+        this.#stop?.()
+        this.#stop = null
       }
     }
   }
@@ -70,26 +69,26 @@ class TodayServiceImpl implements TodayService {
     )
   }
 
-  #start(): void {
+  /**
+   * Keep the date fresh until the returned function runs.
+   */
+  #start(): Unlisten {
+    const { clock } = this.#deps
     this.#syncToday()
     this.#scheduleMidnightRollover()
-    this.#heartbeat = this.#deps.clock.setInterval(this.#syncToday, HEARTBEAT_MS)
+    const heartbeat = clock.setInterval(this.#syncToday, HEARTBEAT_MS)
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.#syncToday)
     }
-  }
-
-  #stop(): void {
-    if (this.#midnightTimer !== null) {
-      this.#deps.clock.clearTimeout(this.#midnightTimer)
-      this.#midnightTimer = null
-    }
-    if (this.#heartbeat !== null) {
-      this.#deps.clock.clearInterval(this.#heartbeat)
-      this.#heartbeat = null
-    }
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', this.#syncToday)
+    return () => {
+      if (this.#midnightTimer !== null) {
+        clock.clearTimeout(this.#midnightTimer)
+        this.#midnightTimer = null
+      }
+      clock.clearInterval(heartbeat)
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', this.#syncToday)
+      }
     }
   }
 }
