@@ -158,7 +158,8 @@ function forwardStripTap(event: ReactMouseEvent<HTMLElement>): void {
     .find((element) => page?.contains(element) ?? false)
   const caret = document.caretRangeFromPoint(clientX, clientY)
   strip.style.removeProperty('pointer-events')
-  if (!(target instanceof HTMLElement)) {
+  // An icon's `<svg>` or `<path>` is an `Element`, not an `HTMLElement`.
+  if (!(target instanceof Element)) {
     return
   }
   const field = target.closest<HTMLElement>(STRIP_FIELDS)
