@@ -16,13 +16,21 @@ import {
 
 interface PaletteContextValue {
   open: boolean
-  query: string
   openPalette: (query?: string) => void
-  setQuery: (query: string) => void
   closePalette: () => void
 }
 
+/**
+ * The palette's input text, in its own context so readers of
+ * {@link usePalette} do not re-render on every keystroke.
+ */
+interface PaletteQueryValue {
+  query: string
+  setQuery: (query: string) => void
+}
+
 const PaletteContext = createContext<PaletteContextValue | null>(null)
+const PaletteQueryContext = createContext<PaletteQueryValue | null>(null)
 
 export function PaletteProvider({ children }: { children: ReactNode }): ReactElement {
   const [open, setOpen] = useState(false)
@@ -37,16 +45,29 @@ export function PaletteProvider({ children }: { children: ReactNode }): ReactEle
   }, [])
 
   const value = useMemo<PaletteContextValue>(
-    () => ({ open, query, openPalette, setQuery, closePalette }),
-    [open, query, openPalette, closePalette],
+    () => ({ open, openPalette, closePalette }),
+    [open, openPalette, closePalette],
   )
-  return <PaletteContext value={value}>{children}</PaletteContext>
+  const queryValue = useMemo<PaletteQueryValue>(() => ({ query, setQuery }), [query])
+  return (
+    <PaletteContext value={value}>
+      <PaletteQueryContext value={queryValue}>{children}</PaletteQueryContext>
+    </PaletteContext>
+  )
 }
 
 export function usePalette(): PaletteContextValue {
   const context = use(PaletteContext)
   if (!context) {
     throw new Error('usePalette must be used within a PaletteProvider')
+  }
+  return context
+}
+
+export function usePaletteQuery(): PaletteQueryValue {
+  const context = use(PaletteQueryContext)
+  if (!context) {
+    throw new Error('usePaletteQuery must be used within a PaletteProvider')
   }
   return context
 }

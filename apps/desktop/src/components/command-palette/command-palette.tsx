@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils.ts'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons.ts'
 import { NotePreview } from './note-preview.tsx'
-import { usePalette } from './palette-provider.tsx'
+import { usePalette, usePaletteQuery } from './palette-provider.tsx'
 import { usePaletteResults } from './use-palette-results.ts'
 
 /**
@@ -54,7 +54,8 @@ interface PendingNoteOpen {
 }
 
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
-  const { open, query, setQuery, closePalette } = usePalette()
+  const { open, closePalette } = usePalette()
+  const { query, setQuery } = usePaletteQuery()
   const dateFormat = useDateFormat()
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
   const navigateNoteLink = useNoteLinkNavigation()

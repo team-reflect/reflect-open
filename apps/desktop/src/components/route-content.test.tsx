@@ -11,7 +11,11 @@ import {
   type TestNoteFileService,
   type TestPlatformOptions,
 } from '@reflect/core/testing'
-import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider.tsx'
+import {
+  PaletteProvider,
+  usePalette,
+  usePaletteQuery,
+} from '@/components/command-palette/palette-provider.tsx'
 import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
@@ -105,7 +109,8 @@ beforeEach(() => {
 })
 
 function PaletteProbe(): ReactElement {
-  const { open, query } = usePalette()
+  const { open } = usePalette()
+  const { query } = usePaletteQuery()
   return <output data-testid="palette">{JSON.stringify({ open, query })}</output>
 }
 
