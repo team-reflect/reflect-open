@@ -12,6 +12,32 @@ export interface Store<T> {
   subscribe: (onChange: VoidFunction) => Unlisten
 }
 
-export interface WriteableStore<T> extends Store<T> {
-  set: (value: T) => void
+export class WriteableStore<T> {
+  #value: T
+  readonly #listeners = new Set<() => void>()
+
+  constructor(value: T) {
+    this.#value = value
+  }
+
+  get(): T {
+    return this.#value
+  }
+
+  set(value: T): void {
+    this.#value = value
+  }
+
+  subscribe(listener: () => void): Unlisten {
+    this.#listeners.add(listener)
+    return () => {
+      this.#listeners.delete(listener)
+    }
+  }
+
+  emit(): void {
+    for (const listener of this.#listeners) {
+      listener()
+    }
+  }
 }
