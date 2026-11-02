@@ -9,7 +9,7 @@ across graphs and must survive graph deletion.
 - **`@reflect/core`** owns the keys, defaults and validation
   (`packages/core/src/settings/schema.ts`) and the runtime document
   (`SettingsService`, `CoreServices.settings`).
-- **The desktop app** reads settings with `useSettings()`
+- **The desktop app** reads settings with `useSettingsField(key)`
   (`apps/desktop/src/providers/settings-provider.tsx`) and renders controls in
   `apps/desktop/src/components/settings/`.
 
@@ -42,11 +42,14 @@ Export new value types from `packages/core/src/index.ts`. Cover the key in
 ## 2. Consume it
 
 ```tsx
-const { settings, updateSettings, updateSettingsWith } = useSettings()
-// read:  settings.yourNewSetting
-// write scalar: updateSettings({ yourNewSetting: value })
-// write derived/list value: updateSettingsWith((current) => ({ yourList: nextList(current) }))
+const yourNewSetting = useSettingsField('yourNewSetting')
+const settingsService = useSettingsService()
+// write scalar: settingsService.update({ yourNewSetting: value })
+// write derived/list value: settingsService.updateWith((current) => ({ yourList: nextList(current) }))
 ```
+
+`useSettingsField` re-renders only when its key changes. Use
+`useSettingsStore()` only where a component needs the whole document.
 
 Outside React, use the service (`settings.get()`, `update`, `updateWith`,
 `subscribe`); a core service takes `settings` in its `deps`.
@@ -55,16 +58,16 @@ What `SettingsService` gives you (do not re-implement it):
 
 - **Updates apply at once,** over defaults while the load is pending, and every
   subscriber sees them.
-- **Use `updateSettingsWith` for read-modify-write** (lists, objects, derived
+- **Use `updateWith` for read-modify-write** (lists, objects, derived
   values). Updaters sent before the load are replayed over the loaded document,
   so an early edit cannot compute from defaults and wipe the stored value.
 - **Saves are async and ordered.** A failed save keeps the in-memory value,
   shows in the operations status UI, and retries on the next change or quit
   flush.
-- **One runtime document.** `useSettings()` and `settings.get()` return the same
+- **One runtime document.** `useSettingsStore()` and `settings.get()` return the same
   object, which keeps its identity until something changes.
 - **Paired side effects must await the load.** If a setting pairs with state
-  elsewhere (e.g. an OS-keychain secret), call `whenSettingsLoaded()` before
+  elsewhere (e.g. an OS-keychain secret), call `whenLoaded()` before
   writing the other half: after a failed load, settings are session-only and
   the paired write would be stranded.
 - **A failed load is session-only:** the service never writes over an
