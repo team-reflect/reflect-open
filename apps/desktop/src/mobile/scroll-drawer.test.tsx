@@ -1,7 +1,8 @@
 import { useCallback, useState, type ReactElement } from 'react'
-import { page, userEvent } from 'vitest/browser'
+import { page } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { describe, expect, it, vi } from 'vitest'
+import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from './scroll-drawer.tsx'
@@ -132,7 +133,17 @@ describe('ScrollDrawer', () => {
   it('closes on a tap above the sheet', async () => {
     await renderInApp(<Harness />)
     await openScroller()
-    await userEvent.click(page.getByRole('dialog'), { position: { x: 20, y: 20 } })
+
+    // Clicks the element at the point, in place: a locator click is unreliable in WebKit CI.
+    const dialog = page.getByRole('dialog').element().getBoundingClientRect()
+    const target = document.elementFromPoint(dialog.left + 20, dialog.top + 20)
+    if (!(target instanceof HTMLElement)) {
+      throw new TypeError('Nothing to tap above the sheet.')
+    }
+    expect(target.classList.contains('scroll-drawer-spacer')).toBe(true)
+    await act(() => {
+      target.click()
+    })
 
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
   })
