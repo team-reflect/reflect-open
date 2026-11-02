@@ -1,6 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TestCoreServices } from '@reflect/core/testing'
+import type { ReactNode } from 'react'
+import { userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { TaskService, TaskWriteResult } from '@reflect/core'
+import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyCaptureMenu } from './daily-capture-menu.tsx'
 import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
 import type { Mutable } from '@reflect/utils'
@@ -27,8 +31,97 @@ vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
   useMobileAudioMemo: () => ({ ...memo }),
 }))
 
+const editorProbe = vi.hoisted(() => ({ focusCalls: 0 }))
+
+// The quick-edit sheet hosts the real markdown editor, covered by its own
+// tests. This textarea stand-in keeps the NoteEditor contract the sheet
+// relies on: an uncontrolled seed, `onChange` with the markdown, and a focus probe.
+vi.mock('@/editor/note-editor.tsx', async () => {
+  const { useEffect, useRef } = await import('react')
+  return {
+    NoteEditor: ({
+      initialContent,
+      onChange,
+      handleRef,
+    }: {
+      initialContent: string
+      onChange?: (markdown: string) => void
+      handleRef?: (handle: import('@/editor/note-editor.tsx').NoteEditorHandle | null) => void
+    }) => {
+      const areaRef = useRef<HTMLTextAreaElement | null>(null)
+      useEffect(() => {
+        handleRef?.({
+          getMarkdown: () => areaRef.current?.value ?? '',
+          setMarkdown: (markdown) => {
+            if (areaRef.current !== null) {
+              areaRef.current.value = markdown
+            }
+          },
+          insertMarkdown: () => {},
+          focus: () => {
+            editorProbe.focusCalls += 1
+          },
+          setSelection: () => {},
+          getSelectedText: () => '',
+          openSelectionMenu: () => {},
+          startPendingReplacement: () => false,
+          appendPendingReplacementText: () => {},
+          acceptPendingReplacement: () => {},
+          discardPendingReplacement: () => {},
+          findNext: () => {},
+          findPrevious: () => {},
+        })
+        return () => handleRef?.(null)
+      }, [handleRef])
+      return (
+        <textarea
+          ref={areaRef}
+          aria-label="Task text"
+          defaultValue={initialContent}
+          onChange={(event) => onChange?.(event.target.value)}
+        />
+      )
+    },
+  }
+})
+
+// Vaul's drag/animation is verified on-device. This passthrough honours `open`
+// and exposes the dismissal path as a button.
+vi.mock('@/components/ui/drawer.tsx', () => ({
+  Drawer: ({
+    open,
+    onOpenChange,
+    children,
+  }: {
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+    children?: ReactNode
+  }) => {
+    return open ? (
+      <div data-testid="drawer">
+        {children}
+        <button type="button" onClick={() => onOpenChange?.(false)}>
+          dismiss-drawer
+        </button>
+      </div>
+    ) : null
+  },
+  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
+}))
+
+/**
+ * The result of a write that changed nothing the cache needs to re-address.
+ */
+const WRITTEN: TaskWriteResult = { source: '', moved: [], inserted: [], tasks: [], updatedAt: 0 }
+
+let core: TestCoreServices
+let insertTask: MockInstance<TaskService['insertTask']>
+let writeTask: MockInstance<TaskService['writeTask']>
+
 function renderMenu(): Promise<InAppRenderResult<TestCoreServices>> {
-  return renderInApp(<DailyCaptureMenu />)
+  return renderInApp(<DailyCaptureMenu />, { core })
 }
 
 beforeEach(() => {
@@ -36,6 +129,16 @@ beforeEach(() => {
   memo.phase = 'idle'
   memo.available = true
   memo.error = null
+  editorProbe.focusCalls = 0
+  core = createTestCoreServices({ database: createWasmTestDatabaseService() })
+  // Today is 2026-06-14.
+  core.clock.setNow(new Date(2026, 5, 14, 12).getTime())
+  insertTask = vi.spyOn(core.tasks, 'insertTask').mockResolvedValue({
+    created: { astPath: [0], markdown: '', breadcrumbs: [], checked: false },
+    moved: [],
+    updatedAt: 0,
+  })
+  writeTask = vi.spyOn(core.tasks, 'writeTask').mockResolvedValue(WRITTEN)
 })
 
 describe('DailyCaptureMenu', () => {
@@ -46,19 +149,19 @@ describe('DailyCaptureMenu', () => {
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')
     expect(view.getByRole('button', { name: 'New note' }).query()).toBeNull()
+    expect(view.getByRole('button', { name: 'New task' }).query()).toBeNull()
     expect(view.getByRole('button', { name: 'Record audio memo' }).query()).toBeNull()
 
-    const newNote = view.container.querySelector<HTMLButtonElement>('button[aria-label="New note"]')
-    const audioMemo = view.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Record audio memo"]',
-    )
-    expect(newNote?.tabIndex).toBe(-1)
-    expect(audioMemo?.tabIndex).toBe(-1)
-    expect(newNote?.parentElement?.classList.contains('pointer-events-none')).toBe(true)
-    expect(audioMemo?.parentElement?.classList.contains('pointer-events-none')).toBe(true)
+    for (const label of ['New note', 'New task', 'Record audio memo']) {
+      const action = view.container.querySelector<HTMLButtonElement>(
+        `button[aria-label="${CSS.escape(label)}"]`,
+      )
+      expect(action?.tabIndex).toBe(-1)
+      expect(action?.parentElement?.classList.contains('pointer-events-none')).toBe(true)
+    }
   })
 
-  it('reveals both actions on the first tap and hides them on the second', async () => {
+  it('reveals every action on the first tap and hides them on the second', async () => {
     const view = await renderMenu()
 
     await view.getByRole('button', { name: 'Show capture actions' }).click()
@@ -68,6 +171,7 @@ describe('DailyCaptureMenu', () => {
       .element(view.getByRole('button', { name: 'Hide capture actions' }))
       .toHaveAttribute('aria-expanded', 'true')
     await expect.element(view.getByRole('button', { name: 'New note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'New task' })).toBeInTheDocument()
     await expect
       .element(view.getByRole('button', { name: 'Record audio memo' }))
       .toBeInTheDocument()
@@ -79,6 +183,7 @@ describe('DailyCaptureMenu', () => {
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')
     expect(view.getByRole('button', { name: 'New note' }).query()).toBeNull()
+    expect(view.getByRole('button', { name: 'New task' }).query()).toBeNull()
     expect(view.getByRole('button', { name: 'Record audio memo' }).query()).toBeNull()
   })
 
@@ -108,6 +213,56 @@ describe('DailyCaptureMenu', () => {
     await expect
       .element(view.getByRole('button', { name: 'Show capture actions' }))
       .toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it("adds a task to today's daily note and opens its sheet with the editor focused", async () => {
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    await vi.waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md'))
+    await expect
+      .element(view.getByRole('button', { name: 'Show capture actions' }))
+      .toHaveAttribute('aria-expanded', 'false')
+    const input = view.getByRole('textbox', { name: 'Task text' })
+    await expect.element(input).toHaveValue('')
+    // The task is brand new, so typing is the next step and the keyboard rises.
+    await vi.waitFor(() => expect(editorProbe.focusCalls).toBeGreaterThan(0))
+
+    await userEvent.type(input, 'buy oat milk')
+    await view.getByRole('button', { name: 'dismiss-drawer' }).click()
+
+    expect(writeTask).toHaveBeenCalledTimes(1)
+    expect(writeTask).toHaveBeenCalledWith(expect.objectContaining({ markdown: '' }), [
+      { kind: 'setMarkdown', markdown: 'buy oat milk' },
+    ])
+    expect(view.getByRole('textbox', { name: 'Task text' }).query()).toBeNull()
+  })
+
+  it('removes the new task when its sheet is dismissed untyped', async () => {
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+    await view.getByRole('button', { name: 'New task' }).click()
+    await expect.element(view.getByRole('textbox', { name: 'Task text' })).toBeInTheDocument()
+
+    await view.getByRole('button', { name: 'dismiss-drawer' }).click()
+
+    // V1's empty-task rule: a change of heart leaves no bare `+ [ ]` behind.
+    await vi.waitFor(() => expect(writeTask).toHaveBeenCalledTimes(1))
+    expect(writeTask).toHaveBeenCalledWith(expect.anything(), [{ kind: 'remove' }])
+  })
+
+  it('opens no sheet when adding the task fails', async () => {
+    insertTask.mockRejectedValue(new Error('disk full'))
+    const view = await renderMenu()
+    await view.getByRole('button', { name: 'Show capture actions' }).click()
+
+    await view.getByRole('button', { name: 'New task' }).click()
+
+    await vi.waitFor(() => expect(insertTask).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(core.progress.findByLabel('Adding task')?.status).toBe('failed'))
+    expect(view.getByRole('textbox', { name: 'Task text' }).query()).toBeNull()
   })
 
   it('starts the audio memo and collapses', async () => {
@@ -148,13 +303,14 @@ describe('DailyCaptureMenu', () => {
       .toBeInTheDocument()
   })
 
-  it('reveals only New note when native audio is unavailable', async () => {
+  it('reveals New note and New task when native audio is unavailable', async () => {
     memo.available = false
     const view = await renderMenu()
 
     await view.getByRole('button', { name: 'Show capture actions' }).click()
 
     await expect.element(view.getByRole('button', { name: 'New note' })).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'New task' })).toBeInTheDocument()
     expect(view.container.querySelector('[data-slot="audio-memo-action"]')).toBeNull()
   })
 })
