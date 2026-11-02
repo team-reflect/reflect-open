@@ -275,54 +275,33 @@ function attachScrollDrawer({
     scroller.scrollTo({ top: openTop(), behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
   }
 
-  let slideHidden = false
-  let handled = false
+  // The spacer is one scrollport high, so the slide is off screen exactly here.
+  const isClosed = (): boolean => scroller.scrollTop <= 1
 
   scroller.scrollTop = openTop()
 
-  // Acts once each time the slide leaves the scrollport, after the finger lifts.
-  const settle = (): void => {
-    if (!slideHidden || handled || watch.isTouching()) {
-      return
-    }
-    handled = true
-    if (!watch.isUserScroll()) {
-      // A focus reveal or a resize moved the sheet: never close for those.
-      scrollOpen()
-      return
-    }
-    popup()?.setAttribute('data-closed-by', 'swipe')
-    requestClose()
-  }
-
+  // Acts once the sheet rests at the closed snap point, after the finger lifts.
   const watch = watchScrollSettle({
     element: scroller,
-    onSettle: settle,
     signal,
-    isSettled: () => scroller.scrollTop <= 1,
-  })
-
-  // The slide leaves the scrollport only at the closed snap point.
-  const visibility = new IntersectionObserver(
-    (entries) => {
-      const entry = entries.at(-1)
-      if (entry === undefined) {
+    isSettled: isClosed,
+    onSettle: () => {
+      if (!isClosed()) {
         return
       }
-      slideHidden = !entry.isIntersecting
-      if (slideHidden) {
-        settle()
-      } else {
-        handled = false
+      if (!watch.isUserScroll()) {
+        // A focus reveal or a resize moved the sheet: never close for those.
+        scrollOpen()
+        return
       }
+      popup()?.setAttribute('data-closed-by', 'swipe')
+      requestClose()
     },
-    { root: scroller, rootMargin: '0px 0px -1px 0px' },
-  )
-  visibility.observe(slide)
+  })
 
   // Content growth, the keyboard padding, or a rotation moves the open snap point.
   const resize = new ResizeObserver(() => {
-    if (!watch.isTouching() && !slideHidden) {
+    if (!watch.isTouching() && !isClosed()) {
       scroller.scrollTop = openTop()
     }
   })
@@ -338,7 +317,6 @@ function attachScrollDrawer({
     },
     detach: () => {
       listeners.abort()
-      visibility.disconnect()
       resize.disconnect()
     },
   }
