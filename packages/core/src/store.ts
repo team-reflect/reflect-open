@@ -62,7 +62,7 @@ export function deriveStore<T, U>(
   derive: (value: T) => U,
   isEqual: (a: U, b: U) => boolean = Object.is,
 ): Store<U> {
-  return combineStores([store], (value) => derive(value), isEqual)
+  return combineStores([store], derive, isEqual)
 }
 
 function isArrayShallowEqual<T>(a: T[], b: T[]): boolean {
