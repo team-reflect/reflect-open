@@ -21,10 +21,6 @@ export interface BackPagerOptions {
    */
   edgeRef: RefObject<HTMLElement | null>
   /**
-   * How many pages the scroller holds.
-   */
-  pageCount: number
-  /**
    * Changes whenever the page list changes.
    */
   pagesKey: string
@@ -38,8 +34,11 @@ export interface BackPagerOptions {
   onPop: () => void
 }
 
-function pinToLastPage(scroller: HTMLElement, pageCount: number): void {
-  scroller.scrollLeft = (pageCount - 1) * scroller.clientWidth
+/**
+ * Rests the scroller on its last page, the end of its scroll range.
+ */
+function pinToLastPage(scroller: HTMLElement): void {
+  scroller.scrollLeft = scroller.scrollWidth - scroller.clientWidth
 }
 
 /**
@@ -62,7 +61,6 @@ export function useBackPager({
   scrollerRef,
   scrimRef,
   edgeRef,
-  pageCount,
   pagesKey,
   enabled,
   onPop,
@@ -73,9 +71,9 @@ export function useBackPager({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
     if (scroller) {
-      pinToLastPage(scroller, pageCount)
+      pinToLastPage(scroller)
     }
-  }, [scrollerRef, pageCount, pagesKey])
+  }, [scrollerRef, pagesKey])
 
   useEffect(() => {
     const scroller = scrollerRef.current
@@ -93,7 +91,7 @@ export function useBackPager({
           return
         }
         if (!watch.isUserScroll()) {
-          pinToLastPage(scroller, pageCount)
+          pinToLastPage(scroller)
           return
         }
         if (scroller.scrollLeft > REVEALED_PX) {
@@ -115,7 +113,7 @@ export function useBackPager({
 
     const resize = new ResizeObserver(() => {
       if (scroller.scrollLeft > REVEALED_PX) {
-        pinToLastPage(scroller, pageCount)
+        pinToLastPage(scroller)
       }
     })
     resize.observe(scroller)
@@ -124,5 +122,5 @@ export function useBackPager({
       controller.abort()
       resize.disconnect()
     }
-  }, [enabled, scrollerRef, scrimRef, edgeRef, pageCount, pagesKey])
+  }, [enabled, scrollerRef, scrimRef, edgeRef, pagesKey])
 }

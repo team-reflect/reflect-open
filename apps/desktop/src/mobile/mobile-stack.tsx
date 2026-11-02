@@ -334,7 +334,6 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     scrollerRef: pagerRef,
     scrimRef,
     edgeRef,
-    pageCount: layers.length,
     pagesKey: layers.map((layer) => layer.key).join('|'),
     enabled: swipeEnabled,
     onPop: popByGesture,
