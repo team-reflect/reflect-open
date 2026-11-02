@@ -6,7 +6,6 @@ import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { getJson, setJson, type StorageService } from '../ports/storage-service.ts'
 import { IAP_PRODUCT_IDS, type IapService } from '../ipc/iap-service.ts'
 import { WritableStore, type Store } from '../store.ts'
-import type { Unlisten } from '../unlisten.ts'
 import { toAppError } from '../errors.ts'
 
 const activeSubscriptionSchema = z.enum(['yearly', 'monthly']).nullable()
@@ -116,7 +115,6 @@ class SubscriptionServiceImpl implements SubscriptionService {
   readonly #deps: SubscriptionServiceDeps
   readonly #enabled: boolean
   readonly #state = new WritableStore<SubscriptionState>(IDLE_STATE, isDeepEqual)
-  #watchers = 0
   readonly #pendingEntitlementLookups = new Map<string, Promise<boolean>>()
   #value: ActiveSubscription = null
   /**
@@ -149,17 +147,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
 
   readonly get = this.#state.get
 
-  readonly subscribe = (listener: VoidFunction): Unlisten => {
-    const unlisten = this.#state.subscribe(listener)
-    this.#watchers += 1
-    let active = true
-    return () => {
-      if (!active) return
-      active = false
-      unlisten()
-      this.#watchers -= 1
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   activeSubscription(): Promise<ActiveSubscription> {
     if (this.#answeredAt !== null && this.#deps.clock.now() - this.#answeredAt < FRESH_MS) {
@@ -184,7 +172,7 @@ class SubscriptionServiceImpl implements SubscriptionService {
 
   readonly invalidate = (): void => {
     this.#answeredAt = null
-    if (this.#watchers > 0) {
+    if (this.#state.subscribed()) {
       void this.refetch()
     }
   }
