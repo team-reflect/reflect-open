@@ -38,11 +38,20 @@ export function MobileShell(): ReactElement {
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
   const [lastDailyRoute, setLastDailyRoute] = useState<DailyRoute>({ kind: 'today' })
+  // A card (a note, Chat) keeps the tab of the screen it was opened from:
+  // the tab root its Back reveals, which also covers All returning to its
+  // card with the list put beneath it in the same render. Deeper cards (a
+  // note opened from a note) fall back to the last tab, remembered across
+  // renders. Tracking that in state (adjusted during render) avoids
+  // reading/writing a ref in render.
+  const tab: MobileTab =
+    tabRootFor(route) ?? (backRoute === null ? null : tabRootFor(backRoute)) ?? lastTab
   // A tab double-tap is a capture gesture (Daily focuses today's editor; the
-  // list tabs focus their search inputs); a pending tap expires if the
-  // route leaves the tab's root between taps — that second tap is a return,
-  // not a double-tap.
-  const isDoubleTap = useDoubleTap<MobileTab>(tabRootFor(route))
+  // list tabs focus their search inputs); a pending tap expires if the shown
+  // tab changes between taps (a deep link elsewhere), so that second tap is a
+  // return, not a double-tap. Watching the shown tab, not its root, lets the
+  // All tap that returns to its open card still pair with a quick second tap.
+  const isDoubleTap = useDoubleTap<MobileTab>(tab)
   const keyboardVisible = useKeyboardVisible()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
@@ -57,14 +66,6 @@ export function MobileShell(): ReactElement {
     }
   }, [route, entryId])
 
-  // A card (a note, Chat) keeps the tab of the screen it was opened from:
-  // the tab root its Back reveals, which also covers All returning to its
-  // card with the list put beneath it in the same render. Deeper cards (a
-  // note opened from a note) fall back to the last tab, remembered across
-  // renders. Tracking that in state (adjusted during render) avoids
-  // reading/writing a ref in render.
-  const tab: MobileTab =
-    tabRootFor(route) ?? (backRoute === null ? null : tabRootFor(backRoute)) ?? lastTab
   const currentDailyRoute = dailyRouteFrom(route)
   if (tab !== lastTab) {
     setLastTab(tab)
@@ -75,11 +76,9 @@ export function MobileShell(): ReactElement {
   const allScreen = useAllTabScreen(route, tab)
 
   const handleTabSelect = (next: MobileTab): void => {
-    // From another tab, All returns to the card it was left on. That tap
-    // moves off All's list by itself, so it must still pair with a quick
-    // second tap.
+    const doubleTap = isDoubleTap(next)
+    // From another tab, All returns to the card it was left on.
     const restoredAllScreen = next === 'all' && tab !== 'all' ? allScreen : null
-    const doubleTap = isDoubleTap(next, { leavesKey: restoredAllScreen !== null })
 
     if (next === 'all') {
       const allList: Route = { kind: 'allNotes', tag: null }

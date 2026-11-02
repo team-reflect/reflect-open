@@ -7,7 +7,7 @@ import {
   type ReactElement,
 } from 'react'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
-import type { AllNotesFilters, Route } from '@reflect/app'
+import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
 import { BACK_SWIPE_SETTLE_MS, useBackSwipe, type BackSwipeState } from '@/mobile/use-back-swipe.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import { RouterFreeze, useRouter } from '@/routing/router.tsx'
@@ -77,10 +77,11 @@ function layerKey(route: Route): string {
 /**
  * The animation an arrival deserves, V1 semantics: entering the note stack
  * slides in, leaving it slides out, moving within it follows history order,
- * and root-to-root moves (tab switches, date links) stay instant. A card that
- * lands over a different root than the screen being left (the All tab
- * returning to its open Chat or note, with All's list put beneath it) is a
- * tab switch too, so it appears in place.
+ * and root-to-root moves (tab switches, date links) stay instant. Only a card
+ * pushed onto the screen being left slides in; one that lands over any other
+ * screen (the All tab returning to its open Chat or note, with All's list put
+ * beneath it, or Back from another tab into a card) is a tab switch too, so
+ * it appears in place.
  *
  * @param below The screen the arriving route sits on (what its Back reveals).
  */
@@ -96,7 +97,7 @@ function transitionFor(
     exiting: { key: layerKey(from.route), route: from.route },
   }
   if (toStacked && !fromStacked) {
-    return layerKey(below) === layerKey(from.route) ? { kind: 'push' } : { kind: 'none' }
+    return routesEqual(below, from.route) ? { kind: 'push' } : { kind: 'none' }
   }
   if (!toStacked && fromStacked) {
     return pop

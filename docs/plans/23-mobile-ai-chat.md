@@ -156,9 +156,9 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
    >
    > All remembers the card it was left on (an open Chat, a note opened from
    > the list, or Settings reached from Chat's setup call-to-action): tapping
-   > All from another tab returns to it, in place
-   > and with the list beneath it so Back lands on All, and tapping All
-   > again, or double-tapping it (search focused), goes back to the list.
+   > All from another tab returns to it, in place and with the list beneath
+   > it so Back lands on All, and tapping All again, or double-tapping it
+   > (search focused), goes back to the list.
 3. **Lexical-only, stated honestly.** Mobile passes
    `semanticSearchEnabled: false` into `streamChat` unconditionally —
    regardless of the (per-device) setting — so `search_notes` runs
