@@ -427,7 +427,6 @@ describe('GraphSessionService close flows', () => {
       status: 'choosing',
       graph: null,
       indexGeneration: null,
-      indexing: false,
       recents,
     })
     expect(context.fileChanges.watcherRunning()).toBe(false)
@@ -533,27 +532,6 @@ describe('GraphSessionService welcome seeding', () => {
 })
 
 describe('GraphSessionService index following', () => {
-  it('reports indexing while the open graph reconciles', async () => {
-    const context = await start()
-    await context.session.openRecent('/a')
-    await expect.poll(() => context.states.some((state) => state.indexing)).toBe(true)
-    await settleIndex(context)
-    expect(context.session.get().indexing).toBe(false)
-  })
-
-  it('keeps the state when the index progress changes but `indexing` does not', async () => {
-    const context = await start()
-    await context.session.openRecent('/a')
-    await expect.poll(() => context.indexLifecycle.progress.get()).toBe('live')
-    const state = context.session.get()
-    const count = context.states.length
-
-    context.indexLifecycle.suspend()
-    expect(context.indexLifecycle.progress.get()).toBe('idle')
-    expect(context.session.get()).toBe(state)
-    expect(context.states).toHaveLength(count)
-  })
-
   it('re-runs the reconcile on request and on a watcher demand', async () => {
     const context = await start()
     await context.session.openRecent('/a')

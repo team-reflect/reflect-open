@@ -7,6 +7,7 @@ import type {
   GraphSession,
   GraphSessionState,
   GraphStatus,
+  IndexLifecycleProgress,
   RecentGraph,
 } from '@reflect/core'
 import { useSelector } from '@/lib/use-store.ts'
@@ -53,8 +54,8 @@ function selectIndexGeneration(state: State): number | null {
   return state.indexGeneration
 }
 
-function selectIndexing(state: State): boolean {
-  return state.indexing
+function selectReconciling(progress: IndexLifecycleProgress): boolean {
+  return progress === 'reconciling'
 }
 
 function selectError(state: State): string | null {
@@ -171,7 +172,7 @@ export function useIndexGeneration(): number | null {
  * True while the background index reconcile is running.
  */
 export function useGraphIndexing(): boolean {
-  return useGraphSelector(selectIndexing)
+  return useSelector(useCoreServices().indexLifecycle.progress, selectReconciling)
 }
 
 /**

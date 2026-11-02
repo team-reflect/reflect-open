@@ -1,4 +1,4 @@
-import { isDeepEqual, isShallowEqual } from '@ocavue/utils'
+import { isDeepEqual } from '@ocavue/utils'
 import { z } from 'zod'
 import { createGraphSession, type GraphRole, type GraphSession } from './graph-session.ts'
 import type { IdService } from '../ports/id-service.ts'
@@ -8,15 +8,12 @@ import type { NoteRowService } from '../documents/note-row-service.ts'
 import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
 import { errorMessage } from '../errors.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
-import type {
-  IndexLifecycleProgress,
-  IndexLifecycleService,
-} from '../indexing/index-lifecycle-service.ts'
+import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
 import type { IndexStoreService } from '../indexing/index-store-service.ts'
 import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import { combineStores, WritableStore, type Store } from '../store.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { MobileStorageService } from '../ipc/mobile-storage-service.ts'
 import type { NoteFileService } from './note-file-service.ts'
 import { ensureWelcomeNote } from './onboarding.ts'
@@ -49,10 +46,6 @@ export interface GraphSessionState<Services = unknown> {
    * independent in Rust. Null when the index failed to open.
    */
   readonly indexGeneration: number | null
-  /**
-   * True while the background index reconcile is running (Plan 06b).
-   */
-  readonly indexing: boolean
   readonly error: string | null
   readonly recents: RecentGraph[]
   /**
@@ -171,17 +164,12 @@ export interface GraphSessionServiceDeps<Services = unknown> {
 const voidSchema = z.null()
 
 /**
- * The fields of a {@link GraphSessionState} that the service writes itself.
- */
-type GraphSessionFields<Services> = Omit<GraphSessionState<Services>, 'indexing'>
-
-/**
- * Field-by-field equality of two {@link GraphSessionFields}. `recents` is
+ * Field-by-field equality of two {@link GraphSessionState}s. `recents` is
  * compared by content because every `loadRecents` reads a new list.
  */
 function isGraphSessionStateEqual<Services>(
-  a: GraphSessionFields<Services>,
-  b: GraphSessionFields<Services>,
+  a: GraphSessionState<Services>,
+  b: GraphSessionState<Services>,
 ): boolean {
   return (
     a.status === b.status &&
@@ -194,18 +182,11 @@ function isGraphSessionStateEqual<Services>(
   )
 }
 
-function deriveGraphSessionState<Services>(
-  fields: GraphSessionFields<Services>,
-  progress: IndexLifecycleProgress,
-): GraphSessionState<Services> {
-  return { ...fields, indexing: progress === 'reconciling' }
-}
-
 class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService<Services> {
   readonly #deps: GraphSessionServiceDeps<Services>
   readonly #releasedListeners = new Set<(reason: GraphReleaseReason) => void>()
   readonly #deletedListeners = new Set<(root: string) => void>()
-  readonly #state = new WritableStore<GraphSessionFields<Services>>(
+  readonly #state = new WritableStore<GraphSessionState<Services>>(
     {
       status: 'loading',
       graph: null,
@@ -217,7 +198,6 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     },
     isGraphSessionStateEqual,
   )
-  readonly #published: Store<GraphSessionState<Services>>
   // Monotonic open token: only the most recent open may commit `graph`/`status`,
   // so overlapping opens (double-click, StrictMode remount) can't finish out of
   // order and leave us on a graph the user didn't pick last.
@@ -229,16 +209,11 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
 
   constructor(deps: GraphSessionServiceDeps<Services>) {
     this.#deps = deps
-    this.#published = combineStores(
-      [this.#state, deps.indexLifecycle.progress],
-      deriveGraphSessionState,
-      isShallowEqual,
-    )
   }
 
-  readonly get = (): GraphSessionState<Services> => this.#published.get()
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: VoidFunction): Unlisten => this.#published.subscribe(listener)
+  readonly subscribe = this.#state.subscribe
 
   onGraphReleased(listener: (reason: GraphReleaseReason) => void): Unlisten {
     return this.#attach(this.#releasedListeners, listener)
@@ -263,7 +238,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     }
   }
 
-  #setState(patch: Partial<GraphSessionFields<Services>>): void {
+  #setState(patch: Partial<GraphSessionState<Services>>): void {
     this.#state.set({ ...this.#state.get(), ...patch })
   }
 
