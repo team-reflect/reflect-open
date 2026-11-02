@@ -17,7 +17,7 @@ const MIDNIGHT_PAD_MS = 250
 
 class TodayServiceImpl implements TodayService {
   readonly #deps: TodayServiceDeps
-  readonly #today: WritableStore<string> // fixme: rename #today to #store
+  readonly #today: WritableStore<string>
   #midnightTimer: TimerHandle | null = null
   #heartbeat: TimerHandle | null = null
 
