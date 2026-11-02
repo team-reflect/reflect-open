@@ -69,6 +69,7 @@
  * its own listeners.
  */
 
+import { isShallowEqual } from '@ocavue/utils'
 import type { Unlisten } from './unlisten.ts'
 
 /**
@@ -143,18 +144,6 @@ export function deriveStore<T, U>(
   return combineStores([store], derive, isEqual)
 }
 
-function isArrayShallowEqual<T>(a: T[], b: T[]): boolean {
-  if (a.length !== b.length) {
-    return false
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) {
-      return false
-    }
-  }
-  return true
-}
-
 /**
  * A {@link Store} of `derive(...values)`, where `values` are the current
  * values of `stores`. A new result that `isEqual` to the previous one is
@@ -174,7 +163,7 @@ export function combineStores<T extends unknown[], U>(
 
   const get = (): U => {
     const newSources: T = stores.map((store) => store.get()) as T
-    if (sources && isArrayShallowEqual(sources, newSources)) {
+    if (sources && isShallowEqual(sources, newSources)) {
       return derived
     }
     const newDerived: U = derive(...newSources)
