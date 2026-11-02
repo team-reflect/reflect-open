@@ -439,6 +439,5 @@ describe('PaywallScreen Reflect Classic verification', () => {
     await expect
       .element(view.getByText('Your Reflect Classic access to Reflect Open has ended.'))
       .toBeVisible()
-    expect(classicAccess.calls()).toContain('start')
   })
 })

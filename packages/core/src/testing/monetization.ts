@@ -18,7 +18,7 @@ import type {
   SubscriptionState,
 } from '../monetization/subscription-service.ts'
 
-export type ClassicAccessCall = 'read' | 'load' | 'signIn' | 'signOut' | 'start'
+export type ClassicAccessCall = 'read' | 'load' | 'signIn' | 'signOut'
 
 export interface TestClassicAccessService extends ClassicAccessService {
   /**
@@ -84,11 +84,6 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
     return
   }
 
-  start(): Unlisten {
-    this.#log.push('start')
-    return () => {}
-  }
-
   setState(patch: Partial<ClassicAccessState>): void {
     this.#state.set({ ...this.get(), ...patch })
   }
@@ -109,7 +104,7 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
 /**
  * A {@link ClassicAccessService} over a settable state. `read` and `load`
  * resolve the stored access; `signIn` resolves `cancelled` until `setSignIn`;
- * `signOut` clears the access; `start` only records the call.
+ * `signOut` clears the access.
  */
 export function createTestClassicAccessService(
   state?: Partial<ClassicAccessState>,
