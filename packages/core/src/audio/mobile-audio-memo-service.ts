@@ -304,7 +304,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
     } else if (recorderState === 'requesting') {
       void this.#cancelRecorder()
       this.#setDrawerOpen(false)
-    } else if (this.#pipeline.getState().error !== null) {
+    } else if (this.#pipeline.get().error !== null) {
       // A parked error must never invisibly block recording. The audio
       // action reopens the drawer, which shows the failure with Retry/Discard.
       this.#setDrawerOpen(true)
@@ -382,7 +382,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
 
   #snapshot(): MobileAudioMemoSessionState {
     const recorderState: AudioRecorderState = this.#deps.audioRecorder.state.get()
-    const pipelineState = this.#pipeline.getState()
+    const pipelineState = this.#pipeline.get()
     return {
       // A live capture owns the surface. A background save's failure parks and
       // shows after the stop, never yanking the waveform mid-recording.
@@ -498,7 +498,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
     // Recording never starts without a transcription key: the drawer opens on
     // its key-setup guidance instead. OS entry points (Siri, the widget, the
     // quick action) funnel through here too, so they surface the same guidance.
-    if (!this.#pipeline.getState().hasTranscriptionConfig) {
+    if (!this.#pipeline.get().hasTranscriptionConfig) {
       return
     }
     try {
