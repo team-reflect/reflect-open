@@ -24,10 +24,12 @@ export class WriteableStore<T> {
     return this.#value
   }
 
-  set(value: T): void {
+  set(value: T, emit: boolean = true): void {
     if (this.#value === value) return
     this.#value = value
-    this.emit()
+    if (emit) {
+      this.emit()
+    }
   }
 
   subscribe(listener: () => void): Unlisten {

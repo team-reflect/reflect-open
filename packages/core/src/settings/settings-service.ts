@@ -214,7 +214,7 @@ class SettingsServiceImpl implements SettingsService {
     if (next !== previous) {
       this.#emit()
     }
-    if (this.#dirty || next !== previous) {
+    if (this.#dirty) {
       this.#submit(next)
     }
   }
