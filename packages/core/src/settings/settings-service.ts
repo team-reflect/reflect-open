@@ -171,7 +171,7 @@ class SettingsServiceImpl implements SettingsService {
       next = { ...next, ...updater(next) }
     }
     this.#state = outcome
-    if (outcome === 'loaded' && isDeepEqual(document, next)) {
+    if (outcome === 'loaded') {
       next = document
     }
     // The status changed too, so notify even if the document did not.
