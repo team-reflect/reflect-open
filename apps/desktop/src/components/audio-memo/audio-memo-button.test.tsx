@@ -1,6 +1,7 @@
 import type { RenderResult } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { WritableStore, type AudioMemoSessionState } from '@reflect/core'
 import { AudioMemoContext, type AudioMemoContextValue } from '@/providers/audio-memo-provider.tsx'
@@ -68,6 +69,10 @@ describe('AudioMemoButton', () => {
     const view = await renderButton()
 
     await expect.element(view.getByText('1:23')).toBeInTheDocument()
+    await act(() => {
+      elapsedMs.set(84_000)
+    })
+    await expect.element(view.getByText('1:24')).toBeInTheDocument()
     await userEvent.click(view.getByRole('button', { name: 'Stop recording' }))
     expect(actions.toggle).toHaveBeenCalled()
   })

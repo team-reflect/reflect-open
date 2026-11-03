@@ -3,9 +3,8 @@ import { createTestAttachmentService } from './attachments.ts'
 
 describe('createTestAttachmentService', () => {
   it('rejects a catalog load while no graph session is open', async () => {
-    const attachments = createTestAttachmentService({
-      graphSession: { get: () => ({ session: null }) },
-    })
+    const closed = { session: null }
+    const attachments = createTestAttachmentService({ graphSession: { get: () => closed } })
 
     await expect(attachments.loadCatalog()).rejects.toThrow('No graph is open.')
   })

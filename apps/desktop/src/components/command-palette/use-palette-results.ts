@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { parseSearchQuery } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
+import { useToday } from '@/lib/use-today.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import {
   useDateFormat,
@@ -54,7 +55,7 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // part of the cache identity — without it a palette cached before midnight
   // would serve a stale "Tomorrow" afterwards. Computed once so the key and the
   // query agree on the same day.
-  const today = paletteSearch.today()
+  const today = useToday()
 
   const {
     data: suggestions,

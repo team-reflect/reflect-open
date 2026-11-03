@@ -11,7 +11,7 @@ import type {
 } from '../ipc/icloud-native-service.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
-import type { GitSyncService, GitSyncState } from '../sync/git-sync-service.ts'
+import { sameState, type GitSyncService, type GitSyncState } from '../sync/git-sync-service.ts'
 import type { ConnectExistingResult, GithubConnector } from '../sync/github-connector.ts'
 import type {
   ConnectGitHostInput,
@@ -496,7 +496,7 @@ class TestGitSyncServiceImpl implements TestGitSyncService {
   readonly #log: GitSyncCall[] = []
 
   constructor(options?: { state?: GitSyncState }) {
-    this.#state = new WritableStore<GitSyncState>(options?.state ?? { phase: 'loading' })
+    this.#state = new WritableStore<GitSyncState>(options?.state ?? { phase: 'loading' }, sameState)
   }
 
   start(): void {

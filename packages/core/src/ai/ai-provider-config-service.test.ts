@@ -50,7 +50,7 @@ async function createService(
     keyValidation,
     id,
   })
-  service.list()
+  service.get()
   await settings.whenLoaded()
   return { settings, secretStore, keyValidation, id, service }
 }
@@ -59,7 +59,7 @@ describe('AiProviderConfigService', () => {
   it('lists the entries and resolves the default one', async () => {
     const { service } = await createService({ aiProviders: [A, B], defaultAiProviderId: 'b' })
 
-    expect(service.list()).toEqual([A, B])
+    expect(service.get().providers).toEqual([A, B])
     expect(service.defaultProvider()).toEqual(B)
     expect(service.get()).toEqual({ providers: [A, B], defaultProviderId: 'b' })
   })
@@ -79,7 +79,7 @@ describe('AiProviderConfigService', () => {
   it('returns a stable list and default entry until the settings change', async () => {
     const { service } = await createService({ aiProviders: [A, B], defaultAiProviderId: 'a' })
 
-    expect(service.list()).toBe(service.list())
+    expect(service.get().providers).toBe(service.get().providers)
     expect(service.defaultProvider()).toBe(service.defaultProvider())
   })
 
@@ -104,7 +104,7 @@ describe('AiProviderConfigService', () => {
     await service.add(draft())
 
     const addedId = id.issued()[0]!
-    expect(service.list()).toEqual([
+    expect(service.get().providers).toEqual([
       { id: addedId, provider: 'anthropic', model: 'claude-sonnet-5-5', keyHint: 'wxyz1' },
     ])
     // The first entry becomes the default automatically.
@@ -149,7 +149,7 @@ describe('AiProviderConfigService', () => {
       }),
     )
 
-    expect(service.list()).toEqual([
+    expect(service.get().providers).toEqual([
       {
         id: id.issued()[0],
         provider: 'openai-compatible',
@@ -171,12 +171,12 @@ describe('AiProviderConfigService', () => {
       keyValidation: createTestAiKeyValidationService(),
       id: createTestIdService(),
     })
-    service.list()
+    service.get()
     await settings.whenLoaded()
 
     await expect(service.add(draft())).rejects.toMatchObject({ message: 'keychain locked' })
 
-    expect(service.list()).toEqual([])
+    expect(service.get().providers).toEqual([])
     await settings.flush()
     expect(settings.saves()).toEqual([])
   })
@@ -190,7 +190,7 @@ describe('AiProviderConfigService', () => {
     })
 
     expect(secretStore.snapshot()).toEqual({})
-    expect(service.list()).toEqual([])
+    expect(service.get().providers).toEqual([])
   })
 
   it('removes an entry, deletes its key, and promotes the next default', async () => {
@@ -201,7 +201,7 @@ describe('AiProviderConfigService', () => {
 
     await service.remove('a')
 
-    expect(service.list()).toEqual([B])
+    expect(service.get().providers).toEqual([B])
     expect(settings.get().defaultAiProviderId).toBe('b')
     expect(secretStore.snapshot()).toEqual({ 'ai-api-key:b': 'sk-b' })
   })
@@ -214,7 +214,7 @@ describe('AiProviderConfigService', () => {
 
     await Promise.all([service.remove('a'), service.remove('b')])
 
-    expect(service.list()).toEqual([])
+    expect(service.get().providers).toEqual([])
     expect(settings.get().defaultAiProviderId).toBeNull()
     expect(secretStore.snapshot()).toEqual({})
   })
@@ -225,17 +225,17 @@ describe('AiProviderConfigService', () => {
     service.makeDefault('b')
 
     expect(service.defaultProvider()).toEqual(B)
-    expect(service.list()).toEqual([A, B])
+    expect(service.get().providers).toEqual([A, B])
   })
 
   it('changes the default model of one entry, and ignores a blank model', async () => {
     const { service } = await createService({ aiProviders: [A, B], defaultAiProviderId: 'a' })
 
     service.setDefaultModel('b', ' gpt-5.4-mini ')
-    expect(service.list()).toEqual([A, { ...B, model: 'gpt-5.4-mini' }])
+    expect(service.get().providers).toEqual([A, { ...B, model: 'gpt-5.4-mini' }])
 
     service.setDefaultModel('b', '   ')
-    expect(service.list()).toEqual([A, { ...B, model: 'gpt-5.4-mini' }])
+    expect(service.get().providers).toEqual([A, { ...B, model: 'gpt-5.4-mini' }])
   })
 
   describe('checkDraft', () => {

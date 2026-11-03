@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.17.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.4...v0.17.0-beta.5) (2026-11-02)
+
+
+### Features
+
+* **mobile:** add New task to the Daily screen's + menu ([#1859](https://github.com/team-reflect/reflect-open/issues/1859)) ([80b76ed](https://github.com/team-reflect/reflect-open/commit/80b76ed7706f3ca4a59854daf03f955ab4dea191))
+* **mobile:** iOS All tab returns to its open Chat or note ([#1867](https://github.com/team-reflect/reflect-open/issues/1867)) ([6adfd76](https://github.com/team-reflect/reflect-open/commit/6adfd7684a608d774d2c4a56bc47a1b9b043c5a4))
+* move iOS Chat into the All tab ([#1860](https://github.com/team-reflect/reflect-open/issues/1860)) ([0c774d6](https://github.com/team-reflect/reflect-open/commit/0c774d6db7c78e60f36f07b7d79a1facb1165232))
+
+
+### Bug Fixes
+
+* **desktop:** report embeddings unsupported on CPUs without AVX2 ([#1803](https://github.com/team-reflect/reflect-open/issues/1803)) ([0c4823c](https://github.com/team-reflect/reflect-open/commit/0c4823ccf8091c5342e6db58145aa9c085c6ea5c))
+* **desktop:** return to the same place in the daily stream after visiting an older note ([#1798](https://github.com/team-reflect/reflect-open/issues/1798)) ([8abd552](https://github.com/team-reflect/reflect-open/commit/8abd55275674a419354246edcfc3c5ca36afc8dd))
+* **mobile:** make bottom sheets smoother ([#1794](https://github.com/team-reflect/reflect-open/issues/1794)) ([8240e05](https://github.com/team-reflect/reflect-open/commit/8240e05eee5abc7a7b7dcf10fbbf909e9bf9a4e0))
+* **mobile:** make row swipe actions smoother ([#1792](https://github.com/team-reflect/reflect-open/issues/1792)) ([141abdf](https://github.com/team-reflect/reflect-open/commit/141abdfe72c496378beb7cd0194665c359dd1739))
+* **mobile:** make swipe back smoother ([#1793](https://github.com/team-reflect/reflect-open/issues/1793)) ([c224cb4](https://github.com/team-reflect/reflect-open/commit/c224cb45514b42494b992cb78eeead51048a8792))
+* update meowdown ([#1795](https://github.com/team-reflect/reflect-open/issues/1795)) ([1bbfb2d](https://github.com/team-reflect/reflect-open/commit/1bbfb2d1d84a2ef9c3ded5ed774624344475819c))
+
 ## [0.17.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.3...v0.17.0-beta.4) (2026-10-30)
 
 

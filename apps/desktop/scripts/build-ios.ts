@@ -10,6 +10,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
+import packageJson from '../package.json' with { type: 'json' }
 import {
   assertDsyms,
   assertSentryDsn,
@@ -88,8 +89,15 @@ async function main(): Promise<void> {
   const config = JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } })
   await runWithTempDir(async (tempDir) => {
     const args = ['ios', 'build', '--ci', '--config', config]
-    // Without line tables the dSYM cannot symbolicate Rust frames.
-    const env: NodeJS.ProcessEnv = { CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only' }
+    const env: NodeJS.ProcessEnv = {
+      // Without line tables the dSYM cannot symbolicate Rust frames.
+      CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
+      // Tauri only versions the app's Info.plist. The app extensions read
+      // these instead, so their versions match the app's (prerelease tag
+      // stripped, as Tauri does).
+      REFLECT_MARKETING_VERSION: packageJson.version.split('-')[0],
+      REFLECT_BUILD_NUMBER: buildNumber,
+    }
     if (noSign) {
       args.push('--no-sign')
     } else {

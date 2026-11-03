@@ -1,27 +1,17 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
+import { useState, type ReactElement } from 'react'
 import { userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import type { NoteTagFacet } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { FilterBar } from './filter-bar.tsx'
 import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from '@reflect/app'
+import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 
 /**
  * The filter badge row (Plan 19): chips toggle or open pickers, everything
- * ANDs, and Reset clears the lot including the route tag. The drawer wrapper
- * needs browser APIs jsdom doesn't provide; as in
- * `note-actions-menu.test.tsx` it's mocked to a passthrough so picker rows
- * are always rendered and the state flow is what's exercised.
+ * ANDs, and Reset clears the lot including the route tag. The pickers open
+ * the real drawer; `swipeDrawerClosed` closes one the way a finger does.
  */
-
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ children, open }: { children?: ReactNode; open?: boolean }) => {
-    return open ? <>{children}</> : null
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
 
 const FACETS: NoteTagFacet[] = [
   { tag: 'Book', count: 3 },
@@ -96,6 +86,7 @@ describe('FilterBar', () => {
     await userEvent.click(view.getByRole('button', { name: /#work/ }))
 
     expect(changes.at(-1)?.tags).toEqual(['book', 'work'])
+    await swipeDrawerClosed()
     await expect.element(view.getByRole('button', { name: '#Book +1' })).toBeVisible()
   })
 

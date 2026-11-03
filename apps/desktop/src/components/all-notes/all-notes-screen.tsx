@@ -50,7 +50,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   // re-runs its restore once the element attaches (a callback ref re-renders;
   // a plain ref would still be null during the restore effect on the first,
   // warm-cache-only mount). The table virtualizes against this container as its
-  // parent, so it no longer needs the element handed down.
+  // parent.
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)

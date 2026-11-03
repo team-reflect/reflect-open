@@ -37,12 +37,9 @@ import { useSelector } from '@/lib/use-store.ts'
 /**
  * The session's stores: the state, and the elapsed time apart from it.
  */
-export type AudioMemoSessionStores = Pick<AudioMemoSession, 'get' | 'subscribe' | 'elapsedMs'>
+type AudioMemoSessionStores = Pick<AudioMemoSession, 'get' | 'subscribe' | 'elapsedMs'>
 
-export interface AudioMemoContextValue extends Pick<
-  AudioMemoSession,
-  'cancel' | 'retry' | 'discard'
-> {
+interface AudioMemoContextValue extends Pick<AudioMemoSession, 'cancel' | 'retry' | 'discard'> {
   readonly session: AudioMemoSessionStores
   /**
    * Idle → start recording (expanding a collapsed sidebar); recording → stop & save.

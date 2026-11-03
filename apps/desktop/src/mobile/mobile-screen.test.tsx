@@ -1,5 +1,6 @@
 import type { RenderResult } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
+import { mouse } from 'vitest-browser-commands/playwright'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
@@ -25,6 +26,7 @@ import {
 } from '@reflect/core'
 import { type Route, createWeekWindow, weekOf, formatMonthLabel } from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
+import { dispatchTouch, scrollElement, touch } from '@/test-utils/scroll.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -98,20 +100,6 @@ vi.mock('@/editor/note-editor.tsx', async () => {
     },
   }
 })
-// Vaul's drag/animation is verified on-device. This passthrough
-// honours `open`, so the month-picker sheet renders only once the title
-// opens it.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: import('react').ReactNode }) => {
-    return open ? <div data-testid="drawer">{children}</div> : null
-  },
-  DrawerContent: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
-  DrawerDescription: ({ children }: { children?: import('react').ReactNode }) => <p>{children}</p>,
-  DrawerTitle: ({ children }: { children?: import('react').ReactNode }) => <h2>{children}</h2>,
-  DrawerTrigger: ({ children }: { children?: import('react').ReactNode }) => <>{children}</>,
-}))
-
 const GRAPH: GraphInfo = { root: '/g', name: 'g', generation: 1 }
 
 // The services of the running test: the graph's files live in `core.noteFile`.
@@ -185,24 +173,9 @@ function visibleLayer(view: BrowserView): HTMLElement {
   return visible
 }
 
-/**
- * Dispatch a pointer event the gesture hook can read.
- */
-async function firePointer(element: Element, type: string, init: PointerEventInit): Promise<void> {
-  await act(() => {
-    element.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }))
-  })
-}
-
 async function finishAnimation(element: Element): Promise<void> {
   await act(() => {
     fireEvent.animationEnd(element)
-  })
-}
-
-async function finishTransition(element: Element): Promise<void> {
-  await act(() => {
-    fireEvent.transitionEnd(element)
   })
 }
 
@@ -342,7 +315,7 @@ describe('MobileShell', () => {
     const pickedMonth = `${Number(getYearMonth(today).slice(0, 4)) + 1}-01`
     await user.click(view.getByRole('button', { name: formatMonthLabel(pickedMonth) }))
 
-    expect(view.getByTestId('drawer').query()).toBeNull()
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
     await waitFor(() => expect(shownMonth(view)).toBe(formatMonthLabel(pickedMonth)))
     const firstDay = `${pickedMonth}-01`
     expect(
@@ -362,7 +335,7 @@ describe('MobileShell', () => {
     await user.click(view.getByRole('button', { name: 'Change month' }))
     await user.click(view.getByRole('button', { name: formatMonthLabel(getYearMonth(today)) }))
 
-    expect(view.getByTestId('drawer').query()).toBeNull()
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
     await waitFor(() => {
       expect(
         view
@@ -790,6 +763,88 @@ describe('MobileShell', () => {
     await waitFor(() => expect(document.activeElement).toBe(composer.element()))
   })
 
+  it('tapping All from another tab returns to the Chat it was left on, over the list', async () => {
+    const user = userEvent
+    const { view, chatEngine } = await mountAllWithChatProvider('You kept one plan.')
+    await user.fill(view.getByRole('searchbox', { name: 'Search notes' }), 'pricing')
+    await user.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+    await waitForChatLayer(view)
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitForChatLayer(view)
+    const chat = page.elementLocator(visibleLayer(view))
+    await expect.element(chat.getByText('You kept one plan.')).toBeVisible()
+    // A return, not a second ask, and the restored card belongs to All.
+    expect(chatEngine.calls()).toHaveLength(1)
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+
+    // All's list sits underneath, so Back lands there rather than on Daily.
+    await user.click(chat.getByRole('button', { name: 'Back' }))
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect(visibleLayer(view).contains(box.element())).toBe(true)
+      expect((box.element() as HTMLInputElement).value).toBe('pricing')
+    })
+  })
+
+  it('double-tapping All from another tab goes back to the list, search focused', async () => {
+    const user = userEvent
+    const { view } = await mountAllWithChatProvider('You kept one plan.')
+    await user.fill(view.getByRole('searchbox', { name: 'Search notes' }), 'pricing')
+    await user.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+    await waitForChatLayer(view)
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+
+    let fakeNow = 1_000
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
+    try {
+      fakeNow = 2_000
+      fireEvent.click(view.getByRole('button', { name: 'All' }))
+      // The first tap returns to Chat; the second, within the window, still
+      // pairs with it even though that return left All's list.
+      await waitForChatLayer(view)
+      fakeNow = 2_100
+      fireEvent.click(view.getByRole('button', { name: 'All' }))
+    } finally {
+      now.mockRestore()
+    }
+
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect(visibleLayer(view).contains(box.element())).toBe(true)
+      expect(document.activeElement).toBe(box.element())
+    })
+  })
+
+  it('returns to a note opened from All at its new path after the file moves', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/01abc.md', 'old path')
+    const view = await mount(
+      { kind: 'allNotes', tag: null },
+      { kind: 'note', path: 'notes/01abc.md' },
+    )
+    await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    await expect.element(view.getByRole('heading', { name: 'Edit note' })).toBeVisible()
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    core.noteFile.set('notes/meeting-notes.md', 'moved agenda')
+    await act(() => core.noteMove.followHealedMove('notes/01abc.md', 'notes/meeting-notes.md'))
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => {
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('moved agenda')
+    })
+  })
+
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
@@ -812,11 +867,12 @@ describe('MobileShell', () => {
 /**
  * The navigation stack (V1 parity): a pushed note slides in as a card over
  * its origin (which stays mounted, hidden, and inert beneath it), popping
- * slides it out, tab switches stay instant, and an edge back-swipe drags the
- * card with the finger — popping past the threshold, snapping back short of
- * it. Tests drive the `animationend` / `transitionend` completions by hand.
+ * slides it out, and tab switches stay instant. The layers are pages of a
+ * horizontal scroller, the current one last, and an edge back-swipe scrolls
+ * it. Tests drive the `animationend` completions by hand, scroll the pager as
+ * a finger would, and read which screen the router lands on.
  */
-describe('MobileStack transitions & back-swipe', () => {
+describe('MobileStack transitions & back pager', () => {
   // The file's preferences prefer reduced motion, as the test browser does, which
   // turns the stack's animations off. These tests are about the animated path,
   // so they report the animating preference; the reduced-motion test below
@@ -831,6 +887,16 @@ describe('MobileStack transitions & back-swipe', () => {
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
     await finishAnimation(stackLayers(view).at(-1)!)
   }
+
+  function pager(view: BrowserView): HTMLElement {
+    const element = view.container.querySelector<HTMLElement>('.mobile-pager')
+    if (!element) {
+      throw new Error('no mobile pager')
+    }
+    return element
+  }
+
+  const today = (): string => formatMonthLabel(getYearMonth(getIsoToday()))
 
   it('pushes a note as a sliding card over its origin, which stays mounted but inert', async () => {
     const user = userEvent
@@ -887,6 +953,45 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeNull()
   })
 
+  it('returns to All’s open note in place, over the list, like any tab switch', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount(
+      { kind: 'allNotes', tag: null },
+      { kind: 'note', path: 'notes/meeting-notes.md' },
+    )
+    // All is lazy: let its list mount before pushing the note over it.
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await pushProbeNote(view)
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await finishAnimation(stackLayers(view).at(-1)!)
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(1))
+
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
+    const [below, current] = stackLayers(view)
+    expect(current!.className).not.toContain('mobile-stack-slide-in')
+    // Hidden and inert beneath the note, so read the DOM, not the a11y tree.
+    expect(below!.querySelector('input[aria-label="Search notes"]')).not.toBeNull()
+    await waitFor(() => {
+      expect(
+        page.elementLocator(current!).getByTestId('fake-editor').element().textContent,
+      ).toContain('agenda')
+    })
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+
+    // Tapping All again, on its card, pops back to the list.
+    await user.click(view.getByRole('button', { name: 'All' }))
+    await finishAnimation(stackLayers(view).at(-1)!)
+    await waitFor(() => {
+      expect(stackLayers(view)).toHaveLength(1)
+      expect(stackLayers(view)[0]!.querySelector('input[aria-label="Search notes"]')).not.toBeNull()
+    })
+  })
+
   it('follows history direction within a note chain: wiki-link pushes, back pops', async () => {
     const user = userEvent
     core.noteFile.set('notes/source.md', 'see [[Target Note]]')
@@ -935,150 +1040,232 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(stackLayers(view)).toHaveLength(1)
   })
 
-  it('pops the note when an edge swipe crosses the release threshold', async () => {
+  it('rests on the pushed note, with its origin mounted on the page below', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
-    const stack = view.container.querySelector('.mobile-stack')!
-    const card = stackLayers(view).at(-1)!
-    await firePointer(stack, 'pointerdown', {
-      pointerId: 1,
-      isPrimary: true,
-      pointerType: 'touch',
-      clientX: 10,
-      clientY: 300,
-    })
-    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
-    // The card tracks the finger in the 375px mobile viewport.
-    // The browser normalizes the written value's bare zeros to `0px`.
-    expect(card.style.transform).toBe('translate3d(30px, 0px, 0px)')
+    const scroller = pager(view)
+    expect(stackLayers(view)).toHaveLength(2)
+    expect(scroller.scrollLeft).toBe(scroller.clientWidth)
+    expect(visibleLayer(view).getBoundingClientRect().left).toBe(
+      scroller.getBoundingClientRect().left,
+    )
+    expect(stackLayers(view)[0]!.getBoundingClientRect().left).toBe(
+      scroller.getBoundingClientRect().left,
+    )
+  })
 
-    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
-    await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
-    // Released past the threshold: the card settles offscreen...
-    expect(card.style.transform).toBe('translate3d(100%, 0px, 0px)')
+  it('pops when a swipe settles on the page below', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
 
-    // ...and only then commits the pop.
-    await finishTransition(card)
-    expect(shownMonth(view)).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
+    await scrollElement({ element: pager(view), left: 0, touch: true })
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
     expect(stackLayers(view)).toHaveLength(1)
   })
 
-  it('commits a gesture pop exactly once (StrictMode + same-frame double transitionend)', async () => {
-    // Three-deep history (today → All → note): a double-committed pop would
-    // sail past All and land on today. Two real-world double-fire vectors:
-    // StrictMode's dev double-invocation (which caught an impure updater
-    // once), and the card's transform + the scrim's opacity settling in the
-    // same frame, so `transitionend` arrives twice before React re-renders.
-    const user = userEvent
+  it('waits for the finger to lift before it pops', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    await touch(scroller, 'start')
+    await scrollElement({ element: scroller, left: 0 })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+
+    await touch(scroller, 'end')
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
+  })
+
+  it('unlocks the revealed page as soon as the finger lifts', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    const [below] = stackLayers(view)
+    await touch(scroller, 'start')
+    await scrollElement({ element: scroller, left: 0 })
+    // Outside `act`, so this reads before React commits the pop.
+    dispatchTouch(scroller, 'end')
+    expect(below!.inert).toBe(false)
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
+  })
+
+  it('ignores a scroll no finger started and returns to the note', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    await scrollElement({ element: scroller, left: 0 })
+    await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+    expect(stackLayers(view)).toHaveLength(2)
+  })
+
+  it('keeps the note when the finger drags back before it lifts', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    await touch(scroller, 'start')
+    await scrollElement({ element: scroller, left: 0 })
+    await scrollElement({ element: scroller, left: scroller.clientWidth })
+    await touch(scroller, 'end')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+    expect(stackLayers(view)).toHaveLength(2)
+  })
+
+  it('commits a swipe pop exactly once (StrictMode, late scroll reports)', async () => {
+    // today → All → note: a second pop would land on today instead of All.
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount(
       { kind: 'today' },
       { kind: 'note', path: 'notes/meeting-notes.md' },
-      {
-        strict: true,
-      },
+      { strict: true },
     )
-    await user.click(view.getByRole('button', { name: 'All' }))
+    await userEvent.click(view.getByRole('button', { name: 'All' }))
     await pushProbeNote(view)
 
-    const stack = view.container.querySelector('.mobile-stack')!
-    const card = stackLayers(view).at(-1)!
-    await firePointer(stack, 'pointerdown', {
-      pointerId: 1,
-      isPrimary: true,
-      pointerType: 'touch',
-      clientX: 10,
-      clientY: 300,
-    })
-    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
-    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
-    await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
-
-    await act(() => {
-      card.dispatchEvent(new Event('transitionend', { bubbles: true }))
-      card.dispatchEvent(new Event('transitionend', { bubbles: true }))
+    const scroller = pager(view)
+    await touch(scroller, 'start')
+    await scrollElement({ element: scroller, left: 0 })
+    // One `act`, so the late reports arrive before React re-renders. A report
+    // after the pop must neither pop again nor pin the popped note back.
+    await act(async () => {
+      dispatchTouch(scroller, 'end')
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      scroller.dispatchEvent(new Event('scroll'))
+      scroller.dispatchEvent(new Event('scrollend'))
+      expect(scroller.scrollLeft).toBe(0)
     })
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
   })
 
-  it('snaps back when the swipe releases short of the threshold', async () => {
+  it('passes a tap on the edge strip to the back button under it', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
-    // A slow machine can stretch the gap between synthetic moves past the
-    // hook's velocity-sampling window, turning this short drag into a
-    // "flick" that pops. Pin the clock so the drag reads as slow and the
-    // release decision is purely distance-based.
-    let clock = 1000
-    const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => (clock += 5))
-    try {
-      const stack = view.container.querySelector('.mobile-stack')!
-      const card = stackLayers(view).at(-1)!
-      await firePointer(stack, 'pointerdown', {
-        pointerId: 1,
-        isPrimary: true,
-        pointerType: 'touch',
-        clientX: 10,
-        clientY: 300,
-      })
-      await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
-      await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 120, clientY: 306 })
-      await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 120, clientY: 306 })
-      expect(card.style.transform).toBe('translate3d(0px, 0px, 0px)')
-
-      await finishTransition(card)
-      expect(view.getByRole('heading').element().textContent).toBe('Edit note')
-      expect(stackLayers(view)).toHaveLength(2)
-    } finally {
-      nowSpy.mockRestore()
-    }
+    const layer = page.elementLocator(visibleLayer(view))
+    const strip = visibleLayer(view).querySelector<HTMLElement>('[data-pager-edge]')!
+    const back = layer.getByRole('button', { name: 'Back' }).element().getBoundingClientRect()
+    const top = strip.getBoundingClientRect().top
+    await userEvent.click(page.elementLocator(strip), {
+      position: { x: 10, y: back.top - top + back.height / 2 },
+    })
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
   })
 
-  it('ignores mid-screen touches, mouse pointers, and vertical scrolls', async () => {
+  /**
+   * Drags the real mouse from the edge strip, at the back button's height,
+   * `dx` px to the right and releases it.
+   */
+  async function mouseDragFromStrip(view: BrowserView, dx: number): Promise<void> {
+    const strip = visibleLayer(view).querySelector<HTMLElement>('[data-pager-edge]')!
+    const back = page
+      .elementLocator(visibleLayer(view))
+      .getByRole('button', { name: 'Back' })
+      .element()
+      .getBoundingClientRect()
+    const x = strip.getBoundingClientRect().left + 10
+    const y = back.top + back.height / 2
+    await mouse.move(x, y, { steps: 3 })
+    await mouse.down()
+    await mouse.move(x + dx, y, { steps: 5 })
+    await mouse.up()
+  }
+
+  it('leaves a finger-held pager where it is when the pager resizes', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
-    const stack = view.container.querySelector('.mobile-stack')!
-    const card = stackLayers(view).at(-1)!
-
-    // Not from the edge.
-    await firePointer(stack, 'pointerdown', {
-      pointerId: 1,
-      isPrimary: true,
-      pointerType: 'touch',
-      clientX: 200,
-      clientY: 300,
+    const scroller = pager(view)
+    const held = Math.round(scroller.clientWidth / 3)
+    // Mid-drag, nothing snaps the pager; a real finger scroll holds snapping off too.
+    scroller.style.scrollSnapType = 'none'
+    await touch(scroller, 'start')
+    await act(async () => {
+      const scrolled = new Promise((resolve) => {
+        scroller.addEventListener('scroll', resolve, { once: true })
+      })
+      scroller.scrollLeft = held
+      await scrolled
     })
-    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 260, clientY: 300 })
-    expect(card.style.transform).toBe('')
-    await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 260, clientY: 300 })
+    // A height change, like the keyboard closing mid-swipe.
+    scroller.style.height = `${scroller.clientHeight - 40}px`
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
-    // Not a touch.
-    await firePointer(stack, 'pointerdown', {
-      pointerId: 2,
-      isPrimary: true,
-      pointerType: 'mouse',
-      clientX: 10,
-      clientY: 300,
-    })
-    await firePointer(stack, 'pointermove', { pointerId: 2, clientX: 80, clientY: 300 })
-    expect(card.style.transform).toBe('')
-    await firePointer(stack, 'pointerup', { pointerId: 2, clientX: 80, clientY: 300 })
+    expect(scroller.scrollLeft).toBe(held)
+    await touch(scroller, 'end')
+    scroller.style.removeProperty('scroll-snap-type')
+  })
 
-    // Vertical intent from the edge: the scroll wins and the gesture disarms.
-    await firePointer(stack, 'pointerdown', {
-      pointerId: 3,
-      isPrimary: true,
-      pointerType: 'touch',
-      clientX: 10,
-      clientY: 300,
+  it('pops when a mouse drags the edge strip past half', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    await mouseDragFromStrip(view, Math.round(pager(view).clientWidth * 0.7))
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
+    expect(stackLayers(view)).toHaveLength(1)
+  })
+
+  it('snaps a short mouse drag back without passing its click to the back button', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    // The drag must move the pager, so a drag that is ignored cannot pass.
+    let lowest = scroller.scrollLeft
+    scroller.addEventListener('scroll', () => {
+      lowest = Math.min(lowest, scroller.scrollLeft)
     })
-    await firePointer(stack, 'pointermove', { pointerId: 3, clientX: 14, clientY: 360 })
-    await firePointer(stack, 'pointermove', { pointerId: 3, clientX: 80, clientY: 360 })
-    expect(card.style.transform).toBe('')
+    await mouseDragFromStrip(view, 60)
+    await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
+    expect(lowest).toBeLessThan(scroller.clientWidth - 30)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+    expect(stackLayers(view)).toHaveLength(2)
+  })
+
+  it('rests on the revealed note after a note-to-note swipe pop', async () => {
+    core.noteFile.set('notes/source.md', 'see [[Target Note]]')
+    const view = await mount({ kind: 'note', path: 'notes/source.md' })
+    await userEvent.click(view.getByRole('button', { name: 'fake-wikilink' }))
+    await finishAnimation(stackLayers(view).at(-1)!)
+
+    await scrollElement({ element: pager(view), left: 0, touch: true })
+    // The source becomes current over a freshly mounted today.
+    await waitFor(
+      () => {
+        expect(
+          page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+        ).toContain('Target Note')
+      },
+      { timeout: 5000 },
+    )
+    expect(stackLayers(view)).toHaveLength(2)
+    const scroller = pager(view)
+    expect(scroller.scrollLeft).toBe(scroller.clientWidth)
+  })
+
+  it('swipes a cold note entry back to today', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'note', path: 'notes/meeting-notes.md' })
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
+    expect(pager(view).scrollLeft).toBe(pager(view).clientWidth)
+
+    await scrollElement({ element: pager(view), left: 0, touch: true })
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
   })
 })

@@ -100,7 +100,8 @@ class SelectionTransformServiceImpl implements SelectionTransformService {
     const base =
       modelOverride === null
         ? providerConfig.defaultProvider()
-        : (providerConfig.list().find((entry) => entry.id === modelOverride.configId) ?? null)
+        : (providerConfig.get().providers.find((entry) => entry.id === modelOverride.configId) ??
+          null)
     if (base === null) {
       yield { type: 'error', message: 'Add an AI provider in Settings to use AI prompts.' }
       return
