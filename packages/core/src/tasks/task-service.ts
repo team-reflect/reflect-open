@@ -1,10 +1,6 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import {
-  requireGraphSession,
-  type GraphRole,
-  type GraphSession,
-  type GraphSessionSource,
-} from '../graph/graph-session.ts'
+import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { NoteBusyError, type NoteDocumentService } from '../documents/note-document-service.ts'
@@ -14,6 +10,7 @@ import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.
 import { INDEX_WRITTEN_EVENT, listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
 import { decodeTaskBreadcrumbs } from '../indexing/indexed-note.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import {
   applyTaskEdits,
@@ -44,7 +41,7 @@ export interface TaskServiceDeps {
   readonly progress: ProgressPort
   readonly clock: ClockService
   readonly logger: LoggerService
-  readonly graphSession: GraphSessionSource & { subscribe: (listener: () => void) => Unlisten }
+  readonly graphSession: Store<{ readonly session: GraphSession | null }>
   readonly indexLifecycle: IndexLifecycleService
   /**
    * Which window this webview is; only a note window follows {@link INDEX_WRITTEN_EVENT}.
@@ -75,6 +72,20 @@ export interface TaskListState {
    * The last read of the completed tasks failed.
    */
   readonly completedFailed: boolean
+}
+
+/**
+ * The session's recently-completed tasks and the graph they belong to.
+ */
+export interface RecentlyCompleted {
+  /**
+   * The graph root of {@link RecentlyCompleted.tasks}.
+   */
+  readonly root: string | null
+  /**
+   * The struck rows, each checked.
+   */
+  readonly tasks: readonly OpenTask[]
 }
 
 /**
@@ -154,7 +165,7 @@ export interface SnippetTaskClick {
  * graphs (whose task paths differ) yields an empty set rather than the
  * previous graph's rows.
  */
-export interface TaskService {
+export interface TaskService extends Store<TaskListState> {
   /**
    * Every open task across the graph, with note context, for the Tasks view.
    * Private notes' tasks are included because this is a local-only surface.
@@ -169,13 +180,13 @@ export interface TaskService {
    * The open graph's task rows. The same object is returned until the rows,
    * a read failure, or the open graph change.
    */
-  getState: () => TaskListState
+  get: () => TaskListState
   /**
-   * Call `listener` whenever {@link TaskService.getState} changes. The first
+   * Call `listener` whenever {@link TaskService.get} changes. The first
    * subscription reads the open tasks; while any listener is subscribed, an
    * index change re-reads them.
    */
-  subscribe: (listener: () => void) => Unlisten
+  subscribe: (listener: VoidFunction) => Unlisten
   /**
    * Re-read the open tasks, and the completed tasks while
    * {@link TaskService.includeCompleted} holds them, through the database.
@@ -324,13 +335,9 @@ export interface TaskService {
    */
   archiveRecentlyCompleted(root: string | null): void
   /**
-   * The session's struck rows for `root`; a stable empty list for any other graph.
+   * The session's struck rows and the graph they belong to.
    */
-  getRecentlyCompleted(root: string | null): readonly OpenTask[]
-  /**
-   * Calls `listener` whenever the recently-completed set changes.
-   */
-  subscribeRecentlyCompleted: (listener: () => void) => () => void
+  readonly recentlyCompleted: Store<RecentlyCompleted>
 }
 
 /**
@@ -452,11 +459,12 @@ function keysOf(tasks: readonly OpenTask[]): string[] {
 
 class TaskServiceImpl implements TaskService {
   readonly #deps: TaskServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #graphRoot: string | null = null
-  #struck: readonly OpenTask[] = EMPTY
-  readonly #stateListeners = new Set<() => void>()
-  #state: TaskListState = EMPTY_STATE
+  readonly #recentlyCompleted = new WritableStore<RecentlyCompleted>(
+    { root: null, tasks: EMPTY },
+    isShallowEqual,
+  )
+  readonly recentlyCompleted: Store<RecentlyCompleted> = this.#recentlyCompleted
+  readonly #state = new WritableStore<TaskListState>(EMPTY_STATE, isShallowEqual)
   #sessionKey: string | null = null
   #open: TaskListSlot = emptySlot()
   #completed: TaskListSlot = emptySlot()
@@ -481,19 +489,14 @@ class TaskServiceImpl implements TaskService {
     )
   }
 
-  readonly getState = (): TaskListState => {
-    this.#adoptSession()
-    return this.#state
-  }
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
     this.#attach()
-    this.#stateListeners.add(listener)
+    const unlisten = this.#state.subscribe(listener)
     this.#syncSession()
     this.#loadStale()
-    return () => {
-      this.#stateListeners.delete(listener)
-    }
+    return unlisten
   }
 
   async refresh(): Promise<void> {
@@ -750,7 +753,7 @@ class TaskServiceImpl implements TaskService {
     notePath: string,
     task: { locator: TaskLocator; checked: boolean },
   ): Promise<void> {
-    if (this.#deps.graphSession.getState().session === null) {
+    if (this.#deps.graphSession.get().session === null) {
       return
     }
     try {
@@ -768,70 +771,56 @@ class TaskServiceImpl implements TaskService {
     if (completed.length === 0) {
       return
     }
-    this.#adopt(root)
-    const byKey = new Map(this.#struck.map((task) => [getTaskKey(task), task]))
+    // Another graph's set is discarded.
+    const current = this.#recentlyCompleted.get()
+    const struck = root === current.root ? current.tasks : EMPTY
+    const byKey = new Map(struck.map((task) => [getTaskKey(task), task]))
     for (const task of completed) {
       byKey.set(getTaskKey(task), withChecked(task, true))
     }
-    this.#struck = [...byKey.values()]
-    this.#emit()
+    this.#recentlyCompleted.set({ root, tasks: [...byKey.values()] })
   }
 
   forgetRecentlyCompleted(root: string | null, keys: readonly string[]): void {
-    if (root !== this.#graphRoot || keys.length === 0) {
+    const current = this.#recentlyCompleted.get()
+    if (root !== current.root || keys.length === 0) {
       return
     }
     const drop = new Set(keys)
-    const next = this.#struck.filter((task) => !drop.has(getTaskKey(task)))
-    if (next.length !== this.#struck.length) {
-      this.#struck = next
-      this.#emit()
+    const next = current.tasks.filter((task) => !drop.has(getTaskKey(task)))
+    if (next.length !== current.tasks.length) {
+      this.#recentlyCompleted.set({ root, tasks: next })
     }
   }
 
   hasRecentlyCompleted(root: string | null, key: string): boolean {
-    return root === this.#graphRoot && this.#struck.some((task) => getTaskKey(task) === key)
+    const current = this.#recentlyCompleted.get()
+    return root === current.root && current.tasks.some((task) => getTaskKey(task) === key)
   }
 
   relocateRecentlyCompleted(root: string | null, notePath: string, moved: TaskMoves): void {
-    if (root !== this.#graphRoot || moved.length === 0) {
+    const current = this.#recentlyCompleted.get()
+    if (root !== current.root || moved.length === 0) {
       return
     }
     const next =
-      withRelocatedTasks({ logger: this.#deps.logger }, this.#struck, notePath, moved) ?? []
-    if (next !== this.#struck) {
-      this.#struck = next
-      this.#emit()
-    }
+      withRelocatedTasks({ logger: this.#deps.logger }, current.tasks, notePath, moved) ?? []
+    this.#recentlyCompleted.set({ root, tasks: next })
   }
 
   reconcileRecentlyCompleted(root: string | null, open: readonly OpenTask[]): void {
-    if (root !== this.#graphRoot) {
+    const current = this.#recentlyCompleted.get()
+    if (root !== current.root) {
       return
     }
-    const next = withoutReopenedTasks(this.#struck, open)
-    if (next !== this.#struck) {
-      this.#struck = next
-      this.#emit()
-    }
+    this.#recentlyCompleted.set({ root, tasks: withoutReopenedTasks(current.tasks, open) })
   }
 
   archiveRecentlyCompleted(root: string | null): void {
-    this.#adopt(root)
-    if (this.#struck.length > 0) {
-      this.#struck = EMPTY
-      this.#emit()
-    }
-  }
-
-  getRecentlyCompleted(root: string | null): readonly OpenTask[] {
-    return root === this.#graphRoot ? this.#struck : EMPTY
-  }
-
-  readonly subscribeRecentlyCompleted = (listener: () => void): (() => void) => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
+    const current = this.#recentlyCompleted.get()
+    if (root !== current.root || current.tasks.length > 0) {
+      // Also switches the active graph, discarding any other graph's set.
+      this.#recentlyCompleted.set({ root, tasks: EMPTY })
     }
   }
 
@@ -884,12 +873,6 @@ class TaskServiceImpl implements TaskService {
     return tasks
   }
 
-  #emit(): void {
-    for (const listener of this.#listeners) {
-      listener()
-    }
-  }
-
   /**
    * Listen for index changes and graph switches, once, on first use.
    */
@@ -927,7 +910,7 @@ class TaskServiceImpl implements TaskService {
    * Drop the rows of a graph that is no longer open; `true` when they were dropped.
    */
   #adoptSession(): boolean {
-    const key = sessionKey(this.#deps.graphSession.getState().session)
+    const key = sessionKey(this.#deps.graphSession.get().session)
     if (key === this.#sessionKey) {
       return false
     }
@@ -936,7 +919,6 @@ class TaskServiceImpl implements TaskService {
     this.#completed.read += 1
     this.#open = emptySlot()
     this.#completed = emptySlot()
-    this.#state = EMPTY_STATE
     return true
   }
 
@@ -950,7 +932,7 @@ class TaskServiceImpl implements TaskService {
    * Read each held list whose rows may be behind the index.
    */
   #loadStale(): void {
-    if (this.#stateListeners.size > 0 && this.#open.stale) {
+    if (this.#state.subscribed() && this.#open.stale) {
       void this.#readOpen()
     }
     if (this.#completedHolds > 0 && this.#completed.stale) {
@@ -997,7 +979,7 @@ class TaskServiceImpl implements TaskService {
    * Re-read the rows when a screen shows them, else mark them stale for the next one.
    */
   #invalidate(): void {
-    if (this.#stateListeners.size > 0) {
+    if (this.#state.subscribed()) {
       void this.refresh()
     } else {
       this.#open.stale = true
@@ -1028,15 +1010,12 @@ class TaskServiceImpl implements TaskService {
   }
 
   #publish(): void {
-    this.#state = {
+    this.#state.set({
       open: this.#open.rows,
       completed: this.#completed.rows,
       openFailed: this.#open.failed,
       completedFailed: this.#completed.failed,
-    }
-    for (const listener of this.#stateListeners) {
-      listener()
-    }
+    })
   }
 
   /**
@@ -1096,7 +1075,7 @@ class TaskServiceImpl implements TaskService {
    * The session key of the open graph.
    */
   #currentKey(): string | null {
-    return sessionKey(this.#deps.graphSession.getState().session)
+    return sessionKey(this.#deps.graphSession.get().session)
   }
 
   /**
@@ -1176,16 +1155,6 @@ class TaskServiceImpl implements TaskService {
       (rows) => rows?.filter((row) => !isSameTask(row, created)),
     )
     return created
-  }
-
-  /**
-   * Switch the active graph, discarding any other graph's set.
-   */
-  #adopt(root: string | null): void {
-    if (root !== this.#graphRoot) {
-      this.#graphRoot = root
-      this.#struck = EMPTY
-    }
   }
 
   async #writeEdits(

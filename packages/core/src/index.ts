@@ -16,6 +16,7 @@ export {
   type IpcBridgeService,
 } from './ipc/ipc-service.ts'
 export type { Unlisten } from './unlisten.ts'
+export { combineStores, deriveStore, type Store, WritableStore } from './store.ts'
 
 export { type HapticsService } from './ipc/haptics-service.ts'
 export { type AudioRecorderFinalSegment } from './audio/audio-recorder-service.ts'
@@ -25,7 +26,11 @@ export {
   type MobileStorageKind,
   type MobileStorageService,
 } from './ipc/mobile-storage-service.ts'
-export { githubAppInstallUrl, type GithubAuthService } from './sync/github-auth-service.ts'
+export {
+  githubAppInstallUrl,
+  type GithubAuthService,
+  type GithubAuthState,
+} from './sync/github-auth-service.ts'
 export { newRepoUrl, parseRepoInput } from './sync/github-repo-service.ts'
 export type { GithubRepoRef } from './sync/types.ts'
 export { type GitSyncService, type GitSyncState } from './sync/git-sync-service.ts'
@@ -35,13 +40,7 @@ export {
   type GitHostConnector,
   type GitHostSignIn,
 } from './sync/git-host-connector.ts'
-export {
-  classifyRemote,
-  githubRemoteUrl,
-  githubRepoOf,
-  redactRemoteUrl,
-  type GitRemote,
-} from './sync/remote-url.ts'
+export { classifyRemote, githubRepoOf, redactRemoteUrl, type GitRemote } from './sync/remote-url.ts'
 export { type GitHostCredentialService } from './sync/git-host-credential-service.ts'
 export { isICloudRoot } from './sync/icloud-sync-service.ts'
 export { type GistPublishService } from './sync/gist-publish-service.ts'
@@ -101,11 +100,7 @@ export {
   type FrontmatterPatch,
 } from './documents/note-session-frontmatter.ts'
 export { type ChatModelSelection } from './settings/schema.ts'
-export {
-  type CloudGraphContext,
-  cloudSafeLinkHref,
-  notePrivate,
-} from './privacy/privacy-service.ts'
+export { type CloudGraphContext } from './privacy/privacy-service.ts'
 export { type CloudSafe } from './privacy/cloud-safe.ts'
 export {
   calendarEventSchema,
@@ -120,6 +115,7 @@ export {
   type UpdatedPreset,
 } from './search/all-notes-filters.ts'
 export { createDailyNoteService, type DailyNoteService } from './daily/daily-note-service.ts'
+export { createTodayService, type TodayService } from './daily/today-service.ts'
 export { type TemplateService } from './documents/template-service.ts'
 export {
   isOstensiblyEmptyNoteSource,
@@ -257,12 +253,10 @@ export {
   clampSidebarWidth,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeTranscriptionPrompt,
-  TIME_FORMATS,
   timeFormatSchema,
   DATE_FORMATS,
   dateFormatSchema,
   weekStartDaySchema,
-  getWeekStartWeekday,
   getUserWeekStart,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
@@ -346,7 +340,11 @@ export {
 } from './ai/openai-compatible.ts'
 export { isHttpBaseUrl } from './lib/http-url.ts'
 
-export { TRANSCRIPTION_PROVIDERS } from './ai/provider-config.ts'
+export {
+  defaultAiProvider,
+  TRANSCRIPTION_PROVIDERS,
+  type AiProvidersState,
+} from './ai/provider-config.ts'
 export { chatModelOptions, type ChatModelOption } from './ai/chat/model-options.ts'
 export { type NoteHitSummary } from './ai/chat/note-tools-service.ts'
 export { chatSystemPrompt } from './ai/chat/system-prompt.ts'
@@ -453,6 +451,7 @@ export { previousTaskKey, todaysDailyTarget } from './tasks/task-navigation.ts'
 export { withDraftDueDate } from './tasks/task-schedule-content.ts'
 export {
   withoutReopenedTasks,
+  type RecentlyCompleted,
   type TaskAction,
   type TaskService,
   type TaskWriteResult,

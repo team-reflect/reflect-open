@@ -19,6 +19,11 @@ export {
 export { createTestOpenerService, type TestOpenerService } from './opener.ts'
 export { createTestAppHost, createTestAppServices, type TestAppServices } from './services.ts'
 export {
+  createTestSystemPreferencesService,
+  type TestSystemPreferencesOptions,
+  type TestSystemPreferencesService,
+} from './system-preferences.ts'
+export {
   createTestLifecycleService,
   type TestLifecycleService,
   type TestLifecycleServiceOptions,

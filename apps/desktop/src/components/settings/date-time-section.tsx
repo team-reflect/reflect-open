@@ -16,7 +16,12 @@ import {
   DATE_FORMATS,
   formatFullDate,
 } from '@reflect/core'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useSettingsService,
+  useTimeFormat,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -50,7 +55,10 @@ const WEEK_START_OPTIONS: WeekStartOption[] = [
  * timestamps or daily-note keys.
  */
 export function DateTimeSection(): ReactElement {
-  const { settings, updateSettings } = useSettings()
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
+  const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
 
   return (
@@ -61,12 +69,14 @@ export function DateTimeSection(): ReactElement {
       >
         <div className="mt-3">
           <Select
-            value={settings.dateFormat}
+            value={dateFormat}
             items={DATE_FORMATS.map((value) => ({
               value,
               label: formatFullDate(today, value),
             }))}
-            onValueChange={(value) => updateSettings({ dateFormat: dateFormatSchema.parse(value) })}
+            onValueChange={(value) => {
+              return settingsService.update({ dateFormat: dateFormatSchema.parse(value) })
+            }}
           >
             <SelectTrigger aria-label="Date format" className="w-44">
               <SelectValue />
@@ -86,10 +96,10 @@ export function DateTimeSection(): ReactElement {
       <SettingsField legend="Start week on" description="The first day shown in calendars.">
         <div className="mt-3">
           <Select
-            value={settings.weekStartDay}
+            value={weekStartDay}
             items={WEEK_START_OPTIONS}
             onValueChange={(value) => {
-              updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
+              settingsService.update({ weekStartDay: weekStartDaySchema.parse(value) })
             }}
           >
             <SelectTrigger aria-label="Start week on" className="w-36">
@@ -113,9 +123,11 @@ export function DateTimeSection(): ReactElement {
       >
         <div className="mt-3">
           <Select
-            value={settings.timeFormat}
+            value={timeFormat}
             items={TIME_FORMAT_OPTIONS}
-            onValueChange={(value) => updateSettings({ timeFormat: timeFormatSchema.parse(value) })}
+            onValueChange={(value) => {
+              return settingsService.update({ timeFormat: timeFormatSchema.parse(value) })
+            }}
           >
             <SelectTrigger aria-label="Time format" className="w-36">
               <SelectValue />

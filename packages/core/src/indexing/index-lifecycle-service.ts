@@ -1,11 +1,12 @@
 import type { MaybePromise } from '@reflect/utils'
-import type { GraphRole, GraphSession, GraphSessionSource } from '../graph/graph-session.ts'
+import type { GraphRole, GraphSession } from '../graph/graph-session.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { isMobilePlatform } from '../ports/platform-facts.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import { errorMessage } from '../errors.ts'
 import { isNotePath } from '../graph/paths.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { FileChange, FileChangeService } from './file-change-service.ts'
 import { createNoteIndexer, type IndexingDeps, type NoteIndexer } from './indexer.ts'
@@ -213,12 +214,6 @@ export interface IndexLifecycleService {
    */
   onMoved(listener: (from: string, to: string) => void): Unlisten
   /**
-   * Listen as a sync pass advances through the file listing (`done`,
-   * `total`, `worked`): the substrate for a "Preparing your notes… 400 of
-   * 3,000" surface during a first index. Superseded passes stop reporting.
-   */
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten
-  /**
    * Listen for iCloud-evicted notes whose content the index lacks (see
    * `IndexPassOptions.onStalePlaceholders`). The app requests targeted
    * downloads for exactly these paths.
@@ -230,11 +225,7 @@ export interface IndexLifecycleService {
    * on purpose: ticks arrive several times a second during a first index, and
    * only the status pill should re-render per tick.
    */
-  fileProgress: () => IndexFileProgress | null
-  /**
-   * Subscribe to {@link IndexLifecycleService.fileProgress} changes.
-   */
-  subscribeFileProgress: (listener: () => void) => Unlisten
+  readonly fileProgress: Store<IndexFileProgress | null>
   /**
    * Full index rebuild with user-visible status: wipe and re-derive the SQLite
    * projection from the markdown files, then report
@@ -285,7 +276,7 @@ export interface IndexLifecycleService {
 export interface IndexLifecycleDeps extends IndexingDeps {
   readonly fileChanges: FileChangeService
   readonly progress: ProgressPort
-  readonly graphSession: GraphSessionSource & { subscribe: (listener: () => void) => Unlisten }
+  readonly graphSession: Store<{ readonly session: GraphSession | null }>
   readonly activity: ActivityPort
   readonly platform: PlatformFacts
   readonly role: GraphRole
@@ -297,12 +288,14 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   readonly #appliedListeners = new Set<(event: IndexAppliedEvent) => void>()
   readonly #reconciledListeners = new Set<(event: IndexReconciledEvent) => MaybePromise<void>>()
   readonly #movedListeners = new Set<(from: string, to: string) => void>()
-  readonly #fileProgressListeners = new Set<(done: number, total: number, worked: number) => void>()
   readonly #stalePlaceholderListeners = new Set<(paths: readonly string[]) => void>()
-  readonly #fileProgressStoreListeners = new Set<() => void>()
   readonly #indexer: NoteIndexer
   readonly #liveIndex: LiveIndex
-  #currentFileProgress: IndexFileProgress | null = null
+  readonly #fileProgress = new WritableStore<IndexFileProgress | null>(
+    null,
+    (a, b) => a?.done === b?.done && a?.total === b?.total && a?.worked === b?.worked,
+  )
+  readonly fileProgress: Store<IndexFileProgress | null> = this.#fileProgress
   #abort: AbortController | null = null
   #done: Promise<void> = Promise.resolve()
   #suspended = false
@@ -381,10 +374,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
             passTotal = total
             passWorked = worked
             if (!isStale()) {
-              this.#setFileProgress({ done: progressDone, total, worked })
-              for (const listener of this.#fileProgressListeners) {
-                listener(progressDone, total, worked)
-              }
+              this.#fileProgress.set({ done: progressDone, total, worked })
             }
           },
         })
@@ -526,9 +516,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       this.suspend()
     }
     // A session that opens while hidden starts suspended.
-    let indexGeneration = graphSession.getState().session?.indexGeneration ?? null
+    let indexGeneration = graphSession.get().session?.indexGeneration ?? null
     const stopSession = graphSession.subscribe(() => {
-      const next = graphSession.getState().session?.indexGeneration ?? null
+      const next = graphSession.get().session?.indexGeneration ?? null
       if (next !== indexGeneration) {
         indexGeneration = next
         if (activity.isHidden()) {
@@ -546,7 +536,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       // before onboarding/open has produced an index session. With a session,
       // the full pass recovers every event missed while hidden; stacked
       // resume/iCloud triggers fold into the lifecycle's queued rerun.
-      this.resume(graphSession.getState().session)
+      this.resume(graphSession.get().session)
     })
     return () => {
       stopSession()
@@ -595,22 +585,12 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     return attach(this.#movedListeners, listener)
   }
 
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten {
-    return attach(this.#fileProgressListeners, listener)
-  }
-
   onStalePlaceholders(listener: (paths: readonly string[]) => void): Unlisten {
     return attach(this.#stalePlaceholderListeners, listener)
   }
 
-  readonly fileProgress = (): IndexFileProgress | null => this.#currentFileProgress
-
-  readonly subscribeFileProgress = (listener: () => void): Unlisten => {
-    return attach(this.#fileProgressStoreListeners, listener)
-  }
-
   rebuildVisibly(): Promise<void> {
-    const { session } = this.#deps.graphSession.getState()
+    const { session } = this.#deps.graphSession.get()
     const generation = session?.indexGeneration ?? null
     if (session === null || generation === null) {
       return Promise.resolve()
@@ -652,24 +632,9 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     }
   }
 
-  #setFileProgress(progress: IndexFileProgress | null): void {
-    const current = this.#currentFileProgress
-    if (
-      progress?.done === current?.done &&
-      progress?.total === current?.total &&
-      progress?.worked === current?.worked
-    ) {
-      return
-    }
-    this.#currentFileProgress = progress
-    for (const listener of this.#fileProgressStoreListeners) {
-      listener()
-    }
-  }
-
   #emitProgress(progress: IndexLifecycleProgress): void {
     if (progress !== 'reconciling') {
-      this.#setFileProgress(null) // the pass finished (or went idle): clear the pill
+      this.#fileProgress.set(null) // the pass finished (or went idle): clear the pill
     }
     for (const listener of this.#progressListeners) {
       listener(progress)

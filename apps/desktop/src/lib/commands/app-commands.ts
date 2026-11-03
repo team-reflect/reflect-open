@@ -5,9 +5,8 @@ import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from '@/lib/cl
 import type { AppCommand, CommandContext } from './types.ts'
 
 /**
- * The first-wave commands (Plan 08). Keybindings here replace the hardcoded
- * switch that used to live in `app-shortcuts.ts` — the binding and the
- * behavior are one definition now.
+ * The app commands. Each command defines its keybinding and its behavior
+ * together.
  */
 
 /**
@@ -373,11 +372,7 @@ export function keybindingFor(commandId: string): string | null {
 const registeredIn = new WeakSet<object>()
 
 /**
- * Register the first-wave commands in `registry`. Called explicitly from
- * `main.tsx` (and by the test render helpers) — registration as an
- * import side effect couples behavior to module graph order, which is exactly
- * the kind of spooky action a registry invites. Idempotent per registry:
- * hosts and tests can call it without coordinating.
+ * Register the app commands in `registry`. Idempotent per registry.
  */
 export function registerAppCommands(registry: CommandService<CommandContext>): void {
   if (registeredIn.has(registry)) {

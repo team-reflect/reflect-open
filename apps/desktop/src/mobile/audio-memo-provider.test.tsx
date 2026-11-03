@@ -14,6 +14,7 @@ import {
   createTestAudioRecorderService,
   createTestPlatformService,
 } from '@reflect/core/testing'
+import { useStore } from '@/lib/use-store.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider, useMobileAudioMemo } from './audio-memo-provider.tsx'
@@ -50,6 +51,19 @@ const RECORDING: AudioRecorderFinalSegment = {
   durationMs: 4000,
 }
 
+/**
+ * The context's actions, with the state and the per-tick values it renders.
+ */
+function useMobileAudioMemoView() {
+  const memo = useMobileAudioMemo()
+  return {
+    ...memo,
+    ...useStore(memo.session),
+    elapsedMs: useStore(memo.session.elapsedMs),
+    level: useStore(memo.session.level),
+  }
+}
+
 async function setup(provider: AiProviderConfig = OPENAI) {
   const audioRecorder = createTestAudioRecorderService({ sessionStartedMs: SESSION_STARTED_MS })
   audioRecorder.setStopResult(RECORDING)
@@ -61,7 +75,7 @@ async function setup(provider: AiProviderConfig = OPENAI) {
     platform: createTestPlatformService({ appPlatform: 'ios' }),
   })
 
-  const hook = await renderHookInApp(() => useMobileAudioMemo(), {
+  const hook = await renderHookInApp(() => useMobileAudioMemoView(), {
     core,
     graph: GRAPH,
     settings: { aiProviders: [provider], defaultAiProviderId: provider.id },

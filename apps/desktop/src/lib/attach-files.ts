@@ -14,12 +14,12 @@ export async function attachFilesToNote(context: CommandContext): Promise<void> 
   const { attachments, graphSession } = context.services
   const { dialog } = context.app
   const findEditor = () => noteEditorHandleFor(notePath)
-  const { session } = graphSession.getState()
+  const { session } = graphSession.get()
   if (session === null || findEditor() === null) {
     return
   }
   const sources = await dialog.pickFiles({ multiple: true, title: 'Attach files' })
-  if (sources === null || graphSession.getState().session !== session) {
+  if (sources === null || graphSession.get().session !== session) {
     return
   }
   await attachments.attachFilesToNote({ sources, findEditor })

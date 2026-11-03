@@ -364,7 +364,7 @@ describe('app commands', () => {
     await command('note.copyDeepLink').run(context)
     expect(deepLinkFor).not.toHaveBeenCalled()
     expect(appLayer.clipboard.writes()).toEqual([])
-    expect(core.progress.getAll()).toEqual([])
+    expect(core.progress.get()).toEqual([])
   })
 
   it('note.copyDeepLink no-ops on note-less routes', async () => {

@@ -141,8 +141,11 @@ import { createNoteFileService, type NoteFileService } from './graph/note-file-s
 import {
   createGraphSessionService,
   type GraphSessionService,
+  type GraphSessionState,
 } from './graph/graph-session-service.ts'
+import type { Store } from './store.ts'
 import { createDailyNoteService, type DailyNoteService } from './daily/daily-note-service.ts'
+import { createTodayService, type TodayService } from './daily/today-service.ts'
 import { createAttachmentService, type AttachmentService } from './documents/attachment-service.ts'
 import { createNoteMoveService, type NoteMoveService } from './documents/note-move-service.ts'
 import {
@@ -254,7 +257,7 @@ export interface CoreServices {
    */
   readonly logger: LoggerService
   /**
-   * Wall time, monotonic time, the local date, and timers.
+   * Wall time, monotonic time, and timers.
    */
   readonly clock: ClockService
   /**
@@ -409,6 +412,10 @@ export interface CoreServices {
    * The optimistic read overlay for note index rows.
    */
   readonly noteRows: NoteRowService
+  /**
+   * The local calendar date, notified whenever it changes.
+   */
+  readonly today: TodayService
   /**
    * The date questions about notes: today, which days have a daily note, and the wake onto a new day.
    */
@@ -661,6 +668,7 @@ export const coreServiceFactories = {
   transcriptEnrichment: createTranscriptEnrichmentService,
   audioMemo: createAudioMemoService,
   chatHistory: createChatHistoryService,
+  today: createTodayService,
   dailyNotes: createDailyNoteService,
   noteTools: createNoteToolsService,
   chatEngine: createChatEngineService,
@@ -922,7 +930,10 @@ export function composeCoreServices(
   const assetStore = create.assetStore({ ipc, clock, fileChanges })
   const openDocuments = create.openDocuments({ fileChanges })
   // Read at call time: the graph session is built later.
-  const lateGraphSession = { getState: () => graphSession.getState() }
+  const lateGraphSession: Store<GraphSessionState<GraphServices>> = {
+    get: () => graphSession.get(),
+    subscribe: (listener) => graphSession.subscribe(listener),
+  }
   const indexQuery = create.indexQuery({ database })
   const wikiResolver = create.wikiResolver({ database })
   const backlinks = create.backlinks({ database, noteFile, graphSession: lateGraphSession })
@@ -957,8 +968,7 @@ export function composeCoreServices(
   const noteDocuments = create.noteDocuments({
     openDocuments,
     noteFile,
-    // Read at call time: the graph session is built later.
-    graphSession: { getState: () => graphSession.getState() },
+    graphSession: lateGraphSession,
   })
   const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })
   const captureInbox = create.captureInbox({ ipc })
@@ -985,21 +995,15 @@ export function composeCoreServices(
     clock,
     logger,
     progress,
-    // Read at call time: the graph session is built on this lifecycle.
-    graphSession: {
-      getState: () => graphSession.getState(),
-      subscribe: (listener) => graphSession.subscribe(listener),
-    },
+    // The graph session is built on this lifecycle.
+    graphSession: lateGraphSession,
     activity,
     platform,
     role: adapters.role,
   })
   const noteRows = create.noteRows({
-    // Read at call time: the graph session is built on these rows.
-    graphSession: {
-      getState: () => graphSession.getState(),
-      subscribe: (listener) => graphSession.subscribe(listener),
-    },
+    // The graph session is built on these rows.
+    graphSession: lateGraphSession,
   })
   const icloudNative = create.icloudNative({ ipc, logger })
   const graphSession = create.graphSession({
@@ -1097,6 +1101,7 @@ export function composeCoreServices(
       ? buildMobileServices()
       : null
   const chatHistory = create.chatHistory({ ipc, database, logger })
+  const today = create.today({ clock })
   const dailyNotes = create.dailyNotes({ database, clock, activity })
   const noteTools = create.noteTools({
     retrieval,
@@ -1277,6 +1282,7 @@ export function composeCoreServices(
       graphSession,
     }),
     noteRows,
+    today,
     dailyNotes,
     templates: create.templates({
       noteFile,
@@ -1324,6 +1330,7 @@ export function composeCoreServices(
       embeddingRuntime,
       settings,
       clock,
+      today,
       id,
       imageCodec,
       logger,

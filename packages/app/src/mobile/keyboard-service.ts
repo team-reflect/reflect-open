@@ -1,24 +1,12 @@
-import type { Unlisten } from '@reflect/core'
+import { WritableStore, type Store } from '@reflect/core'
 
 /**
- * The software keyboard's overlap height, as the UI last measured it.
- * Imperative consumers read {@link KeyboardService.getHeight} (a swipe guard
- * fires at drag start, outside any render); reactive ones subscribe. Members
- * are function properties so surfaces can pass them around unbound.
+ * The software keyboard's overlap height in px, as the UI last measured it:
+ * `0` when the keyboard is closed. Imperative consumers read `get()` (a swipe
+ * guard fires at drag start, outside any render); reactive ones subscribe.
+ * Members are function properties so surfaces can pass them around unbound.
  */
-export interface KeyboardService {
-  /**
-   * The last published keyboard overlap in px: `0` when the keyboard is closed.
-   */
-  getHeight: () => number
-  /**
-   * Whether the software keyboard is up.
-   */
-  isVisible: () => boolean
-  /**
-   * Listen for a changed height.
-   */
-  subscribe: (listener: () => void) => Unlisten
+export interface KeyboardService extends Store<number> {
   /**
    * Record the keyboard overlap height. A height equal to the current one notifies nobody.
    */
@@ -26,28 +14,14 @@ export interface KeyboardService {
 }
 
 class KeyboardServiceImpl implements KeyboardService {
-  readonly #listeners = new Set<() => void>()
-  #currentHeight = 0
+  readonly #height = new WritableStore(0)
 
-  readonly getHeight = (): number => this.#currentHeight
+  readonly get = this.#height.get
 
-  readonly isVisible = (): boolean => this.#currentHeight > 0
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = this.#height.subscribe
 
   publish(height: number): void {
-    if (height === this.#currentHeight) {
-      return
-    }
-    this.#currentHeight = height
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#height.set(height)
   }
 }
 

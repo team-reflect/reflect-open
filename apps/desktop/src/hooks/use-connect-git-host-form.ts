@@ -1,6 +1,6 @@
 import { useForm, type UseFormReturn } from 'react-hook-form'
 import { errorMessage, redactRemoteUrl, type ConnectGitHostInput } from '@reflect/core'
-import { useGitSync } from '@/providers/sync-provider.tsx'
+import { useGitSyncActions } from '@/providers/sync-provider.tsx'
 
 export interface ConnectGitHostForm {
   /** The form, for a `FormProvider` around {@link ConnectGitHostFields}. */
@@ -28,7 +28,7 @@ export function useConnectGitHostForm({
   /** Called once the host accepted the sign-in and the graph is connected. */
   onDone: () => void
 }): ConnectGitHostForm {
-  const { connectGitHost, updateGitHostSignIn } = useGitSync()
+  const { connectGitHost, updateGitHostSignIn } = useGitSyncActions()
   // A remote that is already set keeps its address and branch: only the
   // sign-in changes, and the connector probes the configured remote itself.
   const send =

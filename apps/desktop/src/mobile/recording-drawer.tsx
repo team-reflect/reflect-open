@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { formatElapsed } from '@reflect/utils'
-import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import {
+  useMobileAudioMemo,
+  useMobileAudioMemoCanRetry,
+  useMobileAudioMemoDrawerOpen,
+  useMobileAudioMemoError,
+  useMobileAudioMemoHasTranscriptionConfig,
+  useMobileAudioMemoPhase,
+} from '@/mobile/audio-memo-provider.tsx'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform.tsx'
 import { useRouter } from '@/routing/router.tsx'
 
@@ -21,16 +29,20 @@ import { useRouter } from '@/routing/router.tsx'
  */
 export function RecordingDrawer(): ReactElement {
   const memo = useMobileAudioMemo()
+  const drawerOpen = useMobileAudioMemoDrawerOpen()
+  const error = useMobileAudioMemoError()
+  const canRetry = useMobileAudioMemoCanRetry()
+  const hasTranscriptionConfig = useMobileAudioMemoHasTranscriptionConfig()
 
   return (
-    <Drawer open={memo.drawerOpen} onOpenChange={memo.onDrawerOpenChange}>
+    <Drawer open={drawerOpen} onOpenChange={memo.onDrawerOpenChange}>
       <DrawerContent aria-label="Audio memo">
         <DrawerTitle className="sr-only">Audio memo</DrawerTitle>
-        {memo.error !== null ? (
+        {error !== null ? (
           <div className="flex flex-col gap-3 px-2 pb-2">
-            <p className="text-sm text-destructive">{memo.error}</p>
+            <p className="text-sm text-destructive">{error}</p>
             <div className="flex gap-2">
-              {memo.canRetry ? (
+              {canRetry ? (
                 <Button variant="secondary" onClick={() => memo.retry()}>
                   Retry
                 </Button>
@@ -40,10 +52,10 @@ export function RecordingDrawer(): ReactElement {
               </Button>
             </div>
           </div>
-        ) : !memo.hasTranscriptionConfig ? (
+        ) : !hasTranscriptionConfig ? (
           <KeySetupControls memo={memo} />
         ) : (
-          <LiveRecordingControls key={memo.drawerOpen ? 'open' : 'closed'} memo={memo} />
+          <LiveRecordingControls key={drawerOpen ? 'open' : 'closed'} memo={memo} />
         )}
       </DrawerContent>
     </Drawer>
@@ -78,6 +90,9 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
 }
 
 function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {
+  const phase = useMobileAudioMemoPhase()
+  const level = useStore(memo.session.level)
+  const elapsedMs = useStore(memo.session.elapsedMs)
   const [discardArmed, setDiscardArmed] = useState(false)
   const discardResetTimerRef = useRef<number | null>(null)
 
@@ -114,20 +129,20 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
   return (
     <div className="flex flex-col items-center gap-4 pb-2">
       <div className="flex h-7 items-center justify-center">
-        {memo.phase === 'recording' ? (
-          <RecordingLevelWaveform level={memo.level} />
+        {phase === 'recording' ? (
+          <RecordingLevelWaveform level={level} />
         ) : (
           <p className="text-sm text-text-muted">Waiting for the microphone…</p>
         )}
       </div>
-      <span className="text-lg font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
+      <span className="text-lg font-medium tabular-nums">{formatElapsed(elapsedMs)}</span>
       <div className="flex w-full flex-col items-center gap-3">
         <Button
           variant="destructive"
           size="icon"
           aria-label="Stop recording"
           className="size-14 rounded-full"
-          disabled={memo.phase !== 'recording'}
+          disabled={phase !== 'recording'}
           onClick={() => memo.stopAndSave()}
         >
           <Square aria-hidden fill="currentColor" className="size-5" />

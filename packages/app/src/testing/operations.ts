@@ -49,20 +49,16 @@ class TestOperationsServiceImpl implements TestOperationsService {
     this.#inner.dismiss(id)
   }
 
-  subscribe(listener: () => void): Unlisten {
-    return this.#inner.subscribe(listener)
-  }
+  readonly get = (): readonly Operation[] => this.#inner.get()
 
-  getAll(): readonly Operation[] {
-    return this.#inner.getAll()
-  }
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#inner.subscribe(listener)
 
   findByLabel(label: string): Operation | undefined {
-    return this.#inner.getAll().findLast((operation) => operation.label === label)
+    return this.#inner.get().findLast((operation) => operation.label === label)
   }
 
   snapshot(): OperationSnapshot[] {
-    return this.#inner.getAll().map(({ id: _id, action, ...rest }) => ({
+    return this.#inner.get().map(({ id: _id, action, ...rest }) => ({
       ...rest,
       action: action?.label ?? null,
     }))

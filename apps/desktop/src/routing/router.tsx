@@ -10,7 +10,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import type { NavigateOptions, Route } from '@reflect/app'
+import type { NavigateOptions, Route, ScrollPosition } from '@reflect/app'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export type RouterNavigate = (route: Route, options?: NavigateOptions) => void
@@ -54,17 +54,17 @@ interface RouterValue {
    * a pushed note so the back-swipe gesture reveals a live screen.
    */
   backRoute: Route | null
-  /** Record the active view's scroll offset on the current history entry. */
-  saveScrollState: (offset: number) => void
+  /** Record the active view's scroll position on the current history entry. */
+  saveScrollState: (position: ScrollPosition) => void
   /**
-   * Discard the current view's saved scroll offsets — the active history
+   * Discard the current view's saved scroll positions — the active history
    * entry's and, when the route belongs to a long-lived surface, the surface's
    * too — so the view re-anchors when revisited through **any** door (⌘[ back
    * or a `restoreSurfaceScroll` nav-tab return alike).
    */
   clearScrollState: () => void
-  /** The current entry's recorded offset (present when revisited), or `null`. */
-  savedScroll: () => number | null
+  /** The current entry's recorded position (present when revisited), or `null`. */
+  savedScroll: () => ScrollPosition | null
 }
 
 const RouterContext = createContext<RouterValue | null>(null)
@@ -93,7 +93,7 @@ export function RouterProvider({
   // React state rather than `useSyncExternalStore`: a store read through that
   // hook always updates synchronously, which would drop the transition and
   // flash the loading fallback of every lazily loaded screen.
-  const [state, setState] = useState(() => navigation.getState())
+  const [state, setState] = useState(() => navigation.get())
   /**
    * The state on screen, readable from scroll handlers without re-rendering.
    */
@@ -101,11 +101,11 @@ export function RouterProvider({
   // Written during render, not in an effect: descendant scroll-restoration
   // effects read this (through saveScrollState/savedScroll) on the same
   // commit, and React runs effects child-before-parent — so updating it in an
-  // effect here would lag a frame and restore or save the wrong entry's offset.
+  // effect here would lag a frame and restore or save the wrong entry's position.
   renderedRef.current = state
 
   useEffect(() => {
-    const sync = (): void => setState(navigation.getState())
+    const sync = (): void => setState(navigation.get())
     const unsubscribe = navigation.subscribe(sync)
     // A descendant's effect may have navigated before this subscription.
     startTransition(sync)
@@ -135,7 +135,7 @@ export function RouterProvider({
   )
 
   const saveScrollState = useCallback(
-    (offset: number) => navigation.saveScrollState(offset, renderedRef.current),
+    (position: ScrollPosition) => navigation.saveScrollState(position, renderedRef.current),
     [navigation],
   )
   const clearScrollState = useCallback(
