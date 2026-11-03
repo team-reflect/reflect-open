@@ -375,6 +375,8 @@ pub fn run() {
             git::git_remote_head,
             git::git_pull,
             git::git_push,
+            git::git_note_history,
+            git::git_note_revision,
             quit::quit_confirm,
             windows::open_note_window,
             windows::window_bootstrap,

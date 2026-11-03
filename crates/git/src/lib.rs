@@ -17,6 +17,7 @@ mod commit;
 mod commit_message;
 #[cfg(test)]
 mod fault;
+mod history;
 mod locks;
 mod merge;
 mod remote;
@@ -33,6 +34,7 @@ use serde::Serialize;
 use reflect_types::AppResult;
 
 pub use self::commit::{CommitOutcome, SkippedFile};
+pub use self::history::{NoteHistoryPage, NoteRevision, note_at_revision, note_history};
 pub use self::merge::{ChangeKind, ChangedFile, MergeKind};
 pub use self::remote::{GitCredential, PushOutcome, RemoteDelta, RemoteTip};
 

@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use tauri::State;
 
 use reflect_git::{
-    CommitOutcome, GitCredential, GitStatus, MAX_FILE_BYTES, PullOutcome, PushOutcome, RemoteDelta,
-    RemoteTip,
+    CommitOutcome, GitCredential, GitStatus, MAX_FILE_BYTES, NoteHistoryPage, PullOutcome,
+    PushOutcome, RemoteDelta, RemoteTip,
 };
 
 use crate::blocking::run_blocking;
@@ -164,4 +164,31 @@ pub async fn git_push(
         reflect_git::push(root, credential.clone())
     })
     .await
+}
+
+/// A page of the revisions of the note at `path`, newest first. Read-only, so
+/// it runs outside the graph lock like `git_fetch`.
+#[tauri::command]
+pub async fn git_note_history(
+    path: String,
+    after: Option<String>,
+    limit: usize,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<NoteHistoryPage> {
+    let root = crate::fs::root_for_generation(&state, generation)?;
+    run_blocking(move || reflect_git::note_history(&root, &path, after.as_deref(), limit)).await
+}
+
+/// The text of the note at `path` in revision `oid` (or `HEAD`). Refuses any
+/// path that isn't a note.
+#[tauri::command]
+pub async fn git_note_revision(
+    oid: String,
+    path: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<String> {
+    let root = crate::fs::root_for_generation(&state, generation)?;
+    run_blocking(move || reflect_git::note_at_revision(&root, &oid, &path)).await
 }

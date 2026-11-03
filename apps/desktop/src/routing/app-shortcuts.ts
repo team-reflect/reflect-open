@@ -6,6 +6,7 @@ import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useGraphActions, useGraphInfo, useGraphRecents } from '@/providers/graph-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
+import { useNoteHistory } from '@/providers/note-history-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
 import { useSettingsService } from '@/providers/settings-provider.tsx'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
@@ -63,6 +64,7 @@ export function useAppShortcuts(): CommandContext {
     pickerOpen: templatePickerOpen,
     createOpen: templateCreateOpen,
   } = useNoteTemplates()
+  const { openNoteHistory, historyPath } = useNoteHistory()
   const { toggleSidebar } = useSidebar()
   const { toggle: toggleAudioMemo } = useAudioMemo()
   // The hook can outlive the open graph, and its chat session with it.
@@ -88,6 +90,9 @@ export function useAppShortcuts(): CommandContext {
   // navigate behind them.
   const templatesOpenRef = useRef(templatePickerOpen || templateCreateOpen)
 
+  // And for the note history dialog.
+  const historyOpenRef = useRef(historyPath !== null)
+
   // Read at run time, not captured: a command can fire long after the render
   // that created the context (palette open across an index rebuild, etc.).
   const graphRootRef = useRef<string | null>(graph?.root ?? null)
@@ -99,6 +104,7 @@ export function useAppShortcuts(): CommandContext {
     paletteOpenRef.current = paletteOpen
     shortcutsOpenRef.current = shortcutsOpen
     templatesOpenRef.current = templatePickerOpen || templateCreateOpen
+    historyOpenRef.current = historyPath !== null
     graphRootRef.current = graph?.root ?? null
     recentsRef.current = recents
     openRecentRef.current = openRecent
@@ -171,6 +177,7 @@ export function useAppShortcuts(): CommandContext {
       openShortcuts,
       openTemplatePicker,
       openTemplateCreate,
+      openNoteHistory,
       enableSemanticSearch: () => {
         settingsService.update({ semanticSearchEnabled: true })
         // EmbeddingsSync loads an untouched runtime; a `failed` one only
@@ -189,6 +196,7 @@ export function useAppShortcuts(): CommandContext {
       openShortcuts,
       openTemplatePicker,
       openTemplateCreate,
+      openNoteHistory,
       toggleSidebar,
       newChat,
       openNoteFindForPath,
@@ -230,6 +238,9 @@ export function useAppShortcuts(): CommandContext {
       }
       if (templatesOpenRef.current) {
         return false // the template picker/create dialogs are modal too
+      }
+      if (historyOpenRef.current) {
+        return false // and so is the note history dialog
       }
       void commands.run(id, context)
       return true

@@ -23,6 +23,7 @@ import { useRouter } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { NoteHistoryProvider } from '@/providers/note-history-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyContextSidebar } from './daily-context-sidebar.tsx'
 
@@ -71,6 +72,7 @@ async function renderSidebar(date: string, core = createCore()) {
     appServices: { window: createTestWindowService({ openNoteWindow }) },
     graph: { root: '/g', name: 'g' },
     settings: { semanticSearchEnabled: true, dateFormat: 'mdy', weekStartDay: 'monday' },
+    wrapper: (children) => <NoteHistoryProvider>{children}</NoteHistoryProvider>,
   })
 }
 
