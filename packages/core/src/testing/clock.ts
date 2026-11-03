@@ -1,5 +1,4 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
-import { formatIsoDate } from '@reflect/utils'
 
 /**
  * A {@link ClockService} whose time moves only when a test moves it.
@@ -13,10 +12,6 @@ export interface TestClockService extends ClockService {
    * Sets the wall clock without running timers or moving the monotonic clock.
    */
   setNow(epochMs: number): void
-  /**
-   * Pins `today()` to `isoDate` and notifies `subscribeToday` listeners.
-   */
-  setToday(isoDate: string): void
   /**
    * The number of scheduled timeouts and intervals.
    */
@@ -41,17 +36,12 @@ async function settle(): Promise<void> {
 class TestClockServiceImpl implements TestClockService {
   #wallMs: number
   #monotonicMs = 0
-  #pinnedToday: string | null
-  readonly #listeners = new Set<(today: string) => void>()
   readonly #timers = new Map<number, ScheduledTimer>()
   #nextId = 1
   #nextOrder = 0
-  #lastToday: string
 
-  constructor(options: { now?: number; today?: string } | undefined) {
+  constructor(options: { now?: number } | undefined) {
     this.#wallMs = options?.now ?? 0
-    this.#pinnedToday = options?.today ?? null
-    this.#lastToday = this.today()
   }
 
   now(): number {
@@ -60,17 +50,6 @@ class TestClockServiceImpl implements TestClockService {
 
   monotonicNow(): number {
     return this.#monotonicMs
-  }
-
-  today(): string {
-    return this.#pinnedToday ?? formatIsoDate(new Date(this.#wallMs))
-  }
-
-  subscribeToday(listener: (today: string) => void): () => void {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
   }
 
   setTimeout(fn: () => void, ms: number): TimerHandle {
@@ -117,27 +96,10 @@ class TestClockServiceImpl implements TestClockService {
 
   setNow(epochMs: number): void {
     this.#wallMs = epochMs
-    this.#notifyToday()
-  }
-
-  setToday(isoDate: string): void {
-    this.#pinnedToday = isoDate
-    this.#notifyToday()
   }
 
   pendingTimers(): number {
     return this.#timers.size
-  }
-
-  #notifyToday(): void {
-    const next = this.today()
-    if (next === this.#lastToday) {
-      return
-    }
-    this.#lastToday = next
-    for (const listener of this.#listeners) {
-      listener(next)
-    }
   }
 
   #schedule(fn: () => void, ms: number, interval: number | null): TimerHandle {
@@ -172,17 +134,12 @@ class TestClockServiceImpl implements TestClockService {
   #moveTo(monotonicTarget: number): void {
     this.#wallMs += monotonicTarget - this.#monotonicMs
     this.#monotonicMs = monotonicTarget
-    this.#notifyToday()
   }
 }
 
 /**
- * Without `today`, `today()` follows the local date of `now()`. `setToday`
- * pins it until the next `setToday`.
+ * Creates a {@link TestClockService} whose wall clock starts at `now` (default `0`).
  */
-export function createTestClockService(options?: {
-  now?: number
-  today?: string
-}): TestClockService {
+export function createTestClockService(options?: { now?: number }): TestClockService {
   return new TestClockServiceImpl(options)
 }

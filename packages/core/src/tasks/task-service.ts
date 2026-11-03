@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -405,15 +406,6 @@ const EMPTY_STATE: TaskListState = {
   completedFailed: false,
 }
 
-function isSameTaskListState(a: TaskListState, b: TaskListState): boolean {
-  return (
-    a.open === b.open &&
-    a.completed === b.completed &&
-    a.openFailed === b.openFailed &&
-    a.completedFailed === b.completedFailed
-  )
-}
-
 /**
  * Spacing between index-change re-reads while the index applies batch after batch.
  */
@@ -469,10 +461,10 @@ class TaskServiceImpl implements TaskService {
   readonly #deps: TaskServiceDeps
   readonly #recentlyCompleted = new WritableStore<RecentlyCompleted>(
     { root: null, tasks: EMPTY },
-    (a, b) => a.root === b.root && a.tasks === b.tasks,
+    isShallowEqual,
   )
   readonly recentlyCompleted: Store<RecentlyCompleted> = this.#recentlyCompleted
-  readonly #state = new WritableStore<TaskListState>(EMPTY_STATE, isSameTaskListState)
+  readonly #state = new WritableStore<TaskListState>(EMPTY_STATE, isShallowEqual)
   #sessionKey: string | null = null
   #open: TaskListSlot = emptySlot()
   #completed: TaskListSlot = emptySlot()

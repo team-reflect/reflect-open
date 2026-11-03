@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
+import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
 import { useRouter } from '@/routing/router.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -14,7 +14,7 @@ import { SettingsSection } from './section.tsx'
  */
 export function GraphSection(): ReactElement {
   const graph = useGraphInfo()
-  const { mobileStorageKind } = useMobileGraphBoot()
+  const mobileStorageKind = useMobileStorageKind()
   const { navigate } = useRouter()
   const storage =
     mobileStorageKind === 'icloud'

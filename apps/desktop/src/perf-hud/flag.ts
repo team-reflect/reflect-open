@@ -1,13 +1,13 @@
-import { useSyncExternalStore } from 'react'
+import { WritableStore } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 
-let enabled = false
+const enabled = new WritableStore(false)
 let unmount: (() => void) | null = null
-const listeners = new Set<() => void>()
 
 async function mount(): Promise<void> {
   const { mountPerfHud } = await import('@/perf-hud/runtime.ts')
   // The switch may have turned off while the chunk was loading.
-  if (enabled && !unmount) {
+  if (enabled.get() && !unmount) {
     unmount = mountPerfHud()
   }
 }
@@ -21,29 +21,15 @@ export function startPerfHud(): void {
 
 /** Shows or hides the HUD until the page reloads. */
 export function setPerfHudEnabled(next: boolean): void {
-  enabled = next
+  enabled.set(next)
   if (next) {
     void mount()
   } else {
     unmount?.()
     unmount = null
   }
-  for (const listener of listeners) {
-    listener()
-  }
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
-}
-
-function getEnabled(): boolean {
-  return enabled
 }
 
 export function usePerfHudEnabled(): boolean {
-  return useSyncExternalStore(subscribe, getEnabled, getEnabled)
+  return useStore(enabled)
 }

@@ -191,7 +191,7 @@ describe('togglePinned', () => {
     expect(files.writes()).toEqual([
       { path: 'notes/a.md', contents: '---\npinned: 3072\n---\n\n# A\n', generation: 3 },
     ])
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 3072 })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 3072 })
   })
 
   it('writes a bare `pinned: true` when the shelf cannot be read', async () => {
@@ -207,7 +207,7 @@ describe('togglePinned', () => {
     })
 
     expect(files.getWrites('notes/a.md')).toEqual(['---\npinned: true\n---\n\n# A\n'])
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: null })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: null })
   })
 
   it('gives two quick pins distinct orders through the overlay', async () => {
@@ -235,7 +235,7 @@ describe('togglePinned', () => {
 
     expect(files.getWrites('notes/a.md')).toEqual(['# A\n'])
     // The shelf predicted a pin; the note's frontmatter corrected it.
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: false })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPinned: false })
   })
 
   it('records the predicted pin before the note is read', async () => {
@@ -243,7 +243,7 @@ describe('togglePinned', () => {
     const read = vi.spyOn(files, 'read')
     let overlayAtRead: unknown = 'unread'
     read.mockImplementationOnce(async (...args) => {
-      overlayAtRead = noteRows.getOverlay('notes/a.md')
+      overlayAtRead = noteRows.get().get('notes/a.md')
       read.mockRestore()
       return await files.read(...args)
     })
@@ -344,7 +344,7 @@ describe('togglePinned', () => {
 
     await expect(actions.togglePinned('notes/a.md')).resolves.toEqual({ status: 'failed' })
     expect(files.writes()).toEqual([])
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
     expect(progress.snapshot()).toMatchObject([
       { label: 'Updating pin', status: 'failed', message: 'disk on fire' },
     ])
@@ -362,7 +362,7 @@ describe('togglePinned', () => {
 
     await expect(actions.togglePinned('notes/a.md')).resolves.toEqual({ status: 'failed' })
 
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({
+    expect(noteRows.get().get('notes/a.md')).toEqual({
       gistUrl: 'https://gist.github.com/alex/g1',
     })
   })
@@ -381,7 +381,7 @@ describe('unpin', () => {
       pinOrder: null,
     })
 
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: false })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPinned: false })
     expect(liveContent).not.toHaveBeenCalled()
     expect(session?.getCalls('commitFrontmatter')).toEqual([[{ pinned: false }]])
   })
@@ -433,7 +433,7 @@ describe('reorderPinned', () => {
 
     const first = actions.reorderPinned([{ path: 'notes/a.md', pinnedOrder: 1024 }])
     const second = actions.reorderPinned([{ path: 'notes/a.md', pinnedOrder: 2048 }])
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ pinnedOrder: 2048 })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ pinnedOrder: 2048 })
 
     gate.resolve()
     await Promise.all([first, second])
@@ -461,7 +461,7 @@ describe('reorderPinned', () => {
     await expect(
       actions.reorderPinned([{ path: 'notes/a.md', pinnedOrder: 1024 }]),
     ).rejects.toThrow('disk full')
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
     // A failed reorder does not block the next one.
     await expect(
       actions.reorderPinned([{ path: 'notes/a.md', pinnedOrder: 2048 }]),
@@ -477,7 +477,7 @@ describe('togglePrivate', () => {
       status: 'done',
       isPrivate: true,
     })
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPrivate: true })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPrivate: true })
 
     expect(files.writes()).toEqual([
       { path: 'notes/a.md', contents: '---\nprivate: true\n---\n\n# A\n', generation: 3 },
@@ -517,7 +517,7 @@ describe('togglePrivate', () => {
     const read = vi.spyOn(files, 'read')
     let overlayAtRead: unknown = 'unread'
     read.mockImplementationOnce(async (...args) => {
-      overlayAtRead = noteRows.getOverlay('notes/a.md')
+      overlayAtRead = noteRows.get().get('notes/a.md')
       read.mockRestore()
       return await files.read(...args)
     })
@@ -567,7 +567,7 @@ describe('togglePrivate', () => {
     })
 
     await expect(actions.togglePrivate('notes/a.md')).resolves.toEqual({ status: 'failed' })
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
     expect(progress.snapshot()).toMatchObject([
       { label: 'Updating privacy', status: 'failed', message: 'disk full' },
     ])
@@ -618,7 +618,7 @@ describe('trash', () => {
     })
 
     expect(files.trashed()).toEqual(['notes/keep.md'])
-    expect(noteRows.getOverlay('notes/keep.md')).toEqual({ trashed: true })
+    expect(noteRows.get().get('notes/keep.md')).toEqual({ trashed: true })
   })
 
   it('trashes the file, then discards its open session so it cannot resurrect', async () => {
@@ -649,7 +649,7 @@ describe('trash', () => {
 
     expect(deleteFile).not.toHaveBeenCalled()
     // The row leaves the list at once; the overlay retires when the index reports no row.
-    expect(noteRows.getOverlay('notes/new.md')).toEqual({ trashed: true })
+    expect(noteRows.get().get('notes/new.md')).toEqual({ trashed: true })
     expect(session?.getCalls('discard')).toHaveLength(1)
   })
 
@@ -710,7 +710,7 @@ describe('trash', () => {
     expect(session?.getCalls('discard')).toEqual([])
     expect(session?.getCalls('cancelDelete')).toHaveLength(1)
     expect(sessionFor).toHaveBeenCalledOnce()
-    expect(noteRows.getOverlay('notes/gone.md')).toBeNull()
+    expect(noteRows.get().get('notes/gone.md')).toBeUndefined()
   })
 
   it('refuses a daily note and never touches disk or sessions', async () => {
@@ -780,7 +780,7 @@ describe('trashMany', () => {
     })
 
     expect(files.trashed()).toEqual(['notes/a.md', 'notes/b.md'])
-    expect([...noteRows.getOverlays().keys()]).toEqual(['notes/a.md', 'notes/b.md'])
+    expect([...noteRows.get().keys()]).toEqual(['notes/a.md', 'notes/b.md'])
     expect(progress.started()).toMatchObject([{ label: 'Trashing notes', ended: true }])
     expect(progress.get()).toEqual([])
   })
@@ -813,7 +813,7 @@ describe('trashMany', () => {
     ])
     expect(files.trashed()).toEqual(['notes/a.md', 'notes/c.md'])
     // A note that failed stays listed.
-    expect([...noteRows.getOverlays().keys()]).toEqual(['notes/a.md', 'notes/c.md'])
+    expect([...noteRows.get().keys()]).toEqual(['notes/a.md', 'notes/c.md'])
     expect(progress.snapshot()).toMatchObject([
       { label: 'Trashing notes', status: 'failed', message: 'Daily notes cannot be deleted' },
     ])

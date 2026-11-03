@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SizeClassService } from '@reflect/app'
-import type { GraphInfo, HorizontalSizeClass } from '@reflect/core'
+import { WritableStore, type GraphInfo, type HorizontalSizeClass } from '@reflect/core'
 import { act } from '@/test-utils/act.ts'
 import '@/test-utils/locator.ts'
 import { IPAD_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -15,25 +15,14 @@ vi.mock('@/mobile/tablet-workspace.tsx', () => ({
 
 const GRAPH: GraphInfo = { root: '/graphs/test', name: 'test', generation: 1 }
 
-/** A size class the test moves between, like a window crossing widths. */
+/**
+ * A size class the test moves between, like a window crossing widths.
+ */
 function scriptedSizeClass(initial: HorizontalSizeClass | null) {
-  let current = initial
-  const listeners = new Set<() => void>()
-  const service: SizeClassService = {
-    current: () => current,
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    start: () => {},
-  }
+  const state = new WritableStore(initial)
+  const service: SizeClassService = { get: state.get, subscribe: state.subscribe, start: () => {} }
   const resize = (next: HorizontalSizeClass): void => {
-    current = next
-    for (const listener of listeners) {
-      listener()
-    }
+    state.set(next)
   }
   return { service, resize }
 }

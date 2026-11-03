@@ -2,6 +2,7 @@ import type { ClockService } from '../../ports/clock-service.ts'
 import type { IdService } from '../../ports/id-service.ts'
 import type { ImageCodecService } from '../../ports/image-codec-service.ts'
 import type { LoggerService } from '../../ports/logger-service.ts'
+import type { TodayService } from '../../daily/today-service.ts'
 import type { EmbeddingRuntimeService } from '../../embeddings/embedding-runtime-service.ts'
 import { errorMessage } from '../../errors.ts'
 import type { GraphSession } from '../../graph/graph-session.ts'
@@ -24,7 +25,7 @@ import {
   type ChatAttachment,
   type ChatTurn,
 } from './transcript.ts'
-import { isDeepEqual } from '@ocavue/utils'
+import { isDeepEqual, isShallowEqual } from '@ocavue/utils'
 
 /**
  * One chat session per open graph (Plan 10): the conversation lives here, not
@@ -146,6 +147,15 @@ export interface ChatSession extends Store<ChatSessionState> {
    */
   newChat(): void
   /**
+   * Start a fresh conversation with `question` as its first message. For
+   * asking from outside the composer (mobile's search field), so the
+   * composer's draft text and queued images stay as they were. Changes
+   * nothing for a blank question, with no chat model to send it to, or when
+   * the open conversation already began with this question and no images
+   * (asking again reopens that answer rather than paying for it twice).
+   */
+  ask(question: string): Promise<void>
+  /**
    * Load a past conversation from the history.
    */
   openConversation(id: string): Promise<void>
@@ -171,6 +181,7 @@ export interface ChatSessionServiceDeps {
   readonly embeddingRuntime: EmbeddingRuntimeService
   readonly settings: SettingsService
   readonly clock: ClockService
+  readonly today: TodayService
   readonly id: IdService
   readonly imageCodec: ImageCodecService
   readonly logger: LoggerService
@@ -198,15 +209,6 @@ interface LocalState {
   draft: string
   attachments: ChatAttachment[]
   conversationId: string
-}
-
-function isLocalStateEqual(a: LocalState, b: LocalState): boolean {
-  return (
-    a.turns === b.turns &&
-    a.draft === b.draft &&
-    a.attachments === b.attachments &&
-    a.conversationId === b.conversationId
-  )
 }
 
 interface ChatSessionImplDeps extends ChatSessionServiceDeps {
@@ -238,11 +240,12 @@ class ChatSessionImpl implements ChatSession {
   // successor's slot.
   #sessionCounter = 0
   #activeSend: { controller: AbortController; session: number } | null = null
-  // The session of the most recent send — unlike `activeSend` this is not
+  // The session in which the user last chose the on-screen conversation: a
+  // send into it, or an Ask that reopened it. Unlike `activeSend` this is not
   // cleared when the turn settles, so a pending conversation switch can tell
-  // that the on-screen conversation received a message even after the stream
+  // the user stayed with the on-screen conversation even after the stream
   // finished.
-  #lastSendSession = -1
+  #anchoredSession = -1
 
   constructor(deps: ChatSessionImplDeps, options: ChatSessionOptions) {
     this.#deps = deps
@@ -255,7 +258,7 @@ class ChatSessionImpl implements ChatSession {
         attachments: [],
         conversationId: deps.id.uuid(),
       },
-      isLocalStateEqual,
+      isShallowEqual,
     )
     const selection = deriveStore(
       deps.settings,
@@ -342,11 +345,38 @@ class ChatSessionImpl implements ChatSession {
   }
 
   async send(text: string): Promise<void> {
+    await this.#send(text, { fromComposer: true })
+  }
+
+  async ask(question: string): Promise<void> {
+    const trimmed = question.trim()
+    // A question that can't be sent must not cost the open conversation.
+    if (trimmed === '' || this.#deps.providerConfig.chatModel() === null) {
+      return
+    }
+    // Asking again what the open conversation began with reopens it. Only a
+    // text-only opening counts: the same words about a photo are a different
+    // question. Reopening also abandons a history switch still loading, as a
+    // send would, so the conversation asked for is the one that stays.
+    const opening = this.#local.get().turns[0]
+    if (opening?.userText === trimmed && opening.attachments.length === 0) {
+      this.#anchoredSession = this.#sessionCounter
+      return
+    }
+    this.#startConversation()
+    await this.#send(trimmed, { fromComposer: false })
+  }
+
+  /**
+   * `fromComposer`: the message is the composer's, so its queued images go
+   * with it and the draft and queue clear; otherwise both are left alone.
+   */
+  async #send(text: string, { fromComposer }: { fromComposer: boolean }): Promise<void> {
     const { chatEngine, chatGraphContext, providerConfig, credentials, embeddingRuntime } =
       this.#deps
-    const { settings, clock, id, logger } = this.#deps
+    const { settings, clock, today, id, logger } = this.#deps
     const trimmed = text.trim()
-    const attached = this.#local.get().attachments
+    const attached = fromComposer ? this.#local.get().attachments : []
     const config = providerConfig.chatModel()
     if (
       (trimmed === '' && attached.length === 0) ||
@@ -356,7 +386,9 @@ class ChatSessionImpl implements ChatSession {
       return
     }
     const turnsBefore = this.#local.get().turns
-    this.#update({ draft: '', attachments: [] })
+    if (fromComposer) {
+      this.#update({ draft: '', attachments: [] })
+    }
 
     const turnId = id.uuid()
     const messages = [...buildHistory(turnsBefore), userMessage(trimmed, attached)]
@@ -404,7 +436,7 @@ class ChatSessionImpl implements ChatSession {
     const controller = new AbortController()
     const sending = { controller, session: this.#sessionCounter }
     this.#activeSend = sending
-    this.#lastSendSession = sending.session
+    this.#anchoredSession = sending.session
 
     try {
       // The graph overview degrades to null (prompt without the block)
@@ -428,7 +460,7 @@ class ChatSessionImpl implements ChatSession {
         config,
         apiKey,
         messages,
-        today: clock.today(),
+        today: today.get(),
         // A stray enabled flag must lose to the runtime here.
         semanticSearchEnabled:
           settings.get().semanticSearchEnabled && embeddingRuntime.get().status === 'ready',
@@ -470,9 +502,7 @@ class ChatSessionImpl implements ChatSession {
   }
 
   newChat(): void {
-    this.#activeSend?.controller.abort()
-    this.#sessionCounter += 1
-    this.#update({ turns: [], attachments: [], conversationId: this.#deps.id.uuid() })
+    this.#startConversation({ attachments: [] })
   }
 
   async openConversation(conversationId: string): Promise<void> {
@@ -486,13 +516,14 @@ class ChatSessionImpl implements ChatSession {
     this.#update({ attachments: [] })
     try {
       const restored = await chatHistory.loadConversation(conversationId)
-      // Superseded by another switch or New chat — or by a send: a message
-      // composed while the rows loaded belongs to the conversation that was
-      // on screen, so the user's turn must not be swapped out from under it.
-      // Checked via the last send's session (not the in-flight slot, which
-      // is cleared on settle) — a turn that finished streaming before the
-      // rows arrived still anchors the switch to the conversation it's in.
-      if (session !== this.#sessionCounter || this.#lastSendSession === session) {
+      // Superseded by another switch or New chat — or by a send (or an Ask
+      // that reopened the on-screen conversation): a message composed while
+      // the rows loaded belongs to the conversation that was on screen, so
+      // the user's turn must not be swapped out from under it. Checked via
+      // the anchored session (not the in-flight slot, which is cleared on
+      // settle) — a turn that finished streaming before the rows arrived
+      // still anchors the switch to the conversation it's in.
+      if (session !== this.#sessionCounter || this.#anchoredSession === session) {
         return
       }
       this.#update({ conversationId, turns: restored })
@@ -521,6 +552,16 @@ class ChatSessionImpl implements ChatSession {
     if (conversationId === this.#local.get().conversationId) {
       this.newChat()
     }
+  }
+
+  /**
+   * Abort the in-flight turn and open a fresh, empty conversation, applying
+   * `patch` in the same update.
+   */
+  #startConversation(patch: Partial<LocalState> = {}): void {
+    this.#activeSend?.controller.abort()
+    this.#sessionCounter += 1
+    this.#update({ turns: [], conversationId: this.#deps.id.uuid(), ...patch })
   }
 
   #update(patch: Partial<LocalState>): void {

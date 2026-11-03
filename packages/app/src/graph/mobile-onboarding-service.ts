@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import {
   DEFAULT_GRAPH_NAME,
   errorMessage,
@@ -146,12 +147,15 @@ export interface MobileOnboardingServiceDeps {
 
 class MobileOnboardingServiceImpl implements MobileOnboardingService {
   readonly #deps: MobileOnboardingServiceDeps
-  readonly #state = new WritableStore<MobileOnboardingState>({
-    needsOnboarding: false,
-    storageInfo: null,
-    resolving: false,
-    kind: null,
-  })
+  readonly #state = new WritableStore<MobileOnboardingState>(
+    {
+      needsOnboarding: false,
+      storageInfo: null,
+      resolving: false,
+      kind: null,
+    },
+    isShallowEqual,
+  )
   #warmed: Promise<MobileStorageInfo> | null = null
 
   constructor(deps: MobileOnboardingServiceDeps) {
@@ -260,9 +264,8 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
             // Show onboarding immediately. The sandbox root resolves in
             // milliseconds and unlocks the on-device choice; the iCloud
             // section renders as pending until the container resolves.
-            this.#setState({ needsOnboarding: true })
+            this.#setState({ needsOnboarding: true, resolving: true })
             graphSession.park(null)
-            this.#setState({ resolving: true })
             void mobileStorage.resolveLocal().then(
               (localRoot) => {
                 if (active) {

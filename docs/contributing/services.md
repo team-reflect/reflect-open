@@ -108,9 +108,9 @@ Rules:
 - Class members keep this order: `#` fields, the constructor, the public
   members in the interface's order, `#` methods.
 - A member is a plain method. Only a member that callers pass around without
-  its object (`getState` and `subscribe`, read by
-  `useServiceState(service, service.getState)`) is a function property in the
-  interface and an arrow-function field in the class. Lint
+  its object (`get` and `subscribe`, read by `useStore(service)`) is a
+  function property in the interface and an arrow-function field in the
+  class. Lint
   (`@typescript-eslint/unbound-method`) reports an unbound method. Wrap a
   one-off pass in an arrow at the call site.
 - No getters, setters, overloads, `private`, `protected`, `public` or
@@ -267,10 +267,10 @@ useEffect(
 ```
 
 - An event subscription is a `useEffect` that returns the unsubscribe.
-- Read a store with `useServiceState(service, service.getState)`
-  (`apps/desktop/src/services/use-service-state.ts`), where it is used. Read a
-  graph-scoped instance from `useGraphServices()`. A provider exists only for
-  an instance it creates (`AudioMemoProvider`).
+- Read a store with `useStore(service)`, or one field with
+  `useSelector(service, selectX)` (`apps/desktop/src/lib/use-store.ts`),
+  where it is used. Read a graph-scoped instance from `useGraphServices()`. A
+  provider exists only for an instance it creates (`AudioMemoProvider`).
 - A query calls the service in its `queryFn`. Put the options in
   `apps/desktop/src/lib/query-options.ts`.
 

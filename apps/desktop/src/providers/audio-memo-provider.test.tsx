@@ -10,6 +10,7 @@ import {
   AppError,
 } from '@reflect/core'
 import {
+  createTestAudioRecorderService,
   createTestCoreServices,
   createTestPlatformService,
   createTestSettingsService,
@@ -18,9 +19,10 @@ import {
 import { toast } from '@/components/ui/toast.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
-import { IPAD_PLATFORM, renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { MOBILE_PLATFORM, renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { AudioMemoProvider, useAudioMemo } from './audio-memo-provider.tsx'
+import { AudioMemoProvider, useAudioMemo, useAudioMemoPhase } from './audio-memo-provider.tsx'
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 3 }
 
@@ -51,6 +53,34 @@ const RECORDING: AudioRecorderFinalSegment = {
  */
 const FINAL_PATH = audioMemoPartPath(audioMemoIdentity(new Date(0), 'audio/mp4'), 1, true)
 
+/**
+ * The context's actions, with the state and the elapsed time it renders.
+ */
+function useAudioMemoView() {
+  const memo = useAudioMemo()
+  return { ...memo, ...useStore(memo.session), elapsedMs: useStore(memo.session.elapsedMs) }
+}
+
+/**
+ * Called on every render of a component that reads only the phase.
+ */
+const onPhaseRender = vi.fn()
+
+/**
+ * Called on every render of a component that reads only the elapsed time.
+ */
+const onElapsedRender = vi.fn()
+
+function PhaseProbe(): null {
+  onPhaseRender(useAudioMemoPhase())
+  return null
+}
+
+function ElapsedProbe(): null {
+  onElapsedRender(useStore(useAudioMemo().session.elapsedMs))
+  return null
+}
+
 async function setup(provider: AiProviderConfig = OPENAI) {
   const settings = createTestSettingsService({
     aiProviders: [provider],
@@ -63,12 +93,16 @@ async function setup(provider: AiProviderConfig = OPENAI) {
   })
   core.audioRecorder.setStopResult(RECORDING)
 
-  const hook = await renderHookInApp(() => ({ memo: useAudioMemo(), sidebar: useSidebar() }), {
+  const hook = await renderHookInApp(() => ({ memo: useAudioMemoView(), sidebar: useSidebar() }), {
     core,
     graph: GRAPH,
     wrapper: (children: ReactNode) => (
       <SidebarProvider>
-        <AudioMemoProvider graph={GRAPH}>{children}</AudioMemoProvider>
+        <AudioMemoProvider graph={GRAPH}>
+          <PhaseProbe />
+          <ElapsedProbe />
+          {children}
+        </AudioMemoProvider>
       </SidebarProvider>
     ),
   })
@@ -106,6 +140,23 @@ describe('AudioMemoProvider', () => {
     await vi.waitFor(() => expect(result.current.memo.phase).toBe('idle'))
 
     expect(core.assetStore.uploads()).toEqual([{ kind: 'path', path: FINAL_PATH, generation: 3 }])
+  })
+
+  it('a recording tick re-renders only the elapsed-time readers', async () => {
+    const { result, core } = await setup()
+    await act(() => {
+      result.current.memo.toggle()
+    })
+    onPhaseRender.mockClear()
+    onElapsedRender.mockClear()
+
+    await act(() => {
+      core.audioRecorder.emitLevel({ level: 0.5, elapsedMs: 1200 })
+    })
+
+    expect(result.current.memo.elapsedMs).toBe(1200)
+    expect(onElapsedRender).toHaveBeenLastCalledWith(1200)
+    expect(onPhaseRender).not.toHaveBeenCalled()
   })
 
   it('is unavailable without an OpenAI or Gemini model', async () => {
@@ -244,31 +295,50 @@ describe('AudioMemoProvider', () => {
   })
 })
 
-describe('AudioMemoProvider in the iPad workspace', () => {
+describe('AudioMemoProvider under the iOS app', () => {
   async function renderBridge(isNativeShell: boolean) {
+    const audioRecorder = createTestAudioRecorderService()
     const core = createTestCoreServices({
       database: createWasmTestDatabaseService(),
-      platform: createTestPlatformService({ ...IPAD_PLATFORM, isNativeShell }),
+      platform: createTestPlatformService({ ...MOBILE_PLATFORM, isNativeShell }),
+      audioRecorder,
     })
-    return await renderHookInApp(() => useAudioMemo(), {
+    const hook = await renderHookInApp(() => useAudioMemoView(), {
       core,
       graph: GRAPH,
+      settings: { aiProviders: [OPENAI], defaultAiProviderId: OPENAI.id },
       wrapper: (children: ReactNode) => (
         <MobileAudioMemoProvider graph={GRAPH}>
           <AudioMemoProvider graph={GRAPH}>{children}</AudioMemoProvider>
         </MobileAudioMemoProvider>
       ),
     })
+    const methods = (): string[] => audioRecorder.calls().map((call) => call.method)
+    return { ...hook, methods }
   }
 
   it('borrows the native recording session, presented in the iOS sheet', async () => {
-    const { result } = await renderBridge(true)
-
+    const { result, methods } = await renderBridge(true)
     expect(result.current).toMatchObject({
       presentation: 'sheet',
+      phase: 'idle',
       available: true,
       unavailableReason: null,
     })
+
+    // The mic starts the native recorder through the bridge…
+    await act(() => {
+      result.current.toggle()
+    })
+    expect(result.current.phase).toBe('recording')
+    expect(methods()).toContain('start')
+
+    // …and cancelling drops that same recording.
+    await act(() => {
+      result.current.cancel()
+    })
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
+    expect(methods()).toContain('cancel')
   })
 
   it('turns the mic off where there is no native recorder', async () => {

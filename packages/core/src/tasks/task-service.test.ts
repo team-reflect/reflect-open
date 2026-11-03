@@ -22,6 +22,7 @@ import type {
 } from '../indexing/index-lifecycle-service.ts'
 import { buildIndexedNote } from '../indexing/indexed-note.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
+import { WritableStore } from '../store.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import {
   createNodeTestDatabaseService,
@@ -92,29 +93,6 @@ let reconciledListeners: Set<(event: IndexReconciledEvent) => MaybePromise<void>
 
 const openGraph = createGraphSession({ root: '/g', name: 'g', generation: 7, indexGeneration: 1 })
 
-/**
- * A graph session source over `read`, plus a way to report a switch to its subscribers.
- */
-function sessionSource(read: () => GraphSession | null): TaskServiceDeps['graphSession'] & {
-  notify: () => void
-} {
-  const listeners = new Set<() => void>()
-  return {
-    get: () => ({ session: read() }),
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    notify: () => {
-      for (const listener of listeners) {
-        listener()
-      }
-    },
-  }
-}
-
 function createTasks(
   graphSession: TaskServiceDeps['graphSession'],
   role: TaskServiceDeps['role'] = 'main',
@@ -169,7 +147,7 @@ beforeEach(() => {
   logger = createTestLoggerService()
   appliedListeners = new Set()
   reconciledListeners = new Set()
-  tasks = createTasks(sessionSource(() => openGraph))
+  tasks = createTasks(new WritableStore({ session: openGraph }))
 })
 
 const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -623,7 +601,7 @@ describe('snippet tasks', () => {
 describe('no graph open', () => {
   it('rejects writes and skips snippet toggles', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
-    const closed = createTasks(sessionSource(() => null))
+    const closed = createTasks(new WritableStore({ session: null }))
 
     await expect(closed.writeTask(task, [{ kind: 'toggle' }])).rejects.toThrow('No graph is open.')
     await closed.toggleSnippetTask('notes/a.md', { locator: task, checked: false })
@@ -634,18 +612,22 @@ describe('no graph open', () => {
   it('stops a batch once its graph is replaced', async () => {
     noteFile.set('notes/a.md', '+ [ ] one\n+ [ ] two\n')
     const controller = new AbortController()
-    let session = createGraphSession(
-      { root: '/g', name: 'g', generation: 7, indexGeneration: 1 },
-      controller.signal,
-    )
-    const switching = createTasks(sessionSource(() => session))
+    const source = new WritableStore<{ session: GraphSession | null }>({
+      session: createGraphSession(
+        { root: '/g', name: 'g', generation: 7, indexGeneration: 1 },
+        controller.signal,
+      ),
+    })
+    const switching = createTasks(source)
     const one = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'one' })
     const two = makeOpenTask({ notePath: 'notes/a.md', astPath: [1], markdown: 'two' })
     const writeTask = switching.writeTask.bind(switching)
     vi.spyOn(switching, 'writeTask').mockImplementation(async (task, actions) => {
       const result = await writeTask(task, actions)
       controller.abort()
-      session = createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 })
+      source.set({
+        session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
+      })
       return result
     })
 
@@ -706,7 +688,7 @@ describe('recently completed', () => {
 
   it('is separate per service', () => {
     tasks.markRecentlyCompleted('/g', [a])
-    const other = createTasks(sessionSource(() => openGraph))
+    const other = createTasks(new WritableStore({ session: openGraph }))
     expect(other.recentlyCompleted.get().tasks).toEqual([])
   })
 })
@@ -946,10 +928,7 @@ describe('task list state', () => {
       ['main', 1],
       ['note-window', 2],
     ] as const) {
-      tasks = createTasks(
-        sessionSource(() => openGraph),
-        role,
-      )
+      tasks = createTasks(new WritableStore({ session: openGraph }), role)
       const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([one])
       tasks.subscribe(() => {})
       await flushMicrotasks()
@@ -978,8 +957,7 @@ describe('task list state', () => {
   })
 
   it('drops the rows on a graph switch and reads the new graph', async () => {
-    let session: GraphSession | null = openGraph
-    const source = sessionSource(() => session)
+    const source = new WritableStore<{ session: GraphSession | null }>({ session: openGraph })
     const switching = createTasks(source)
     const getOpenTasks = vi.spyOn(switching, 'getOpenTasks').mockResolvedValue([one])
     switching.subscribe(() => {})
@@ -987,14 +965,14 @@ describe('task list state', () => {
     expect(switching.get().open).toEqual([one])
 
     getOpenTasks.mockResolvedValue([two])
-    session = createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 })
-    source.notify()
+    source.set({
+      session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
+    })
     expect(switching.get().open).toBeUndefined()
     await flushMicrotasks()
     expect(switching.get().open).toEqual([two])
 
-    session = null
-    source.notify()
+    source.set({ session: null })
     expect(switching.get().open).toBeUndefined()
     await switching.refresh()
     expect(getOpenTasks).toHaveBeenCalledTimes(2)

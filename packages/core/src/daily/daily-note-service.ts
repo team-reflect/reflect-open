@@ -45,14 +45,10 @@ export interface DailyNoteServiceDeps {
 }
 
 /**
- * The date questions about notes: today, which days have a daily note, and
- * the wake onto a new day.
+ * The date questions about notes: which days have a daily note, and the wake
+ * onto a new day.
  */
 export interface DailyNoteService {
-  /**
-   * Today's local calendar date as `YYYY-MM-DD` (the clock's live date).
-   */
-  today(): string
   /**
    * ISO dates within `[start, end]` (inclusive) whose daily note has content,
    * ascending: the calendar's day markers.
@@ -68,12 +64,12 @@ export interface DailyNoteService {
   /**
    * V1's wake-to-today: calls `listener` with the new date when the app
    * returns to the foreground on a later calendar date than it was last seen
-   * on. An app left open across midnight rolls over through the clock's
-   * `subscribeToday` instead, so this only reports the backgrounded case. The
+   * on. An app left open across midnight rolls over through
+   * `TodayService` instead, so this only reports the backgrounded case. The
    * caller navigates; this service does not.
    *
    * The date is read from the wall clock (`now()`) at each visibility change,
-   * not from `today()`: the clock refreshes its cached date on the same
+   * not from `TodayService`: it refreshes its cached date on the same
    * visibility event, and listener order must not decide the result.
    */
   subscribeWakeOnNewDay(listener: (today: string) => void): Unlisten
@@ -84,10 +80,6 @@ class DailyNoteServiceImpl implements DailyNoteService {
 
   constructor(deps: DailyNoteServiceDeps) {
     this.#deps = deps
-  }
-
-  today(): string {
-    return this.#deps.clock.today()
   }
 
   async dailyDatesInRange(start: string, end: string): Promise<string[]> {

@@ -1,3 +1,4 @@
+import { isDeepEqual } from '@ocavue/utils'
 import type {
   ClassicAccess,
   ClassicAccessService,
@@ -18,7 +19,7 @@ import type {
   SubscriptionState,
 } from '../monetization/subscription-service.ts'
 
-export type ClassicAccessCall = 'read' | 'load' | 'signIn' | 'signOut' | 'start'
+export type ClassicAccessCall = 'read' | 'load' | 'signIn' | 'signOut'
 
 export interface TestClassicAccessService extends ClassicAccessService {
   /**
@@ -84,11 +85,6 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
     return
   }
 
-  start(): Unlisten {
-    this.#log.push('start')
-    return () => {}
-  }
-
   setState(patch: Partial<ClassicAccessState>): void {
     this.#state.set({ ...this.get(), ...patch })
   }
@@ -109,7 +105,7 @@ class TestClassicAccessServiceImpl implements TestClassicAccessService {
 /**
  * A {@link ClassicAccessService} over a settable state. `read` and `load`
  * resolve the stored access; `signIn` resolves `cancelled` until `setSignIn`;
- * `signOut` clears the access; `start` only records the call.
+ * `signOut` clears the access.
  */
 export function createTestClassicAccessService(
   state?: Partial<ClassicAccessState>,
@@ -137,7 +133,10 @@ class TestSubscriptionServiceImpl implements TestSubscriptionService {
   readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(state?: Partial<SubscriptionState>) {
-    this.#state = new WritableStore({ value: null, isLoading: false, isError: false, ...state })
+    this.#state = new WritableStore<SubscriptionState>(
+      { value: null, isLoading: false, isError: false, ...state },
+      isDeepEqual,
+    )
     this.get = this.#state.get
     this.subscribe = this.#state.subscribe
   }
@@ -194,11 +193,14 @@ class TestAppStoreEnvironmentServiceImpl implements TestAppStoreEnvironmentServi
   readonly subscribe: (listener: VoidFunction) => Unlisten
 
   constructor(env: AppStoreEnvironment) {
-    this.#state = new WritableStore<AppStoreEnvironmentState>({
-      value: env,
-      isLoading: false,
-      isError: false,
-    })
+    this.#state = new WritableStore<AppStoreEnvironmentState>(
+      {
+        value: env,
+        isLoading: false,
+        isError: false,
+      },
+      isDeepEqual,
+    )
     this.get = this.#state.get
     this.subscribe = this.#state.subscribe
   }

@@ -1,10 +1,7 @@
 import { useEffect } from 'react'
-import type { ResolvedTheme as AppResolvedTheme, ThemeState } from '@reflect/app'
+import type { ResolvedTheme, ThemeState } from '@reflect/app'
 import { useSelector } from '@/lib/use-store.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
-
-/** The concrete theme actually applied to the document. */
-export type ResolvedTheme = AppResolvedTheme
 
 function selectResolvedTheme(state: ThemeState): ResolvedTheme {
   return state.resolved

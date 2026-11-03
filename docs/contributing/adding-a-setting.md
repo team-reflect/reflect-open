@@ -62,8 +62,7 @@ const settingsService = useSettingsService()
 // write derived/list value: settingsService.updateWith((current) => ({ yourList: nextList(current) }))
 ```
 
-A setting hook re-renders only when its key changes. Use
-`useSettingsStore()` only where a component needs the whole document.
+A setting hook re-renders only when its key changes.
 
 Outside React, use the service (`settings.get()`, `update`, `updateWith`,
 `subscribe`); a core service takes `settings` in its `deps`.
@@ -78,8 +77,8 @@ What `SettingsService` gives you (do not re-implement it):
 - **Saves are async and ordered.** A failed save keeps the in-memory value,
   shows in the operations status UI, and retries on the next change or quit
   flush.
-- **One runtime document.** `useSettingsStore()` and `settings.get()` return the same
-  object, which keeps its identity until something changes.
+- **One runtime document.** `settings.get()` returns the same object until
+  something changes.
 - **Paired side effects must await the load.** If a setting pairs with state
   elsewhere (e.g. an OS-keychain secret), call `whenLoaded()` before
   writing the other half: after a failed load, settings are session-only and

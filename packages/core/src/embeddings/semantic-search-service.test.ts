@@ -13,6 +13,7 @@ import {
   createTestSettingsService,
   createTestStorageService,
 } from '../testing/index.ts'
+import { WritableStore } from '../store.ts'
 import type { EmbeddingBackfillResult } from './embedding-index-service.ts'
 import type { EmbedStatus } from './embedding-runtime-service.ts'
 import type { RetrievalHit } from './retrieval-service.ts'
@@ -49,7 +50,7 @@ async function setup(options?: {
   const indexLifecycle = createTestIndexLifecycleService({
     logger,
     progress,
-    graphSession: { get: () => ({ session }), subscribe: () => () => {} },
+    graphSession: new WritableStore({ session }),
     indexStore: createTestIndexStoreService({
       fail: (call) => {
         return options?.failClear === true && call.method === 'clear'

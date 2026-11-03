@@ -1,83 +1,84 @@
-import type { ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import type { MobileAudioMemoContextValue } from '@/mobile/audio-memo-provider.tsx'
-import type { Mutable } from '@reflect/utils'
+import { WritableStore, type MobileAudioMemoSessionState } from '@reflect/core'
+import { MobileAudioMemoContext } from '@/mobile/audio-memo-provider.tsx'
 
-const memo = vi.hoisted((): Mutable<MobileAudioMemoContextValue> => ({
+const INITIAL: MobileAudioMemoSessionState = {
   phase: 'recording',
-  elapsedMs: 65_000,
-  level: 0.4,
   pendingCount: 0,
   available: true,
   hasTranscriptionConfig: true,
   error: null,
   canRetry: false,
   drawerOpen: true,
+}
+
+const state = new WritableStore(INITIAL)
+const elapsedMs = new WritableStore(0)
+const level = new WritableStore(0)
+const actions = {
   toggle: vi.fn(),
   stopAndSave: vi.fn(),
   cancelRecording: vi.fn(),
   onDrawerOpenChange: vi.fn(),
   retry: vi.fn(),
   discard: vi.fn(),
-}))
+}
+const session = { get: state.get, subscribe: state.subscribe, elapsedMs, level }
 
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) => {
-    return open ? <div data-testid="drawer">{children}</div> : null
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
-
-vi.mock('@/mobile/audio-memo-provider.tsx', () => ({
-  useMobileAudioMemo: () => ({ ...memo }),
-}))
+function setMemo(patch: Partial<MobileAudioMemoSessionState>): void {
+  state.set({ ...state.get(), ...patch })
+}
 
 const { RecordingDrawer } = await import('./recording-drawer.tsx')
+
+function renderDrawer(): ReturnType<typeof renderInApp> {
+  return renderInApp(
+    <MobileAudioMemoContext value={{ session, ...actions }}>
+      <RecordingDrawer />
+    </MobileAudioMemoContext>,
+  )
+}
 
 beforeEach(() => {
   vi.useRealTimers()
   vi.clearAllMocks()
-  memo.phase = 'recording'
-  memo.elapsedMs = 65_000
-  memo.hasTranscriptionConfig = true
-  memo.error = null
-  memo.drawerOpen = true
+  state.set(INITIAL)
+  elapsedMs.set(65_000)
+  level.set(0.4)
 })
 
 afterEach(() => vi.useRealTimers())
 
 describe('RecordingDrawer', () => {
   it('counts past an hour: a session has no duration limit', async () => {
-    memo.elapsedMs = 65 * 60_000 + 3000
-    const view = await renderInApp(<RecordingDrawer />)
+    elapsedMs.set(65 * 60_000 + 3000)
+    const view = await renderDrawer()
 
     await expect.element(view.getByText('1:05:03')).toBeVisible()
   })
 
   it('requires a second tap before discarding a live recording', async () => {
-    const view = await renderInApp(<RecordingDrawer />)
+    const view = await renderDrawer()
 
     await userEvent.click(view.getByRole('button', { name: 'Discard recording' }))
 
-    expect(memo.cancelRecording).not.toHaveBeenCalled()
+    expect(actions.cancelRecording).not.toHaveBeenCalled()
     await expect
       .element(view.getByRole('button', { name: 'Confirm discard recording' }))
       .toMatchTextContent('Tap again to discard')
 
     await userEvent.click(view.getByRole('button', { name: 'Confirm discard recording' }))
 
-    expect(memo.cancelRecording).toHaveBeenCalledOnce()
+    expect(actions.cancelRecording).toHaveBeenCalledOnce()
   })
 
   it('lets the discard confirmation lapse back to a single safe tap', async () => {
     vi.useFakeTimers()
-    const view = await renderInApp(<RecordingDrawer />)
+    const view = await renderDrawer()
 
     await act(() => {
       fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
@@ -90,23 +91,23 @@ describe('RecordingDrawer', () => {
       fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
     })
 
-    expect(memo.cancelRecording).not.toHaveBeenCalled()
+    expect(actions.cancelRecording).not.toHaveBeenCalled()
     await expect
       .element(view.getByRole('button', { name: 'Confirm discard recording' }))
       .toBeVisible()
   })
 
   it('stops and saves from the primary control without confirmation', async () => {
-    const view = await renderInApp(<RecordingDrawer />)
+    const view = await renderDrawer()
 
     await userEvent.click(view.getByRole('button', { name: 'Stop recording' }))
 
-    expect(memo.stopAndSave).toHaveBeenCalledOnce()
+    expect(actions.stopAndSave).toHaveBeenCalledOnce()
   })
 
   it('without a transcription model, guides key setup instead of recording', async () => {
-    memo.hasTranscriptionConfig = false
-    const view = await renderInApp(<RecordingDrawer />)
+    setMemo({ hasTranscriptionConfig: false })
+    const view = await renderDrawer()
 
     await expect
       .element(view.getByText(/send the recording to OpenAI or Google Gemini/))
@@ -117,6 +118,6 @@ describe('RecordingDrawer', () => {
     expect(view.appServices.navigation.navigations()).toEqual([
       { route: { kind: 'settings' }, options: undefined },
     ])
-    expect(memo.onDrawerOpenChange).toHaveBeenCalledWith(false)
+    expect(actions.onDrawerOpenChange).toHaveBeenCalledWith(false)
   })
 })

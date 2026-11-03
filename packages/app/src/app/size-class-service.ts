@@ -5,9 +5,10 @@ import {
   type IpcBridgeService,
   type LoggerService,
   type PlatformFacts,
-  type Unlisten,
+  type Store,
+  WritableStore,
 } from '@reflect/core'
-import type { PlatformMedia } from './platform-service.ts'
+import type { PlatformMedia } from './system-preferences-service.ts'
 
 /**
  * The window's horizontal size class, the signal iPadOS apps lay out by. On
@@ -16,19 +17,10 @@ import type { PlatformMedia } from './platform-service.ts'
  * Manager window behave like an iPhone. Elsewhere the answer is fixed: the
  * desktop app is always `regular`, a phone always `compact`.
  *
- * Members are function properties so React can hand them to
- * `useSyncExternalStore` unbound.
+ * The value is `null` while an iPad has not answered yet: a surface that
+ * depends on it waits rather than guessing and remounting.
  */
-export interface SizeClassService {
-  /**
-   * The current size class, or `null` while an iPad has not answered yet:
-   * a surface that depends on it waits rather than guessing and remounting.
-   */
-  current: () => HorizontalSizeClass | null
-  /**
-   * Listen for a changed size class.
-   */
-  subscribe: (listener: () => void) => Unlisten
+export interface SizeClassService extends Store<HorizontalSizeClass | null> {
   /**
    * Start following the window. Idempotent; the iPad root calls it before its first render.
    */
@@ -55,27 +47,19 @@ const REGULAR_WIDTH_QUERY = '(min-width: 640px)'
 
 class SizeClassServiceImpl implements SizeClassService {
   readonly #deps: SizeClassServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #current: HorizontalSizeClass | null
+  readonly #state: WritableStore<HorizontalSizeClass | null>
+  readonly get: Store<HorizontalSizeClass | null>['get']
+  readonly subscribe: Store<HorizontalSizeClass | null>['subscribe']
   #started = false
 
   constructor(deps: SizeClassServiceDeps) {
     this.#deps = deps
     const { platform } = deps
-    this.#current = platform.isTablet
-      ? null
-      : platform.appPlatform === 'desktop'
-        ? 'regular'
-        : 'compact'
-  }
-
-  readonly current = (): HorizontalSizeClass | null => this.#current
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
+    this.#state = new WritableStore<HorizontalSizeClass | null>(
+      platform.isTablet ? null : platform.appPlatform === 'desktop' ? 'regular' : 'compact',
+    )
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
   }
 
   start(): void {
@@ -93,13 +77,15 @@ class SizeClassServiceImpl implements SizeClassService {
   async #followScene(): Promise<void> {
     const { ipc, logger } = this.#deps
     // Subscribe before the first read, so a change between the two still lands.
-    const subscription = sizeClassChangedEvent(ipc, (payload) => this.#publish(payload.horizontal))
+    const subscription = sizeClassChangedEvent(ipc, (payload) =>
+      this.#state.set(payload.horizontal),
+    )
     try {
       await subscription.ready
       const { horizontal } = await sizeClassCommand(ipc, {})
       // An event that landed during the read is newer than its answer.
-      if (this.#current === null) {
-        this.#publish(horizontal)
+      if (this.#state.get() === null) {
+        this.#state.set(horizontal)
       }
     } catch (error) {
       subscription.unlisten()
@@ -115,23 +101,13 @@ class SizeClassServiceImpl implements SizeClassService {
         ? (query: string) => globalThis.matchMedia(query)
         : undefined)
     if (matchMedia === undefined) {
-      this.#publish('regular')
+      this.#state.set('regular')
       return
     }
     const query = matchMedia(REGULAR_WIDTH_QUERY)
-    const publishQuery = (): void => this.#publish(query.matches ? 'regular' : 'compact')
+    const publishQuery = (): void => this.#state.set(query.matches ? 'regular' : 'compact')
     query.addEventListener('change', publishQuery)
     publishQuery()
-  }
-
-  #publish(sizeClass: HorizontalSizeClass): void {
-    if (sizeClass === this.#current) {
-      return
-    }
-    this.#current = sizeClass
-    for (const listener of this.#listeners) {
-      listener()
-    }
   }
 }
 

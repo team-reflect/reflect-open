@@ -26,7 +26,7 @@ export type ChatActions = Omit<ChatSession, 'get' | 'subscribe' | 'attach'>
 /**
  * The model fields of the chat session state.
  */
-export type ChatModels = Pick<ChatSessionState, 'providers' | 'modelOptions' | 'activeModel'>
+type ChatModels = Pick<ChatSessionState, 'providers' | 'modelOptions' | 'activeModel'>
 
 function selectTurns(state: ChatSessionState): ChatTurn[] {
   return state.turns
@@ -87,6 +87,7 @@ export function useChatActions(): ChatActions {
       send: (text) => session.send(text),
       stop: () => session.stop(),
       newChat: () => session.newChat(),
+      ask: (question) => session.ask(question),
       openConversation: (id) => session.openConversation(id),
       deleteConversation: (id) => session.deleteConversation(id),
     }),
@@ -135,6 +136,13 @@ export function useChatStatus(): ChatStatus {
  */
 export function useChatProviders(): ChatModels['providers'] {
   return useSelector(useChat(), selectProviders)
+}
+
+/**
+ * The model the next message is sent with.
+ */
+export function useChatActiveModel(): ChatModels['activeModel'] {
+  return useSelector(useChat(), selectActiveModel)
 }
 
 /**

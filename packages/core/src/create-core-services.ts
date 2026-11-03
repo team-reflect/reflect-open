@@ -145,6 +145,7 @@ import {
 } from './graph/graph-session-service.ts'
 import type { Store } from './store.ts'
 import { createDailyNoteService, type DailyNoteService } from './daily/daily-note-service.ts'
+import { createTodayService, type TodayService } from './daily/today-service.ts'
 import { createAttachmentService, type AttachmentService } from './documents/attachment-service.ts'
 import { createNoteMoveService, type NoteMoveService } from './documents/note-move-service.ts'
 import {
@@ -256,7 +257,7 @@ export interface CoreServices {
    */
   readonly logger: LoggerService
   /**
-   * Wall time, monotonic time, the local date, and timers.
+   * Wall time, monotonic time, and timers.
    */
   readonly clock: ClockService
   /**
@@ -411,6 +412,10 @@ export interface CoreServices {
    * The optimistic read overlay for note index rows.
    */
   readonly noteRows: NoteRowService
+  /**
+   * The local calendar date, notified whenever it changes.
+   */
+  readonly today: TodayService
   /**
    * The date questions about notes: today, which days have a daily note, and the wake onto a new day.
    */
@@ -663,6 +668,7 @@ export const coreServiceFactories = {
   transcriptEnrichment: createTranscriptEnrichmentService,
   audioMemo: createAudioMemoService,
   chatHistory: createChatHistoryService,
+  today: createTodayService,
   dailyNotes: createDailyNoteService,
   noteTools: createNoteToolsService,
   chatEngine: createChatEngineService,
@@ -1095,6 +1101,7 @@ export function composeCoreServices(
       ? buildMobileServices()
       : null
   const chatHistory = create.chatHistory({ ipc, database, logger })
+  const today = create.today({ clock })
   const dailyNotes = create.dailyNotes({ database, clock, activity })
   const noteTools = create.noteTools({
     retrieval,
@@ -1275,6 +1282,7 @@ export function composeCoreServices(
       graphSession,
     }),
     noteRows,
+    today,
     dailyNotes,
     templates: create.templates({
       noteFile,
@@ -1322,6 +1330,7 @@ export function composeCoreServices(
       embeddingRuntime,
       settings,
       clock,
+      today,
       id,
       imageCodec,
       logger,

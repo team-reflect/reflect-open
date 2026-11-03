@@ -10,9 +10,8 @@ import { NewGraphDrawer } from '@/mobile/new-graph-drawer.tsx'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
 import { useRouter } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 interface MobileGraphsProps {
   /**
@@ -36,7 +35,7 @@ interface MobileGraphsProps {
 export function MobileGraphs({ safeAreaInsets = true }: MobileGraphsProps): ReactElement {
   const { back, canBack, navigate } = useRouter()
   const graph = useGraphInfo()
-  const { completeOnboarding } = useMobileGraphBoot()
+  const { mobileOnboarding } = useAppServices()
   const [pendingRoot, setPendingRoot] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -58,7 +57,7 @@ export function MobileGraphs({ safeAreaInsets = true }: MobileGraphsProps): Reac
   function switchTo(kind: MobileStorageKind, root: string): Promise<void> {
     setPendingRoot(root)
     setSwitchError(null)
-    return completeOnboarding(kind, root).then(
+    return mobileOnboarding.completeOnboarding(kind, root).then(
       () => {
         // A confirmed switch remounts the router (keyed by graph root), so
         // this screen is gone; clearing state only matters on failure paths.

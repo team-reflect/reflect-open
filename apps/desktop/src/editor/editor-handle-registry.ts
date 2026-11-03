@@ -9,7 +9,7 @@ import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
  *
  * Module-level rather than a provider: registrations come from render-phase
  * ref callbacks and reads from command dispatch, neither of which needs
- * React state or re-renders (the same shape as `operations.ts`).
+ * React state or re-renders.
  */
 const handles = new Map<string, NoteEditorHandle>()
 
