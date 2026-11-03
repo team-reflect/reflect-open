@@ -150,6 +150,12 @@ export const mutationKeys = {
       return [...this.all, root, 'write'] as const
     },
   },
+  suggestedBacklinks: {
+    all: ['suggested-backlinks'] as const,
+    link(root: GraphRoot) {
+      return [...this.all, root, 'link'] as const
+    },
+  },
   classic: {
     all: ['classic'] as const,
     signIn: ['classic', 'sign-in'] as const,

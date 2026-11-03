@@ -4,16 +4,17 @@ import { AppError, errorMessage } from '../errors.ts'
 import { requireGraphSession, type GraphSessionSource } from '../graph/graph-session.ts'
 import { hasSearchableChar } from '../lib/searchable-char.ts'
 import { wikiNoteReference } from '../graph/note-reference.ts'
-import { asciiLowerCase } from '../graph/paths.ts'
+import { asciiLowerCase, foldGraphPath } from '../graph/paths.ts'
 import { foldKey } from '../markdown/keys.ts'
 import { displayNoteTitle } from '../markdown/note-title.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
-import { plainTextSpans } from '../markdown/extract.ts'
+import { parseNote, plainTextSpans } from '../markdown/extract.ts'
 import { plainTextOfRange } from '../markdown/plain-text.ts'
 import { lineEndAt, lineStartAt, prepareBlockContext } from './block-context.ts'
 import type { DatabaseService } from './database-service.ts'
-import { findNoteMentions, linksToAnyName, type NoteMention } from './note-mentions.ts'
-import { keysAddressingPath, sourceRecency } from './queries-shared.ts'
+import { projectNoteLinks } from './indexed-note.ts'
+import { findNoteMentions, type NoteMention } from './note-mentions.ts'
+import { keysAddressingPath, keysResolvingTo, sourceRecency } from './queries-shared.ts'
 import { containsUnsegmentedScript, quoteFtsLiteral } from './search-query.ts'
 import { serializeWikiSuggestionAddress } from './suggest.ts'
 
@@ -37,6 +38,12 @@ const MAX_SOURCES = 30
  * to mention the name: a common name must not read the whole graph.
  */
 const MAX_READS = 100
+
+/**
+ * How many mentioning lines one source contributes: a log that names the
+ * note on every line must not fill the section on its own.
+ */
+const MAX_LINES_PER_SOURCE = 3
 
 /**
  * A note the full-text index offers as possibly mentioning the target.
@@ -83,14 +90,16 @@ export interface SuggestedBacklinkService {
    * Daily notes and templates have no mentions, and neither does a name that
    * another note also claims, since linking it could resolve to that note
    * instead. Sources are ordered newest first; the lines of one source are in
-   * document order, one entry per line.
+   * document order, one entry per line, at most {@link MAX_LINES_PER_SOURCE}.
    */
   getSuggestedBacklinks(path: string): Promise<SuggestedBacklink[]>
   /**
    * Rewrite `mention` in `sourcePath` as a wiki link to `path`, keeping its
-   * spelling. Goes through the open editor session when there is one. When
-   * the note has changed so that the mention is no longer at that position,
-   * nothing is written; the failure is reported, then rethrown.
+   * spelling. Goes through the open editor session when there is one.
+   * Nothing is written when the note has changed so that the mention is no
+   * longer at that position, or when `path` no longer wins that spelling (a
+   * rename, or a name another note now claims); the failure is reported, then
+   * rethrown.
    */
   linkMention(path: string, sourcePath: string, mention: NoteMention): Promise<void>
 }
@@ -106,6 +115,36 @@ function readsAsPlainName(name: string, key: string): boolean {
   }
   const reference = wikiNoteReference(name)
   return reference?.kind === 'key' && reference.key === key
+}
+
+/**
+ * How the target is addressed: every key it wins in `note_keys` (title,
+ * aliases, filename) and its folded path, the two things a backlink row joins
+ * on.
+ */
+interface TargetAddress {
+  readonly keys: ReadonlySet<string>
+  readonly pathKey: string
+}
+
+/**
+ * Whether `content` (the current text of `sourcePath`) links to the target,
+ * by the indexer's own reading of each link: a wiki link naming one of the
+ * target's keys, or any link addressing its path. Asked of the live text, so
+ * a source that has just been linked drops out before the index catches up.
+ */
+function linksTo(sourcePath: string, content: string, target: TargetAddress): boolean {
+  const { keys, pathKey } = target
+  return projectNoteLinks(parseNote({ path: sourcePath, source: content })).some((link) => {
+    // A name counts only for a link with no path reading: the index tries a
+    // slashed target as a file first, and repeating that precedence here would
+    // copy the resolver. A slashed name link is judged by its path alone, so at
+    // worst its source stays suggested until the index catches up.
+    return (
+      (link.kind === 'wiki' && link.targetPathKey === null && keys.has(link.targetKey)) ||
+      link.targetPathKey === pathKey
+    )
+  })
 }
 
 /**
@@ -128,7 +167,10 @@ class SuggestedBacklinkServiceImpl implements SuggestedBacklinkService {
     if (names.length === 0) {
       return []
     }
-    const candidates = await this.#candidateSources(path, names)
+    const [candidates, target] = await Promise.all([
+      this.#candidateSources(path, names),
+      this.#targetAddress(path),
+    ])
     // Read in batches of the sources still wanted, so no note is read past the
     // last one returned, and keep going past candidates with no real mention.
     const mentions: SuggestedBacklink[] = []
@@ -147,7 +189,7 @@ class SuggestedBacklinkServiceImpl implements SuggestedBacklinkService {
         }),
       )
       for (const { candidate, content } of read) {
-        const lines = this.#mentionLines(candidate, content, names)
+        const lines = this.#mentionLines(candidate, content, names, target)
         if (lines.length > 0) {
           mentions.push(...lines)
           sources += 1
@@ -230,12 +272,23 @@ class SuggestedBacklinkServiceImpl implements SuggestedBacklinkService {
   }
 
   /**
+   * Every key the target wins in `note_keys`, and its folded path.
+   */
+  async #targetAddress(path: string): Promise<TargetAddress> {
+    return {
+      keys: await keysResolvingTo(this.#deps.database.db, path),
+      pathKey: foldGraphPath(path),
+    }
+  }
+
+  /**
    * Notes whose body may mention a name and that don't already link to
    * `path`, newest first. A superset of the real mentions: the full-text match
    * ignores case, accents and Markdown structure. A name in an unsegmented
    * script can't use it (the tokenizer indexes an uninterrupted run of Han or
-   * kana as one token), so those match by substring instead, with both sides
-   * lowercased the way SQLite's `lower` does it: ASCII letters only.
+   * kana as one token), so those match by substring instead, in either
+   * Unicode form (the tokenizer folds forms itself), with both sides lowercased
+   * the way SQLite's `lower` does it: ASCII letters only.
    */
   async #candidateSources(path: string, names: readonly string[]): Promise<CandidateSource[]> {
     const phrases = names.filter((name) => !containsUnsegmentedScript(name))
@@ -248,9 +301,12 @@ class SuggestedBacklinkServiceImpl implements SuggestedBacklinkService {
       )
     }
     if (substrings.length > 0) {
+      const spellings = new Set(
+        substrings.flatMap((name) => [name.normalize('NFC'), name.normalize('NFD')]),
+      )
       const contains = sql.join(
-        substrings.map((name) => {
-          return sql`instr(lower(body), ${asciiLowerCase(name)}) > 0`
+        [...spellings].map((spelling) => {
+          return sql`instr(lower(body), ${asciiLowerCase(spelling)}) > 0`
         }),
         sql` or `,
       )
@@ -282,28 +338,30 @@ class SuggestedBacklinkServiceImpl implements SuggestedBacklinkService {
   }
 
   /**
-   * One entry per line of `content` that mentions a name, in document order,
-   * each line as plain text by the note's own parse (so a construct that
-   * opened on an earlier line still reads cleanly). Nothing when the content
-   * already links to the target: the index may not have caught up yet.
+   * One entry per line of `content` that mentions a name, in document order
+   * and at most {@link MAX_LINES_PER_SOURCE}, each line as plain text by the
+   * note's own parse (so a construct that opened on an earlier line still
+   * reads cleanly). Nothing when the content already links to the target: the
+   * index may not have caught up yet.
    */
   #mentionLines(
     candidate: CandidateSource,
     content: string,
     names: readonly string[],
+    target: TargetAddress,
   ): SuggestedBacklink[] {
     const prepared = prepareBlockContext(content)
-    if (linksToAnyName(prepared, names)) {
-      return []
-    }
     const mentions = findNoteMentions(prepared, names)
-    if (mentions.length === 0) {
+    if (mentions.length === 0 || linksTo(candidate.sourcePath, content, target)) {
       return []
     }
     const { body, bodyOffset } = prepared
     const { cuts, literalRanges } = plainTextSpans(prepared.tree)
     const lines = new Map<number, SuggestedBacklink>()
     for (const mention of mentions) {
+      if (lines.size === MAX_LINES_PER_SOURCE) {
+        break
+      }
       const position = mention.from - bodyOffset
       const lineStart = lineStartAt(body, position)
       if (!lines.has(lineStart)) {

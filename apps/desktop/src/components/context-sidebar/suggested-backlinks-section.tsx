@@ -21,8 +21,8 @@ interface SuggestedBacklinksSectionProps {
  * to it — a return arrow and the source's title (which opens it), the line
  * beneath as plain text, and a check that rewrites the mention as a
  * `[[wiki link]]`, after which the source shows among the incoming
- * backlinks. Renders nothing when there are no suggestions; a failed query
- * says so, since it means the index is broken. Mounted in the note context
+ * backlinks. Renders nothing when there are no suggestions; a failed lookup
+ * says so. Mounted in the note context
  * sidebar only: daily notes are never suggested as link targets.
  */
 export function SuggestedBacklinksSection({
@@ -79,7 +79,7 @@ export function SuggestedBacklinksSection({
                   <Check aria-hidden className="size-3.5" />
                 </button>
               </div>
-              <p className="mt-0.5 text-xs leading-5 text-text">{entry.line}</p>
+              <p className="mt-0.5 text-xs leading-5 break-words text-text">{entry.line}</p>
             </li>
           )
         })}

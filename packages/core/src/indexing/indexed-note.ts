@@ -318,13 +318,12 @@ export function projectNoteClaims(
 }
 
 /**
- * Flatten a parsed note into the index payload. `meta.source` is the raw
- * markdown the note was parsed from.
+ * The note's links as the index stores them: each `[[wiki]]` and Markdown
+ * link with the name key and path key the backlinks view joins on. Shared by
+ * the indexer and the suggested backlinks, so both read a note's links the
+ * same way; each resolves them against its own data.
  */
-export function buildIndexedNote(
-  parsed: ParsedNote,
-  meta: { fileHash: string; mtime: number; source: string; assetText?: string },
-): IndexedNote {
+export function projectNoteLinks(parsed: ParsedNote): IndexedLink[] {
   const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => {
     const reference = wikiNoteReference(link.target)
     const hasNameReading = reference?.kind === 'key' || reference?.kind === 'pathOrKey'
@@ -357,6 +356,18 @@ export function buildIndexedNote(
       posTo: link.to,
     }
   })
+  return [...wikiLinks, ...mdLinks]
+}
+
+/**
+ * Flatten a parsed note into the index payload. `meta.source` is the raw
+ * markdown the note was parsed from.
+ */
+export function buildIndexedNote(
+  parsed: ParsedNote,
+  meta: { fileHash: string; mtime: number; source: string; assetText?: string },
+): IndexedNote {
+  const links = projectNoteLinks(parsed)
   const aliases = projectNoteAliases(parsed)
   const body = splitFrontmatter(meta.source).body
 
@@ -383,7 +394,7 @@ export function buildIndexedNote(
     assetText: meta.assetText ?? '',
     preview: previewSnippet(parsed.displayText, parsed.title),
     hasContent: parsed.displayText !== '' || hasSearchableChar(body),
-    links: [...wikiLinks, ...mdLinks],
+    links,
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
     aliases,
     claims: projectNoteClaims(parsed, aliases),

@@ -257,12 +257,7 @@ function basename(path: string): string {
   return file.replace(/\.md$/i, '')
 }
 
-/**
- * Read the wiki link spanning `[from, to)` of `body` (its `[[` to its `]]`)
- * as the indexer does: target and display unescaped, offsets shifted by
- * `offset`.
- */
-export function readWikiLink(body: string, from: number, to: number, offset: number): WikiLink {
+function readWikiLink(body: string, from: number, to: number, offset: number): WikiLink {
   const inner = body.slice(from + 2, to - 2)
   const pipe = inner.indexOf('|')
   const target = unescapeMarkdownText((pipe === -1 ? inner : inner.slice(0, pipe)).trim())

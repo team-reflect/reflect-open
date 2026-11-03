@@ -22,7 +22,7 @@ export interface WikiLinkSuggestionResult {
 }
 
 /**
- * The recency key of a linking note, newest first in both the backlinks and
+ * The recency key of a source note, newest first in both the backlinks and
  * the suggested-backlinks queries: a daily note by its day, any other note by
  * its last update. One definition, so the two can't order sources apart.
  */
@@ -95,6 +95,16 @@ async function fetchKeyWinners(
     }
   }
   return winners
+}
+
+/**
+ * Every folded key that resolves to the note at `path` (the keys it wins in
+ * `note_keys`: daily date, title, aliases, filename) — what a backlink row
+ * joins on to reach it.
+ */
+export async function keysResolvingTo(db: Kysely<Database>, path: string): Promise<Set<string>> {
+  const rows = await db.selectFrom('noteKeys').where('notePath', '=', path).select('key').execute()
+  return new Set(rows.map((row) => row.key).filter((key) => key !== null))
 }
 
 /**

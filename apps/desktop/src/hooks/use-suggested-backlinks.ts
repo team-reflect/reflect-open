@@ -1,15 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { NoteMention, SuggestedBacklink } from '@reflect/core'
-import { queryKeys } from '@/lib/query-client.ts'
+import { mutationKeys, queryKeys } from '@/lib/query-client.ts'
+import { createSuggestedBacklinksQueryOptions } from '@/lib/query-options.ts'
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
- * One link action, with the note and cached list it belongs to.
+ * One link action, with the note it links to.
  */
 interface LinkVariables {
   readonly target: string
-  readonly listKey: ReturnType<typeof queryKeys.suggestedBacklinks.note>
   readonly sourcePath: string
   readonly mention: NoteMention
 }
@@ -23,7 +23,7 @@ export interface SuggestedBacklinks {
    */
   mentions: SuggestedBacklink[]
   /**
-   * True when the query failed and there is nothing to show.
+   * True when the last fetch failed, even if an older list is cached.
    */
   isError: boolean
   /**
@@ -31,7 +31,8 @@ export interface SuggestedBacklinks {
    */
   link: (sourcePath: string, mention: NoteMention) => void
   /**
-   * True while a link write and its refetch are in flight; the section disables links.
+   * True while any link write and its refetch are in flight, from any section
+   * instance; the section disables links.
    */
   isLinking: boolean
 }
@@ -42,9 +43,9 @@ export interface SuggestedBacklinks {
  * on each save anywhere in the graph. The graph root is in the key, so a graph
  * switch never serves the previous graph's list, and unused entries expire on
  * the default schedule. A mention written elsewhere shows the next time the
- * note is opened. A link
- * that writes drops its source's entries at once; one that is refused
- * re-reads the list, so no entry keeps acting on offsets that have moved.
+ * note is opened. Every link attempt re-reads the lists on screen and drops
+ * the rest, so a linked source drops out and no entry keeps acting on offsets
+ * that have moved.
  *
  * @param path graph-relative path of the note whose mentions to load.
  */
@@ -53,43 +54,43 @@ export function useSuggestedBacklinks(path: string): SuggestedBacklinks {
   const { suggestedBacklinks } = useCoreServices()
   const queryClient = useQueryClient()
 
-  const queryKey = queryKeys.suggestedBacklinks.note(graph?.root, path)
   const { data, isError } = useQuery({
-    queryKey,
-    queryFn: () => suggestedBacklinks.getSuggestedBacklinks(path),
+    ...createSuggestedBacklinksQueryOptions(suggestedBacklinks, graph?.root, path),
     enabled: graph !== null,
   })
 
-  // The link carries the list it came from: the sidebar is reused across
+  // The link carries the note it links to: the sidebar is reused across
   // notes, so by the time a slow write settles the hook may be showing
-  // another note, and the outcome belongs to the one that was linked.
-  const { mutate, isPending, variables } = useMutation({
+  // another one. It is keyed so that a section mounted mid-write (after a
+  // daily note or a collapsed sidebar) still sees it in flight.
+  const mutationKey = mutationKeys.suggestedBacklinks.link(graph?.root)
+  const { mutate } = useMutation({
+    mutationKey,
     mutationFn: ({ target, sourcePath, mention }: LinkVariables) => {
       return suggestedBacklinks.linkMention(target, sourcePath, mention)
     },
-    // The linked source now links to this note, so none of its lines are
-    // suggestions any more. Drop them here rather than refetch: a refetch can
-    // run before the index has seen the write and bring them straight back.
-    // A refetch still in flight read the source before the write; cancel it so
-    // it can't put the entries back.
-    onSuccess: async (_result, { listKey, sourcePath }) => {
-      await queryClient.cancelQueries({ queryKey: listKey })
-      queryClient.setQueryData<SuggestedBacklink[]>(listKey, (current) => {
-        return current?.filter((entry) => entry.sourcePath !== sourcePath)
-      })
-    },
-    // A refused link means the source moved under the list: re-read it.
-    onError: async (_error, { listKey }) => {
-      await queryClient.invalidateQueries({ queryKey: listKey })
+    // Re-read every list either way: the write changed the source, so any
+    // list may hold its old offsets. A written link drops its source from the
+    // linked note's list, which the service skips once its current text links
+    // here, even before the index catches up; a refused one comes back with
+    // fresh offsets. A list nobody shows any more (the user moved to another
+    // note, or another graph) is forgotten rather than re-read: the service
+    // reads the open graph, and the next mount loads it fresh. Both steps
+    // cancel a fetch that read the source before the write.
+    onSettled: async () => {
+      const queryKey = queryKeys.suggestedBacklinks.all
+      queryClient.removeQueries({ queryKey, type: 'inactive' })
+      await queryClient.invalidateQueries({ queryKey })
     },
   })
+  const isLinking = useIsMutating({ mutationKey }) > 0
 
   return {
     mentions: data ?? [],
-    isError: isError && data === undefined,
+    isError,
     link: (sourcePath, mention) => {
-      mutate({ target: path, listKey: queryKey, sourcePath, mention })
+      mutate({ target: path, sourcePath, mention })
     },
-    isLinking: isPending && variables.target === path,
+    isLinking,
   }
 }
