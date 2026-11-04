@@ -1,4 +1,4 @@
-name: Build
+name: Release build
 
 # Checks that the release build of each platform compiles and bundles. It uses
 # no secrets and uploads nothing.
@@ -14,7 +14,7 @@ on:
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
 concurrency:
-  group: build-${{ github.workflow }}-${{ github.ref }}
+  group: release-build-${{ github.ref }}
   cancel-in-progress: true
 
 # Least-privilege default: the build only needs to read the repo.
@@ -45,7 +45,7 @@ jobs:
             os: ubuntu-24.04-arm
             command: pnpm build:linux
 
-    name: build-${{ matrix.name }}
+    name: release-build-${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
 
@@ -68,6 +68,6 @@ jobs:
         if: matrix.name == 'macos'
         run: rustup target add x86_64-apple-darwin
 
-      - name: Build
+      - name: Release build
         shell: bash
         run: ${{ matrix.command }}
