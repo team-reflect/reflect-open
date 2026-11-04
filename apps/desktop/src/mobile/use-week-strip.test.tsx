@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { WeekStartDay } from '@reflect/core'
 import { getUserWeekStart } from '@reflect/core'
 import { createWeekWindow, weekAtIndex, weekIndexOf } from '@reflect/app'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
 import { shouldRecenterWeeks, useWeekStrip, type WeekStrip } from './use-week-strip.ts'
@@ -26,7 +27,7 @@ interface StripProps {
   width: number
 }
 
-async function mountStrip() {
+async function mountStrip(options?: { reducedMotion?: boolean }) {
   const strip: { current: WeekStrip | null } = { current: null }
   const update: { current: (props: Partial<StripProps>) => void } = { current: () => {} }
   function Harness(): ReactElement {
@@ -63,7 +64,14 @@ async function mountStrip() {
       </div>
     )
   }
-  const screen = await renderInApp(<Harness />, { platform: MOBILE_PLATFORM })
+  const screen = await renderInApp(<Harness />, {
+    platform: MOBILE_PLATFORM,
+    appServices: {
+      systemPreferences: createTestSystemPreferencesService({
+        reducedMotion: options?.reducedMotion ?? false,
+      }),
+    },
+  })
   const scroller = screen.container.querySelector<HTMLElement>('div[style*="overflow"]')!
   await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ANCHOR * WIDTH))
   return {
@@ -138,6 +146,14 @@ describe('useWeekStrip', () => {
     expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 1))
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe((ANCHOR + 1) * WIDTH))
     expect(strip().weekWindow).toEqual(initialWindow)
+  })
+
+  it('jumps to a followed week at once when the user prefers reduced motion', async () => {
+    const { scroller, update } = await mountStrip({ reducedMotion: true })
+
+    await update({ date: '2026-06-19' })
+
+    expect(scroller.scrollLeft).toBe((ANCHOR + 1) * WIDTH)
   })
 
   it('showWeekOf scrolls to an in-window target', async () => {
