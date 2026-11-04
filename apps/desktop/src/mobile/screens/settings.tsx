@@ -80,6 +80,21 @@ const PAYWALL_PHASE_OPTIONS: readonly SegmentedOption<PaywallPhase | 'off'>[] = 
 ]
 
 /**
+ * Shows What's New again in this session.
+ */
+function WhatsNewRow(): ReactElement {
+  const { whatsNew } = useAppServices()
+  const override = useStore(whatsNew.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate What’s New"
+      checked={override}
+      onCheckedChange={whatsNew.setOverride}
+    />
+  )
+}
+
+/**
  * Simulates a paywall phase for this session, so a TestFlight build can walk
  * through every phase.
  */
@@ -557,6 +572,7 @@ export function MobileSettings(): ReactElement {
               {isIos && (environment.value === 'Sandbox' || environment.value === 'Xcode') ? (
                 <PaywallPhaseRow />
               ) : null}
+              <WhatsNewRow />
               <SettingsSwitchRow
                 label="Performance HUD"
                 checked={perfHudEnabled}
