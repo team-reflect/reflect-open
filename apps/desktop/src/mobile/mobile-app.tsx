@@ -57,8 +57,7 @@ function KeyboardEffects(): null {
 // over the current surface later; a purchase closes it.
 function MobileOverlay(): ReactElement | null {
   const paywallGate = usePaywallGate()
-  const open = paywallGate === 'show'
-  return open ? <PaywallDrawer open={open} /> : null
+  return <PaywallDrawer open={paywallGate === 'show'} />
 }
 
 /**
