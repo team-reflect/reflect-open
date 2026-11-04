@@ -1,5 +1,5 @@
 import { useCallback, useState, type ReactElement } from 'react'
-import { page, userEvent } from 'vitest/browser'
+import { page } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { describe, expect, it, vi } from 'vitest'
 import { act } from '@/test-utils/act.ts'
@@ -16,12 +16,10 @@ import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from './scroll-drawer.
 function Harness({
   onOpenChange,
   keepOpen = false,
-  dismissible = true,
   rows = 3,
 }: {
   onOpenChange?: ((open: boolean) => void) | undefined
   keepOpen?: boolean | undefined
-  dismissible?: boolean | undefined
   rows?: number | undefined
 }): ReactElement {
   const [open, setOpen] = useState(true)
@@ -35,7 +33,7 @@ function Harness({
     [onOpenChange, keepOpen],
   )
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange} dismissible={dismissible}>
+    <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent>
         <DrawerTitle>Test drawer</DrawerTitle>
         <DrawerBody>
@@ -159,46 +157,5 @@ describe('ScrollDrawer', () => {
     // A detached scroller would also read 0 for both.
     expect(scroller.isConnected).toBe(true)
     await expect.element(page.getByRole('dialog')).toBeInTheDocument()
-  })
-
-  describe('when not dismissible', () => {
-    it('opens at the end of a one-pixel scroll range', async () => {
-      await renderInApp(<Harness dismissible={false} />)
-      const scroller = await openScroller()
-
-      expect(scroller.scrollTop).toBe(openTop(scroller))
-      expect(openTop(scroller)).toBeCloseTo(1, 0)
-    })
-
-    it('stays open after a pull', async () => {
-      const onOpenChange = vi.fn()
-      await renderInApp(<Harness dismissible={false} onOpenChange={onOpenChange} />)
-      const scroller = await openScroller()
-      await scrollElement({ element: scroller, top: 0, touch: true })
-
-      expect(onOpenChange).not.toHaveBeenCalled()
-      await expect.element(page.getByRole('dialog')).toBeVisible()
-    })
-
-    it('ignores a tap above the sheet and Escape', async () => {
-      const onOpenChange = vi.fn()
-      await renderInApp(<Harness dismissible={false} onOpenChange={onOpenChange} />)
-      await openScroller()
-
-      const dialog = page.getByRole('dialog').element().getBoundingClientRect()
-      const target = document.elementFromPoint(dialog.left + 20, dialog.top + 20)
-      if (!(target instanceof HTMLElement)) {
-        throw new TypeError('Nothing to tap above the sheet.')
-      }
-      expect(target.classList.contains('scroll-drawer-spacer')).toBe(true)
-      expect(target.tagName).toBe('DIV')
-      await act(() => {
-        target.click()
-      })
-      await userEvent.keyboard('{Escape}')
-
-      expect(onOpenChange).not.toHaveBeenCalled()
-      await expect.element(page.getByRole('dialog')).toBeVisible()
-    })
   })
 })

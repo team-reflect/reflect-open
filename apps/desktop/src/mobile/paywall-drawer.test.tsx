@@ -1,3 +1,4 @@
+import { userEvent } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -111,6 +112,17 @@ beforeEach(() => {
       }),
     },
   }
+})
+
+describe('PaywallDrawer', () => {
+  it('stays open on Escape', async () => {
+    const view = await mount()
+    await expect.element(view.getByRole('dialog', { name: 'Unlock Reflect Pro' })).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(view.getByRole('dialog', { name: 'Unlock Reflect Pro' })).toBeVisible()
+  })
 })
 
 describe('PaywallDrawer products', () => {

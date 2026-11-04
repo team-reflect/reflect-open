@@ -22,7 +22,6 @@ import './scroll-drawer.css'
 interface DrawerContextValue {
   open: boolean
   onOpenChange: (open: boolean) => void
-  dismissible: boolean
 }
 
 const DrawerContext = createContext<DrawerContextValue | null>(null)
@@ -48,12 +47,6 @@ export interface DrawerProps {
    * when a trigger asks to open. The owner may keep the drawer open.
    */
   onOpenChange: (open: boolean) => void
-  /**
-   * Whether a swipe, a tap above the sheet, or Escape may close the drawer.
-   * When `false`, a pull only rubber-bands the sheet. Defaults to
-   * `true`.
-   */
-  dismissible?: boolean | undefined
   children?: ReactNode | undefined
 }
 
@@ -63,31 +56,11 @@ export interface DrawerProps {
  * finger at the display's refresh rate even while the main thread is busy.
  * Base UI's `Dialog` owns focus, `inert`, Escape, and the dialog role.
  */
-export function Drawer({
-  open,
-  onOpenChange,
-  dismissible = true,
-  children,
-}: DrawerProps): ReactElement {
-  const handleOpenChange = useCallback(
-    (next: boolean) => {
-      if (next || dismissible) {
-        onOpenChange(next)
-      }
-    },
-    [onOpenChange, dismissible],
-  )
-  const contextValue = useMemo(
-    () => ({ open, onOpenChange: handleOpenChange, dismissible }),
-    [open, handleOpenChange, dismissible],
-  )
+export function Drawer({ open, onOpenChange, children }: DrawerProps): ReactElement {
+  const contextValue = useMemo(() => ({ open, onOpenChange }), [open, onOpenChange])
   return (
     <DrawerContext value={contextValue}>
-      <DialogPrimitive.Root
-        open={open}
-        onOpenChange={handleOpenChange}
-        disablePointerDismissal={!dismissible}
-      >
+      <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
         {children}
       </DialogPrimitive.Root>
     </DrawerContext>
@@ -121,7 +94,6 @@ export function DrawerContent({
   initialFocus,
   ...props
 }: DrawerContentProps): ReactElement {
-  const { dismissible } = useDrawer()
   const popupRef = useRef<HTMLDivElement>(null)
   return (
     <DialogPrimitive.Portal>
@@ -133,11 +105,7 @@ export function DrawerContent({
         className="scroll-drawer-popup fixed inset-0 z-50 outline-none"
         {...props}
       >
-        {dismissible ? (
-          <DrawerSheet popupRef={popupRef}>{children}</DrawerSheet>
-        ) : (
-          <FixedDrawerSheet>{children}</FixedDrawerSheet>
-        )}
+        <DrawerSheet popupRef={popupRef}>{children}</DrawerSheet>
       </DialogPrimitive.Popup>
     </DialogPrimitive.Portal>
   )
@@ -220,46 +188,6 @@ function DrawerSheet({
           {/* The mouse drags the sheet only from its top edge (the grab
               handle), so a mouse press in the content can select text. */}
           <div ref={handleRef} aria-hidden className="absolute inset-x-0 top-0 h-6" />
-        </div>
-      </div>
-    </>
-  )
-}
-
-/**
- * A sheet that never closes. Its track is one pixel taller than the scroller,
- * so a pull rubber-bands where the platform does and barely moves it elsewhere.
- */
-function FixedDrawerSheet({ children }: { children?: ReactNode | undefined }): ReactElement {
-  const scrollerRef = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current
-    if (scroller === null) {
-      return
-    }
-    const scrollOpen = (): void => {
-      scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight
-    }
-    scrollOpen()
-    const resize = new ResizeObserver(scrollOpen)
-    resize.observe(scroller)
-    return () => resize.disconnect()
-  }, [])
-
-  return (
-    <>
-      <div aria-hidden className="scroll-drawer-backdrop">
-        <div className="scroll-drawer-tint size-full bg-black/30" />
-      </div>
-      <div ref={scrollerRef} className="scroll-drawer scroll-drawer-fixed">
-        <div className="scroll-drawer-track">
-          <div aria-hidden className="scroll-drawer-spacer" />
-          <div className="scroll-drawer-slide">
-            <div className="scroll-drawer-panel flex min-h-0 flex-1 flex-col rounded-t-xl bg-popover text-sm text-popover-foreground inset-ring-1 inset-ring-foreground/10 select-text pb-above-keyboard px-safe">
-              {children}
-            </div>
-          </div>
         </div>
       </div>
     </>
