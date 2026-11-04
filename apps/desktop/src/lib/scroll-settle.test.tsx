@@ -249,6 +249,23 @@ describe('watchScrollSettle', () => {
       expect(onClick).not.toHaveBeenCalled()
     })
 
+    it('settles where `releaseTo` points after a drag', async () => {
+      const element = mountSnapScroller()
+      const onSettle = vi.fn()
+      const releaseTo = vi.fn(() => 0)
+      watchScrollSettle({ element, onSettle, signal: listeners.controller.signal, releaseTo })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      // Past half of the range.
+      await mouseTo(element, 5)
+      await mouse.up()
+
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(releaseTo).toHaveBeenCalledWith(90)
+      expect(element.scrollLeft).toBe(0)
+    })
+
     it('leaves a click under the drag distance alone', async () => {
       const element = mountSnapScroller()
       const onSettle = vi.fn()

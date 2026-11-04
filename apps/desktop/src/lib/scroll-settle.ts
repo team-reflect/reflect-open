@@ -41,6 +41,11 @@ export interface ScrollSettleOptions {
    * mouse drag.
    */
   dragHandle?: HTMLElement | null | undefined
+  /**
+   * Where a mouse drag release scrolls to, given the position at release.
+   * Defaults to the nearer end of the range.
+   */
+  releaseTo?: ((position: number) => number) | undefined
 }
 
 export interface ScrollSettleWatch {
@@ -64,8 +69,8 @@ export interface ScrollSettleWatch {
  *
  * A mouse drag scrolls the element the way a finger does: snapping is off
  * from the first move until the release scroll stops, and on release the
- * element scrolls smoothly to the nearer end of its range. The drag and that
- * scroll count as one user scroll.
+ * element scrolls smoothly to `releaseTo`'s position, by default the nearer
+ * end of its range. The drag and that scroll count as one user scroll.
  */
 export function watchScrollSettle({
   element,
@@ -73,6 +78,7 @@ export function watchScrollSettle({
   signal,
   isSettled,
   dragHandle = element,
+  releaseTo,
 }: ScrollSettleOptions): ScrollSettleWatch {
   // Fingers that landed on the element and have not lifted.
   const fingers = new Set<number>()
@@ -295,7 +301,7 @@ export function watchScrollSettle({
       const range = x
         ? element.scrollWidth - element.clientWidth
         : element.scrollHeight - element.clientHeight
-      const end = position() < range / 2 ? 0 : range
+      const end = releaseTo ? releaseTo(position()) : position() < range / 2 ? 0 : range
       // The press lasts until the release scroll stops: on `scrollend` at
       // `end`, or after the quiet time. A late `scrollend` from the drag
       // itself does not end it, and an interrupted scroll cannot hold it.
