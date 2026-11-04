@@ -206,12 +206,18 @@ class PaywallServiceImpl implements PaywallService {
   }
 
   readonly dismissSkippable = (): void => {
+    // Records today again, so a paywall left open past midnight still closes.
+    this.#deps.storage.local.set(
+      PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY,
+      this.#deps.installClock.get().today,
+    )
     this.setRequested(false)
   }
 
   readonly setPhaseOverride = (next: PaywallPhase | null): void => {
     const { storage } = this.#deps
     storage.local.set(PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY, null)
+    this.setRequested(false)
     storage.session.set(PAYWALL_PHASE_OVERRIDE_STORAGE_KEY, next)
   }
 

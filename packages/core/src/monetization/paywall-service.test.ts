@@ -236,6 +236,18 @@ describe('PaywallService skippable paywall', () => {
     expect(paywall.requested.get()).toBe(false)
     expect(paywall.gate.get()).toBe('hidden')
   })
+
+  it('closes when dismissed on a later day than it opened', () => {
+    installClock.setState({ phase: 'skippable' })
+    const paywall = service()
+    paywall.markSkippableShown()
+
+    installClock.setState({ today: '2026-11-05' })
+    expect(paywall.gate.get()).toBe('skippable')
+    paywall.dismissSkippable()
+
+    expect(paywall.gate.get()).toBe('hidden')
+  })
 })
 
 describe('PaywallService.phaseOverride', () => {
@@ -267,6 +279,16 @@ describe('PaywallService.phaseOverride', () => {
     paywall.setPhaseOverride('skippable')
 
     expect(paywall.gate.get()).toBe('skippable')
+  })
+
+  it('hides an open paywall when Hidden is selected', () => {
+    installClock.setState({ phase: 'skippable' })
+    const paywall = service()
+    paywall.markSkippableShown()
+
+    paywall.setPhaseOverride('hidden')
+
+    expect(paywall.gate.get()).toBe('hidden')
   })
 })
 
