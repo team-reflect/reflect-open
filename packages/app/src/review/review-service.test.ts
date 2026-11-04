@@ -13,15 +13,16 @@ import { createTestOpenerService } from '../testing/opener.ts'
 import {
   createReviewService,
   decideAskForReview,
-  REVIEW_COOLDOWN_MS,
+  REVIEW_COOLDOWN_DAYS,
   REVIEW_REQUESTED_AT_STORAGE_KEY,
   REVIEW_SHOWN_AT_STORAGE_KEY,
-  REVIEW_SHOWN_COOLDOWN_MS,
+  REVIEW_SHOWN_COOLDOWN_DAYS,
   WRITE_REVIEW_URL,
   type ReviewInputs,
 } from './review-service.ts'
 
 const NOW = 1_800_000_000_000
+const DAY_MS = 24 * 60 * 60 * 1000
 
 const INPUTS: ReviewInputs = {
   environment: 'Production',
@@ -47,8 +48,8 @@ describe('decideAskForReview', () => {
       { environment: 'Xcode' },
       { environment: null },
       { paid: false },
-      { requestedAt: NOW - REVIEW_COOLDOWN_MS + 1 },
-      { shownAt: NOW - REVIEW_SHOWN_COOLDOWN_MS + 1 },
+      { requestedAt: NOW - REVIEW_COOLDOWN_DAYS * DAY_MS + 1 },
+      { shownAt: NOW - REVIEW_SHOWN_COOLDOWN_DAYS * DAY_MS + 1 },
     ]
     for (const inputs of cases) {
       expect(decide(inputs)).toBe(false)
@@ -56,8 +57,8 @@ describe('decideAskForReview', () => {
   })
 
   it('asks again once each cooldown ends', () => {
-    expect(decide({ requestedAt: NOW - REVIEW_COOLDOWN_MS })).toBe(true)
-    expect(decide({ shownAt: NOW - REVIEW_SHOWN_COOLDOWN_MS })).toBe(true)
+    expect(decide({ requestedAt: NOW - REVIEW_COOLDOWN_DAYS * DAY_MS })).toBe(true)
+    expect(decide({ shownAt: NOW - REVIEW_SHOWN_COOLDOWN_DAYS * DAY_MS })).toBe(true)
   })
 
   it('asks with the override despite every condition', () => {

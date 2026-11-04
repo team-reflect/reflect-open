@@ -31,12 +31,14 @@ export const REVIEW_OVERRIDE_STORAGE_KEY = 'reflect.review.override'
  * How long the review page stays away after Rate Reflect, matching Apple's
  * prompt quota period.
  */
-export const REVIEW_COOLDOWN_MS = 365 * 24 * 60 * 60 * 1000
+export const REVIEW_COOLDOWN_DAYS = 365
 
 /**
  * How long the review page stays away after it showed without a rating.
  */
-export const REVIEW_SHOWN_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000
+export const REVIEW_SHOWN_COOLDOWN_DAYS = 30
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 export const WRITE_REVIEW_URL = 'https://apps.apple.com/app/id6787385615?action=write-review'
 
@@ -73,13 +75,13 @@ export function decideAskForReview(inputs: ReviewInputs): boolean {
   if (inputs.override) {
     return true
   }
-  const since = (time: number | null, cooldown: number): boolean =>
-    time === null || inputs.now - time >= cooldown
+  const since = (time: number | null, days: number): boolean =>
+    time === null || inputs.now - time >= days * DAY_MS
   return (
     inputs.environment === 'Production' &&
     inputs.paid &&
-    since(inputs.requestedAt, REVIEW_COOLDOWN_MS) &&
-    since(inputs.shownAt, REVIEW_SHOWN_COOLDOWN_MS)
+    since(inputs.requestedAt, REVIEW_COOLDOWN_DAYS) &&
+    since(inputs.shownAt, REVIEW_SHOWN_COOLDOWN_DAYS)
   )
 }
 
