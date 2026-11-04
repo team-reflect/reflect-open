@@ -6,6 +6,7 @@ import {
   type Store,
 } from '@reflect/core'
 import type { ClipboardService } from './app/clipboard-service.ts'
+import type { ToastService } from './app/toast-service.ts'
 import {
   createOpenerService,
   type OpenerService,
@@ -99,6 +100,10 @@ export interface AppHost {
    */
   readonly clipboard: ClipboardService
   /**
+   * The toast surface.
+   */
+  readonly toasts: ToastService
+  /**
    * The native operations behind the opener service.
    */
   readonly opener: OpenerTransport
@@ -145,6 +150,10 @@ export interface AppServices {
    * The system clipboard.
    */
   readonly clipboard: ClipboardService
+  /**
+   * The toast surface.
+   */
+  readonly toasts: ToastService
   /**
    * Hands URLs and paths to the operating system.
    */
@@ -293,6 +302,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       logger: core.logger,
     }),
     clipboard: host.clipboard,
+    toasts: host.toasts,
     opener,
     commands,
     keymap,

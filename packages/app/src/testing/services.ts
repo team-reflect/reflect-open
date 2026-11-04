@@ -10,6 +10,7 @@ import {
 import { createTestWindowService, type TestWindowService } from './window.ts'
 import { createAppServices, type AppHost, type AppServices } from '../create-app-services.ts'
 import { createTestClipboardService, type TestClipboardService } from './clipboard.ts'
+import { createTestToastService, type TestToastService } from './toast.ts'
 import { createTestNativeMenuHost } from './commands.ts'
 import { createTestOpenerService, type TestOpenerService } from './opener.ts'
 import { createLinkNavigationService } from '../navigation/link-navigation-service.ts'
@@ -29,6 +30,7 @@ export type TestAppServices = Omit<
   AppServices,
   | 'navigation'
   | 'clipboard'
+  | 'toasts'
   | 'opener'
   | 'lifecycle'
   | 'window'
@@ -41,6 +43,7 @@ export type TestAppServices = Omit<
   readonly systemPreferences: TestSystemPreferencesService
   readonly mobileOnboarding: TestMobileOnboardingService
   readonly clipboard: TestClipboardService
+  readonly toasts: TestToastService
   readonly opener: TestOpenerService
   readonly navigation: TestNavigationService
   readonly lifecycle: TestLifecycleService
@@ -48,8 +51,8 @@ export type TestAppServices = Omit<
 
 /**
  * A host of silent doubles: a main test window, a dialog that cancels, a test
- * lifecycle, an operations list over a test clock, a recording clipboard and
- * an opener that opens nothing. `overrides` replace fields of the result.
+ * lifecycle, an operations list over a test clock, a recording clipboard, a
+ * toast surface that keeps its toasts, and an opener that opens nothing. `overrides` replace fields of the result.
  */
 export function createTestAppHost(overrides: Partial<AppHost> = {}): AppHost {
   return {
@@ -58,6 +61,7 @@ export function createTestAppHost(overrides: Partial<AppHost> = {}): AppHost {
     lifecycle: createTestLifecycleService(),
     operations: createTestOperationsService(),
     clipboard: createTestClipboardService(),
+    toasts: createTestToastService(),
     opener: { openUrl: () => {}, revealItemInDir: () => {} },
     ...overrides,
   }
@@ -84,6 +88,7 @@ export function createTestAppServices(
   const dialog = overrides.dialog ?? createTestDialogService()
   const systemPreferences = overrides.systemPreferences ?? createTestSystemPreferencesService()
   const clipboard = overrides.clipboard ?? createTestClipboardService()
+  const toasts = overrides.toasts ?? createTestToastService()
   const opener = overrides.opener ?? createTestOpenerService({ logger: core.logger })
   const navigation = overrides.navigation ?? createTestNavigationService()
   // Over the core's test activity port, so one emit reaches both layers.
@@ -92,7 +97,7 @@ export function createTestAppServices(
     overrides.lifecycle ??
     createTestLifecycleService(activity === undefined ? undefined : { activity })
   const app = createAppServices(core, {
-    ...createTestAppHost({ window, dialog, operations, clipboard, lifecycle }),
+    ...createTestAppHost({ window, dialog, operations, clipboard, toasts, lifecycle }),
     updater: createTestUpdaterAdapter(),
     nativeMenu: createTestNativeMenuHost(),
   })
@@ -137,6 +142,7 @@ export function createTestAppServices(
     systemPreferences,
     mobileOnboarding,
     clipboard,
+    toasts,
     opener,
     lifecycle,
     navigation,

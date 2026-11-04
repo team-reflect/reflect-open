@@ -7,7 +7,6 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { toast } from '@/components/ui/toast.tsx'
 import type {
   PendingReplacementResolveHandler,
   SelectionMenuContext,
@@ -27,7 +26,7 @@ import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useNoteRow } from '@/hooks/use-note-row.ts'
 import { useRouterActions } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The editor AI menu (the "run a prompt on the selection" flow): meowdown owns
@@ -103,6 +102,7 @@ export function useEditorAiMenu({
     (resolvedPrivacy?.epoch === sessionEpoch ? resolvedPrivacy.isPrivate : true)
   const { providers } = useAiProviders()
   const { selectionTransform } = useCoreServices()
+  const { toasts } = useAppServices()
   const { prompts } = useAiPrompts()
   const { navigate } = useRouterActions()
 
@@ -145,7 +145,7 @@ export function useEditorAiMenu({
           setRunMode(null)
         }
         editorRef.current?.discardPendingReplacement()
-        toast.add({ type: 'error', title: message })
+        toasts.show({ type: 'error', title: message })
       }
 
       // The service picks the provider, gates the selection against the
@@ -170,7 +170,7 @@ export function useEditorAiMenu({
         // and the user decides with Accept/Discard.
       }
     },
-    [selectionTransform, path, isPrivate, editorRef],
+    [selectionTransform, toasts, path, isPrivate, editorRef],
   )
 
   const runPrompt = useCallback(

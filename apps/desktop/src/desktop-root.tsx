@@ -1,7 +1,7 @@
 import { useEffect, type ReactElement } from 'react'
+import { syncDesktopToasts } from '@reflect/app'
 import { App } from '@/app.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
-import { attachOperationToasts } from '@/components/operation-toasts.ts'
 import { OutdatedWebEngineBanner } from '@/components/outdated-web-engine-banner.tsx'
 import { Toaster } from '@/components/ui/toast.tsx'
 import { WindowDragRegion } from '@/components/window-drag-region.tsx'
@@ -17,7 +17,7 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
  */
 export function DesktopRoot(): ReactElement {
   const { noteMove, platform, logger, deepLinkIntake } = useCoreServices()
-  const { operations } = useAppServices()
+  const { toasts, update, operations, whatsNew } = useAppServices()
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
   // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.
@@ -41,11 +41,12 @@ export function DesktopRoot(): ReactElement {
   // longer matches `from`, and re-routing an absent entry is a no-op).
   useEffect(() => noteMove.followNativeMoves(), [noteMove])
 
-  // Every desktop window mirrors its own operations store into toasts (the
-  // store is per-webview, matching the per-window mount this replaces). The
-  // effect only ties the subscription to the window's lifetime; the toast
-  // calls themselves run inside the store mutations that report the work.
-  useEffect(() => attachOperationToasts(operations, logger), [operations, logger])
+  // Per window: each webview has its own operations store. Stopping leaves
+  // the toasts open, so StrictMode's second effect run shows them again.
+  useEffect(
+    () => syncDesktopToasts({ toasts, update, operations, whatsNew, platform, logger }),
+    [toasts, update, operations, whatsNew, platform, logger],
+  )
 
   return (
     <AppErrorBoundary>

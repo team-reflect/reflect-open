@@ -25,6 +25,7 @@ import {
   sentryExceptionTelemetrySdk,
 } from '@/lib/exception-telemetry.ts'
 import { createNavigatorClipboardService } from '@/services/browser-clipboard.ts'
+import { createBaseUiToastService } from '@/services/base-ui-toast-service.ts'
 import { createBrowserDialogService } from '@/services/browser-dialog.ts'
 import { createBrowserOpenerTransport } from '@/services/browser-opener.ts'
 import { createBrowserImageCodec } from '@/services/browser-image-codec.ts'
@@ -103,6 +104,7 @@ export function createDesktopHost(
     lifecycle,
     operations: createOperationsService({ clock }),
     clipboard: createNavigatorClipboardService(),
+    toasts: createBaseUiToastService(),
   }
   const exceptionTelemetry = createExceptionTelemetry({
     dsn: buildExceptionTelemetryDsn(),

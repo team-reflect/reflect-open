@@ -40,6 +40,14 @@ export { type WhatsNewPhase, type WhatsNewService } from './whats-new/whats-new-
 export { type FeedbackChannel, type ReviewService } from './review/review-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
+  syncToasts,
+  type KeyedToastSpec,
+  type ToastAction,
+  type ToastService,
+  type ToastSpec,
+} from './app/toast-service.ts'
+export { syncDesktopToasts, type DesktopToastsDeps } from './app/desktop-toasts.ts'
+export {
   type OpenerService,
   type OpenerTransport,
   type SystemSettingsPane,

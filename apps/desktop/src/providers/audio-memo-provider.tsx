@@ -11,11 +11,11 @@ import {
 } from 'react'
 import type { AudioMemoSession, AudioMemoSessionState, GraphInfo } from '@reflect/core'
 import {
-  dismissRecordingReminder,
-  showRecordingReminder,
+  getRecordingReminderToast,
+  RECORDING_REMINDER_TOAST_ID,
 } from '@/components/audio-memo/recording-reminder.ts'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { useSelector } from '@/lib/use-store.ts'
 
 /**
@@ -102,6 +102,7 @@ interface AudioMemoProviderProps {
 
 export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): ReactElement {
   const { audioMemo } = useCoreServices()
+  const { toasts } = useAppServices()
   const { collapsed, toggleSidebar } = useSidebar()
 
   // Read at call time: the session outlives the renders that made these.
@@ -121,8 +122,12 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
         reveal: () => {
           toggleSidebarRef.current()
         },
-        showReminder: showRecordingReminder,
-        dismissReminder: dismissRecordingReminder,
+        showReminder: (elapsedMs, stop) => {
+          toasts.show(getRecordingReminderToast(elapsedMs, stop))
+        },
+        dismissReminder: () => {
+          toasts.close(RECORDING_REMINDER_TOAST_ID)
+        },
       },
     })
     setSession(next)
@@ -130,7 +135,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       next.dispose()
       setSession((current) => (current === next ? null : current))
     }
-  }, [audioMemo, graph.generation])
+  }, [audioMemo, toasts, graph.generation])
 
   const store = session ?? CLOSED_SESSION
 
