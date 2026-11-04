@@ -59,9 +59,9 @@ export interface WeekWindow {
 }
 
 /**
- * Weeks either side of the strip's anchor (~half a year each way).
+ * Weeks either side of the strip's anchor (about two months each way).
  */
-export const WEEK_WINDOW_RADIUS = 26
+export const WEEK_WINDOW_RADIUS = 8
 
 /**
  * Build the window centered on the week containing `date`.

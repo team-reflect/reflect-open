@@ -2547,27 +2547,6 @@
       ]
     },
     {
-      "name": "embla-carousel",
-      "ecosystem": "npm",
-      "license": "MIT",
-      "url": "https://www.embla-carousel.com",
-      "texts": []
-    },
-    {
-      "name": "embla-carousel-react",
-      "ecosystem": "npm",
-      "license": "MIT",
-      "url": "https://www.embla-carousel.com",
-      "texts": []
-    },
-    {
-      "name": "embla-carousel-reactive-utils",
-      "ecosystem": "npm",
-      "license": "MIT",
-      "url": "https://www.embla-carousel.com",
-      "texts": []
-    },
-    {
       "name": "encode_unicode",
       "ecosystem": "cargo",
       "license": "MIT",

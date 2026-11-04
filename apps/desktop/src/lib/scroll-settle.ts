@@ -64,8 +64,8 @@ export interface ScrollSettleWatch {
  *
  * A mouse drag scrolls the element the way a finger does: snapping is off
  * from the first move until the release scroll stops, and on release the
- * element scrolls smoothly to the nearer end of its range. The drag and that
- * scroll count as one user scroll.
+ * element scrolls smoothly to the snap position the browser picks from there.
+ * The drag and that scroll count as one user scroll.
  */
 export function watchScrollSettle({
   element,
@@ -289,13 +289,16 @@ export function watchScrollSettle({
         controller.abort()
         return
       }
-      // Snap stays off until the release scroll stops. Turned back on here, it
-      // would re-snap to the target the drag started from.
       suppressNextClick()
-      const range = x
-        ? element.scrollWidth - element.clientWidth
-        : element.scrollHeight - element.clientHeight
-      const end = position() < range / 2 ? 0 : range
+      // Snap turned back on moves the element to its snap position at the next
+      // layout, which the read forces. Safari makes that move a jump, so snap
+      // goes off again within the same task, before a frame paints, and stays
+      // off until the smooth scroll there stops.
+      const from = position()
+      element.style.scrollSnapType = ''
+      const end = position()
+      element.style.scrollSnapType = 'none'
+      element.scrollTo({ [x ? 'left' : 'top']: from, behavior: 'instant' })
       // The press lasts until the release scroll stops: on `scrollend` at
       // `end`, or after the quiet time. A late `scrollend` from the drag
       // itself does not end it, and an interrupted scroll cannot hold it.
