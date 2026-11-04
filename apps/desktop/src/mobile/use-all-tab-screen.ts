@@ -8,14 +8,14 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  * card pushed over All (Chat, a note opened from the list, Settings reached
  * from Chat's setup prompt), or `null` when All was last on its list. Only
  * the top card is kept, not the stack under it. A remembered note follows
- * file moves, as the router's history does; like that history, it is not
- * cleared when the note is deleted.
+ * file moves, as the router's history does, and is forgotten once it is
+ * trashed in the app.
  *
  * @param route The current route.
  * @param tab The tab the shell shows as current for `route`.
  */
 export function useAllTabScreen(route: Route, tab: MobileTab): Route | null {
-  const { noteMove } = useCoreServices()
+  const { noteMove, noteRows } = useCoreServices()
   const [screen, setScreen] = useState<Route | null>(null)
 
   // Adjusted during render (the shell's `lastTab` pattern) so a tab tap in
@@ -37,6 +37,17 @@ export function useAllTabScreen(route: Route, tab: MobileTab): Route | null {
       })
     })
   }, [noteMove])
+
+  useEffect(() => {
+    return noteRows.subscribe(() => {
+      const overlays = noteRows.get()
+      setScreen((current) => {
+        return current?.kind === 'note' && overlays.get(current.path)?.trashed === true
+          ? null
+          : current
+      })
+    })
+  }, [noteRows])
 
   return screen
 }
