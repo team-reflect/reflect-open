@@ -85,7 +85,7 @@ import {
   createTestIapService,
   createTestWebAuthService,
 } from './plugins.ts'
-import { createTestAppInfoService, createTestSecretStoreService } from './secrets.ts'
+import { createTestSecretStoreService } from './secrets.ts'
 import { createTestSettingsService } from './settings.ts'
 import { createTestActivityPort } from './shell.ts'
 import { createTestStorageService } from './storage.ts'
@@ -225,7 +225,6 @@ function createTestServiceFactories(overrides: TestCoreServiceOverrides) {
     chatHistory: () => createTestChatHistoryService(),
     chatEngine: () => createTestChatEngineService(),
     chatGraphContext: () => createTestChatGraphContextService(),
-    appInfo: () => createTestAppInfoService(),
     semanticSearch: (deps) => createTestSemanticSearchService(deps),
     capture: () => createTestCaptureService(),
   } satisfies Partial<ServiceFactories>

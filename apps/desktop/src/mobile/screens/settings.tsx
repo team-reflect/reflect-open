@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
-import { useAppVersion } from '@/hooks/use-app-version.ts'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
 import { queryKeys } from '@/lib/query-client.ts'
@@ -173,7 +172,6 @@ export function MobileSettings(): ReactElement {
   const transcriptionPrompt = useTranscriptionPrompt()
   const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
-  const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
   const perfHudEnabled = usePerfHudEnabled()
@@ -181,7 +179,9 @@ export function MobileSettings(): ReactElement {
   // Development and TestFlight installs show the prerelease tag; anything else hides it.
   const showPrerelease =
     platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
-  const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
+  const versionLabel = showPrerelease
+    ? platformService.appVersion
+    : marketingVersion(platformService.appVersion)
   const gitSync = useGitSyncState()
   const { disconnectGraph } = useGitSyncActions()
   const githubConnected = useGithubConnected()
