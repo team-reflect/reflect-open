@@ -175,16 +175,24 @@ function visibleLayer(view: BrowserView): HTMLElement {
   return visible
 }
 
-/** Finishes the running animations of the stack layers and the scrim. */
+/**
+ * Finishes the animations of the stack layers and the scrim until no layer
+ * slides.
+ */
 async function finishStackAnimations(view: BrowserView): Promise<void> {
-  await act(async () => {
-    const animations = Array.from(
-      view.container.querySelectorAll('.mobile-stack-layer, .mobile-stack-scrim'),
-    ).flatMap((element) => element.getAnimations())
-    for (const animation of animations) {
-      animation.finish()
-    }
-    await Promise.allSettled(animations.map((animation) => animation.finished))
+  await waitFor(async () => {
+    await act(async () => {
+      const animations = Array.from(
+        view.container.querySelectorAll('.mobile-stack-layer, .mobile-stack-scrim'),
+      ).flatMap((element) => element.getAnimations())
+      for (const animation of animations) {
+        animation.finish()
+      }
+      await Promise.allSettled(animations.map((animation) => animation.finished))
+    })
+    expect(
+      view.container.querySelector('.mobile-stack-slide-in, .mobile-stack-slide-out'),
+    ).toBeNull()
   })
 }
 
