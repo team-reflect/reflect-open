@@ -46,12 +46,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const { noteList } = useCoreServices()
   const { navigate } = useRouterActions()
   const navigateNoteLink = useNoteLinkNavigation()
-  // The scroll container lives in state, not a ref, so scroll restoration
-  // re-runs its restore once the element attaches (a callback ref re-renders;
-  // a plain ref would still be null during the restore effect on the first,
-  // warm-cache-only mount). The table virtualizes against this container as its
-  // parent.
-  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -71,7 +66,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   })
 
   const ready = notes !== undefined
-  const { onScroll } = useScrollRestoration(scrollElement, ready)
+  const { onScroll } = useScrollRestoration(scrollRef, ready)
 
   // The flat, render-order paths the selection and its shortcuts act on.
   const orderedPaths = useMemo(() => (notes ?? []).map((note) => note.path), [notes])
@@ -160,7 +155,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
         </div>
       </header>
       <div
-        ref={setScrollElement}
+        ref={scrollRef}
         data-testid="all-notes-scroll"
         onScroll={onScroll}
         className="min-h-0 flex-1 overflow-auto"
