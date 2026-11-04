@@ -33,7 +33,7 @@ function iosServices() {
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ appPlatform: 'ios' }),
   })
-  services.mobile.installClock.setState({ phase: 'required', today: '2026-11-04' })
+  services.mobile.installClock.setState({ phase: 'required', dayIndex: 3 })
   return services
 }
 
