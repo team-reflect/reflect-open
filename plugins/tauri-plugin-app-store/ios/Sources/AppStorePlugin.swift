@@ -89,6 +89,12 @@ class AppStorePlugin: Plugin {
   /// TestFlight) and reports nothing back.
   @MainActor
   @objc public func requestReview(_ invoke: Invoke) async throws {
+    // The Swift package says iOS 16, but the TestFlight build compiles this
+    // file with a lower deployment target, so the check must stay.
+    guard #available(iOS 16.0, *) else {
+      invoke.reject("requestReview needs iOS 16")
+      return
+    }
     guard
       let scene = UIApplication.shared.connectedScenes
         .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
