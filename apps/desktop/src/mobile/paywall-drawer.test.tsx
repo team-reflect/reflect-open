@@ -169,7 +169,7 @@ describe('PaywallDrawer modes', () => {
       .toBeVisible()
     await expect.element(view.getByText('Cancel in two taps.')).toBeVisible()
     await expect.element(view.getByText('Your notes stay yours.')).toBeVisible()
-    await expect.element(view.getByText('No account, no ads.')).toBeVisible()
+    await expect.element(view.getByText('Private by default.')).toBeVisible()
     expect(view.getByRole('button', { name: 'Later' }).query()).toBeNull()
   })
 

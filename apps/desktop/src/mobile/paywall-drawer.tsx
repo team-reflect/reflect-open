@@ -344,8 +344,8 @@ const REASSURANCES = [
     detail: 'They are Markdown files you can open in Files, subscribed or not.',
   },
   {
-    title: 'No account, no ads.',
-    detail: 'Reflect has no server that stores your notes.',
+    title: 'Private by default.',
+    detail: 'Notes stay on your devices. Sync with iCloud or your own Git server.',
   },
 ]
 
