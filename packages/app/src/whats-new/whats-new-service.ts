@@ -1,19 +1,16 @@
-import { isShallowEqual } from '@ocavue/utils'
 import {
   combineStores,
   deriveStore,
   marketingVersion,
   WritableStore,
-  type ActivityPort,
-  type DeepLinkIntakeService,
-  type GraphStatus,
+  type GraphSessionService,
   type PlatformFacts,
   type StorageService,
   type Store,
   type Unlisten,
 } from '@reflect/core'
 import type { WindowService } from '../app/window-service.ts'
-import type { WhatsNewItem, WhatsNewPlatform } from './whats-new-content.ts'
+import type { WhatsNewItem } from './whats-new-content.ts'
 
 /**
  * The full version, prerelease tag included, whose What's New the user last saw or skipped.
@@ -26,10 +23,10 @@ export const WHATS_NEW_SEEN_STORAGE_KEY = 'reflect.whats-new.seen'
 export const WHATS_NEW_OVERRIDE_STORAGE_KEY = 'reflect.whats-new.override'
 
 /**
- * Whether something with priority, like the paywall, holds What's New back:
- * `pending` until it is known, `blocked` while it shows, `clear` otherwise.
+ * How far this launch got: no graph open yet, a graph opened, or a graph
+ * opened after the graph chooser or the onboarding (a new install).
  */
-export type WhatsNewBlocker = 'pending' | 'clear' | 'blocked'
+export type WhatsNewLaunch = 'opening' | 'opened' | 'openedAfterSetup'
 
 /**
  * Everything {@link decideWhatsNew} reads.
@@ -37,36 +34,27 @@ export type WhatsNewBlocker = 'pending' | 'clear' | 'blocked'
 export interface WhatsNewInputs {
   readonly isMainWindow: boolean
   readonly isDev: boolean
-  readonly platform: WhatsNewPlatform | null
   /**
-   * The full app version, prerelease tag included.
+   * The current version's items for this platform.
    */
-  readonly version: string
-  readonly seen: string | null
+  readonly items: readonly WhatsNewItem[]
+  /**
+   * The user already saw or skipped the current version.
+   */
+  readonly seen: boolean
   readonly override: boolean
-  readonly blocker: WhatsNewBlocker
   /**
-   * This launch has opened a graph.
+   * Something with priority, like the paywall, shows or may show.
    */
-  readonly graphOpened: boolean
-  /**
-   * This launch showed the graph chooser or the onboarding before it opened a graph.
-   */
-  readonly setupSeen: boolean
-  /**
-   * A deep link arrived since the app last became visible.
-   */
-  readonly deepLinkSeen: boolean
+  readonly blocked: boolean
+  readonly launch: WhatsNewLaunch
 }
 
 /**
  * `wait` shows nothing for now; `skip` shows nothing and marks the version
  * seen; `show` shows the items.
  */
-export type WhatsNewDecision =
-  | { readonly kind: 'wait'; readonly items?: undefined }
-  | { readonly kind: 'skip'; readonly items?: undefined }
-  | { readonly kind: 'show'; readonly items: readonly WhatsNewItem[] }
+export type WhatsNewDecision = 'wait' | 'skip' | 'show'
 
 /**
  * Whether to show What's New, and its items.
@@ -75,69 +63,25 @@ export type WhatsNewGate =
   | { readonly kind: 'hidden'; readonly items?: undefined }
   | { readonly kind: 'whatsNew'; readonly items: readonly WhatsNewItem[] }
 
-const WAIT: WhatsNewDecision = { kind: 'wait' }
-const SKIP: WhatsNewDecision = { kind: 'skip' }
 const HIDDEN: WhatsNewGate = { kind: 'hidden' }
 
-function filterItems(
-  items: readonly WhatsNewItem[] | undefined,
-  platform: WhatsNewPlatform,
-): WhatsNewItem[] {
-  return (items ?? []).filter((item) => item.platforms.includes(platform))
-}
-
 /**
- * What to do with What's New for the given inputs and content.
+ * What to do with What's New for the given inputs.
  */
-export function decideWhatsNew(
-  inputs: WhatsNewInputs,
-  content: Readonly<Record<string, readonly WhatsNewItem[]>>,
-): WhatsNewDecision {
-  const { platform, version } = inputs
-  if (!inputs.isMainWindow || platform === null || !inputs.graphOpened) {
-    return WAIT
+export function decideWhatsNew(inputs: WhatsNewInputs): WhatsNewDecision {
+  if (!inputs.isMainWindow || inputs.launch === 'opening' || inputs.blocked) {
+    return 'wait'
   }
-  if (inputs.blocker !== 'clear') {
-    return WAIT
-  }
-  const items = filterItems(content[marketingVersion(version)], platform)
   if (inputs.override) {
-    if (items.length > 0) {
-      return { kind: 'show', items }
-    }
-    const newest = Object.values(content)[0]
-    const fallback = filterItems(newest, platform)
-    return fallback.length > 0 ? { kind: 'show', items: fallback } : WAIT
+    return inputs.items.length > 0 ? 'show' : 'wait'
   }
-  if (inputs.isDev || inputs.seen === version) {
-    return WAIT
+  if (inputs.isDev || inputs.seen) {
+    return 'wait'
   }
-  if (inputs.setupSeen || items.length === 0) {
-    return SKIP
+  if (inputs.launch === 'openedAfterSetup' || inputs.items.length === 0) {
+    return 'skip'
   }
-  if (inputs.deepLinkSeen) {
-    return WAIT
-  }
-  return { kind: 'show', items }
-}
-
-function isDecisionEqual(a: WhatsNewDecision, b: WhatsNewDecision): boolean {
-  return a.kind === b.kind && isShallowEqual(a.items ?? [], b.items ?? [])
-}
-
-function toGate(decision: WhatsNewDecision): WhatsNewGate {
-  return decision.kind === 'show' ? { kind: 'whatsNew', items: decision.items } : HIDDEN
-}
-
-function toWhatsNewPlatform(platform: PlatformFacts): WhatsNewPlatform | null {
-  switch (platform.appPlatform) {
-    case 'desktop':
-      return 'desktop'
-    case 'ios':
-      return 'ios'
-    case 'android':
-      return null
-  }
+  return 'show'
 }
 
 function selectIsOverride(value: string | null): boolean {
@@ -162,9 +106,9 @@ export interface WhatsNewService {
    */
   dismiss: () => void
   /**
-   * Follows the setup and deep-link signals, and marks a version seen when it
-   * should never show. Call it before the graph boot.
-   * Returns the function that stops it.
+   * Follows how this launch opens its graph, and marks a version seen when it
+   * should never show. Call it before the graph boot. Returns the function
+   * that stops it.
    */
   start(): Unlisten
 }
@@ -173,60 +117,48 @@ export interface WhatsNewServiceDeps {
   readonly storage: StorageService
   readonly platform: PlatformFacts
   readonly window: WindowService
-  readonly graphSession: Store<{ readonly status: GraphStatus }>
-  readonly intake: DeepLinkIntakeService
-  readonly activity: ActivityPort
-  readonly blocker: Store<WhatsNewBlocker>
+  readonly graphSession: GraphSessionService
+  /**
+   * Whether something with priority, like the paywall, holds What's New back.
+   */
+  readonly blocked: Store<boolean>
   readonly content: Readonly<Record<string, readonly WhatsNewItem[]>>
 }
 
 class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
-  readonly #graphOpened = new WritableStore(false)
-  readonly #setupSeen = new WritableStore(false)
-  readonly #deepLinkSeen = new WritableStore(false)
+  readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
   readonly #decision: Store<WhatsNewDecision>
   readonly gate: Store<WhatsNewGate>
   readonly override: Store<boolean>
 
   constructor(deps: WhatsNewServiceDeps) {
     this.#deps = deps
-    const { storage, platform, window, blocker, content } = deps
+    const { storage, platform, window, blocked, content } = deps
     const isMainWindow = window.isMainWindow()
-    const whatsNewPlatform = toWhatsNewPlatform(platform)
+    const items = (content[marketingVersion(platform.appVersion)] ?? []).filter((item) => {
+      return item.platforms.includes(platform.appPlatform)
+    })
+    const shown: WhatsNewGate = { kind: 'whatsNew', items }
     this.override = deriveStore(
       storage.session.store(WHATS_NEW_OVERRIDE_STORAGE_KEY),
       selectIsOverride,
     )
     this.#decision = combineStores(
-      [
-        storage.local.store(WHATS_NEW_SEEN_STORAGE_KEY),
-        this.override,
-        blocker,
-        this.#graphOpened,
-        this.#setupSeen,
-        this.#deepLinkSeen,
-      ],
-      (seen, override, blockerValue, graphOpened, setupSeen, deepLinkSeen) => {
-        return decideWhatsNew(
-          {
-            isMainWindow,
-            isDev: platform.isDev,
-            platform: whatsNewPlatform,
-            version: platform.appVersion,
-            seen,
-            override,
-            blocker: blockerValue,
-            graphOpened,
-            setupSeen,
-            deepLinkSeen,
-          },
-          content,
-        )
+      [storage.local.store(WHATS_NEW_SEEN_STORAGE_KEY), this.override, blocked, this.#launch],
+      (seen, override, blockedValue, launch) => {
+        return decideWhatsNew({
+          isMainWindow,
+          isDev: platform.isDev,
+          items,
+          seen: seen === platform.appVersion,
+          override,
+          blocked: blockedValue,
+          launch,
+        })
       },
-      isDecisionEqual,
     )
-    this.gate = deriveStore(this.#decision, toGate)
+    this.gate = deriveStore(this.#decision, (decision) => (decision === 'show' ? shown : HIDDEN))
   }
 
   readonly setOverride = (next: boolean): void => {
@@ -243,41 +175,33 @@ class WhatsNewServiceImpl implements WhatsNewService {
   }
 
   start(): Unlisten {
-    const { graphSession, intake, activity } = this.#deps
-
+    const { graphSession } = this.#deps
     // Only the statuses before the first open count: a later graph switch
     // also passes through 'choosing'.
-    let stopSetup: Unlisten | null = null
-    const followSetup = (): void => {
+    let setupSeen = false
+    const followLaunch = (): void => {
       const { status } = graphSession.get()
       if (status === 'choosing') {
-        this.#setupSeen.set(true)
+        setupSeen = true
       } else if (status === 'ready') {
-        this.#graphOpened.set(true)
-        stopSetup?.()
-        stopSetup = null
+        this.#launch.set(setupSeen ? 'openedAfterSetup' : 'opened')
+        stopLaunch()
       }
     }
-    stopSetup = graphSession.subscribe(followSetup)
-    followSetup()
+    const stopLaunch = graphSession.subscribe(followLaunch)
+    followLaunch()
 
     const markSkipped = (): void => {
-      if (this.#decision.get().kind === 'skip') {
+      if (this.#decision.get() === 'skip') {
         this.#markSeen()
       }
     }
-    const unlisteners: Unlisten[] = [
-      intake.onUrl(() => this.#deepLinkSeen.set(true)),
-      activity.subscribeHidden(() => this.#deepLinkSeen.set(false)),
-      this.#decision.subscribe(markSkipped),
-    ]
+    const stopDecision = this.#decision.subscribe(markSkipped)
     markSkipped()
 
     return () => {
-      stopSetup?.()
-      for (const unlisten of unlisteners.splice(0)) {
-        unlisten()
-      }
+      stopLaunch()
+      stopDecision()
     }
   }
 }

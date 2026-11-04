@@ -1,7 +1,4 @@
-/**
- * The platforms a What's New item can target.
- */
-export type WhatsNewPlatform = 'desktop' | 'ios'
+import type { AppPlatform } from '@reflect/core'
 
 /**
  * One user-facing change.
@@ -9,12 +6,11 @@ export type WhatsNewPlatform = 'desktop' | 'ios'
 export interface WhatsNewItem {
   readonly title: string
   readonly body: string
-  readonly platforms: readonly WhatsNewPlatform[]
+  readonly platforms: readonly AppPlatform[]
 }
 
 /**
- * User-facing changes keyed by marketing version, newest first. A beta
- * appends to its marketing version's list, so each beta update shows
- * everything so far.
+ * User-facing changes keyed by marketing version. A beta appends to its
+ * marketing version's list, so each beta update shows everything so far.
  */
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {}

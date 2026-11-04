@@ -1,4 +1,4 @@
-import type { CoreServices } from '@reflect/core'
+import { combineStores, WritableStore, type CoreServices, type Store } from '@reflect/core'
 import type { ClipboardService } from './app/clipboard-service.ts'
 import {
   createOpenerService,
@@ -58,7 +58,6 @@ import {
   type MobileOnboardingService,
 } from './graph/mobile-onboarding-service.ts'
 import { createGraphBootService, type GraphBootService } from './graph/graph-boot-service.ts'
-import { createWhatsNewBlocker } from './whats-new/paywall-blocker.ts'
 import { WHATS_NEW } from './whats-new/whats-new-content.ts'
 import { createWhatsNewService, type WhatsNewService } from './whats-new/whats-new-service.ts'
 
@@ -337,10 +336,24 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       platform: core.platform,
       window: host.window,
       graphSession: core.graphSession,
-      intake: core.deepLinkIntake,
-      activity: host.lifecycle,
-      blocker: createWhatsNewBlocker(core),
+      blocked: whatsNewBlocked(core),
       content: WHATS_NEW,
     }),
   }
+}
+
+/**
+ * Whether the paywall shows, or may still show because a check behind it is loading.
+ */
+function whatsNewBlocked(core: CoreServices): Store<boolean> {
+  const { mobile } = core
+  if (mobile === null) {
+    return new WritableStore(false)
+  }
+  return combineStores(
+    [mobile.paywall.gate, mobile.subscription, core.classicAccess, mobile.installClock],
+    (phase, active, classic, clock) => {
+      return phase !== 'hidden' || active.isLoading || classic.isLoading || clock.isLoading
+    },
+  )
 }
