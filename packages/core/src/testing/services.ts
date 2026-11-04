@@ -73,6 +73,7 @@ import { createTestMobileStorageService } from './mobile-storage.ts'
 import {
   createTestAppStoreEnvironmentService,
   createTestClassicAccessService,
+  createTestInstallClockService,
   createTestSubscriptionService,
 } from './monetization.ts'
 import { createTestPersistenceFlushService } from './persistence-flush.ts'
@@ -186,6 +187,7 @@ function createTestServiceFactories(overrides: TestCoreServiceOverrides) {
     subscription: () => createTestSubscriptionService(),
     // A sandbox install keeps the paywall hidden until a test asks for it.
     appStoreEnvironment: () => createTestAppStoreEnvironmentService('Sandbox'),
+    installClock: () => createTestInstallClockService(),
     haptics: () => createTestHapticsService(),
     noteFile: () => createTestNoteFileService(),
     assetStore: () => createTestAssetStoreService(),
@@ -250,7 +252,10 @@ type Override<Base, Narrow> = Omit<Base, keyof Narrow> & Narrow
  */
 export type TestMobileServices = Override<
   MobileServices,
-  Pick<Built<TestServiceFactories>, 'haptics' | 'subscription' | 'appStoreEnvironment'>
+  Pick<
+    Built<TestServiceFactories>,
+    'haptics' | 'subscription' | 'appStoreEnvironment' | 'installClock'
+  >
 >
 
 /**
