@@ -523,7 +523,7 @@ export interface MobileServices {
    */
   readonly appStoreEnvironment: AppStoreEnvironmentService
   /**
-   * Whether the paywall replaces the app, and the actions that lift it.
+   * Whether the paywall covers the app, and the actions that lift it.
    */
   readonly paywall: PaywallService
   /**
