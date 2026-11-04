@@ -66,6 +66,7 @@ class InstallClockServiceImpl implements InstallClockService {
   readonly #enabled: boolean
   readonly #state: WritableStore<InstallClockState>
   #record: InstallClockRecord | null = null
+  #savedLastSeenAt: number | null = null
   #pendingRefresh: Promise<void> | null = null
   #stopWork: Unlisten | null = null
 
@@ -140,6 +141,7 @@ class InstallClockServiceImpl implements InstallClockService {
     const parsed = raw === null ? null : installClockSchema.safeParse(safeParseJson(raw))
     if (parsed?.success === true) {
       this.#record = parsed.data
+      this.#savedLastSeenAt = parsed.data.lastSeenAt
       return
     }
     if (parsed !== null) {
@@ -150,10 +152,16 @@ class InstallClockServiceImpl implements InstallClockService {
     this.#save(this.#record)
   }
 
+  /**
+   * Writes the record. A failed write clears the saved mark, so the next
+   * refresh writes again.
+   */
   #save(record: InstallClockRecord): void {
+    this.#savedLastSeenAt = record.lastSeenAt
     this.#deps.secretStore
       .set(INSTALL_CLOCK_SECRET, JSON.stringify(record))
       .catch((error: unknown) => {
+        this.#savedLastSeenAt = null
         this.#deps.logger.warn('Saving the install clock failed', error)
       })
   }
@@ -171,12 +179,21 @@ class InstallClockServiceImpl implements InstallClockService {
       return
     }
     const effectiveNow = Math.max(now, record.lastSeenAt)
-    if (effectiveNow - record.lastSeenAt >= LAST_SEEN_WRITE_INTERVAL_MS) {
-      this.#record = { ...record, lastSeenAt: effectiveNow }
+    const phase = getPaywallPhase(effectiveNow - record.firstLaunchAt)
+    // The high-water mark moves in memory on every refresh. The keychain gets
+    // it at most once an hour, and also on a phase change, so a clock set
+    // back never rewinds a phase the app has seen.
+    this.#record = { ...record, lastSeenAt: effectiveNow }
+    const saved = this.#savedLastSeenAt
+    if (
+      saved === null ||
+      effectiveNow - saved >= LAST_SEEN_WRITE_INTERVAL_MS ||
+      phase !== getPaywallPhase(saved - record.firstLaunchAt)
+    ) {
       this.#save(this.#record)
     }
     this.#state.set({
-      phase: getPaywallPhase(effectiveNow - record.firstLaunchAt),
+      phase,
       firstLaunchAt: record.firstLaunchAt,
       today: formatIsoDate(new Date(effectiveNow)),
       isLoading: false,

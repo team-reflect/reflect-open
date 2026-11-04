@@ -116,6 +116,48 @@ describe('InstallClockService', () => {
     })
   })
 
+  it('never rewinds a phase seen since the last hourly write', async () => {
+    const firstLaunchAt = NOW + 10 * 60 * 1000 - PAYWALL_HIDDEN_DAYS * DAY_MS
+    withStored(firstLaunchAt, NOW)
+    const installClock = service()
+    await settled(installClock)
+    expect(installClock.get().phase).toBe('hidden')
+
+    await clock.advance(20 * 60 * 1000)
+    activity.emitVisible()
+    await vi.waitFor(() => expect(installClock.get().phase).toBe('skippable'))
+    expect(stored()).toEqual({ firstLaunchAt, lastSeenAt: NOW + 20 * 60 * 1000 })
+
+    clock.setNow(NOW - DAY_MS)
+    activity.emitVisible()
+    await new Promise((resolve) => setTimeout(resolve))
+
+    expect(installClock.get().phase).toBe('skippable')
+  })
+
+  it('writes again after a failed write', async () => {
+    const set = vi
+      .fn<SecretStoreService['set']>()
+      .mockRejectedValueOnce(new Error('keychain locked'))
+      .mockResolvedValue(undefined)
+    const installClock = service({
+      secretStore: {
+        get: vi.fn(() => Promise.resolve(null)),
+        set,
+        delete: vi.fn(() => Promise.resolve()),
+      },
+    })
+    await settled(installClock)
+
+    await vi.waitFor(() => {
+      expect(set).toHaveBeenCalledTimes(2)
+    })
+    expect(set).toHaveBeenLastCalledWith(
+      INSTALL_CLOCK_SECRET,
+      JSON.stringify({ firstLaunchAt: NOW, lastSeenAt: NOW }),
+    )
+  })
+
   it('reads as hidden without writing when the keychain fails, then retries', async () => {
     const get = vi.fn(() => Promise.reject(new Error('keychain locked')))
     const set = vi.fn(() => Promise.resolve())
