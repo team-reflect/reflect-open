@@ -73,7 +73,7 @@ export function useSubscriptionControls(): SubscriptionControls {
     redeemPending: iap.redeemMutation.isPending,
     removeClassicVerificationPending: classicSignOut.isPending,
     // The request flips usePaywallGate to 'show', so the gate in
-    // mobile-app.tsx replaces the app with the paywall immediately. It is
+    // mobile-app.tsx opens the paywall over the app immediately. It is
     // what makes that work outside the App Store, where the gate otherwise
     // never shows the paywall at all.
     subscribe: () => {

@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
 import { Check, CircleAlert, Dot } from 'lucide-react'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button.tsx'
@@ -89,7 +90,8 @@ function StepIcon({ state }: { state: StepState }): ReactElement {
 /**
  * Full-screen progress of a Reflect Classic sign-in, from the moment the
  * sign-in sheet closes until the user acknowledges the result. Renders nothing
- * while idle, while the sheet is open, or after a cancelled sheet.
+ * while idle, while the sheet is open, or after a cancelled sheet. It is a
+ * dialog of its own, so it stacks above an open drawer.
  */
 export function ClassicSignInProgress({ signIn }: { signIn: ClassicSignIn }): ReactElement | null {
   const { classicAccess: classic, logger } = useCoreServices()
@@ -107,69 +109,71 @@ export function ClassicSignInProgress({ signIn }: { signIn: ClassicSignIn }): Re
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal
-      aria-labelledby="classic-sign-in-title"
-      className="fixed inset-0 z-40 flex bg-surface-app px-safe-offset-5 pt-safe-or-6 pb-safe-or-4 text-text"
-    >
-      <div className="mx-auto flex w-full max-w-md flex-col gap-6 py-6">
-        <div className="mt-[20vh] flex flex-col gap-5">
-          <img src={appIcon} alt="" draggable={false} className="size-11 rounded-xl" />
-          <h1 id="classic-sign-in-title" className="text-[24px] font-semibold leading-tight">
-            {screen.title}
-          </h1>
-          <ul className="flex flex-col gap-3" aria-live="polite">
-            {screen.steps.map((step) => (
-              <li
-                key={step.label}
-                className="flex items-start gap-3 text-sm leading-5"
-                data-state={step.state}
+    <DialogPrimitive.Root open disablePointerDismissal>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Popup className="fixed inset-0 z-50 flex bg-surface-app px-safe-offset-5 pt-safe-or-6 pb-safe-or-4 text-text outline-none">
+          <div className="mx-auto flex w-full max-w-md flex-col gap-6 py-6">
+            <div className="mt-[20vh] flex flex-col gap-5">
+              <img src={appIcon} alt="" draggable={false} className="size-11 rounded-xl" />
+              <DialogPrimitive.Title
+                id="classic-sign-in-title"
+                className="text-[24px] font-semibold leading-tight"
               >
-                <span aria-hidden className="flex h-5 shrink-0 items-center">
-                  <StepIcon state={step.state} />
-                </span>
-                <span className={step.state === 'pending' ? 'text-text-muted' : undefined}>
-                  {step.label}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                {screen.title}
+              </DialogPrimitive.Title>
+              <ul className="flex flex-col gap-3" aria-live="polite">
+                {screen.steps.map((step) => (
+                  <li
+                    key={step.label}
+                    className="flex items-start gap-3 text-sm leading-5"
+                    data-state={step.state}
+                  >
+                    <span aria-hidden className="flex h-5 shrink-0 items-center">
+                      <StepIcon state={step.state} />
+                    </span>
+                    <span className={step.state === 'pending' ? 'text-text-muted' : undefined}>
+                      {step.label}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-        <div className="mt-auto flex flex-col items-center gap-4">
-          {mutation.data?.kind === 'signed-in' ? (
-            <Button className="h-12 w-full rounded-xl text-base" onClick={() => void done()}>
-              Start writing
-            </Button>
-          ) : null}
-          {mutation.data?.kind === 'not-eligible' ? (
-            <Button
-              className="h-12 w-full rounded-xl text-base"
-              onClick={() => mutation.mutate(true)}
-            >
-              Use a different account
-            </Button>
-          ) : null}
-          {mutation.isError ? (
-            <Button
-              className="h-12 w-full rounded-xl text-base"
-              onClick={() => mutation.mutate(false)}
-            >
-              Try again
-            </Button>
-          ) : null}
-          {mutation.data?.kind === 'not-eligible' || mutation.isError ? (
-            <button
-              type="button"
-              className="text-sm text-text-secondary underline"
-              onClick={() => mutation.reset()}
-            >
-              Back
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+            <div className="mt-auto flex flex-col items-center gap-4">
+              {mutation.data?.kind === 'signed-in' ? (
+                <Button className="h-12 w-full rounded-xl text-base" onClick={() => void done()}>
+                  Start writing
+                </Button>
+              ) : null}
+              {mutation.data?.kind === 'not-eligible' ? (
+                <Button
+                  className="h-12 w-full rounded-xl text-base"
+                  onClick={() => mutation.mutate(true)}
+                >
+                  Use a different account
+                </Button>
+              ) : null}
+              {mutation.isError ? (
+                <Button
+                  className="h-12 w-full rounded-xl text-base"
+                  onClick={() => mutation.mutate(false)}
+                >
+                  Try again
+                </Button>
+              ) : null}
+              {mutation.data?.kind === 'not-eligible' || mutation.isError ? (
+                <button
+                  type="button"
+                  className="text-sm text-text-secondary underline"
+                  onClick={() => mutation.reset()}
+                >
+                  Back
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </DialogPrimitive.Popup>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }
