@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -12,6 +13,7 @@ import {
 import { watchScrollSettle, type ScrollSettleWatch } from '@/lib/scroll-settle.ts'
 import { cn } from '@/lib/utils.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
+import './swipe-row.css'
 
 interface SwipeRowProps {
   /**
@@ -38,6 +40,11 @@ interface SwipeRowProps {
    * Classes for the opaque surface that covers the actions.
    */
   surfaceClassName: string
+  /**
+   * CSS color behind the actions, seen when an over-swipe pulls them past
+   * the trailing edge. Match the last action, e.g. `var(--color-destructive)`.
+   */
+  overscrollColor: string
   children: ReactNode
 }
 
@@ -57,6 +64,7 @@ export function SwipeRow({
   actions,
   className,
   surfaceClassName,
+  overscrollColor,
   children,
 }: SwipeRowProps): ReactElement {
   const reducedMotion = usePrefersReducedMotion()
@@ -137,6 +145,12 @@ export function SwipeRow({
   )
 
   const actionsStyle = useMemo(() => ({ width: actionWidth }), [actionWidth])
+  const scrollerStyle = useMemo(() => {
+    return {
+      '--swipe-row-overscroll-color': overscrollColor,
+      '--swipe-row-action-width': `${actionWidth}px`,
+    } as CSSProperties
+  }, [overscrollColor, actionWidth])
 
   return (
     <div
@@ -145,8 +159,9 @@ export function SwipeRow({
       // Marks a horizontal scroller.
       data-scroll-x=""
       onPointerDown={onPointerDown}
+      style={scrollerStyle}
       className={cn(
-        'flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
+        'swipe-row flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
         className,
       )}
     >
@@ -154,6 +169,7 @@ export function SwipeRow({
         {children}
       </div>
       <div
+        data-slot="swipe-row-actions"
         className="sticky right-0 flex flex-none"
         style={actionsStyle}
         aria-hidden={!revealed || undefined}
@@ -161,7 +177,13 @@ export function SwipeRow({
       >
         {actions}
       </div>
-      <span aria-hidden className="w-0 flex-none snap-end" />
+      <span
+        // The open snap point: `snap-end` stops the row at scrollLeft = actionWidth.
+        // 1px wide because WebKit ignores zero-width snap areas; `-ml-px` cancels
+        // the extra pixel. See also https://github.com/team-reflect/reflect-open/pull/1926
+        aria-hidden
+        className="-ml-px w-px flex-none snap-end"
+      ></span>
     </div>
   )
 }

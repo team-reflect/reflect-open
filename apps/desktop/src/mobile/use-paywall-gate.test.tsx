@@ -29,10 +29,12 @@ afterEach(() => {
 })
 
 function iosServices() {
-  return createTestCoreServices({
+  const services = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ appPlatform: 'ios' }),
   })
+  services.mobile.installClock.setState({ phase: 'required', dayIndex: 3 })
+  return services
 }
 
 describe('usePaywallGate', () => {
@@ -40,12 +42,29 @@ describe('usePaywallGate', () => {
     const services = iosServices()
     services.mobile.appStoreEnvironment.setState({ value: 'Production' })
     const { result } = await renderHookInApp(() => usePaywallGate(), { core: services })
-    expect(result.current).toBe('show')
+    expect(result.current).toBe('required')
 
     await act(() => {
       services.mobile.appStoreEnvironment.setState({ value: 'Sandbox' })
     })
-    expect(result.current).toBe('hide')
+    expect(result.current).toBe('hidden')
+  })
+
+  it('records the day the skippable paywall opens and shows it once that day', async () => {
+    const services = iosServices()
+    services.mobile.appStoreEnvironment.setState({ value: 'Production' })
+    services.mobile.installClock.setState({ phase: 'skippable' })
+    const first = await renderHookInApp(() => usePaywallGate(), { core: services })
+    expect(first.result.current).toBe('skippable')
+    await vi.waitFor(() => expect(services.mobile.paywall.requested.get()).toBe(true))
+
+    await act(() => {
+      services.mobile.paywall.dismissSkippable()
+    })
+    expect(first.result.current).toBe('hidden')
+
+    const second = await renderHookInApp(() => usePaywallGate(), { core: services })
+    expect(second.result.current).toBe('hidden')
   })
 
   it('does not re-render when a check changes without moving the gate', async () => {
@@ -59,14 +78,14 @@ describe('usePaywallGate', () => {
       },
       { core: services },
     )
-    expect(result.current).toBe('show')
+    expect(result.current).toBe('required')
     const settled = renders
 
     await act(() => {
       services.mobile.subscription.setState({ isError: true })
       services.classicAccess.setState({ access: null })
     })
-    expect(result.current).toBe('show')
+    expect(result.current).toBe('required')
     expect(renders).toBe(settled)
   })
 
@@ -121,6 +140,7 @@ describe('usePaywallGate', () => {
         subscription,
         classicAccess,
         appStoreEnvironment,
+        installClock: base.mobile.installClock,
         iap,
         appStore,
         platform: base.platform,
@@ -147,15 +167,15 @@ describe('usePaywallGate', () => {
       await vi.waitFor(() => {
         expect(services.mobile.appStoreEnvironment.get().value).toBe('Sandbox')
       })
-      expect(result.current.gate).toBe('hide')
+      expect(result.current.gate).toBe('hidden')
 
       await act(() => {
         result.current.requested[1](true)
       })
-      await vi.waitFor(() => expect(result.current.gate).toBe('show'))
+      await vi.waitFor(() => expect(result.current.gate).toBe('skippable'))
 
       await act(() => services.mobile.paywall.purchase(IAP_PRODUCT_IDS.monthly))
-      await vi.waitFor(() => expect(result.current.gate).toBe('hide'))
+      await vi.waitFor(() => expect(result.current.gate).toBe('hidden'))
       expect(iap.purchases()).toEqual([IAP_PRODUCT_IDS.monthly])
     })
   })

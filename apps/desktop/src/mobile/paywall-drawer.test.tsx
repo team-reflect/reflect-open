@@ -1,8 +1,12 @@
+import { userEvent } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   IAP_PRODUCT_IDS,
+  PAYWALL_HIDDEN_DAYS,
+  PAYWALL_SKIPPABLE_DAYS,
   createPaywallService,
+  type PaywallPhase,
   type CoreServices,
   type ClassicSignInOptions,
   type ClassicSignInResult,
@@ -13,16 +17,20 @@ import {
   createTestAppStoreService,
   createTestClassicAccessService,
   createTestIapService,
+  createTestInstallClockService,
   createTestPlatformService,
   createTestSubscriptionService,
   type TestClassicAccessService,
+  type TestInstallClockService,
   type TestLoggerService,
   type TestSubscriptionService,
 } from '@reflect/core/testing'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { PaywallScreen } from './paywall-screen.tsx'
+import { PaywallDrawer } from './paywall-drawer.tsx'
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 const YEARLY_PRODUCT = {
   formattedPrice: '$99999.99',
@@ -42,6 +50,8 @@ let purchases: string[]
 let syncs: number
 let redeems: number
 let subscription: TestSubscriptionService
+let installClock: TestInstallClockService
+let dismissals: number
 let classicAccess: TestClassicAccessService
 let logger: TestLoggerService
 let services: CoreServices
@@ -50,8 +60,16 @@ let queryClient: QueryClient
 /**
  * Render the paywall over the services of the running test.
  */
-async function mount(): Promise<InAppRenderResult<CoreServices>> {
-  const view = await renderInApp(<PaywallScreen />, { core: services })
+async function mount(gate: PaywallPhase = 'required'): Promise<InAppRenderResult<CoreServices>> {
+  const view = await renderInApp(
+    <PaywallDrawer
+      gate={gate}
+      onDismiss={() => {
+        dismissals += 1
+      }}
+    />,
+    { core: services },
+  )
   queryClient = view.queryClient
   return view
 }
@@ -72,12 +90,14 @@ beforeEach(() => {
   purchases = []
   syncs = 0
   redeems = 0
+  dismissals = 0
   const base = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     platform: createTestPlatformService({ appPlatform: 'ios' }),
   })
   logger = base.logger
   subscription = createTestSubscriptionService()
+  installClock = createTestInstallClockService()
   classicAccess = createTestClassicAccessService()
   const iap = createTestIapService()
   vi.spyOn(iap, 'getProducts').mockImplementation(() => getProducts())
@@ -100,10 +120,12 @@ beforeEach(() => {
     mobile: {
       ...base.mobile,
       subscription,
+      installClock,
       paywall: createPaywallService({
         subscription,
         classicAccess,
         appStoreEnvironment: base.mobile.appStoreEnvironment,
+        installClock,
         iap,
         appStore,
         platform: base.platform,
@@ -113,7 +135,92 @@ beforeEach(() => {
   }
 })
 
-describe('PaywallScreen products', () => {
+describe('PaywallDrawer modes', () => {
+  it('shows the free days left and a Later button when skippable', async () => {
+    installClock.setState({ firstLaunchAt: services.clock.now() - PAYWALL_HIDDEN_DAYS * DAY_MS })
+    const view = await mount('skippable')
+
+    await expect.element(view.getByRole('dialog', { name: 'Enjoying Reflect?' })).toBeVisible()
+    await expect.element(view.getByText(`${PAYWALL_SKIPPABLE_DAYS} free days left`)).toBeVisible()
+    await expect
+      .element(
+        view.getByText(
+          `Day ${PAYWALL_HIDDEN_DAYS + 1} of ${PAYWALL_HIDDEN_DAYS + PAYWALL_SKIPPABLE_DAYS}`,
+        ),
+      )
+      .toBeVisible()
+    await view.getByRole('button', { name: 'Later' }).click()
+    expect(dismissals).toBe(1)
+  })
+
+  it('leaves out the countdown when the first launch is unknown', async () => {
+    const view = await mount('skippable')
+
+    await expect.element(view.getByRole('button', { name: 'Later' })).toBeVisible()
+    expect(view.getByText(/free days? left/).query()).toBeNull()
+    expect(view.getByRole('progressbar').query()).toBeNull()
+  })
+
+  it('leaves out the countdown when the free days have run out', async () => {
+    installClock.setState({ firstLaunchAt: services.clock.now() - 100 * DAY_MS })
+    const view = await mount('skippable')
+
+    await expect.element(view.getByRole('button', { name: 'Later' })).toBeVisible()
+    expect(view.getByText(/free days? left/).query()).toBeNull()
+    expect(view.getByRole('progressbar').query()).toBeNull()
+  })
+
+  it('has no Later button and reassures when required', async () => {
+    const view = await mount('required')
+
+    await expect.element(view.getByRole('dialog', { name: 'Unlock Reflect Pro' })).toBeVisible()
+    await expect.element(view.getByText('Cancel in two taps.')).toBeVisible()
+    await expect.element(view.getByText('Your notes stay yours.')).toBeVisible()
+    await expect.element(view.getByText('Private by default.')).toBeVisible()
+    expect(view.getByRole('button', { name: 'Later' }).query()).toBeNull()
+  })
+
+  it.each(['skippable', 'required'] as const)(
+    'offers Subscribe, restore, redeem, and the legal links when %s',
+    async (gate) => {
+      const view = await mount(gate)
+
+      await expect.element(view.getByRole('button', { name: 'Subscribe' })).toBeVisible()
+      for (const name of ['Redeem a code', 'Restore Purchases', 'Terms of Use', 'Privacy Policy']) {
+        await expect.element(view.getByRole('button', { name })).toBeInTheDocument()
+      }
+      expect(document.body.textContent).not.toMatch(/trial/i)
+    },
+  )
+
+  it('renders nothing while hidden', async () => {
+    const view = await mount('hidden')
+
+    await expect.element(view.getByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('stays open on Escape when required', async () => {
+    const view = await mount('required')
+    const dialog = view.getByRole('dialog', { name: 'Unlock Reflect Pro' })
+    await expect.element(dialog).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(dialog).toBeVisible()
+    expect(dismissals).toBe(0)
+  })
+
+  it('dismisses on Escape when skippable', async () => {
+    const view = await mount('skippable')
+    await expect.element(view.getByRole('dialog', { name: 'Enjoying Reflect?' })).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(dismissals).toBe(1)
+  })
+})
+
+describe('PaywallDrawer products', () => {
   it('shows the existing failure UI when a required product is missing', async () => {
     getProducts = () => Promise.resolve([YEARLY_PRODUCT])
     const view = await mount()
@@ -129,24 +236,24 @@ describe('PaywallScreen products', () => {
   })
 })
 
-describe('PaywallScreen purchase mutation', () => {
+describe('PaywallDrawer purchase mutation', () => {
   it('purchases the yearly plan, disables every action, and invalidates on success', async () => {
     const pendingPurchase = Promise.withResolvers<void>()
     purchase = () => pendingPurchase.promise
     const view = await mount()
-    const trial = view.getByRole('button', { name: 'Start 7-day free trial' })
+    const subscribe = view.getByRole('button', { name: 'Subscribe' })
 
-    await expect.element(trial).toBeVisible()
-    await trial.click()
+    await expect.element(subscribe).toBeVisible()
+    await subscribe.click()
 
-    await expect.element(trial).toBeDisabled()
+    await expect.element(subscribe).toBeDisabled()
     await expect.element(view.getByRole('radio', { name: /Yearly/ })).toBeDisabled()
     await expect.element(view.getByRole('radio', { name: /Monthly/ })).toBeDisabled()
     await expect
       .element(view.getByRole('button', { name: /Already a Reflect member/ }))
       .toBeDisabled()
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeDisabled()
-    await expect.element(trial.getByTestId('spinner')).toBeInTheDocument()
+    await expect.element(subscribe.getByTestId('spinner')).toBeInTheDocument()
     expect(purchases).toEqual([IAP_PRODUCT_IDS.yearly])
     const activePurchase = queryClient
       .getMutationCache()
@@ -159,27 +266,27 @@ describe('PaywallScreen purchase mutation', () => {
 
     pendingPurchase.resolve()
     await vi.waitFor(() => expect(invalidations()).toBe(1))
-    await expect.element(trial).not.toBeDisabled()
+    await expect.element(subscribe).not.toBeDisabled()
   })
 
   it('uses the monthly initiator and treats a rejected purchase as fail soft', async () => {
     purchase = () => Promise.reject(new Error('cancelled'))
     const view = await mount()
-    await expect.element(view.getByRole('button', { name: 'Start 7-day free trial' })).toBeVisible()
+    await expect.element(view.getByRole('button', { name: 'Subscribe' })).toBeVisible()
 
     await view.getByRole('radio', { name: /Monthly/ }).click()
-    const trial = view.getByRole('button', { name: 'Start 7-day free trial' })
-    await trial.click()
+    const subscribe = view.getByRole('button', { name: 'Subscribe' })
+    await subscribe.click()
 
     await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0))
     expect(purchases).toEqual([IAP_PRODUCT_IDS.monthly])
     expect(invalidations()).toBe(0)
-    await expect.element(trial).not.toBeDisabled()
+    await expect.element(subscribe).not.toBeDisabled()
     expect(view.getByText(/cancelled/).query()).toBeNull()
   })
 })
 
-describe('PaywallScreen offer code', () => {
+describe('PaywallDrawer offer code', () => {
   it('opens the in-app redemption sheet and refetches entitlements after it closes', async () => {
     const pendingRedeem = Promise.withResolvers<void>()
     redeem = () => pendingRedeem.promise
@@ -190,9 +297,7 @@ describe('PaywallScreen offer code', () => {
     await button.click()
 
     await expect.element(view.getByRole('button', { name: 'Opening…' })).toBeDisabled()
-    await expect
-      .element(view.getByRole('button', { name: 'Start 7-day free trial' }))
-      .toBeDisabled()
+    await expect.element(view.getByRole('button', { name: 'Subscribe' })).toBeDisabled()
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeDisabled()
     expect(redeems).toBe(1)
     expect(invalidations()).toBe(0)
@@ -233,7 +338,7 @@ describe('PaywallScreen offer code', () => {
   })
 })
 
-describe('PaywallScreen restore mutation', () => {
+describe('PaywallDrawer restore mutation', () => {
   it('syncs with the App Store and shows the no-purchase message when nothing is owned', async () => {
     const view = await mount()
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeVisible()
@@ -282,7 +387,7 @@ describe('PaywallScreen restore mutation', () => {
       .element(view.getByText('No previous purchase found for this Apple account.'))
       .toBeVisible()
 
-    await view.getByRole('button', { name: 'Start 7-day free trial' }).click()
+    await view.getByRole('button', { name: 'Subscribe' }).click()
 
     expect(view.getByText(/No previous purchase/).query()).toBeNull()
     pendingPurchase.resolve()
@@ -298,11 +403,9 @@ describe('PaywallScreen restore mutation', () => {
     await view.getByRole('button', { name: 'Restore Purchases' }).click()
 
     await expect.element(view.getByRole('button', { name: 'Restoring…' })).toBeDisabled()
+    await expect.element(view.getByRole('button', { name: 'Subscribe' })).toBeDisabled()
     await expect
-      .element(view.getByRole('button', { name: 'Start 7-day free trial' }))
-      .toBeDisabled()
-    await expect
-      .element(view.getByRole('button', { name: 'Start 7-day free trial' }).getByTestId('spinner'))
+      .element(view.getByRole('button', { name: 'Subscribe' }).getByTestId('spinner'))
       .not.toBeInTheDocument()
     const activeRestore = queryClient
       .getMutationCache()
@@ -314,7 +417,7 @@ describe('PaywallScreen restore mutation', () => {
   })
 })
 
-describe('PaywallScreen Reflect Classic verification', () => {
+describe('PaywallDrawer Reflect Classic verification', () => {
   const CLAIM = /Already a Reflect member/
   const SIGN_IN = /Sign in here/
 

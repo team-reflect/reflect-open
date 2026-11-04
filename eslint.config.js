@@ -124,8 +124,6 @@ const DESKTOP_VI_MOCK_ALLOW = [
   '@/editor/note-editor.tsx',
   // The read-only Markdown renderer loads the same editor stack.
   '@/editor/markdown-preview.tsx',
-  // The carousel engine measures real layout; tests script its API.
-  'embla-carousel-react',
 ]
 
 /** Extra specifiers for one desktop test file, each with its reason. */
@@ -275,7 +273,18 @@ export default defineESLintConfig(
   {
     files: [`**/*.${SOURCE_EXTENSIONS}`],
     plugins: { architecture: architecturePlugin },
-    rules: { 'architecture/maybe-promise': 'error' },
+    rules: {
+      'architecture/maybe-promise': 'error',
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'AbortSignal',
+          property: 'any',
+          message:
+            'Use `anySignal` (`apps/desktop/src/lib/any-signal.ts`): WebKit can collect an `AbortSignal.any` result that only listener options hold.',
+        },
+      ],
+    },
   },
   {
     files: [`packages/core/**/*.${SOURCE_EXTENSIONS}`],

@@ -8,5 +8,5 @@ import type { HapticsService } from '@reflect/core'
  * fail-soft; see `HapticsService.impactLight`.
  */
 export function hapticImpactLight(haptics: HapticsService): void {
-  void haptics.impactLight().catch(() => {})
+  void haptics.impactLight()
 }

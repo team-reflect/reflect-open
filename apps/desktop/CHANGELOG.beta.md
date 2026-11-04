@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.18.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.3...v0.18.0-beta.4) (2026-11-04)
+
+
+### Features
+
+* **desktop:** offer What's New in a toast after an update ([#1963](https://github.com/team-reflect/reflect-open/issues/1963)) ([982c4f1](https://github.com/team-reflect/reflect-open/commit/982c4f133d60c546c125b9f8a5d6de4e12884dcb))
+
+
+### Bug Fixes
+
+* **desktop:** keep What's New items during the close animation ([#1962](https://github.com/team-reflect/reflect-open/issues/1962)) ([cade3ef](https://github.com/team-reflect/reflect-open/commit/cade3efb0463ff8abdf7924794942c597e2d56ef))
+* **mobile:** make the week strip scroll smoothly ([#1957](https://github.com/team-reflect/reflect-open/issues/1957)) ([8e1baca](https://github.com/team-reflect/reflect-open/commit/8e1bacab1862004267b3f4720d01a5b2bc4e2d92))
+
+## [0.18.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.2...v0.18.0-beta.3) (2026-11-04)
+
+
+### Features
+
+* **mobile:** add drawer depth effect ([#1954](https://github.com/team-reflect/reflect-open/issues/1954)) ([6b18f5a](https://github.com/team-reflect/reflect-open/commit/6b18f5adfde72b51ff414b41575424f49abb3651))
+* **mobile:** invite users to send feedback ([#1947](https://github.com/team-reflect/reflect-open/issues/1947)) ([5912d17](https://github.com/team-reflect/reflect-open/commit/5912d1703f6ff066a9cda85d256b1c870cb784c2))
+
+
+### Bug Fixes
+
+* **mobile:** make swiping between days smoother ([#1939](https://github.com/team-reflect/reflect-open/issues/1939)) ([15aebea](https://github.com/team-reflect/reflect-open/commit/15aebea8e523661af563c978070cd6a1e735a22b))
+
+## [0.18.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.1...v0.18.0-beta.2) (2026-11-04)
+
+
+### Features
+
+* show What's New after an update ([#1944](https://github.com/team-reflect/reflect-open/issues/1944)) ([2f6759d](https://github.com/team-reflect/reflect-open/commit/2f6759dbe47ec313dc397dfb955bbd272f689452))
+
+
+### Bug Fixes
+
+* **core:** log a failed V1 import cancel ([#1951](https://github.com/team-reflect/reflect-open/issues/1951)) ([b69decb](https://github.com/team-reflect/reflect-open/commit/b69decb358d278fb166ed8d27da351fb897a6aed))
+* **core:** log failed background attachment listings ([#1948](https://github.com/team-reflect/reflect-open/issues/1948)) ([405a402](https://github.com/team-reflect/reflect-open/commit/405a40280751d3d7fc80e205efc157e83b2eae73))
+* **core:** log failed deletes of discarded audio memo segments ([#1950](https://github.com/team-reflect/reflect-open/issues/1950)) ([3ed8844](https://github.com/team-reflect/reflect-open/commit/3ed88445259bbf8f902fc8fba4c4c5430420c4fa))
+
+## [0.18.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.17.0...v0.18.0-beta.1) (2026-11-04)
+
+
+### Features
+
+* **mobile:** show the remaining trial days ([#1932](https://github.com/team-reflect/reflect-open/issues/1932)) ([ecafd7b](https://github.com/team-reflect/reflect-open/commit/ecafd7bd1c4f2655c317d47d906087877d4b8143))
+
+
+### Bug Fixes
+
+* **mobile:** fill over-swiped swipe rows with the last action color ([#1933](https://github.com/team-reflect/reflect-open/issues/1933)) ([7f4bb85](https://github.com/team-reflect/reflect-open/commit/7f4bb85c346b90f5eb2b20e31a49943ad00734d6))
+
+## [0.17.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.5...v0.17.0-beta.6) (2026-11-04)
+
+
+### Bug Fixes
+
+* **mobile:** iOS All tab forgets a trashed note ([#1930](https://github.com/team-reflect/reflect-open/issues/1930)) ([267c822](https://github.com/team-reflect/reflect-open/commit/267c8220bbdbc705ad425d6fa3ed624334ee83f2))
+* **mobile:** keep swipe rows from stopping half open in WebKit ([#1926](https://github.com/team-reflect/reflect-open/issues/1926)) ([a403a87](https://github.com/team-reflect/reflect-open/commit/a403a8757865c06d207041eef79b13fde57eb91c))
+
 ## [0.17.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.4...v0.17.0-beta.5) (2026-11-02)
 
 

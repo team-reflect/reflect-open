@@ -19,6 +19,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { apply as applyMergePatch } from 'tiny-merge-patch'
 import { exec } from 'tinyexec'
@@ -357,6 +358,24 @@ async function createUpdaterArchive(bundle: Bundle): Promise<void> {
 }
 
 /**
+ * Runs `hdiutil` up to 3 times. On CI runners it sometimes fails with
+ * "Resource busy" while the system still holds the image.
+ */
+async function runHdiutil(args: readonly string[]): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    const { exitCode } = await exec('hdiutil', args, { nodeOptions: { stdio: 'inherit' } })
+    if (exitCode === 0) {
+      return
+    }
+    if (attempt === 3) {
+      throw new Error(`hdiutil ${args[0]} failed with exit code ${exitCode}`)
+    }
+    log(`hdiutil ${args[0]} failed, retrying in ${attempt * 5}s`)
+    await sleep(attempt * 5000)
+  }
+}
+
+/**
  * Tauri's DMG script drives Finder and is brittle on CI. `hdiutil` under-sizes
  * a compressed image made straight from a folder, so build a writable image
  * with headroom first, then compress it.
@@ -372,11 +391,11 @@ async function createDmg(bundle: Bundle, signer: Signer, tempDir: string): Promi
   const usedKb = Number(usage.stdout.split('\t')[0])
   const sizeMb = Math.ceil(usedKb / 1024) * 2 + 32
   const volumeName = basename(bundle.app, '.app')
-  const createArgs = ['-volname', volumeName, '-srcfolder', stagingDir, '-format', 'UDRW']
-  await exec('hdiutil', ['create', ...createArgs, '-size', `${sizeMb}m`, writableDmg], INHERIT)
+  const createArgs = ['-volname', volumeName, '-srcfolder', stagingDir, '-format', 'UDRW', '-ov']
+  await runHdiutil(['create', ...createArgs, '-size', `${sizeMb}m`, writableDmg])
   mkdirSync(dirname(bundle.dmg), { recursive: true })
   const convertArgs = ['-format', 'UDZO', '-imagekey', 'zlib-level=9', '-ov', '-o', bundle.dmg]
-  await exec('hdiutil', ['convert', writableDmg, ...convertArgs], INHERIT)
+  await runHdiutil(['convert', writableDmg, ...convertArgs])
   await runCodesign(signer, [bundle.dmg])
 }
 

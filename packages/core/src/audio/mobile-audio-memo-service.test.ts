@@ -292,6 +292,28 @@ describe('MobileAudioMemoService.openSession', () => {
     expect(kit.assetStore.assets().size).toBe(0)
   })
 
+  it('logs a segment that a discard fails to delete', async () => {
+    const kit = await setup()
+    const landed = audioMemoPartPath(MEMO, 1, false)
+    kit.noteFile.set(landed, 'x')
+    const cause = new Error('disk busy')
+    vi.spyOn(kit.assetStore, 'deleteAudioMemo').mockRejectedValue(cause)
+    const session = await kit.open()
+
+    session.toggle()
+    await flush()
+    kit.recorder.emitSegment(ROTATED)
+    await flush()
+
+    await session.cancelRecording()
+    await flush()
+
+    expect(kit.logger.getWarnings()).toContainEqual({
+      message: 'deleting an audio memo segment failed:',
+      cause,
+    })
+  })
+
   it('a straggler segment from a discarded session is dropped, not resurrected', async () => {
     const kit = await setup()
     const session = await kit.open()

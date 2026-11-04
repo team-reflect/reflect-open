@@ -39,7 +39,7 @@ function WeekRowComponent({
   const days = Array.from({ length: 7 }, (_, index) => addDaysToIsoDate(weekStart, index))
   const selectedIndex = selectedDay ? days.indexOf(selectedDay) : -1
   return (
-    <div className="relative flex min-w-0 flex-[0_0_100%]">
+    <div className="relative flex w-full shrink-0 snap-start snap-always">
       {selectedIndex >= 0 && (
         /* One circle per row, translated to the selected column, so moving
            within the week slides it behind the day numbers (the buttons are

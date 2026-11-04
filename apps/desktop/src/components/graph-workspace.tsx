@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { PaletteProvider } from '@/components/command-palette/palette-provider.tsx'
 import { NoteWindowContent } from '@/components/note-window-content.tsx'
+import { WhatsNewDialog } from '@/components/whats-new/whats-new-dialog.tsx'
 import { WorkspaceContent } from '@/components/workspace-content.tsx'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider.tsx'
 import { FocusedDailyProvider } from '@/providers/focused-daily-provider.tsx'
@@ -55,6 +56,7 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
                       {appWindow.isMainWindow() ? (
                         <V1ImportProvider>
                           <WorkspaceContent graph={graph} />
+                          <WhatsNewDialog />
                         </V1ImportProvider>
                       ) : (
                         <NoteWindowContent />

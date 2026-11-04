@@ -1,192 +1,244 @@
 import { act } from '@/test-utils/act.ts'
-import { cleanup, renderHook } from 'vitest-browser-react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState, type ReactElement } from 'react'
+import { describe, expect, it, vi } from 'vitest'
 import type { WeekStartDay } from '@reflect/core'
 import { getUserWeekStart } from '@reflect/core'
 import { createWeekWindow, weekAtIndex, weekIndexOf } from '@reflect/app'
-import { shouldRecenterWeeks, useWeekStrip } from './use-week-strip.ts'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
+import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { scrollElement, touch } from '@/test-utils/scroll.ts'
+import { shouldRecenterWeeks, useWeekStrip, type WeekStrip } from './use-week-strip.ts'
 
 /**
- * The strip's Embla wiring — window rebuilds landing on the anchor, the
- * browse-vs-follow echo guard, and the week-start realignment — driven through
- * a fake Embla API: jsdom can't host the carousel's pointer gestures, so the
- * fake exposes the settled-swipe events the real one would fire.
+ * The strip's paging driven through a real native scroller: a finger scroll
+ * stands in for a swipe, since nothing in the strip handles touches itself.
  */
-
-const embla = vi.hoisted(() => {
-  const handlers = new Map<string, Set<(api: unknown) => void>>()
-  let selected = 0
-
-  const api = {
-    selectedScrollSnap: (): number => selected,
-    on: (event: string, handler: (api: unknown) => void) => {
-      let registered = handlers.get(event)
-      if (!registered) {
-        registered = new Set()
-        handlers.set(event, registered)
-      }
-      registered.add(handler)
-      return api
-    },
-    off: (event: string, handler: (api: unknown) => void) => {
-      handlers.get(event)?.delete(handler)
-      return api
-    },
-    scrollTo: vi.fn((index: number) => {
-      selected = index
-    }),
-    reInit: vi.fn((options?: { startIndex?: number }) => {
-      if (options?.startIndex !== undefined) {
-        selected = options.startIndex
-      }
-    }),
-  }
-
-  function emit(event: string): void {
-    for (const handler of handlers.get(event) ?? []) {
-      handler(api)
-    }
-  }
-
-  return {
-    api,
-    /** Land on `index` and fire select + settle, as a finished swipe would. */
-    settleAt(index: number): void {
-      selected = index
-      emit('select')
-      emit('settle')
-    },
-    reset(): void {
-      handlers.clear()
-      selected = 0
-      api.scrollTo.mockClear()
-      api.reInit.mockClear()
-    },
-  }
-})
-
-vi.mock('embla-carousel-react', () => ({
-  default: () => [() => {}, embla.api],
-}))
-
-afterEach(async () => {
-  await cleanup()
-  embla.reset()
-})
 
 /** 2026-06-12 is a Friday; its Monday-start week (2026-06-08) anchors the window. */
 const DATE = '2026-06-12'
 const WEEK_START: WeekStartDay = 'monday'
+const WIDTH = 390
 const initialWindow = createWeekWindow(DATE, WEEK_START)
+const ANCHOR = initialWindow.anchorIndex
 
-async function mountStrip(date: string = DATE, weekStart: WeekStartDay = WEEK_START) {
-  return await renderHook(
-    (
-      {
-        date: currentDate,
-        weekStart: currentWeekStart,
-      }: { date: string; weekStart: WeekStartDay } = { date, weekStart },
-    ) => useWeekStrip(currentDate, currentWeekStart),
-    { initialProps: { date, weekStart } },
-  )
+interface StripProps {
+  date: string
+  weekStart: WeekStartDay
+  width: number
+}
+
+async function mountStrip(options?: { reducedMotion?: boolean }) {
+  const strip: { current: WeekStrip | null } = { current: null }
+  const update: { current: (props: Partial<StripProps>) => void } = { current: () => {} }
+  function Harness(): ReactElement {
+    const [props, setProps] = useState<StripProps>({
+      date: DATE,
+      weekStart: WEEK_START,
+      width: WIDTH,
+    })
+    update.current = (next) => setProps((current) => ({ ...current, ...next }))
+    const current = useWeekStrip(props.date, props.weekStart)
+    strip.current = current
+    return (
+      <div
+        ref={current.scrollerRef}
+        style={{
+          display: 'flex',
+          width: props.width,
+          overflowX: 'auto',
+          scrollSnapType: 'x mandatory',
+        }}
+      >
+        {Array.from({ length: current.weekWindow.count }, (_, index) => (
+          <div
+            key={weekAtIndex(current.weekWindow, index)}
+            style={{
+              width: '100%',
+              height: 40,
+              flexShrink: 0,
+              scrollSnapAlign: 'start',
+              scrollSnapStop: 'always',
+            }}
+          >
+            <button type="button">day</button>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  const screen = await renderInApp(<Harness />, {
+    platform: MOBILE_PLATFORM,
+    appServices: {
+      systemPreferences: createTestSystemPreferencesService({
+        reducedMotion: options?.reducedMotion ?? false,
+      }),
+    },
+  })
+  const scroller = screen.container.querySelector<HTMLElement>('div[style*="overflow"]')!
+  await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ANCHOR * WIDTH))
+  return {
+    scroller,
+    strip: (): WeekStrip => strip.current!,
+    update: async (props: Partial<StripProps>) => {
+      await act(() => update.current(props))
+    },
+  }
 }
 
 describe('useWeekStrip', () => {
-  it('rebuilds the window when a swipe settles near an edge and reinits onto the anchor', async () => {
-    const { result } = await mountStrip()
+  it('rebuilds the window when a swipe settles near an edge and stays on the browsed week', async () => {
+    const { scroller, strip } = await mountStrip()
 
-    await act(() => embla.settleAt(1))
+    await scrollElement({ element: scroller, left: WIDTH, touch: true })
 
     const browsedWeek = weekAtIndex(initialWindow, 1)
     const rebuilt = createWeekWindow(browsedWeek, WEEK_START)
-    expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({
-      startIndex: rebuilt.anchorIndex,
-    })
-    // The browsed week became the rebuilt window's anchor — still on screen.
-    expect(result.current.displayedWeekStart).toBe(browsedWeek)
-    expect(embla.api.scrollTo).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(strip().weekWindow).toEqual(rebuilt))
+    expect(scroller.scrollLeft).toBe(rebuilt.anchorIndex * WIDTH)
+    expect(strip().displayedWeekStart).toBe(browsedWeek)
   })
 
   it('leaves a mid-window settle alone', async () => {
-    const { result } = await mountStrip()
+    const { scroller, strip } = await mountStrip()
 
-    await act(() => embla.settleAt(28))
+    await scrollElement({ element: scroller, left: (ANCHOR + 2) * WIDTH, touch: true })
 
-    expect(result.current.weekWindow).toEqual(initialWindow)
-    expect(result.current.displayedWeekStart).toBe(weekAtIndex(initialWindow, 28))
-    expect(embla.api.reInit).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      return expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 2))
+    })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(strip().weekWindow).toEqual(initialWindow)
+    expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
+  })
+
+  it('shows the week nearest a finger scroll before the scroll settles', async () => {
+    const { scroller, strip } = await mountStrip()
+
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (ANCHOR + 1) * WIDTH, behavior: 'instant' }))
+
+    await vi.waitFor(() => {
+      return expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 1))
+    })
+    await touch(scroller, 'end')
+  })
+
+  it('pulls a scroll that no finger started back to the displayed week', async () => {
+    const { scroller, strip } = await mountStrip()
+
+    await act(() => {
+      scroller.scrollLeft = (ANCHOR + 3) * WIDTH
+    })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ANCHOR * WIDTH))
+    expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR))
+  })
+
+  it('shows the week of a day that keyboard focus moves to', async () => {
+    const { scroller, strip } = await mountStrip()
+
+    await act(() => {
+      scroller.children[ANCHOR + 2]?.querySelector('button')?.focus()
+    })
+
+    expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 2))
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
   })
 
   it('follows an in-window date change without snapping back while browsing', async () => {
-    const { result, rerender } = await mountStrip()
+    const { scroller, strip, update } = await mountStrip()
 
-    // Browse two weeks ahead of the selection: the echo guard must keep the
-    // re-render from scrolling the strip back to the (unchanged) date's week.
-    await act(() => embla.settleAt(28))
-    expect(embla.api.scrollTo).not.toHaveBeenCalled()
+    // Browse two weeks ahead of the selection: a re-render must not scroll the
+    // strip back to the (unchanged) date's week.
+    await scrollElement({ element: scroller, left: (ANCHOR + 2) * WIDTH, touch: true })
+    await update({ width: WIDTH })
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
 
-    // A real date change is followed with a plain scroll — no rebuild.
-    await rerender({ date: '2026-06-19', weekStart: WEEK_START })
-    expect(embla.api.scrollTo).toHaveBeenCalledWith(27)
-    expect(result.current.displayedWeekStart).toBe(weekAtIndex(initialWindow, 27))
-    expect(result.current.weekWindow).toEqual(initialWindow)
-    expect(embla.api.reInit).not.toHaveBeenCalled()
+    await update({ date: '2026-06-19' })
+    expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 1))
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe((ANCHOR + 1) * WIDTH))
+    expect(strip().weekWindow).toEqual(initialWindow)
+  })
+
+  it('jumps to a followed week at once when the user prefers reduced motion', async () => {
+    const { scroller, update } = await mountStrip({ reducedMotion: true })
+
+    await update({ date: '2026-06-19' })
+
+    expect(scroller.scrollLeft).toBe((ANCHOR + 1) * WIDTH)
   })
 
   it('showWeekOf scrolls to an in-window target', async () => {
-    const { result } = await mountStrip()
+    const { scroller, strip } = await mountStrip()
 
-    await act(() => result.current.showWeekOf('2026-06-19'))
+    await act(() => strip().showWeekOf('2026-06-19'))
 
-    expect(embla.api.scrollTo).toHaveBeenCalledWith(27)
-    expect(result.current.displayedWeekStart).toBe(weekAtIndex(initialWindow, 27))
-    expect(result.current.weekWindow).toEqual(initialWindow)
+    expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 1))
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe((ANCHOR + 1) * WIDTH))
+    expect(strip().weekWindow).toEqual(initialWindow)
   })
 
   it('showWeekOf rebuilds the window around an out-of-window target', async () => {
-    const { result } = await mountStrip()
+    const { scroller, strip } = await mountStrip()
     const target = '2027-06-12'
     expect(weekIndexOf(initialWindow, target, WEEK_START)).toBe(-1)
 
-    await act(() => result.current.showWeekOf(target))
+    await act(() => strip().showWeekOf(target))
 
     const rebuilt = createWeekWindow(target, WEEK_START)
-    expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({
-      startIndex: rebuilt.anchorIndex,
-    })
-    expect(result.current.displayedWeekStart).toBe(getUserWeekStart(target, WEEK_START))
-    expect(embla.api.scrollTo).not.toHaveBeenCalled()
+    expect(strip().weekWindow).toEqual(rebuilt)
+    expect(strip().displayedWeekStart).toBe(getUserWeekStart(target, WEEK_START))
+    expect(scroller.scrollLeft).toBe(rebuilt.anchorIndex * WIDTH)
   })
 
   it('rebuilds around a far date change that falls outside the window', async () => {
-    const { result, rerender } = await mountStrip()
+    const { scroller, strip, update } = await mountStrip()
 
-    await rerender({ date: '2027-06-12', weekStart: WEEK_START })
+    await update({ date: '2027-06-12' })
 
     const rebuilt = createWeekWindow('2027-06-12', WEEK_START)
-    expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({
-      startIndex: rebuilt.anchorIndex,
-    })
-    expect(result.current.displayedWeekStart).toBe(getUserWeekStart('2027-06-12', WEEK_START))
+    expect(strip().weekWindow).toEqual(rebuilt)
+    expect(strip().displayedWeekStart).toBe(getUserWeekStart('2027-06-12', WEEK_START))
+    expect(scroller.scrollLeft).toBe(rebuilt.anchorIndex * WIDTH)
   })
 
   it('rebuilds when the week-start setting re-aligns the weeks', async () => {
-    const { result, rerender } = await mountStrip()
+    const { scroller, strip, update } = await mountStrip()
     // The old window's Monday-aligned weeks no longer contain any
     // Sunday-start week — the misalignment signal a rebuild answers.
     expect(weekIndexOf(initialWindow, DATE, 'sunday')).toBe(-1)
 
-    await rerender({ date: DATE, weekStart: 'sunday' })
+    await update({ weekStart: 'sunday' })
 
     const rebuilt = createWeekWindow(DATE, 'sunday')
-    expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({
-      startIndex: rebuilt.anchorIndex,
-    })
-    expect(result.current.displayedWeekStart).toBe(getUserWeekStart(DATE, 'sunday'))
+    expect(strip().weekWindow).toEqual(rebuilt)
+    expect(strip().displayedWeekStart).toBe(getUserWeekStart(DATE, 'sunday'))
+    expect(scroller.scrollLeft).toBe(rebuilt.anchorIndex * WIDTH)
+  })
+
+  it('stays on the displayed week when the page width changes', async () => {
+    const { scroller, update } = await mountStrip()
+    // Without snapping, only the strip moves the scroller.
+    scroller.style.scrollSnapType = 'none'
+
+    await update({ width: 500 })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ANCHOR * 500))
+  })
+
+  it('leaves the scroller to a finger that is down when the page width changes', async () => {
+    const { scroller, update } = await mountStrip()
+    scroller.style.scrollSnapType = 'none'
+
+    await touch(scroller, 'start')
+    await update({ width: 500 })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(scroller.scrollLeft).toBe(ANCHOR * WIDTH)
+    await touch(scroller, 'end')
   })
 })
 

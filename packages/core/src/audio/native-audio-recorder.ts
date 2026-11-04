@@ -272,7 +272,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
   #claimFinal(stop: RecordingStopResponse): AudioRecorderFinalSegment | null {
     this.#claimed.add(stop.path)
     if (stop.part === 1 && stop.durationMs < MIN_RECORDING_DURATION_MS) {
-      void deleteStagedCommand(this.#deps.ipc, { request: { path: stop.path } }).catch(() => {})
+      void this.#deleteMisclick(stop.path)
       this.#claimed.delete(stop.path)
       return null
     }
@@ -283,6 +283,17 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
       part: stop.part,
       end: true,
       durationMs: stop.durationMs,
+    }
+  }
+
+  /**
+   * Delete the staged file of a misclick. A failure is logged and the file stays.
+   */
+  async #deleteMisclick(path: string): Promise<void> {
+    try {
+      await this.deleteStaged(path)
+    } catch (cause) {
+      this.#deps.logger.warn('deleting a misclick recording failed:', cause)
     }
   }
 }

@@ -3,9 +3,11 @@ import { IAP_PRODUCT_IDS } from '../ipc/iap-service.ts'
 import {
   createTestAppStoreEnvironmentService,
   createTestClassicAccessService,
+  createTestInstallClockService,
   createTestSubscriptionService,
   type TestAppStoreEnvironmentService,
   type TestClassicAccessService,
+  type TestInstallClockService,
   type TestSubscriptionService,
 } from '../testing/monetization.ts'
 import { createTestPlatformService } from '../testing/platform.ts'
@@ -17,10 +19,14 @@ import {
 } from '../testing/plugins.ts'
 import { createTestStorageService, type TestStorageService } from '../testing/storage.ts'
 import {
+  PAYWALL_PHASE_OVERRIDE_STORAGE_KEY,
   PAYWALL_REQUESTED_STORAGE_KEY,
+  PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY,
   createPaywallService,
   type PaywallService,
 } from './paywall-service.ts'
+
+const DAY_INDEX = 3
 
 const YEARLY = { productId: IAP_PRODUCT_IDS.yearly, formattedPrice: '$99.99' }
 const MONTHLY = { productId: IAP_PRODUCT_IDS.monthly, formattedPrice: '$9.99' }
@@ -28,6 +34,7 @@ const MONTHLY = { productId: IAP_PRODUCT_IDS.monthly, formattedPrice: '$9.99' }
 let subscription: TestSubscriptionService
 let classicAccess: TestClassicAccessService
 let appStoreEnvironment: TestAppStoreEnvironmentService
+let installClock: TestInstallClockService
 let iap: TestIapService
 let appStore: TestAppStoreService
 let storage: TestStorageService
@@ -36,6 +43,7 @@ beforeEach(() => {
   subscription = createTestSubscriptionService()
   classicAccess = createTestClassicAccessService()
   appStoreEnvironment = createTestAppStoreEnvironmentService('Production')
+  installClock = createTestInstallClockService({ phase: 'required', dayIndex: DAY_INDEX })
   iap = createTestIapService({ products: [YEARLY, MONTHLY] })
   appStore = createTestAppStoreService()
   storage = createTestStorageService()
@@ -46,6 +54,7 @@ function service(appPlatform: 'ios' | 'desktop' = 'ios'): PaywallService {
     subscription,
     classicAccess,
     appStoreEnvironment,
+    installClock,
     iap,
     appStore,
     platform: createTestPlatformService({ appPlatform }),
@@ -58,75 +67,112 @@ function classicRecord(expiresAt: number) {
 }
 
 describe('PaywallService.gate', () => {
-  it('shows the paywall on an App Store install with no subscription', () => {
-    expect(service().gate.get()).toBe('show')
+  it('requires a subscription on an App Store install once the free period ends', () => {
+    expect(service().gate.get()).toBe('required')
+  })
+
+  it('stays hidden during the hidden phase', () => {
+    installClock.setState({ phase: 'hidden' })
+    expect(service().gate.get()).toBe('hidden')
+  })
+
+  it('shows the skippable paywall once a day', () => {
+    installClock.setState({ phase: 'skippable' })
+    const paywall = service()
+    expect(paywall.gate.get()).toBe('skippable')
+
+    storage.local.set(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY, String(DAY_INDEX))
+    expect(paywall.gate.get()).toBe('hidden')
+
+    installClock.setState({ dayIndex: DAY_INDEX + 1 })
+    expect(paywall.gate.get()).toBe('skippable')
   })
 
   it('hides it for a TestFlight or development install while StoreKit is pending', () => {
     appStoreEnvironment.setState({ value: 'Sandbox' })
     subscription.setState({ isLoading: true })
-    expect(service().gate.get()).toBe('hide')
+    expect(service().gate.get()).toBe('hidden')
   })
 
   it('hides it for a StoreKit-configuration run', () => {
     appStoreEnvironment.setState({ value: 'Xcode' })
-    expect(service().gate.get()).toBe('hide')
+    expect(service().gate.get()).toBe('hidden')
   })
 
   it('treats an unknown channel as an App Store install', () => {
     appStoreEnvironment.setState({ value: null, isError: true })
-    expect(service().gate.get()).toBe('show')
+    expect(service().gate.get()).toBe('required')
   })
 
   it('never waits for the probe', () => {
     appStoreEnvironment.setState({ value: null, isLoading: true })
-    expect(service().gate.get()).toBe('show')
+    expect(service().gate.get()).toBe('required')
   })
 
-  it('honors an explicit request outside the App Store', () => {
+  it('honors an explicit request outside the App Store with a skippable paywall', () => {
     appStoreEnvironment.setState({ value: 'Sandbox' })
     const paywall = service()
-    expect(paywall.gate.get()).toBe('hide')
+    expect(paywall.gate.get()).toBe('hidden')
 
     paywall.setRequested(true)
 
     expect(paywall.requested.get()).toBe(true)
     expect(storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY)).toBe('true')
-    expect(paywall.gate.get()).toBe('show')
+    expect(paywall.gate.get()).toBe('skippable')
+  })
+
+  it('honors an explicit request during the hidden phase', () => {
+    installClock.setState({ phase: 'hidden' })
+    const paywall = service()
+
+    paywall.setRequested(true)
+
+    expect(paywall.gate.get()).toBe('skippable')
+  })
+
+  it('keeps a required paywall required when requested', () => {
+    const paywall = service()
+    paywall.setRequested(true)
+    expect(paywall.gate.get()).toBe('required')
   })
 
   it('lets a subscriber through in every channel', () => {
     subscription.setState({ value: 'yearly' })
-    expect(service().gate.get()).toBe('hide')
+    expect(service().gate.get()).toBe('hidden')
   })
 
   it('lets a verified Reflect Classic subscriber through', () => {
     classicAccess.setState({ access: classicRecord(1), active: true })
-    expect(service().gate.get()).toBe('hide')
+    expect(service().gate.get()).toBe('hidden')
   })
 
   it('shows the paywall once the Reflect Classic access has ended', () => {
     classicAccess.setState({ access: classicRecord(1), active: false })
-    expect(service().gate.get()).toBe('show')
+    expect(service().gate.get()).toBe('required')
   })
 
   it('keeps the app visible while the subscription is being checked', () => {
     subscription.setState({ isLoading: true })
-    expect(service().gate.get()).toBe('hide')
+    expect(service().gate.get()).toBe('hidden')
   })
 
   it('keeps the app visible while the keychain is still being read', () => {
     classicAccess.setState({ isLoading: true })
-    expect(service().gate.get()).toBe('hide')
+    expect(service().gate.get()).toBe('hidden')
+  })
+
+  it('keeps the app visible while the install clock is loading', () => {
+    installClock.setState({ phase: null, isLoading: true })
+    expect(service().gate.get()).toBe('hidden')
   })
 
   it('shows the paywall after a failed subscription check', () => {
     subscription.setState({ isError: true })
-    expect(service().gate.get()).toBe('show')
+    expect(service().gate.get()).toBe('required')
   })
 
   it('stays out of the way off iOS', () => {
-    expect(service('desktop').gate.get()).toBe('hide')
+    expect(service('desktop').gate.get()).toBe('hidden')
   })
 
   it('notifies only when the gate changes', () => {
@@ -135,7 +181,7 @@ describe('PaywallService.gate', () => {
     const unsubscribe = paywall.gate.subscribe(listener)
 
     subscription.setState({ value: 'monthly' })
-    expect(paywall.gate.get()).toBe('hide')
+    expect(paywall.gate.get()).toBe('hidden')
     expect(listener).toHaveBeenCalledOnce()
 
     classicAccess.setState({ active: true })
@@ -146,7 +192,7 @@ describe('PaywallService.gate', () => {
     unsubscribe()
     subscription.setState({ value: null })
     classicAccess.setState({ active: false })
-    expect(paywall.gate.get()).toBe('show')
+    expect(paywall.gate.get()).toBe('skippable')
     expect(listener).toHaveBeenCalledOnce()
   })
 
@@ -172,6 +218,77 @@ describe('PaywallService.gate', () => {
     first()
     second()
     expect(watchers).toBe(0)
+  })
+})
+
+describe('PaywallService skippable paywall', () => {
+  it('stays open after recording today, and closes when dismissed', () => {
+    installClock.setState({ phase: 'skippable' })
+    const paywall = service()
+
+    paywall.markSkippableShown()
+
+    expect(storage.local.get(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY)).toBe(String(DAY_INDEX))
+    expect(paywall.gate.get()).toBe('skippable')
+
+    paywall.dismissSkippable()
+
+    expect(paywall.requested.get()).toBe(false)
+    expect(paywall.gate.get()).toBe('hidden')
+  })
+
+  it('closes when dismissed on a later day than it opened', () => {
+    installClock.setState({ phase: 'skippable' })
+    const paywall = service()
+    paywall.markSkippableShown()
+
+    installClock.setState({ dayIndex: DAY_INDEX + 1 })
+    expect(paywall.gate.get()).toBe('skippable')
+    paywall.dismissSkippable()
+
+    expect(paywall.gate.get()).toBe('hidden')
+  })
+})
+
+describe('PaywallService.phaseOverride', () => {
+  it('simulates a phase outside the App Store', () => {
+    appStoreEnvironment.setState({ value: 'Sandbox' })
+    installClock.setState({ phase: 'hidden' })
+    const paywall = service()
+
+    paywall.setPhaseOverride('required')
+
+    expect(paywall.phaseOverride.get()).toBe('required')
+    expect(storage.session.get(PAYWALL_PHASE_OVERRIDE_STORAGE_KEY)).toBe('required')
+    expect(paywall.gate.get()).toBe('required')
+
+    paywall.setPhaseOverride(null)
+
+    expect(paywall.phaseOverride.get()).toBeNull()
+    expect(paywall.gate.get()).toBe('hidden')
+  })
+
+  it('shows the skippable paywall again each time it is selected', () => {
+    appStoreEnvironment.setState({ value: 'Sandbox' })
+    const paywall = service()
+    paywall.setPhaseOverride('skippable')
+    paywall.markSkippableShown()
+    paywall.dismissSkippable()
+    expect(paywall.gate.get()).toBe('hidden')
+
+    paywall.setPhaseOverride('skippable')
+
+    expect(paywall.gate.get()).toBe('skippable')
+  })
+
+  it('hides an open paywall when Hidden is selected', () => {
+    installClock.setState({ phase: 'skippable' })
+    const paywall = service()
+    paywall.markSkippableShown()
+
+    paywall.setPhaseOverride('hidden')
+
+    expect(paywall.gate.get()).toBe('hidden')
   })
 })
 

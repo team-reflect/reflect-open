@@ -2,10 +2,12 @@ import { useEffect, type ReactElement } from 'react'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
-import { PaywallScreen } from '@/mobile/paywall-screen.tsx'
+import { PaywallDrawer } from '@/mobile/paywall-drawer.tsx'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
+import { WhatsNewDrawer } from '@/mobile/whats-new-drawer.tsx'
 import {
   useKeyboardCaretReveal,
   useKeyboardFieldReveal,
@@ -26,20 +28,62 @@ import { useAppServices } from '@/services/services-provider.tsx'
  *
  * The router mounts per graph exactly as on desktop; `MobileScreen` renders
  * the current route (daily spine, note pages), so wiki-link and date-link
- * taps navigate for real. The keyboard-height mirror lives here so every
- * screen inherits `--keyboard-height`; the field/caret reveals and the
- * checkbox-haptic listener mount here so they cover every screen's inputs.
+ * taps navigate for real. The keyboard effects and the checkbox-haptic
+ * listener mount here so they cover every screen's inputs, and the paywall
+ * drawer mounts beside the surface so it can cover any of them.
  */
 export function MobileApp(): ReactElement {
+  return (
+    <>
+      <KeyboardEffects />
+      <MobileSurface />
+      <MobileOverlay />
+    </>
+  )
+}
+
+/**
+ * The keyboard-height mirror (so every screen inherits `--keyboard-height`)
+ * and the field/caret reveals. A leaf, so a keyboard height change re-renders
+ * only this component.
+ */
+function KeyboardEffects(): null {
+  useKeyboardHeightVar()
+  useKeyboardFieldReveal()
+  useKeyboardCaretReveal()
+  return null
+}
+
+/**
+ * The What's New and paywall drawers over every surface. What's New waits
+ * while the paywall shows or may show, so the two never open together.
+ * Subscription verification runs beside startup, never in its critical path:
+ * while StoreKit or settings are unresolved the gate stays hidden and the
+ * local app boots normally. A settled
+ * negative answer opens the paywall later. A purchase closes it, and so does
+ * Later on a skippable paywall. A leaf, so a gate change re-renders only this
+ * component.
+ */
+function MobileOverlay(): ReactElement {
+  const { paywall } = useMobileServices()
+  const paywallGate = usePaywallGate()
+  return (
+    <>
+      <WhatsNewDrawer />
+      <PaywallDrawer gate={paywallGate} onDismiss={paywall.dismissSkippable} />
+    </>
+  )
+}
+
+/**
+ * The onboarding, loading, and error gates in front of the routed shell.
+ */
+function MobileSurface(): ReactElement {
   const { quitPolicy } = useAppServices()
   const status = useGraphStatus()
   const graph = useGraphInfo()
   const error = useGraphError()
   const needsOnboarding = useNeedsOnboarding()
-  const paywallGate = usePaywallGate()
-  useKeyboardHeightVar()
-  useKeyboardFieldReveal()
-  useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the
@@ -50,14 +94,6 @@ export function MobileApp(): ReactElement {
   useEffect(() => {
     return quitPolicy.installMobileBackgroundPolicy()
   }, [quitPolicy])
-
-  // Subscription verification runs beside startup, never in its critical
-  // path: while StoreKit or settings are unresolved the gate stays hidden and
-  // the local app boots normally. A settled negative answer can replace the
-  // current surface with the paywall later; a purchase lifts it.
-  if (paywallGate === 'show') {
-    return <PaywallScreen />
-  }
 
   if (status === 'ready' && graph) {
     return (

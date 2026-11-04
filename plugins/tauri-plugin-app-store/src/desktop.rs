@@ -27,4 +27,8 @@ impl<R: Runtime> AppStore<R> {
     pub fn present_offer_code_redeem_sheet(&self) -> crate::Result<()> {
         Ok(())
     }
+
+    pub fn request_review(&self) -> crate::Result<()> {
+        Ok(())
+    }
 }

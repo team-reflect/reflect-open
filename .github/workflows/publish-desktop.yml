@@ -36,7 +36,7 @@ permissions:
 
 jobs:
   macos:
-    name: Build the macOS release
+    name: macOS
     uses: ./.github/workflows/publish-macos.yml
     with:
       tag: ${{ inputs.tag }}
@@ -53,7 +53,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   windows:
-    name: Build the Windows installer
+    name: Windows
     uses: ./.github/workflows/publish-windows.yml
     with:
       tag: ${{ inputs.tag }}
@@ -62,7 +62,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   linux:
-    name: Build the Linux packages
+    name: Linux
     uses: ./.github/workflows/publish-linux.yml
     with:
       tag: ${{ inputs.tag }}
@@ -71,7 +71,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   testflight:
-    name: Upload the release to TestFlight
+    name: TestFlight
     uses: ./.github/workflows/publish-testflight.yml
     with:
       commit: ${{ inputs.commit }}
@@ -83,7 +83,7 @@ jobs:
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
   finalize:
-    name: Finalize the release
+    name: Finalize
     needs: [macos, windows, linux]
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: ubuntu-24.04
@@ -175,13 +175,23 @@ jobs:
             exit 0
           fi
 
+          # Uploads clobber, so a failed upload can be retried.
+          upload() {
+            for attempt in 1 2 3; do
+              gh release upload updater-beta "$@" --clobber && return 0
+              echo "::warning::gh release upload failed (attempt $attempt)"
+              sleep $((attempt * 10))
+            done
+            return 1
+          }
+
           dmgs=("${ASSET}_aarch64.dmg" "${ASSET}_universal.dmg")
           gh release download "$TAG" --dir . --pattern "${dmgs[0]}" --pattern "${dmgs[1]}" --pattern latest.json
 
           if gh release view updater-beta > /dev/null; then
             # DMGs first, so a failed upload leaves the working manifest untouched.
-            gh release upload updater-beta "${dmgs[@]}" --clobber
-            gh release upload updater-beta latest.json --clobber
+            upload "${dmgs[@]}"
+            upload latest.json
           else
             gh release create updater-beta "${dmgs[@]}" latest.json \
               --title 'Latest Reflect Beta downloads' \

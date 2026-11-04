@@ -119,6 +119,10 @@ import {
   createAppStoreEnvironmentService,
   type AppStoreEnvironmentService,
 } from './monetization/app-store-environment-service.ts'
+import {
+  createInstallClockService,
+  type InstallClockService,
+} from './monetization/install-clock-service.ts'
 import { createPaywallService, type PaywallService } from './monetization/paywall-service.ts'
 import {
   createSubscriptionService,
@@ -207,7 +211,7 @@ import {
   type WikiResolverService,
 } from './indexing/wiki-resolver-service.ts'
 import { createIndexStoreService, type IndexStoreService } from './indexing/index-store-service.ts'
-import { createAppStoreService } from './ipc/app-store-service.ts'
+import { createAppStoreService, type AppStoreService } from './ipc/app-store-service.ts'
 import { createIapService } from './ipc/iap-service.ts'
 import type { IpcBridgeService } from './ipc/ipc-service.ts'
 import {
@@ -223,7 +227,6 @@ import {
 import { createPrivacyService, type PrivacyService } from './privacy/privacy-service.ts'
 import { createSettingsService, type SettingsService } from './settings/settings-service.ts'
 import { createAgentSkillService, type AgentSkillService } from './ai/agent-skill-service.ts'
-import { createAppInfoService, type AppInfoService } from './ports/app-info-service.ts'
 import { createBackgroundReconcilerFactory } from './reconcile/background-reconciler.ts'
 import type { ClockService } from './ports/clock-service.ts'
 import type { HttpService } from './ports/http-service.ts'
@@ -276,10 +279,6 @@ export interface CoreServices {
    * Host filesystem path building, in the host platform's path syntax.
    */
   readonly path: PathService
-  /**
-   * Facts about the running application build.
-   */
-  readonly appInfo: AppInfoService
   /**
    * Live reads of the OS calendar database.
    */
@@ -523,7 +522,15 @@ export interface MobileServices {
    */
   readonly appStoreEnvironment: AppStoreEnvironmentService
   /**
-   * Whether the paywall replaces the app, and the actions that lift it.
+   * StoreKit's App Store sheets and prompts.
+   */
+  readonly appStore: AppStoreService
+  /**
+   * Time since this device's first launch, which schedules the paywall.
+   */
+  readonly installClock: InstallClockService
+  /**
+   * Whether the paywall covers the app, and the actions that lift it.
    */
   readonly paywall: PaywallService
   /**
@@ -609,6 +616,7 @@ export const coreServiceFactories = {
   appStore: createAppStoreService,
   subscription: createSubscriptionService,
   appStoreEnvironment: createAppStoreEnvironmentService,
+  installClock: createInstallClockService,
   haptics: createHapticsService,
   nativeAction: createNativeActionService,
   paywall: createPaywallService,
@@ -673,7 +681,6 @@ export const coreServiceFactories = {
   noteTools: createNoteToolsService,
   chatEngine: createChatEngineService,
   chatGraphContext: createChatGraphContextService,
-  appInfo: createAppInfoService,
   contactSuggestions: createContactSuggestionService,
   meetings: createMeetingService,
   agentSkill: createAgentSkillService,
@@ -900,16 +907,20 @@ export function composeCoreServices(
     const appStore = create.appStore({ ipc })
     const subscription = create.subscription({ iap, storage, clock, platform, logger })
     const appStoreEnvironment = create.appStoreEnvironment({ appStore, storage, platform })
+    const installClock = create.installClock({ secretStore, clock, activity, platform, logger })
     const haptics = create.haptics({ ipc, logger })
     const nativeAction = create.nativeAction({ audioRecorder, clock, platform, logger })
     return {
       haptics,
       subscription,
       appStoreEnvironment,
+      appStore,
+      installClock,
       paywall: create.paywall({
         subscription,
         classicAccess,
         appStoreEnvironment,
+        installClock,
         iap,
         appStore,
         platform,
@@ -1043,6 +1054,7 @@ export function composeCoreServices(
     clock,
     platform: fileSrc,
     graphSession,
+    logger,
   })
   const persistenceFlush = create.persistenceFlush({
     settings,
@@ -1159,7 +1171,6 @@ export function composeCoreServices(
     platform,
     storage,
     path,
-    appInfo: create.appInfo({ ipc }),
     calendar,
     contacts,
     contactSuggestions: create.contactSuggestions({

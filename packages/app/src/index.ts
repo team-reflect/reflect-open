@@ -35,6 +35,9 @@ export {
   type ThemeService,
   type ThemeState,
 } from './settings/theme-service.ts'
+export { type WhatsNewItem } from './whats-new/whats-new-content.ts'
+export { type WhatsNewPhase, type WhatsNewService } from './whats-new/whats-new-service.ts'
+export { type FeedbackChannel, type ReviewService } from './review/review-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
   type OpenerService,
