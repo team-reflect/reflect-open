@@ -313,7 +313,7 @@ describe('the enable flow', () => {
   it('setEnabled persists the opt-in and never prompts', async () => {
     const settings = createTestSettingsService()
     await settings.whenLoaded()
-    contacts.setStatus('notDetermined')
+    await contacts.setStatus('notDetermined')
     const enabling = contactSuggestionsOver({ contacts, settings })
 
     enabling.setEnabled(true)
@@ -325,18 +325,18 @@ describe('the enable flow', () => {
   })
 
   it('requestAccess prompts and the permission state then answers', async () => {
-    contacts.setStatus('notDetermined')
+    await contacts.setStatus('notDetermined')
 
     await service.requestAccess()
 
     expect(contacts.accessRequests()).toBe(1)
-    expect(contacts.getState()).toEqual({ authorization: 'authorized' })
+    expect(contacts.get()).toEqual({ authorization: 'authorized' })
   })
 
   it('requestAccess swallows a failed prompt', async () => {
     const failing = contactSuggestionsOver({
       contacts: {
-        getState: contacts.getState,
+        get: contacts.get,
         subscribe: contacts.subscribe,
         refresh: () => contacts.refresh(),
         canLookup: (current) => contacts.canLookup(current),
@@ -368,7 +368,7 @@ describe('showsSuggestionFor', () => {
   ): boolean {
     const gated = contactSuggestionsOver({
       contacts: {
-        getState: () => ({ authorization }),
+        get: () => ({ authorization }),
         subscribe: contacts.subscribe,
         refresh: () => contacts.refresh(),
         requestAccess: () => contacts.requestAccess(),

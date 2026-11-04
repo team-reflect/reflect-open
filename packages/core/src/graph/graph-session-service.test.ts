@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '../errors.ts'
-import { createGraphSession, type GraphRole, type GraphSession } from './graph-session.ts'
+import { deriveStore } from '../store.ts'
+import type { GraphRole, GraphSession } from './graph-session.ts'
 import { createNoteRowService } from '../documents/note-row-service.ts'
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { createTestNoteMoveService } from '../testing/documents.ts'
@@ -98,14 +99,14 @@ function setup(options?: SetupOptions) {
     fileChanges,
     logger,
     graphSession: {
-      getState: () => session.getState(),
+      get: () => session.get(),
       subscribe: (listener) => session.subscribe(listener),
     },
   })
   const mobileStorage = createTestMobileStorageService()
   const noteRows = createNoteRowService({
     graphSession: {
-      getState: () => session.getState(),
+      get: () => session.get(),
       subscribe: (listener) => session.subscribe(listener),
     },
   })
@@ -145,7 +146,7 @@ function setup(options?: SetupOptions) {
   })
   const states: GraphSessionState<{ id: number }>[] = []
   session.subscribe(() => {
-    states.push(session.getState())
+    states.push(session.get())
   })
   const released: GraphReleaseReason[] = []
   session.onGraphReleased((reason) => {
@@ -215,7 +216,7 @@ describe('GraphSessionService note window', () => {
     const context = setup({ role: 'note-window' })
     context.session.adopt(ADOPTED, 5)
 
-    const state = context.session.getState()
+    const state = context.session.get()
     expect(state.status).toBe('ready')
     expect(state.graph).toEqual(ADOPTED)
     expect(state.indexGeneration).toBe(5)
@@ -241,7 +242,7 @@ describe('GraphSessionService note window', () => {
     )
     context.session.refreshIndex()
 
-    expect(context.session.getState().graph).toEqual(ADOPTED)
+    expect(context.session.get().graph).toEqual(ADOPTED)
     expect(context.commands()).toEqual([])
     expect(context.mobileStorage.createdGraphs()).toEqual([])
     expect(context.indexCalls()).toEqual([])
@@ -263,7 +264,7 @@ describe('GraphSessionService open sequencing', () => {
 
     const firstOpen = session.openRecent('/a')
     const secondOpen = session.openRecent('/b')
-    expect(session.getState().status).toBe('opening')
+    expect(session.get().status).toBe('opening')
 
     // The second backend open must wait for the first (Rust GraphState is
     // last-write-wins; running in request order keeps it on the last graph).
@@ -276,9 +277,9 @@ describe('GraphSessionService open sequencing', () => {
     await expect(firstOpen).resolves.toBe(false)
     await expect(secondOpen).resolves.toBe(true)
 
-    expect(session.getState().status).toBe('ready')
+    expect(session.get().status).toBe('ready')
     // The superseded first open must not have committed its graph.
-    expect(session.getState().graph?.root).toBe('/b')
+    expect(session.get().graph?.root).toBe('/b')
     expect(context.states.map((state) => state.graph?.root)).not.toContain('/a')
   })
 
@@ -288,8 +289,8 @@ describe('GraphSessionService open sequencing', () => {
 
     await expect(context.session.openRecent('/broken')).resolves.toBe(false)
 
-    expect(context.session.getState().status).toBe('choosing')
-    expect(context.session.getState().error).toMatch(/cannot open graph/)
+    expect(context.session.get().status).toBe('choosing')
+    expect(context.session.get().error).toMatch(/cannot open graph/)
   })
 
   it('closes the half-open graph when building its services throws', async () => {
@@ -297,13 +298,13 @@ describe('GraphSessionService open sequencing', () => {
 
     await expect(context.session.openRecent('/a')).resolves.toBe(false)
 
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'choosing',
       graph: null,
       session: null,
       services: null,
     })
-    expect(context.session.getState().error).toMatch(/services are broken/)
+    expect(context.session.get().error).toMatch(/services are broken/)
     expect(context.built[0]?.session.signal.aborted).toBe(true)
   })
 
@@ -314,7 +315,7 @@ describe('GraphSessionService open sequencing', () => {
     context.failures.open = false
 
     await expect(context.session.openRecent('/a')).resolves.toBe(true)
-    expect(context.session.getState()).toMatchObject({ status: 'ready', error: null })
+    expect(context.session.get()).toMatchObject({ status: 'ready', error: null })
   })
 
   it('opens the graph without an index session when the index fails to open', async () => {
@@ -322,7 +323,7 @@ describe('GraphSessionService open sequencing', () => {
 
     await expect(context.session.openRecent('/a')).resolves.toBe(true)
 
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'ready',
       graph: { root: '/a' },
       indexGeneration: null,
@@ -352,7 +353,7 @@ describe('GraphSessionService session object', () => {
   it('publishes one session per open and aborts it when another open is requested', async () => {
     const context = await start()
     await context.session.openRecent('/a')
-    const first = context.session.getState().session
+    const first = context.session.get().session
     expect(first).toMatchObject({ root: '/a', name: 'a', generation: 1, indexGeneration: 1 })
     expect(first?.signal.aborted).toBe(false)
 
@@ -360,7 +361,7 @@ describe('GraphSessionService session object', () => {
     expect(first?.signal.aborted).toBe(true)
     await opening
 
-    const second = context.session.getState().session
+    const second = context.session.get().session
     expect(second).toMatchObject({ root: '/b', generation: 2 })
     expect(second?.signal.aborted).toBe(false)
   })
@@ -368,12 +369,12 @@ describe('GraphSessionService session object', () => {
   it('aborts the session when the graph closes', async () => {
     const context = await start()
     await context.session.openRecent('/a')
-    const { session: opened } = context.session.getState()
+    const { session: opened } = context.session.get()
 
     await context.session.close()
 
     expect(opened?.signal.aborted).toBe(true)
-    expect(context.session.getState().session).toBeNull()
+    expect(context.session.get().session).toBeNull()
   })
 })
 
@@ -382,11 +383,11 @@ describe('GraphSessionService close flows', () => {
 
   it('forgets the open graph and returns to the chooser', async () => {
     const context = await start({ recents })
-    expect(context.session.getState().status).toBe('ready')
+    expect(context.session.get().status).toBe('ready')
 
     await context.session.forgetRecent('/known')
 
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'choosing',
       graph: null,
       indexGeneration: null,
@@ -401,7 +402,7 @@ describe('GraphSessionService close flows', () => {
 
     await context.session.forgetRecent('/older')
 
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'ready',
       graph: { root: '/known' },
       recents,
@@ -414,7 +415,7 @@ describe('GraphSessionService close flows', () => {
 
     await context.session.forgetRecent('/known')
 
-    expect(context.session.getState()).toMatchObject({ status: 'ready', error: null, recents })
+    expect(context.session.get()).toMatchObject({ status: 'ready', error: null, recents })
   })
 
   it('closes the open graph and stops at the chooser', async () => {
@@ -422,11 +423,10 @@ describe('GraphSessionService close flows', () => {
 
     await context.session.close()
 
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'choosing',
       graph: null,
       indexGeneration: null,
-      indexing: false,
       recents,
     })
     expect(context.fileChanges.watcherRunning()).toBe(false)
@@ -439,7 +439,7 @@ describe('GraphSessionService close flows', () => {
 
     expect(context.ipc.calls()).toContainEqual({ command: 'graph_delete', args: { generation: 1 } })
     expect(context.deleted).toEqual(['/known'])
-    expect(context.session.getState()).toMatchObject({ status: 'choosing', graph: null })
+    expect(context.session.get()).toMatchObject({ status: 'choosing', graph: null })
   })
 
   it('reopens the graph and rethrows when the delete fails', async () => {
@@ -449,7 +449,7 @@ describe('GraphSessionService close flows', () => {
     await expect(context.session.deleteGraph()).rejects.toMatchObject({ message: 'cannot trash' })
 
     // The command invalidated the session pin: a fresh open restores a writable one.
-    expect(context.session.getState()).toMatchObject({
+    expect(context.session.get()).toMatchObject({
       status: 'ready',
       graph: { root: '/known', generation: 2 },
     })
@@ -470,7 +470,7 @@ describe('GraphSessionService create', () => {
     await expect(context.session.createGraphAt('/icloud/Documents/Work')).resolves.toBe(true)
 
     expect(context.mobileStorage.createdGraphs()).toEqual(['/icloud/Documents/Work'])
-    expect(context.session.getState().graph?.root).toBe('/icloud/Documents/Work')
+    expect(context.session.get().graph?.root).toBe('/icloud/Documents/Work')
   })
 
   it('surfaces a failed create without opening', async () => {
@@ -479,7 +479,7 @@ describe('GraphSessionService create', () => {
 
     await expect(context.session.createGraphAt('/new')).resolves.toBe(false)
 
-    expect(context.session.getState()).toMatchObject({ status: 'choosing', error: 'cannot create' })
+    expect(context.session.get()).toMatchObject({ status: 'choosing', error: 'cannot create' })
     expect(context.commands()).not.toContain('graph_open')
   })
 })
@@ -523,7 +523,7 @@ describe('GraphSessionService welcome seeding', () => {
     await context.session.openRecent('/fresh')
     await expect.poll(() => context.indexCalls()).toContain('clear')
 
-    expect(context.session.getState().status).toBe('ready')
+    expect(context.session.get().status).toBe('ready')
     expect(context.logger.getErrors()).toContainEqual({
       message: 'welcome seed failed:',
       cause: 'scan failed',
@@ -532,14 +532,6 @@ describe('GraphSessionService welcome seeding', () => {
 })
 
 describe('GraphSessionService index following', () => {
-  it('reports indexing while the open graph reconciles', async () => {
-    const context = await start()
-    await context.session.openRecent('/a')
-    await expect.poll(() => context.states.some((state) => state.indexing)).toBe(true)
-    await settleIndex(context)
-    expect(context.session.getState().indexing).toBe(false)
-  })
-
   it('re-runs the reconcile on request and on a watcher demand', async () => {
     const context = await start()
     await context.session.openRecent('/a')
@@ -574,13 +566,6 @@ describe('GraphSessionService index following', () => {
     await settleIndex(context)
     context.stop()
     expect(context.fileChanges.listenerCount().reconcile).toBe(0)
-
-    const count = context.states.length
-    context.indexLifecycle.sync(
-      createGraphSession({ root: '/a', name: 'a', generation: 1, indexGeneration: 1 }),
-    )
-    await settleIndex(context)
-    expect(context.states).toHaveLength(count)
   })
 })
 
@@ -588,26 +573,26 @@ describe('GraphSessionService graph services', () => {
   it('builds the services of each opened session and ends them with it', async () => {
     const context = await start()
     await context.session.openRecent('/a')
-    const first = context.session.getState()
+    const first = context.session.get()
     expect(context.built.map(({ role }) => role)).toEqual(['main'])
     expect(context.built[0]?.session).toBe(first.session)
     expect(first.services).toBe(context.built[0]?.services)
 
     const opening = context.session.openRecent('/b')
     expect(first.session?.signal.aborted).toBe(true)
-    expect(context.session.getState().services).toBeNull()
+    expect(context.session.get().services).toBeNull()
     await opening
-    expect(context.session.getState().services).toEqual({ id: 2 })
+    expect(context.session.get().services).toEqual({ id: 2 })
 
     await context.session.close()
     expect(context.built[1]?.session.signal.aborted).toBe(true)
-    expect(context.session.getState().services).toBeNull()
+    expect(context.session.get().services).toBeNull()
   })
 
   it('builds note-window services for an adopted session', () => {
     const context = setup({ role: 'note-window' })
     context.session.adopt(ADOPTED, 5)
-    expect(context.session.getState().services).toEqual({ id: 1 })
+    expect(context.session.get().services).toEqual({ id: 1 })
     expect(context.built.map(({ role, session }) => [role, session.indexGeneration])).toEqual([
       ['note-window', 5],
     ])
@@ -616,7 +601,7 @@ describe('GraphSessionService graph services', () => {
   it('builds services for a graph whose index failed to open', async () => {
     const context = await start({ indexOpenFails: true })
     await context.session.openRecent('/a')
-    expect(context.session.getState()).toMatchObject({ status: 'ready', services: { id: 1 } })
+    expect(context.session.get()).toMatchObject({ status: 'ready', services: { id: 1 } })
     expect(context.built.map(({ role, session }) => [role, session.indexGeneration])).toEqual([
       ['main', null],
     ])
@@ -668,5 +653,58 @@ describe('GraphSessionService index reactions', () => {
     await context.session.openRecent('/a')
     await settleIndex(context)
     expect(context.reloads).toEqual([])
+  })
+})
+
+describe('GraphSessionService store', () => {
+  it('returns the same state until it changes', async () => {
+    const context = await start({ recents: [{ root: '/a', name: 'a', openedMs: 1 }] })
+    await settleIndex(context)
+    const state = context.session.get()
+    expect(context.session.get()).toBe(state)
+
+    context.session.reportError('cannot sync')
+    expect(context.session.get()).not.toBe(state)
+    expect(context.session.get().graph).toBe(state.graph)
+  })
+
+  it('ignores a write that changes no field', async () => {
+    const context = await start({ recents: [{ root: '/a', name: 'a', openedMs: 1 }] })
+    await settleIndex(context)
+    const state = context.session.get()
+    const count = context.states.length
+
+    await context.session.loadRecents()
+    context.session.reportError('cannot sync')
+    context.session.reportError('cannot sync')
+
+    expect(context.states).toHaveLength(count + 1)
+    expect(context.session.get().recents).toBe(state.recents)
+  })
+
+  it('notifies a derived store only when its field changes', async () => {
+    const context = await start({ recents: [{ root: '/a', name: 'a', openedMs: 1 }] })
+    await settleIndex(context)
+    const graph = deriveStore(context.session, (state) => state.graph)
+    const listener = vi.fn()
+    graph.subscribe(listener)
+
+    context.session.reportError('cannot sync')
+    await context.session.forgetRecent('/other')
+    expect(listener).not.toHaveBeenCalled()
+
+    await context.session.close()
+    expect(listener).toHaveBeenCalledOnce()
+    expect(graph.get()).toBeNull()
+  })
+
+  it('stops notifying once unsubscribed', async () => {
+    const context = await start()
+    const listener = vi.fn()
+    const unlisten = context.session.subscribe(listener)
+    unlisten()
+
+    await context.session.openRecent('/a')
+    expect(listener).not.toHaveBeenCalled()
   })
 })

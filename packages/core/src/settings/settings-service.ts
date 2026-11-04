@@ -2,8 +2,10 @@ import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import { deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { DEFAULT_SETTINGS, settingsSchema, type Settings } from './schema.ts'
+import { isDeepEqual } from '@ocavue/utils'
 
 /**
  * How the initial settings load ended; `failed` means session-only updates.
@@ -15,35 +17,34 @@ export type SettingsStatus = 'loading' | SettingsLoadOutcome
 type SettingsUpdater = (current: Settings) => Partial<Settings>
 
 /**
- * The global settings document: loaded once, patches visible immediately,
+ * The global settings document: loaded once, updates visible immediately,
  * saves persisted one at a time. When the load fails, updates stay
  * session-only so a defaults-built save never overwrites the stored document.
  */
-export interface SettingsService {
-  /**
-   * The current settings, merged over `DEFAULT_SETTINGS`. Stable until the next change.
-   */
-  get: () => Settings
-  subscribe: (listener: () => void) => Unlisten
+export interface SettingsService extends Store<Settings> {
   /**
    * Merges `patch` now and persists the full document in the background.
    */
   update: (patch: Partial<Settings>) => void
   /**
-   * Computes a patch from the latest settings; calls made before the load replay over the loaded document.
+   * Merges the patch that `updater` builds from the latest settings. Calls made
+   * while loading replay over the loaded document, so `updater` must be pure.
    */
   updateWith: (updater: SettingsUpdater) => void
   whenLoaded: () => Promise<SettingsLoadOutcome>
   /**
-   * After a failed load, load the stored document again; on success it
+   * After a failed load, loads the stored document again; on success it
    * replaces the session-only settings. Otherwise answers {@link whenLoaded}.
    */
-  reload(): Promise<SettingsLoadOutcome>
+  reload: () => Promise<SettingsLoadOutcome>
   /**
-   * Drains pending saves and resubmits a document that no save has confirmed. Never rejects.
+   * Waits for pending saves and resubmits settings that no save confirmed. Never rejects.
    */
-  flush(): Promise<void>
-  status(): SettingsStatus
+  flush: () => Promise<void>
+  /**
+   * Whether the stored document is loaded. Changes together with the settings it brings.
+   */
+  readonly status: Store<SettingsStatus>
 }
 
 const voidSchema = z.null()
@@ -53,236 +54,137 @@ export interface SettingsServiceDeps {
   readonly progress: ProgressPort
 }
 
+interface SettingsState {
+  readonly settings: Settings
+  readonly status: SettingsStatus
+}
+
+function selectSettings(state: SettingsState): Settings {
+  return state.settings
+}
+
+function selectStatus(state: SettingsState): SettingsStatus {
+  return state.status
+}
+
 class SettingsServiceImpl implements SettingsService {
   readonly #deps: SettingsServiceDeps
-  readonly #listeners = new Set<() => void>()
-
-  #state: SettingsStatus = 'loading'
-  #started = false
-  #current: Settings = DEFAULT_SETTINGS
-  #preloadPatch: Partial<Settings> = {}
-  #pendingUpdaters: SettingsUpdater[] = []
-
-  #dirty = false
-  #lastSubmission: Promise<void> = Promise.resolve()
-
-  #resolveLoad: (outcome: SettingsLoadOutcome) => void = () => {}
-  #loaded = new Promise<SettingsLoadOutcome>((resolve) => {
-    this.#resolveLoad = resolve
+  /**
+   * One store, so the settings and the status change together.
+   */
+  readonly #state = new WritableStore<SettingsState>({
+    settings: DEFAULT_SETTINGS,
+    status: 'loading',
   })
-  #reloading: Promise<SettingsLoadOutcome> | null = null
+  readonly #settings = deriveStore(this.#state, selectSettings, isDeepEqual)
+  readonly status = deriveStore(this.#state, selectStatus)
+  #loading: Promise<SettingsLoadOutcome> | undefined
+  /**
+   * Updates made while loading, replayed over the loaded document.
+   */
+  #pending: SettingsUpdater[] = []
+  /**
+   * The settings that the disk holds, as far as this service knows.
+   */
+  #saved?: Settings
+  #saving: Promise<void> = Promise.resolve()
 
   constructor(deps: SettingsServiceDeps) {
     this.#deps = deps
   }
 
   readonly get = (): Settings => {
-    this.#start()
-    return this.#current
+    void this.#load()
+    return this.#settings.get()
   }
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#start()
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    void this.#load()
+    return this.#settings.subscribe(listener)
   }
 
   readonly update = (patch: Partial<Settings>): void => {
-    this.#start()
-    if (this.#state === 'loading') {
-      this.#preloadPatch = { ...this.#preloadPatch, ...patch }
-      this.#current = { ...DEFAULT_SETTINGS, ...this.#preloadPatch }
-      this.#emit()
-      return
-    }
-    this.#apply(() => patch)
+    this.updateWith(() => patch)
   }
 
   readonly updateWith = (updater: SettingsUpdater): void => {
-    this.#start()
-    if (this.#state === 'loading') {
-      this.#pendingUpdaters.push(updater)
+    const settings = this.get()
+    this.#setState({ settings: { ...settings, ...updater(settings) } })
+    if (this.status.get() === 'loading') {
+      this.#pending.push(updater)
+    }
+    this.#save()
+  }
+
+  readonly whenLoaded = (): Promise<SettingsLoadOutcome> => this.#load()
+
+  readonly reload = (): Promise<SettingsLoadOutcome> => {
+    if (this.status.get() === 'failed') {
+      this.#setState({ status: 'loading' })
+      this.#loading = undefined
+    }
+    return this.#load()
+  }
+
+  readonly flush = async (): Promise<void> => {
+    await this.#drain()
+    this.#save()
+    await this.#drain()
+  }
+
+  #load(): Promise<SettingsLoadOutcome> {
+    const { ipc, progress } = this.#deps
+    this.#loading ??= ipc.call('settings_load', {}, settingsSchema).then(
+      (document) => {
+        this.#saved = document
+        const settings = this.#pending.reduce((s, updater) => ({ ...s, ...updater(s) }), document)
+        return this.#settle('loaded', settings)
+      },
+      (error: unknown) => {
+        progress.fail('Loading settings', errorMessage(error))
+        // Every pending update is already visible.
+        return this.#settle('failed', this.#settings.get())
+      },
+    )
+    return this.#loading
+  }
+
+  #settle(status: SettingsLoadOutcome, settings: Settings): SettingsLoadOutcome {
+    this.#pending = []
+    this.#setState({ status, settings })
+    this.#save()
+    return status
+  }
+
+  #setState(patch: Partial<SettingsState>): void {
+    this.#state.set({ ...this.#state.get(), ...patch })
+  }
+
+  #save(): void {
+    const { ipc, progress } = this.#deps
+    const settings = this.#settings.get()
+    if (this.status.get() !== 'loaded' || isDeepEqual(settings, this.#saved)) {
       return
     }
-    this.#apply(updater)
-  }
-
-  readonly whenLoaded = (): Promise<SettingsLoadOutcome> => {
-    this.#start()
-    return this.#loaded
-  }
-
-  reload(): Promise<SettingsLoadOutcome> {
-    const { ipc, progress } = this.#deps
-    if (this.#state !== 'failed') {
-      this.#start()
-      return this.#loaded
-    }
-    this.#reloading ??= ipc
-      .call('settings_load', {}, settingsSchema)
-      .then(
-        (document): SettingsLoadOutcome => {
-          this.#state = 'loaded'
-          this.#current = document
-          this.#loaded = Promise.resolve('loaded')
-          this.#emit()
-          return 'loaded'
-        },
-        (error: unknown): SettingsLoadOutcome => {
-          progress.fail('Loading settings', errorMessage(error))
-          return 'failed'
-        },
-      )
-      .finally(() => {
-        this.#reloading = null
-      })
-    return this.#reloading
-  }
-
-  async flush(): Promise<void> {
-    await this.#drain()
-    if (this.#dirty && this.#state === 'loaded') {
-      this.#submit(this.#current)
-      await this.#drain()
-    }
-  }
-
-  status(): SettingsStatus {
-    return this.#state
-  }
-
-  #emit(): void {
-    for (const listener of this.#listeners) {
-      listener()
-    }
-  }
-
-  #submit(target: Settings): void {
-    const { ipc, progress } = this.#deps
-    this.#dirty = true
-    this.#lastSubmission = this.#lastSubmission.then(async () => {
+    this.#saving = this.#saving.then(async () => {
       try {
-        await ipc.call('settings_save', { settings: target }, voidSchema)
-        if (this.#current === target) {
-          this.#dirty = false
-        }
+        await ipc.call('settings_save', { settings }, voidSchema)
+        this.#saved = settings
       } catch (error) {
         progress.fail('Saving settings', errorMessage(error))
       }
     })
   }
 
-  #hydrate(outcome: SettingsLoadOutcome, document: Settings): void {
-    let next: Settings = { ...document, ...this.#preloadPatch }
-    const queued = this.#pendingUpdaters
-    this.#pendingUpdaters = []
-    this.#preloadPatch = {}
-    for (const updater of queued) {
-      next = { ...next, ...updater(next) }
-    }
-    this.#state = outcome
-    if (outcome === 'loaded') {
-      next = replaceEqualDeep(document, next)
-      this.#current = next
-      if (next !== document) {
-        this.#submit(next)
-      }
-    } else {
-      this.#current = next
-    }
-    this.#resolveLoad(outcome)
-    this.#emit()
-  }
-
-  #start(): void {
-    const { ipc, progress } = this.#deps
-    if (this.#started) {
-      return
-    }
-    this.#started = true
-    ipc.call('settings_load', {}, settingsSchema).then(
-      (document) => this.#hydrate('loaded', document),
-      (error: unknown) => {
-        progress.fail('Loading settings', errorMessage(error))
-        this.#hydrate('failed', DEFAULT_SETTINGS)
-      },
-    )
-  }
-
-  #apply(updater: SettingsUpdater): void {
-    const previous = this.#current
-    const merged = { ...previous, ...updater(previous) }
-    if (this.#state === 'failed') {
-      this.#current = merged
-      this.#emit()
-      return
-    }
-    const next = replaceEqualDeep(previous, merged)
-    this.#current = next
-    if (next !== previous) {
-      this.#emit()
-    }
-    if (this.#dirty || next !== previous) {
-      this.#submit(next)
-    }
-  }
-
   async #drain(): Promise<void> {
-    let submission = this.#lastSubmission
-    await submission
-    while (submission !== this.#lastSubmission) {
-      submission = this.#lastSubmission
-      await submission
-    }
+    let saving: Promise<void>
+    do {
+      saving = this.#saving
+      await saving
+    } while (saving !== this.#saving)
   }
 }
 
 export function createSettingsService(deps: SettingsServiceDeps): SettingsService {
   return new SettingsServiceImpl(deps)
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const prototype: unknown = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
-}
-
-/**
- * Returns `next`, reusing every part of `previous` that is deeply equal to it.
- */
-function replaceEqualDeep<T>(previous: T, next: T): T {
-  if (previous === next) {
-    return previous
-  }
-  if (Array.isArray(previous) && Array.isArray(next)) {
-    const before: readonly unknown[] = previous
-    const after: readonly unknown[] = next
-    let equal = before.length === after.length
-    const copy = after.map((item, i) => {
-      const shared = replaceEqualDeep(before[i], item)
-      if (shared !== before[i]) {
-        equal = false
-      }
-      return shared
-    })
-    return equal ? previous : (copy as T)
-  }
-  if (isPlainObject(previous) && isPlainObject(next)) {
-    const keys = Object.keys(next)
-    let equal = keys.length === Object.keys(previous).length
-    const copy: Record<string, unknown> = {}
-    for (const key of keys) {
-      const shared = replaceEqualDeep(previous[key], next[key])
-      if (shared !== previous[key] || !Object.hasOwn(previous, key)) {
-        equal = false
-      }
-      copy[key] = shared
-    }
-    return equal ? previous : (copy as T)
-  }
-  return next
 }

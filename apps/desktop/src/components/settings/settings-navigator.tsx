@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { cn } from '@/lib/utils.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 import { scrollToSettingsSection } from './section-scrolling.ts'
 import type { SettingsSectionId } from './sections.ts'
 import { useActiveSettingsSection } from './use-active-settings-section.ts'
@@ -25,6 +26,7 @@ interface SettingsNavigatorProps {
  * gains a size.
  */
 export function SettingsNavigator({ className }: SettingsNavigatorProps): ReactElement {
+  const { systemPreferences } = useAppServices()
   const navRef = useRef<HTMLElement | null>(null)
   const itemsRef = useRef(new Map<SettingsSectionId, HTMLButtonElement>())
   const activeId = useActiveSettingsSection(navRef)
@@ -80,7 +82,11 @@ export function SettingsNavigator({ className }: SettingsNavigatorProps): ReactE
               aria-current={isActive ? 'location' : undefined}
               onClick={() => {
                 if (navRef.current) {
-                  scrollToSettingsSection(navRef.current, section.id)
+                  scrollToSettingsSection(
+                    navRef.current,
+                    section.id,
+                    systemPreferences.reducedMotion.get(),
+                  )
                 }
               }}
               className={cn(

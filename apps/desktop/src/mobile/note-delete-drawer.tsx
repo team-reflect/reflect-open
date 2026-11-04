@@ -6,7 +6,7 @@ import {
   DrawerContent,
   DrawerDescription,
   DrawerTitle,
-} from '@/components/ui/drawer.tsx'
+} from '@/mobile/scroll-drawer.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 

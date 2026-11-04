@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -9,18 +8,6 @@ import { MonthPickerDrawer } from './month-picker-drawer.tsx'
  * Year browsing must never navigate, each open must start from the header's
  * month, and the selection/today months carry the strip's markings.
  */
-
-// The drawer needs browser APIs jsdom doesn't provide (matchMedia, pointer
-// capture); its drag/animation is verified on-device. This passthrough
-// honours `open` so open/close behavior stays testable.
-vi.mock('@/components/ui/drawer.tsx', () => ({
-  Drawer: ({ open, children }: { open?: boolean; children?: ReactNode }) => {
-    return open ? <div data-testid="drawer">{children}</div> : null
-  },
-  DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerBody: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-}))
 
 async function mount(overrides: Partial<Parameters<typeof MonthPickerDrawer>[0]> = {}) {
   const onPick = vi.fn()
@@ -88,7 +75,7 @@ describe('MonthPickerDrawer', () => {
         onPick={() => {}}
       />,
     )
-    await expect.element(page.getByTestId('drawer')).not.toBeInTheDocument()
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
 
     await view.rerender(
       <MonthPickerDrawer

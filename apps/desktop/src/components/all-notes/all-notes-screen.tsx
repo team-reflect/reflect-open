@@ -9,9 +9,9 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { useListSelection } from '@/lib/selection/use-list-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AllNotesFilters } from './all-notes-filters.tsx'
 import { AllNotesTable } from './all-notes-table.tsx'
@@ -42,15 +42,15 @@ interface AllNotesScreenProps {
  * wired to the router's per-entry scroll memory by hand.
  */
 export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { noteList } = useCoreServices()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const navigateNoteLink = useNoteLinkNavigation()
   // The scroll container lives in state, not a ref, so scroll restoration
   // re-runs its restore once the element attaches (a callback ref re-renders;
   // a plain ref would still be null during the restore effect on the first,
   // warm-cache-only mount). The table virtualizes against this container as its
-  // parent, so it no longer needs the element handed down.
+  // parent.
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)

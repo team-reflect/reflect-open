@@ -81,7 +81,7 @@ export function attachOperationToasts(
 ): () => void {
   let shownIds = new Set<number>()
   const sync = (): void => {
-    const current = operations.getAll()
+    const current = operations.get()
     const nextIds = new Set(current.map((operation) => operation.id))
     for (const id of shownIds) {
       if (!nextIds.has(id)) {

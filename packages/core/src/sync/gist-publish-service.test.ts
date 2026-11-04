@@ -321,14 +321,14 @@ describe('GistPublishService.publish', () => {
     })
 
     expect(progress.started()).toMatchObject([{ label: 'Publishing gist', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('records the published url in the optimistic overlay, stamped with the generation', async () => {
     const { service, noteRows } = setup()
     await service.publish(PATH)
 
-    expect(noteRows.getOverlay(PATH)).toMatchObject({
+    expect(noteRows.get().get(PATH)).toMatchObject({
       gistUrl: PUBLISHED.htmlUrl,
       gistStale: false,
     })
@@ -340,7 +340,7 @@ describe('GistPublishService.publish', () => {
     const { service, noteRows } = setup({ token: null })
     await service.publish(PATH)
 
-    expect(noteRows.getOverlay(PATH)).toBeNull()
+    expect(noteRows.get().get(PATH)).toBeUndefined()
   })
 
   it('surfaces failures and resolves null', async () => {
@@ -430,8 +430,8 @@ describe('GistPublishService.unpublish', () => {
     await expect(service.unpublish(PATH)).resolves.toEqual({ url: null, stale: false })
 
     expect(progress.started()).toMatchObject([{ label: 'Unpublishing gist', ended: true }])
-    expect(progress.getAll()).toEqual([])
-    expect(noteRows.getOverlay(PATH)).toMatchObject({ gistUrl: null, gistStale: false })
+    expect(progress.get()).toEqual([])
+    expect(noteRows.get().get(PATH)).toMatchObject({ gistUrl: null, gistStale: false })
   })
 
   it('surfaces failures and leaves no overlay', async () => {
@@ -445,7 +445,7 @@ describe('GistPublishService.unpublish', () => {
         message: expect.stringMatching(/connect github/i) as string,
       }),
     )
-    expect(noteRows.getOverlay(PATH)).toBeNull()
+    expect(noteRows.get().get(PATH)).toBeUndefined()
   })
 
   it('blocks publish or update while an unpublish is in flight for the same note', async () => {
@@ -484,6 +484,6 @@ describe('with no graph open', () => {
     await expect(service.unpublish(PATH)).resolves.toBeNull()
 
     expect(http.requests()).toEqual([])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 })

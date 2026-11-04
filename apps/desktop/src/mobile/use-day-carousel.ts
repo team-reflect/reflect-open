@@ -172,7 +172,7 @@ export function useDayCarousel(
     // Swiping between days is disabled while the software keyboard is up (V1
     // parity: horizontal drags would fight text selection and the caret).
     // Embla evaluates the predicate at drag start.
-    watchDrag: () => keyboard.getHeight() === 0,
+    watchDrag: () => keyboard.get() === 0,
     // The container's direct children change only on a re-anchor, and the
     // follow effect below already reInits synchronously (layout effect —
     // before Embla's MutationObserver microtask would fire). Watching

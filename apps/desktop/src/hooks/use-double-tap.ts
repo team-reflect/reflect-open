@@ -6,9 +6,9 @@ const DOUBLE_TAP_MS = 450
  * Double-tap detection over a set of keys: two taps of the same key within
  * `windowMs` pair into a double-tap (keys are compared with `===`). A pending
  * tap only pairs while `activeKey` stays on its key — when the surrounding
- * state moves off it between taps (the mobile tab bar's case: a deep link or
- * an opened note between two tab taps), the second tap reads as a return to
- * the key, not a double-tap, so it starts a fresh pairing instead.
+ * state moves off it between taps (the mobile tab bar's case: a deep link to
+ * another tab between two tab taps), the second tap reads as a return to the
+ * key, not a double-tap, so it starts a fresh pairing instead.
  *
  * @param activeKey The key currently "held" by the surrounding state, or
  *   `null` when none is — watched to expire stranded taps.

@@ -3,8 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { parseSearchQuery } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 import { useEmbedStatus } from '@/lib/use-embed-status.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useToday } from '@/lib/use-today.ts'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
+import {
+  useDateFormat,
+  useSemanticSearchEnabled,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import type { PaletteSections } from './entries.ts'
 
@@ -25,16 +30,18 @@ export interface PaletteResults {
 }
 
 export function usePaletteResults(open: boolean, query: string): PaletteResults {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { paletteSearch } = useAppServices()
   // Hybrid needs both halves of the opt-in: the setting on *and* the model
   // ready. The setting gate makes disabling immediate — the model stays loaded
   // for the session, but its results must not. Plain-text queries blend
   // semantic hits via RRF and degrade invisibly to lexical without either.
   // Filtered queries stay constraint-based — filters are exact by nature.
-  const { settings } = useSettings()
+  const semanticSearchEnabled = useSemanticSearchEnabled()
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
   const embed = useEmbedStatus()
-  const hybrid = settings.semanticSearchEnabled && embed.status === 'ready'
+  const hybrid = semanticSearchEnabled && embed.status === 'ready'
 
   // Defer the query the index sees: fast typing coalesces (the plan's
   // debounce) while the input itself stays perfectly responsive.
@@ -48,7 +55,7 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // part of the cache identity — without it a palette cached before midnight
   // would serve a stale "Tomorrow" afterwards. Computed once so the key and the
   // query agree on the same day.
-  const today = paletteSearch.today()
+  const today = useToday()
 
   const {
     data: suggestions,
@@ -57,15 +64,15 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   } = useQuery({
     queryKey: queryKeys.index.paletteSuggestions(graph?.root, {
       text: trimmed,
-      dateFormat: settings.dateFormat,
-      weekStartDay: settings.weekStartDay,
+      dateFormat,
+      weekStartDay,
       today,
     }),
     queryFn: () => {
       return paletteSearch.suggestTitles(trimmed, {
         today,
-        dateFormat: settings.dateFormat,
-        weekStartDay: settings.weekStartDay,
+        dateFormat,
+        weekStartDay,
       })
     },
     enabled: searching && !parsed.filtered,

@@ -137,26 +137,26 @@ describe('setOverlay', () => {
     noteRows.subscribe(listener)
     noteRows.setOverlay('notes/a.md', GEN, {})
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: undefined })
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
     expect(listener).not.toHaveBeenCalled()
   })
 
   it('scopes the overlay to the writing generation', () => {
     const { noteRows, graph } = createRows()
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL })
-    expect(noteRows.getOverlay('notes/a.md')?.gistUrl).toBe(URL)
+    expect(noteRows.get().get('notes/a.md')?.gistUrl).toBe(URL)
     // A reader on a different graph generation never sees it.
     graph.setGraph({ generation: GEN + 1 })
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
     graph.setGraph(null)
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 
   it('merges patches of the same generation', () => {
     const { noteRows } = createRows()
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL })
     noteRows.setOverlay('notes/a.md', GEN, { gistStale: false })
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ gistUrl: URL, gistStale: false })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ gistUrl: URL, gistStale: false })
   })
 
   it('lets a newer generation replace an older overlay', () => {
@@ -164,7 +164,7 @@ describe('setOverlay', () => {
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: 'old' })
     noteRows.setOverlay('notes/a.md', GEN + 1, { gistUrl: 'new' })
     expect(noteRows.getOverlaysOn(GEN + 1).get('notes/a.md')?.gistUrl).toBe('new')
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 
   it('ignores an older generation late write, keeping the newer overlay', () => {
@@ -172,25 +172,25 @@ describe('setOverlay', () => {
     noteRows.setOverlay('notes/a.md', GEN + 1, { gistUrl: 'new' })
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: 'stale' }) // older graph, resolved late
     expect(noteRows.getOverlaysOn(GEN + 1).get('notes/a.md')?.gistUrl).toBe('new')
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 
   it('drops the pin order on an unpin and the trash mark on any other patch', () => {
     const { noteRows } = createRows()
     noteRows.setOverlay('notes/a.md', GEN, { isPinned: true, pinnedOrder: 1024 })
     noteRows.setOverlay('notes/a.md', GEN, { isPinned: false })
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: false })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPinned: false })
 
     noteRows.setOverlay('notes/a.md', GEN, { trashed: true })
     noteRows.setOverlay('notes/a.md', GEN, { isPrivate: true })
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: false, isPrivate: true })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPinned: false, isPrivate: true })
   })
 
   it('keeps the overlays of two services apart', () => {
     const first = createRows().noteRows
     const second = createRows().noteRows
     first.setOverlay('notes/a.md', GEN, { gistUrl: URL })
-    expect(second.getOverlay('notes/a.md')).toBeNull()
+    expect(second.get().get('notes/a.md')).toBeUndefined()
   })
 })
 
@@ -200,10 +200,10 @@ describe('reconcile', () => {
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL })
 
     noteRows.reconcile('notes/a.md', noteRow({ gistUrl: null }))
-    expect(noteRows.getOverlay('notes/a.md')?.gistUrl).toBe(URL) // index hasn't caught up
+    expect(noteRows.get().get('notes/a.md')?.gistUrl).toBe(URL) // index hasn't caught up
 
     noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL }))
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull() // index agrees, retired
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined() // index agrees, retired
   })
 
   it('retires overlay fields independently as the index catches up', () => {
@@ -211,17 +211,17 @@ describe('reconcile', () => {
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL, gistStale: false })
 
     noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: true }))
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ gistStale: false })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ gistStale: false })
 
     noteRows.reconcile('notes/a.md', noteRow({ gistUrl: URL, gistStale: false }))
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 
   it('holds the overlay against a null row (nothing to compare yet)', () => {
     const { noteRows } = createRows()
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL })
     noteRows.reconcile('notes/a.md', null)
-    expect(noteRows.getOverlay('notes/a.md')?.gistUrl).toBe(URL)
+    expect(noteRows.get().get('notes/a.md')?.gistUrl).toBe(URL)
   })
 
   it('holds an overlay whose generation does not match the reconciling read', () => {
@@ -241,10 +241,10 @@ describe('reconcile (pin, private, trash)', () => {
     noteRows.setOverlay('notes/a.md', GEN, { isPinned: true, pinnedOrder: 1024, isPrivate: true })
 
     noteRows.reconcile('notes/a.md', noteRow({ isPrivate: true }))
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 1024 })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ isPinned: true, pinnedOrder: 1024 })
 
     noteRows.reconcile('notes/a.md', { isPinned: true, pinnedOrder: 1024 })
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 
   it('retires a trashed note once the index has no row for it', () => {
@@ -252,10 +252,10 @@ describe('reconcile (pin, private, trash)', () => {
     noteRows.setOverlay('notes/a.md', GEN, { trashed: true })
 
     noteRows.reconcile('notes/a.md', noteRow())
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ trashed: true })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ trashed: true })
 
     noteRows.reconcile('notes/a.md', null)
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 })
 
@@ -272,7 +272,7 @@ describe('reconcileRows', () => {
       { path: 'notes/b.md', isPinned: false },
     ])
 
-    expect(noteRows.getOverlays().size).toBe(0)
+    expect(noteRows.get().size).toBe(0)
     expect(listener).toHaveBeenCalledOnce()
   })
 
@@ -281,12 +281,12 @@ describe('reconcileRows', () => {
     noteRows.setOverlay('notes/a.md', GEN, { trashed: true })
 
     noteRows.reconcileRows([{ path: 'notes/b.md' }])
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ trashed: true })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ trashed: true })
     noteRows.reconcileRows([{ path: 'notes/a.md' }], { complete: true })
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ trashed: true })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ trashed: true })
 
     noteRows.reconcileRows([{ path: 'notes/b.md' }], { complete: true })
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 })
 
@@ -296,31 +296,60 @@ describe('dropOverlay', () => {
     noteRows.setOverlay('notes/a.md', GEN, { pinnedOrder: 2048, gistUrl: URL })
 
     noteRows.dropOverlay('notes/a.md', GEN, { pinnedOrder: 1024 })
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ pinnedOrder: 2048, gistUrl: URL })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ pinnedOrder: 2048, gistUrl: URL })
 
     noteRows.dropOverlay('notes/a.md', GEN, { pinnedOrder: 2048 })
-    expect(noteRows.getOverlay('notes/a.md')).toEqual({ gistUrl: URL })
+    expect(noteRows.get().get('notes/a.md')).toEqual({ gistUrl: URL })
 
     noteRows.dropOverlay('notes/a.md', GEN, { gistUrl: URL })
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
   })
 })
 
-describe('getOverlays', () => {
+describe('get', () => {
   it("returns the open graph's overlays as a snapshot that changes only with them", () => {
     const { noteRows } = createRows()
     noteRows.setOverlay('notes/a.md', GEN, { isPinned: true })
     noteRows.setOverlay('notes/b.md', GEN + 1, { isPinned: true })
 
-    const snapshot = noteRows.getOverlays()
+    const snapshot = noteRows.get()
     expect([...snapshot]).toEqual([['notes/a.md', { isPinned: true }]])
-    expect(noteRows.getOverlays()).toBe(snapshot)
+    expect(noteRows.get()).toBe(snapshot)
     expect(noteRows.getOverlaysOn(GEN)).toBe(snapshot)
     expect([...noteRows.getOverlaysOn(GEN + 1)]).toEqual([['notes/b.md', { isPinned: true }]])
-    expect(noteRows.getOverlays()).toBe(snapshot)
+    expect(noteRows.get()).toBe(snapshot)
 
     noteRows.setOverlay('notes/a.md', GEN, { isPrivate: true })
-    expect(noteRows.getOverlays()).not.toBe(snapshot)
+    expect(noteRows.get()).not.toBe(snapshot)
+  })
+
+  it('keeps the snapshot and does not notify on a write that changes no overlay on the open graph', () => {
+    const { noteRows, graph } = createRows()
+    noteRows.setOverlay('notes/a.md', GEN, { isPinned: true })
+    const snapshot = noteRows.get()
+    const listener = vi.fn()
+    noteRows.subscribe(listener)
+
+    noteRows.setOverlay('notes/b.md', GEN + 1, { isPinned: true })
+    noteRows.setOverlay('notes/a.md', GEN - 1, { isPrivate: true })
+    noteRows.dropOverlay('notes/a.md', GEN, { isPrivate: true })
+    noteRows.reconcile('notes/a.md', { isPrivate: false })
+    graph.setGraph({ generation: GEN })
+
+    expect(noteRows.get()).toBe(snapshot)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('stops notifying after unsubscribe', () => {
+    const { noteRows } = createRows()
+    const listener = vi.fn()
+    const unlisten = noteRows.subscribe(listener)
+
+    noteRows.setOverlay('notes/a.md', GEN, { isPinned: true })
+    expect(listener).toHaveBeenCalledOnce()
+    unlisten()
+    noteRows.setOverlay('notes/b.md', GEN, { isPinned: true })
+    expect(listener).toHaveBeenCalledOnce()
   })
 
   it('reads nothing while no graph is open and notifies when the graph changes', () => {
@@ -331,7 +360,7 @@ describe('getOverlays', () => {
 
     graph.setGraph(null)
     expect(listener).toHaveBeenCalled()
-    expect(noteRows.getOverlays().size).toBe(0)
+    expect(noteRows.get().size).toBe(0)
     noteRows.reconcileRows([], { complete: true })
     expect(noteRows.getOverlaysOn(GEN).size).toBe(1)
   })
@@ -347,7 +376,7 @@ describe('reset', () => {
     noteRows.reset()
     noteRows.reset()
 
-    expect(noteRows.getOverlay('notes/a.md')).toBeNull()
+    expect(noteRows.get().get('notes/a.md')).toBeUndefined()
     expect(listener).toHaveBeenCalledOnce()
     unlisten()
     noteRows.setOverlay('notes/a.md', GEN, { gistUrl: URL })

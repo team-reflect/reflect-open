@@ -9,9 +9,12 @@ import {
   parse,
   parseISO,
   startOfWeek,
+  startOfDay,
   type Day,
 } from 'date-fns'
 import { UTCDate, utc } from '@date-fns/utc'
+
+export { startOfDay, addDays }
 
 /**
  * Calendar math on ISO `YYYY-MM-DD` dates and `YYYY-MM` year-months. Daily

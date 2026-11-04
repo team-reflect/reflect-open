@@ -158,7 +158,7 @@ describe('DailyEventsSection', () => {
 
   it('passes invite emails and the contacts gate through to the action', async () => {
     stored = { calendarEnabled: true, calendarIds: ['cal-work'], contactsEnabled: true }
-    contacts.setStatus('authorized')
+    await contacts.setStatus('authorized')
     calendar.setEvents([
       eventAt(9, {
         title: 'Standup',

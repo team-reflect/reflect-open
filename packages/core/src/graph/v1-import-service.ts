@@ -4,6 +4,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import { errorMessage } from '../errors.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import { listenNow, type IpcBridgeService } from '../ipc/ipc-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { GraphSessionService } from './graph-session-service.ts'
 import {
@@ -44,9 +45,7 @@ export type V1ImportState =
  * attachment-heavy graphs. Members are function properties so surfaces can
  * pass them around unbound.
  */
-export interface V1ImportService {
-  getState: () => V1ImportState
-  subscribe: (listener: () => void) => Unlisten
+export interface V1ImportService extends Store<V1ImportState> {
   /**
    * Kick off an import of the chosen `.zip`; ignored while one runs and while no graph is open.
    */
@@ -78,8 +77,9 @@ export interface V1ImportServiceDeps {
 
 class V1ImportServiceImpl implements V1ImportService {
   readonly #deps: V1ImportServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #state: V1ImportState = { phase: 'idle' }
+  readonly #state = new WritableStore<V1ImportState>({ phase: 'idle' })
+  readonly get = this.#state.get
+  readonly subscribe = this.#state.subscribe
   #running = false
   #cancelRequested = false
   // The native import keeps running without its workspace; if the workspace
@@ -95,27 +95,19 @@ class V1ImportServiceImpl implements V1ImportService {
     this.#deps = deps
   }
 
-  readonly getState = (): V1ImportState => this.#state
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
-
   start(zipPath: string): void {
     const { ipc, graphSession } = this.#deps
-    const startedFor = graphSession.getState().graph
+    const startedFor = graphSession.get().graph
     if (this.#running || startedFor === null) {
       return
     }
     this.#running = true
     this.#cancelRequested = false
-    this.#setState({ phase: 'running', progress: null, cancelling: false })
+    this.#state.set({ phase: 'running', progress: null, cancelling: false })
     const unlisten = this.#subscribeProgress((progress) => {
-      if (this.#state.phase === 'running') {
-        this.#setState({ ...this.#state, progress })
+      const state = this.#state.get()
+      if (state.phase === 'running') {
+        this.#state.set({ ...state, progress })
       }
     })
     void (async () => {
@@ -125,7 +117,7 @@ class V1ImportServiceImpl implements V1ImportService {
           { path: zipPath, generation: startedFor.generation },
           graphImportSummarySchema,
         )
-        const current = graphSession.getState().graph
+        const current = graphSession.get().graph
         if (
           this.#attached &&
           current !== null &&
@@ -134,14 +126,14 @@ class V1ImportServiceImpl implements V1ImportService {
         ) {
           this.#markOwnWrites(summary)
           graphSession.refreshIndex()
-          this.#setState({ phase: 'done', summary })
+          this.#state.set({ phase: 'done', summary })
         } else {
-          this.#setState({ phase: 'idle' })
+          this.#state.set({ phase: 'idle' })
         }
       } catch (caught: unknown) {
         // A rejection after the user hit Cancel is the cancellation itself,
         // not a failure worth surfacing.
-        this.#setState(
+        this.#state.set(
           this.#cancelRequested
             ? { phase: 'idle' }
             : { phase: 'failed', message: errorMessage(caught) },
@@ -158,15 +150,16 @@ class V1ImportServiceImpl implements V1ImportService {
       return
     }
     this.#cancelRequested = true
-    if (this.#state.phase === 'running') {
-      this.#setState({ ...this.#state, cancelling: true })
+    const state = this.#state.get()
+    if (state.phase === 'running') {
+      this.#state.set({ ...state, cancelling: true })
     }
     void this.#cancelNative().catch(() => {})
   }
 
   dismiss(): void {
-    if (this.#state.phase !== 'running') {
-      this.#setState({ phase: 'idle' })
+    if (this.#state.get().phase !== 'running') {
+      this.#state.set({ phase: 'idle' })
     }
   }
 
@@ -177,16 +170,6 @@ class V1ImportServiceImpl implements V1ImportService {
       if (this.#running) {
         void this.#cancelNative().catch(() => {})
       }
-    }
-  }
-
-  #setState(next: V1ImportState): void {
-    if (next === this.#state) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
     }
   }
 
