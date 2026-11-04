@@ -166,7 +166,7 @@ export function SwipeRow({
         // 1px wide because WebKit ignores zero-width snap areas; `-ml-px` cancels
         // the extra pixel. See also
         aria-hidden
-        className="w-0 flex-none snap-end"
+        className="-ml-px w-px flex-none snap-end"
       ></span>
     </div>
   )
