@@ -58,6 +58,7 @@ import {
   type MobileOnboardingService,
 } from './graph/mobile-onboarding-service.ts'
 import { createGraphBootService, type GraphBootService } from './graph/graph-boot-service.ts'
+import { createReviewService, type ReviewService } from './review/review-service.ts'
 import { WHATS_NEW } from './whats-new/whats-new-content.ts'
 import { createWhatsNewService, type WhatsNewService } from './whats-new/whats-new-service.ts'
 
@@ -214,6 +215,10 @@ export interface AppServices {
    * The What's New page shown once per app version after an update.
    */
   readonly whatsNew: WhatsNewService
+  /**
+   * The App Store review request on iOS, and the rate and feedback links.
+   */
+  readonly review: ReviewService
 }
 
 /**
@@ -338,6 +343,15 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       graphSession: core.graphSession,
       blocked: whatsNewBlocked(core),
       content: WHATS_NEW,
+    }),
+    review: createReviewService({
+      storage: core.storage,
+      clock: core.clock,
+      platform: core.platform,
+      logger: core.logger,
+      opener,
+      classicAccess: core.classicAccess,
+      mobile: core.mobile,
     }),
   }
 }

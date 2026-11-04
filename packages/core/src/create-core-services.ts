@@ -211,7 +211,7 @@ import {
   type WikiResolverService,
 } from './indexing/wiki-resolver-service.ts'
 import { createIndexStoreService, type IndexStoreService } from './indexing/index-store-service.ts'
-import { createAppStoreService } from './ipc/app-store-service.ts'
+import { createAppStoreService, type AppStoreService } from './ipc/app-store-service.ts'
 import { createIapService } from './ipc/iap-service.ts'
 import type { IpcBridgeService } from './ipc/ipc-service.ts'
 import {
@@ -521,6 +521,10 @@ export interface MobileServices {
    * The App Store install channel, probed once per launch.
    */
   readonly appStoreEnvironment: AppStoreEnvironmentService
+  /**
+   * StoreKit's App Store sheets and prompts.
+   */
+  readonly appStore: AppStoreService
   /**
    * Time since this device's first launch, which schedules the paywall.
    */
@@ -910,6 +914,7 @@ export function composeCoreServices(
       haptics,
       subscription,
       appStoreEnvironment,
+      appStore,
       installClock,
       paywall: create.paywall({
         subscription,

@@ -83,6 +83,28 @@ class AppStorePlugin: Plugin {
       invoke.reject("presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")
     }
   }
+
+  /// Asks StoreKit for its review prompt. The system decides whether it
+  /// shows (at most three times in 365 days on App Store installs, never in
+  /// TestFlight) and reports nothing back.
+  @MainActor
+  @objc public func requestReview(_ invoke: Invoke) async throws {
+    // The Swift package says iOS 16, but the TestFlight build compiles this
+    // file with a lower deployment target, so the check must stay.
+    guard #available(iOS 16.0, *) else {
+      invoke.reject("requestReview needs iOS 16")
+      return
+    }
+    guard
+      let scene = UIApplication.shared.connectedScenes
+        .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+    else {
+      invoke.reject("no active window scene")
+      return
+    }
+    AppStore.requestReview(in: scene)
+    invoke.resolve()
+  }
 }
 
 @_cdecl("init_plugin_app_store")

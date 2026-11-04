@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.18.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.2...v0.18.0-beta.3) (2026-11-04)
+
+
+### Features
+
+* **mobile:** add drawer depth effect ([#1954](https://github.com/team-reflect/reflect-open/issues/1954)) ([6b18f5a](https://github.com/team-reflect/reflect-open/commit/6b18f5adfde72b51ff414b41575424f49abb3651))
+* **mobile:** invite users to send feedback ([#1947](https://github.com/team-reflect/reflect-open/issues/1947)) ([5912d17](https://github.com/team-reflect/reflect-open/commit/5912d1703f6ff066a9cda85d256b1c870cb784c2))
+
+
+### Bug Fixes
+
+* **mobile:** make swiping between days smoother ([#1939](https://github.com/team-reflect/reflect-open/issues/1939)) ([15aebea](https://github.com/team-reflect/reflect-open/commit/15aebea8e523661af563c978070cd6a1e735a22b))
+
 ## [0.18.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.1...v0.18.0-beta.2) (2026-11-04)
 
 

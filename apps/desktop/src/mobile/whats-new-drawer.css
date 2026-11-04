@@ -1,0 +1,53 @@
+/* The sheet morphs between the heights of the What's New page and the review
+   page, while the pages slide past each other inside it. */
+.scroll-drawer-panel:has(> [data-whats-new]) {
+  view-transition-name: whats-new-sheet;
+}
+
+::view-transition-group(whats-new-sheet) {
+  animation-duration: 350ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* The sheet holds no content of its own while the pages transition, so its
+   new snapshot alone, pinned to the top and cropped, grows with the group. */
+::view-transition-old(whats-new-sheet) {
+  display: none;
+}
+
+::view-transition-new(whats-new-sheet) {
+  animation: none;
+  height: 100%;
+  object-fit: none;
+  object-position: top;
+}
+
+::view-transition-old(.whats-new-page-out) {
+  animation: whats-new-page-out 150ms ease-in both;
+}
+
+::view-transition-new(.whats-new-page-in) {
+  animation: whats-new-page-in 300ms cubic-bezier(0.32, 0.72, 0, 1) 100ms both;
+}
+
+@keyframes whats-new-page-out {
+  to {
+    opacity: 0;
+    transform: translate3d(-24px, 0, 0);
+  }
+}
+
+@keyframes whats-new-page-in {
+  from {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(whats-new-sheet),
+  ::view-transition-old(.whats-new-page-out),
+  ::view-transition-new(.whats-new-page-in) {
+    animation: none;
+  }
+}
