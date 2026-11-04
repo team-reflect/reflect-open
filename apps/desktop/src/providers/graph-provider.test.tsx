@@ -235,7 +235,7 @@ describe('GraphProvider', () => {
     const before = { ...renders }
 
     await act(() => {
-      core.graphSession.setState({ indexing: true })
+      core.indexLifecycle.setProgress('reconciling')
     })
 
     await expect.element(screen.getByText('indexing')).toBeVisible()

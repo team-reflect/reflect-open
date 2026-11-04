@@ -71,11 +71,13 @@ describe('renderInApp', () => {
   it('reports the graph, the graph state and a later graph switch', async () => {
     const { core } = await renderInApp(<Probe />, {
       graph: { root: '/g', generation: 3, indexGeneration: 7 },
-      graphState: { indexing: true, recents: [{ root: '/g', name: 'g', openedMs: 1 }] },
+      graphState: { recents: [{ root: '/g', name: 'g', openedMs: 1 }] },
+      indexing: true,
     })
     await expect.element(page.getByTestId('graph')).toHaveTextContent('ready /g 3 7 indexing 1 -')
 
     core.graphSession.setGraph(null)
+    core.indexLifecycle.setProgress(null)
     await expect.element(page.getByTestId('graph')).toHaveTextContent('choosing none - - idle 1 -')
   })
 
