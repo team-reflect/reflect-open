@@ -295,6 +295,12 @@ const APP_COMMANDS: AppCommand[] = [
     run: (context) => context.navigate({ kind: 'settings' }),
   },
   {
+    id: 'whatsNew.show',
+    title: 'What’s New',
+    keywords: ['changelog', 'release notes', 'update', 'version'],
+    run: (context) => context.app.whatsNew.setOverride(true),
+  },
+  {
     id: 'shortcuts.show',
     title: 'Keyboard shortcuts',
     keywords: ['cheat', 'sheet', 'keys', 'bindings', 'hotkeys', 'help'],
