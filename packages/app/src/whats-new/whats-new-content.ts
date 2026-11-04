@@ -22,3 +22,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     },
   ],
 }
+
+/**
+ * Marketing versions whose What's New is followed by the review page on iOS.
+ * Mark at most three a year, matching Apple's prompt quota, and only versions
+ * with an iOS item in {@link WHATS_NEW}.
+ */
+export const ASK_FOR_REVIEW_VERSIONS: ReadonlySet<string> = new Set()

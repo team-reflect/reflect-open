@@ -1,6 +1,6 @@
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
-import type { WhatsNewGate, WhatsNewService } from '@reflect/app'
+import type { ReviewService, WhatsNewGate, WhatsNewService } from '@reflect/app'
 import { WritableStore } from '@reflect/core'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -25,6 +25,19 @@ function createFakeWhatsNew() {
   return { whatsNew, dismissed: () => dismissed }
 }
 
+function createFakeReview() {
+  const calls: string[] = []
+  const review: ReviewService = {
+    override: new WritableStore(false),
+    setOverride: () => {},
+    shouldAsk: () => true,
+    requestReview: () => calls.push('requestReview'),
+    writeReview: () => calls.push('writeReview'),
+    sendFeedback: () => calls.push('sendFeedback'),
+  }
+  return { review, calls }
+}
+
 describe('WhatsNewDrawer', () => {
   it('shows the items and closes on Continue', async () => {
     const { whatsNew, dismissed } = createFakeWhatsNew()
@@ -42,6 +55,38 @@ describe('WhatsNewDrawer', () => {
     await renderInApp(<WhatsNewDrawer />, { appServices: { whatsNew }, servicesOnly: true })
 
     await expect.element(page.getByText('Chat in the All tab')).toBeVisible()
+    await swipeDrawerClosed()
+
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+    expect(dismissed()).toBe(1)
+  })
+
+  it('turns to the review page on Continue when the review service asks', async () => {
+    const { whatsNew, dismissed } = createFakeWhatsNew()
+    const { review, calls } = createFakeReview()
+    await renderInApp(<WhatsNewDrawer />, { appServices: { whatsNew, review }, servicesOnly: true })
+
+    await userEvent.click(page.getByRole('button', { name: 'Continue' }))
+    await expect.element(page.getByText('Help others find Reflect')).toBeVisible()
+    expect(dismissed()).toBe(0)
+
+    await userEvent.click(page.getByRole('button', { name: 'Rate Reflect' }))
+    await userEvent.click(page.getByRole('button', { name: 'Write a review' }))
+    await userEvent.click(page.getByRole('button', { name: 'Send feedback' }))
+    expect(calls).toEqual(['requestReview', 'writeReview', 'sendFeedback'])
+
+    await userEvent.click(page.getByRole('button', { name: 'Not now' }))
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+    expect(dismissed()).toBe(1)
+  })
+
+  it('marks the version seen when the review page is swiped closed', async () => {
+    const { whatsNew, dismissed } = createFakeWhatsNew()
+    const { review } = createFakeReview()
+    await renderInApp(<WhatsNewDrawer />, { appServices: { whatsNew, review }, servicesOnly: true })
+
+    await userEvent.click(page.getByRole('button', { name: 'Continue' }))
+    await expect.element(page.getByText('Help others find Reflect')).toBeVisible()
     await swipeDrawerClosed()
 
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()

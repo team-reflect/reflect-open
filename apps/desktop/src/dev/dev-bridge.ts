@@ -139,6 +139,7 @@ class DevBridgeImpl implements IpcBridge {
         return { environment: 'Sandbox' }
       case 'plugin:app-store|sync':
       case 'plugin:app-store|present_offer_code_redeem_sheet':
+      case 'plugin:app-store|request_review':
         return null
       case 'plugin:iap|get_products': {
         const { payload } = iapProductsArgsSchema.parse(args)

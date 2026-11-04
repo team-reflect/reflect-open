@@ -95,6 +95,21 @@ function WhatsNewRow(): ReactElement {
 }
 
 /**
+ * Shows the review page after What's New in this session.
+ */
+function ReviewRow(): ReactElement {
+  const { review } = useAppServices()
+  const override = useStore(review.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate review page"
+      checked={override}
+      onCheckedChange={review.setOverride}
+    />
+  )
+}
+
+/**
  * Simulates a paywall phase for this session, so a TestFlight build can walk
  * through every phase.
  */
@@ -172,7 +187,7 @@ export function MobileSettings(): ReactElement {
   const mobileStorageKind = useMobileStorageKind()
   const isIos = platform === 'ios'
   const subscriptionControls = useSubscriptionControls()
-  const { opener } = useAppServices()
+  const { opener, review } = useAppServices()
   const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
   const theme = useThemeSetting()
   const editorTextSize = useEditorTextSize()
@@ -545,6 +560,8 @@ export function MobileSettings(): ReactElement {
               label="Notes"
               value={notes === undefined ? '…' : String(notes.length)}
             />
+            {isIos ? <SettingsActionRow label="Rate Reflect" onPress={review.writeReview} /> : null}
+            <SettingsActionRow label="Send feedback" onPress={review.sendFeedback} />
             <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsNavRow
               label="Open Source Licenses"
@@ -573,6 +590,7 @@ export function MobileSettings(): ReactElement {
                 <PaywallPhaseRow />
               ) : null}
               <WhatsNewRow />
+              <ReviewRow />
               <SettingsSwitchRow
                 label="Performance HUD"
                 checked={perfHudEnabled}

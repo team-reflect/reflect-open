@@ -38,7 +38,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::get_environment,
             commands::sync,
-            commands::present_offer_code_redeem_sheet
+            commands::present_offer_code_redeem_sheet,
+            commands::request_review
         ])
         .setup(|app, api| {
             #[cfg(mobile)]

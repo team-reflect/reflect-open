@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-request-review"
+description = "Enables the request_review command without any pre-configured scope."
+commands.allow = ["request_review"]
+
+[[permission]]
+identifier = "deny-request-review"
+description = "Denies the request_review command without any pre-configured scope."
+commands.deny = ["request_review"]

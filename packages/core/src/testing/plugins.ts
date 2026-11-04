@@ -118,7 +118,7 @@ export function createTestIapService(options?: {
   return new TestIapServiceImpl(options)
 }
 
-export type AppStoreCall = 'environment' | 'sync' | 'presentOfferCodeRedeemSheet'
+export type AppStoreCall = 'environment' | 'sync' | 'presentOfferCodeRedeemSheet' | 'requestReview'
 
 export interface TestAppStoreService extends AppStoreService {
   /**
@@ -147,6 +147,11 @@ class TestAppStoreServiceImpl implements TestAppStoreService {
 
   presentOfferCodeRedeemSheet(): void {
     this.#log.push('presentOfferCodeRedeemSheet')
+    return
+  }
+
+  requestReview(): void {
+    this.#log.push('requestReview')
     return
   }
 

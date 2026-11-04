@@ -37,6 +37,7 @@ export {
 } from './settings/theme-service.ts'
 export { type WhatsNewItem } from './whats-new/whats-new-content.ts'
 export { type WhatsNewGate, type WhatsNewService } from './whats-new/whats-new-service.ts'
+export { type ReviewService } from './review/review-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
   type OpenerService,
