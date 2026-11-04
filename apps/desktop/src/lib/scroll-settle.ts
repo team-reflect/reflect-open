@@ -37,9 +37,10 @@ export interface ScrollSettleOptions {
    */
   isSettled?: (() => boolean) | undefined
   /**
-   * Where a mouse drag may start. Defaults to `element`.
+   * Where a mouse drag may start. Defaults to `element`. `null` starts no
+   * mouse drag.
    */
-  dragHandle?: HTMLElement | undefined
+  dragHandle?: HTMLElement | null | undefined
 }
 
 export interface ScrollSettleWatch {
@@ -194,7 +195,7 @@ export function watchScrollSettle({
     { passive: true, signal },
   )
   element.addEventListener('scrollend', flush, { signal })
-  dragHandle.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
+  dragHandle?.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
   signal.addEventListener(
     'abort',
     () => {
