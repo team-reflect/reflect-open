@@ -73,7 +73,7 @@ describe('WhatsNewDrawer', () => {
     await renderInApp(<WhatsNewDrawer />, { appServices: { whatsNew, review }, servicesOnly: true })
 
     await userEvent.click(page.getByRole('button', { name: 'Continue' }))
-    await expect.element(page.getByText('Help others find Reflect')).toBeVisible()
+    await expect.element(page.getByText('Enjoying Reflect?')).toBeVisible()
     expect(dismissed()).toBe(0)
 
     await userEvent.click(page.getByRole('button', { name: 'Rate Reflect' }))
@@ -94,7 +94,7 @@ describe('WhatsNewDrawer', () => {
     await renderInApp(<WhatsNewDrawer />, { appServices: { whatsNew, review }, servicesOnly: true })
 
     await userEvent.click(page.getByRole('button', { name: 'Continue' }))
-    await expect.element(page.getByText('Help others find Reflect')).toBeVisible()
+    await expect.element(page.getByText('Enjoying Reflect?')).toBeVisible()
     await swipeDrawerClosed()
 
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
