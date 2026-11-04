@@ -30,7 +30,6 @@ interface PurchaseVariables {
 /** V1 web page that hands a paying Reflect member their free-year offer code. */
 const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 
-// FIXME: rename paywall-screen.tsx to paywall-drawer.tsx
 /**
  * The paywall as a near full-screen drawer that cannot be closed.
  */

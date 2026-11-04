@@ -22,7 +22,7 @@ import {
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { PaywallDrawer } from './paywall-screen.tsx'
+import { PaywallDrawer } from './paywall-drawer.tsx'
 
 const YEARLY_PRODUCT = {
   formattedPrice: '$99999.99',
