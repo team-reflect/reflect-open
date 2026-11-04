@@ -131,13 +131,16 @@ describe('useDayCarousel', () => {
     const onSelect = vi.fn<(date: string) => void>()
     const onTarget = vi.fn<(date: string, navigationKey: string) => void>()
     const navigate: { current: (route: Route) => void } = { current: () => {} }
+    const resize: { current: (width: number) => void } = { current: () => {} }
     let seq = 0
     // Stands in for the router: a settled day comes back as the new route.
     function Harness(): ReactElement {
       const [route, setRoute] = useState(() => routeTo(DATE, seq))
+      const [width, setWidth] = useState(WIDTH)
       navigate.current = setRoute
+      resize.current = setWidth
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', width: WIDTH, height: 600 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', width, height: 600 }}>
           <DayCarousel
             date={route.date}
             navigationKey={route.navigationKey}
@@ -164,6 +167,9 @@ describe('useDayCarousel', () => {
       onTarget,
       navigate: async (date: string) => {
         await act(() => navigate.current(routeTo(date, ++seq)))
+      },
+      resize: async (width: number) => {
+        await act(() => resize.current(width))
       },
     }
   }
@@ -303,6 +309,46 @@ describe('useDayCarousel', () => {
 
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe((CENTER + 1) * WIDTH))
     expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-13')
+  })
+
+  it('lands a second swipe that starts before the first settles on a mounted slide', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 1) * WIDTH, behavior: 'instant' }))
+    await touch(scroller, 'end')
+    // The second finger lands inside the quiet time, before any settle.
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 2) * WIDTH, behavior: 'instant' }))
+    await vi.waitFor(() => expect(slide('2026-06-14')).not.toBeNull())
+    await touch(scroller, 'end')
+    await act(() => scroller.dispatchEvent(new Event('scrollend')))
+
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-14'))
+    expect(scroller.scrollLeft).toBe((CENTER + 2) * WIDTH)
+  })
+
+  it('stays on the same day when the page width changes', async () => {
+    const { scroller, onSelect, resize } = await mountCarousel()
+    // Without snapping, only the carousel moves the scroller.
+    scroller.style.scrollSnapType = 'none'
+
+    await resize(500)
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(CENTER * 500))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('leaves the scroller to a finger that is down when the page width changes', async () => {
+    const { scroller, resize } = await mountCarousel()
+    scroller.style.scrollSnapType = 'none'
+
+    await touch(scroller, 'start')
+    await resize(500)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
+    await touch(scroller, 'end')
   })
 
   it('stops horizontal scrolling while the software keyboard is up', async () => {

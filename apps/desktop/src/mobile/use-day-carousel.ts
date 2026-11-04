@@ -240,7 +240,6 @@ export function useDayCarousel(
   const selectedIndexRef = useRef(routeIndex)
   // The nearest index the current user scroll has reached.
   const nearestRef = useRef(routeIndex)
-  const watchRef = useRef<ScrollSettleWatch | null>(null)
   // A user scroll has moved the scroller and has not settled.
   const userScrollingRef = useRef(false)
 
@@ -248,8 +247,10 @@ export function useDayCarousel(
   // without predicting the snap: the next day mounts while the browser keeps
   // the gesture moving, and the strip follows. The reach only grows until
   // the settle, so dragging back and forth over the middle mounts nothing twice.
-  const handleScroll = useEffectEvent((scroller: HTMLElement) => {
-    if (!watchRef.current?.isUserScroll()) {
+  // The strip update stays out of the mount's transition, so it does not wait
+  // for the next day's editor to render.
+  const handleScroll = useEffectEvent((scroller: HTMLElement, watch: ScrollSettleWatch) => {
+    if (!watch.isUserScroll()) {
       restOn(scroller, selectedIndexRef.current)
       return
     }
@@ -259,6 +260,7 @@ export function useDayCarousel(
       return
     }
     nearestRef.current = nearest
+    onTarget(dateAtIndex(dayWindow, nearest), navigationKey)
     startTransition(() => {
       setSelection((current) => {
         return current.navigationKey === navigationKey
@@ -269,7 +271,6 @@ export function useDayCarousel(
             }
           : current
       })
-      onTarget(dateAtIndex(dayWindow, nearest), navigationKey)
     })
   })
 
@@ -278,9 +279,9 @@ export function useDayCarousel(
   // edge also rebuilds the window around the current day; the report lands
   // in the same batch, so the follow effect sees the re-anchored window
   // together with the new `date` and moves the scroller onto the same day.
-  const handleSettle = useEffectEvent((scroller: HTMLElement) => {
+  const handleSettle = useEffectEvent((scroller: HTMLElement, watch: ScrollSettleWatch) => {
     userScrollingRef.current = false
-    if (!watchRef.current?.isUserScroll()) {
+    if (!watch.isUserScroll()) {
       restOn(scroller, selectedIndexRef.current)
       return
     }
@@ -318,15 +319,14 @@ export function useDayCarousel(
     const controller = new AbortController()
     const watch = watchScrollSettle({
       element: scroller,
-      onSettle: () => handleSettle(scroller),
+      onSettle: () => handleSettle(scroller, watch),
       signal: controller.signal,
       // The watch's mouse drag releases to an end of the range: right for a
       // two-position scroller, wrong for a pager.
       dragHandle: null,
     })
-    watchRef.current = watch
     // After the watch, whose own listener decides whether this scroll is the user's.
-    const onScroll = (): void => handleScroll(scroller)
+    const onScroll = (): void => handleScroll(scroller, watch)
     scroller.addEventListener('scroll', onScroll, { passive: true })
     // Rotation and split view change the page width: stay on the same day,
     // unless a finger or its momentum owns the position (the settle aligns it).
@@ -340,7 +340,6 @@ export function useDayCarousel(
       controller.abort()
       scroller.removeEventListener('scroll', onScroll)
       resize.disconnect()
-      watchRef.current = null
     }
   }, [])
 
