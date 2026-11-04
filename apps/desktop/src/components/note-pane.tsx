@@ -142,7 +142,6 @@ export function NotePaneComponent({
   const editorDefaultBullet = useEditorDefaultBullet()
   const editorBulletAfterHeading = useEditorBulletAfterHeading()
   const { noteCreation, platform } = useCoreServices()
-  const graphKey = graph?.root ?? null
   const dailyNote = isDaily(path)
   const policy = deferredCreationPolicy(path)
   const lazyCreate = lazy && policy.lazyCreatable
@@ -186,11 +185,7 @@ export function NotePaneComponent({
   const onLinkClick = useMarkdownLinkClick(path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
-  const linkPreviewSession = useMemo(
-    () => (graphKey === null ? null : { path, graphKey, sessionEpoch: document.sessionEpoch }),
-    [path, graphKey, document.sessionEpoch],
-  )
-  const resolveLinkPreview = useLinkPreview(linkPreviewSession)
+  const resolveLinkPreview = useLinkPreview(graph === null ? null : path)
 
   const bindEditor = document.bindEditor
   const aiEditorRef = useRef<NoteEditorHandle | null>(null)
