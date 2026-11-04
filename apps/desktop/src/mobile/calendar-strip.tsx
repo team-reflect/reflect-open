@@ -19,7 +19,7 @@ interface CalendarStripProps {
   /**
    * The day the strip should highlight — the route's selected day, or the
    * destination of an in-flight carousel swipe (the parent hands the swipe
-   * target over at pointer-up so the strip and month title lead the route).
+   * target over mid-swipe so the strip and month title lead the route).
    */
   date: string
   /** Today's live ISO date — owned by the parent so the strip and the

@@ -31,9 +31,9 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // a date-preserving Today tap — mints a new key, which supersedes the swipe
   // state scoped to the old one.
   const navigationKey = `${entryId}:${arrivalSeq}:${date}`
-  // The day a swipe is heading toward, announced at pointer-up — the strip
-  // (and its rolling month title) follows it while the carousel's snap
-  // animation plays, instead of waiting for the settle-time route change.
+  // The day a swipe is heading toward, announced mid-swipe — the strip (and
+  // its rolling month title) follows it while the carousel still moves,
+  // instead of waiting for the settle-time route change.
   const { targetDate, followSwipeTarget } = useSwipeTarget(navigationKey)
   const select = useCallback(
     (day: string): void => {
