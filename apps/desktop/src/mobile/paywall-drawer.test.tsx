@@ -1,3 +1,4 @@
+import { userEvent } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -27,7 +28,7 @@ import {
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { PaywallDrawer } from './paywall-screen.tsx'
+import { PaywallDrawer } from './paywall-drawer.tsx'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -189,6 +190,26 @@ describe('PaywallDrawer modes', () => {
     await mount('hidden')
 
     expect(document.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('stays open on Escape when required', async () => {
+    const view = await mount('required')
+    const dialog = view.getByRole('dialog', { name: 'Keep writing with Reflect Pro' })
+    await expect.element(dialog).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(dialog).toBeVisible()
+    expect(dismissals).toBe(0)
+  })
+
+  it('dismisses on Escape when skippable', async () => {
+    const view = await mount('skippable')
+    await expect.element(view.getByRole('dialog', { name: 'Enjoying Reflect?' })).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(dismissals).toBe(1)
   })
 })
 

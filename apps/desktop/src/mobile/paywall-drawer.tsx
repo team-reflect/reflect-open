@@ -16,16 +16,16 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
-import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { ClassicMemberDrawer } from '@/mobile/classic-member-drawer.tsx'
 import { ClassicSignInProgress } from '@/mobile/classic-sign-in-progress.tsx'
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import {
   classicAccessMessage,
   useClassicAccess,
   useClassicSignIn,
 } from '@/mobile/use-classic-access.ts'
-import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { useIapRestoreRedeem } from '@/mobile/use-iap-restore-redeem.ts'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
@@ -53,8 +53,9 @@ interface PaywallDrawerProps {
 }
 
 /**
- * The paywall as a near full-screen drawer. A skippable paywall closes like
- * any drawer; a required one cannot be closed.
+ * The paywall as a near full-screen drawer. Closing a skippable paywall calls
+ * `onDismiss`. A required one ignores every request to close: a tap above the
+ * sheet and Escape do nothing, and a swipe scrolls the sheet back open.
  */
 export function PaywallDrawer({ gate, onDismiss }: PaywallDrawerProps): ReactElement {
   // The last open mode, so the exit animation keeps its content.
@@ -65,9 +66,8 @@ export function PaywallDrawer({ gate, onDismiss }: PaywallDrawerProps): ReactEle
   return (
     <Drawer
       open={gate !== 'hidden'}
-      dismissible={mode === 'skippable'}
       onOpenChange={(open) => {
-        if (!open) onDismiss()
+        if (!open && mode === 'skippable') onDismiss()
       }}
     >
       <DrawerContent>

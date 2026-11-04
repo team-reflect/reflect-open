@@ -84,6 +84,7 @@ export function MobileTaskRow({
         onClose={close}
         onBeginInteraction={beginInteraction}
         surfaceClassName="bg-surface"
+        overscrollColor="var(--color-destructive)"
         actions={
           <>
             <SwipeActionButton

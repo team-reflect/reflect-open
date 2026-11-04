@@ -2,7 +2,7 @@ import { useEffect, type ReactElement } from 'react'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
-import { PaywallDrawer } from '@/mobile/paywall-screen.tsx'
+import { PaywallDrawer } from '@/mobile/paywall-drawer.tsx'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
@@ -28,13 +28,15 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * The router mounts per graph exactly as on desktop; `MobileScreen` renders
  * the current route (daily spine, note pages), so wiki-link and date-link
  * taps navigate for real. The keyboard effects and the checkbox-haptic
- * listener mount here so they cover every screen's inputs.
+ * listener mount here so they cover every screen's inputs, and the paywall
+ * drawer mounts beside the surface so it can cover any of them.
  */
 export function MobileApp(): ReactElement {
   return (
     <>
       <KeyboardEffects />
       <MobileSurface />
+      <MobileOverlay />
     </>
   )
 }
@@ -52,28 +54,23 @@ function KeyboardEffects(): null {
 }
 
 /**
- * The current surface with the paywall drawer over it.
+ * The paywall drawer over every surface. Subscription verification runs beside
+ * startup, never in its critical path: while StoreKit or settings are
+ * unresolved the gate stays hidden and the local app boots normally. A settled
+ * negative answer opens the paywall later. A purchase closes it, and so does
+ * Later on a skippable paywall. A leaf, so a gate change re-renders only this
+ * component.
  */
-function MobileSurface(): ReactElement {
+function MobileOverlay(): ReactElement {
   const { paywall } = useMobileServices()
   const paywallGate = usePaywallGate()
-
-  // Subscription verification runs beside startup, never in its critical
-  // path: while StoreKit or settings are unresolved the gate stays hidden and
-  // the local app boots normally. The paywall is a drawer over the current
-  // surface; a purchase closes it.
-  return (
-    <>
-      <MobileSurfaceContent />
-      <PaywallDrawer gate={paywallGate} onDismiss={paywall.dismissSkippable} />
-    </>
-  )
+  return <PaywallDrawer gate={paywallGate} onDismiss={paywall.dismissSkippable} />
 }
 
 /**
  * The onboarding, loading, and error gates in front of the routed shell.
  */
-function MobileSurfaceContent(): ReactElement {
+function MobileSurface(): ReactElement {
   const { quitPolicy } = useAppServices()
   const status = useGraphStatus()
   const graph = useGraphInfo()

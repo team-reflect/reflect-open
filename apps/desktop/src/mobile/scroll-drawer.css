@@ -39,29 +39,6 @@
   scroll-snap-align: end;
 }
 
-.scroll-drawer-fixed {
-  --drawer-pull: 5rem;
-}
-
-/* Exactly one pull distance taller than the scrollport. */
-.scroll-drawer-track {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  height: calc(100% + var(--drawer-pull));
-}
-
-.scroll-drawer-fixed .scroll-drawer-spacer {
-  flex: 1 0 0;
-  height: auto;
-  scroll-snap-align: none;
-}
-
-/* Percentages resolve against the taller track. */
-.scroll-drawer-fixed .scroll-drawer-slide {
-  max-height: calc(100% - 6rem - var(--drawer-pull));
-}
-
 .scroll-drawer-backdrop {
   position: absolute;
   inset: 0;

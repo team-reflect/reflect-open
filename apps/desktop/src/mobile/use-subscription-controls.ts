@@ -34,7 +34,7 @@ export interface SubscriptionControls {
   readonly restorePending: boolean
   readonly redeemPending: boolean
   readonly removeClassicVerificationPending: boolean
-  /** Show the paywall, which replaces the app until a purchase or dismissal. */
+  /** Opens the paywall drawer over the app; it stays open until a purchase. */
   subscribe: () => void
   manage: () => void
   restore: () => void
