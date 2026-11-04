@@ -104,11 +104,12 @@ export function SwipeRow({
         setLifts((count) => count + 1)
       }
     }
-    scroller.addEventListener('touchend', placeHeld, { passive: true })
-    scroller.addEventListener('touchcancel', placeHeld, { passive: true })
+    scroller.addEventListener('touchend', placeHeld, { passive: true, signal: controller.signal })
+    scroller.addEventListener('touchcancel', placeHeld, {
+      passive: true,
+      signal: controller.signal,
+    })
     return () => {
-      scroller.removeEventListener('touchend', placeHeld)
-      scroller.removeEventListener('touchcancel', placeHeld)
       controller.abort()
       watchRef.current = null
     }
