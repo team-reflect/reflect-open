@@ -176,7 +176,7 @@ describe('useDayCarousel', () => {
     }
   }
 
-  const slide = (day: string): HTMLElement | null => {
+  const slide = (day: string): Element | null => {
     return page.locate(`[data-day="${CSS.escape(day)}"]`).query()
   }
 
