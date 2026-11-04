@@ -1049,6 +1049,7 @@ export function composeCoreServices(
     clock,
     platform: fileSrc,
     graphSession,
+    logger,
   })
   const persistenceFlush = create.persistenceFlush({
     settings,
