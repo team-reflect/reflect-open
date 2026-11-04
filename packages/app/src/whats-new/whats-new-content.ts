@@ -21,13 +21,13 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       platforms: ['desktop', 'ios'],
     },
     {
-      title: 'Smoother everywhere',
-      body: 'Swiping between days, the week strip, swipe back, swipe actions on rows, bottom sheets, and dragging images all feel smoother.',
+      title: 'Faster, smoother gestures',
+      body: 'Swipes, sheets, and image dragging respond faster and move more smoothly.',
       platforms: ['ios'],
     },
     {
-      title: 'Depth behind sheets',
-      body: 'When a sheet opens, the page behind it steps back, so you always know where you are.',
+      title: 'Sheets with depth',
+      body: 'Open sheets now float above the page, which steps back to give them room.',
       platforms: ['ios'],
     },
   ],
