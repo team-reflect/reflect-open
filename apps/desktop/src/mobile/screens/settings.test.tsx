@@ -3,7 +3,6 @@ import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GitSyncState, Settings } from '@reflect/core'
 import {
-  createTestAppInfoService,
   createTestAppStoreService,
   createTestClassicAccessService,
   createTestCoreServices,
@@ -84,12 +83,14 @@ async function mount(options?: MountOptions) {
   const core = createTestCoreServices({
     appStore,
     database: createWasmTestDatabaseService(),
-    appInfo: createTestAppInfoService('1.2.3-beta.4'),
     gitSync,
     gitHostConnector,
     // A note window's graph runs no sync lifecycle.
     role: options?.gitSync === null ? 'note-window' : 'main',
-    ...(options?.ios ? { platform: createTestPlatformService(MOBILE_PLATFORM) } : {}),
+    platform: createTestPlatformService({
+      ...(options?.ios ? MOBILE_PLATFORM : {}),
+      appVersion: '1.2.3-beta.4',
+    }),
     ...(options?.subscription === undefined ? {} : { subscription: options.subscription }),
     ...(options?.classicAccess === undefined ? {} : { classicAccess: options.classicAccess }),
   })

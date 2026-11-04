@@ -97,8 +97,12 @@ export function GraphProvider({
   platform?: AppPlatform
 }) {
   const { graphSession: session } = useCoreServices()
-  const { graphBoot, mobileOnboarding } = useAppServices()
+  const { graphBoot, mobileOnboarding, whatsNew } = useAppServices()
   const services = useSelector(session, selectServices)
+
+  // Ahead of the boot effects, so What's New sees whether this launch passes
+  // through the chooser or the onboarding.
+  useEffect(() => whatsNew.start(), [whatsNew])
 
   // Desktop main-window boot reopens the most recent graph or shows the
   // chooser; a secondary note window adopts the main window's graph. Mobile

@@ -2,16 +2,16 @@ import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { LicensesDialog } from '@/components/licenses/licenses-dialog.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { useAppVersion } from '@/hooks/use-app-version.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
 import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
 import { useUpdate } from '@/providers/update-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 import { SettingsSection } from './section.tsx'
 import { SettingsSwitchField } from './switch-field.tsx'
 import { UpdateField } from './update-field.tsx'
 
 export function AboutSection(): ReactElement {
-  const version = useAppVersion()
+  const { platform } = useCoreServices()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
   const perfHudEnabled = usePerfHudEnabled()
@@ -24,7 +24,7 @@ export function AboutSection(): ReactElement {
           <div className="text-sm font-medium text-text">Reflect Open</div>
         </div>
         <span onClick={versionTap} className="shrink-0 text-sm text-text-secondary">
-          {version !== null ? `v${version}` : '—'}
+          v{platform.appVersion}
         </span>
       </div>
       <button

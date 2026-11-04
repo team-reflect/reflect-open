@@ -1,4 +1,4 @@
-import { useEffect, type UIEvent } from 'react'
+import { useEffect, type RefObject, type UIEvent } from 'react'
 import { useRouter } from '@/routing/router.tsx'
 
 /**
@@ -9,26 +9,22 @@ import { useRouter } from '@/routing/router.tsx'
  * on the content being loaded: restoring against an empty, zero-height container
  * would clamp the offset to 0 and lose the position.
  *
- * Takes the scroll element itself (not a ref) so the restore re-runs once it
- * mounts — a virtualized container already holds it in state for its virtualizer,
- * and a plain one can with a callback ref. Returns the `onScroll` handler to put
- * on the scroll container.
+ * The scroll container behind `elementRef` must stay mounted while the route
+ * renders: a mount or swap alone does not re-run the restore. Returns the
+ * `onScroll` handler to put on the scroll container.
  */
 export function useScrollRestoration(
-  element: HTMLElement | null,
+  elementRef: RefObject<HTMLElement | null>,
   ready: boolean,
 ): { onScroll: (event: UIEvent<HTMLElement>) => void } {
   const { arrivalSeq, entryId, saveScrollState, savedScroll } = useRouter()
   useEffect(() => {
+    const element = elementRef.current
     if (ready && element) {
       const saved = savedScroll()
-      // Setting scrollTop is a DOM side effect inside an effect; the rule treats
-      // the `element` argument as immutable, but mutating the live DOM node here
-      // is intentional.
-      // eslint-disable-next-line react-hooks/immutability
       element.scrollTop = typeof saved === 'number' ? saved : 0
     }
-  }, [arrivalSeq, entryId, ready, savedScroll, element])
+  }, [arrivalSeq, entryId, ready, savedScroll, elementRef])
   return {
     onScroll: (event) => saveScrollState(event.currentTarget.scrollTop),
   }
