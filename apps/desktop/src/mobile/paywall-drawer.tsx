@@ -32,11 +32,12 @@ interface PurchaseVariables {
 const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 
 /**
- * The paywall as a near full-screen drawer that cannot be closed.
+ * The paywall as a near full-screen drawer. It ignores every request to
+ * close, so a swipe scrolls the sheet back open.
  */
 export function PaywallDrawer({ open }: { open: boolean }): ReactElement {
   return (
-    <Drawer open={open} onOpenChange={doNothing} dismissible={false}>
+    <Drawer open={open} onOpenChange={() => {}}>
       <DrawerContent>
         <PaywallContent />
       </DrawerContent>
