@@ -9,7 +9,6 @@ import {
 } from 'react'
 import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@reflect/app'
 import { watchScrollSettle, type ScrollSettleWatch } from '@/lib/scroll-settle.ts'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 
 /**
  * Days either side of the carousel anchor. A fixed **symmetric** window
@@ -176,11 +175,11 @@ function nearestIndex(scroller: HTMLElement, count: number): number | undefined 
   return Math.min(count - 1, Math.max(0, Math.round(scroller.scrollLeft / width)))
 }
 
-/** Moves the scroller onto page `index`, unless it is already there. */
-function restOn(scroller: HTMLElement, index: number, behavior: ScrollBehavior): void {
+/** Moves the scroller onto page `index` at once, unless it is already there. */
+function restOn(scroller: HTMLElement, index: number): void {
   const left = index * pageWidth(scroller)
   if (Math.abs(scroller.scrollLeft - left) >= 1) {
-    scroller.scrollTo({ left, behavior })
+    scroller.scrollTo({ left, behavior: 'instant' })
   }
 }
 
@@ -206,7 +205,6 @@ export function useDayCarousel(
   onSelect: (date: string) => void,
   onTarget: (date: string, navigationKey: string) => void,
 ): DayCarousel {
-  const reducedMotion = usePrefersReducedMotion()
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [dayWindow, setDayWindow] = useState<DayWindow>(() => {
     return createDayWindow(date, CAROUSEL_WINDOW)
@@ -252,7 +250,7 @@ export function useDayCarousel(
   // the settle, so dragging back and forth over the middle mounts nothing twice.
   const handleScroll = useEffectEvent((scroller: HTMLElement) => {
     if (!watchRef.current?.isUserScroll()) {
-      restOn(scroller, selectedIndexRef.current, 'instant')
+      restOn(scroller, selectedIndexRef.current)
       return
     }
     userScrollingRef.current = true
@@ -283,7 +281,7 @@ export function useDayCarousel(
   const handleSettle = useEffectEvent((scroller: HTMLElement) => {
     userScrollingRef.current = false
     if (!watchRef.current?.isUserScroll()) {
-      restOn(scroller, selectedIndexRef.current, 'instant')
+      restOn(scroller, selectedIndexRef.current)
       return
     }
     const index = nearestIndex(scroller, dayWindow.count)
@@ -293,7 +291,7 @@ export function useDayCarousel(
     selectedIndexRef.current = index
     nearestRef.current = index
     // WebKit can come to rest between snap points.
-    restOn(scroller, index, reducedMotion ? 'instant' : 'smooth')
+    restOn(scroller, index)
     const day = dateAtIndex(dayWindow, index)
     // An editor left focused on another day would scroll the carousel back to
     // reveal its caret.
@@ -322,7 +320,8 @@ export function useDayCarousel(
       element: scroller,
       onSettle: () => handleSettle(scroller),
       signal: controller.signal,
-      // Nearly every slide is an editor, where a mouse press selects text.
+      // The watch's mouse drag releases to an end of the range: right for a
+      // two-position scroller, wrong for a pager.
       dragHandle: null,
     })
     watchRef.current = watch
@@ -333,7 +332,7 @@ export function useDayCarousel(
     // unless a finger or its momentum owns the position (the settle aligns it).
     const resize = new ResizeObserver(() => {
       if (!watch.isTouching() && !userScrollingRef.current) {
-        restOn(scroller, selectedIndexRef.current, 'instant')
+        restOn(scroller, selectedIndexRef.current)
       }
     })
     resize.observe(scroller)
@@ -360,21 +359,23 @@ export function useDayCarousel(
     }
   }, [date, dayWindow])
 
+  // Places the scroller on the route's day before the first paint.
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    if (scroller) {
+      restOn(scroller, selectedIndexRef.current)
+    }
+  }, [])
+
   // Follow an external selection (calendar tap, Today, date link): jump, or
   // do nothing for our own swipe's echo — {@link reconcileCarousel} owns the
-  // decision. The first run places the scroller on the route's day. A
-  // *layout* effect so the scroll and `selectedIndex` (which decides slide
-  // mounting) update before paint. An instant scroll also cancels any
-  // momentum still running.
-  const placedRef = useRef(false)
+  // decision. A *layout* effect so the scroll and `selectedIndex` (which
+  // decides slide mounting) update before paint. An instant scroll also
+  // cancels any momentum still running.
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
     if (!scroller) {
       return
-    }
-    if (!placedRef.current) {
-      placedRef.current = true
-      restOn(scroller, selectedIndexRef.current, 'instant')
     }
     const previousNavigation = reconciledNavigationRef.current
     const forceScroll =
@@ -396,7 +397,7 @@ export function useDayCarousel(
     selectedIndexRef.current = sync.index
     nearestRef.current = sync.index
     userScrollingRef.current = false
-    restOn(scroller, sync.index, 'instant')
+    restOn(scroller, sync.index)
     setSelection(adoptSelection(navigationKey, sync.index))
   }, [date, dayWindow, navigationKey])
 

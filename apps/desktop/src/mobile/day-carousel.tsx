@@ -61,18 +61,14 @@ export function DayCarousel({
   // holding it in state (read during render) rather than a ref is safe.
   const [scrollMemory] = useState(() => new Map<string, number>())
   const keyboardVisible = useKeyboardVisible()
-  // Percentages of the track, which is `count` pages wide.
-  const page = 100 / dayWindow.count
   const cells = useMemo(() => {
     return Array.from({ length: dayWindow.count }, (_, index) => (
       <div
         key={dateAtIndex(dayWindow, index)}
-        data-day-cell
-        className="h-full shrink-0 snap-start snap-always"
-        style={{ flexBasis: `${page}%` }}
+        className="h-full w-full shrink-0 snap-start snap-always"
       />
     ))
-  }, [dayWindow, page])
+  }, [dayWindow])
   const mountedIndexes = Array.from(
     { length: mountedRange.high - mountedRange.low + 1 },
     (_, offset) => mountedRange.low + offset,
@@ -89,7 +85,7 @@ export function DayCarousel({
         keyboardVisible ? 'overflow-x-hidden' : 'overflow-x-auto',
       )}
     >
-      <div className="relative flex h-full" style={{ width: `${dayWindow.count * 100}%` }}>
+      <div className="relative flex h-full">
         {cells}
         {mountedIndexes.map((index) => {
           const day = dateAtIndex(dayWindow, index)
@@ -97,8 +93,8 @@ export function DayCarousel({
             <div
               key={day}
               data-day={day}
-              className="absolute inset-y-0"
-              style={{ left: `${index * page}%`, width: `${page}%` }}
+              className="absolute inset-y-0 w-full"
+              style={{ left: `${index * 100}%` }}
             >
               <DaySlide
                 day={day}
