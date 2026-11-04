@@ -14,16 +14,16 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
 import { WhatsNewItems } from './whats-new-items.tsx'
 
 /**
- * The desktop What's New dialog, open while the What's New gate shows. Every
+ * The desktop What's New dialog, open while What's New is shown. Every
  * way of closing it marks the version seen.
  */
 export function WhatsNewDialog(): ReactElement {
   const { whatsNew } = useAppServices()
   const { platform } = useCoreServices()
-  const gate = useStore(whatsNew.gate)
+  const phase = useStore(whatsNew.phase)
   return (
     <Dialog
-      open={gate.kind === 'whatsNew'}
+      open={phase === 'shown'}
       onOpenChange={(open) => {
         if (!open) {
           whatsNew.dismiss()
@@ -36,7 +36,7 @@ export function WhatsNewDialog(): ReactElement {
           <DialogTitle className="text-xl font-semibold tracking-tight">What’s new</DialogTitle>
           <DialogDescription>Version {marketingVersion(platform.appVersion)}</DialogDescription>
         </DialogHeader>
-        <WhatsNewItems items={gate.items ?? []} />
+        <WhatsNewItems items={whatsNew.items} />
         <DialogFooter>
           <Button onClick={whatsNew.dismiss}>Continue</Button>
         </DialogFooter>

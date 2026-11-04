@@ -65,15 +65,15 @@ function HeaderCard({
 }
 
 /**
- * The mobile What's New drawer, open while the What's New gate shows. Every
+ * The mobile What's New drawer, open while What's New is shown. Every
  * way of closing it marks the version seen.
  */
 export function WhatsNewDrawer(): ReactElement {
   const { whatsNew } = useAppServices()
-  const gate = useStore(whatsNew.gate)
+  const phase = useStore(whatsNew.phase)
   return (
     <Drawer
-      open={gate.kind === 'whatsNew'}
+      open={phase === 'shown'}
       onOpenChange={(open) => {
         if (!open) {
           whatsNew.dismiss()
@@ -81,7 +81,7 @@ export function WhatsNewDrawer(): ReactElement {
       }}
     >
       <DrawerContent>
-        <WhatsNewPages items={gate.items ?? []} onClose={whatsNew.dismiss} />
+        <WhatsNewPages items={whatsNew.items} onClose={whatsNew.dismiss} />
       </DrawerContent>
     </Drawer>
   )

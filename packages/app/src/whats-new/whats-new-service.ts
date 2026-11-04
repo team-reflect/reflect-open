@@ -57,13 +57,9 @@ export interface WhatsNewInputs {
 export type WhatsNewDecision = 'wait' | 'skip' | 'show'
 
 /**
- * Whether to show What's New, and its items.
+ * Whether What's New is hidden or shown.
  */
-export type WhatsNewGate =
-  | { readonly kind: 'hidden'; readonly items?: undefined }
-  | { readonly kind: 'whatsNew'; readonly items: readonly WhatsNewItem[] }
-
-const HIDDEN: WhatsNewGate = { kind: 'hidden' }
+export type WhatsNewPhase = 'hidden' | 'shown'
 
 /**
  * What to do with What's New for the given inputs.
@@ -93,9 +89,13 @@ function selectIsOverride(value: string | null): boolean {
  */
 export interface WhatsNewService {
   /**
-   * Whether to show What's New, and its items.
+   * The current version's items for this platform.
    */
-  readonly gate: Store<WhatsNewGate>
+  readonly items: readonly WhatsNewItem[]
+  /**
+   * Whether What's New is hidden or shown.
+   */
+  readonly phase: Store<WhatsNewPhase>
   /**
    * Whether QA forces What's New on in this session.
    */
@@ -129,7 +129,8 @@ class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
   readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
   readonly #decision: Store<WhatsNewDecision>
-  readonly gate: Store<WhatsNewGate>
+  readonly items: readonly WhatsNewItem[]
+  readonly phase: Store<WhatsNewPhase>
   readonly override: Store<boolean>
 
   constructor(deps: WhatsNewServiceDeps) {
@@ -139,7 +140,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
     const items = (content[marketingVersion(platform.appVersion)] ?? []).filter((item) => {
       return item.platforms.includes(platform.appPlatform)
     })
-    const shown: WhatsNewGate = { kind: 'whatsNew', items }
+    this.items = items
     this.override = deriveStore(
       storage.session.store(WHATS_NEW_OVERRIDE_STORAGE_KEY),
       selectIsOverride,
@@ -158,7 +159,9 @@ class WhatsNewServiceImpl implements WhatsNewService {
         })
       },
     )
-    this.gate = deriveStore(this.#decision, (decision) => (decision === 'show' ? shown : HIDDEN))
+    this.phase = deriveStore(this.#decision, (decision): WhatsNewPhase => {
+      return decision === 'show' ? 'shown' : 'hidden'
+    })
   }
 
   readonly setOverride = (next: boolean): void => {
