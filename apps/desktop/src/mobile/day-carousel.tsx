@@ -65,14 +65,17 @@ export function DayCarousel({
       <div key={dateAtIndex(dayWindow, index)} data-day-cell className="h-full w-full shrink-0" />
     ))
   }, [dayWindow])
-  const mountedIndexes: number[] = []
-  for (
-    let index = Math.max(0, selectedIndex - MOUNT_RADIUS);
-    index <= Math.min(dayWindow.count - 1, selectedIndex + MOUNT_RADIUS);
-    index++
-  ) {
-    mountedIndexes.push(index)
-  }
+  const mountedIndexes = useMemo(() => {
+    const indexes: number[] = []
+    for (
+      let index = Math.max(0, selectedIndex - MOUNT_RADIUS);
+      index <= Math.min(dayWindow.count - 1, selectedIndex + MOUNT_RADIUS);
+      index++
+    ) {
+      indexes.push(index)
+    }
+    return indexes
+  }, [selectedIndex, dayWindow.count])
 
   return (
     /* `overflow: clip`: not a scroll container, so a stray scrollLeft write
