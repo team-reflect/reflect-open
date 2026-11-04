@@ -93,6 +93,8 @@ export function DayCarousel({
             <div
               key={day}
               data-day={day}
+              // Off-screen days stay out of the focus order and the accessibility tree.
+              inert={index !== selectedIndex}
               className="absolute inset-y-0 w-full"
               style={{ left: `${index * 100}%` }}
             >
