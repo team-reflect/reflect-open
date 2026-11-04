@@ -43,6 +43,7 @@ export function PaywallDrawer({ open }: { open: boolean }): ReactElement {
   )
 }
 
+// FIXME: rename PaywallContent to PaywallDrawerContent
 function PaywallContent(): ReactElement {
   const { paywall } = useMobileServices()
   const { opener } = useAppServices()
