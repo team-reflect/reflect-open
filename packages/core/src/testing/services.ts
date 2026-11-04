@@ -73,6 +73,7 @@ import { createTestMobileStorageService } from './mobile-storage.ts'
 import {
   createTestAppStoreEnvironmentService,
   createTestClassicAccessService,
+  createTestInstallClockService,
   createTestSubscriptionService,
 } from './monetization.ts'
 import { createTestPersistenceFlushService } from './persistence-flush.ts'
@@ -84,7 +85,7 @@ import {
   createTestIapService,
   createTestWebAuthService,
 } from './plugins.ts'
-import { createTestAppInfoService, createTestSecretStoreService } from './secrets.ts'
+import { createTestSecretStoreService } from './secrets.ts'
 import { createTestSettingsService } from './settings.ts'
 import { createTestActivityPort } from './shell.ts'
 import { createTestStorageService } from './storage.ts'
@@ -186,6 +187,7 @@ function createTestServiceFactories(overrides: TestCoreServiceOverrides) {
     subscription: () => createTestSubscriptionService(),
     // A sandbox install keeps the paywall hidden until a test asks for it.
     appStoreEnvironment: () => createTestAppStoreEnvironmentService('Sandbox'),
+    installClock: () => createTestInstallClockService(),
     haptics: () => createTestHapticsService(),
     noteFile: () => createTestNoteFileService(),
     assetStore: () => createTestAssetStoreService(),
@@ -223,7 +225,6 @@ function createTestServiceFactories(overrides: TestCoreServiceOverrides) {
     chatHistory: () => createTestChatHistoryService(),
     chatEngine: () => createTestChatEngineService(),
     chatGraphContext: () => createTestChatGraphContextService(),
-    appInfo: () => createTestAppInfoService(),
     semanticSearch: (deps) => createTestSemanticSearchService(deps),
     capture: () => createTestCaptureService(),
   } satisfies Partial<ServiceFactories>
@@ -250,7 +251,10 @@ type Override<Base, Narrow> = Omit<Base, keyof Narrow> & Narrow
  */
 export type TestMobileServices = Override<
   MobileServices,
-  Pick<Built<TestServiceFactories>, 'haptics' | 'subscription' | 'appStoreEnvironment'>
+  Pick<
+    Built<TestServiceFactories>,
+    'haptics' | 'subscription' | 'appStoreEnvironment' | 'installClock'
+  >
 >
 
 /**

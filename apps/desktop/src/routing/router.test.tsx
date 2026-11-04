@@ -5,7 +5,7 @@ import { createTestCoreServices, type TestCoreServices } from '@reflect/core/tes
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { Route } from '@reflect/app'
-import { RouterFreeze, useRouter } from './router.tsx'
+import { RouterFreeze, useRouter, useRouterActions } from './router.tsx'
 
 /**
  * `useRouter()` under the app's `RouterProvider`, mounted on `initialRoute`.
@@ -45,7 +45,7 @@ describe('router', () => {
     expect(result.current.arrivalSeq).toBe(2)
     expect(result.current.arrivalFocusEditor).toBe(true)
     expect(result.current.backRoute).toEqual({ kind: 'daily', date: '2026-06-08' })
-    expect(appServices.navigation.getState().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(appServices.navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
 
     await act(() => result.current.back())
     expect(result.current.route).toEqual({ kind: 'daily', date: '2026-06-08' })
@@ -101,6 +101,22 @@ describe('router', () => {
     expect(result.current.entryId).toBe(entryId)
     expect(result.current.arrivalSeq).toBe(arrivals)
     expect(result.current.savedScroll()).toBeNull()
+  })
+
+  it('useRouterActions does not re-render on navigation', async () => {
+    let renders = 0
+    const { result } = await renderHookInApp(() => {
+      renders += 1
+      return useRouterActions()
+    })
+    const actions = result.current
+    const rendersBefore = renders
+
+    await act(() => actions.navigate({ kind: 'tasks' }))
+    await act(() => actions.back())
+
+    expect(renders).toBe(rendersBefore)
+    expect(result.current).toBe(actions)
   })
 
   it('RouterFreeze pins what a background subtree sees until it surfaces', async () => {

@@ -6,7 +6,7 @@ import { SettingsField } from '@/components/settings/field.tsx'
 import { SettingsSection } from '@/components/settings/section.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface AgentSkillAction {
@@ -26,7 +26,7 @@ interface AgentSkillAction {
  * hides the entry through the same gate (see use-visible-settings-sections).
  */
 export function AgentsSection(): ReactElement | null {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { agentSkill, platform, graphSession } = useCoreServices()
   const queryClient = useQueryClient()
   const queryKey = queryKeys.agentSkill.status(graph?.root)
@@ -39,7 +39,7 @@ export function AgentsSection(): ReactElement | null {
     mutationKey: mutationKeys.agentSkill.write(graph?.root),
     scope: { id: mutationScopeIds.agentSkillWrite(graph?.root) },
     mutationFn: async (variables: AgentSkillAction): Promise<AgentSkillStatus> => {
-      if (graphSession.getState().session?.generation !== variables.generation) {
+      if (graphSession.get().session?.generation !== variables.generation) {
         throw new Error('The graph changed before the agent skill write ran')
       }
       return variables.action === 'uninstall'

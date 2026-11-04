@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { applyNoteRowOverlays, type NoteListRowFacts, type NoteRowOverlay } from '@reflect/core'
+import { useSelector, useStore } from '@/lib/use-store.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /*
@@ -12,9 +13,11 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export function useNoteRowOverlay(path: string): NoteRowOverlay | null {
   const { noteRows } = useCoreServices()
-  const subscribe = useCallback((listener: () => void) => noteRows.subscribe(listener), [noteRows])
-  const getSnapshot = useCallback(() => noteRows.getOverlay(path), [noteRows, path])
-  return useSyncExternalStore(subscribe, getSnapshot)
+  const selector = useCallback(
+    (overlays: ReadonlyMap<string, NoteRowOverlay>) => overlays.get(path) ?? null,
+    [path],
+  )
+  return useSelector(noteRows, selector)
 }
 
 /**
@@ -22,9 +25,7 @@ export function useNoteRowOverlay(path: string): NoteRowOverlay | null {
  */
 export function useNoteRowOverlays(): ReadonlyMap<string, NoteRowOverlay> {
   const { noteRows } = useCoreServices()
-  const subscribe = useCallback((listener: () => void) => noteRows.subscribe(listener), [noteRows])
-  const getSnapshot = useCallback(() => noteRows.getOverlays(), [noteRows])
-  return useSyncExternalStore(subscribe, getSnapshot)
+  return useStore(noteRows)
 }
 
 export interface UseNoteRowsOptions {

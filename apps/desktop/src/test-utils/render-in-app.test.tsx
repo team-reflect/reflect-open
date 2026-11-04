@@ -2,29 +2,42 @@ import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { createTestCoreServices } from '@reflect/core/testing'
-import { useGraph, useMaybeGraph } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
-import { useGitSyncContext } from '@/providers/sync-provider.tsx'
+import {
+  useGraphIndexing,
+  useGraphInfo,
+  useGraphRecents,
+  useGraphStatus,
+  useIndexGeneration,
+} from '@/providers/graph-provider.tsx'
+import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
+import { useDateFormat, useSettingsService } from '@/providers/settings-provider.tsx'
+import { useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MOBILE_PLATFORM, renderHookInApp, renderInApp } from './render-in-app.tsx'
 
 function Probe(): ReactElement {
-  const { status, graph, indexGeneration, indexing, recents, mobileStorageKind } = useGraph()
-  const { settings, updateSettings } = useSettings()
+  const status = useGraphStatus()
+  const graph = useGraphInfo()
+  const indexGeneration = useIndexGeneration()
+  const indexing = useGraphIndexing()
+  const recents = useGraphRecents()
+  const mobileStorageKind = useMobileStorageKind()
+  const dateFormat = useDateFormat()
+  const settingsService = useSettingsService()
   const { route, navigate } = useRouter()
-  const sync = useGitSyncContext()
+  const sync = useGitSyncState()
   return (
     <div>
       <output data-testid="graph">
         {status} {graph?.root ?? 'none'} {graph?.generation ?? '-'} {indexGeneration ?? '-'}{' '}
         {indexing ? 'indexing' : 'idle'} {recents.length} {mobileStorageKind ?? '-'}
       </output>
-      <output data-testid="settings">{settings.dateFormat}</output>
+      <output data-testid="settings">{dateFormat}</output>
       <output data-testid="route">{JSON.stringify(route)}</output>
-      <output data-testid="git-sync">{sync?.state.phase ?? 'no sync'}</output>
-      <button type="button" onClick={() => updateSettings({ dateFormat: 'iso' })}>
+      <output data-testid="git-sync">{sync.phase}</output>
+      <button type="button" onClick={() => settingsService.update({ dateFormat: 'iso' })}>
         iso
       </button>
       <button type="button" onClick={() => navigate({ kind: 'tasks' })}>
@@ -58,11 +71,13 @@ describe('renderInApp', () => {
   it('reports the graph, the graph state and a later graph switch', async () => {
     const { core } = await renderInApp(<Probe />, {
       graph: { root: '/g', generation: 3, indexGeneration: 7 },
-      graphState: { indexing: true, recents: [{ root: '/g', name: 'g', openedMs: 1 }] },
+      graphState: { recents: [{ root: '/g', name: 'g', openedMs: 1 }] },
+      indexing: true,
     })
     await expect.element(page.getByTestId('graph')).toHaveTextContent('ready /g 3 7 indexing 1 -')
 
     core.graphSession.setGraph(null)
+    core.indexLifecycle.setProgress(null)
     await expect.element(page.getByTestId('graph')).toHaveTextContent('choosing none - - idle 1 -')
   })
 
@@ -119,7 +134,7 @@ describe('renderInApp', () => {
   })
 
   it('mounts only the services with `servicesOnly`, and registers the app commands', async () => {
-    const { result, appServices: appLayer } = await renderHookInApp(() => useMaybeGraph(), {
+    const { result, appServices: appLayer } = await renderHookInApp(() => useGraphInfo(), {
       servicesOnly: true,
     })
 
@@ -130,7 +145,7 @@ describe('renderInApp', () => {
 
 describe('renderHookInApp', () => {
   it('runs the hook inside the same providers', async () => {
-    const { result, core } = await renderHookInApp(() => useGraph().graph?.root ?? null, {
+    const { result, core } = await renderHookInApp(() => useGraphInfo()?.root ?? null, {
       graph: { root: '/g' },
     })
     expect(result.current).toBe('/g')

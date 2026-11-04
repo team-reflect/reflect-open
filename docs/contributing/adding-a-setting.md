@@ -9,8 +9,8 @@ across graphs and must survive graph deletion.
 - **`@reflect/core`** owns the keys, defaults and validation
   (`packages/core/src/settings/schema.ts`) and the runtime document
   (`SettingsService`, `CoreServices.settings`).
-- **The desktop app** reads settings with `useSettings()`
-  (`apps/desktop/src/providers/settings-provider.tsx`) and renders controls in
+- **The desktop app** reads each setting through its own hook, such as
+  `useTimeFormat()` (`apps/desktop/src/providers/settings-provider.tsx`), and renders controls in
   `apps/desktop/src/components/settings/`.
 
 ## 1. Declare the key in the schema
@@ -41,12 +41,28 @@ Export new value types from `packages/core/src/index.ts`. Cover the key in
 
 ## 2. Consume it
 
+In `settings-provider.tsx`, add a selector and a hook next to the others:
+
 ```tsx
-const { settings, updateSettings, updateSettingsWith } = useSettings()
-// read:  settings.yourNewSetting
-// write scalar: updateSettings({ yourNewSetting: value })
-// write derived/list value: updateSettingsWith((current) => ({ yourList: nextList(current) }))
+function selectYourNewSetting(settings: Settings): YourNewSetting {
+  return settings.yourNewSetting
+}
+
+export function useYourNewSetting(): YourNewSetting {
+  return useSettingsSelector(selectYourNewSetting)
+}
 ```
+
+Then read it in a component:
+
+```tsx
+const yourNewSetting = useYourNewSetting()
+const settingsService = useSettingsService()
+// write scalar: settingsService.update({ yourNewSetting: value })
+// write derived/list value: settingsService.updateWith((current) => ({ yourList: nextList(current) }))
+```
+
+A setting hook re-renders only when its key changes.
 
 Outside React, use the service (`settings.get()`, `update`, `updateWith`,
 `subscribe`); a core service takes `settings` in its `deps`.
@@ -55,16 +71,16 @@ What `SettingsService` gives you (do not re-implement it):
 
 - **Updates apply at once,** over defaults while the load is pending, and every
   subscriber sees them.
-- **Use `updateSettingsWith` for read-modify-write** (lists, objects, derived
+- **Use `updateWith` for read-modify-write** (lists, objects, derived
   values). Updaters sent before the load are replayed over the loaded document,
   so an early edit cannot compute from defaults and wipe the stored value.
 - **Saves are async and ordered.** A failed save keeps the in-memory value,
   shows in the operations status UI, and retries on the next change or quit
   flush.
-- **One runtime document.** `useSettings()` and `settings.get()` return the same
-  object, which keeps its identity until something changes.
+- **One runtime document.** `settings.get()` returns the same object until
+  something changes.
 - **Paired side effects must await the load.** If a setting pairs with state
-  elsewhere (e.g. an OS-keychain secret), call `whenSettingsLoaded()` before
+  elsewhere (e.g. an OS-keychain secret), call `whenLoaded()` before
   writing the other half: after a failed load, settings are session-only and
   the paired write would be stranded.
 - **A failed load is session-only:** the service never writes over an
@@ -84,7 +100,7 @@ Build sections from the shared primitives: `SettingsSection` (`section.tsx`),
 controls and overlays, use the shadcn primitives in
 `apps/desktop/src/components/ui/` (`Switch`, `Select`, `Dialog`, …).
 
-`onChange` calls `updateSettings` or `updateSettingsWith` directly (see
+`onChange` calls `settingsService.update` or `settingsService.updateWith` directly (see
 `appearance-section.tsx`, `editor-section.tsx`, `all-notes-section.tsx`). Test
 at the narrowest useful level, always with `renderInApp` and never by mocking
 providers (see [testing.md](testing.md)):
@@ -100,7 +116,7 @@ providers (see [testing.md](testing.md)):
 - [ ] Value schema with `.catch(default)` added to `settingsSchema`
 - [ ] New types exported from `packages/core/src/index.ts`
 - [ ] Schema tests: missing → default, invalid → default, valid round-trips
-- [ ] Control built from the shared primitives, wired to `updateSettings`
+- [ ] Control built from the shared primitives, wired to `settingsService.update`
 - [ ] New group registered in `settings/sections.ts` and rendered from
       `settings-screen.tsx`
 - [ ] `renderInApp` test asserting `core.settings`

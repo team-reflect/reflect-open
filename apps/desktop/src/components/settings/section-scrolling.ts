@@ -27,19 +27,21 @@ export function findScrollContainer(node: HTMLElement): HTMLElement | null {
 /**
  * Scrolls the settings page so the given section's heading lands just below
  * the container's top edge. `anchor` is any element inside the settings
- * scroll container (the navigator passes its own node). Smooth unless the OS
- * asks for reduced motion.
+ * scroll container (the navigator passes its own node). Smooth unless
+ * `reducedMotion` is true.
  */
-export function scrollToSettingsSection(anchor: HTMLElement, id: SettingsSectionId): void {
+export function scrollToSettingsSection(
+  anchor: HTMLElement,
+  id: SettingsSectionId,
+  reducedMotion: boolean,
+): void {
   const target = document.getElementById(settingsSectionDomId(id))
   const container = findScrollContainer(anchor)
   if (!target || !container) {
     return
   }
   const offset = target.getBoundingClientRect().top - container.getBoundingClientRect().top
-  const behavior: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ? 'auto'
-    : 'smooth'
+  const behavior: ScrollBehavior = reducedMotion ? 'auto' : 'smooth'
   container.scrollTo({
     top: Math.max(0, container.scrollTop + offset - SECTION_JUMP_OFFSET_PX),
     behavior,

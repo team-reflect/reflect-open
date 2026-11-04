@@ -775,7 +775,7 @@ describe('AssetDescriptionService.backfillVisibly', () => {
       ],
     ])
     expect(indexedEvents()).toBe(1)
-    expect(operations.getAll().filter((operation) => operation.status !== 'running')).toEqual([])
+    expect(operations.get().filter((operation) => operation.status !== 'running')).toEqual([])
   })
 
   it('describes without re-indexing when the index failed to open', async () => {
@@ -799,7 +799,7 @@ describe('AssetDescriptionService.backfillVisibly', () => {
     const outcome = await service.backfillVisibly()
 
     expect(outcome.stopped).toEqual({ reason: 'noGraph', message: 'No graph is open.' })
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
     expect(describer.calls()).toEqual([])
   })
 

@@ -12,6 +12,7 @@ import {
 import { flushSync } from 'react-dom'
 import { clamp } from '@ocavue/utils'
 import { PointerDrag, VelocitySampler, VELOCITY_STALE_MS } from '@/lib/pointer-drag.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 const DRAG_ACTIVATE_PX = 8
 const DISMISS_FRACTION = 0.18
@@ -265,6 +266,7 @@ export function useImageDismissDrag({
   enabled: boolean
   onClose: () => void
 }): ImageDismissDrag {
+  const { systemPreferences } = useAppServices()
   const stateRef = useRef<DragState>(IDLE)
   const [state, setState] = useState<RenderedState>(IDLE)
   const [drag] = useState(() => new PointerDrag())
@@ -418,7 +420,7 @@ export function useImageDismissDrag({
         !interrupted && (releaseDistance > current.height * DISMISS_FRACTION || flicked)
       suppressUpcomingClick()
 
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (systemPreferences.reducedMotion.get()) {
         clearDragPresentation(getDragTargets())
         stateRef.current = IDLE
         if (shouldClose) {
@@ -439,7 +441,7 @@ export function useImageDismissDrag({
           : SNAP_BACK_MS,
       })
     },
-    [commit, onClose, suppressUpcomingClick, drag, velocity, getDragTargets],
+    [commit, onClose, suppressUpcomingClick, drag, velocity, getDragTargets, systemPreferences],
   )
 
   const onPointerUp = useCallback(

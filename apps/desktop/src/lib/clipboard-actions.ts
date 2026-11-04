@@ -10,7 +10,7 @@ export async function copyNoteDeepLink(
   { clipboard, operations }: AppServices,
   path: string,
 ): Promise<void> {
-  if (graphSession.getState().session === null) {
+  if (graphSession.get().session === null) {
     return
   }
   let url: string
@@ -37,7 +37,7 @@ export async function copyNotePath(
   { clipboard, operations }: AppServices,
   path: string,
 ): Promise<void> {
-  if (graphSession.getState().session === null) {
+  if (graphSession.get().session === null) {
     operations.start('Copying note path').fail('No graph is open')
     return
   }

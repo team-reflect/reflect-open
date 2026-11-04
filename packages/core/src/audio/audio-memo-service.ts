@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
 import {
   AUDIO_MEMO_REMINDER_MS,
@@ -7,6 +8,7 @@ import {
 import { audioMemoIdentity, audioMemoPartFromPath, audioMemoPartPath } from './audio-memo.ts'
 import type { AiCredentialService } from '../ai/ai-credential-service.ts'
 import type { AiProviderConfigService } from '../ai/ai-provider-config-service.ts'
+import { pickTranscriptionConfig } from '../ai/provider-config.ts'
 import type { TranscriptEnrichmentService } from '../ai/transcript-enrichment-service.ts'
 import type { TranscriptionService } from '../ai/transcription-service.ts'
 import type { BackgroundReconcilerFactory } from '../reconcile/background-reconciler.ts'
@@ -26,6 +28,7 @@ import type { AssetStoreService } from '../graph/asset-store-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import { AUDIO_MEMOS_DIR } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
+import { deriveStore, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import {
@@ -144,12 +147,7 @@ export interface AudioMemoPipelineOptions {
  * failed *capture* (the one step that can lose audio) parks the queue behind
  * a Retry/Discard error.
  */
-export interface AudioMemoPipeline {
-  /**
-   * The current state. The same object until something changes.
-   */
-  getState(): AudioMemoPipelineState
-  subscribe(listener: () => void): Unlisten
+export interface AudioMemoPipeline extends Store<AudioMemoPipelineState> {
   /**
    * Queue a stopped recording for capture into the graph.
    */
@@ -173,7 +171,8 @@ export interface AudioMemoPipeline {
    */
   listSegments(memo: AudioMemoIdentity): Promise<string[]>
   /**
-   * Delete one segment from the graph. Idempotent.
+   * Delete one segment from the graph. Idempotent. Never rejects: a failure is
+   * logged and the segment stays.
    */
   deleteSegment(path: string): Promise<void>
   /**
@@ -218,10 +217,6 @@ export interface AudioMemoSessionOptions {
 export interface AudioMemoSessionState {
   readonly phase: AudioMemoPhase
   /**
-   * Live while recording.
-   */
-  readonly elapsedMs: number
-  /**
    * The live input stream, for the waveform.
    */
   readonly stream: MediaStream | null
@@ -258,12 +253,12 @@ export interface AudioMemoSessionState {
  * never outlive its UI invisibly: hiding the UI mid-recording stops and saves
  * instead of leaving a hidden hot microphone.
  */
-export interface AudioMemoSession {
+export interface AudioMemoSession extends Store<AudioMemoSessionState> {
   /**
-   * The current state. The same object until something changes.
+   * The recording's elapsed time, live while recording. Apart from the
+   * state, as it changes on every tick.
    */
-  getState: () => AudioMemoSessionState
-  subscribe(listener: () => void): Unlisten
+  readonly elapsedMs: Store<number>
   /**
    * Idle → start recording (revealing a hidden UI); recording → stop & save.
    */
@@ -382,7 +377,6 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
   readonly #deps: AudioMemoPipelineDeps
   readonly #generation: number
   readonly #isErrorSurfaceVisible: () => boolean
-  readonly #listeners = new Set<() => void>()
   #pendingCount = 0
   #error: string | null = null
   /**
@@ -400,9 +394,9 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
    * write the recording twice.
    */
   #parked: PendingAudioCapture | null = null
-  #hasTranscriptionConfig: boolean
+  readonly #hasTranscriptionConfig: Store<boolean>
   #reconciler: AudioMemoTranscriptionSession | null
-  #state: AudioMemoPipelineState
+  readonly #state: WritableStore<AudioMemoPipelineState>
   readonly #stopTranscribing: Unlisten | undefined
   readonly #stopConfig: Unlisten
 
@@ -411,11 +405,15 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
     this.#deps = deps
     this.#generation = generation
     this.#isErrorSurfaceVisible = options.isErrorSurfaceVisible
-    this.#hasTranscriptionConfig = aiProviderConfig.transcriptionConfig() !== null
+    const hasTranscriptionConfig = deriveStore(
+      aiProviderConfig,
+      (state) => pickTranscriptionConfig(state) !== null,
+    )
+    this.#hasTranscriptionConfig = hasTranscriptionConfig
     // One lifecycle per graph session. It owns the launch pass and all retry
     // triggers; the pump only schedules. Main window only.
     this.#reconciler = deps.reconciler
-    this.#state = this.#snapshot()
+    this.#state = new WritableStore(this.#snapshot(), isShallowEqual)
 
     this.#stopTranscribing = this.#reconciler?.subscribe(() => {
       this.#publish()
@@ -424,29 +422,16 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
 
     // Passes gate on a configured model before any IO. When the user adds the
     // first key mid-session, kick the pass that gate was suppressing.
-    this.#stopConfig = aiProviderConfig.subscribe(() => {
-      const hadConfig = this.#hasTranscriptionConfig
-      this.#hasTranscriptionConfig = aiProviderConfig.transcriptionConfig() !== null
-      if (this.#hasTranscriptionConfig && !hadConfig) {
+    this.#stopConfig = hasTranscriptionConfig.subscribe(() => {
+      if (hasTranscriptionConfig.get()) {
         this.#reconciler?.schedule()
       }
       this.#publish()
     })
   }
 
-  getState(): AudioMemoPipelineState {
-    return this.#state
-  }
-
-  subscribe(listener: () => void): Unlisten {
-    const entry = (): void => {
-      listener()
-    }
-    this.#listeners.add(entry)
-    return () => {
-      this.#listeners.delete(entry)
-    }
-  }
+  readonly get = (): AudioMemoPipelineState => this.#state.get()
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#state.subscribe(listener)
 
   enqueue(capture: PendingAudioCapture): void {
     this.#queue.push(capture)
@@ -498,7 +483,11 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
   }
 
   async deleteSegment(path: string): Promise<void> {
-    await this.#deps.assetStore.deleteAudioMemo(path, this.#generation)
+    try {
+      await this.#deps.assetStore.deleteAudioMemo(path, this.#generation)
+    } catch (cause) {
+      this.#deps.logger.warn('deleting an audio memo segment failed:', cause)
+    }
   }
 
   dispose(): void {
@@ -511,29 +500,15 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
   #snapshot(): AudioMemoPipelineState {
     return {
       pendingCount: this.#pendingCount,
-      transcribing: this.#reconciler?.getTranscribing() ?? false,
-      hasTranscriptionConfig: this.#hasTranscriptionConfig,
+      transcribing: this.#reconciler?.get() ?? false,
+      hasTranscriptionConfig: this.#hasTranscriptionConfig.get(),
       error: this.#error,
       canRetry: this.#parked !== null,
     }
   }
 
   #publish(): void {
-    const state = this.#state
-    const next = this.#snapshot()
-    if (
-      next.pendingCount === state.pendingCount &&
-      next.transcribing === state.transcribing &&
-      next.hasTranscriptionConfig === state.hasTranscriptionConfig &&
-      next.error === state.error &&
-      next.canRetry === state.canRetry
-    ) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(this.#snapshot())
   }
 
   async #pump(): Promise<void> {
@@ -613,14 +588,14 @@ class AudioMemoSessionImpl implements AudioMemoSession {
   readonly #deps: AudioMemoSessionDeps
   readonly #surface: AudioMemoSurface
   readonly #pipeline: AudioMemoPipeline
-  readonly #listeners = new Set<() => void>()
   readonly #unlisten: Unlisten[]
   #surfaceHidden: boolean
   /**
    * True from the stop click until the recorder hands over the blob.
    */
   #stopping = false
-  #elapsedMs = 0
+  readonly #elapsedMs = new WritableStore(0)
+  readonly elapsedMs: Store<number> = this.#elapsedMs
   #live: LiveSession | null = null
   /**
    * Re-entry guard for the stop click's await gap.
@@ -634,7 +609,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
    * Concurrent recorder stops share one result, so the final segment is handed over once.
    */
   #recorderStop: Promise<void> | null = null
-  #state: AudioMemoSessionState
+  readonly #state: WritableStore<AudioMemoSessionState>
 
   constructor(deps: AudioMemoSessionDeps, options: AudioMemoSessionOptions) {
     const { audioRecorder } = deps
@@ -646,21 +621,20 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     this.#pipeline = deps.openPipeline({
       isErrorSurfaceVisible: () => !this.#surfaceHidden,
     })
-    this.#state = this.#snapshot()
+    this.#state = new WritableStore(this.#snapshot(), isShallowEqual)
 
     this.#unlisten = [
       this.#pipeline.subscribe(() => {
         this.#publish()
       }),
-      audioRecorder.subscribeState((next) => {
-        if (next !== 'recording') {
-          this.#elapsedMs = 0
+      audioRecorder.state.subscribe(() => {
+        if (audioRecorder.state.get() !== 'recording') {
+          this.#elapsedMs.set(0)
         }
         this.#publish()
       }),
       audioRecorder.subscribeLevel((event) => {
-        this.#elapsedMs = event.elapsedMs
-        this.#publish()
+        this.#elapsedMs.set(event.elapsedMs)
       }),
       audioRecorder.subscribeSegment((segment) => {
         this.#handleSegment(segment)
@@ -671,20 +645,11 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     ]
   }
 
-  readonly getState = (): AudioMemoSessionState => this.#state
-
-  subscribe(listener: () => void): Unlisten {
-    const entry = (): void => {
-      listener()
-    }
-    this.#listeners.add(entry)
-    return () => {
-      this.#listeners.delete(entry)
-    }
-  }
+  readonly get = (): AudioMemoSessionState => this.#state.get()
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#state.subscribe(listener)
 
   toggle(): void {
-    const recorderState = this.#deps.audioRecorder.state()
+    const recorderState = this.#deps.audioRecorder.state.get()
     if (recorderState === 'recording') {
       if (this.#stopGuard) {
         // The click landed in the stop's await gap, where the button already
@@ -698,7 +663,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
       // A second press while the OS prompt is up aborts the request. The
       // alternative is a click that visibly does nothing.
       this.#cancelRecorder()
-    } else if (this.#pipeline.getState().error !== null) {
+    } else if (this.#pipeline.get().error !== null) {
       // A parked error must never invisibly block recording. Hidden, the
       // error UI doesn't exist, so surface it; visible, it was on screen and a
       // fresh record request acknowledges it (the same click the red mic
@@ -721,7 +686,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
       // whose write is still in flight delete themselves via onCaptured.
       session.cancelled = true
       for (const path of session.captured) {
-        void this.#pipeline.deleteSegment(path).catch(() => {})
+        void this.#pipeline.deleteSegment(path)
       }
       session.captured = []
     }
@@ -741,7 +706,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
     if (!hidden) {
       return
     }
-    const recorderState = this.#deps.audioRecorder.state()
+    const recorderState = this.#deps.audioRecorder.state.get()
     if (recorderState === 'recording') {
       void this.#stopAndSave()
     } else if (recorderState === 'requesting') {
@@ -760,8 +725,8 @@ class AudioMemoSessionImpl implements AudioMemoSession {
 
   #snapshot(): AudioMemoSessionState {
     const { audioRecorder } = this.#deps
-    const recorderState = audioRecorder.state()
-    const pipelineState = this.#pipeline.getState()
+    const recorderState = audioRecorder.state.get()
+    const pipelineState = this.#pipeline.get()
     const unavailableReason = !audioRecorder.isSupported()
       ? UNSUPPORTED_REASON
       : !pipelineState.hasTranscriptionConfig
@@ -780,7 +745,6 @@ class AudioMemoSessionImpl implements AudioMemoSession {
               : this.#stopping || pipelineState.pendingCount > 0 || pipelineState.transcribing
                 ? 'transcribing'
                 : 'idle',
-      elapsedMs: this.#elapsedMs,
       stream: audioRecorder.stream(),
       pendingCount: pipelineState.pendingCount,
       available: unavailableReason === null,
@@ -792,24 +756,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
   }
 
   #publish(): void {
-    const state = this.#state
-    const next = this.#snapshot()
-    if (
-      next.phase === state.phase &&
-      next.elapsedMs === state.elapsedMs &&
-      next.stream === state.stream &&
-      next.pendingCount === state.pendingCount &&
-      next.unavailableReason === state.unavailableReason &&
-      next.error === state.error &&
-      next.canRetry === state.canRetry &&
-      next.recorderState === state.recorderState
-    ) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(this.#snapshot())
   }
 
   #handleSegment(segment: AudioRecorderSegment): void {
@@ -832,7 +779,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
         // A cancel may land while this segment's write is in flight. Its
         // bytes are durable by now, so the cancel cleanup runs here.
         if (session.cancelled) {
-          return pipeline.deleteSegment(path).catch(() => {})
+          return pipeline.deleteSegment(path)
         }
         session.captured.push(path)
       },
@@ -860,7 +807,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
 
   async #start(): Promise<void> {
     const { audioRecorder, clock, platform } = this.#deps
-    if (!audioRecorder.isSupported() || !this.#pipeline.getState().hasTranscriptionConfig) {
+    if (!audioRecorder.isSupported() || !this.#pipeline.get().hasTranscriptionConfig) {
       return
     }
     if (this.#surfaceHidden) {

@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import type { Unlisten } from '@reflect/core'
+import { WritableStore, type Unlisten } from '@reflect/core'
 import {
   retryUpdate,
   type AvailableUpdate,
@@ -209,24 +209,18 @@ export interface TestUpdateService extends UpdateService {
 }
 
 class TestUpdateServiceImpl implements TestUpdateService {
-  #current: UpdateState
-  readonly #listeners = new Set<() => void>()
+  readonly #state: WritableStore<UpdateState>
 
   readonly supported = true
   readonly calls: TestUpdateCall[] = []
 
   constructor(state: UpdateState) {
-    this.#current = state
+    this.#state = new WritableStore(state)
   }
 
-  readonly getState = (): UpdateState => this.#current
+  readonly get = (): UpdateState => this.#state.get()
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#state.subscribe(listener)
 
   start(): void {
     this.calls.push('start')
@@ -254,10 +248,7 @@ class TestUpdateServiceImpl implements TestUpdateService {
   }
 
   setState(state: UpdateState): void {
-    this.#current = state
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(state)
   }
 }
 

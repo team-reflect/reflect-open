@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@meowdown/markdown": "^0.78.0",
-    "@ocavue/utils": "^1.9.0",
+    "@ocavue/utils": "^1.11.0",
     "@post-embed/exporter": "^0.5.0",
     "@post-embed/schema": "^0.5.2",
     "@post-embed/types": "^0.5.0",
@@ -29,12 +29,12 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.34",
+    "@ai-sdk/provider": "^4.0.35",
     "@ocavue/tsconfig": "^0.7.1",
     "jsdom": "^30.1.3",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.0",
     "vitest-fail-on-console": "^0.10.1"
   }
 }

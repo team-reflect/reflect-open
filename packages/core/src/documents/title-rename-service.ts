@@ -120,7 +120,7 @@ export function createTitleRenameService(deps: TitleRenameServiceDeps): TitleRen
 
 class RenameCoordinatorImpl implements RenameCoordinator {
   readonly #deps: TitleRenameServiceDeps
-  readonly #graph: ReturnType<GraphSessionSource['getState']>['session']
+  readonly #graph: ReturnType<GraphSessionSource['get']>['session']
   readonly #tracker: TitleRenameTracker
   /**
    * The note's current path — a landed move advances it (Plan 17).
@@ -141,7 +141,7 @@ class RenameCoordinatorImpl implements RenameCoordinator {
 
   constructor(deps: TitleRenameServiceDeps, options: RenameCoordinatorOptions) {
     this.#deps = deps
-    this.#graph = deps.graphSession.getState().session
+    this.#graph = deps.graphSession.get().session
     this.#currentPath = options.path
     this.#tracker = createTitleRenameTracker({
       path: options.path,

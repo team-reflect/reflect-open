@@ -28,6 +28,12 @@ const presentOfferCodeRedeemSheetCommand = definePluginCommand<Record<string, ne
   ignoredResult,
 )
 
+const requestReviewCommand = definePluginCommand<Record<string, never>, unknown>(
+  'app-store',
+  'request_review',
+  ignoredResult,
+)
+
 /**
  * The App Store install channel and its restore and redeem flows.
  */
@@ -52,6 +58,13 @@ export interface AppStoreService {
    * result, which resolves as soon as the sheet is presented.
    */
   presentOfferCodeRedeemSheet(): MaybePromise<void>
+  /**
+   * Ask StoreKit for its review prompt. The system decides whether it shows:
+   * at most three times in 365 days on an App Store install, every time in a
+   * development build, and never in TestFlight. Nothing reports whether it
+   * showed or what the user chose.
+   */
+  requestReview(): MaybePromise<void>
 }
 
 export interface AppStoreServiceDeps {
@@ -75,6 +88,10 @@ class AppStoreServiceImpl implements AppStoreService {
 
   async presentOfferCodeRedeemSheet(): Promise<void> {
     await presentOfferCodeRedeemSheetCommand(this.#deps.ipc, {})
+  }
+
+  async requestReview(): Promise<void> {
+    await requestReviewCommand(this.#deps.ipc, {})
   }
 }
 

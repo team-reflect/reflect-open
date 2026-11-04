@@ -2,7 +2,7 @@
 
 **Goal:** the desktop AI Chat (Plan 10 — BYOK, tool-grounded, `private: true`
 hard-blocked, durable history) on the iOS app as a first-class mobile surface:
-a Chat tab that streams answers grounded in the user's notes, with provider
+a Chat screen that streams answers grounded in the user's notes, with provider
 keys entered on the device and stored in the iOS keychain. **Same engine, new
 shell** — no chat-engine changes, no new sync mechanism, no new privacy
 surface.
@@ -11,8 +11,9 @@ surface.
 (mobile shell: tabs, stack, keyboard bridge, settings primitives), Plan 21/22
 (the sync + settings substrate the chat history rides beside).
 **Unlocks:** mobile audio-memo transcription (BYOK keys on device), the
-search-grounded chat entry from the All tab (the V1-mobile interaction, a
-later wave), mobile AI actions (summarize/rewrite) when the desktop write wave
+search-results-grounded chat entry from the All tab (the V1-mobile
+interaction, a later wave; asking the typed text from All shipped 2026-11-02,
+see decision 2), mobile AI actions (summarize/rewrite) when the desktop write wave
 lands.
 
 **Explicitly not in scope:** the write wave (patchsets, rewrite — deferred on
@@ -34,6 +35,10 @@ keyboard's own dictation.
 > physical device with a real key: the full streaming pass (send, stop,
 > tool chips, private-note refusal, history restore) and the picker/HEIC
 > attachment check.
+>
+> **Navigation revised (2026-11-02):** Chat is no longer a tab. It is a card
+> pushed over All, reached from the search field's Ask row and the All
+> header's Chat button (decision 2's revision note; step 3).
 >
 > **Step 0 verdicts (2026-07-05, iPhone 17 Pro simulator).** Product call
 > (2026-07-05): the simulator verdicts are accepted for hardware too, so the
@@ -99,7 +104,8 @@ keyboard's own dictation.
   depends on this) — so a focused chat textarea hides the tab bar and pins
   the composer on the keyboard edge with no shell changes. And
   `mobile-stack.tsx`'s `isStacked` lists only `note`/`settings`/`graphs`, so
-  `{ kind: 'chat' }` is already a root route: **no stack changes**.
+  `{ kind: 'chat' }` is already a root route: **no stack changes**. (Revised
+  2026-11-02: `isStacked` now includes `chat`, pushed over All.)
 - **Mobile substrate.** Tab bar + stack (`mobile-tab-bar.tsx`,
   `mobile-stack.tsx`), `--keyboard-height` layout (`use-keyboard.ts`,
   `mobile-shell.tsx`), vaul Drawer idiom, inset-grouped `settings-list.tsx`
@@ -127,13 +133,39 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
    The V1-mobile "chat over the current search results" entry from the All
    tab is real and worth keeping *later* — as an additional entry point that
    seeds the same session, not a different chat.
+
+   > **Revised (2026-11-02): Chat moved into All.** The tab bar is back to
+   > three tabs (Daily, All, Tasks), and Chat is a card pushed over All
+   > (stacked like a note, so Back returns to the results with the query
+   > intact). Two entry points:
+   >
+   > - The search field reads "Search or ask…". While there is typed text,
+   >   an AI provider is configured, and no `#tag` token is being picked,
+   >   an Ask row above the results starts a fresh conversation with the text
+   >   sent as the first message (`ChatSession.ask`, which leaves the
+   >   composer's draft and queued images alone and does nothing for a blank
+   >   question or a missing model). Asking the question the open
+   >   conversation began with (text only, no photo) reopens it instead of
+   >   asking again, so a second tap after Back costs no duplicate model call.
+   >   The model runs its own `search_notes`; the visible results are not
+   >   passed in, so results-grounded chat is still the later wave.
+   > - The All header's Chat button resumes the current conversation (a dot
+   >   marks one in progress) or, with none, opens an empty one with the
+   >   composer focused. With no provider it lands on the setup
+   >   call-to-action (decision 4).
+   >
+   > All remembers the card it was left on (an open Chat, a note opened from
+   > the list, or Settings reached from Chat's setup call-to-action): tapping
+   > All from another tab returns to it, in place and with the list beneath
+   > it so Back lands on All, and tapping All again, or double-tapping it
+   > (search focused), goes back to the list.
 3. **Lexical-only, stated honestly.** Mobile passes
    `semanticSearchEnabled: false` into `streamChat` unconditionally —
    regardless of the (per-device) setting — so `search_notes` runs
    `mode: 'lexical'` and the tool description tells the model it's keyword
    search. Never rely on hybrid's degrade-on-error to absorb the missing
    embed runtime.
-4. **Providers are configured per device.** The Chat tab with no configured
+4. **Providers are configured per device.** The Chat screen with no configured
    provider renders a CTA to Settings → AI. Keys are validated on entry
    (`validate-key.ts`, over `providerFetch`), stored only under
    `ai-api-key:<configId>` in the iOS keychain, and surfaced afterward only
@@ -207,6 +239,13 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
    definition. Tests: turns survive a tab round-trip; the lifted draft
    survives a tab round-trip.
 
+   > **Revised (2026-11-02):** the Chat tab is gone. `MobileTab` is
+   > `'daily' | 'all' | 'tasks'`, `tabRootFor` maps `chat` to `null` (it keeps
+   > the tab it was opened from), and `isStacked` includes `chat`, so it
+   > pushes over All with Back and the edge back-swipe. The entry points live
+   > in All (`ask-row.tsx`, `chat-button.tsx`). The round-trip tests now
+   > cover leaving the screen and coming back.
+
 4. **AI provider settings on mobile.** In `screens/settings.tsx`, a new "AI"
    `SettingsGroup`: one row per configured provider (name + `keyHint`,
    default marker), an "Add provider…" action row opening an add-provider
@@ -242,7 +281,7 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
 
 - On a phone with no desktop history: user adds an Anthropic or OpenAI key in
   Settings → AI (validated; stored in the iOS keychain; only the hint visible
-  afterward), opens the Chat tab, asks a question about their notes, and
+  afterward), asks a question about their notes from the All tab, and
   watches the answer stream in with tool chips and tappable `[[wiki link]]`
   citations.
 - `search_notes` on mobile is lexical: tool description says keyword search,
@@ -253,8 +292,9 @@ search: the `embed_unsupported.rs` stand-in reports the `unsupported` status.
   integration test proves the wiring.
 - Conversations persist per graph across relaunch and index rebuilds; the
   6-hour idle cutoff and history drawer behave as on desktop.
-- Chat tab keeps its conversation, half-typed draft, and scroll position
-  across tab switches; keyboard shows/hides without tab-bar/composer overlap;
+- Chat keeps its conversation and half-typed draft when left (Back to All)
+  and reopened (revised 2026-11-02; was "across tab switches", with scroll
+  position); keyboard shows/hides without tab-bar/composer overlap;
   formatting toolbar never appears for the composer.
 - `pnpm check` + targeted tests pass; the `?platform=ios` harness renders the
   chat screen end-to-end on the dev bridge.

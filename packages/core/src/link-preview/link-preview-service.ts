@@ -7,24 +7,6 @@ import type { PrivacyService } from '../privacy/privacy-service.ts'
 import type { parseLinkPreviewMeta } from './metadata.ts'
 
 /**
- * Immutable identity of the note and editor session that owns a resolver.
- */
-export interface LinkPreviewSession {
-  /**
-   * Graph-relative note path whose live source supplies the privacy flag.
-   */
-  readonly path: string
-  /**
-   * Stable graph-root identity used to reject results from another graph.
-   */
-  readonly graphKey: string
-  /**
-   * Open-document epoch used to reject results from a replaced editor session.
-   */
-  readonly sessionEpoch: number
-}
-
-/**
  * The display metadata of one link, as the editor's preview card shows it.
  */
 export interface LinkPreview {
@@ -60,17 +42,13 @@ export interface LinkPreviewServiceDeps {
  */
 export interface LinkPreviewService {
   /**
-   * Build the resolver of one editor session. `currentSession` reports the
-   * session the editor shows now; a lookup of a replaced session resolves
-   * `undefined`. Source reads go to the graph open when the resolver is
-   * built; with none, every lookup resolves `undefined`. The returned promise cache includes successful and permanent
+   * Build the resolver of the note at graph-relative `path`, whose live source
+   * supplies the privacy flag. Source reads go to the graph open when the
+   * resolver is built; with none, every lookup resolves `undefined`. The returned promise cache includes successful and permanent
    * failed lookups, deduplicates concurrent calls, and leaves transient
    * network failures eligible for retry.
    */
-  createResolver(
-    session: LinkPreviewSession,
-    currentSession: () => LinkPreviewSession | null,
-  ): LinkPreviewResolver
+  createResolver(path: string): LinkPreviewResolver
 }
 
 type LinkPreviewResolution =
@@ -90,14 +68,6 @@ const FAILED_RESOLUTION: LinkPreviewResolution = {
   cacheable: true,
 }
 
-function sameSession(left: LinkPreviewSession | null, right: LinkPreviewSession): boolean {
-  return (
-    left?.path === right.path &&
-    left.graphKey === right.graphKey &&
-    left.sessionEpoch === right.sessionEpoch
-  )
-}
-
 function isTransientFailure(error: unknown): boolean {
   return isAppError(error) && error.kind === 'network'
 }
@@ -109,22 +79,18 @@ class LinkPreviewServiceImpl implements LinkPreviewService {
     this.#deps = deps
   }
 
-  createResolver(
-    session: LinkPreviewSession,
-    currentSession: () => LinkPreviewSession | null,
-  ): LinkPreviewResolver {
+  createResolver(path: string): LinkPreviewResolver {
     const { noteDocuments, privacy, webFetch, parseMetadata, graphSession } = this.#deps
-    const graph = graphSession.getState().session
+    const graph = graphSession.get().session
     const cache = new Map<string, Promise<LinkPreviewResolution>>()
 
     async function authorizeOutboundUrls(
       urls: readonly string[],
     ): Promise<readonly CloudSafe<string>[] | null> {
-      if (graph === null || !sameSession(currentSession(), session)) return null
+      if (graph === null) return null
       try {
-        const source = await noteDocuments.readExisting(session.path, graph.generation)
-        if (!sameSession(currentSession(), session)) return null
-        const note = { path: session.path, isPrivate: privacy.notePrivate(source) }
+        const source = await noteDocuments.readExisting(path, graph.generation)
+        const note = { path, isPrivate: privacy.notePrivate(source) }
         return urls.map((url) => privacy.cloudSafeLinkHref(note, url))
       } catch {
         return null

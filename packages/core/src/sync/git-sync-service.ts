@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
 import { isCaptureSpoolPath } from '../capture/capture-identity.ts'
 import type { ActivityPort } from '../ports/activity-port.ts'
@@ -10,6 +11,7 @@ import { errorMessage } from '../errors.ts'
 import { isNotePath } from '../graph/paths.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
@@ -139,17 +141,12 @@ export interface GitSyncServiceDeps {
  * hook, and the connect / disconnect / sync-now actions. Which remote to
  * connect is the connectors' business (`GithubConnector`, `GitHostConnector`).
  */
-export interface GitSyncService {
+export interface GitSyncService extends Store<GitSyncState> {
   /**
    * Probe the graph and start the engine if fully connected. Idempotent;
    * overlapping calls run one after the other.
    */
   start(): MaybePromise<void>
-  getState: () => GitSyncState
-  /**
-   * Subscribe to state changes; returns the unsubscribe.
-   */
-  subscribe: (listener: () => void) => Unlisten
   /**
    * Point `origin` at `remoteUrl`, align the local branch with `branch` (the
    * remote's default, so sync never forks a parallel branch), and restart.
@@ -177,14 +174,13 @@ class GitSyncServiceImpl implements GitSyncService {
   readonly #root: string
   readonly #indexGeneration: number | null
   readonly #mobile: boolean
-  readonly #listeners = new Set<() => void>()
   readonly #resumeDisposers: Array<() => void> = []
   readonly #credentialDisposers: Array<() => void> = []
   /**
    * Serializes `start()` calls: two in flight at once would adopt two engines.
    */
   #startTail: Promise<void> = Promise.resolve()
-  #state: GitSyncState = { phase: 'loading' }
+  readonly #state = new WritableStore<GitSyncState>({ phase: 'loading' }, sameState)
   #disposed = false
   #engine: SyncEngine | null = null
   #unlisten: Unlisten | null = null
@@ -310,14 +306,9 @@ class GitSyncServiceImpl implements GitSyncService {
     }
   }
 
-  readonly getState = (): GitSyncState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   async disconnectGraph(): Promise<void> {
     await this.#deps.git.disconnect(this.#generation)
@@ -339,7 +330,6 @@ class GitSyncServiceImpl implements GitSyncService {
     for (const dispose of this.#credentialDisposers.splice(0)) {
       dispose()
     }
-    this.#listeners.clear()
   }
 
   /**
@@ -352,7 +342,7 @@ class GitSyncServiceImpl implements GitSyncService {
       return
     }
     const onChange = (): void => {
-      const state = this.#state
+      const state = this.#state.get()
       const affected =
         state.phase === 'needsCredential' ||
         (state.phase === 'connected' &&
@@ -368,13 +358,10 @@ class GitSyncServiceImpl implements GitSyncService {
   }
 
   #setState(next: GitSyncState): void {
-    if (this.#disposed || sameState(this.#state, next)) {
+    if (this.#disposed) {
       return
     }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(next)
   }
 
   /**
@@ -417,7 +404,8 @@ class GitSyncServiceImpl implements GitSyncService {
     getCredential: () => MaybePromise<GitCredential | null>,
   ): Promise<void> {
     const { git, activity, logger } = this.#deps
-    const failed = this.#state.phase === 'connected' && this.#state.status.state === 'error'
+    const state = this.#state.get()
+    const failed = state.phase === 'connected' && state.status.state === 'error'
     if (!activity.isHidden() && !failed) {
       try {
         const credential = await getCredential()
@@ -580,7 +568,8 @@ class GitSyncServiceImpl implements GitSyncService {
   ): Promise<void> {
     const next = await classifyForbiddenStatus(this.#deps.githubAuth, remote.repo)
     // Only replace the exact status this probe was asked about.
-    if (next !== null && this.#state.phase === 'connected' && this.#state.status === status) {
+    const state = this.#state.get()
+    if (next !== null && state.phase === 'connected' && state.status === status) {
       this.#setState({ phase: 'connected', remoteUrl, remote, isPrimaryChannel, status: next })
     }
   }
@@ -600,7 +589,10 @@ function isForbidden(status: SyncStatus): boolean {
   return isSyncError(status) && status.errorKind === 'auth' && status.message.includes('403')
 }
 
-function sameState(a: GitSyncState, b: GitSyncState): boolean {
+/**
+ * Whether two states are equal for the subscribers of a {@link GitSyncService}.
+ */
+export function sameState(a: GitSyncState, b: GitSyncState): boolean {
   if (a.phase === 'needsCredential' && b.phase === 'needsCredential') {
     return a.remoteUrl === b.remoteUrl
   }
@@ -610,13 +602,6 @@ function sameState(a: GitSyncState, b: GitSyncState): boolean {
   return (
     a.remoteUrl === b.remoteUrl &&
     a.isPrimaryChannel === b.isPrimaryChannel &&
-    sameStatus(a.status, b.status)
+    isShallowEqual(a.status, b.status)
   )
-}
-
-function sameStatus(a: SyncStatus, b: SyncStatus): boolean {
-  const left: Record<string, unknown> = a
-  const right: Record<string, unknown> = b
-  const keys = Object.keys(left)
-  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key])
 }

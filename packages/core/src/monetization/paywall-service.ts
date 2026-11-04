@@ -1,19 +1,21 @@
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import type { StorageService } from '../ports/storage-service.ts'
-import type { ClassicAccessService } from '../classic/classic-access-service.ts'
+import type { ClassicAccessService, ClassicAccessState } from '../classic/classic-access-service.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
 import { IAP_PRODUCT_IDS, type IapProduct, type IapService } from '../ipc/iap-service.ts'
-import type { Unlisten } from '../unlisten.ts'
+import { combineStores, deriveStore, type Store } from '../store.ts'
 import type {
   AppStoreEnvironment,
   AppStoreEnvironmentService,
+  AppStoreEnvironmentState,
 } from './app-store-environment-service.ts'
-import type { ActiveSubscription, SubscriptionService } from './subscription-service.ts'
-
-/**
- * Paywall visibility: `show` replaces the app; `hide` leaves the app visible.
- */
-export type PaywallGate = 'show' | 'hide'
+import type { InstallClockService, InstallClockState } from './install-clock-service.ts'
+import type { PaywallPhase } from './paywall-phase.ts'
+import type {
+  ActiveSubscription,
+  SubscriptionService,
+  SubscriptionState,
+} from './subscription-service.ts'
 
 /**
  * Session-wide, so the request survives leaving and re-entering Settings.
@@ -21,23 +23,48 @@ export type PaywallGate = 'show' | 'hide'
 export const PAYWALL_REQUESTED_STORAGE_KEY = 'reflect.paywall-requested'
 
 /**
- * Whether the paywall replaces the app, and the actions that lift it.
+ * The install clock's `dayIndex` on which the skippable paywall last opened.
+ */
+export const PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY = 'reflect.paywall.skippable-shown-day'
+
+/**
+ * A simulated phase for QA, for this session only.
+ */
+export const PAYWALL_PHASE_OVERRIDE_STORAGE_KEY = 'reflect.paywall.phase-override'
+
+/**
+ * Whether the paywall covers the app, and the actions that lift it.
  */
 export interface PaywallService {
   /**
-   * Whether to render the paywall. An unsettled subscription check returns
-   * `hide` so verification never blocks app startup.
+   * Whether to render the paywall, and whether it can be closed. An unsettled
+   * check reads `hidden` so verification never blocks app startup. It
+   * subscribes to its inputs only while it has subscribers.
    */
-  gate: () => PaywallGate
+  readonly gate: Store<PaywallPhase>
   /**
-   * Calls `listener` whenever `gate()` or `requested()` may have changed.
+   * Whether the skippable paywall is open in this session, because the user
+   * asked for it or because it opened on its own.
    */
-  subscribe: (listener: () => void) => Unlisten
-  /**
-   * Whether the user asked to see the paywall in this session.
-   */
-  requested: () => boolean
+  readonly requested: Store<boolean>
   setRequested: (next: boolean) => void
+  /**
+   * Records that the skippable paywall opened today and keeps it open until
+   * {@link PaywallService.dismissSkippable}.
+   */
+  markSkippableShown: () => void
+  /**
+   * Closes the skippable paywall.
+   */
+  dismissSkippable: () => void
+  /**
+   * The simulated phase, or `null` for the real one.
+   */
+  readonly phaseOverride: Store<PaywallPhase | null>
+  /**
+   * Sets the simulated phase and forgets that the skippable paywall opened today.
+   */
+  setPhaseOverride: (next: PaywallPhase | null) => void
   /**
    * The store's offers for the yearly and monthly plans.
    */
@@ -67,62 +94,131 @@ function isAppStoreInstall(environment: AppStoreEnvironment): boolean {
   return environment !== 'Sandbox' && environment !== 'Xcode'
 }
 
+interface GateInputs {
+  readonly active: SubscriptionState
+  readonly classic: ClassicAccessState
+  readonly environment: AppStoreEnvironmentState
+  readonly clock: InstallClockState
+  readonly requested: boolean
+  readonly shownDay: string | null
+  readonly override: PaywallPhase | null
+}
+
+/**
+ * The paywall visibility on iOS for the given inputs.
+ */
+function computeGate({
+  active,
+  classic,
+  environment,
+  clock,
+  requested,
+  shownDay,
+  override,
+}: GateInputs): PaywallPhase {
+  if (active.value !== null || classic.active) {
+    return 'hidden'
+  }
+  // Ahead of the pending checks on purpose: a build that already knows it is
+  // not from the App Store drops into the notes without waiting on StoreKit.
+  if (override === null && !isAppStoreInstall(environment.value)) {
+    return requested ? 'skippable' : 'hidden'
+  }
+  if (active.isLoading || classic.isLoading || clock.isLoading) {
+    return 'hidden'
+  }
+  const phase = override ?? clock.phase
+  if (phase === 'required') {
+    return 'required'
+  }
+  if (requested || (phase === 'skippable' && shownDay !== String(clock.dayIndex))) {
+    return 'skippable'
+  }
+  return 'hidden'
+}
+
 export interface PaywallServiceDeps {
   readonly subscription: SubscriptionService
   readonly classicAccess: ClassicAccessService
   readonly appStoreEnvironment: AppStoreEnvironmentService
+  readonly installClock: InstallClockService
   readonly iap: IapService
   readonly appStore: AppStoreService
   readonly platform: PlatformFacts
   readonly storage: StorageService
 }
 
+function selectIsRequested(value: string | null): boolean {
+  return value === 'true'
+}
+
+function selectPhase(value: string | null): PaywallPhase | null {
+  return value === 'hidden' || value === 'skippable' || value === 'required' ? value : null
+}
+
 class PaywallServiceImpl implements PaywallService {
   readonly #deps: PaywallServiceDeps
+  readonly gate: Store<PaywallPhase>
+  readonly requested: Store<boolean>
+  readonly phaseOverride: Store<PaywallPhase | null>
 
   constructor(deps: PaywallServiceDeps) {
     this.#deps = deps
-  }
-
-  readonly gate = (): PaywallGate => {
-    const { subscription, classicAccess, appStoreEnvironment, platform } = this.#deps
-    if (platform.appPlatform !== 'ios') {
-      return 'hide'
-    }
-    const active = subscription.getState()
-    const classic = classicAccess.getState()
-    if (active.value !== null || classic.active) {
-      return 'hide'
-    }
-    // Ahead of the pending checks on purpose: a build that already knows it is
-    // not from the App Store drops into the notes without waiting on StoreKit.
-    if (!isAppStoreInstall(appStoreEnvironment.getState().value) && !this.requested()) {
-      return 'hide'
-    }
-    return active.isLoading || classic.isLoading ? 'hide' : 'show'
-  }
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    const { subscription, classicAccess, appStoreEnvironment, storage } = this.#deps
-    const unlisten = [
-      subscription.subscribe(listener),
-      classicAccess.subscribe(listener),
-      appStoreEnvironment.subscribe(listener),
-      storage.session.subscribe(PAYWALL_REQUESTED_STORAGE_KEY, listener),
-    ]
-    return () => {
-      for (const stop of unlisten) {
-        stop()
-      }
-    }
-  }
-
-  readonly requested = (): boolean => {
-    return this.#deps.storage.session.get(PAYWALL_REQUESTED_STORAGE_KEY) === 'true'
+    const { subscription, classicAccess, appStoreEnvironment, installClock, platform, storage } =
+      deps
+    this.requested = deriveStore(
+      storage.session.store(PAYWALL_REQUESTED_STORAGE_KEY),
+      selectIsRequested,
+    )
+    this.phaseOverride = deriveStore(
+      storage.session.store(PAYWALL_PHASE_OVERRIDE_STORAGE_KEY),
+      selectPhase,
+    )
+    this.gate = combineStores(
+      [
+        subscription,
+        classicAccess,
+        appStoreEnvironment,
+        installClock,
+        this.requested,
+        storage.local.store(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY),
+        this.phaseOverride,
+      ],
+      (active, classic, environment, clock, requested, shownDay, override) => {
+        return platform.appPlatform === 'ios'
+          ? computeGate({ active, classic, environment, clock, requested, shownDay, override })
+          : 'hidden'
+      },
+    )
   }
 
   readonly setRequested = (next: boolean): void => {
     this.#deps.storage.session.set(PAYWALL_REQUESTED_STORAGE_KEY, next ? 'true' : 'false')
+  }
+
+  readonly markSkippableShown = (): void => {
+    // Open first, so the day never closes the paywall it records.
+    this.setRequested(true)
+    this.#deps.storage.local.set(
+      PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY,
+      String(this.#deps.installClock.get().dayIndex),
+    )
+  }
+
+  readonly dismissSkippable = (): void => {
+    // Records the day again, so a paywall left open into the next day still closes.
+    this.#deps.storage.local.set(
+      PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY,
+      String(this.#deps.installClock.get().dayIndex),
+    )
+    this.setRequested(false)
+  }
+
+  readonly setPhaseOverride = (next: PaywallPhase | null): void => {
+    const { storage } = this.#deps
+    storage.local.set(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY, null)
+    this.setRequested(false)
+    storage.session.set(PAYWALL_PHASE_OVERRIDE_STORAGE_KEY, next)
   }
 
   products(): Promise<IapProduct[]> {

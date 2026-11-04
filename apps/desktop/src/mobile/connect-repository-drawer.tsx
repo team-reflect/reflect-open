@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { RepositoryHost } from '@/components/settings/connect-repository-dialog.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { SettingsGroup, SettingsNavRow } from '@/mobile/settings-list.tsx'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
 

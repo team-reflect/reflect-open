@@ -11,7 +11,14 @@ runs:
   steps:
     - name: List installed Xcode versions
       shell: bash
-      run: ls -d /Applications/Xcode*.app
+      run: |
+        for app in /Applications/Xcode*.app; do
+          echo "======="
+          echo "Xcode path: $app"
+          echo "Xcode real path: $(realpath "$app")"
+          echo "Xcode version: $(plutil -extract CFBundleShortVersionString raw "$app/Contents/version.plist")"
+          echo "Xcode build number: $(plutil -extract ProductBuildVersion raw "$app/Contents/version.plist")"
+        done
 
     - name: Print the Xcode version before
       shell: bash

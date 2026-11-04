@@ -12,14 +12,14 @@ import { MonthTitle } from '@/mobile/month-title.tsx'
 import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
 import { WeekRow } from '@/mobile/week-row.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useWeekStartDay } from '@/providers/settings-provider.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 
 interface CalendarStripProps {
   /**
    * The day the strip should highlight — the route's selected day, or the
    * destination of an in-flight carousel swipe (the parent hands the swipe
-   * target over at pointer-up so the strip and month title lead the route).
+   * target over mid-swipe so the strip and month title lead the route).
    */
   date: string
   /** Today's live ISO date — owned by the parent so the strip and the
@@ -53,11 +53,11 @@ export function CalendarStrip({
   onSelect,
 }: CalendarStripProps): ReactElement {
   const { haptics } = useMobileServices()
-  const { settings } = useSettings()
-  const { navigate } = useRouter()
-  const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(
+  const weekStartDay = useWeekStartDay()
+  const { navigate } = useRouterActions()
+  const { scrollerRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(
     date,
-    settings.weekStartDay,
+    weekStartDay,
   )
   const dailyNoteDates = useDailyNoteDates(
     weekWindow.start,
@@ -66,7 +66,7 @@ export function CalendarStrip({
 
   // Header month: the selection's own month while its week is on screen;
   // while browsing, the visible week's dominant (middle-day) month.
-  const selectionWeekStart = getUserWeekStart(date, settings.weekStartDay)
+  const selectionWeekStart = getUserWeekStart(date, weekStartDay)
   const headerDate =
     displayedWeekStart === selectionWeekStart ? date : addDaysToIsoDate(displayedWeekStart, 3)
   const showToday = date !== today
@@ -152,26 +152,26 @@ export function CalendarStrip({
           </Button>
         </div>
       </div>
-      {/* `overflow: clip` with the class as pre-iOS-16 fallback: see the day
-          carousel's viewport. */}
-      <div className="overflow-hidden" style={{ overflow: 'clip' }} ref={emblaRef}>
-        <div className="flex">
-          {Array.from({ length: weekWindow.count }, (_, index) => {
-            const weekStart = weekAtIndex(weekWindow, index)
-            const weekEnd = addDaysToIsoDate(weekStart, 6)
-            const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
-            return (
-              <WeekRow
-                key={weekStart}
-                weekStart={weekStart}
-                selectedDay={contains(date) ? date : null}
-                todayDay={contains(today) ? today : null}
-                dailyNoteDates={dailyNoteDates}
-                onSelect={onSelect}
-              />
-            )
-          })}
-        </div>
+      <div
+        ref={scrollerRef}
+        data-scroll-x
+        className="flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain"
+      >
+        {Array.from({ length: weekWindow.count }, (_, index) => {
+          const weekStart = weekAtIndex(weekWindow, index)
+          const weekEnd = addDaysToIsoDate(weekStart, 6)
+          const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
+          return (
+            <WeekRow
+              key={weekStart}
+              weekStart={weekStart}
+              selectedDay={contains(date) ? date : null}
+              todayDay={contains(today) ? today : null}
+              dailyNoteDates={dailyNoteDates}
+              onSelect={onSelect}
+            />
+          )
+        })}
       </div>
       <MonthPickerDrawer
         open={monthPickerOpen}

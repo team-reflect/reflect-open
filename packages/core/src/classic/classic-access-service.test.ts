@@ -220,10 +220,10 @@ describe('signIn', () => {
     const classic = service()
 
     await classic.signIn({ ephemeral: false })
-    expect(classic.getState()).toEqual({ access: null, active: false, isLoading: true })
+    expect(classic.get()).toEqual({ access: null, active: false, isLoading: true })
 
     await classic.read()
-    expect(classic.getState()).toMatchObject({ active: true, isLoading: false })
+    expect(classic.get()).toMatchObject({ active: true, isLoading: false })
   })
 
   it('uses the last paid period for an account that stopped paying', async () => {
@@ -388,15 +388,15 @@ describe('read', () => {
 
     await expect(classic.read()).resolves.toEqual(access)
     expect(paths()).toEqual([])
-    expect(classic.getState()).toEqual({ access, active: true, isLoading: false })
+    expect(classic.get()).toEqual({ access, active: true, isLoading: false })
   })
 
   it('is null without a stored record', async () => {
     const classic = service()
-    expect(classic.getState().isLoading).toBe(true)
+    expect(classic.get().isLoading).toBe(true)
 
     await expect(classic.read()).resolves.toBeNull()
-    expect(classic.getState()).toEqual({ access: null, active: false, isLoading: false })
+    expect(classic.get()).toEqual({ access: null, active: false, isLoading: false })
   })
 
   it('reports an expired record as inactive by the clock', async () => {
@@ -406,16 +406,47 @@ describe('read', () => {
     clock.setNow(NOW + 2 * DAY_MS)
 
     await classic.read()
-    expect(classic.getState().active).toBe(false)
+    expect(classic.get().active).toBe(false)
+  })
+
+  it('keeps the state reference until the next read and stops notifying after unsubscribe', async () => {
+    const classic = service({ appPlatform: 'desktop' })
+    const state = classic.get()
+    expect(classic.get()).toBe(state)
+    const listener = vi.fn()
+    const unsubscribe = classic.subscribe(listener)
+
+    await classic.read()
+    expect(classic.get()).not.toBe(state)
+    expect(listener).toHaveBeenCalledOnce()
+
+    unsubscribe()
+    await classic.read()
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('does not notify when a read finds the same access', async () => {
+    secrets = createTestSecretStoreService({
+      [CLASSIC_ACCESS_SECRET]: JSON.stringify(storedAccess()),
+    })
+    const classic = service({ appPlatform: 'desktop' })
+    await classic.read()
+    const state = classic.get()
+    const listener = vi.fn()
+    classic.subscribe(listener)
+
+    await classic.read()
+    expect(classic.get()).toBe(state)
+    expect(listener).not.toHaveBeenCalled()
   })
 
   it('stops loading and rethrows when the keychain fails', async () => {
     secrets = createTestSecretStoreService()
     vi.spyOn(secrets, 'get').mockRejectedValue(new Error('locked'))
-    const classic = service()
+    const classic = service({ appPlatform: 'desktop' })
     const notified: boolean[] = []
     classic.subscribe(() => {
-      notified.push(classic.getState().isLoading)
+      notified.push(classic.get().isLoading)
     })
 
     await expect(classic.read()).rejects.toThrow('locked')
@@ -468,7 +499,7 @@ describe('load', () => {
     await expect(classic.load()).resolves.toEqual(expected)
     expect(paths()).toEqual(['/api/users/me'])
     expect(stored()).toEqual(expected)
-    expect(classic.getState()).toEqual({ access: expected, active: true, isLoading: false })
+    expect(classic.get()).toEqual({ access: expected, active: true, isLoading: false })
   })
 
   it('shares one recheck between overlapping calls', async () => {
@@ -520,7 +551,7 @@ describe('signOut', () => {
     secrets = createTestSecretStoreService({
       [CLASSIC_ACCESS_SECRET]: JSON.stringify(storedAccess()),
     })
-    const classic = service()
+    const classic = service({ appPlatform: 'desktop' })
     await classic.read()
     let notified = 0
     classic.subscribe(() => {
@@ -530,12 +561,12 @@ describe('signOut', () => {
     await classic.signOut()
 
     expect(secrets.snapshot()).toEqual({})
-    expect(classic.getState()).toEqual({ access: null, active: false, isLoading: false })
+    expect(classic.get()).toEqual({ access: null, active: false, isLoading: false })
     expect(notified).toBe(1)
   })
 })
 
-describe('start', () => {
+describe('subscribe', () => {
   function withStored(access: ClassicAccess): void {
     secrets = createTestSecretStoreService({ [CLASSIC_ACCESS_SECRET]: JSON.stringify(access) })
   }
@@ -545,9 +576,9 @@ describe('start', () => {
     routes({ '/api/users/me': meRoute(true) })
     const classic = service()
 
-    classic.start()
+    classic.subscribe(() => {})
     await vi.waitFor(() => expect(paths()).toEqual(['/api/users/me']))
-    expect(classic.getState().access?.checkedAt).toBe(NOW)
+    expect(classic.get().access?.checkedAt).toBe(NOW)
 
     await clock.advance(DAY_MS)
     activity.emitVisible()
@@ -558,8 +589,8 @@ describe('start', () => {
     withStored(storedAccess({ token: null }))
     const classic = service()
 
-    classic.start()
-    await vi.waitFor(() => expect(classic.getState().isLoading).toBe(false))
+    classic.subscribe(() => {})
+    await vi.waitFor(() => expect(classic.get().isLoading).toBe(false))
     const reads = vi.spyOn(secrets, 'get')
     activity.emitVisible()
 
@@ -570,7 +601,7 @@ describe('start', () => {
     withStored(storedAccess())
     routes({ '/api/users/me': meRoute(true) })
     const classic = service()
-    classic.start()
+    classic.subscribe(() => {})
     await vi.waitFor(() => expect(paths()).toHaveLength(1))
 
     await classic.signOut()
@@ -580,14 +611,32 @@ describe('start', () => {
     expect(reads).not.toHaveBeenCalled()
   })
 
-  it('stops rechecking when stopped', async () => {
+  it('reads once for several subscribers', async () => {
+    withStored(storedAccess({ token: null }))
+    const reads = vi.spyOn(secrets, 'get')
+    const classic = service()
+
+    classic.subscribe(() => {})
+    classic.subscribe(() => {})
+    await vi.waitFor(() => expect(classic.get().isLoading).toBe(false))
+
+    expect(reads).toHaveBeenCalledOnce()
+  })
+
+  it('stops rechecking after the last unsubscribe', async () => {
     withStored(storedAccess())
     routes({ '/api/users/me': meRoute(true) })
     const classic = service()
-    const stop = classic.start()
+    const unsubscribeFirst = classic.subscribe(() => {})
+    const unsubscribeSecond = classic.subscribe(() => {})
     await vi.waitFor(() => expect(paths()).toHaveLength(1))
 
-    stop()
+    unsubscribeFirst()
+    await clock.advance(DAY_MS)
+    activity.emitVisible()
+    await vi.waitFor(() => expect(paths()).toHaveLength(2))
+
+    unsubscribeSecond()
     const reads = vi.spyOn(secrets, 'get')
     activity.emitVisible()
 
@@ -597,7 +646,7 @@ describe('start', () => {
   it('logs a failed keychain read', async () => {
     secrets = createTestSecretStoreService()
     vi.spyOn(secrets, 'get').mockRejectedValue(new Error('locked'))
-    service().start()
+    service().subscribe(() => {})
 
     await vi.waitFor(() => {
       expect(logger.getErrors()).toEqual([
@@ -611,7 +660,7 @@ describe('start', () => {
     const reads = vi.spyOn(secrets, 'get')
     const classic = service({ appPlatform: 'desktop' })
 
-    classic.start()
+    classic.subscribe(() => {})
     activity.emitVisible()
 
     expect(reads).not.toHaveBeenCalled()

@@ -253,6 +253,24 @@ body {
   label {
     touch-action: manipulation;
   }
+
+  /* Stacked mobile screens pan only vertically, so a horizontal drag reaches
+     the back pager only through its edge strip. The rule has zero
+     specificity, so any touch-* utility still wins. Horizontal scrollers
+     (`data-scroll-x`, also set by meowdown) and everything inside them opt
+     back in; the scrollers keep their own overscroll. */
+  :where(.mobile-pager-content, .mobile-pager-content *) {
+    touch-action: pan-y;
+  }
+
+  :where(.mobile-pager-content) [data-scroll-x] {
+    touch-action: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  :where(.mobile-pager-content) [data-scroll-x] * {
+    touch-action: auto;
+  }
 }
 
 /* ---- Editor (Plan 05) ------------------------------------------------------

@@ -249,6 +249,25 @@ describe('watchScrollSettle', () => {
       expect(onClick).not.toHaveBeenCalled()
     })
 
+    it('settles at the snap target nearest the release, not only at an end', async () => {
+      const element = mountSnapScroller()
+      element.firstElementChild?.insertAdjacentHTML(
+        'beforeend',
+        '<i style="position: absolute; left: 60px; width: 1px; scroll-snap-align: start"></i>',
+      )
+      const onSettle = vi.fn()
+      watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, 45)
+      expect(element.scrollLeft).toBe(50)
+      await mouse.up()
+
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(element.scrollLeft).toBe(60)
+    })
+
     it('leaves a click under the drag distance alone', async () => {
       const element = mountSnapScroller()
       const onSettle = vi.fn()
@@ -400,6 +419,23 @@ describe('watchScrollSettle', () => {
       field.style.cssText = 'width: 100px; height: 10px; padding: 0; border: 0'
       element.firstElementChild!.append(field)
       watchScrollSettle({ element, onSettle: vi.fn(), signal: listeners.controller.signal })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, 45)
+      await mouse.up()
+
+      expect(element.scrollLeft).toBe(0)
+    })
+
+    it('starts no drag with a `null` drag handle', async () => {
+      const element = mountSnapScroller()
+      watchScrollSettle({
+        element,
+        onSettle: vi.fn(),
+        signal: listeners.controller.signal,
+        dragHandle: null,
+      })
 
       await mouseTo(element, 95)
       await mouse.down()
