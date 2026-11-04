@@ -18,12 +18,6 @@ import type {
 } from './subscription-service.ts'
 
 /**
- * Paywall visibility: `hidden` leaves the app alone, `skippable` shows a
- * paywall the user can close, and `required` shows one they cannot.
- */
-export type PaywallGate = PaywallPhase
-
-/**
  * Session-wide, so the request survives leaving and re-entering Settings.
  */
 export const PAYWALL_REQUESTED_STORAGE_KEY = 'reflect.paywall-requested'
@@ -47,7 +41,7 @@ export interface PaywallService {
    * check reads `hidden` so verification never blocks app startup. It
    * subscribes to its inputs only while it has subscribers.
    */
-  readonly gate: Store<PaywallGate>
+  readonly gate: Store<PaywallPhase>
   /**
    * Whether the skippable paywall is open in this session, because the user
    * asked for it or because it opened on its own.
@@ -121,7 +115,7 @@ function computeGate({
   requested,
   shownOn,
   override,
-}: GateInputs): PaywallGate {
+}: GateInputs): PaywallPhase {
   if (active.value !== null || classic.active) {
     return 'hidden'
   }
@@ -164,7 +158,7 @@ function selectPhase(value: string | null): PaywallPhase | null {
 
 class PaywallServiceImpl implements PaywallService {
   readonly #deps: PaywallServiceDeps
-  readonly gate: Store<PaywallGate>
+  readonly gate: Store<PaywallPhase>
   readonly requested: Store<boolean>
   readonly phaseOverride: Store<PaywallPhase | null>
 

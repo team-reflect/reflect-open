@@ -317,7 +317,7 @@ export {
   createAppStoreEnvironmentService,
   type AppStoreEnvironment,
 } from './monetization/app-store-environment-service.ts'
-export { createPaywallService, type PaywallGate } from './monetization/paywall-service.ts'
+export { createPaywallService } from './monetization/paywall-service.ts'
 export {
   PAYWALL_HIDDEN_DAYS,
   PAYWALL_SKIPPABLE_DAYS,
