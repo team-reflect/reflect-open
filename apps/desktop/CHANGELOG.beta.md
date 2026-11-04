@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.5...v0.17.0-beta.6) (2026-11-04)
+
+
+### Bug Fixes
+
+* **mobile:** iOS All tab forgets a trashed note ([#1930](https://github.com/team-reflect/reflect-open/issues/1930)) ([267c822](https://github.com/team-reflect/reflect-open/commit/267c8220bbdbc705ad425d6fa3ed624334ee83f2))
+* **mobile:** keep swipe rows from stopping half open in WebKit ([#1926](https://github.com/team-reflect/reflect-open/issues/1926)) ([a403a87](https://github.com/team-reflect/reflect-open/commit/a403a8757865c06d207041eef79b13fde57eb91c))
+
 ## [0.17.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.4...v0.17.0-beta.5) (2026-11-02)
 
 
