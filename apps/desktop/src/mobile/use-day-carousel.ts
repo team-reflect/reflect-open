@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from 'react'
 import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@reflect/app'
+import { nearestIndex, restOn } from '@/lib/scroll-pager.ts'
 import { watchScrollSettle, type ScrollSettleWatch } from '@/lib/scroll-settle.ts'
 
 /**
@@ -159,28 +160,6 @@ function adoptSelection(
 interface CarouselNavigationState {
   readonly navigationKey: string
   readonly date: string
-}
-
-/** The scroller's page width, unrounded (`clientWidth` is a whole number). */
-function pageWidth(scroller: HTMLElement): number {
-  return scroller.getBoundingClientRect().width
-}
-
-/** The page nearest the scroller's offset, or `undefined` before layout. */
-function nearestIndex(scroller: HTMLElement, count: number): number | undefined {
-  const width = pageWidth(scroller)
-  if (width === 0) {
-    return undefined
-  }
-  return Math.min(count - 1, Math.max(0, Math.round(scroller.scrollLeft / width)))
-}
-
-/** Moves the scroller onto page `index` at once, unless it is already there. */
-function restOn(scroller: HTMLElement, index: number): void {
-  const left = index * pageWidth(scroller)
-  if (Math.abs(scroller.scrollLeft - left) >= 1) {
-    scroller.scrollTo({ left, behavior: 'instant' })
-  }
 }
 
 /**
