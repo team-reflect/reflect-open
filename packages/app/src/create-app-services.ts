@@ -58,6 +58,9 @@ import {
   type MobileOnboardingService,
 } from './graph/mobile-onboarding-service.ts'
 import { createGraphBootService, type GraphBootService } from './graph/graph-boot-service.ts'
+import { createWhatsNewBlocker } from './whats-new/paywall-blocker.ts'
+import { WHATS_NEW } from './whats-new/whats-new-content.ts'
+import { createWhatsNewService, type WhatsNewService } from './whats-new/whats-new-service.ts'
 
 /**
  * What the host supplies to the app layer: the window, lifecycle, storage,
@@ -208,6 +211,10 @@ export interface AppServices {
    * When the app lands its dirty state: on quit and window close, or on moving to the background.
    */
   readonly quitPolicy: QuitPolicyService
+  /**
+   * The What's New page shown once per app version after an update.
+   */
+  readonly whatsNew: WhatsNewService
 }
 
 /**
@@ -324,6 +331,18 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       window: host.window,
       platform: core.platform,
       persistenceFlush: core.persistenceFlush,
+    }),
+    whatsNew: createWhatsNewService({
+      storage: core.storage,
+      appInfo: core.appInfo,
+      platform: core.platform,
+      window: host.window,
+      graphSession: core.graphSession,
+      intake: core.deepLinkIntake,
+      activity: host.lifecycle,
+      blocker: createWhatsNewBlocker(core),
+      content: WHATS_NEW,
+      logger: core.logger,
     }),
   }
 }
