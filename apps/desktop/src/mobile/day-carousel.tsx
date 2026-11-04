@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useMemo, useState, type ReactElement } from 'react'
 import { dateAtIndex } from '@reflect/app'
 import { DaySlide } from '@/mobile/day-slide.tsx'
 import { useDayCarousel } from '@/mobile/use-day-carousel.ts'
@@ -30,15 +30,14 @@ interface DayCarouselProps {
   onTarget: (date: string, navigationKey: string) => void
 }
 
-/** Slides within this many of the selection mount an editor; the rest are
- *  empty spacers Embla can still measure (bounds webview memory). */
+/** Days within this many of the selection mount a slide (bounds webview memory). */
 const MOUNT_RADIUS = 1
 
 /**
  * V1's swipeable day carousel: horizontal paging between daily notes. The slide
  * window, Embla wiring, and route↔slide sync all live in {@link useDayCarousel};
- * this component just renders the slides, mounting a {@link DaySlide} only near
- * the selection and leaving the rest as empty spacers. Each day's scroll offset
+ * this component renders one empty cell per day for Embla to snap to, and a
+ * {@link DaySlide} over each cell near the selection. Each day's scroll offset
  * lives in a carousel-owned map so it survives its slide unmounting (V1's
  * per-slide scroll preservation).
  */
@@ -61,6 +60,22 @@ export function DayCarousel({
   // One mutable map for the carousel's life; the identity never changes, so
   // holding it in state (read during render) rather than a ref is safe.
   const [scrollMemory] = useState(() => new Map<string, number>())
+  const cells = useMemo(() => {
+    return Array.from({ length: dayWindow.count }, (_, index) => (
+      <div key={dateAtIndex(dayWindow, index)} data-day-cell className="h-full w-full shrink-0" />
+    ))
+  }, [dayWindow])
+  const mountedIndexes = useMemo(() => {
+    const indexes: number[] = []
+    for (
+      let index = Math.max(0, selectedIndex - MOUNT_RADIUS);
+      index <= Math.min(dayWindow.count - 1, selectedIndex + MOUNT_RADIUS);
+      index++
+    ) {
+      indexes.push(index)
+    }
+    return indexes
+  }, [selectedIndex, dayWindow.count])
 
   return (
     /* `overflow: clip`: not a scroll container, so a stray scrollLeft write
@@ -68,23 +83,26 @@ export function DayCarousel({
        belt. Inline so pre-iOS-16 falls back to the class's `hidden`, healed
        by the scroll guard in useDayCarousel. */
     <div className="min-h-0 flex-1 overflow-hidden" style={{ overflow: 'clip' }} ref={emblaRef}>
-      <div className="flex h-full">
-        {Array.from({ length: dayWindow.count }, (_, index) => {
+      <div className="relative flex h-full">
+        {cells}
+        {mountedIndexes.map((index) => {
           const day = dateAtIndex(dayWindow, index)
-          const mounted = Math.abs(index - selectedIndex) <= MOUNT_RADIUS
           return (
-            <div key={day} className="min-w-0 flex-[0_0_100%]">
-              {mounted ? (
-                <DaySlide
-                  day={day}
-                  today={today}
-                  selected={index === selectedIndex}
-                  scrollMemory={scrollMemory}
-                  scrollResetSeq={scrollResetSeq}
-                  focusRequested={focusDate === day && index === selectedIndex}
-                  onFocusConsumed={onFocusConsumed}
-                />
-              ) : null}
+            <div
+              key={day}
+              data-day={day}
+              className="absolute inset-y-0 w-full"
+              style={{ left: `${index * 100}%` }}
+            >
+              <DaySlide
+                day={day}
+                today={today}
+                selected={index === selectedIndex}
+                scrollMemory={scrollMemory}
+                scrollResetSeq={scrollResetSeq}
+                focusRequested={focusDate === day && index === selectedIndex}
+                onFocusConsumed={onFocusConsumed}
+              />
             </div>
           )
         })}

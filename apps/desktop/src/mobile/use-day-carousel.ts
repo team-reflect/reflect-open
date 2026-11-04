@@ -6,18 +6,17 @@ import { useAppServices } from '@/services/services-provider.tsx'
 /**
  * Days either side of the carousel anchor. A fixed **symmetric** window
  * (three months each way) lets Embla page between days without runtime
- * re-anchoring in ordinary use; only the slides near the selection mount an
- * editor, so the empty ones are cheap spacers. Swiping within
+ * re-anchoring in ordinary use; only the days near the selection mount a
+ * slide, so the rest are cheap empty cells. Swiping within
  * {@link RECENTER_MARGIN} of an edge (or a date-link beyond the window)
  * re-anchors it around the current day, so both directions stay effectively
  * infinite (V1 parity). The desktop daily stream shares the window math
  * ({@link createDayWindow}) with a wider, asymmetric reach — but it truly
- * virtualizes its rows, where the carousel renders every slide spacer and
- * only mounts the editors near the selection.
+ * virtualizes its rows, where the carousel renders every day cell and
+ * only mounts the slides near the selection.
  *
- * The spacers are cheap but not free: every slide is a React child
- * reconciled on each selection change and a DOM node under Embla's
- * `ResizeObserver`, and a re-anchor re-measures them all — the home
+ * The cells are cheap but not free: every cell is a DOM node under Embla's
+ * `ResizeObserver`, and a re-anchor re-renders and re-measures them all — the home
  * screen's swipe cost scales linearly with this number (the iOS battery
  * audit's finding at the old ~1-year radius). 90 keeps 60 swipes of
  * headroom from center before a re-anchor at {@link RECENTER_MARGIN},
@@ -167,6 +166,8 @@ export function useDayCarousel(
   // After mount, positioning belongs exclusively to the follow effect below.
   const [emblaOptions] = useState<Parameters<typeof useEmblaCarousel>[0]>(() => ({
     startIndex: indexWithin(dayWindow, date),
+    // Snap to the empty day cells, not the absolutely positioned slides.
+    slides: '[data-day-cell]',
     align: 'center',
     skipSnaps: false,
     // Swiping between days is disabled while the software keyboard is up (V1

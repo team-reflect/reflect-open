@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { NoteWindowContent } from '@/components/note-window-content.tsx'
+import { WhatsNewDialog } from '@/components/whats-new/whats-new-dialog.tsx'
 import { WorkspaceContent } from '@/components/workspace-content.tsx'
 import { WorkspaceProviders } from '@/components/workspace-providers.tsx'
 import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
@@ -34,6 +35,7 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
         {appWindow.isMainWindow() ? (
           <V1ImportProvider>
             <WorkspaceContent graph={graph} />
+            <WhatsNewDialog />
           </V1ImportProvider>
         ) : (
           <NoteWindowContent />

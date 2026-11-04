@@ -159,11 +159,7 @@ export {
   type TestLanguageModelService,
   type TestLanguageModelSource,
 } from './ai.ts'
-export {
-  createTestAppInfoService,
-  createTestSecretStoreService,
-  type TestSecretStoreService,
-} from './secrets.ts'
+export { createTestSecretStoreService, type TestSecretStoreService } from './secrets.ts'
 export {
   createTestIndexStoreService,
   type IndexStoreCall,
@@ -250,11 +246,13 @@ export {
 export {
   createTestAppStoreEnvironmentService,
   createTestClassicAccessService,
+  createTestInstallClockService,
   createTestSubscriptionService,
   type AppStoreEnvironmentCall,
   type ClassicAccessCall,
   type SubscriptionCall,
   type TestAppStoreEnvironmentService,
   type TestClassicAccessService,
+  type TestInstallClockService,
   type TestSubscriptionService,
 } from './monetization.ts'

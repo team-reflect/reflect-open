@@ -137,7 +137,7 @@ export { type OpenDocumentsService } from './documents/open-documents-service.ts
 export { type RenameCoordinator } from './documents/title-rename-service.ts'
 export { createDocumentBinding, type DocumentBinding } from './documents/document-binding.ts'
 export { type ResolvedArchivedPost } from './embeds/x-archive-service.ts'
-export { marketingVersion } from './ports/app-info-service.ts'
+export { marketingVersion } from './ports/app-version.ts'
 export { reachWebStorage, type StorageService } from './ports/storage-service.ts'
 export {
   type Operation,
@@ -317,7 +317,20 @@ export {
   createAppStoreEnvironmentService,
   type AppStoreEnvironment,
 } from './monetization/app-store-environment-service.ts'
-export { createPaywallService, type PaywallGate } from './monetization/paywall-service.ts'
+export { createPaywallService } from './monetization/paywall-service.ts'
+export {
+  PAYWALL_HIDDEN_DAYS,
+  PAYWALL_SKIPPABLE_DAYS,
+  getPaywallDaysLeft,
+  getPaywallPhase,
+  getPaywallRequiredAt,
+  type PaywallPhase,
+} from './monetization/paywall-phase.ts'
+export {
+  createInstallClockService,
+  type InstallClockService,
+  type InstallClockState,
+} from './monetization/install-clock-service.ts'
 export {
   IAP_PRODUCT_IDS,
   createIapService,
@@ -406,7 +419,6 @@ export {
   createLinkPreviewService,
   type LinkPreviewResolver,
   type LinkPreviewService,
-  type LinkPreviewSession,
 } from './link-preview/link-preview-service.ts'
 export { parseLinkPreviewMeta } from './link-preview/metadata.ts'
 
