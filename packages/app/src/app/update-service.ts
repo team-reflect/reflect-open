@@ -4,6 +4,8 @@ import {
   type ClockService,
   type LoggerService,
   type PlatformFacts,
+  WritableStore,
+  type Store,
   type TimerHandle,
   type Unlisten,
 } from '@reflect/core'
@@ -43,6 +45,10 @@ export interface AvailableUpdate {
    * Download, verify, and install the update, reporting progress through `onEvent`.
    */
   downloadAndInstall(onEvent: (event: UpdateDownloadEvent) => void): Promise<void>
+  /**
+   * Release the native resource that holds this update.
+   */
+  close(): Promise<void>
 }
 
 /**
@@ -56,17 +62,12 @@ export interface UpdaterAdapter {
   relaunch(): MaybePromise<void>
 }
 
-/**
- * `getState` and `subscribe` are function properties so React can read them unbound.
- */
-export interface UpdateService {
+export interface UpdateService extends Store<UpdateState> {
   /**
    * False outside a desktop native shell (browser dev, iOS, Android): hide
    * update UI entirely.
    */
   readonly supported: boolean
-  getState: () => UpdateState
-  subscribe: (listener: () => void) => Unlisten
   /**
    * Begin auto-checking in the main window: once now, then every six hours.
    */
@@ -118,7 +119,7 @@ function errorMessage(error: unknown): string {
  * Runs the retry that matches the failure in `service`'s state.
  */
 export function retryUpdate(service: UpdateService): MaybePromise<void> {
-  const state = service.getState()
+  const state = service.get()
   return state.phase === 'error' && state.during === 'install'
     ? service.install()
     : service.checkNow()
@@ -135,8 +136,7 @@ export function retryUpdate(service: UpdateService): MaybePromise<void> {
  */
 class UpdateServiceImpl implements UpdateService {
   readonly #deps: UpdateServiceDeps & { readonly updater: UpdaterAdapter }
-  readonly #listeners = new Set<() => void>()
-  #state: UpdateState = { phase: 'idle' }
+  readonly #state = new WritableStore<UpdateState>({ phase: 'idle' })
   #pendingUpdate: AvailableUpdate | null = null
   #timer: TimerHandle | null = null
 
@@ -150,14 +150,9 @@ class UpdateServiceImpl implements UpdateService {
     this.supported = deps.platform.isNativeShell && !isMobilePlatform(deps.platform.appPlatform)
   }
 
-  readonly getState = (): UpdateState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
-    return () => {
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   start(): void {
     if (!this.supported || !this.#mainWindow || this.#timer !== null) {
@@ -175,13 +170,14 @@ class UpdateServiceImpl implements UpdateService {
   }
 
   async install(): Promise<void> {
-    const update = this.#pendingUpdate
-    if (!update || this.#state.phase === 'downloading' || this.#state.phase === 'ready') {
+    const update: AvailableUpdate | null = this.#pendingUpdate
+    const phase = this.#state.get().phase
+    if (!update || phase === 'downloading' || phase === 'ready') {
       return
     }
     let contentLength: number | null = null
     let received = 0
-    this.#setState({ phase: 'downloading', version: update.version, percent: null })
+    this.#state.set({ phase: 'downloading', version: update.version, percent: null })
     try {
       await update.downloadAndInstall((event) => {
         switch (event.event) {
@@ -193,17 +189,17 @@ class UpdateServiceImpl implements UpdateService {
             received += event.data.chunkLength
             if (contentLength !== null && contentLength > 0) {
               const percent = Math.min(100, Math.round((received / contentLength) * 100))
-              this.#setState({ phase: 'downloading', version: update.version, percent })
+              this.#state.set({ phase: 'downloading', version: update.version, percent })
             }
             break
           case 'Finished':
-            this.#setState({ phase: 'downloading', version: update.version, percent: 100 })
+            this.#state.set({ phase: 'downloading', version: update.version, percent: 100 })
             break
         }
       })
-      this.#setState({ phase: 'ready', version: update.version })
+      this.#state.set({ phase: 'ready', version: update.version })
     } catch (error) {
-      this.#setState({ phase: 'error', message: errorMessage(error), during: 'install' })
+      this.#state.set({ phase: 'error', message: errorMessage(error), during: 'install' })
     }
   }
 
@@ -222,15 +218,16 @@ class UpdateServiceImpl implements UpdateService {
     }
   }
 
-  #setState(next: UpdateState): void {
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
+  async #close(update: AvailableUpdate | null): Promise<void> {
+    try {
+      await update?.close()
+    } catch (error) {
+      this.#deps.logger.warn('closing an update failed', error)
     }
   }
 
   async #runCheck(silent: boolean): Promise<void> {
-    const phase = this.#state.phase
+    const phase = this.#state.get().phase
     if (phase === 'checking' || phase === 'downloading' || phase === 'ready') {
       return
     }
@@ -240,31 +237,34 @@ class UpdateServiceImpl implements UpdateService {
     // propagation) or a failure (offline is normal). Only the user's own
     // check shows its lifecycle, and only its answer is authoritative.
     if (!silent) {
-      this.#setState({ phase: 'checking' })
+      this.#state.set({ phase: 'checking' })
     }
-    // Every setState replaces the object, so identity means "nothing else
+    // Every set replaces the object, so identity means "nothing else
     // (e.g. an install of a previously found update) transitioned while we awaited".
-    const baseline = this.#state
+    const baseline = this.#state.get()
     try {
-      const update = await this.#deps.updater.check()
-      if (this.#state !== baseline) {
+      const update: AvailableUpdate | null = await this.#deps.updater.check()
+      if (this.#state.get() !== baseline) {
+        void this.#close(update)
         return
       }
       if (update) {
+        void this.#close(this.#pendingUpdate)
         this.#pendingUpdate = update
-        this.#setState({ phase: 'available', version: update.version })
+        this.#state.set({ phase: 'available', version: update.version })
       } else if (!silent) {
+        void this.#close(this.#pendingUpdate)
         this.#pendingUpdate = null
-        this.#setState({ phase: 'upToDate' })
+        this.#state.set({ phase: 'upToDate' })
       }
     } catch (error) {
-      if (this.#state !== baseline) {
+      if (this.#state.get() !== baseline) {
         return
       }
       if (silent) {
         this.#deps.logger.warn('update check failed (ignored)', error)
       } else {
-        this.#setState({ phase: 'error', message: errorMessage(error), during: 'check' })
+        this.#state.set({ phase: 'error', message: errorMessage(error), during: 'check' })
       }
     }
   }
@@ -279,7 +279,7 @@ const IDLE: UpdateState = { phase: 'idle' }
 class UnsupportedUpdateService implements UpdateService {
   readonly supported = false
 
-  readonly getState = (): UpdateState => IDLE
+  readonly get = (): UpdateState => IDLE
 
   readonly subscribe = (): Unlisten => () => {}
 

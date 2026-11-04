@@ -1,20 +1,25 @@
-import type { PaywallGate } from '@reflect/core'
-import { useActiveSubscription } from '@/mobile/use-active-subscription.ts'
-import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
-import { useClassicAccess } from '@/mobile/use-classic-access.ts'
+import { useEffect } from 'react'
+import type { PaywallPhase } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
+import { useSubscriptionLookups } from '@/mobile/use-active-subscription.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useServiceState } from '@/services/use-service-state.ts'
-
-export type { PaywallGate } from '@reflect/core'
 
 /**
  * Whether to render the paywall. Mounting starts the subscription, Reflect
- * Classic, and install-channel checks that the gate reads.
+ * Classic, and install-channel checks that the gate reads. It re-renders only
+ * when the gate changes. Opening the skippable paywall records today's date.
  */
-export function usePaywallGate(): PaywallGate {
-  useActiveSubscription()
-  useClassicAccess()
-  useAppStoreEnvironment()
-  const { paywall } = useMobileServices()
-  return useServiceState(paywall, paywall.gate)
+export function usePaywallGate(): PaywallPhase {
+  const { paywall, appStoreEnvironment } = useMobileServices()
+  useSubscriptionLookups()
+  useEffect(() => {
+    void appStoreEnvironment.environment()
+  }, [appStoreEnvironment])
+  const gate = useStore(paywall.gate)
+  useEffect(() => {
+    if (gate === 'skippable') {
+      paywall.markSkippableShown()
+    }
+  }, [gate, paywall])
+  return gate
 }

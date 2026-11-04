@@ -163,8 +163,9 @@ targets:
         # Rendered by Tauri from `version` in tauri.conf.json (the prerelease
         # tag is stripped — Apple requires three dot-separated integers), so the
         # version lives in one place and never drifts. Do not hardcode a literal.
-        CFBundleShortVersionString: { { apple.bundle-version-short } }
-        CFBundleVersion: { { apple.bundle-version } }
+        # Quoted so the formatter does not split the braces into YAML maps.
+        CFBundleShortVersionString: '{{apple.bundle-version-short}}'
+        CFBundleVersion: '{{apple.bundle-version}}'
     # Entitlements are hand-maintained files, one per flavor, selected by the
     # per-config CODE_SIGN_ENTITLEMENTS in settingGroups: the release file
     # (reflect-open_iOS.entitlements) carries iCloud Drive document storage
@@ -263,8 +264,8 @@ targets:
       properties:
         # The share sheet's row label (the icon comes from the host app).
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        CFBundleShortVersionString: { { apple.bundle-version-short } }
-        CFBundleVersion: { { apple.bundle-version } }
+        CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           # Storyboard-less principal class; `@objc(ShareViewController)`
@@ -336,8 +337,8 @@ targets:
       path: RecordingWidget/Info.plist
       properties:
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        CFBundleShortVersionString: { { apple.bundle-version-short } }
-        CFBundleVersion: { { apple.bundle-version } }
+        CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     # The widget needs no capability of its own, but the release pipeline

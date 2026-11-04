@@ -170,7 +170,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
   })
 
   it('exposes the transcribing flag while a pass has memos, and notifies subscribers', async () => {
-    const { kit, subject } = await open()
+    const { kit, subject, passes } = await open()
     kit.addRecording(MEMO.audioPath)
     const provider = Promise.withResolvers<string>()
     kit.transcription.setResult(() => provider.promise)
@@ -179,13 +179,37 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     subject.start()
     await flush()
 
-    expect(subject.getTranscribing()).toBe(true)
+    expect(subject.get()).toBe(true)
     expect(notifications).toHaveBeenCalledTimes(1)
 
     provider.resolve('memo transcript')
     await flush()
-    expect(subject.getTranscribing()).toBe(false)
+    expect(subject.get()).toBe(false)
     expect(notifications).toHaveBeenCalledTimes(2)
+
+    // A pass with nothing to transcribe leaves the flag at false: no notification.
+    const passesBefore = passes()
+    subject.schedule()
+    await flush()
+    expect(passes()).toBe(passesBefore + 1)
+    expect(notifications).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops notifying a subscriber once it unsubscribes', async () => {
+    const { kit, subject } = await open()
+    kit.addRecording(MEMO.audioPath)
+    const provider = Promise.withResolvers<string>()
+    kit.transcription.setResult(() => provider.promise)
+    const notifications = vi.fn()
+    const unsubscribe = subject.subscribe(notifications)
+    unsubscribe()
+    subject.start()
+    await flush()
+
+    expect(subject.get()).toBe(true)
+    expect(notifications).not.toHaveBeenCalled()
+    provider.resolve('memo transcript')
+    await flush()
   })
 
   it('surfaces a stop that needs attention once, deduped across retries', async () => {
@@ -204,7 +228,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     kit.activity.emitWake()
     await flush()
     expect(kit.transcription.calls()).toHaveLength(2)
-    expect(kit.progress.getAll()).toHaveLength(1)
+    expect(kit.progress.get()).toHaveLength(1)
   })
 
   it('keeps expected stops silent — offline heals on the next trigger', async () => {
@@ -215,7 +239,7 @@ describe('AudioMemoTranscriptionService.openSession', () => {
     await flush()
 
     expect(kit.transcription.calls()).toHaveLength(1)
-    expect(kit.progress.getAll()).toEqual([])
+    expect(kit.progress.get()).toEqual([])
   })
 
   it('dispose detaches every trigger and flips the pass abort gate', async () => {

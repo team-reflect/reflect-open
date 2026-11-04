@@ -18,17 +18,13 @@ no module-level mutable state.
   every service once and returns **`CoreServices`**. The host calls it once per
   webview, before `createAppServices`. `CoreInternalServices` holds the services
   that only other services use.
-- **`CoreAdapters`** is what the host supplies: the IPC bridge, the platform
-  facts, HTTP, Web storage, path, and the optional logger, clock, id,
-  image codec and deep-link source. The desktop builds them in
+- **`CoreAdapters`** is what the host supplies. The desktop builds them in
   `apps/desktop/src/services/create-desktop-services.ts`
   (`createDesktopAdapters`).
 - **Ports** are the `CoreAdapters` fields that the app layer implements:
-  `progress` (`ProgressPort`), `activity` (`ActivityPort`), both in
-  `ports/activity-port.ts` and `ports/progress-port.ts`, plus `role` (`'main'` or `'note-window'`),
-  `peerIndexWrites` and `createGraphServices`. Core never asks which window it
-  is in any other way.
-- **Per-session services.** `createGraphServices(session, deps, flags)`
+  `progress`, `activity`, `role` and `createGraphServices`.
+  Core never asks which window it is in any other way.
+- **Per-session services.** `createGraphServices`
   (`create-graph-services.ts`) builds the services of one open graph and
   disposes them when `session.signal` aborts. The `GraphLifecycleFlags` pick
   which lifecycles run; the app layer decides them.
@@ -36,15 +32,15 @@ no module-level mutable state.
   `subscribe(listener)`. This package never touches a UI cache.
 - **`@reflect/core/testing`** (`testing/`) holds the test doubles and
   `createTestCoreServices(overrides)`, the whole container built by the
-  production root over test adapters.
+  production root over test adapters. Production code never imports it.
 
 The conventions are in
-[architecture-conventions](../../docs/plans/architecture-conventions.md) §3. To
+[architecture-conventions](../../docs/plans/architecture-conventions.md). To
 add a service, follow [services.md](../../docs/contributing/services.md).
 
 ## The transport
 
-`IpcBridgeService` (`createIpcBridgeService({ transport, logger })`) wraps the
+`IpcBridgeService` wraps the
 host's `IpcBridge` transport (`invoke` + `listen`). It is the single point where
 an untyped IPC response becomes a typed value: every response is zod-validated,
 and every rejection becomes the shared `AppError`. The desktop builds one and
@@ -52,29 +48,10 @@ shares it with the app layer. Code never calls the transport directly.
 
 ## Domains
 
-| Module | What it owns |
-|---|---|
-| `ports/` | The host ports (`ActivityPort`, `ProgressPort`) and the primitives with their default implementations: `LoggerService`, `ClockService`, `IdService`, `PlatformFacts`, `StorageService`, `HttpService`, `PathService`, `AppInfoService`. |
-| `graph/` | Graph file storage: path helpers, the typed file services (`NoteFileService`, `AssetStoreService`), note creation and link resolution, the capture inbox, and the open graph (`GraphSessionService`). |
-| `documents/` | Open notes: `NoteSessionService`, `OpenDocumentsService`, `NoteDocumentService`, moves and title renames, `NoteActionsService`, attachments and templates. |
-| `markdown/` | The document model: frontmatter, the Lezer grammar with `[[wiki link]]`, extraction (`parseNote`), source-level edits. |
-| `indexing/` | The SQLite projection: `IndexLifecycleService`, `IndexStoreService`, `FileChangeService`, and the read services over `DatabaseService` (`IndexQueryService`, `SearchService`, `BacklinkService`, ...). |
-| `daily/` | `DailyNoteService`: today, which days have a daily note, the wake onto a new day. |
-| `tasks/` | `TaskService` and the pure Tasks-view model. |
-| `search/` | The updated-at filter presets of note search. |
-| `navigation/` | The `reflect://` protocol: parsing, formatting, and `DeepLinkIntakeService` (intake and resolution to a `DeepLinkTarget`). Routes live in `@reflect/app`. |
-| `ai/` | BYOK providers, the one-shot tasks (selection transform, describers, transcription), and `ai/chat/`. |
-| `privacy/` | The `private: true` gate: `PrivacyService` and the `CloudSafe<T>` brand. |
-| `capture/`, `assets/`, `audio/` | The background pipelines of an open graph: link capture, asset descriptions, audio memos. |
-| `embeddings/` | Local semantic search: `EmbeddingIndexService`, `RetrievalService`, `SemanticSearchService`. |
-| `sync/` | Git backup (`BackupService`, the sync engine, the GitHub services) and iCloud (`ICloudSyncService`, `ICloudDownloadService`). |
-| `calendar/` | `CalendarService` (live EventKit reads) and the display policy of the events panel. |
-| `contacts/` | `ContactsService`, `PersonNoteService`, `MeetingService`, `ContactSuggestionService`, and the matching rules. |
-| `settings/` | The settings schema and `SettingsService`. |
-| `monetization/` | The mobile subscription, paywall and App Store environment services (`CoreServices.mobile`). |
-| `ipc/` | `IpcBridgeService` and the typed plugin bindings. |
-| `testing/` | The `@reflect/core/testing` entry. Never imported by production code. |
-| `errors.ts` | The `AppError` discriminated union shared with Rust. |
+Each directory under `src/` is one domain. A few to know:
+
+- `privacy/` is the `private: true` gate: `PrivacyService` and the `CloudSafe<T>` brand.
+- `errors.ts` holds the `AppError` discriminated union shared with Rust.
 
 ## Generations
 

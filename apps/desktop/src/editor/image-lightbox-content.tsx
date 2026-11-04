@@ -18,17 +18,36 @@ export function ImageLightboxContent({
   onClose,
   onOpenImage,
 }: ImageLightboxContentProps): ReactElement {
-  const dismissDrag = useImageDismissDrag({ active: true, enabled: mobileSurface, onClose })
+  const {
+    chromeStyle,
+    chromeRef,
+    backdropRef,
+    backdropStyle,
+    handlers,
+    finishSettle,
+    imageRef,
+    imageStyle,
+  } = useImageDismissDrag({
+    active: true,
+    enabled: mobileSurface,
+    onClose,
+  })
 
   return (
     <>
       {mobileSurface ? (
-        <div aria-hidden className="absolute inset-0 bg-black" style={dismissDrag.backdropStyle} />
+        <div
+          ref={backdropRef}
+          aria-hidden
+          className="absolute inset-0 bg-black"
+          style={backdropStyle}
+        />
       ) : null}
       {mobileSurface ? (
         <LightboxChromeButton
           side="left"
-          wrapperStyle={dismissDrag.chromeStyle}
+          wrapperRef={chromeRef}
+          wrapperStyle={chromeStyle}
           size="icon-lg"
           aria-label="Close"
           onClick={onClose}
@@ -39,7 +58,8 @@ export function ImageLightboxContent({
       {onOpenImage ? (
         <LightboxChromeButton
           side="right"
-          wrapperStyle={dismissDrag.chromeStyle}
+          wrapperRef={chromeRef}
+          wrapperStyle={chromeStyle}
           size="sm"
           className="h-9 px-3"
           onClick={onOpenImage}
@@ -55,13 +75,14 @@ export function ImageLightboxContent({
           'absolute inset-0 flex cursor-zoom-out items-center justify-center overflow-hidden bg-transparent',
           mobileSurface ? 'touch-none p-0' : 'p-6',
         )}
-        {...dismissDrag.handlers}
+        {...handlers}
       >
         <LightboxImage
+          ref={imageRef}
           item={item}
           className="select-none"
-          onTransitionEnd={dismissDrag.finishSettle}
-          style={dismissDrag.imageStyle}
+          onTransitionEnd={finishSettle}
+          style={imageStyle}
         />
       </button>
     </>

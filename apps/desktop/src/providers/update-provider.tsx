@@ -1,10 +1,10 @@
 import { createContext, use, useEffect, useMemo, type ReactElement, type ReactNode } from 'react'
 import type { UpdateService, UpdateState } from '@reflect/app'
 import { attachUpdateToasts } from '@/components/update-toasts.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
 
-type UpdateContextValue = { state: UpdateState } & Pick<
+type UpdateContextValue = Pick<
   UpdateService,
   'supported' | 'checkNow' | 'install' | 'restart' | 'retryAction'
 >
@@ -22,8 +22,7 @@ interface UpdateProviderProps {
 }
 
 /**
- * Thin React shim over the app's `UpdateService`, surfaced through
- * `useServiceState`. Mounted above the graph gate so update checks run
+ * Thin React shim over the app's `UpdateService`. Mounted above the graph gate so update checks run
  * from first launch, before any graph is open.
  */
 export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): ReactElement {
@@ -47,25 +46,22 @@ export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): Re
     }
   }, [update, supported, resolvedAutoCheck, logger])
 
-  const state = useServiceState(update, update.getState)
-
   const value = useMemo<UpdateContextValue>(
     () => ({
-      state,
       supported: update.supported,
       checkNow: () => update.checkNow(),
       install: () => update.install(),
       restart: () => update.restart(),
       retryAction: () => update.retryAction(),
     }),
-    [update, state],
+    [update],
   )
 
   return <UpdateContext value={value}>{children}</UpdateContext>
 }
 
 /**
- * Update state + actions; must be used under an {@link UpdateProvider}.
+ * Update actions; must be used under an {@link UpdateProvider}.
  */
 export function useUpdate(): UpdateContextValue {
   const value = use(UpdateContext)
@@ -73,4 +69,11 @@ export function useUpdate(): UpdateContextValue {
     throw new Error('useUpdate must be used within an UpdateProvider')
   }
   return value
+}
+
+/**
+ * The update lifecycle state.
+ */
+export function useUpdateState(): UpdateState {
+  return useStore(useAppServices().update)
 }

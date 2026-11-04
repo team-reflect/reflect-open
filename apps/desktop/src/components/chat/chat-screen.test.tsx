@@ -20,13 +20,12 @@ import {
   type TestChatGraphContextService,
   type TestOpenGraph,
 } from '@reflect/core/testing'
-import { useChatSession, type ChatContextValue } from '@/providers/chat-provider.tsx'
-import type { Route } from '@/routing/route.ts'
+import { useChatActions, type ChatActions } from '@/providers/chat-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ChatScreen } from './chat-screen.tsx'
-import { deepLinkForRoute } from '@reflect/app'
+import { deepLinkForRoute, type Route } from '@reflect/app'
 
 /**
  * The chat view over a faked engine: the provider stack, the chat session and
@@ -97,12 +96,12 @@ function dropFiles(target: Element, files: File[]): boolean {
   )
 }
 
-const probedSendRef: RefObject<ChatContextValue['send'] | null> = createRef()
-const probedNewChatRef: RefObject<ChatContextValue['newChat'] | null> = createRef()
+const probedSendRef: RefObject<ChatActions['send'] | null> = createRef()
+const probedNewChatRef: RefObject<ChatActions['newChat'] | null> = createRef()
 const probedRouteRef: RefObject<Route | null> = createRef()
 
 function SendProbe(): ReactElement | null {
-  const { send, newChat } = useChatSession()
+  const { send, newChat } = useChatActions()
 
   useLayoutEffect(() => {
     probedSendRef.current = send

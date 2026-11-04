@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { onTestFinished } from 'vitest'
 import { render, renderHook, type RenderHookResult, type RenderResult } from 'vitest-browser-react'
-import type { AppServices, MobileOnboardingState } from '@reflect/app'
+import type { AppServices, MobileOnboardingState, Route } from '@reflect/app'
 import {
   createTestAppServices,
   createTestOperationsService,
@@ -33,7 +33,6 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { registerAppCommands } from '@/lib/commands/app-commands.ts'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
-import type { Route } from '@/routing/route.ts'
 import { RouterProvider } from '@/routing/router.tsx'
 import { AppServicesProvider, CoreServicesProvider } from '@/services/services-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -56,9 +55,13 @@ export interface RenderInAppOptions {
    */
   graph?: TestOpenGraph | null | undefined
   /**
-   * Reported over the graph state, e.g. `{ indexing: true }`, `{ error }`, `{ recents }`.
+   * Reported over the graph state, e.g. `{ error }`, `{ recents }`.
    */
   graphState?: Partial<GraphSessionState<GraphServices>>
+  /**
+   * Reports the index lifecycle as reconciling, through `core.indexLifecycle.setProgress()`.
+   */
+  indexing?: boolean
   /**
    * The stored settings document, loaded before the first render.
    */
@@ -97,7 +100,7 @@ export interface RenderInAppOptions {
    * Mount only `CoreServicesProvider` and the query client, for a test of a
    * provider this helper otherwise mounts, or of one that needs no graph.
    * `core` keeps its own graph session, and the settings load is not awaited.
-   * Not with `graph`, `graphState`, `route` or `sync`.
+   * Not with `graph`, `graphState`, `indexing`, `route` or `sync`.
    */
   servicesOnly?: boolean
 }
@@ -181,6 +184,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
     servicesOnly &&
     (options?.graph !== undefined ||
       options?.graphState !== undefined ||
+      options?.indexing !== undefined ||
       options?.route !== undefined ||
       options?.sync !== undefined)
   ) {
@@ -214,6 +218,12 @@ async function prepare(options: AnyOptions | undefined): Promise<
     session.setGraph(options?.graph === undefined ? {} : options.graph)
     if (options?.graphState !== undefined) {
       session.setState(options.graphState)
+    }
+    if (options?.indexing === true) {
+      if (!('setProgress' in core.indexLifecycle)) {
+        throw new Error('renderInApp: `indexing` needs a test index lifecycle in `core`')
+      }
+      ;(core.indexLifecycle as TestCoreServices['indexLifecycle']).setProgress('reconciling')
     }
   }
 
@@ -279,7 +289,7 @@ async function prepare(options: AnyOptions | undefined): Promise<
  * the graph services) and `RouterProvider`. All of them read `core`, which defaults to test doubles. Tests drive and observe
  * the app through the returned `core`: `core.graphSession.setGraph()`,
  * `core.settings.get()`, `appServices.navigation.navigations()`,
- * `core.progress.getAll()`.
+ * `core.progress.get()`.
  *
  * Pass your own `core` to replace or spy on a service before the first render.
  */

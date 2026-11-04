@@ -102,7 +102,7 @@ describe('PublishedUrlSection', () => {
     await vi.waitFor(() => expect(clipboard.writes()).toEqual([url]))
     await vi.waitFor(() => expect(operations.findByLabel('Published URL copied')).toBeDefined())
     await operations.clock.advance(MIN_VISIBLE_MS)
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
   })
 
   it('updates the published gist from the URL section icon', async () => {

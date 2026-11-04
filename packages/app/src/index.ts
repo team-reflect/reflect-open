@@ -22,13 +22,22 @@ export {
   MIN_VISIBLE_MS,
   type OperationsService,
 } from './app/operations-service.ts'
-export { type UpdaterAdapter, type UpdateService, type UpdateState } from './app/update-service.ts'
+export {
+  type AvailableUpdate,
+  type UpdaterAdapter,
+  type UpdateService,
+  type UpdateState,
+} from './app/update-service.ts'
 export {
   createThemeService,
   THEME_PREFERENCE_CACHE_KEY,
   type ResolvedTheme,
   type ThemeService,
+  type ThemeState,
 } from './settings/theme-service.ts'
+export { type WhatsNewItem } from './whats-new/whats-new-content.ts'
+export { type WhatsNewPhase, type WhatsNewService } from './whats-new/whats-new-service.ts'
+export { type FeedbackChannel, type ReviewService } from './review/review-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
   type OpenerService,
@@ -85,32 +94,29 @@ export { dailyArrivalIntent } from './daily/daily-arrivals.ts'
 export {
   createDayWindow,
   dateAtIndex,
-  FUTURE_DAYS,
+  extendDayWindowBack,
   indexOfDate,
   indexWithin,
   neighborDate,
   PAST_DAYS,
+  type DayScrollPosition,
   type DayWindow,
   type DayWindowRadius,
 } from './daily/day-window.ts'
 export {
-  addMonths,
   buildMonthGrid,
-  monthLabel,
-  monthOf,
-  monthShortLabel,
-  weekdayLabels,
+  formatMonthLabel,
+  formatShortMonthLabel,
+  getWeekdayLabels,
   type MonthGrid,
   type MonthGridCell,
 } from './daily/month-grid.ts'
 export {
   createWeekWindow,
   monthPickTarget,
-  WEEK_WINDOW_RADIUS,
   weekAtIndex,
   weekIndexOf,
   weekOf,
-  weekStartOf,
   type WeekWindow,
 } from './daily/week-window.ts'
 export { type Command, type CommandService } from './commands/command-service.ts'
@@ -127,12 +133,7 @@ export {
   type NativeMenuService,
   type NativeSubmenu,
 } from './commands/native-menu-service.ts'
-export {
-  buildPaletteSections,
-  type NoteEntry,
-  type PaletteHit,
-  type PaletteSections,
-} from './search/palette-entries.ts'
+export { type NoteEntry, type PaletteHit, type PaletteSections } from './search/palette-entries.ts'
 export { type PaletteSearchService } from './search/palette-search-service.ts'
 export { deepLinkForRoute } from './navigation/deep-link-format.ts'
 export { type DeepLinkRouter } from './navigation/deep-link-router.ts'
@@ -141,7 +142,11 @@ export {
   type LinkNavigationHost,
   type LinkNavigationService,
 } from './navigation/link-navigation-service.ts'
-export { type NavigateOptions, type NavigationService } from './navigation/navigation-service.ts'
+export {
+  type NavigateOptions,
+  type NavigationService,
+  type ScrollPosition,
+} from './navigation/navigation-service.ts'
 export {
   effectiveDailyDate,
   focusedNotePathForRoute,
@@ -167,11 +172,10 @@ export {
   type PickFolderOptions,
 } from './app/dialog-service.ts'
 export {
-  createPlatformService,
   type ColorScheme,
   type PlatformMedia,
-  type PlatformService,
-} from './app/platform-service.ts'
+  type SystemPreferencesService,
+} from './app/system-preferences-service.ts'
 export { type GraphBootService } from './graph/graph-boot-service.ts'
 export {
   type MobileOnboardingService,

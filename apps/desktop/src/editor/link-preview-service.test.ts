@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import type { LinkPreviewResolver } from '@meowdown/core'
 import {
   createLinkPreviewService,
-  type LinkPreviewSession,
   type NoteDocumentService,
   type parseLinkPreviewMeta,
   type WebFetchService,
@@ -15,7 +14,7 @@ import {
 } from '@reflect/core/testing'
 
 /**
- * The boundaries of the resolver pipeline that `useLinkPreview` gets from `LinkPreviewService`.
+ * The boundaries of the resolver pipeline that `NotePane` gets from `LinkPreviewService`.
  */
 interface LinkPreviewResolverDependencies {
   /**
@@ -37,11 +36,10 @@ interface LinkPreviewResolverDependencies {
 }
 
 /**
- * One editor-session resolver of a `LinkPreviewService` over `dependencies`.
+ * One note resolver of a `LinkPreviewService` over `dependencies`.
  */
 function createNoteLinkPreviewResolver(
-  session: LinkPreviewSession,
-  currentSession: () => LinkPreviewSession | null,
+  path: string,
   dependencies: LinkPreviewResolverDependencies,
 ): LinkPreviewResolver {
   const { noteDocuments, privacy, webFetch } = createTestCoreServices({
@@ -56,14 +54,10 @@ function createNoteLinkPreviewResolver(
     webFetch,
     parseMetadata: dependencies.parseMetadata,
     graphSession: createTestGraphSessionService({ graph: { generation: 7 } }),
-  }).createResolver(session, currentSession)
+  }).createResolver(path)
 }
 
-const session: LinkPreviewSession = {
-  path: 'notes/a.md',
-  graphKey: '/graph-a',
-  sessionEpoch: 3,
-}
+const notePath = 'notes/a.md'
 const publicSource = '---\nprivate: false\n---\n# Public'
 const privateSource = '---\nprivate: true\n---\n# Private'
 const page = {
@@ -88,9 +82,9 @@ function dependencies(
 }
 
 describe('createNoteLinkPreviewResolver', () => {
-  it('caches successes and deduplicates concurrent requests per session', async () => {
+  it('caches successes and deduplicates concurrent requests per resolver', async () => {
     const deps = dependencies()
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
     const first = resolver('https://example.com/page')
     const second = resolver('https://example.com/page')
 
@@ -109,7 +103,7 @@ describe('createNoteLinkPreviewResolver', () => {
   it('revalidates privacy before returning a cached preview', async () => {
     let source = publicSource
     const deps = dependencies({ readSource: vi.fn(() => Promise.resolve(source)) })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
 
     await expect(resolver('https://example.com')).resolves.toMatchObject({
       title: 'Example title',
@@ -122,7 +116,7 @@ describe('createNoteLinkPreviewResolver', () => {
   it('does not cache an initial privacy denial', async () => {
     let source = privateSource
     const deps = dependencies({ readSource: vi.fn(() => Promise.resolve(source)) })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
 
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     source = publicSource
@@ -153,7 +147,7 @@ describe('createNoteLinkPreviewResolver', () => {
       readSource: vi.fn(() => Promise.resolve(source)),
       parseMetadata,
     })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
 
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     source = publicSource
@@ -165,7 +159,7 @@ describe('createNoteLinkPreviewResolver', () => {
 
   it('caches permanent failed lookups and refuses non-web destinations', async () => {
     const deps = dependencies({ fetchHtml: vi.fn().mockRejectedValue(new Error('offline')) })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     await expect(resolver('file:///etc/passwd')).resolves.toBeUndefined()
@@ -178,7 +172,7 @@ describe('createNoteLinkPreviewResolver', () => {
       .mockRejectedValueOnce(new AppError('network', 'offline'))
       .mockResolvedValue(page)
     const deps = dependencies({ fetchHtml })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
 
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     await expect(resolver('https://example.com')).resolves.toMatchObject({
@@ -193,7 +187,7 @@ describe('createNoteLinkPreviewResolver', () => {
       .mockRejectedValueOnce(new AppError('network', 'offline'))
       .mockResolvedValue('data:image/png;base64,aGVsbG8=')
     const deps = dependencies({ fetchIcon })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
 
     await expect(resolver('https://example.com')).resolves.toEqual({
       title: 'Example title',
@@ -212,7 +206,7 @@ describe('createNoteLinkPreviewResolver', () => {
         throw new Error('malformed page URL')
       }),
     })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
@@ -226,7 +220,7 @@ describe('createNoteLinkPreviewResolver', () => {
       vi.fn().mockRejectedValue(new Error('unreadable')),
     ]) {
       const deps = dependencies({ readSource })
-      const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+      const resolver = createNoteLinkPreviewResolver(notePath, deps)
       await expect(resolver('https://example.com')).resolves.toBeUndefined()
       expect(deps.fetchHtml).not.toHaveBeenCalled()
       expect(deps.fetchIcon).not.toHaveBeenCalled()
@@ -248,23 +242,10 @@ describe('createNoteLinkPreviewResolver', () => {
     const readSource = vi.fn()
     for (const source of sources) readSource.mockResolvedValueOnce(source)
     const deps = dependencies({ readSource })
-    const resolver = createNoteLinkPreviewResolver(session, () => session, deps)
+    const resolver = createNoteLinkPreviewResolver(notePath, deps)
     await expect(resolver('https://example.com')).resolves.toBeUndefined()
     expect(readSource).toHaveBeenCalledTimes(sources.length)
     expect(deps.fetchHtml).toHaveBeenCalledTimes(1)
     expect(deps.fetchIcon).toHaveBeenCalledTimes(expectedIconCalls)
-  })
-
-  it('discards stale graph and editor-session work before a later request', async () => {
-    let current: LinkPreviewSession | null = session
-    const fetchHtml = vi.fn(() => {
-      current = { ...session, graphKey: '/graph-b' }
-      return Promise.resolve(page)
-    })
-    const deps = dependencies({ fetchHtml })
-    const resolver = createNoteLinkPreviewResolver(session, () => current, deps)
-    await expect(resolver('https://example.com')).resolves.toBeUndefined()
-    expect(deps.fetchIcon).not.toHaveBeenCalled()
-    expect(deps.readSource).toHaveBeenCalledTimes(1)
   })
 })

@@ -12,16 +12,15 @@
     "test": "vitest run --config ../../vitest.config.ts --project app"
   },
   "dependencies": {
-    "@ocavue/utils": "^1.9.0",
+    "@ocavue/utils": "^1.11.0",
     "@reflect/core": "workspace:*",
     "@reflect/utils": "workspace:*",
-    "date-fns": "^4.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.0",
     "vitest-fail-on-console": "^0.10.1"
   }
 }

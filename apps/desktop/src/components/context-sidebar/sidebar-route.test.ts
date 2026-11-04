@@ -19,7 +19,7 @@ describe('contextSidebarTarget', () => {
   })
 
   it('trusts the daily date — the router normalizes malformed ones away', () => {
-    // normalizeRoute (routing/route.ts) collapses an impossible daily date to
+    // normalizeRoute (`@reflect/app`) collapses an impossible daily date to
     // the today route before it can reach a view; see router.test.tsx.
     expect(contextSidebarTarget({ kind: 'daily', date: '2026-06-15' }, TODAY)).toEqual({
       kind: 'daily',

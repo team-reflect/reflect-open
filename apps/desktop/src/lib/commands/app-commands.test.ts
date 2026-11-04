@@ -14,9 +14,7 @@ import {
   type TestEmbeddingIndexService,
   type TestEmbeddingRuntimeService,
 } from '@reflect/core/testing'
-import { deepLinkForRoute } from '@reflect/app'
-import { notePathForRoute, type Route } from '@/routing/route.ts'
-import type { NavigateOptions } from '@/routing/router.tsx'
+import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } from '@reflect/app'
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
 import type { CommandContext } from './types.ts'
 
@@ -337,7 +335,7 @@ describe('app commands', () => {
     await command('note.copyDeepLink').run(context)
     expect(deepLinkFor).not.toHaveBeenCalled()
     expect(appLayer.clipboard.writes()).toEqual([])
-    expect(core.progress.getAll()).toEqual([])
+    expect(core.progress.get()).toEqual([])
   })
 
   it('note.copyDeepLink no-ops on note-less routes', async () => {

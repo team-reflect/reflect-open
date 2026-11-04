@@ -1,3 +1,5 @@
+import { isIsoDate } from '@reflect/utils'
+
 /**
  * Pure helpers for the graph's on-disk path conventions (Plan 02). These build
  * and recognize **graph-relative** paths; the Rust layer owns the root and the
@@ -89,38 +91,11 @@ function asciiLowerCase(value: string): string {
 
 /** Matches a daily-note path and captures its ISO date. */
 const DAILY_PATH_RE = /^daily\/(\d{4}-\d{2}-\d{2})\.md$/
-/** A bare ISO date (`YYYY-MM-DD`). */
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-
-/**
- * Is this a real calendar date, not merely a `YYYY-MM-DD`-shaped string?
- * `daily/2026-02-31.md` is a legal filename and an ordinary note; it must
- * never claim a date that no calendar has. Rejects well-formatted but invalid
- * dates (e.g. 2026-13-99) by round-tripping through UTC and comparing the
- * components.
- */
-export function isCalendarDate(date: string): boolean {
-  if (!ISO_DATE_RE.test(date)) {
-    return false
-  }
-  // The regex guarantees three numeric parts, so the destructure can't yield
-  // undefined. `setUTCFullYear` rather than `Date.UTC`: the latter remaps
-  // years 0-99 to 1900-1999, which would reject real dates like 0099-12-31.
-  const [year, month, day] = date.split('-').map(Number) as [number, number, number]
-  const utc = new Date(0)
-  utc.setUTCFullYear(year, month - 1, day)
-  return (
-    utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day
-  )
-}
 
 /** Graph-relative path to a daily note for an ISO `YYYY-MM-DD` date. */
 export function dailyPath(date: string): string {
-  if (!ISO_DATE_RE.test(date)) {
+  if (!isIsoDate(date)) {
     throw new Error(`dailyPath expects an ISO YYYY-MM-DD date, got: ${date}`)
-  }
-  if (!isCalendarDate(date)) {
-    throw new Error(`dailyPath expects a valid calendar date, got: ${date}`)
   }
   return `${DAILY_DIR}/${date}.md`
 }
@@ -153,6 +128,21 @@ export function templatePath(slug: string): string {
 /** Graph-relative path to an attachment under `assets/`. */
 export function assetPath(name: string): string {
   return `${ASSETS_DIR}/${name}`
+}
+
+/**
+ * The graph-relative path of `desiredName` under `assets/`, or of the first
+ * `-2`-suffixed variant that `exists` rejects, like Rust's `persist_unique`.
+ */
+export function pickFreeAssetPath(desiredName: string, exists: (path: string) => boolean): string {
+  const dot = desiredName.lastIndexOf('.')
+  const stem = dot > 0 ? desiredName.slice(0, dot) : desiredName
+  const extension = dot > 0 ? desiredName.slice(dot) : ''
+  let path = assetPath(desiredName)
+  for (let suffix = 2; exists(path); suffix++) {
+    path = assetPath(`${stem}-${suffix}${extension}`)
+  }
+  return path
 }
 
 /** Graph-relative path to a stored recording under `audio-memos/`. */

@@ -1,17 +1,15 @@
 import { useEffect, type ReactElement } from 'react'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useEditorFullWidth } from '@/providers/settings-provider.tsx'
 
 /**
  * Applies the desktop note-width preference to every note surface.
  *
- * The shared `.reflect-content-gutter` class is used by daily notes,
- * standalone notes, and secondary note windows. Mirroring the setting onto
- * the document root lets one CSS variable update all of those surfaces while
- * leaving the mobile-specific gutter unchanged.
+ * Mirrors the setting onto the document root, so one CSS variable updates
+ * every surface with the shared `.reflect-content-gutter` class. The
+ * mobile-specific gutter is unchanged.
  */
 export function EditorFullWidthEffect(): ReactElement | null {
-  const { settings } = useSettings()
-  const fullWidth = settings.editorFullWidth
+  const fullWidth = useEditorFullWidth()
 
   useEffect(() => {
     const root = document.documentElement

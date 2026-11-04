@@ -118,16 +118,12 @@ const architecturePlugin = {
 
 /** Mocked in any desktop test: pure UI children and heavy children. */
 const DESKTOP_VI_MOCK_ALLOW = [
-  // Vaul's drag and animation are verified on a device; tests use a passthrough.
-  '@/components/ui/drawer.tsx',
   // The Base UI toast manager needs its viewport; tests record the `toast.add` calls.
   '@/components/ui/toast.tsx',
   // The ProseKit editor: a test of a screen around it uses a probe.
   '@/editor/note-editor.tsx',
   // The read-only Markdown renderer loads the same editor stack.
   '@/editor/markdown-preview.tsx',
-  // The carousel engine measures real layout; tests script its API.
-  'embla-carousel-react',
 ]
 
 /** Extra specifiers for one desktop test file, each with its reason. */
@@ -142,16 +138,6 @@ const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
   // The real resolver only lets `reflect-asset:` media through, which no test
   // browser can load; the mock also widens `X_MEDIA_URL_PROTOCOLS`.
   'apps/desktop/src/editor/note-editor.test.tsx': ['@/editor/use-x-post-resolver.ts'],
-
-  // Presentation tests over every phase of the recorder. The context value is
-  // scripted; the session behind it has its own tests in core and in
-  // `providers/audio-memo-provider.test.tsx` / `mobile/audio-memo-provider.test.tsx`.
-  'apps/desktop/src/components/audio-memo/audio-memo-button.test.tsx': [
-    '@/providers/audio-memo-provider.tsx',
-  ],
-  'apps/desktop/src/mobile/daily-capture-menu.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
-  'apps/desktop/src/mobile/recording-drawer.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
-  'apps/desktop/src/mobile/mobile-screen.test.tsx': ['@/mobile/audio-memo-provider.tsx'],
 }
 
 /**
@@ -287,7 +273,18 @@ export default defineESLintConfig(
   {
     files: [`**/*.${SOURCE_EXTENSIONS}`],
     plugins: { architecture: architecturePlugin },
-    rules: { 'architecture/maybe-promise': 'error' },
+    rules: {
+      'architecture/maybe-promise': 'error',
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'AbortSignal',
+          property: 'any',
+          message:
+            'Use `anySignal` (`apps/desktop/src/lib/any-signal.ts`): WebKit can collect an `AbortSignal.any` result that only listener options hold.',
+        },
+      ],
+    },
   },
   {
     files: [`packages/core/**/*.${SOURCE_EXTENSIONS}`],

@@ -1,50 +1,43 @@
 # Porting backlink hover previews
 
 **Status: ported.** Resting the pointer on a wiki link in a primary desktop
-note pane now opens a compact, passive preview of the existing local target.
-Meowdown owns the editor hover lifecycle and overlay; Reflect owns
-side-effect-free resolution, generation-pinned reads, and local-only content.
+note pane opens a compact, passive preview of the existing local target.
+Meowdown owns the hover lifecycle and overlay; Reflect owns side-effect-free
+resolution, generation-pinned reads, and local-only content.
 
-This is separate from both the `[[` autocomplete menu documented in
-[Reflect v1: Backlink Menu & Date Generator](../reflect-v1-backlink-menu.md)
-and the incoming-backlinks panel delivered by
-[Plan 07](../plans/07-backlinks.md). In v1 terminology the inline link itself
-was a "backlink"; this document calls it a **wiki link** where that avoids
-confusion.
+This is separate from the `[[` autocomplete menu
+([Reflect v1: Backlink Menu & Date Generator](../reflect-v1-backlink-menu.md))
+and the incoming-backlinks panel ([Plan 07](../plans/07-backlinks.md)). v1
+called the inline link a "backlink"; this doc says **wiki link** where that
+avoids confusion.
 
 ## Legacy reference
 
-The behavior below was verified against:
-
-- the Reflect v1 repository at
-  `a7fa07f6792268f5c15dac35297d39f97e22149c`;
-- the reflect-editor repository at
-  `6456d2293879e01420fd7bea1a712f39057eb8dc` (`0.28.1`, the version used by
-  that Reflect snapshot).
+Verified against Reflect v1 at `a7fa07f6792268f5c15dac35297d39f97e22149c`
+and reflect-editor at `6456d2293879e01420fd7bea1a712f39057eb8dc` (`0.28.1`,
+the version that snapshot used).
 
 ### What the user saw
 
-- Hovering a resolved wiki link in either a regular note or a daily note
-  opened a read-only preview of the linked note. It was not wired to incoming
-  backlink snippets, tags, external links, or static/public views.
-- There was no intentional dwell delay. The card appeared after the local
-  target-note lookup. Leaving emitted a dismiss event immediately, but the app
-  redundantly repeated the async lookup before clearing the card.
-- The card followed the pointer, nominally 20px below and to its right. It
-  shifted or flipped to remain at least 8px inside the viewport.
-- A normal note rendered its entire stored editor document, including its
-  title, at extra-small editor typography. The viewport was a fixed
-  `350 × 200px`, clipped with no scroll or fade.
-- A note backed by v1's ASIN/book store showed a special 300px-wide book card:
-  an `80 × 128px` cover, authors, and a truncated title linking to Amazon.
-- Missing targets showed nothing. Empty notes could produce an empty card;
-  loading and read failures had no explicit state.
-- The preview was pointer-only. Wiki links had `tabindex="-1"`, and there was
-  no keyboard-focus or touch equivalent.
+- Hovering a resolved wiki link in a regular or daily note opened a
+  read-only preview of the target. Not wired to backlink snippets, tags,
+  external links, or static/public views.
+- No dwell delay: the card appeared after the local lookup. Leave dismissed
+  at once (the app redundantly repeated the lookup before clearing).
+- The card followed the pointer, nominally 20px below-right, shifting or
+  flipping to stay 8px inside the viewport.
+- A normal note rendered its whole stored document, title included, at
+  extra-small typography in a fixed `350 × 200px` viewport, clipped with no
+  scroll or fade.
+- ASIN/book notes showed a 300px book card: `80 × 128px` cover, authors,
+  and a truncated title linking to Amazon.
+- Missing targets showed nothing; empty notes could show an empty card; no
+  loading or error state.
+- Pointer-only: wiki links had `tabindex="-1"`, with no keyboard or touch
+  equivalent.
 
-The same preview component was reused by v1's graph map, which had its own
-event source. That reuse is not part of this port because v2 has no graph-map
-surface yet.
+v1's graph map reused the component; that is not ported because v2 has no
+graph map yet.
 
 ### How it was wired
 
@@ -55,24 +48,22 @@ surface yet.
 | `reflect/components/pointer-card/pointer-card-anchor.tsx`, `note-preview/note-preview-popover.tsx`, and `ui/popover.tsx` | Followed the pointer with a virtual Radix anchor, handled collisions, portaled the card, and preserved editor focus. |
 | `reflect/components/note-preview/popover/note-content.tsx`, `note-book.tsx`, and `utils.ts` | Rendered stored `note.documentHtml` in the clipped static editor or selected the ASIN-specific book card. |
 
-Three historical fixes capture behavior a future implementation can easily
-miss:
+Historical fixes worth not losing:
 
-- `reflect@368869e73` made the preview follow the pointer.
-- `reflect@689c3e957` enabled viewport collision avoidance.
-- `reflect-editor@8453e8f3` moved hover tracking out of per-node listeners so
-  deleting the currently hovered link still emitted leave.
+- `reflect@368869e73`: the preview follows the pointer.
+- `reflect@689c3e957`: viewport collision avoidance.
+- `reflect-editor@8453e8f3`: hover tracking moved out of per-node
+  listeners, so deleting the hovered link still emits leave.
 
-The final feature had no meaningful direct tests. Its app handler also had no
-stale-request guard: a slow lookup for A could reopen A after leave or replace
-a newer preview for B. It rendered the full stored document despite clipping
-it to 200px, so large notes and remote media could be expensive, and pending
-edits were not guaranteed to appear. These are legacy hazards, not contracts.
+Legacy hazards, not contracts: no meaningful tests; no stale-request guard
+(a slow lookup for A could reopen A after leave or replace B's preview);
+the full stored document rendered despite 200px clipping, so large notes
+and remote media were expensive; pending edits might not appear.
 
 ## Porting contract
 
-The product value is a quick glimpse of a linked note without leaving the note
-being edited. Preserve that value while adopting v2's boundaries:
+The value is a quick glimpse of a linked note without leaving the current
+one.
 
 | Preserve from v1 | V2 rule |
 | --- | --- |
@@ -83,142 +74,114 @@ being edited. Preserve that value while adopting v2's boundaries:
 | Dismissal when the link or editor goes away | Close on leave, link deletion/rewrite, navigation, graph switch, window close, or unmount; stale async work can never reopen it. |
 | Generic note content | Do not port the ASIN/book card in the first pass; v2 has no corresponding store. Graph-map reuse waits for a map surface. |
 
-Do not add a mobile long-press as part of this work. A touch preview gesture
-would need its own interaction design.
+No mobile long-press: a touch preview needs its own interaction design.
 
 ## Implemented v2 shape
 
 The split follows [Editor architecture](../contributing/editor-architecture.md),
-[Plan 05](../plans/05-markdown-editor.md), and the porting convention that
-editor-level overlay UI belongs upstream in Meowdown.
+[Plan 05](../plans/05-markdown-editor.md), and the convention that
+editor-level overlays belong upstream in Meowdown.
 
 ### 1. Add a Meowdown wiki-link hover component
 
-Meowdown already has the relevant machinery for ordinary Markdown links:
-
-- `packages/core/src/extensions/mark-hover.ts` delegates mark enter/leave;
-- `packages/core/src/extensions/link-hover.ts` specializes it for links;
-- `packages/react/src/components/link-menu.tsx` derives a stable virtual
-  anchor, positions the overlay, and handles delayed open/close.
-
-Add the wiki-link equivalent alongside the existing `onWikilinkClick`
-contract. Meowdown should own hit testing, a stable link-range anchor, hover
-lifecycle, viewport collision, and focus behavior, while accepting a host
-renderer/slot for the target-specific body. Reflect should not attach
-listeners to Meowdown's private `.md-wikilink-*` DOM classes or build a second
-overlay lifecycle around the event.
-
-The Meowdown layer must emit leave when the hovered mark is deleted or
-replaced. That is the regression `reflect-editor@8453e8f3` fixed.
+Meowdown already had this for ordinary links (`mark-hover.ts`,
+`link-hover.ts`, `link-menu.tsx`). The wiki-link equivalent sits beside
+`onWikilinkClick`: Meowdown owns hit testing, a stable link-range anchor,
+hover lifecycle, collision, and focus, and accepts a host renderer for the
+body. Reflect must not listen on Meowdown's private `.md-wikilink-*`
+classes or build a second overlay lifecycle. Meowdown must emit leave when
+the hovered mark is deleted or replaced (the `reflect-editor@8453e8f3`
+regression).
 
 ### 2. Supply content from the primary `NotePane`
 
-`apps/desktop/src/editor/note-editor.tsx` is the thin Meowdown wrapper. Thread
-the host renderer through it without putting note resolution or loading state
-there.
-
-`apps/desktop/src/components/note-pane.tsx` should supply the renderer through
-a focused hook/component, just as it supplies `useWikiLinkNavigation`. Keep
-the prop optional and pass it only from primary note panes, not compact task
-editors. Mobile mounts `NotePane` too, so omit it when
-`platform.surface.touchEditor` is true.
+`apps/desktop/src/editor/note-editor.tsx` only threads the renderer through;
+no resolution or loading state there. `apps/desktop/src/components/note-pane.tsx`
+supplies it through a focused hook, like `useWikiLinkNavigation`. The prop
+is optional and passed only from primary note panes, not task editors, and
+omitted when `platform.surface.touchEditor` is true (mobile mounts
+`NotePane` too).
 
 ### 3. Resolve an existing target without creating it
 
-The current pieces are in `packages/core/src/indexing/wiki-resolver-service.ts`
-and `packages/core/src/graph/note-creation-service.ts`:
-
-- `findExactWikiTargetMatches` preserves ambiguity within the winning indexed
-  date/title/alias tier, but it is internal and index-only;
-- `resolveWikiTarget` collapses ambiguity to one deterministic path;
-- `resolveOrCreateNoteWithTitle` preserves ambiguity and checks the on-disk
-  slug family when the index lags, but can create on a miss.
-
-Extract a public, side-effect-free existing-target resolver from the last
-flow. It should share the click path's precedence and stale-index disk check,
-return resolved / ambiguous / missing, and stop before creation. Continue to a
-preview only for one existing path. Missing daily dates remain valid click
-targets but have no file to preview. No index schema migration is required,
-and the incoming-backlinks query/panel remain untouched.
+In `packages/core/src/indexing/wiki-resolver-service.ts` and
+`packages/core/src/graph/note-creation-service.ts`,
+`findExactWikiTargetMatches` is internal and index-only,
+`resolveWikiTarget` collapses ambiguity, and `resolveOrCreateNoteWithTitle`
+checks the on-disk slug family but creates on a miss. So a public,
+side-effect-free resolver was extracted from the last one: same precedence
+and stale-index disk check as the click path, returns resolved / ambiguous
+/ missing, never creates. Only one existing path previews. Missing daily
+dates stay valid click targets but have no file to preview. No index
+migration; the incoming-backlinks query/panel are untouched.
 
 ### 4. Read and render without content egress
 
-Read the freshest authoritative source: a loaded open session's live buffer,
-or `noteFile.read(path, graph.generation)` otherwise. Reuse only the session-first
-idea from `NoteDocumentService.readSource`
-(`packages/core/src/documents/note-document-service.ts`); its
-fallback converts `notFound` to an empty note and is not generation-pinned,
-which is wrong for this feature. Preserve missing/deleted as unavailable and
-discard a read that finishes after the graph changes.
+Read a loaded session's live buffer, else `noteFile.read(path,
+graph.generation)`. Only the session-first idea comes from
+`NoteDocumentService.readSource`
+(`packages/core/src/documents/note-document-service.ts`): its fallback turns
+`notFound` into an empty note and is not generation-pinned, which is wrong
+here. Missing/deleted stays unavailable; a read that finishes after a graph
+change is discarded.
 
-Factor the reusable body/loading behavior from
-`apps/desktop/src/components/command-palette/note-preview.tsx`: strip
-frontmatter and render the body with
-`apps/desktop/src/editor/markdown-preview.tsx`. A daily note needs the same
-separate formatted-date heading the command-palette preview adds because its
-markdown body does not contain the date as an H1.
+The body reuses `apps/desktop/src/components/command-palette/note-preview.tsx`
+behavior: strip frontmatter, render with
+`apps/desktop/src/editor/markdown-preview.tsx`, and add the formatted-date
+heading for daily notes (their body has no date H1).
 
-The first port should be passive and local-only:
-
-- wiki links and ordinary Markdown links inside the card are inert;
-- preview images resolve safe graph assets only;
-- remote images, embeds, and other automatic network loads are disabled.
-
-`MarkdownPreview` currently always wires ordinary external links, and
-`useAssetPersistence.resolveImageUrl` passes through `http(s)` sources, so the
-shared renderer needs explicit non-interactive and local-media-only options
-rather than relying on omitted wiki-link callbacks. With those constraints, a
-`private: true` note can be previewed locally like any other note without
-changing the guarantees in [Privacy](../privacy.md).
+The card is passive and local-only: links inside are inert, images resolve
+safe graph assets only, and remote images and embeds never load.
+`MarkdownPreview` wires external links by default and
+`useAssetPersistence.resolveImageUrl` passes `http(s)` through, so the
+renderer needs explicit non-interactive and local-media-only options. With
+those, a `private: true` note previews locally without changing
+[Privacy](../privacy.md).
 
 ## Correctness and test checklist
 
-- Meowdown emits one enter for a wiki link, ignores movement among its child
+- Meowdown emits one enter per wiki link, ignores movement among child
   elements, leaves before entering an adjacent link, and closes when the
   hovered mark is deleted or replaced.
-- The overlay remains inside every viewport edge and opening/closing it does
-  not change editor focus, selection, or undo history.
-- A uniquely resolved indexed title, alias, or existing daily date previews
-  in both regular and daily editors. Templates, missing targets, and ambiguous
-  targets never show an arbitrary note.
-- The side-effect-free resolver covers an index-lagging on-disk match and
-  proves that every missing-target path performs no write or create.
-- Enter A then B, or enter then leave, stays correct when async results resolve
-  out of order. Navigation, graph change, unmount, and target deletion discard
-  pending results and stale bodies.
-- Frontmatter is hidden, daily dates remain visible as headings, and empty,
-  missing, and read-error states never flash the previous note.
-- Preview rendering cannot activate any link or load remote media, including
-  for `private: true` notes.
-- Only pointer-capable primary note panes receive the hover renderer. Task
-  editors and touch-only surfaces do not.
-- Existing click and `Mod-Enter` navigation behave unchanged.
-- Large-note coverage measures the cost of parsing the full clipped preview;
-  optimize later with a markdown-aware preview projection if needed, never by
-  cutting raw markdown mid-token.
+- The overlay stays inside every viewport edge; opening/closing does not
+  change editor focus, selection, or undo history.
+- A unique indexed title, alias, or existing daily date previews in regular
+  and daily editors. Templates, missing, and ambiguous targets never show
+  an arbitrary note.
+- The resolver covers an index-lagging on-disk match, and no missing-target
+  path writes or creates.
+- Out-of-order async results (A then B, enter then leave) stay correct.
+  Navigation, graph change, unmount, and target deletion discard pending
+  results and stale bodies.
+- Frontmatter is hidden, daily dates show as headings, and empty, missing,
+  and error states never flash the previous note.
+- The preview cannot activate a link or load remote media, including for
+  `private: true` notes.
+- Only pointer-capable primary note panes get the renderer.
+- Click and `Mod-Enter` navigation are unchanged.
+- Measure the cost of parsing large notes; optimize later with a
+  markdown-aware preview projection, never by cutting raw markdown
+  mid-token.
 
 ## Implementation decisions
 
 - **Timing:** a target-aware 300ms dwell avoids flashes while the pointer
-  crosses prose. Reflect resolves the body asynchronously, so the card opens
-  once both the dwell and the local read have finished. Moving to another
-  wiki link switches without a new dwell and keeps the previous body until
-  the next one is ready; leaving closes after a 200ms grace.
-- **Interactivity:** the card is pointer-transparent and inert. Its links,
-  checkboxes, images, and embeds cannot navigate, mutate content, take focus,
-  or trigger remote loads.
-- **Viewport:** Meowdown owns the card chrome and its compact clipped
-  surface (`320 × 192px` with an 8px collision margin); Reflect renders only
-  the content inside it.
-- **Unavailable state:** missing, ambiguous, locally unavailable, deleted, and
-  failed targets resolve the body to nothing, so no card ever opens for them.
-  A successfully read note with an empty body shows `Empty note`; daily notes
-  keep their separately formatted date heading.
-- **Freshness:** the body is a snapshot read when the hover begins. Deleting
-  or rewriting the hovered link inside the editor closes the card through
-  Meowdown's transaction-aware hover tracking; external file changes during
-  the few seconds a card is open are not tracked.
-- **Resolution:** the shared existing-target resolver has a distinct
-  `unavailable` outcome in addition to resolved / ambiguous / missing. This
-  prevents hover or navigation from treating a placeholder or transient read
-  failure as permission to create a duplicate note.
+  crosses prose. The card opens once both the dwell and the local read
+  finish. Moving to another wiki link switches without a new dwell and
+  keeps the previous body until the next is ready; leaving closes after a
+  200ms grace.
+- **Interactivity:** the card is pointer-transparent and inert. Links,
+  checkboxes, images, and embeds cannot navigate, mutate, take focus, or
+  load remotely.
+- **Viewport:** Meowdown owns the card chrome and clipped surface
+  (`320 × 192px`, 8px collision margin); Reflect renders only the content.
+- **Unavailable state:** missing, ambiguous, unavailable, deleted, and
+  failed targets resolve to nothing, so no card opens. A read note with an
+  empty body shows `Empty note`; daily notes keep their date heading.
+- **Freshness:** the body is a snapshot from hover start. Deleting or
+  rewriting the hovered link closes the card through Meowdown's
+  transaction-aware tracking; external file changes while a card is open
+  are not tracked.
+- **Resolution:** the resolver also has an `unavailable` outcome, so hover
+  or navigation never treats a placeholder or transient read failure as
+  permission to create a duplicate note.

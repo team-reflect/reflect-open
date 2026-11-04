@@ -7,6 +7,7 @@ import react from '@vitejs/plugin-react'
 import pkg from './package.json' with { type: 'json' }
 
 const host: string | undefined = process.env.TAURI_DEV_HOST
+const port = 1420
 
 const platform: 'mobile' | 'desktop' | '' = (() => {
   const env = process.env.TAURI_ENV_PLATFORM
@@ -30,7 +31,7 @@ const platform: 'mobile' | 'desktop' | '' = (() => {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react({ compiler: true }),
+    react({ compiler: { reportDiagnostics: true } }),
 
     tailwindcss(),
     sentryVitePlugin({
@@ -46,10 +47,6 @@ export default defineConfig({
       },
     }),
   ],
-
-  define: {
-    __REFLECT_VERSION__: JSON.stringify(pkg.version),
-  },
 
   // The JS target lowers syntax that Safari 16.4 introduced (class static blocks).
   // If the CSS target is below Safari 17.5, Lightning CSS downlevels `light-dark()` to a broken polyfill.
@@ -88,7 +85,7 @@ export default defineConfig({
   clearScreen: false,
   // 2. Tauri expects a fixed port; fail if it is not available
   server: {
-    port: 1420,
+    port,
     strictPort: true,
     host: host || false,
     watch: {
@@ -99,5 +96,10 @@ export default defineConfig({
       unhandledErrors: true,
       logLevels: ['error', 'warn', 'info', 'log', 'debug'],
     },
+    ...(host
+      ? {
+          ws: { host, port },
+        }
+      : {}),
   },
 })

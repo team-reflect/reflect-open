@@ -1,27 +1,9 @@
 import { useId, useState, type ReactElement, type ReactNode } from 'react'
-import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
 import { useQuery } from '@tanstack/react-query'
-import {
-  aiProvider,
-  aiProviderRequiresApiKey,
-  errorMessage,
-  marketingVersion,
-  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
-  TRANSCRIPTION_PROMPT_MAX_LENGTH,
-  normalizeChatSystemPrompt,
-  normalizeTranscriptionPrompt,
-  type AiPrompt,
-  type AiProviderConfig,
-  type DateFormat,
-  type EditorTextSize,
-  type ThemePreference,
-  type TimeFormat,
-  type WeekStartDay,
-} from '@reflect/core'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
-import { useAppVersion } from '@/hooks/use-app-version.ts'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
@@ -44,15 +26,105 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
+import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
-import { formatFullDate } from '@/lib/dates.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  marketingVersion,
+  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
+  TRANSCRIPTION_PROMPT_MAX_LENGTH,
+  normalizeChatSystemPrompt,
+  normalizeTranscriptionPrompt,
+  type AiPrompt,
+  type AiProviderConfig,
+  type EditorTextSize,
+  type PaywallPhase,
+  type ThemePreference,
+  type TimeFormat,
+  type WeekStartDay,
+  DATE_FORMATS,
+  formatFullDate,
+} from '@reflect/core'
+import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
+import {
+  useChatSystemPrompt,
+  useDateFormat,
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorSmoothCaretAnimation,
+  useEditorTextSize,
+  useSettingsService,
+  useThemeSetting,
+  useTimeFormat,
+  useTranscriptionFormat,
+  useTranscriptionPrompt,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
-import { useGitSyncContext } from '@/providers/sync-provider.tsx'
+import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
+
+const PAYWALL_PHASE_OPTIONS: readonly SegmentedOption<PaywallPhase | 'off'>[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'skippable', label: 'Skippable' },
+  { value: 'required', label: 'Required' },
+]
+
+/**
+ * Shows What's New again in this session.
+ */
+function WhatsNewRow(): ReactElement {
+  const { whatsNew } = useAppServices()
+  const override = useStore(whatsNew.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate What’s New"
+      checked={override}
+      onCheckedChange={whatsNew.setOverride}
+    />
+  )
+}
+
+/**
+ * Shows the review page after What's New in this session.
+ */
+function ReviewRow(): ReactElement {
+  const { review } = useAppServices()
+  const override = useStore(review.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate review page"
+      checked={override}
+      onCheckedChange={review.setOverride}
+    />
+  )
+}
+
+/**
+ * Simulates a paywall phase for this session, so a TestFlight build can walk
+ * through every phase.
+ */
+function PaywallPhaseRow(): ReactElement {
+  const { paywall } = useMobileServices()
+  const override = useStore(paywall.phaseOverride)
+  return (
+    <SettingsSegmentedRow
+      label="Paywall"
+      value={override ?? 'off'}
+      options={PAYWALL_PHASE_OPTIONS}
+      onChange={(next) => paywall.setPhaseOverride(next === 'off' ? null : next)}
+    />
+  )
+}
 
 const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
   { value: 'system', label: 'System' },
@@ -73,8 +145,6 @@ const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
   { value: 'medium', label: 'Medium' },
   { value: 'large', label: 'Large' },
 ]
-
-const DATE_FORMATS: readonly DateFormat[] = ['mdy', 'dmy', 'iso']
 
 const WEEK_START_OPTIONS: readonly SegmentedOption<WeekStartDay>[] = [
   { value: 'sunday', label: 'Sunday' },
@@ -112,26 +182,41 @@ function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
  */
 export function MobileSettings(): ReactElement {
   const { back, canBack, navigate } = useRouter()
-  const { graph, mobileStorageKind, platform } = useGraph()
+  const graph = useGraphInfo()
+  const { platform } = useGraphActions()
+  const mobileStorageKind = useMobileStorageKind()
   const isIos = platform === 'ios'
   const subscriptionControls = useSubscriptionControls()
-  const { opener } = useAppServices()
+  const { opener, review } = useAppServices()
   const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
-  const { settings, updateSettings } = useSettings()
+  const theme = useThemeSetting()
+  const editorTextSize = useEditorTextSize()
+  const selectedDateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
+  const chatSystemPrompt = useChatSystemPrompt()
+  const transcriptionFormat = useTranscriptionFormat()
+  const transcriptionPrompt = useTranscriptionPrompt()
+  const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
-  const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
+  const perfHudEnabled = usePerfHudEnabled()
   const environment = useAppStoreEnvironment()
   // Development and TestFlight installs show the prerelease tag; anything else hides it.
   const showPrerelease =
     platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
-  const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
-  const sync = useGitSyncContext()
+  const versionLabel = showPrerelease
+    ? platformService.appVersion
+    : marketingVersion(platformService.appVersion)
+  const gitSync = useGitSyncState()
+  const { disconnectGraph } = useGitSyncActions()
   const githubConnected = useGithubConnected()
-  const [disconnecting, setDisconnecting] = useState(false)
-  const [signingOut, setSigningOut] = useState(false)
-  const [signOutError, setSignOutError] = useState<string | null>(null)
+  const disconnectAction = useAsyncAction()
+  const signOutAction = useAsyncAction()
   const [signInOpen, setSignInOpen] = useState(false)
   // Which connect sheet is open: the host choice, or one host's own flow.
   // `remoteUrl` prefills the host form for a remote that is already set.
@@ -160,13 +245,10 @@ export function MobileSettings(): ReactElement {
     enabled: graph !== null,
   })
 
-  const gitSync = sync?.state ?? null
   const status = getMobileSyncStatus(gitSync)
   // A graph with a remote, connected or waiting for its sign-in.
   const remote =
-    gitSync !== null && (gitSync.phase === 'connected' || gitSync.phase === 'needsCredential')
-      ? gitSync
-      : null
+    gitSync.phase === 'connected' || gitSync.phase === 'needsCredential' ? gitSync : null
   // A host remote that waits for its sign-in can get one here. Plain HTTP
   // cannot: the resolver never sends a sign-in in the clear.
   const canAddSignIn =
@@ -183,37 +265,32 @@ export function MobileSettings(): ReactElement {
   // are mutually exclusive per graph, Plan 21) and wait out the controller's
   // `loading` phase so the rows never flash on a graph that turns out to be
   // connected.
-  const canConnect = mobileStorageKind === 'local' && gitSync?.phase === 'disconnected'
+  const canConnect = mobileStorageKind === 'local' && gitSync.phase === 'disconnected'
 
   // Stop syncing this graph: drop its remote. The local clone and every
   // sign-in stay; the controller restarts into its disconnected state.
   async function disconnect(): Promise<void> {
-    if (sync === null) {
-      return
-    }
-    setDisconnecting(true)
-    try {
-      await sync.disconnectGraph()
-    } catch (err) {
-      logger.error('stop syncing failed:', errorMessage(err))
-    } finally {
-      setDisconnecting(false)
-    }
+    await disconnectAction.run(async () => {
+      try {
+        await disconnectGraph()
+      } catch (err) {
+        logger.error('stop syncing failed:', errorMessage(err))
+      }
+    })
   }
 
   // Forget the GitHub sign-in of this device; every GitHub repository stops
   // syncing until the next sign-in.
   async function signOut(): Promise<void> {
-    setSigningOut(true)
-    setSignOutError(null)
-    try {
-      await githubAuth.clear()
-    } catch (err) {
-      setSignOutError(errorMessage(err))
-      logger.error('GitHub sign-out failed:', errorMessage(err))
-    } finally {
-      setSigningOut(false)
-    }
+    await signOutAction.run(async () => {
+      try {
+        await githubAuth.clear()
+      } catch (err) {
+        logger.error('GitHub sign-out failed:', errorMessage(err))
+        // Rethrown so `signOutAction.error` shows it in the Accounts footer.
+        throw err
+      }
+    })
   }
 
   const storageLabel =
@@ -242,15 +319,15 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup header="Appearance">
             <SettingsSegmentedRow
               label="Theme"
-              value={settings.theme}
+              value={theme}
               options={THEME_OPTIONS}
-              onChange={(theme) => updateSettings({ theme })}
+              onChange={(theme) => settingsService.update({ theme })}
             />
             <SettingsSegmentedRow
               label="Text size"
-              value={settings.editorTextSize}
+              value={editorTextSize}
               options={TEXT_SIZE_OPTIONS}
-              onChange={(editorTextSize) => updateSettings({ editorTextSize })}
+              onChange={(editorTextSize) => settingsService.update({ editorTextSize })}
             />
           </SettingsGroup>
 
@@ -262,8 +339,8 @@ export function MobileSettings(): ReactElement {
               <SettingsSelectRow
                 key={dateFormat}
                 label={formatFullDate(today, dateFormat)}
-                selected={settings.dateFormat === dateFormat}
-                onPress={() => updateSettings({ dateFormat })}
+                selected={selectedDateFormat === dateFormat}
+                onPress={() => settingsService.update({ dateFormat })}
               />
             ))}
           </SettingsGroup>
@@ -271,36 +348,38 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup header="Week and time">
             <SettingsSegmentedRow
               label="Week start"
-              value={settings.weekStartDay}
+              value={weekStartDay}
               options={WEEK_START_OPTIONS}
-              onChange={(weekStartDay) => updateSettings({ weekStartDay })}
+              onChange={(weekStartDay) => settingsService.update({ weekStartDay })}
             />
             <SettingsSegmentedRow
               label="Time format"
-              value={settings.timeFormat}
+              value={timeFormat}
               options={TIME_FORMAT_OPTIONS}
-              onChange={(timeFormat) => updateSettings({ timeFormat })}
+              onChange={(timeFormat) => settingsService.update({ timeFormat })}
             />
           </SettingsGroup>
 
           <SettingsGroup header="Editor">
             <SettingsSwitchRow
               label="Smooth caret animation"
-              checked={settings.editorSmoothCaretAnimation}
+              checked={editorSmoothCaretAnimation}
               onCheckedChange={(editorSmoothCaretAnimation) => {
-                updateSettings({ editorSmoothCaretAnimation })
+                settingsService.update({ editorSmoothCaretAnimation })
               }}
             />
             <SettingsSwitchRow
               label="Start with a bullet"
-              checked={settings.editorDefaultBullet}
-              onCheckedChange={(editorDefaultBullet) => updateSettings({ editorDefaultBullet })}
+              checked={editorDefaultBullet}
+              onCheckedChange={(editorDefaultBullet) => {
+                return settingsService.update({ editorDefaultBullet })
+              }}
             />
             <SettingsSwitchRow
               label="Bullet after a heading"
-              checked={settings.editorBulletAfterHeading}
+              checked={editorBulletAfterHeading}
               onCheckedChange={(editorBulletAfterHeading) => {
-                updateSettings({ editorBulletAfterHeading })
+                settingsService.update({ editorBulletAfterHeading })
               }}
             />
           </SettingsGroup>
@@ -323,9 +402,7 @@ export function MobileSettings(): ReactElement {
             <SettingsActionRow label="Add AI provider" onPress={() => setAddProviderOpen(true)} />
             <SettingsNavRow
               label="System prompt"
-              value={
-                normalizeChatSystemPrompt(settings.chatSystemPrompt) === '' ? 'Default' : 'Custom'
-              }
+              value={normalizeChatSystemPrompt(chatSystemPrompt) === '' ? 'Default' : 'Custom'}
               onPress={() => setSystemPromptOpen(true)}
             />
           </SettingsGroup>
@@ -360,17 +437,15 @@ export function MobileSettings(): ReactElement {
           >
             <SettingsSwitchRow
               label="Transcription auto-format"
-              checked={settings.transcriptionFormat}
+              checked={transcriptionFormat}
               descriptionId={audioMemoDescriptionId}
-              onCheckedChange={(transcriptionFormat) => updateSettings({ transcriptionFormat })}
+              onCheckedChange={(transcriptionFormat) => {
+                return settingsService.update({ transcriptionFormat })
+              }}
             />
             <SettingsNavRow
               label="Helper text"
-              value={
-                normalizeTranscriptionPrompt(settings.transcriptionPrompt) === ''
-                  ? 'None'
-                  : 'Custom'
-              }
+              value={normalizeTranscriptionPrompt(transcriptionPrompt) === '' ? 'None' : 'Custom'}
               onPress={() => setTranscriptionPromptOpen(true)}
             />
           </SettingsGroup>
@@ -415,7 +490,7 @@ export function MobileSettings(): ReactElement {
                 <SettingsActionRow
                   label="Stop syncing"
                   tone="destructive"
-                  pending={disconnecting}
+                  pending={disconnectAction.pending}
                   onPress={() => void disconnect()}
                 />
               ) : null}
@@ -425,7 +500,7 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup
             header="Accounts"
             footer={
-              signOutError ??
+              signOutAction.error ??
               'GitHub is used for GitHub repositories and for sharing notes as gists.'
             }
           >
@@ -433,7 +508,7 @@ export function MobileSettings(): ReactElement {
               <SettingsActionRow
                 label="Sign out of GitHub"
                 tone="destructive"
-                pending={signingOut}
+                pending={signOutAction.pending}
                 onPress={() => void signOut()}
               />
             ) : (
@@ -469,27 +544,36 @@ export function MobileSettings(): ReactElement {
               <SettingsActionRow
                 label="Redeem Code"
                 pending={subscriptionControls.redeemPending}
-                onPress={() => {
-                  void subscriptionControls.redeem()
-                }}
+                onPress={subscriptionControls.redeem}
               />
               <SettingsActionRow
                 label="Restore Purchases"
                 pending={subscriptionControls.restorePending}
-                onPress={() => {
-                  void subscriptionControls.restore()
-                }}
+                onPress={subscriptionControls.restore}
               />
               <SettingsActionRow label="Terms of Use" onPress={subscriptionControls.openTerms} />
             </SettingsGroup>
           ) : null}
 
+          <SettingsGroup header="Feedback">
+            {isIos ? <SettingsActionRow label="Rate Reflect" onPress={review.writeReview} /> : null}
+            <SettingsActionRow
+              label="Join the Discord community"
+              onPress={() => review.sendFeedback('discord')}
+            />
+            <SettingsActionRow
+              label="Report a bug on GitHub"
+              onPress={() => review.sendFeedback('github')}
+            />
+            <SettingsActionRow label="Email support" onPress={() => review.sendFeedback('email')} />
+          </SettingsGroup>
+
           <SettingsGroup header="About">
+            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsValueRow
               label="Notes"
               value={notes === undefined ? '…' : String(notes.length)}
             />
-            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsNavRow
               label="Open Source Licenses"
               onPress={() => navigate({ kind: 'licenses' })}
@@ -513,6 +597,16 @@ export function MobileSettings(): ReactElement {
                   value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
                 />
               ) : null}
+              {isIos && (environment.value === 'Sandbox' || environment.value === 'Xcode') ? (
+                <PaywallPhaseRow />
+              ) : null}
+              <WhatsNewRow />
+              <ReviewRow />
+              <SettingsSwitchRow
+                label="Performance HUD"
+                checked={perfHudEnabled}
+                onCheckedChange={setPerfHudEnabled}
+              />
               <SettingsActionRow
                 label="Trigger test error"
                 tone="destructive"
@@ -571,10 +665,10 @@ export function MobileSettings(): ReactElement {
         maxLength={CHAT_SYSTEM_PROMPT_MAX_LENGTH}
         rows={8}
         normalize={normalizeChatSystemPrompt}
-        value={settings.chatSystemPrompt}
+        value={chatSystemPrompt}
         open={systemPromptOpen}
         onOpenChange={setSystemPromptOpen}
-        onSave={(chatSystemPrompt) => updateSettings({ chatSystemPrompt })}
+        onSave={(chatSystemPrompt) => settingsService.update({ chatSystemPrompt })}
       />
       <TextSettingDrawer
         title="Transcription helper text"
@@ -584,10 +678,10 @@ export function MobileSettings(): ReactElement {
         maxLength={TRANSCRIPTION_PROMPT_MAX_LENGTH}
         rows={3}
         normalize={normalizeTranscriptionPrompt}
-        value={settings.transcriptionPrompt}
+        value={transcriptionPrompt}
         open={transcriptionPromptOpen}
         onOpenChange={setTranscriptionPromptOpen}
-        onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
+        onSave={(transcriptionPrompt) => settingsService.update({ transcriptionPrompt })}
       />
       <AiPromptDrawer
         prompt={editingPrompt}

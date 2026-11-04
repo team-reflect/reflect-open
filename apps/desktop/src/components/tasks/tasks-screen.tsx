@@ -28,10 +28,10 @@ import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard.ts'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection.ts'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useToday } from '@/lib/use-today.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
-import { routeForPath } from '@/routing/route.ts'
+import { useStore } from '@/lib/use-store.ts'
+import { routeForPath } from '@reflect/app'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
 import { TaskGroupSection } from './task-group-section.tsx'
 import { TaskScheduleCalendar } from './task-schedule-calendar.tsx'
@@ -73,7 +73,7 @@ function focusedSelectedKey(
  * "show archived" filter, which reveals the whole completed history.
  */
 export function TasksScreen(): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { tasks: taskService } = useCoreServices()
   const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
@@ -81,12 +81,9 @@ export function TasksScreen(): ReactElement {
   const [query, setQuery] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { open, completed, openFailed, completedFailed } = useServiceState(
-    taskService,
-    taskService.getState,
-  )
+  const { open, completed, openFailed, completedFailed } = useStore(taskService)
   useEffect(
     () => (filters.archived ? taskService.includeCompleted() : undefined),
     [taskService, filters.archived],
@@ -101,7 +98,7 @@ export function TasksScreen(): ReactElement {
   // must wait for both — else a graph with only completed tasks flashes "No
   // tasks to show." while the completed query is still loading.
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
-  const { onScroll } = useScrollRestoration(scrollElement, ready)
+  const { onScroll } = useScrollRestoration(scrollRef, ready)
 
   // This session's completed tasks, still showing struck until archived —
   // reconciled against the open read so a task reopened at its source note
@@ -310,7 +307,7 @@ export function TasksScreen(): ReactElement {
           onOpenChange={setFiltersOpen}
         />
       </header>
-      <div ref={setScrollElement} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
+      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
         {isError ? (
           <p role="alert" className="px-4 py-6 text-sm text-text-muted lg:px-12">
             Couldn’t load tasks.

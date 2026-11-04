@@ -1,7 +1,8 @@
 import type { LoggerService } from '../ports/logger-service.ts'
-import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import type { IpcBridgeService, PluginSubscription } from '../ipc/ipc-service.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { PluginEvent, PluginSubscription } from '../ipc/plugin.ts'
+import type { PluginEvent } from '../ipc/plugin.ts'
 import {
   actionPerformedCommand,
   actionsReadyCommand,
@@ -98,8 +99,8 @@ class PluginEventFanOut<Payload, Value> {
 
 class NativeAudioRecorderImpl implements AudioRecorderService {
   readonly #deps: NativeAudioRecorderDeps
-  #state: AudioRecorderState = 'idle'
-  readonly #stateListeners = new Set<(state: AudioRecorderState) => void>()
+  readonly #state = new WritableStore<AudioRecorderState>('idle')
+  readonly state: Store<AudioRecorderState> = this.#state
   readonly #claimed = new Set<string>()
   #stopping: Promise<AudioRecorderFinalSegment | null> | null = null
   readonly #levelEvents: PluginEventFanOut<RecordingLevelEvent, RecordingLevelEvent>
@@ -113,7 +114,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
   constructor(deps: NativeAudioRecorderDeps) {
     this.#deps = deps
     this.#levelEvents = new PluginEventFanOut(deps, recordingLevelEvent, (event, deliver) => {
-      if (this.#state === 'recording') {
+      if (this.#state.get() === 'recording') {
         deliver(event)
       }
     })
@@ -128,7 +129,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
       })
     })
     this.#stoppedEvents = new PluginEventFanOut(deps, recordingStoppedEvent, (event, deliver) => {
-      this.#setState('idle')
+      this.#state.set('idle')
       deliver({ segment: this.#claimFinal(event), reason: event.reason })
     })
     this.#nativeActionEvents = new PluginEventFanOut(
@@ -144,43 +145,29 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     return true
   }
 
-  state(): AudioRecorderState {
-    return this.#state
-  }
-
-  subscribeState(listener: (state: AudioRecorderState) => void): Unlisten {
-    const entry = (next: AudioRecorderState): void => {
-      listener(next)
-    }
-    this.#stateListeners.add(entry)
-    return () => {
-      this.#stateListeners.delete(entry)
-    }
-  }
-
   stream(): MediaStream | null {
     return null
   }
 
   async start(options: StartRecordingOptions): Promise<RecordingSessionStart | null> {
     const { ipc } = this.#deps
-    if (this.#currentState() !== 'idle') {
+    if (this.#state.get() !== 'idle') {
       return null
     }
-    this.#setState('requesting')
+    this.#state.set('requesting')
     let session: RecordingSessionStart
     try {
       session = await startRecordingCommand(ipc, {
         request: { segmentMs: options.segmentMs, reminderMs: options.reminderMs },
       })
     } catch (error) {
-      this.#setState('idle')
+      this.#state.set('idle')
       throw error
     }
     // A `recordingStopped` event can end the session while the start is in
     // flight; do not resurrect it.
-    if (this.#currentState() === 'requesting') {
-      this.#setState('recording')
+    if (this.#state.get() === 'requesting') {
+      this.#state.set('recording')
     }
     return session
   }
@@ -194,7 +181,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
       try {
         return this.#claimFinal(await stopRecordingCommand(ipc, {}))
       } finally {
-        this.#setState('idle')
+        this.#state.set('idle')
       }
     })().finally(() => {
       this.#stopping = null
@@ -208,7 +195,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     try {
       await cancelRecordingCommand(this.#deps.ipc, {})
     } finally {
-      this.#setState('idle')
+      this.#state.set('idle')
     }
   }
 
@@ -277,22 +264,6 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     return this.#nativeActionEvents.subscribe(listener)
   }
 
-  // Read through a method so narrowing from an earlier check does not
-  // survive an await that a `recordingStopped` event can cross.
-  #currentState(): AudioRecorderState {
-    return this.#state
-  }
-
-  #setState(next: AudioRecorderState): void {
-    if (next === this.#state) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#stateListeners) {
-      listener(next)
-    }
-  }
-
   /**
    * Claim a finished session's last segment, or drop it as a misclick. Only a
    * one-segment session can be too short to keep: a later segment carries
@@ -301,7 +272,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
   #claimFinal(stop: RecordingStopResponse): AudioRecorderFinalSegment | null {
     this.#claimed.add(stop.path)
     if (stop.part === 1 && stop.durationMs < MIN_RECORDING_DURATION_MS) {
-      void deleteStagedCommand(this.#deps.ipc, { request: { path: stop.path } }).catch(() => {})
+      void this.#deleteMisclick(stop.path)
       this.#claimed.delete(stop.path)
       return null
     }
@@ -312,6 +283,17 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
       part: stop.part,
       end: true,
       durationMs: stop.durationMs,
+    }
+  }
+
+  /**
+   * Delete the staged file of a misclick. A failure is logged and the file stays.
+   */
+  async #deleteMisclick(path: string): Promise<void> {
+    try {
+      await this.deleteStaged(path)
+    } catch (cause) {
+      this.#deps.logger.warn('deleting a misclick recording failed:', cause)
     }
   }
 }

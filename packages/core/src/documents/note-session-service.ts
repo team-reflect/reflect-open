@@ -16,17 +16,6 @@ import type {
   NoteSessionStatus,
 } from './note-session-types.ts'
 
-export { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
-export {
-  INITIAL_NOTE_SNAPSHOT,
-  type NoteContentOrigin,
-  type NoteSession,
-  type NoteSessionOptions,
-  type NoteSessionService,
-  type NoteSessionSnapshot,
-  type NoteSessionStatus,
-} from './note-session-types.ts'
-
 /**
  * File access of one session, with the graph generation bound to its writes.
  */
@@ -164,7 +153,7 @@ class NoteSessionImpl implements NoteSession {
     this.#applyContent = options.applyContent
     this.#onContent = options.onContent
     this.#reconcilePendingEditorInput = options.reconcilePendingEditorInput
-    const graph = graphSession.getState().session
+    const graph = graphSession.get().session
     this.#io = {
       read: async (forPath) => {
         if (graph === null) {

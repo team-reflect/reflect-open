@@ -1,103 +1,93 @@
 # Porting sync, offline, and the data layer
 
 **v2 status: replaced.** Nothing in V1 mobile's Firestore/Yjs/encrypted-
-SQLite stack survives — v2 mobile runs the same markdown + libgit2 +
-rebuildable-index architecture as desktop, unchanged
+SQLite stack survives; v2 mobile runs desktop's markdown + libgit2 +
+rebuildable-index architecture unchanged
 ([sync strategy](../../reflect-v2-sync-strategy.md), Plan 19 decisions
-5–6). What ports is the set of **behavioral contracts** V1 proved matter
-on a phone. This doc records those, and enough of the V1 mechanism to
-explain where each contract came from.
+5–6). What ports is the set of **behavioral contracts** V1 proved matter on
+a phone, with enough V1 mechanism to explain each.
 
 ## What V1 mobile does
 
 ### The local stack
 
 - SQLite via `@capacitor-community/sqlite` with a `capacitor-sqlite-kysely`
-  dialect; one database file; **all access serialized through a
-  `pLimit(1)` lock** because the Capacitor bridge cannot tolerate
-  concurrent access (`services/db/sqlite/`).
+  dialect, one file, **all access serialized through a `pLimit(1)` lock**
+  because the Capacitor bridge can't handle concurrency
+  (`services/db/sqlite/`).
 - Tables mirror the web projection (`services/db/sqlite/schema.ts`):
-  `notes` (Yjs update state + ProseMirror JSON + derived columns: tags,
-  hasTask, emails, linkHrefs, dailyDate, normalizedSubject, aliases,
-  backlinkIds, documentText), `notesFts`, `noteBacklinks`,
-  `assets`/`assetsFts`, `contacts`, `books`, `commitBackups`, `jobs`,
-  `lastSyncs` — plus a `notesVec` table that exists but is unused.
-- All note content is **encrypted at rest**; decryption happens on-device
-  during sync-down conversion, gated by the graph encryption key.
+  `notes` (Yjs state + ProseMirror JSON + derived columns: tags, hasTask,
+  emails, linkHrefs, dailyDate, normalizedSubject, aliases, backlinkIds,
+  documentText), `notesFts`, `noteBacklinks`, `assets`/`assetsFts`,
+  `contacts`, `books`, `commitBackups`, `jobs`, `lastSyncs`, plus an unused
+  `notesVec`.
+- Note content is **encrypted at rest**, decrypted on-device during
+  sync-down with the graph key.
 
 ### Sync
 
-Several distinct layers (`services/db/sync/`, `services/api/`):
+Layers in `services/db/sync/` and `services/api/`:
 
-- **Down**: initial paginated Firestore fetch (500-doc pages with "Got X
+- **Down**: an initial paginated Firestore fetch (500-doc pages, "Got X
   notes" progress), then `onSnapshot` listeners filtered by a per-table
-  watermark (`lastSyncs`, with a 1-hour safety buffer). Conflicts decided
-  by timestamp (remote newer wins); notes whose commit history diverged
-  trigger a custom path that fetches and replays commits.
-- **Up**: rows flagged `hasChanges`/`isDeleted`, flushed on a ~2 s
-  debounce and immediately on reconnect; Firestore transactions reject
-  the write if the remote is newer (retry later). Deletes are soft
-  locally until the remote delete succeeds.
-- **Content**: rich note bodies sync as **Yjs commits** through the
-  shared change manager; unsaved local edits live as pending commits in
-  `ChangeStore` and persist across reloads. On reconnect, pending commits
-  flush and missed remote commits replay — CRDT merge means users never
-  see a conflict.
-- **Jobs** (`jobs` table): reindex search, rewrite backlinks, repair
-  outdated docs — persisted so background work survives restarts.
-- The app monitors free disk space and pauses sync when the device is
-  nearly full; online state comes from `@capacitor/network`.
+  watermark (`lastSyncs`, 1-hour safety buffer). Remote-newer wins;
+  diverged commit histories trigger a fetch-and-replay path.
+- **Up**: rows flagged `hasChanges`/`isDeleted` flush on a ~2 s debounce
+  and at once on reconnect; Firestore transactions reject writes when the
+  remote is newer (retry later). Deletes stay soft locally until the remote
+  delete succeeds.
+- **Content**: note bodies sync as **Yjs commits** through the shared
+  change manager; unsaved edits are pending commits in `ChangeStore` and
+  survive reloads. On reconnect they flush and missed remote commits
+  replay; CRDT merge means users never see a conflict.
+- **Jobs** (`jobs` table): reindex search, rewrite backlinks, repair docs,
+  persisted across restarts.
+- Sync pauses when the device is nearly full; online state comes from
+  `@capacitor/network`.
 
 ### What it adds up to (the contracts)
 
-1. **Instant open**: every UI read hits local SQLite; nothing waits on
-   the network.
-2. **Everything works offline**: reading, searching, editing, creating —
-   changes queue and reconcile later.
-3. **Writes are optimistic**: the UI reflects an edit immediately;
-   persistence and sync are background concerns.
+1. **Instant open**: every UI read hits local SQLite.
+2. **Everything works offline**: read, search, edit, create; changes
+   reconcile later.
+3. **Writes are optimistic**: the UI updates at once; persistence and sync
+   are background.
 4. **Capture is never lost**: pending changes survive reloads, process
    death, and offline periods.
-5. **First sync is onboarding**: a visible, honest progress experience.
+5. **First sync is onboarding**: visible, honest progress.
 
 ## What changes in v2, and why
 
-The architecture is already decided and largely built; the point of this
-section is the mapping, not a proposal:
+The architecture is decided and largely built; this is the mapping:
 
-- **Markdown files are the source of truth**; SQLite under `.reflect/` is
-  a rebuildable per-device projection (same schema as desktop, FTS5,
-  built by the same indexing code). V1's derived-columns idea survives as
-  the index projection; the encrypted dual document representation does
-  not.
-- **libgit2 replaces Firestore**: foreground-only sync cycles (resume,
-  debounced edits, network regain), plain-language status. There are no
-  real-time listeners; the phone spends much of its life "not yet
-  pushed", which is why the status surface is more prominent than on
-  desktop.
+- **Markdown files are the source of truth**; SQLite under `.reflect/` is a
+  rebuildable per-device projection (desktop's schema and indexing code).
+  V1's derived columns survive as the projection; the encrypted dual
+  document form does not.
+- **libgit2 replaces Firestore**: foreground-only cycles (resume, debounced
+  edits, network regain) with plain-language status. No real-time
+  listeners; the phone is often "not yet pushed", so status is more
+  prominent than on desktop.
 - **The no-watcher seam replaces sync-down fan-out**: every local write
   emits its file-change batch in-process (`emitFileChanges`), driving
   incremental reindex, query invalidation, sync dirty-marking, and
-  open-editor reconciliation — one channel instead of V1's
-  listener/watermark machinery. Pull-applied changes flow through the
-  existing `onRemoteChanges` path.
-- **Contract 4 is re-solved locally**: local commit never blocks on the
-  network; push is opportunistic; **flush-on-background + a local commit
-  on pause** protects the save-debounce window even if iOS kills the app
-  (Plan 19 decision 6 and its acceptance criterion: kill the app
-  mid-debounce, the edit is on disk).
-- **Conflicts merge on the device.** V1's CRDT silently merged concurrent
-  edits. Reflect v2 merges notes through one ladder (Plan 21), and other
-  files keep a conflict copy. Conflicts never block sync of other notes. The canonical case is phone + Mac both appending
-  to today's daily note; the append-union rung merges it.
+  open-editor reconciliation. Pull-applied changes use `onRemoteChanges`.
+- **Contract 4 is re-solved locally**: local commit never waits on the
+  network; push is opportunistic; **flush-on-background + a local commit on
+  pause** protects the save-debounce window even if iOS kills the app
+  (Plan 19 decision 6: kill mid-debounce, the edit is on disk).
+- **Conflicts merge on the device.** V1's CRDT merged silently. v2 merges
+  notes through one ladder (Plan 21); other files keep a conflict copy.
+  Conflicts never block other notes. The canonical case, phone + Mac both
+  appending to today, merges on the append-union rung.
 - **Contract 5 maps to first clone**: cloning a years-old graph over
-  cellular, foregrounded, with progress UI; shallow/partial clone is the
-  noted follow-up.
+  cellular, foregrounded, with progress; shallow/partial clone is the
+  follow-up.
 - **No job queue**: reindex is incremental off the write seam, and a full
-  rebuild is always possible from files. **No disk-space machinery** in
-  v1 (worth revisiting if clone-size complaints arrive). **Chat tables**
-  (`chat_*`) are per-device durable state and never sync — desktop chat
-  history does not appear on mobile.
+  rebuild from files is always possible. **No disk-space machinery** in v1
+  (revisit if clone-size complaints arrive). **`chat_*` tables** are
+  per-device durable state and never sync, so desktop chat history does not
+  appear on mobile.
 
 ## V1 → v2 mapping
 

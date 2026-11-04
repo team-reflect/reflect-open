@@ -1,5 +1,6 @@
 import {
   dayRange,
+  WritableStore,
   type CalendarAuthorizationStatus,
   type CalendarEvent,
   type CalendarInfo,
@@ -8,6 +9,7 @@ import {
   type PlatformFacts,
   type Settings,
   type SettingsService,
+  type Store,
   type Unlisten,
 } from '@reflect/core'
 import type { AppLifecycleService } from '../app/lifecycle-service.ts'
@@ -27,12 +29,7 @@ export interface CalendarEventsState {
  * settings field (docs/porting/calendar-meetings-integration.md). Events are
  * fetched live: nothing here is cached, and nothing is indexed.
  */
-export interface CalendarEventsService {
-  getState: () => CalendarEventsState
-  /**
-   * Called after the state changes.
-   */
-  subscribe: (listener: () => void) => Unlisten
+export interface CalendarEventsService extends Store<CalendarEventsState> {
   /**
    * Read the permission state now, again whenever the page turns visible or
    * the calendar reports a change, until the returned function runs. The
@@ -126,8 +123,10 @@ export interface CalendarEventsServiceDeps {
 
 class CalendarEventsServiceImpl implements CalendarEventsService {
   readonly #deps: CalendarEventsServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #state: CalendarEventsState = { authorization: null }
+  readonly #state = new WritableStore<CalendarEventsState>(
+    { authorization: null },
+    (a, b) => a.authorization === b.authorization,
+  )
   // Bumped by every read, so only the latest one publishes.
   #reads = 0
 
@@ -135,17 +134,9 @@ class CalendarEventsServiceImpl implements CalendarEventsService {
     this.#deps = deps
   }
 
-  readonly getState = (): CalendarEventsState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    const deliver = (): void => {
-      listener()
-    }
-    this.#listeners.add(deliver)
-    return () => {
-      this.#listeners.delete(deliver)
-    }
-  }
+  readonly subscribe = this.#state.subscribe
 
   watchAuthorization(): Unlisten {
     const { calendar, lifecycle } = this.#deps
@@ -214,13 +205,10 @@ class CalendarEventsServiceImpl implements CalendarEventsService {
       this.#deps.logger.error('calendar authorization read failed:', cause)
       return
     }
-    if (read !== this.#reads || authorization === this.#state.authorization) {
+    if (read !== this.#reads) {
       return
     }
-    this.#state = { authorization }
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set({ authorization })
   }
 }
 

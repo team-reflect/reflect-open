@@ -1,4 +1,4 @@
-import { Fragment, type Dispatch, type ReactElement, type SetStateAction } from 'react'
+import { Fragment, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import {
   getTaskKey,
@@ -6,6 +6,7 @@ import {
   type InsertTaskTarget,
   type OpenTask,
   type TaskGroup,
+  type WritableStore,
 } from '@reflect/core'
 import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
 import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation.tsx'
@@ -45,10 +46,9 @@ interface MobileTaskGroupProps {
    */
   onDelete: (task: OpenTask) => void
   /**
-   * The `getTaskKey` of the one row whose swipe actions are showing, across all groups.
+   * The one row whose swipe actions are showing, across all groups.
    */
-  revealedTaskKey: string | null
-  setRevealedTaskKey: Dispatch<SetStateAction<string | null>>
+  revealedRow: WritableStore<string | null>
 }
 
 /**
@@ -68,8 +68,7 @@ export function MobileTaskGroup({
   togglePending,
   onOpen,
   onDelete,
-  revealedTaskKey,
-  setRevealedTaskKey,
+  revealedRow,
 }: MobileTaskGroupProps): ReactElement {
   const { haptics } = useMobileServices()
   const showSource = group.kind !== 'note'
@@ -118,27 +117,19 @@ export function MobileTaskGroup({
         {contexts.map((context) => (
           <Fragment key={getTaskKey(context.tasks[0]!)}>
             <TaskBreadcrumbs breadcrumbs={context.visibleBreadcrumbs} className="px-4 pb-1 pt-3" />
-            {context.tasks.map((task) => {
-              const key = getTaskKey(task)
-              return (
-                <MobileTaskRow
-                  key={key}
-                  task={task}
-                  showSource={showSource}
-                  onEdit={onEdit}
-                  onToggle={() => onToggle(task)}
-                  togglePending={togglePending}
-                  revealed={revealedTaskKey === key}
-                  onReveal={() => setRevealedTaskKey(key)}
-                  onClose={() => setRevealedTaskKey(null)}
-                  onBeginInteraction={() => {
-                    setRevealedTaskKey((current) => (current === key ? current : null))
-                  }}
-                  onOpenNote={() => onOpen(task.notePath)}
-                  onDelete={() => onDelete(task)}
-                />
-              )
-            })}
+            {context.tasks.map((task) => (
+              <MobileTaskRow
+                key={getTaskKey(task)}
+                task={task}
+                showSource={showSource}
+                onEdit={onEdit}
+                onToggle={() => onToggle(task)}
+                togglePending={togglePending}
+                revealedRow={revealedRow}
+                onOpenNote={() => onOpen(task.notePath)}
+                onDelete={() => onDelete(task)}
+              />
+            ))}
           </Fragment>
         ))}
       </ul>

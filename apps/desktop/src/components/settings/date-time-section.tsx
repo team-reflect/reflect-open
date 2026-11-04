@@ -1,13 +1,5 @@
 import { useState, type ReactElement } from 'react'
 import {
-  dateFormatSchema,
-  timeFormatSchema,
-  weekStartDaySchema,
-  type DateFormat,
-  type TimeFormat,
-  type WeekStartDay,
-} from '@reflect/core'
-import {
   Select,
   SelectContent,
   SelectGroup,
@@ -15,8 +7,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select.tsx'
-import { formatFullDate } from '@/lib/dates.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  dateFormatSchema,
+  timeFormatSchema,
+  weekStartDaySchema,
+  type TimeFormat,
+  type WeekStartDay,
+  DATE_FORMATS,
+  formatFullDate,
+} from '@reflect/core'
+import {
+  useDateFormat,
+  useSettingsService,
+  useTimeFormat,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -43,16 +48,17 @@ const WEEK_START_OPTIONS: WeekStartOption[] = [
 
 // The options demonstrate themselves: each shows today's date in its format,
 // so the day/month order is visible rather than described.
-const DATE_FORMAT_VALUES: DateFormat[] = ['mdy', 'dmy', 'iso']
-
 /**
  * Date & time display preferences. Both formats feed every date and time the
  * app renders (via `formatDayLabel`/`formatTimeOfDay`/`formatRecencyLabel` in
- * `lib/dates.ts`) — display-only, so switching them never touches stored
+ * `@reflect/core`) — display-only, so switching them never touches stored
  * timestamps or daily-note keys.
  */
 export function DateTimeSection(): ReactElement {
-  const { settings, updateSettings } = useSettings()
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
+  const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
 
   return (
@@ -63,19 +69,21 @@ export function DateTimeSection(): ReactElement {
       >
         <div className="mt-3">
           <Select
-            value={settings.dateFormat}
-            items={DATE_FORMAT_VALUES.map((value) => ({
+            value={dateFormat}
+            items={DATE_FORMATS.map((value) => ({
               value,
               label: formatFullDate(today, value),
             }))}
-            onValueChange={(value) => updateSettings({ dateFormat: dateFormatSchema.parse(value) })}
+            onValueChange={(value) => {
+              return settingsService.update({ dateFormat: dateFormatSchema.parse(value) })
+            }}
           >
             <SelectTrigger aria-label="Date format" className="w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {DATE_FORMAT_VALUES.map((value) => (
+                {DATE_FORMATS.map((value) => (
                   <SelectItem key={value} value={value}>
                     {formatFullDate(today, value)}
                   </SelectItem>
@@ -88,10 +96,10 @@ export function DateTimeSection(): ReactElement {
       <SettingsField legend="Start week on" description="The first day shown in calendars.">
         <div className="mt-3">
           <Select
-            value={settings.weekStartDay}
+            value={weekStartDay}
             items={WEEK_START_OPTIONS}
             onValueChange={(value) => {
-              updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
+              settingsService.update({ weekStartDay: weekStartDaySchema.parse(value) })
             }}
           >
             <SelectTrigger aria-label="Start week on" className="w-36">
@@ -115,9 +123,11 @@ export function DateTimeSection(): ReactElement {
       >
         <div className="mt-3">
           <Select
-            value={settings.timeFormat}
+            value={timeFormat}
             items={TIME_FORMAT_OPTIONS}
-            onValueChange={(value) => updateSettings({ timeFormat: timeFormatSchema.parse(value) })}
+            onValueChange={(value) => {
+              return settingsService.update({ timeFormat: timeFormatSchema.parse(value) })
+            }}
           >
             <SelectTrigger aria-label="Time format" className="w-36">
               <SelectValue />

@@ -11,11 +11,8 @@ import type {
   SaveChatTurnInput,
 } from '../ai/chat/chat-history-service.ts'
 import type { ChatTurn } from '../ai/chat/transcript.ts'
-import {
-  cloudSafeGraphContext,
-  type CloudGraphContext,
-  type CloudSafe,
-} from '../privacy/privacy-service.ts'
+import { cloudSafeGraphContext, type CloudGraphContext } from '../privacy/privacy-service.ts'
+import type { CloudSafe } from '../privacy/cloud-safe.ts'
 
 export interface TestChatConversation {
   conversation: ChatConversation

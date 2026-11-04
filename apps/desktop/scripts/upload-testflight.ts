@@ -1,5 +1,5 @@
 // Uploads what `pnpm build:ios` made: the dSYMs to Sentry, then the IPA to
-// TestFlight. See docs/ios-testflight.md.
+// TestFlight. See docs/distribution.md.
 //
 //   pnpm upload:testflight
 

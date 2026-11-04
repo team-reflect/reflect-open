@@ -1,8 +1,8 @@
-import type { MaybePromise } from '@reflect/utils'
+import { isIsoDate, type MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import { noteBasenameKey } from '../graph/note-reference.ts'
-import { dateFromDailyPath, foldGraphPath, isCalendarDate } from '../graph/paths.ts'
+import { dateFromDailyPath, foldGraphPath } from '../graph/paths.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { DatabaseService } from './database-service.ts'
 
@@ -212,7 +212,7 @@ function movedNoteAddress(path: string) {
   return {
     pathKey: foldGraphPath(path),
     basenameKey: noteBasenameKey(path),
-    dailyDate: date !== null && isCalendarDate(date) ? date : null,
+    dailyDate: date !== null && isIsoDate(date) ? date : null,
   }
 }
 

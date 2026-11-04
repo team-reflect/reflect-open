@@ -1,16 +1,14 @@
 # Porting calendar / meetings integration
 
-**Status: shipped (macOS desktop).** The v1 feature — the day's meetings
-beside the daily note, one action to turn a meeting into a backlinked note —
-is one of Reflect's defining loops and ports to v2 with the same shape. What
-changes completely is how calendars are reached.
+**Status: shipped (macOS desktop).** The v1 loop (the day's meetings beside
+the daily note, one action to turn a meeting into a backlinked note) ports
+with the same shape. Only how calendars are reached changes.
 
-Landed as: the `calendar` Rust module
-(`apps/desktop/src-tauri/src/calendar.rs`), typed bindings + display policy
-in `packages/core/src/calendar/`, the `addMeetingToDaily` action
-(`packages/core/src/contacts/meeting-service.ts`), the Settings **Calendar**
-section, and the Events section in the daily context sidebar with its
-add-meeting dialog. iOS still inherits the EventKit approach later (its
+Landed as: `apps/desktop/src-tauri/src/calendar.rs`, bindings and display
+policy in `packages/core/src/calendar/`, the `addMeetingToDaily` action
+(`packages/core/src/contacts/meeting-service.ts`), the Settings
+**Calendar** section, and the Events section in the daily context sidebar
+with its add-meeting dialog. iOS inherits the EventKit approach later (its
 Info.plist/entitlements live in the generated Xcode project, not this
 bundle config).
 
@@ -18,85 +16,68 @@ bundle config).
 
 - Connected Google, Microsoft, or iCloud calendars via OAuth / app-specific
   passwords, with credentials held server-side.
-- Daily notes showed an **Events** sidebar (auto-refreshing) with the day's
-  meetings from the calendars the user enabled.
+- Daily notes showed an auto-refreshing **Events** sidebar with the day's
+  meetings from enabled calendars.
 - Clicking a meeting opened an **Add event** modal; submitting created or
-  found a meeting note, created person notes for attendees, and backlinked
-  all of them from the daily note.
+  found a meeting note, created attendee person notes, and backlinked them
+  all from the daily note.
 
 ## Why the v1 approach can't port
 
-Provider OAuth requires a confidential client secret and redirect endpoints
-held on a server. v2 is open-source and client-only: there is no server to
-hold secrets, and a client secret shipped in an open-source binary is
-public. Per-provider API integrations (Google Calendar API, Microsoft Graph,
-CalDAV) are therefore out.
+Provider OAuth needs a confidential client secret and redirect endpoints on
+a server. v2 is open-source and client-only, so a shipped client secret
+would be public. Google Calendar API, Microsoft Graph, and CalDAV are out.
 
 ## How it will work in v2
 
 ### Apple Calendar via EventKit
 
-v2 reads the calendars macOS already has, through the EventKit framework.
-This is a smaller integration than it sounds like a regression:
-**macOS Calendar already aggregates Google, Microsoft/Exchange, and iCloud
-accounts.** A user who adds their Google account in System Settings →
-Internet Accounts sees those events in Reflect with zero OAuth — Apple
-maintains the sync. Access is read-only and entirely local; no network call
-is added to [docs/privacy.md](../privacy.md)'s inventory.
+v2 reads the calendars macOS already has. **macOS Calendar already
+aggregates Google, Microsoft/Exchange, and iCloud accounts**, so a user who
+adds Google in System Settings → Internet Accounts sees those events with
+zero OAuth. Access is read-only and local; no network call is added to
+[docs/privacy.md](../privacy.md).
 
 ### User experience
 
-1. **Enabling.** A **Calendar** section in Settings with a single switch.
-   Turning it on triggers the standard macOS permission prompt ("Reflect
-   would like to access your calendar"). Denied or revoked permission shows
-   an inline explanation with a button to System Settings — no error badges
-   or revoke-and-reconnect loops, because there are no credentials to go
-   stale.
-2. **Choosing calendars.** Once granted, the section lists every calendar
-   on the Mac (across all accounts) with checkboxes, mirroring v1's
-   "2/5 calendars" selector. Enabled calendar identifiers are stored in the
-   user settings file.
-3. **Events on the daily note.** Today's events from enabled calendars
-   appear in a panel on the daily note: title and start time (respecting the
-   existing time-format setting), declined and all-day/busy-placeholder
-   events filtered out, as in v1.
-4. **Add to daily note.** Each event has one primary action, carrying over
-   the v1 modal: editable meeting name, editable attendee list, and a
-   "create backlinked note?" choice. Submitting writes plain markdown into
-   the daily note — a `[[Meeting name]]` link and `[[Person]]` links per
-   attendee — and creates the meeting/person notes if missing. With the
-   [contacts integration](./contacts-integration.md) on, a fresh person note
-   is pre-filled from the Apple Contacts entry matching the attendee's
-   invite email. After that, they are ordinary notes; nothing about them
-   stays tied to the calendar. Existing `#person` notes are reused by explicit
-   email ownership even when their title differs from the calendar name.
-   Conflicting or unaddressable owners are written as plain attendee text and
-   do not create another person note.
+1. **Enabling.** A **Calendar** switch in Settings triggers the macOS
+   permission prompt. Denied or revoked permission shows an inline
+   explanation with a button to System Settings. No error badges or
+   reconnect loops: there are no credentials to go stale.
+2. **Choosing calendars.** The section lists every calendar on the Mac with
+   checkboxes (like v1's "2/5 calendars"). Enabled identifiers are stored in
+   the user settings file.
+3. **Events on the daily note.** Today's events from enabled calendars, with
+   title and start time (per the time-format setting); declined and
+   all-day/busy-placeholder events are filtered out, as in v1.
+4. **Add to daily note.** One primary action per event, carrying over v1's
+   modal: editable meeting name, editable attendees, and a "create
+   backlinked note?" choice. Submitting writes plain markdown (a
+   `[[Meeting name]]` link and `[[Person]]` per attendee) and creates
+   missing notes. With [contacts](./contacts-integration.md) on, a new
+   person note is pre-filled from the Apple Contacts entry matching the
+   invite email. After that they are ordinary notes, not tied to the
+   calendar. Existing `#person` notes are reused by explicit email
+   ownership even when the title differs. Conflicting or unaddressable
+   owners are written as plain text and create no person note.
 
 ### Architecture
 
-- **Rust owns the capability.** A `calendar` module in
-  `apps/desktop/src-tauri/src/` binds EventKit through the `objc2` /
-  `objc2-event-kit` crates (the codebase is pure Rust today and stays that
-  way — no Swift). Commands: request access, list calendars, list events
-  for a date range.
-- **TypeScript owns policy.** `@reflect/core` gets a service over the commands
-  (`CalendarService`, `packages/core/src/calendar/calendar-service.ts`) and the
-  note-writing logic for "add meeting" (`MeetingService`,
-  `packages/core/src/contacts/meeting-service.ts`); the daily-note panel
-  consumes them. Events are **fetched live,
-  not indexed** — EventKit is fast and local, the SQLite index stays a
-  projection of markdown only, and no calendar data is ever persisted
-  except the markdown the user explicitly creates.
-- **Packaging.** The hardened-runtime entitlement
-  (`com.apple.security.personal-information.calendars`) and an
-  `NSCalendarsFullAccessUsageDescription` string join the bundle config;
-  notarization is already in place
-  ([docs/macos-distribution.md](../macos-distribution.md)).
-- **iOS.** EventKit is the same API on iOS, so the mobile companion
-  ([plans/19-mobile.md](../plans/19-mobile.md)) inherits this integration
-  rather than needing a separate "mobile sync" story like v1's Capacitor
-  builds did.
+- **Rust owns the capability.** The `calendar` module binds EventKit through
+  `objc2` / `objc2-event-kit` (the codebase stays pure Rust, no Swift).
+  Commands: request access, list calendars, list events for a range.
+- **TypeScript owns policy.** `CalendarService`
+  (`packages/core/src/calendar/calendar-service.ts`) and `MeetingService`
+  (`packages/core/src/contacts/meeting-service.ts`) feed the daily-note
+  panel. Events are **fetched live, not indexed**: EventKit is fast and
+  local, the index stays a projection of markdown, and no calendar data
+  persists except markdown the user creates.
+- **Packaging.** The `com.apple.security.personal-information.calendars`
+  entitlement and an `NSCalendarsFullAccessUsageDescription` string;
+  notarization is already in place ([docs/distribution.md](../distribution.md)).
+- **iOS.** EventKit is the same API, so the mobile companion
+  ([plans/19-mobile.md](../plans/19-mobile.md)) inherits this instead of
+  needing a separate sync story like v1's Capacitor builds.
 
 ## v1 → v2 mapping
 
@@ -110,28 +91,25 @@ is added to [docs/privacy.md](../privacy.md)'s inventory.
 
 ## Explicitly not ported
 
-- Direct Google/Microsoft/CalDAV connections and the whole credential
-  lifecycle (connect, revoke, token refresh, error recovery).
-- Any write access to calendars (v1 was read-only too; v2 keeps that).
-- Meeting location / organizer / conference links (v1 didn't surface them
-  either; can be revisited since EventKit exposes them).
+- Direct Google/Microsoft/CalDAV connections and the credential lifecycle.
+- Write access to calendars (v1 was read-only too).
+- Location / organizer / conference links (v1 didn't show them either;
+  EventKit exposes them if wanted later).
 
 ## Decisions (were open questions)
 
-- The events panel is a **context-sidebar section** on the daily note,
-  tracking the focused day; it can move into the daily-note header once that
-  layout settles.
-- "Create backlinked note?" **defaults on for recurring events** (v1's
-  behavior — EventKit's `hasRecurrenceRules` is plumbed through as
-  `recurring`), off otherwise. Meeting notes are reused per title: a
-  recurring "Standup" links one `[[Standup]]` note from every day.
-- The daily-note markdown lands under a `## Meetings` heading
-  (`appendListItemUnderHeading`), one bullet per meeting in v1's exact line shape:
-  `- 9:00am met with [[Person A]], [[Person B]] for [[Meeting]]`. As in v1,
-  an unchecked "create backlinked note" writes the meeting name as plain
-  text, and untitled / "block" / "busy" events never reach the panel. Two
-  deliberate v1 deviations: no nested empty bullet under the line (the v2
-  serializer drops empty list items), and re-adding a backlinked meeting is
-  idempotent instead of appending a duplicate.
-- No Google-OAuth-shaped hint; the Settings copy points at
-  System Settings → Internet Accounts when no calendars are found.
+- The events panel is a **context-sidebar section** tracking the focused
+  day; it can move into the daily-note header once that layout settles.
+- "Create backlinked note?" **defaults on for recurring events** (v1
+  behavior; EventKit's `hasRecurrenceRules` is plumbed as `recurring`), off
+  otherwise. Meeting notes are reused per title: a recurring "Standup"
+  links one `[[Standup]]` note every day.
+- Markdown lands under a `## Meetings` heading
+  (`appendListItemUnderHeading`), one bullet per meeting in v1's line
+  shape: `- 9:00am met with [[Person A]], [[Person B]] for [[Meeting]]`. As
+  in v1, unchecking "create backlinked note" writes the name as plain text,
+  and untitled / "block" / "busy" events never reach the panel. Two
+  deliberate deviations: no nested empty bullet (the serializer drops empty
+  list items), and re-adding a backlinked meeting is idempotent.
+- No Google-OAuth-shaped hint; when no calendars are found, the Settings
+  copy points at System Settings → Internet Accounts.

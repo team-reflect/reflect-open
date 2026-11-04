@@ -84,7 +84,7 @@ a looser dev CSP if HMR requires it. High security value, contained blast radius
 
 **Problem (confirmed).** The read-only `db_query` bridge gated writes only with
 `rusqlite::Statement::readonly()`
-([`apps/desktop/src-tauri/src/db/query.rs`](../../apps/desktop/src-tauri/src/db/query.rs)).
+([`crates/index/src/query.rs`](../../crates/index/src/query.rs)).
 SQLite considers `ATTACH`/`DETACH` and connection-state `PRAGMA`s "read only"
 even though none of them read our projection. A failing probe test confirmed the
 hole: the bridge accepted
@@ -128,11 +128,11 @@ by hand. The code says so explicitly:
 
 > Mirrors the `indexedNoteSchema` zod contract … field-for-field … a change on
 > either side must be mirrored on the other.
-> — [`write.rs:14`](../../apps/desktop/src-tauri/src/db/write.rs)
+> — [`write.rs:14`](../../crates/index/src/write.rs)
 
 The same mirror exists for `ChatConversation`/`ChatMessageRow`
-([`chat_write.rs`](../../apps/desktop/src-tauri/src/db/chat_write.rs)) and
-`EmbeddedChunk` ([`embed_write.rs`](../../apps/desktop/src-tauri/src/db/embed_write.rs)).
+([`chat_write.rs`](../../crates/index/src/chat_write.rs)) and
+`EmbeddedChunk` ([`embed_write.rs`](../../crates/index/src/embed_write.rs)).
 Drift is only caught at runtime (serde rejection + payload tests), never at
 compile time. This is the legitimate ergonomic pain that motivated the
 "generic `db_execute`" idea in TDR 0001 — but it can be fixed without opening a

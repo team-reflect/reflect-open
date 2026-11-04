@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import type { TimerHandle } from '@reflect/core'
-import prettyMs from 'pretty-ms'
+import { formatDurationInWords } from '@reflect/utils'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -9,13 +9,13 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export function CountdownText({ until }: { until: number }): ReactElement {
   const { clock } = useCoreServices()
-  const [text, setText] = useState(() => formatRemaining(until - clock.now()))
+  const [text, setText] = useState(() => formatDurationInWords(until - clock.now()))
 
   useEffect(() => {
     let handle: TimerHandle | undefined
     const tick = (): void => {
       const remaining = until - clock.now()
-      setText(formatRemaining(remaining))
+      setText(formatDurationInWords(remaining))
       if (remaining > 0) {
         handle = clock.setTimeout(tick, msUntilNextChange(remaining))
       }
@@ -29,12 +29,6 @@ export function CountdownText({ until }: { until: number }): ReactElement {
   }, [clock, until])
 
   return <>{text}</>
-}
-
-function formatRemaining(ms: number): string {
-  // Whole seconds: pretty-ms words anything under a second in milliseconds.
-  const seconds = Math.floor(Math.max(ms, 0) / 1000)
-  return seconds === 0 ? '0 seconds' : prettyMs(seconds * 1000, { compact: true, verbose: true })
 }
 
 function msUntilNextChange(remaining: number): number {

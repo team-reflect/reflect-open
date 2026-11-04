@@ -1,16 +1,20 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
-import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane.tsx'
 import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
-import { formatDayLabel } from '@/lib/dates.ts'
+import { dailyPath, formatDayLabel } from '@reflect/core'
+import {
+  createDayWindow,
+  dateAtIndex,
+  extendDayWindowBack,
+  indexOfDate,
+  neighborDate,
+} from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useToday } from '@/lib/use-today.ts'
-import { createDayWindow, dateAtIndex, indexOfDate, neighborDate } from '@/lib/day-window.ts'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
 import { clamp } from '@ocavue/utils'
 
 /** The size guess virtua uses for a row it has not measured yet. */
@@ -41,25 +45,26 @@ const CONTENT_GUTTER = 'reflect-content-gutter'
  * above, future below — where **every day is a virtual note**. Each visible row
  * mounts the Plan 05 editor lazily (`createIfMissing`), so a day only becomes a
  * real `daily/*.md` when edited. Offscreen rows unmount and flush through the
- * save pipeline's final-flush path. The window is a fixed ±range around today
- * (virtual rows are free), so there is no bidirectional infinite-scroll
- * bookkeeping; index↔date is pure offset math.
+ * save pipeline's final-flush path. The window is a ±range around today
+ * (virtual rows are free) that grows back only when an arrival lands before it,
+ * so scrolling needs no bidirectional infinite-scroll bookkeeping; index↔date
+ * is pure offset math.
  */
 export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const { arrivalSeq, arrivalFocusEditor, entryId, saveScrollState, savedScroll } = useRouter()
   const virtualizerRef = useRef<VirtualizerHandle>(null)
-  // The window anchors at today-on-mount and stays stable for the view's life.
-  // (`dayWindow`, not `window` — shadowing the DOM global here was a footgun.)
-  const { dailyNotes } = useCoreServices()
-  const [dayWindow] = useState(() => createDayWindow(dailyNotes.today()))
+  // The window anchors at today-on-mount and only grows back, when an arrival
+  // lands before it. (`dayWindow`, not `window` — shadowing the DOM global here was a
+  // footgun.)
+  const today = useToday()
+  const [dayWindow, setDayWindow] = useState(() => createDayWindow(today))
   // Per-row data is unused (the date is derived from the index); a stable array
   // of the window's length just tells virtua how many rows exist.
   const data = useMemo(() => Array.from({ length: dayWindow.count }), [dayWindow.count])
   const [scrollIndex, setScrollIndex] = useState<number>(dayWindow.anchorIndex)
   const [focusIndex, setFocusIndex] = useState<number>(dayWindow.anchorIndex)
-  const today = useToday()
   const targetDate = target.kind === 'today' ? today : target.date
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
 
   // targetDate is read at arrival time, not reacted to. On the `today` route
   // it follows this component's live clock — the same value that paints the
@@ -178,16 +183,28 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
 
   // Re-anchor on every explicit arrival (`arrivalSeq` bumps even when ⌘D is
   // pressed while already on today — the router clears the entry's saved
-  // offset for that case; `entryId` covers back/forward between entries whose
+  // position for that case; `entryId` covers back/forward between entries whose
   // routes resolve to the same day). A back/forward-restored entry carries its
-  // offset; a fresh navigation anchors to the target day.
+  // saved day; a fresh navigation anchors to the target day.
   //
   // A layout effect, not a passive one: virtua applies an imperative scroll in a
   // pre-paint microtask, so anchoring here pins the target day to the viewport
   // top before the first frame is shown, instead of painting the top of the
   // five-year window and then lurching down.
   useLayoutEffect(() => {
-    const restored = savedScroll()
+    const target = targetDateRef.current
+    const saved = savedScroll()
+    const restored = typeof saved === 'object' ? saved : null
+    const extended = extendDayWindowBack(dayWindow, restored?.date ?? target)
+    if (extended !== dayWindow) {
+      // An arrival or restored day before the window grows it; the effect
+      // re-runs on the new window to anchor there. Tracked indices move with it.
+      const added = extended.anchorIndex - dayWindow.anchorIndex
+      setScrollIndex((index) => index + added)
+      setFocusIndex((index) => index + added)
+      setDayWindow(extended)
+      return
+    }
     if (restored !== null) {
       // A restored arrival also cancels any focus still pending from a prior
       // navigation the user backed out of before that day's editor mounted (both
@@ -195,10 +212,12 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       // otherwise steal focus when its row scrolls into view.
       focusPendingRef.current = null
       pendingFocusRef.current = null
-      virtualizerRef.current?.scrollTo(restored)
+      virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, restored.date), {
+        align: 'start',
+        offset: restored.offset,
+      })
       return
     }
-    const target = targetDateRef.current
     pendingFocusRef.current = null
     focusPendingRef.current = {
       date: target,
@@ -206,6 +225,20 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     }
     virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
   }, [arrivalSeq, entryId, dayWindow, savedScroll])
+
+  // Save the day at the viewport top and how far into it the viewport starts.
+  const saveDayScroll = useCallback(
+    (scrollTop: number) => {
+      const virtualizer = virtualizerRef.current
+      if (!virtualizer) return
+      const index = virtualizer.findItemIndex(scrollTop)
+      saveScrollState({
+        date: dateAtIndex(dayWindow, index),
+        offset: scrollTop - virtualizer.getItemOffset(index),
+      })
+    },
+    [dayWindow, saveScrollState],
+  )
 
   const onScrollOffset = useCallback((offset: number) => {
     const scrollIndex = virtualizerRef.current?.findItemIndex(offset)
@@ -228,7 +261,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     <div
       data-testid="daily-stream"
       className="h-full overflow-auto"
-      onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
+      onScroll={(event) => saveDayScroll(event.currentTarget.scrollTop)}
       // An explicit click/touch picks its own focus target — a focus still
       // pending for a day whose editor hasn't mounted yet must not steal the
       // caret later. Typing is deliberately not a cancel: ⌘D-then-type should
@@ -244,7 +277,11 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
         itemSize={ESTIMATED_DAY_HEIGHT}
         bufferSize={2 * ESTIMATED_DAY_HEIGHT}
         keepMounted={keepMounted}
-        shift={true}
+        // Every growth is followed by a scroll to a day, which virtua's prepend
+        // compensation could land after and undo (seen in Chromium, so Windows'
+        // WebView2). The cost: rows measured before a growth keep their sizes at
+        // their old indices, now earlier days, until those rows remount.
+        shift={false}
         onScroll={onScrollOffset}
       >
         {(_, index) => {
@@ -280,7 +317,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
                 )}
                 onClick={() => handleSubjectClick(date)}
               >
-                {formatDayLabel(date, settings.dateFormat)}
+                {formatDayLabel(date, dateFormat)}
               </h2>
               <NotePane
                 path={dailyPath(date)}

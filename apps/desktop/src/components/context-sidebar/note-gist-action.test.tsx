@@ -46,7 +46,7 @@ async function renderAction() {
  */
 async function waitForReads(queryClient: QueryClient): Promise<void> {
   await vi.waitFor(() => {
-    expect(core.githubAuth.getState().connected).toBe(connected)
+    expect(core.githubAuth.get().connected).toBe(connected)
     expect(queryClient.getQueryData(queryKeys.index.note('/g', 'notes/a.md'))).toEqual(row)
   })
 }
@@ -72,7 +72,7 @@ describe('NoteGistAction', () => {
     row = noteRow({ isPrivate: true })
     const view = await renderAction()
     await waitForReads(view.queryClient)
-    expect(view.getByRole('button').query()).toBeNull()
+    await vi.waitFor(() => expect(view.getByRole('button').query()).toBeNull())
   })
 
   it('offers Share with private link for an unpublished note (even before its row exists)', async () => {

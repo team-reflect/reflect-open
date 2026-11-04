@@ -1,7 +1,9 @@
 import type { IdService } from '../ports/id-service.ts'
+import { deriveStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
-import type { AiPrompt, AiPromptMode } from '../settings/schema.ts'
+import type { AiPrompt, AiPromptMode, Settings } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
+import { isDeepEqual } from '@ocavue/utils'
 
 /**
  * What the prompt editor collects; `id` is minted on add.
@@ -23,31 +25,31 @@ export interface AiPromptServiceDeps {
  * workflow, not note content), and every write rebuilds from the settings as
  * they are when the update applies, so concurrent edits do not overwrite
  * each other.
+ *
+ * As a {@link Store}, its value is the saved prompts, in display order. It
+ * notifies only when the list changes, not on other settings changes.
  */
-export interface AiPromptService {
-  /**
-   * The saved prompts, in display order. Stable until the list changes.
-   */
-  list: () => AiPrompt[]
-  /**
-   * Calls `listener` after any settings change.
-   */
-  subscribe: (listener: () => void) => Unlisten
+export interface AiPromptService extends Store<AiPrompt[]> {
   add(draft: AiPromptDraft): void
   update(id: string, draft: AiPromptDraft): void
   remove(id: string): void
 }
 
+function selectAiPrompts(settings: Settings): AiPrompt[] {
+  return settings.aiPrompts
+}
+
 class AiPromptServiceImpl implements AiPromptService {
   readonly #deps: AiPromptServiceDeps
+  readonly #store: Store<AiPrompt[]>
 
   constructor(deps: AiPromptServiceDeps) {
     this.#deps = deps
+    this.#store = deriveStore(deps.settings, selectAiPrompts, isDeepEqual)
   }
 
-  readonly list = (): AiPrompt[] => this.#deps.settings.get().aiPrompts
-
-  readonly subscribe = (listener: () => void): Unlisten => this.#deps.settings.subscribe(listener)
+  readonly get = (): AiPrompt[] => this.#store.get()
+  readonly subscribe = (listener: () => void): Unlisten => this.#store.subscribe(listener)
 
   add(draft: AiPromptDraft): void {
     const { settings, id: idService } = this.#deps

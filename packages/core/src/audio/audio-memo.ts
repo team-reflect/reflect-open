@@ -1,5 +1,7 @@
+import { formatDate, formatIsoDate } from '@reflect/utils'
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcription-service.ts'
-import { audioMemoPath, dailyPath, notePath } from '../graph/paths.ts'
+import { type FileStamp, formatFileStamp, parseFileStamp } from '../lib/file-stamp.ts'
+import { audioMemoPath, notePath } from '../graph/paths.ts'
 import type { AudioMemoIdentity } from './audio-memo-session.ts'
 
 /**
@@ -26,7 +28,7 @@ const MIME_BY_EXTENSION: Record<string, string> = Object.fromEntries(
  * has no duration cap, so `part-1000` must parse like `part-999`.
  */
 const MEMO_PATH_RE =
-  /^audio-memos\/(audio-memo-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3})(?:\.part-(\d{3,})(-end)?)?\.([a-z0-9]+)$/
+  /^audio-memos\/(audio-memo-(\d{4}-\d{2}-\d{2}-\d{6}-\d{3}))(?:\.part-(\d{3,})(-end)?)?\.([a-z0-9]+)$/
 
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0')
@@ -34,17 +36,14 @@ function pad(value: number, width: number): string {
 
 function buildIdentity(
   base: string,
-  date: string,
-  hours: string,
-  minutes: string,
-  seconds: string,
+  { date, time }: FileStamp,
   extension: string,
 ): AudioMemoIdentity {
   return {
     base,
     date,
-    title: `Audio memo ${date} ${hours}:${minutes}:${seconds}`,
-    alias: `Audio memo ${hours}:${minutes}`,
+    title: `Audio memo ${date} ${time}`,
+    alias: `Audio memo ${time.slice(0, 5)}`,
     audioPath: audioMemoPath(`${base}.${extension}`),
     notePath: notePath(base),
     mimeType: MIME_BY_EXTENSION[extension] ?? 'audio/mp4',
@@ -55,13 +54,10 @@ function buildIdentity(
  * The identity a fresh recording will be stored under (local time).
  */
 export function audioMemoIdentity(recordedAt: Date, mimeType: string): AudioMemoIdentity {
-  const date = `${recordedAt.getFullYear()}-${pad(recordedAt.getMonth() + 1, 2)}-${pad(recordedAt.getDate(), 2)}`
-  const hours = pad(recordedAt.getHours(), 2)
-  const minutes = pad(recordedAt.getMinutes(), 2)
-  const seconds = pad(recordedAt.getSeconds(), 2)
-  const base = `audio-memo-${date}-${hours}${minutes}${seconds}-${pad(recordedAt.getMilliseconds(), 3)}`
+  const stamp = formatFileStamp(recordedAt)
   const extension = AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'
-  return buildIdentity(base, date, hours, minutes, seconds, extension)
+  const fields = { date: formatIsoDate(recordedAt), time: formatDate(recordedAt, 'HH:mm:ss') }
+  return buildIdentity(`audio-memo-${stamp}`, fields, extension)
 }
 
 /**
@@ -92,31 +88,20 @@ export function audioMemoPartFromPath(path: string): ParsedAudioMemoPart | null 
   if (match === null) {
     return null
   }
-  const [, base, date, hours, minutes, seconds, part, end, extension] = match
-  if (
-    base === undefined ||
-    date === undefined ||
-    hours === undefined ||
-    minutes === undefined ||
-    seconds === undefined ||
-    extension === undefined
-  ) {
-    return null
-  }
-  if (Number(hours) > 23 || Number(minutes) > 59 || Number(seconds) > 59) {
+  const [, base, stamp, part, end, extension] = match
+  if (base === undefined || stamp === undefined || extension === undefined) {
     return null
   }
   const partNumber = part === undefined ? 1 : Number(part)
   if (partNumber < 1) {
     return null
   }
-  try {
-    dailyPath(date) // calendar-validates the date the same way the backlink will
-  } catch {
+  const fields = parseFileStamp(stamp)
+  if (fields === null) {
     return null
   }
   return {
-    memo: buildIdentity(base, date, hours, minutes, seconds, extension),
+    memo: buildIdentity(base, fields, extension),
     part: partNumber,
     end: part === undefined ? true : end !== undefined,
   }

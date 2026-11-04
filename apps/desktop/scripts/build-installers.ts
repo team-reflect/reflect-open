@@ -1,7 +1,7 @@
 // Builds the installers of the target platform: the NSIS installer for
 // Windows, the AppImage and `.deb` for Linux. None of them is code-signed. With
 // TAURI_SIGNING_PRIVATE_KEY set, Tauri also writes the updater signature
-// (`.sig`) of each one. See docs/windows-builds.md and docs/linux-builds.md.
+// (`.sig`) of each one. See docs/distribution.md.
 //
 //   pnpm build:windows [--target=<triple>] [--artifact-dir=<path>]
 //   pnpm build:linux [--target=<triple>] [--artifact-dir=<path>]

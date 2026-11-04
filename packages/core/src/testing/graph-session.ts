@@ -7,6 +7,7 @@ import {
   type GraphSessionServiceDeps,
   type GraphSessionState,
 } from '../graph/graph-session-service.ts'
+import { combineStores, WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { GraphInfo, RecentGraph } from '../graph/schemas.ts'
 import { createTestFileChangeService } from './file-change.ts'
@@ -79,7 +80,6 @@ function graphPatch(
       status: 'choosing',
       graph: null,
       indexGeneration: null,
-      indexing: false,
       error: null,
       session: null,
       services: null,
@@ -95,7 +95,6 @@ function graphPatch(
     status: 'ready',
     graph: info,
     indexGeneration,
-    indexing: false,
     error: null,
     session: createGraphSession({ ...info, indexGeneration, role }, signal),
     services: null,
@@ -110,15 +109,10 @@ class TestGraphSessionServiceImpl<Services> implements TestGraphSessionService<S
   readonly #inner: GraphSessionService<Services>
   readonly #role: GraphRole
   readonly #createServices: GraphSessionServiceDeps<Services>['createServices']
-  readonly #listeners = new Set<() => void>()
   // Ends the session of the last `setGraph`.
   #seeded = new AbortController()
-  #overlay: Partial<GraphSessionState<Services>>
-  #merged: {
-    base: GraphSessionState<Services>
-    overlay: Partial<GraphSessionState<Services>>
-  } | null = null
-  #snapshot: GraphSessionState<Services>
+  readonly #overlay: WritableStore<Partial<GraphSessionState<Services>>>
+  readonly #store: Store<GraphSessionState<Services>>
 
   constructor(
     inner: GraphSessionService<Services>,
@@ -132,30 +126,19 @@ class TestGraphSessionServiceImpl<Services> implements TestGraphSessionService<S
     this.#inner = inner
     this.#role = options.role
     this.#createServices = options.createServices
-    this.#overlay = {
+    this.#overlay = new WritableStore({
       ...(options.graph === undefined ? {} : this.#seedGraph(options.graph)),
       ...options.state,
-    }
-    this.#snapshot = inner.getState()
+    })
+    this.#store = combineStores([inner, this.#overlay], (base, overlay) => ({
+      ...base,
+      ...overlay,
+    }))
   }
 
-  readonly getState = (): GraphSessionState<Services> => {
-    const base = this.#inner.getState()
-    if (this.#merged?.base !== base || this.#merged.overlay !== this.#overlay) {
-      this.#merged = { base, overlay: this.#overlay }
-      this.#snapshot = { ...base, ...this.#overlay }
-    }
-    return this.#snapshot
-  }
+  readonly get = (): GraphSessionState<Services> => this.#store.get()
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    const unlisten = this.#inner.subscribe(listener)
-    this.#listeners.add(listener)
-    return () => {
-      unlisten()
-      this.#listeners.delete(listener)
-    }
-  }
+  readonly subscribe = (listener: VoidFunction): Unlisten => this.#store.subscribe(listener)
 
   attach(): Unlisten {
     return this.#inner.attach()
@@ -210,10 +193,7 @@ class TestGraphSessionServiceImpl<Services> implements TestGraphSessionService<S
   }
 
   setState(patch: Partial<GraphSessionState<Services>>): void {
-    this.#overlay = { ...this.#overlay, ...patch }
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#overlay.set({ ...this.#overlay.get(), ...patch })
   }
 
   setGraph(graph: TestOpenGraph | null): void {
@@ -285,7 +265,7 @@ export function createTestGraphSessionService<Services = never>(
       options?.noteRows ??
       createNoteRowService({
         graphSession: {
-          getState: () => testService.getState(),
+          get: () => testService.get(),
           subscribe: (listener) => testService.subscribe(listener),
         },
       }),

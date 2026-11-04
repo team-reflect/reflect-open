@@ -9,8 +9,6 @@ interface SwipeActionButtonProps {
   /** The short visible caption under the icon (the full name goes in `ariaLabel`). */
   label: string
   ariaLabel: string
-  /** Mirror of the row's revealed state: hidden actions leave the tab order. */
-  revealed: boolean
   /** The action's background, e.g. `bg-accent` or `bg-destructive`. */
   className: string
   onClick: () => void
@@ -21,14 +19,12 @@ export function SwipeActionButton({
   icon,
   label,
   ariaLabel,
-  revealed,
   className,
   onClick,
 }: SwipeActionButtonProps): ReactElement {
   return (
     <button
       type="button"
-      tabIndex={revealed ? 0 : -1}
       className={cn(
         'flex h-full flex-col items-center justify-center gap-1 text-[10px] font-medium text-text-on-brand active:opacity-70',
         className,

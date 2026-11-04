@@ -1,17 +1,16 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { errorMessage, type MobileStorageKind } from '@reflect/core'
+import { errorMessage, type MobileStorageKind, graphNameFromRoot } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
-import { graphNameFromRoot } from '@/lib/graph-names.ts'
 import { queryKeys } from '@/lib/query-client.ts'
 import { NewGraphDrawer } from '@/mobile/new-graph-drawer.tsx'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
-import { useCoreServices } from '@/services/services-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The Graphs screen (route kind `graphs`) — the mobile graph switcher as an
@@ -26,7 +25,8 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export function MobileGraphs(): ReactElement {
   const { back, canBack, navigate } = useRouter()
-  const { graph, completeOnboarding } = useGraph()
+  const graph = useGraphInfo()
+  const { mobileOnboarding } = useAppServices()
   const [pendingRoot, setPendingRoot] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -48,7 +48,7 @@ export function MobileGraphs(): ReactElement {
   function switchTo(kind: MobileStorageKind, root: string): Promise<void> {
     setPendingRoot(root)
     setSwitchError(null)
-    return completeOnboarding(kind, root).then(
+    return mobileOnboarding.completeOnboarding(kind, root).then(
       () => {
         // A confirmed switch remounts the router (keyed by graph root), so
         // this screen is gone; clearing state only matters on failure paths.

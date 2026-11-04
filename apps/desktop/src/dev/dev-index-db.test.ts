@@ -22,11 +22,7 @@ import {
   createTestLoggerService,
 } from '@reflect/core/testing'
 import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db.ts'
-import {
-  buildAllNotesSearch,
-  EMPTY_ALL_NOTES_FILTERS,
-  searchPlanFor,
-} from '@/mobile/search-filters/filter-state.ts'
+import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
 
 function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
   return {
@@ -127,11 +123,12 @@ function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServ
   })
   const database = createDatabaseService({ ipc })
   const wikiResolver = createWikiResolverService({ database })
+  const clock = createTestClockService()
   return {
     search: createSearchService({ database, wikiResolver }),
     dailyNotes: createDailyNoteService({
       database,
-      clock: createTestClockService(),
+      clock,
       activity: createTestActivityPort(),
     }),
     wikiResolver,

@@ -4,13 +4,16 @@ import type {
   AudioRecorderService,
   AudioRecorderState,
   AudioRecorderStopped,
+} from '../audio/audio-recorder-service.ts'
+import type {
   RecordingLevelEvent,
   RecordingNativeActionEvent,
   RecordingSessionStart,
   RecordingStatus,
   StagedRecordingFile,
   StartRecordingOptions,
-} from '../audio/audio-recorder-service.ts'
+} from '../ipc/recording-plugin.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 
 export type AudioRecorderCall =
@@ -81,7 +84,8 @@ function emit<Value>(listeners: Set<(value: Value) => void>, value: Value): void
 class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
   readonly #sessionStartedMs: number
   readonly #supported: boolean
-  #state: AudioRecorderState = 'idle'
+  readonly #state = new WritableStore<AudioRecorderState>('idle')
+  readonly state: Store<AudioRecorderState> = this.#state
   #stopResult: AudioRecorderFinalSegment | null = null
   #startFailure: { error: unknown } | null = null
   #startHeld: Promise<void> | null = null
@@ -93,7 +97,6 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
   #staged: StagedRecordingFile[] = []
   readonly #log: AudioRecorderCall[] = []
   readonly #claimed = new Set<string>()
-  readonly #stateListeners = new Set<(state: AudioRecorderState) => void>()
   readonly #levelListeners = new Set<(event: RecordingLevelEvent) => void>()
   readonly #segmentListeners = new Set<(segment: AudioRecorderSegment) => void>()
   readonly #stoppedListeners = new Set<(stopped: AudioRecorderStopped) => void>()
@@ -109,21 +112,13 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
     return this.#supported
   }
 
-  state(): AudioRecorderState {
-    return this.#state
-  }
-
-  subscribeState(listener: (state: AudioRecorderState) => void): Unlisten {
-    return subscribeTo(this.#stateListeners, listener)
-  }
-
   stream(): MediaStream | null {
     return null
   }
 
   async start(startOptions: StartRecordingOptions): Promise<RecordingSessionStart | null> {
     this.#log.push({ method: 'start', options: { ...startOptions } })
-    if (this.#state !== 'idle') {
+    if (this.#state.get() !== 'idle') {
       return null
     }
     if (this.#startFailure !== null) {
@@ -134,7 +129,7 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
     if (this.#startHeld !== null) {
       const held = this.#startHeld
       this.#startHeld = null
-      this.#setState('requesting')
+      this.#state.set('requesting')
       const cancelled = Promise.withResolvers<boolean>()
       this.#cancelHeldStart = () => {
         cancelled.resolve(true)
@@ -145,7 +140,7 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
         return null
       }
     }
-    this.#setState('recording')
+    this.#state.set('recording')
     return { sessionStartedMs: this.#sessionStartedMs }
   }
 
@@ -157,7 +152,7 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
       this.#stopHeld = null
       await held
     }
-    this.#setState('idle')
+    this.#state.set('idle')
     if (result?.audio.kind === 'staged') {
       this.#claimed.add(result.audio.path)
     }
@@ -167,13 +162,13 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
   cancel(): void {
     this.#log.push({ method: 'cancel' })
     this.#cancelHeldStart?.()
-    this.#setState('idle')
+    this.#state.set('idle')
     return
   }
 
   status(): RecordingStatus {
     this.#log.push({ method: 'status' })
-    return { recording: this.#state === 'recording', elapsedMs: 0 }
+    return { recording: this.#state.get() === 'recording', elapsedMs: 0 }
   }
 
   listStaged(): StagedRecordingFile[] {
@@ -266,7 +261,7 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
   }
 
   emitStopped(stopped: AudioRecorderStopped): void {
-    this.#setState('idle')
+    this.#state.set('idle')
     emit(this.#stoppedListeners, stopped)
   }
 
@@ -276,14 +271,6 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
 
   emitNativeAction(event: RecordingNativeActionEvent): void {
     emit(this.#nativeActionListeners, event)
-  }
-
-  #setState(next: AudioRecorderState): void {
-    if (next === this.#state) {
-      return
-    }
-    this.#state = next
-    emit(this.#stateListeners, next)
   }
 }
 

@@ -2,7 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import type { ReactElement } from 'react'
 import { ArrowDownToLine, RefreshCw, RotateCw } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { useUpdate } from '@/providers/update-provider.tsx'
+import { useUpdate, useUpdateState } from '@/providers/update-provider.tsx'
 import { SettingsField } from './field.tsx'
 
 /**
@@ -10,7 +10,8 @@ import { SettingsField } from './field.tsx'
  * whose label tracks the update lifecycle, with the outcome reported inline.
  */
 export function UpdateField(): ReactElement {
-  const { state, checkNow, install, restart, retryAction } = useUpdate()
+  const state = useUpdateState()
+  const { checkNow, install, restart, retryAction } = useUpdate()
 
   const action: {
     label: string

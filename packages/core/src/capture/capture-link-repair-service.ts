@@ -1,4 +1,5 @@
-import { captureFromPath, captureLocalDate, type CaptureIdentity } from './capture-identity.ts'
+import { addDays, formatIsoDate } from '@reflect/utils'
+import { captureFromPath, type CaptureIdentity } from './capture-identity.ts'
 import { captureNoteMeta, displayTitle, noteSource } from './capture-note.ts'
 import type { OpenDocumentsService } from '../documents/open-documents-service.ts'
 import { isAppError } from '../errors.ts'
@@ -77,7 +78,7 @@ function findCaptureRepair(source: string, identity: CaptureIdentity): CaptureLi
  * How far back the sweep looks. Sync races happen soon after a capture, and
  * the bound keeps the per-pass cost independent of the graph's history.
  */
-export const CAPTURE_LINK_REPAIR_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+export const CAPTURE_LINK_REPAIR_WINDOW_DAYS = 30
 
 export interface CaptureLinkRepairServiceDeps {
   readonly noteFile: NoteFileService
@@ -95,7 +96,7 @@ export interface CaptureLinkRepairServiceDeps {
 export interface CaptureLinkRepairService {
   /**
    * Repair the placeholder links of captures from the last
-   * {@link CAPTURE_LINK_REPAIR_WINDOW_MS} in their Daily notes. Never throws.
+   * {@link CAPTURE_LINK_REPAIR_WINDOW_DAYS} days in their Daily notes. Never throws.
    */
   sweep(generation: number): Promise<void>
 }
@@ -132,7 +133,7 @@ class CaptureLinkRepairServiceImpl implements CaptureLinkRepairService {
     generation: number,
   ): Promise<Map<string, Map<string, CaptureLinkRepair>>> {
     const { noteFile, clock } = this.#deps
-    const cutoff = captureLocalDate(new Date(clock.now() - CAPTURE_LINK_REPAIR_WINDOW_MS))
+    const cutoff = formatIsoDate(addDays(clock.now(), -CAPTURE_LINK_REPAIR_WINDOW_DAYS))
     const repairsByDailyPath = new Map<string, Map<string, CaptureLinkRepair>>()
     for (const file of await noteFile.listNotes(generation)) {
       const identity = captureFromPath(file.path)

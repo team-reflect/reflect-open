@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { routeForTag } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 
 export type TagNavigation = (tag: string) => void
 
@@ -13,7 +13,7 @@ export type TagNavigation = (tag: string) => void
  * @returns a stable click handler for the note editor's tag extension.
  */
 export function useTagNavigation(): TagNavigation {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
 
   return useCallback(
     (tag) => {

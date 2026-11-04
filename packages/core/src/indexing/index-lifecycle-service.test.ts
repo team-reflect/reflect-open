@@ -20,6 +20,7 @@ import { createTestActivityPort } from '../testing/shell.ts'
 import {
   createIndexLifecycleService,
   type IndexAppliedEvent,
+  type IndexFileProgress,
   type IndexLifecycleProgress,
   type IndexReconciledEvent,
 } from './index-lifecycle-service.ts'
@@ -144,7 +145,7 @@ function setup(options?: {
     logger,
     progress: operations,
     graphSession: {
-      getState: () => graph,
+      get: () => graph,
       subscribe: (listener) => {
         graphListeners.add(listener)
         return () => {
@@ -160,11 +161,11 @@ function setup(options?: {
   const applied: IndexAppliedEvent[] = []
   const reconciled: IndexReconciledEvent[] = []
   const moved: Array<[string, string]> = []
-  const fileProgress: Array<[number, number, number]> = []
+  const fileProgress: Array<IndexFileProgress | null> = []
   const stalePlaceholders: string[][] = []
   const order: string[] = []
-  index.onProgress((stage) => {
-    progress.push(stage)
+  index.progress.subscribe(() => {
+    progress.push(index.progress.get())
   })
   index.onApplied((event) => {
     applied.push(event)
@@ -177,8 +178,8 @@ function setup(options?: {
   index.onMoved((from, to) => {
     moved.push([from, to])
   })
-  index.onFileProgress((done, total, worked) => {
-    fileProgress.push([done, total, worked])
+  index.fileProgress.subscribe(() => {
+    fileProgress.push(index.fileProgress.get())
   })
   index.onStalePlaceholders((paths) => {
     stalePlaceholders.push([...paths])
@@ -662,30 +663,26 @@ describe('file progress', () => {
 
   it('publishes the running pass and clears once it goes live', async () => {
     const { index, fileProgress } = setupLargePass()
-    const seen: Array<ReturnType<typeof index.fileProgress>> = []
-    const unsubscribe = index.subscribeFileProgress(() => {
-      seen.push(index.fileProgress())
+    expect(index.fileProgress.get()).toBeNull()
+    const atLive: Array<ReturnType<typeof index.fileProgress.get>> = []
+    index.progress.subscribe(() => {
+      if (index.progress.get() === 'live') {
+        atLive.push(index.fileProgress.get())
+      }
     })
-    expect(index.fileProgress()).toBeNull()
 
     index.sync(sessionAt(5))
     await index.settled()
 
     expect(fileProgress).toEqual([
-      [16, 32, 15],
-      [32, 32, 31],
-      [32, 32, 32],
-    ])
-    expect(seen).toEqual([
       { done: 16, total: 32, worked: 15 },
       { done: 32, total: 32, worked: 31 },
       { done: 32, total: 32, worked: 32 },
       null, // the pass went live: the pill clears
     ])
-
-    unsubscribe()
+    expect(atLive).toEqual([null])
     index.suspend()
-    expect(seen).toHaveLength(4) // already clear, and no longer listening
+    expect(fileProgress).toHaveLength(4) // already clear: no notification
   })
 
   it('stops reporting file progress once the pass is superseded', async () => {
@@ -700,21 +697,21 @@ describe('file progress', () => {
     index.sync(sessionAt(5, opened.signal))
     await index.settled()
 
-    expect(fileProgress).toEqual([[16, 32, 15]])
+    expect(fileProgress).toEqual([{ done: 16, total: 32, worked: 15 }])
   })
 
   it('a test lifecycle seeds file progress for its subscribers', () => {
     const index = createTestIndexLifecycleService()
     const listener = vi.fn()
-    const unsubscribe = index.subscribeFileProgress(listener)
+    const unsubscribe = index.fileProgress.subscribe(listener)
 
     index.setFileProgress({ done: 16, total: 3000, worked: 16 })
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(index.fileProgress()).toEqual({ done: 16, total: 3000, worked: 16 })
+    expect(index.fileProgress.get()).toEqual({ done: 16, total: 3000, worked: 16 })
 
     index.setFileProgress(null)
     expect(listener).toHaveBeenCalledTimes(2)
-    expect(index.fileProgress()).toBeNull()
+    expect(index.fileProgress.get()).toBeNull()
 
     unsubscribe()
     index.setFileProgress({ done: 1, total: 200, worked: 1 })
@@ -880,7 +877,7 @@ describe('rebuildVisibly', () => {
   it('a test lifecycle records the requested generations', async () => {
     const session = sessionAt(7)
     const index = createTestIndexLifecycleService({
-      graphSession: { getState: () => ({ session }), subscribe: () => () => {} },
+      graphSession: { get: () => ({ session }), subscribe: () => () => {} },
     })
     await index.rebuildVisibly()
     expect(index.rebuilds()).toEqual([7])

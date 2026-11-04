@@ -26,8 +26,7 @@ const registeredIn = new WeakSet<object>()
 
 /**
  * Register both keymap scopes in `keymap`, the collision ledger: a keystroke
- * bound twice, in one scope or across them, throws. Called explicitly from
- * `main.tsx`, like `registerAppCommands`. Idempotent per registry.
+ * bound twice, in one scope or across them, throws. Idempotent per registry.
  */
 export function registerAppKeymaps(keymap: KeymapService): void {
   if (registeredIn.has(keymap)) {

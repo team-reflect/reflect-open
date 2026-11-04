@@ -8,7 +8,7 @@ import {
 } from '@reflect/core'
 import { useNoteRowOverlays } from '@/hooks/note-row-overlay.ts'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const EMPTY: readonly PinnedNote[] = []
@@ -22,11 +22,10 @@ function titleFromPath(path: string): string {
  * The pinned notes from the index, kept fresh by the usual index invalidation
  * (a pin lands in the file, the watcher re-indexes it, the query refetches),
  * with the note-row overlay merged over them so a pin, unpin, or reorder
- * shows at once. Shared by the sidebar's Pinned section and the Recents dedup:
- * one query key, so both consumers ride a single fetch.
+ * shows at once. Every caller shares one query key, so they share one fetch.
  */
 export function usePinnedNotes(): readonly PinnedNote[] {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const root = graph?.root
   const { indexQuery, noteRows } = useCoreServices()
   const queryClient = useQueryClient()

@@ -11,6 +11,7 @@ import {
   createTestAttachmentService,
   createTestClockService,
   createTestFileChangeService,
+  createTestLoggerService,
   createTestNoteFileService,
   createTestNoteLinkResolverService,
   createTestNoteSession,
@@ -97,6 +98,7 @@ function attachmentsOver(listing: () => Promise<readonly { path: string; size: n
     clock,
     platform: createTestPlatformService(),
     graphSession: openGraph(),
+    logger: createTestLoggerService(),
   })
 }
 
