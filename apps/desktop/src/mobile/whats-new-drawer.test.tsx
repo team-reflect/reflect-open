@@ -14,6 +14,8 @@ function createFakeWhatsNew() {
     phase,
     override: new WritableStore(false),
     setOverride: () => {},
+    accept: () => {},
+    decline: () => {},
     dismiss: () => {
       dismissed += 1
       phase.set('hidden')
