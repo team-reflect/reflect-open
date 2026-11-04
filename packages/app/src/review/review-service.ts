@@ -75,8 +75,7 @@ export function decideAskForReview(inputs: ReviewInputs): boolean {
   if (inputs.override) {
     return true
   }
-  const since = (time: number | null, days: number): boolean =>
-    time === null || inputs.now - time >= days * DAY_MS
+  const since = (time: number | null, days: number): boolean => { return time === null || inputs.now - time >= days * DAY_MS }
   return (
     inputs.environment === 'Production' &&
     inputs.paid &&
