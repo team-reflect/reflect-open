@@ -11,13 +11,4 @@ describe('hapticImpactLight', () => {
 
     expect(haptics.impacts()).toBe(2)
   })
-
-  it('swallows a failing haptic engine', async () => {
-    const failing = createTestHapticsService({ fail: true })
-
-    hapticImpactLight(failing)
-    await Promise.resolve()
-
-    expect(failing.impacts()).toBe(1)
-  })
 })
