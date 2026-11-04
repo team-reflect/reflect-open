@@ -1,3 +1,5 @@
+import { anySignal } from '@/lib/any-signal.ts'
+
 /**
  * Quiet time (ms) after the last scroll event before a scroll counts as settled.
  */
@@ -228,7 +230,7 @@ export function watchScrollSettle({
     let quiet: ReturnType<typeof setTimeout> | undefined
     const controller = new AbortController()
     press = controller
-    const pressSignal = AbortSignal.any([signal, controller.signal])
+    const pressSignal = anySignal([signal, controller.signal])
     // Stops text selection and native drag and drop, and leaves the press
     // itself to the control under it: a `preventDefault` on `pointerdown`
     // would cancel its `mousedown`.
@@ -240,7 +242,7 @@ export function watchScrollSettle({
     }
     // The button is down: from `pointerdown` until `pointerup` or `pointercancel`.
     const released = new AbortController()
-    const held = AbortSignal.any([pressSignal, released.signal])
+    const held = anySignal([pressSignal, released.signal])
     pressSignal.addEventListener(
       'abort',
       () => {
