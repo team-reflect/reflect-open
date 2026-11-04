@@ -249,6 +249,37 @@ describe('watchScrollSettle', () => {
       expect(onClick).not.toHaveBeenCalled()
     })
 
+    it.each([
+      // Past half of page 1, short of half the range: the nearer end is 0.
+      { to: 35, page: 100 },
+      // Short of half of page 2, past half the range: the nearer end is 200.
+      { to: -45, page: 100 },
+    ])('settles at the nearest page with `mousePage` (drag to $to)', async ({ to, page }) => {
+      const element = mountSnapScroller()
+      // Three 100px pages: a 200px range.
+      element.innerHTML = `
+        <div style="display: flex; width: 300px; height: 10px">
+          <i style="flex: 0 0 100px; scroll-snap-align: start"></i>
+          <i style="flex: 0 0 100px; scroll-snap-align: start"></i>
+          <i style="flex: 0 0 100px; scroll-snap-align: start"></i>
+        </div>`
+      const onSettle = vi.fn()
+      watchScrollSettle({
+        element,
+        onSettle,
+        signal: listeners.controller.signal,
+        mousePage: () => 100,
+      })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, to)
+      await mouse.up()
+
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(element.scrollLeft).toBe(page)
+    })
+
     it('leaves a click under the drag distance alone', async () => {
       const element = mountSnapScroller()
       const onSettle = vi.fn()
