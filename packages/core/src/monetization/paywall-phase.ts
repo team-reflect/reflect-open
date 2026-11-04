@@ -26,15 +26,15 @@ export function getPaywallPhase(elapsedMs: number): PaywallPhase {
 }
 
 /**
- * Epoch ms at which the paywall stops being skippable.
- */
-export function getPaywallRequiredAt(firstLaunchAt: number): number {
-  return firstLaunchAt + (PAYWALL_HIDDEN_DAYS + PAYWALL_SKIPPABLE_DAYS) * DAY_MS
-}
-
-/**
  * Whole days, rounded up, until the paywall stops being skippable; `0` once it is required.
  */
 export function getPaywallDaysLeft(firstLaunchAt: number, now: number): number {
   return Math.max(0, Math.ceil((getPaywallRequiredAt(firstLaunchAt) - now) / DAY_MS))
+}
+
+/**
+ * Epoch ms at which the paywall stops being skippable.
+ */
+export function getPaywallRequiredAt(firstLaunchAt: number): number {
+  return firstLaunchAt + (PAYWALL_HIDDEN_DAYS + PAYWALL_SKIPPABLE_DAYS) * DAY_MS
 }
