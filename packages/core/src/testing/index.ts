@@ -159,11 +159,7 @@ export {
   type TestLanguageModelService,
   type TestLanguageModelSource,
 } from './ai.ts'
-export {
-  createTestAppInfoService,
-  createTestSecretStoreService,
-  type TestSecretStoreService,
-} from './secrets.ts'
+export { createTestSecretStoreService, type TestSecretStoreService } from './secrets.ts'
 export {
   createTestIndexStoreService,
   type IndexStoreCall,
