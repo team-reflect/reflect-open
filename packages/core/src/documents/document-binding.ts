@@ -29,13 +29,13 @@ import type { OpenDocumentsService } from './open-documents-service.ts'
  * useEffect(() => {
  *   const { session, created } = binding.bind(path, {
  *     coordinator: () => titleRename.createCoordinator({ ... }),
- *     session: (coordinator) => noteSessions.create({ ... }),
+ *     session: (coordinator, epoch) => noteSessions.create({ ... }),
  *   })
  *   if (created) session.load()            // adopted sessions are already live
  *   return () => binding.unbind(path)
  * }, [path, ...])
- * // …and the editor is keyed on binding.epoch(), not the path, so a rename
- * // that retargets the session never remounts it — the cursor survives.
+ * // …and the editor is keyed on the session's epoch, not the path, so a
+ * // rename that retargets the session never remounts it — the cursor survives.
  * ```
  *
  * Why a rename leads here: `docs/readable-filenames.md`.
@@ -60,9 +60,12 @@ export interface DocumentCoordinator {
 
 export interface BindFactories<Coordinator extends DocumentCoordinator = DocumentCoordinator> {
   /**
-   * Build the session; receives the coordinator its `onContent` feeds.
+   * Build the session; receives the coordinator its `onContent` feeds, and its
+   * epoch: a count of session *creations* on this binding (adoptions keep the
+   * adopted session's), which the editor is keyed on. State the caller derives
+   * from this session carries it, so nothing reads it back during render.
    */
-  session: (coordinator: Coordinator | null) => NoteSession
+  session: (coordinator: Coordinator | null, epoch: number) => NoteSession
   coordinator: () => Coordinator | null
 }
 
@@ -89,10 +92,6 @@ export interface DocumentBinding<Coordinator extends DocumentCoordinator = Docum
    */
   session(): NoteSession | null
   coordinator(): Coordinator | null
-  /**
-   * Counts session *creations* (not adoptions) — the editor's remount key.
-   */
-  epoch(): number
 }
 
 export interface DocumentBindingDeps {
@@ -133,8 +132,8 @@ class DocumentBindingImpl<
       owner = this.#coordinator
     } else {
       owner = create.coordinator()
-      bound = create.session(owner)
       this.#epoch += 1
+      bound = create.session(owner, this.#epoch)
     }
     this.#session = bound
     this.#coordinator = owner
@@ -181,10 +180,6 @@ class DocumentBindingImpl<
 
   coordinator(): Coordinator | null {
     return this.#coordinator
-  }
-
-  epoch(): number {
-    return this.#epoch
   }
 
   #teardown(target: NoteSession, owner: Coordinator | null): void {

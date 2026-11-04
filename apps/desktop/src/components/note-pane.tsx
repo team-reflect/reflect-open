@@ -186,10 +186,14 @@ export function NotePaneComponent({
   const onLinkClick = useMarkdownLinkClick(path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
-  const linkPreviewSession = useMemo(
-    () => (graphKey === null ? null : { path, graphKey, sessionEpoch: document.sessionEpoch }),
-    [path, graphKey, document.sessionEpoch],
-  )
+  // Outbound features gate on the note the editor shows, which can briefly
+  // differ from the route's note during a switch.
+  const editorPath = document.editorPath ?? path
+  const linkPreviewSession = useMemo(() => {
+    return graphKey === null
+      ? null
+      : { path: editorPath, graphKey, sessionEpoch: document.sessionEpoch }
+  }, [editorPath, graphKey, document.sessionEpoch])
   const resolveLinkPreview = useLinkPreview(linkPreviewSession)
 
   const bindEditor = document.bindEditor
@@ -245,7 +249,7 @@ export function NotePaneComponent({
   )
 
   const aiMenu = useEditorAiMenu({
-    path,
+    path: editorPath,
     sessionEpoch: document.sessionEpoch,
     editorRef: aiEditorRef,
   })

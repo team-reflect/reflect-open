@@ -5,6 +5,11 @@ export type NoteSessionStatus = 'loading' | 'ready' | 'error'
 
 /** The observable document state, emitted to `onSnapshot` whenever it changes. */
 export interface NoteSessionSnapshot {
+  /**
+   * The session's path; a rename that retargets the session reports its new
+   * one. Null before a session exists.
+   */
+  path: string | null
   status: NoteSessionStatus
   /**
    * Markdown to seed the editor with once `status` is `ready` — the body
@@ -31,6 +36,7 @@ export interface NoteSessionSnapshot {
 
 /** The snapshot before a session has loaded anything. */
 export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
+  path: null,
   status: 'loading',
   initialContent: '',
   protected: false,

@@ -1125,6 +1125,8 @@ describe('retarget (Plan 17)', () => {
 
     h.session.retarget('notes/hello.md')
     expect(h.session.path).toBe('notes/hello.md')
+    // Reported at once: observers that gate on the note's path (privacy) follow it.
+    expect(h.snapshots.at(-1)?.path).toBe('notes/hello.md')
     // The buffer carried over: not dirty, nothing rewritten on retarget alone.
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
 
