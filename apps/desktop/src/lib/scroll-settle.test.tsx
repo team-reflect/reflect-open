@@ -54,6 +54,23 @@ describe('watchScrollSettle', () => {
     expect(watch.isUserScroll()).toBe(true)
   })
 
+  it('reports after a finger lifts from a node removed while it was down', async () => {
+    const element = mountScroller()
+    const onSettle = vi.fn()
+    const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+    const child = document.createElement('span')
+    element.firstElementChild!.append(child)
+
+    await touch(child, 'start')
+    child.remove()
+    await touch(child, 'end')
+    expect(watch.isTouching()).toBe(false)
+
+    element.scrollLeft = 50
+
+    await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+  })
+
   it('reports on touchend with no scroll after it once the element is settled', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()

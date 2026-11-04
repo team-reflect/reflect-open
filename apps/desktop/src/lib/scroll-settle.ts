@@ -94,6 +94,9 @@ export function watchScrollSettle({
   let snapTailTimer: ReturnType<typeof setTimeout> | undefined
   // The current mouse press, from `pointerdown` until its release scroll stops.
   let press: AbortController | undefined
+  // The current touch gesture, from the first finger down until the last lifts.
+  let gesture: AbortController | undefined
+  let gestureSignal = signal
 
   const isTouching = (): boolean => fingers.size > 0 || mouseDragging
   const endSnapTail = (): void => {
@@ -127,9 +130,19 @@ export function watchScrollSettle({
   element.addEventListener(
     'touchstart',
     (event: TouchEvent) => {
+      if (fingers.size === 0) {
+        gesture = new AbortController()
+        gestureSignal = anySignal([signal, gesture.signal])
+      }
       for (const touch of event.changedTouches) {
         fingers.add(touch.identifier)
       }
+      // A finger lifts with `touchend` on the node it landed on. When that
+      // node leaves the document mid-gesture, the event no longer bubbles to
+      // the element, so the listener goes on the node itself.
+      const target = event.target as HTMLElement | null
+      target?.addEventListener('touchend', release, { passive: true, signal: gestureSignal })
+      target?.addEventListener('touchcancel', release, { passive: true, signal: gestureSignal })
       endSnapTail()
       fingerScroll = true
       scrolledSinceTouch = false
@@ -141,6 +154,9 @@ export function watchScrollSettle({
   const release = (event: TouchEvent): void => {
     for (const touch of event.changedTouches) {
       fingers.delete(touch.identifier)
+    }
+    if (fingers.size === 0) {
+      gesture?.abort()
     }
     if (isTouching()) {
       return
@@ -156,8 +172,6 @@ export function watchScrollSettle({
       settleOrWait()
     }
   }
-  element.addEventListener('touchend', release, { passive: true, signal })
-  element.addEventListener('touchcancel', release, { passive: true, signal })
   element.addEventListener(
     'wheel',
     () => {
