@@ -148,7 +148,6 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
       element: scroller,
       onSettle: () => handleSettle(scroller, watch.isUserScroll()),
       signal: controller.signal,
-      releaseTo: (left) => Math.round(left / pageWidth(scroller)) * pageWidth(scroller),
     })
     // After the watch, whose own listener decides whether this scroll is the user's.
     scroller.addEventListener('scroll', () => handleScroll(scroller, watch.isUserScroll()), {

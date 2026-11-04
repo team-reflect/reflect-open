@@ -249,21 +249,23 @@ describe('watchScrollSettle', () => {
       expect(onClick).not.toHaveBeenCalled()
     })
 
-    it('settles where `releaseTo` points after a drag', async () => {
+    it('settles at the snap target nearest the release, not only at an end', async () => {
       const element = mountSnapScroller()
+      element.firstElementChild?.insertAdjacentHTML(
+        'beforeend',
+        '<i style="position: absolute; left: 60px; width: 1px; scroll-snap-align: start"></i>',
+      )
       const onSettle = vi.fn()
-      const releaseTo = vi.fn(() => 0)
-      watchScrollSettle({ element, onSettle, signal: listeners.controller.signal, releaseTo })
+      watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
 
       await mouseTo(element, 95)
       await mouse.down()
-      // Past half of the range.
-      await mouseTo(element, 5)
+      await mouseTo(element, 45)
+      expect(element.scrollLeft).toBe(50)
       await mouse.up()
 
       await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
-      expect(releaseTo).toHaveBeenCalledWith(90)
-      expect(element.scrollLeft).toBe(0)
+      expect(element.scrollLeft).toBe(60)
     })
 
     it('leaves a click under the drag distance alone', async () => {
