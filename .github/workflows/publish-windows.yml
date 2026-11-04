@@ -28,7 +28,7 @@ defaults:
 
 jobs:
   windows:
-    name: ${{ matrix.name }}
+    name: Windows ${{ matrix.name }}
     if: github.repository == 'team-reflect/reflect-open'
     environment: release_app
     runs-on: ${{ matrix.runner }}
