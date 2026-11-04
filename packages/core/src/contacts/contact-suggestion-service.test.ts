@@ -313,7 +313,7 @@ describe('the enable flow', () => {
   it('setEnabled persists the opt-in and never prompts', async () => {
     const settings = createTestSettingsService()
     await settings.whenLoaded()
-    contacts.setStatus('notDetermined')
+    await contacts.setStatus('notDetermined')
     const enabling = contactSuggestionsOver({ contacts, settings })
 
     enabling.setEnabled(true)
@@ -325,7 +325,7 @@ describe('the enable flow', () => {
   })
 
   it('requestAccess prompts and the permission state then answers', async () => {
-    contacts.setStatus('notDetermined')
+    await contacts.setStatus('notDetermined')
 
     await service.requestAccess()
 

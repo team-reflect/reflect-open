@@ -8,7 +8,7 @@ import type { ProgressPort } from '../ports/progress-port.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
-import { WritableStore, type Store } from '../store.ts'
+import { combineStores, WritableStore, type Store } from '../store.ts'
 import {
   createIndexLifecycleService,
   type IndexAppliedEvent,
@@ -73,6 +73,10 @@ export interface TestIndexLifecycleService extends IndexLifecycleService {
    */
   setFileProgress(progress: IndexFileProgress | null): void
   /**
+   * Report `progress` over the real one; `null` follows the real one again.
+   */
+  setProgress(progress: IndexLifecycleProgress | null): void
+  /**
    * The index generation of every `rebuildVisibly` request with an open index, in order.
    */
   rebuilds(): readonly number[]
@@ -82,6 +86,13 @@ export interface TestIndexLifecycleService extends IndexLifecycleService {
    * sync pass) does.
    */
   emitApplied(changes: readonly FileChange[] | null, generation: number): void
+}
+
+function selectSeededProgress(
+  real: IndexLifecycleProgress,
+  seed: IndexLifecycleProgress | null,
+): IndexLifecycleProgress {
+  return seed ?? real
 }
 
 class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
@@ -94,9 +105,12 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
    */
   readonly #fileProgress: WritableStore<IndexFileProgress | null>
   readonly fileProgress: Store<IndexFileProgress | null>
+  readonly #progressSeed = new WritableStore<IndexLifecycleProgress | null>(null)
+  readonly progress: Store<IndexLifecycleProgress>
 
   constructor(inner: IndexLifecycleService, graphSession: IndexLifecycleDeps['graphSession']) {
     this.#inner = inner
+    this.progress = combineStores([inner.progress, this.#progressSeed], selectSeededProgress)
     this.#graphSession = graphSession
     this.#fileProgress = new WritableStore(inner.fileProgress.get())
     this.fileProgress = this.#fileProgress
@@ -143,10 +157,6 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
 
   followActivity(): Unlisten {
     return this.#inner.followActivity()
-  }
-
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten {
-    return this.#inner.onProgress(listener)
   }
 
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten {
@@ -208,6 +218,10 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
 
   setFileProgress(progress: IndexFileProgress | null): void {
     this.#fileProgress.set(progress)
+  }
+
+  setProgress(progress: IndexLifecycleProgress | null): void {
+    this.#progressSeed.set(progress)
   }
 
   rebuilds(): readonly number[] {

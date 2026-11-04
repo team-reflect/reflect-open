@@ -3,7 +3,7 @@ import { MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { imageFilesFrom } from '@/lib/chat-attachments.ts'
 import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { ChatInput } from './chat-input.tsx'
 import { ChatTurnList } from './chat-turn-list.tsx'
 
@@ -21,7 +21,7 @@ import { ChatTurnList } from './chat-turn-list.tsx'
 export function ChatScreen(): ReactElement {
   const providers = useChatProviders()
   const { attachImages } = useChatActions()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
 
   if (providers.length === 0) {
     return (

@@ -13,7 +13,7 @@ import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
 import { WeekRow } from '@/mobile/week-row.tsx'
 import { useWeekStartDay } from '@/providers/settings-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 
 interface CalendarStripProps {
   /**
@@ -54,7 +54,7 @@ export function CalendarStrip({
 }: CalendarStripProps): ReactElement {
   const { haptics } = useMobileServices()
   const weekStartDay = useWeekStartDay()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(date, weekStartDay)
   const dailyNoteDates = useDailyNoteDates(
     weekWindow.start,

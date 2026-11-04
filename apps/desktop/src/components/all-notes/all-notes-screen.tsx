@@ -11,7 +11,7 @@ import { useScrollRestoration } from '@/lib/use-scroll-restoration.ts'
 import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { AllNotesFilters } from './all-notes-filters.tsx'
 import { AllNotesTable } from './all-notes-table.tsx'
@@ -44,7 +44,7 @@ interface AllNotesScreenProps {
 export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const graph = useGraphInfo()
   const { noteList } = useCoreServices()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const navigateNoteLink = useNoteLinkNavigation()
   // The scroll container lives in state, not a ref, so scroll restoration
   // re-runs its restore once the element attaches (a callback ref re-renders;

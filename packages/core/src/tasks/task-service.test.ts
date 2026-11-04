@@ -885,8 +885,10 @@ describe('task list state', () => {
     await clock.advance(3_000)
     expect(getOpenTasks).toHaveBeenCalledTimes(3)
 
-    // Unsubscribed, a change only marks the rows stale for the next subscriber.
+    // Unsubscribed, the service stops listening and the next subscriber reads again.
     unsubscribe()
+    expect(appliedListeners.size).toBe(0)
+    expect(reconciledListeners.size).toBe(0)
     await clock.advance(3_000)
     emitApplied()
     await flushMicrotasks()
