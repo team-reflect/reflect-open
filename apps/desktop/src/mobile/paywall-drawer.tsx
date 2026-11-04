@@ -1,25 +1,25 @@
-import { useState, type ReactElement } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { Check } from 'lucide-react'
-import { IAP_PRODUCT_IDS } from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
 import { cn } from '@/lib/utils.ts'
-import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
 import { ClassicMemberDrawer } from '@/mobile/classic-member-drawer.tsx'
 import { ClassicSignInProgress } from '@/mobile/classic-sign-in-progress.tsx'
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/mobile/legal-urls.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import {
   classicAccessMessage,
   useClassicAccess,
   useClassicSignIn,
 } from '@/mobile/use-classic-access.ts'
-import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { useIapRestoreRedeem } from '@/mobile/use-iap-restore-redeem.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
+import { IAP_PRODUCT_IDS } from '@reflect/core'
 import { doNothing } from '@reflect/utils'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Check } from 'lucide-react'
+import { useState, type ReactElement } from 'react'
 
 type PurchasePlan = 'monthly' | 'yearly'
 
@@ -37,7 +37,7 @@ const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
  */
 export function PaywallDrawer({ open }: { open: boolean }): ReactElement {
   return (
-    <Drawer open={open} onOpenChange={() => {}}>
+    <Drawer open={open} onOpenChange={doNothing}>
       <DrawerContent>
         <PaywallContent />
       </DrawerContent>
