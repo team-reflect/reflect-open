@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { WritableStore, type AppInfoService, type GraphStatus } from '@reflect/core'
+import { WritableStore, type GraphStatus } from '@reflect/core'
 import {
   createTestActivityPort,
   createTestDeepLinkIntakeService,
-  createTestLoggerService,
   createTestPlatformService,
   createTestStorageService,
 } from '@reflect/core/testing'
@@ -35,6 +34,7 @@ const INPUTS: WhatsNewInputs = {
   seen: '0.19.0',
   override: false,
   blocker: 'clear',
+  graphOpened: true,
   setupSeen: false,
   deepLinkSeen: false,
 }
@@ -75,10 +75,11 @@ describe('decideWhatsNew', () => {
     expect(decide({ seen: null }).kind).toBe('show')
   })
 
-  it('waits outside the main window, on Android, and until the version is known', () => {
+  it('waits outside the main window, on Android, and until a graph opens', () => {
     expect(decide({ isMainWindow: false }).kind).toBe('wait')
     expect(decide({ platform: null }).kind).toBe('wait')
-    expect(decide({ version: null }).kind).toBe('wait')
+    expect(decide({ graphOpened: false }).kind).toBe('wait')
+    expect(decide({ graphOpened: false, override: true }).kind).toBe('wait')
   })
 
   it('waits for the blocker, even with the override on', () => {
@@ -125,11 +126,12 @@ describe('decideWhatsNew', () => {
 })
 
 interface SetupOptions {
-  version?: string | Error
+  version?: string
   seen?: string | null
   blocker?: WhatsNewBlocker
   label?: string
   isDev?: boolean
+  status?: GraphStatus
 }
 
 function setup(options: SetupOptions = {}) {
@@ -137,18 +139,19 @@ function setup(options: SetupOptions = {}) {
   if (options.seen) {
     storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, options.seen)
   }
-  const version = options.version ?? '0.19.1'
-  const appInfo: AppInfoService = {
-    version: () => (version instanceof Error ? Promise.reject(version) : Promise.resolve(version)),
-  }
-  const graphSession = new WritableStore<{ readonly status: GraphStatus }>({ status: 'loading' })
+  const graphSession = new WritableStore<{ readonly status: GraphStatus }>({
+    status: options.status ?? 'ready',
+  })
   const intake = createTestDeepLinkIntakeService()
   const activity = createTestActivityPort()
   const blocker = new WritableStore<WhatsNewBlocker>(options.blocker ?? 'clear')
   const whatsNew = createWhatsNewService({
     storage,
-    appInfo,
-    platform: createTestPlatformService({ appPlatform: 'desktop', isDev: options.isDev ?? false }),
+    platform: createTestPlatformService({
+      appPlatform: 'desktop',
+      appVersion: options.version ?? '0.19.1',
+      isDev: options.isDev ?? false,
+    }),
     window: createTestWindowService(
       options.label === undefined ? undefined : { label: options.label },
     ),
@@ -157,7 +160,6 @@ function setup(options: SetupOptions = {}) {
     activity,
     blocker,
     content: CONTENT,
-    logger: createTestLoggerService(),
   })
   const stop = whatsNew.start()
   const setStatus = (status: GraphStatus) => graphSession.set({ status })
@@ -165,18 +167,12 @@ function setup(options: SetupOptions = {}) {
   return { whatsNew, storage, intake, activity, blocker, setStatus, seen, stop }
 }
 
-async function settle(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
-}
-
 describe('createWhatsNewService', () => {
-  it('shows after a normal launch and hides once dismissed', async () => {
-    const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0' })
+  it('shows after a normal launch and hides once dismissed', () => {
+    const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0', status: 'loading' })
     expect(whatsNew.gate.get().kind).toBe('hidden')
     setStatus('opening')
     setStatus('ready')
-    await settle()
     expect(whatsNew.gate.get()).toEqual({ kind: 'whatsNew', items: [ITEM_2, ITEM_3] })
 
     whatsNew.dismiss()
@@ -184,35 +180,30 @@ describe('createWhatsNewService', () => {
     expect(seen()).toBe('0.19.1')
   })
 
-  it('marks the version seen without showing after the graph chooser', async () => {
-    const { whatsNew, setStatus, seen } = setup()
+  it('marks the version seen without showing after the graph chooser', () => {
+    const { whatsNew, setStatus, seen } = setup({ status: 'loading' })
     setStatus('choosing')
     setStatus('opening')
     setStatus('ready')
-    await settle()
     expect(whatsNew.gate.get().kind).toBe('hidden')
     expect(seen()).toBe('0.19.1')
   })
 
-  it('ignores a graph switch after the first open', async () => {
+  it('ignores a graph switch after the first open', () => {
     const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0' })
-    setStatus('ready')
     setStatus('choosing')
-    await settle()
     expect(whatsNew.gate.get().kind).toBe('whatsNew')
     expect(seen()).toBe('0.19.0')
   })
 
-  it('marks a version without items seen', async () => {
+  it('marks a version without items seen', () => {
     const { whatsNew, seen } = setup({ version: '0.20.0', seen: '0.19.1' })
-    await settle()
     expect(whatsNew.gate.get().kind).toBe('hidden')
     expect(seen()).toBe('0.20.0')
   })
 
-  it('waits for the blocker, and hides without marking the version seen when it blocks', async () => {
+  it('waits for the blocker, and hides without marking the version seen when it blocks', () => {
     const { whatsNew, blocker, seen } = setup({ seen: '0.19.0', blocker: 'pending' })
-    await settle()
     expect(whatsNew.gate.get().kind).toBe('hidden')
 
     blocker.set('clear')
@@ -223,9 +214,8 @@ describe('createWhatsNewService', () => {
     expect(seen()).toBe('0.19.0')
   })
 
-  it('waits after a deep link until the app was hidden', async () => {
+  it('waits after a deep link until the app was hidden', () => {
     const { whatsNew, intake, activity } = setup({ seen: '0.19.0' })
-    await settle()
     intake.dispatch('reflect://note/abc')
     expect(whatsNew.gate.get().kind).toBe('hidden')
 
@@ -233,24 +223,15 @@ describe('createWhatsNewService', () => {
     expect(whatsNew.gate.get().kind).toBe('whatsNew')
   })
 
-  it('stays hidden and marks nothing when the version cannot be read', async () => {
-    const { whatsNew, seen } = setup({ version: new Error('no shell'), seen: '0.19.0' })
-    await settle()
-    expect(whatsNew.gate.get().kind).toBe('hidden')
-    expect(seen()).toBe('0.19.0')
-  })
-
-  it('stays hidden and marks nothing in a note window', async () => {
-    const { whatsNew, setStatus, seen } = setup({ label: 'note-1' })
+  it('stays hidden and marks nothing in a note window', () => {
+    const { whatsNew, setStatus, seen } = setup({ label: 'note-1', status: 'loading' })
     setStatus('choosing')
-    await settle()
     expect(whatsNew.gate.get().kind).toBe('hidden')
     expect(seen()).toBeNull()
   })
 
-  it('shows in a development build only with the override, which dismiss turns off', async () => {
+  it('shows in a development build only with the override, which dismiss turns off', () => {
     const { whatsNew, storage } = setup({ isDev: true, seen: '0.19.0' })
-    await settle()
     expect(whatsNew.gate.get().kind).toBe('hidden')
 
     whatsNew.setOverride(true)
@@ -263,17 +244,15 @@ describe('createWhatsNewService', () => {
     expect(whatsNew.gate.get().kind).toBe('hidden')
   })
 
-  it('keeps the gate reference when an input changes without changing the result', async () => {
+  it('keeps the gate reference when an input changes without changing the result', () => {
     const { whatsNew } = setup({ seen: '0.19.0' })
-    await settle()
     const gate = whatsNew.gate.get()
     whatsNew.setOverride(true)
     expect(whatsNew.gate.get()).toBe(gate)
   })
 
-  it('stops following its signals', async () => {
+  it('stops following its signals', () => {
     const { whatsNew, intake, stop } = setup({ seen: '0.19.0' })
-    await settle()
     stop()
     intake.dispatch('reflect://note/abc')
     expect(whatsNew.gate.get().kind).toBe('whatsNew')

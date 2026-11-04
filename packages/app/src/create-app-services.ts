@@ -334,7 +334,6 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     }),
     whatsNew: createWhatsNewService({
       storage: core.storage,
-      appInfo: core.appInfo,
       platform: core.platform,
       window: host.window,
       graphSession: core.graphSession,
@@ -342,7 +341,6 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       activity: host.lifecycle,
       blocker: createWhatsNewBlocker(core),
       content: WHATS_NEW,
-      logger: core.logger,
     }),
   }
 }

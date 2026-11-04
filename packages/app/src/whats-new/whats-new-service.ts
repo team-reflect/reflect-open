@@ -5,10 +5,8 @@ import {
   marketingVersion,
   WritableStore,
   type ActivityPort,
-  type AppInfoService,
   type DeepLinkIntakeService,
   type GraphStatus,
-  type LoggerService,
   type PlatformFacts,
   type StorageService,
   type Store,
@@ -41,12 +39,16 @@ export interface WhatsNewInputs {
   readonly isDev: boolean
   readonly platform: WhatsNewPlatform | null
   /**
-   * The full app version; `null` until it is read.
+   * The full app version, prerelease tag included.
    */
-  readonly version: string | null
+  readonly version: string
   readonly seen: string | null
   readonly override: boolean
   readonly blocker: WhatsNewBlocker
+  /**
+   * This launch has opened a graph.
+   */
+  readonly graphOpened: boolean
   /**
    * This launch showed the graph chooser or the onboarding before it opened a graph.
    */
@@ -92,7 +94,7 @@ export function decideWhatsNew(
   content: Readonly<Record<string, readonly WhatsNewItem[]>>,
 ): WhatsNewDecision {
   const { platform, version } = inputs
-  if (!inputs.isMainWindow || platform === null || version === null) {
+  if (!inputs.isMainWindow || platform === null || !inputs.graphOpened) {
     return WAIT
   }
   if (inputs.blocker !== 'clear') {
@@ -160,8 +162,8 @@ export interface WhatsNewService {
    */
   dismiss: () => void
   /**
-   * Reads the app version, follows the setup and deep-link signals, and marks
-   * a version seen when it should never show. Call it before the graph boot.
+   * Follows the setup and deep-link signals, and marks a version seen when it
+   * should never show. Call it before the graph boot.
    * Returns the function that stops it.
    */
   start(): Unlisten
@@ -169,7 +171,6 @@ export interface WhatsNewService {
 
 export interface WhatsNewServiceDeps {
   readonly storage: StorageService
-  readonly appInfo: AppInfoService
   readonly platform: PlatformFacts
   readonly window: WindowService
   readonly graphSession: Store<{ readonly status: GraphStatus }>
@@ -177,12 +178,11 @@ export interface WhatsNewServiceDeps {
   readonly activity: ActivityPort
   readonly blocker: Store<WhatsNewBlocker>
   readonly content: Readonly<Record<string, readonly WhatsNewItem[]>>
-  readonly logger: LoggerService
 }
 
 class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
-  readonly #version = new WritableStore<string | null>(null)
+  readonly #graphOpened = new WritableStore(false)
   readonly #setupSeen = new WritableStore(false)
   readonly #deepLinkSeen = new WritableStore(false)
   readonly #decision: Store<WhatsNewDecision>
@@ -200,23 +200,24 @@ class WhatsNewServiceImpl implements WhatsNewService {
     )
     this.#decision = combineStores(
       [
-        this.#version,
         storage.local.store(WHATS_NEW_SEEN_STORAGE_KEY),
         this.override,
         blocker,
+        this.#graphOpened,
         this.#setupSeen,
         this.#deepLinkSeen,
       ],
-      (version, seen, override, blockerValue, setupSeen, deepLinkSeen) => {
+      (seen, override, blockerValue, graphOpened, setupSeen, deepLinkSeen) => {
         return decideWhatsNew(
           {
             isMainWindow,
             isDev: platform.isDev,
             platform: whatsNewPlatform,
-            version,
+            version: platform.appVersion,
             seen,
             override,
             blocker: blockerValue,
+            graphOpened,
             setupSeen,
             deepLinkSeen,
           },
@@ -238,15 +239,11 @@ class WhatsNewServiceImpl implements WhatsNewService {
   }
 
   #markSeen(): void {
-    const version = this.#version.get()
-    if (version !== null) {
-      this.#deps.storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, version)
-    }
+    this.#deps.storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, this.#deps.platform.appVersion)
   }
 
   start(): Unlisten {
-    const { graphSession, intake, activity, appInfo, logger } = this.#deps
-    let active = true
+    const { graphSession, intake, activity } = this.#deps
 
     // Only the statuses before the first open count: a later graph switch
     // also passes through 'choosing'.
@@ -256,6 +253,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
       if (status === 'choosing') {
         this.#setupSeen.set(true)
       } else if (status === 'ready') {
+        this.#graphOpened.set(true)
         stopSetup?.()
         stopSetup = null
       }
@@ -275,19 +273,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
     ]
     markSkipped()
 
-    void (async () => {
-      try {
-        const version = await appInfo.version()
-        if (active) {
-          this.#version.set(version)
-        }
-      } catch (err) {
-        logger.warn("What's New could not read the app version", err)
-      }
-    })()
-
     return () => {
-      active = false
       stopSetup?.()
       for (const unlisten of unlisteners.splice(0)) {
         unlisten()
