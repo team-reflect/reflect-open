@@ -14,9 +14,9 @@ runs:
       run: |
         for app in /Applications/Xcode*.app; do
           echo "======="
-          echo "$app"
-          realpath "$app"
-          plutil -extract ProductBuildVersion raw "$app/Contents/version.plist"
+          echo "Xcode path: $app"
+          echo "Xcode real path: $(realpath "$app")"
+          echo "Xcode version: $(plutil -extract ProductBuildVersion raw "$app/Contents/version.plist")"
         done
 
     - name: Print the Xcode version before
