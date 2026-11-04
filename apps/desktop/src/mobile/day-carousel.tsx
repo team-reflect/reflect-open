@@ -73,13 +73,10 @@ export function DayCarousel({
       />
     ))
   }, [dayWindow, page])
-  const mountedIndexes = useMemo(() => {
-    const indexes: number[] = []
-    for (let index = mountedRange.low; index <= mountedRange.high; index++) {
-      indexes.push(index)
-    }
-    return indexes
-  }, [mountedRange.low, mountedRange.high])
+  const mountedIndexes = Array.from(
+    { length: mountedRange.high - mountedRange.low + 1 },
+    (_, offset) => mountedRange.low + offset,
+  )
 
   return (
     <div

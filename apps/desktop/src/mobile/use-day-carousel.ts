@@ -121,21 +121,25 @@ export interface DayCarousel {
 /** Days either side of the selection and the swipe's reach that mount a slide. */
 const MOUNT_RADIUS = 1
 
+/**
+ * The settled slide, and the nearest indexes (`low` to `high`) a swipe has
+ * scrolled to since that settle.
+ */
 interface CarouselSelectionState {
   readonly navigationKey: string
   readonly index: number
-}
-
-/** The nearest indexes a swipe has scrolled to since the last settle. */
-interface CarouselReachState {
-  readonly navigationKey: string
   readonly low: number
   readonly high: number
 }
 
+/** The selection settled on `index`, with no swipe reach beyond it. */
+function settledOn(navigationKey: string, index: number): CarouselSelectionState {
+  return { navigationKey, index, low: index, high: index }
+}
+
 /**
- * State updater adopting the arrival's `navigationKey` and `index`, bailing
- * out (returning the current state) when both already match — the state is an
+ * State updater settling on the arrival's `navigationKey` and `index`, bailing
+ * out (returning the current state) when it already is — the state is an
  * object, so an unconditional set would re-render the carousel even when
  * nothing changed.
  */
@@ -144,23 +148,12 @@ function adoptSelection(
   index: number,
 ): (current: CarouselSelectionState) => CarouselSelectionState {
   return (current) => {
-    return current.navigationKey === navigationKey && current.index === index
-      ? current
-      : { navigationKey, index }
-  }
-}
-
-/** State updater collapsing the reach onto `index`, bailing out when it already is. */
-function collapseReach(
-  navigationKey: string,
-  index: number,
-): (current: CarouselReachState) => CarouselReachState {
-  return (current) => {
     return current.navigationKey === navigationKey &&
+      current.index === index &&
       current.low === index &&
       current.high === index
       ? current
-      : { navigationKey, low: index, high: index }
+      : settledOn(navigationKey, index)
   }
 }
 
@@ -174,11 +167,20 @@ function pageWidth(scroller: HTMLElement): number {
   return scroller.getBoundingClientRect().width
 }
 
-/** Moves the scroller onto page `index` at once, unless it is already there. */
-function restOn(scroller: HTMLElement, index: number): void {
+/** The page nearest the scroller's offset, or `undefined` before layout. */
+function nearestIndex(scroller: HTMLElement, count: number): number | undefined {
+  const width = pageWidth(scroller)
+  if (width === 0) {
+    return undefined
+  }
+  return Math.min(count - 1, Math.max(0, Math.round(scroller.scrollLeft / width)))
+}
+
+/** Moves the scroller onto page `index`, unless it is already there. */
+function restOn(scroller: HTMLElement, index: number, behavior: ScrollBehavior): void {
   const left = index * pageWidth(scroller)
   if (Math.abs(scroller.scrollLeft - left) >= 1) {
-    scroller.scrollTo({ left, behavior: 'instant' })
+    scroller.scrollTo({ left, behavior })
   }
 }
 
@@ -195,7 +197,7 @@ function restOn(scroller: HTMLElement, index: number): void {
  * turns into a daily-route navigation). The route flows back in as `date` and
  * moves the scroller to match — guarded by {@link reconcileCarousel} so the
  * swipe's own echo doesn't redundantly re-scroll. A `date` beyond the window
- * re-anchors it. Scrolls that no finger, wheel, or mouse started (a caret
+ * re-anchors it. Scrolls that no finger or wheel started (a caret
  * reveal, a focus) are pulled back to the selected day.
  */
 export function useDayCarousel(
@@ -210,33 +212,23 @@ export function useDayCarousel(
     return createDayWindow(date, CAROUSEL_WINDOW)
   })
   const routeIndex = indexWithin(dayWindow, date)
-  const [selection, setSelection] = useState<CarouselSelectionState>(() => ({
-    navigationKey,
-    index: routeIndex,
-  }))
-  const [reach, setReach] = useState<CarouselReachState>(() => ({
-    navigationKey,
-    low: routeIndex,
-    high: routeIndex,
-  }))
+  const [selection, setSelection] = useState<CarouselSelectionState>(() => {
+    return settledOn(navigationKey, routeIndex)
+  })
   // A newer router arrival is authoritative over transition-priority swipe
   // state. Carry its identity in the state itself so an older queued updater
   // cannot restore the old mount range after navigation has won.
-  const selectedIndex =
-    selection.navigationKey === navigationKey || routeIndex === -1 ? selection.index : routeIndex
-  if (selection.navigationKey !== navigationKey) {
-    setSelection({ navigationKey, index: selectedIndex })
+  const currentSelection =
+    selection.navigationKey === navigationKey
+      ? selection
+      : settledOn(navigationKey, routeIndex === -1 ? selection.index : routeIndex)
+  if (currentSelection !== selection) {
+    setSelection(currentSelection)
   }
-  const currentReach =
-    reach.navigationKey === navigationKey
-      ? reach
-      : { navigationKey, low: selectedIndex, high: selectedIndex }
-  if (reach.navigationKey !== navigationKey) {
-    setReach(currentReach)
-  }
+  const selectedIndex = currentSelection.index
   const mountedRange = {
-    low: Math.max(0, Math.min(selectedIndex, currentReach.low) - MOUNT_RADIUS),
-    high: Math.min(dayWindow.count - 1, Math.max(selectedIndex, currentReach.high) + MOUNT_RADIUS),
+    low: Math.max(0, currentSelection.low - MOUNT_RADIUS),
+    high: Math.min(dayWindow.count - 1, currentSelection.high + MOUNT_RADIUS),
   }
 
   // The day we last reported via onSelect — so the route echo it produces
@@ -260,27 +252,20 @@ export function useDayCarousel(
   // the settle, so dragging back and forth over the middle mounts nothing twice.
   const handleScroll = useEffectEvent((scroller: HTMLElement) => {
     if (!watchRef.current?.isUserScroll()) {
-      restOn(scroller, selectedIndexRef.current)
+      restOn(scroller, selectedIndexRef.current, 'instant')
       return
     }
     userScrollingRef.current = true
-    const width = pageWidth(scroller)
-    if (width === 0) {
-      return
-    }
-    const nearest = Math.min(
-      dayWindow.count - 1,
-      Math.max(0, Math.round(scroller.scrollLeft / width)),
-    )
-    if (nearest === nearestRef.current) {
+    const nearest = nearestIndex(scroller, dayWindow.count)
+    if (nearest === undefined || nearest === nearestRef.current) {
       return
     }
     nearestRef.current = nearest
     startTransition(() => {
-      setReach((current) => {
+      setSelection((current) => {
         return current.navigationKey === navigationKey
           ? {
-              navigationKey,
+              ...current,
               low: Math.min(current.low, nearest),
               high: Math.max(current.high, nearest),
             }
@@ -298,23 +283,17 @@ export function useDayCarousel(
   const handleSettle = useEffectEvent((scroller: HTMLElement) => {
     userScrollingRef.current = false
     if (!watchRef.current?.isUserScroll()) {
-      restOn(scroller, selectedIndexRef.current)
+      restOn(scroller, selectedIndexRef.current, 'instant')
       return
     }
-    const width = pageWidth(scroller)
-    if (width === 0) {
+    const index = nearestIndex(scroller, dayWindow.count)
+    if (index === undefined) {
       return
     }
-    const index = Math.min(
-      dayWindow.count - 1,
-      Math.max(0, Math.round(scroller.scrollLeft / width)),
-    )
     selectedIndexRef.current = index
     nearestRef.current = index
-    if (Math.abs(scroller.scrollLeft - index * width) >= 1) {
-      // WebKit can come to rest between snap points.
-      scroller.scrollTo({ left: index * width, behavior: reducedMotion ? 'instant' : 'smooth' })
-    }
+    // WebKit can come to rest between snap points.
+    restOn(scroller, index, reducedMotion ? 'instant' : 'smooth')
     const day = dateAtIndex(dayWindow, index)
     // An editor left focused on another day would scroll the carousel back to
     // reveal its caret.
@@ -324,7 +303,6 @@ export function useDayCarousel(
       active.blur()
     }
     setSelection(adoptSelection(navigationKey, index))
-    setReach(collapseReach(navigationKey, index))
     if (day !== reportedRef.current) {
       reportedRef.current = day
       onSelect(day)
@@ -344,7 +322,8 @@ export function useDayCarousel(
       element: scroller,
       onSettle: () => handleSettle(scroller),
       signal: controller.signal,
-      mousePage: () => pageWidth(scroller),
+      // Nearly every slide is an editor, where a mouse press selects text.
+      dragHandle: null,
     })
     watchRef.current = watch
     // After the watch, whose own listener decides whether this scroll is the user's.
@@ -354,7 +333,7 @@ export function useDayCarousel(
     // unless a finger or its momentum owns the position (the settle aligns it).
     const resize = new ResizeObserver(() => {
       if (!watch.isTouching() && !userScrollingRef.current) {
-        restOn(scroller, selectedIndexRef.current)
+        restOn(scroller, selectedIndexRef.current, 'instant')
       }
     })
     resize.observe(scroller)
@@ -395,7 +374,7 @@ export function useDayCarousel(
     }
     if (!placedRef.current) {
       placedRef.current = true
-      restOn(scroller, selectedIndexRef.current)
+      restOn(scroller, selectedIndexRef.current, 'instant')
     }
     const previousNavigation = reconciledNavigationRef.current
     const forceScroll =
@@ -417,9 +396,8 @@ export function useDayCarousel(
     selectedIndexRef.current = sync.index
     nearestRef.current = sync.index
     userScrollingRef.current = false
-    restOn(scroller, sync.index)
+    restOn(scroller, sync.index, 'instant')
     setSelection(adoptSelection(navigationKey, sync.index))
-    setReach(collapseReach(navigationKey, sync.index))
   }, [date, dayWindow, navigationKey])
 
   return { scrollerRef, dayWindow, selectedIndex, mountedRange }

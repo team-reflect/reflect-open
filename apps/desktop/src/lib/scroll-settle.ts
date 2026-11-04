@@ -37,14 +37,10 @@ export interface ScrollSettleOptions {
    */
   isSettled?: (() => boolean) | undefined
   /**
-   * Where a mouse drag may start. Defaults to `element`.
+   * Where a mouse drag may start. Defaults to `element`. `null` starts no
+   * mouse drag.
    */
-  dragHandle?: HTMLElement | undefined
-  /**
-   * The page size for a mouse drag release. When set, the release scrolls to
-   * the nearest page instead of the nearer end of the range.
-   */
-  mousePage?: (() => number) | undefined
+  dragHandle?: HTMLElement | null | undefined
 }
 
 export interface ScrollSettleWatch {
@@ -68,9 +64,8 @@ export interface ScrollSettleWatch {
  *
  * A mouse drag scrolls the element the way a finger does: snapping is off
  * from the first move until the release scroll stops, and on release the
- * element scrolls smoothly to the nearest page with `mousePage`, or else to
- * the nearer end of its range. The drag and that scroll count as one user
- * scroll.
+ * element scrolls smoothly to the nearer end of its range. The drag and that
+ * scroll count as one user scroll.
  */
 export function watchScrollSettle({
   element,
@@ -78,7 +73,6 @@ export function watchScrollSettle({
   signal,
   isSettled,
   dragHandle = element,
-  mousePage,
 }: ScrollSettleOptions): ScrollSettleWatch {
   // Fingers that landed on the element and have not lifted.
   const fingers = new Set<number>()
@@ -201,7 +195,7 @@ export function watchScrollSettle({
     { passive: true, signal },
   )
   element.addEventListener('scrollend', flush, { signal })
-  dragHandle.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
+  dragHandle?.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
   signal.addEventListener(
     'abort',
     () => {
@@ -301,13 +295,7 @@ export function watchScrollSettle({
       const range = x
         ? element.scrollWidth - element.clientWidth
         : element.scrollHeight - element.clientHeight
-      const page = mousePage?.()
-      const end =
-        page === undefined
-          ? position() < range / 2
-            ? 0
-            : range
-          : Math.min(range, Math.round(position() / page) * page)
+      const end = position() < range / 2 ? 0 : range
       // The press lasts until the release scroll stops: on `scrollend` at
       // `end`, or after the quiet time. A late `scrollend` from the drag
       // itself does not end it, and an interrupted scroll cannot hold it.
