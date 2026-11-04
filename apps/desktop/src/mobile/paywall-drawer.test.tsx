@@ -1,3 +1,4 @@
+import { userEvent } from 'vitest/browser'
 import type { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -22,7 +23,7 @@ import {
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { PaywallScreen } from './paywall-screen.tsx'
+import { PaywallDrawer } from './paywall-drawer.tsx'
 
 const YEARLY_PRODUCT = {
   formattedPrice: '$99999.99',
@@ -51,7 +52,7 @@ let queryClient: QueryClient
  * Render the paywall over the services of the running test.
  */
 async function mount(): Promise<InAppRenderResult<CoreServices>> {
-  const view = await renderInApp(<PaywallScreen />, { core: services })
+  const view = await renderInApp(<PaywallDrawer open />, { core: services })
   queryClient = view.queryClient
   return view
 }
@@ -113,7 +114,18 @@ beforeEach(() => {
   }
 })
 
-describe('PaywallScreen products', () => {
+describe('PaywallDrawer', () => {
+  it('stays open on Escape', async () => {
+    const view = await mount()
+    await expect.element(view.getByRole('dialog', { name: 'Unlock Reflect Pro' })).toBeVisible()
+
+    await userEvent.keyboard('{Escape}')
+
+    await expect.element(view.getByRole('dialog', { name: 'Unlock Reflect Pro' })).toBeVisible()
+  })
+})
+
+describe('PaywallDrawer products', () => {
   it('shows the existing failure UI when a required product is missing', async () => {
     getProducts = () => Promise.resolve([YEARLY_PRODUCT])
     const view = await mount()
@@ -129,7 +141,7 @@ describe('PaywallScreen products', () => {
   })
 })
 
-describe('PaywallScreen purchase mutation', () => {
+describe('PaywallDrawer purchase mutation', () => {
   it('purchases the yearly plan, disables every action, and invalidates on success', async () => {
     const pendingPurchase = Promise.withResolvers<void>()
     purchase = () => pendingPurchase.promise
@@ -179,7 +191,7 @@ describe('PaywallScreen purchase mutation', () => {
   })
 })
 
-describe('PaywallScreen offer code', () => {
+describe('PaywallDrawer offer code', () => {
   it('opens the in-app redemption sheet and refetches entitlements after it closes', async () => {
     const pendingRedeem = Promise.withResolvers<void>()
     redeem = () => pendingRedeem.promise
@@ -233,7 +245,7 @@ describe('PaywallScreen offer code', () => {
   })
 })
 
-describe('PaywallScreen restore mutation', () => {
+describe('PaywallDrawer restore mutation', () => {
   it('syncs with the App Store and shows the no-purchase message when nothing is owned', async () => {
     const view = await mount()
     await expect.element(view.getByRole('button', { name: 'Restore Purchases' })).toBeVisible()
@@ -314,7 +326,7 @@ describe('PaywallScreen restore mutation', () => {
   })
 })
 
-describe('PaywallScreen Reflect Classic verification', () => {
+describe('PaywallDrawer Reflect Classic verification', () => {
   const CLAIM = /Already a Reflect member/
   const SIGN_IN = /Sign in here/
 

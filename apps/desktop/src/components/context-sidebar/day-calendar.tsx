@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useDateFormat, useWeekStartDay } from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
 
 interface DayCalendarProps {
@@ -41,7 +41,7 @@ const HEADER_BUTTON_CLASS =
  * calendar glyph between the month arrows jumps back to today.
  */
 export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const navigateNoteLink = useNoteLinkNavigation(selectedDate)
   const graph = useGraphInfo()
   const { dailyNotes } = useCoreServices()

@@ -3,7 +3,7 @@ import type { XPostResolver } from '@meowdown/core'
 import { queryOptions } from '@tanstack/react-query'
 import { parseXPostId } from '@post-embed/schema'
 import { queryClient, queryKeys } from '@/lib/query-client.ts'
-import { useMaybeGraphInfo } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 export const X_MEDIA_URL_PROTOCOLS = ['reflect-asset:']
@@ -52,5 +52,5 @@ export function getXPostResolver(
 
 export function useXPostResolver() {
   const { embedMedia } = useCoreServices()
-  return getXPostResolver(embedMedia, useMaybeGraphInfo())
+  return getXPostResolver(embedMedia, useGraphInfo())
 }

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { ChevronRight, Sparkles } from 'lucide-react'
 import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 
 interface MobileAskRowProps {
   /** The All tab's search text, asked as typed. */
@@ -19,7 +19,7 @@ interface MobileAskRowProps {
 export function MobileAskRow({ query }: MobileAskRowProps): ReactElement | null {
   const providers = useChatProviders()
   const { ask } = useChatActions()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const question = query.trim()
 
   if (question === '' || providers.length === 0) {

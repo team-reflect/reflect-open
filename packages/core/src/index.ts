@@ -186,6 +186,7 @@ export { createSearchService, type SearchService } from './indexing/search-servi
 export { createSuggestionService, type SuggestionService } from './indexing/suggestion-service.ts'
 export {
   type IndexFileProgress,
+  type IndexLifecycleProgress,
   type IndexLifecycleService,
 } from './indexing/index-lifecycle-service.ts'
 export { type AiPromptDraft, type AiPromptService } from './ai/ai-prompt-service.ts'

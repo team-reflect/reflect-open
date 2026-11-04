@@ -164,8 +164,8 @@ function setup(options?: {
   const fileProgress: Array<IndexFileProgress | null> = []
   const stalePlaceholders: string[][] = []
   const order: string[] = []
-  index.onProgress((stage) => {
-    progress.push(stage)
+  index.progress.subscribe(() => {
+    progress.push(index.progress.get())
   })
   index.onApplied((event) => {
     applied.push(event)
@@ -665,8 +665,8 @@ describe('file progress', () => {
     const { index, fileProgress } = setupLargePass()
     expect(index.fileProgress.get()).toBeNull()
     const atLive: Array<ReturnType<typeof index.fileProgress.get>> = []
-    index.onProgress((progress) => {
-      if (progress === 'live') {
+    index.progress.subscribe(() => {
+      if (index.progress.get() === 'live') {
         atLive.push(index.fileProgress.get())
       }
     })

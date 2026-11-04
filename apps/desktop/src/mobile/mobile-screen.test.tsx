@@ -845,6 +845,25 @@ describe('MobileShell', () => {
     })
   })
 
+  it('returns to the list when the note opened from All was trashed', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount(
+      { kind: 'allNotes', tag: null },
+      { kind: 'note', path: 'notes/meeting-notes.md' },
+    )
+    await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    await expect.element(view.getByRole('heading', { name: 'Edit note' })).toBeVisible()
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    await act(() => core.noteActions.trashOne('notes/meeting-notes.md'))
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
+  })
+
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')

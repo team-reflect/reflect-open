@@ -7,7 +7,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  * `null` means nothing is stored, or storage could not be read; passing
  * `null` to the setter removes the key.
  */
-export function useSessionStorageExternalStore(
+export function useSessionStorageValue(
   key: string,
 ): [value: string | null, setValue: (value: string | null) => void] {
   const { storage } = useCoreServices()

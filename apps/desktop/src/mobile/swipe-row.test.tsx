@@ -27,6 +27,7 @@ function Harness({ initiallyRevealed = false }: { initiallyRevealed?: boolean })
         onBeginInteraction={onBeginInteraction}
         className="h-12"
         surfaceClassName="bg-background"
+        overscrollColor="red"
         actions={
           <button type="button" style={{ width: ACTION_WIDTH }} onClick={onAction}>
             Delete
@@ -140,6 +141,15 @@ describe('SwipeRow', () => {
     // The finger did not move the row, so no settle report follows.
     await touch(scroller, 'end')
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(0))
+  })
+
+  it('snaps a scroll that stops past halfway to the open position', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    scroller.scrollTo({ left: ACTION_WIDTH - 26, behavior: 'instant' })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ACTION_WIDTH))
   })
 
   it('reports the start of every interaction, a tap included', async () => {

@@ -280,7 +280,18 @@ export default defineESLintConfig(
   {
     files: [`**/*.${SOURCE_EXTENSIONS}`],
     plugins: { architecture: architecturePlugin },
-    rules: { 'architecture/maybe-promise': 'error' },
+    rules: {
+      'architecture/maybe-promise': 'error',
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'AbortSignal',
+          property: 'any',
+          message:
+            'Use `anySignal` (`apps/desktop/src/lib/any-signal.ts`): WebKit can collect an `AbortSignal.any` result that only listener options hold.',
+        },
+      ],
+    },
   },
   {
     files: [`packages/core/**/*.${SOURCE_EXTENSIONS}`],

@@ -16,7 +16,7 @@ import type {
 } from './subscription-service.ts'
 
 /**
- * Paywall visibility: `show` replaces the app; `hide` leaves the app visible.
+ * Paywall visibility: `show` covers the app; `hide` leaves the app visible.
  */
 export type PaywallGate = 'show' | 'hide'
 
@@ -26,7 +26,7 @@ export type PaywallGate = 'show' | 'hide'
 export const PAYWALL_REQUESTED_STORAGE_KEY = 'reflect.paywall-requested'
 
 /**
- * Whether the paywall replaces the app, and the actions that lift it.
+ * Whether the paywall covers the app, and the actions that lift it.
  */
 export interface PaywallService {
   /**
