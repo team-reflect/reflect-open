@@ -13,4 +13,12 @@ export interface WhatsNewItem {
  * User-facing changes keyed by marketing version. A beta appends to its
  * marketing version's list, so each beta update shows everything so far.
  */
-export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {}
+export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
+  '0.18.0': [
+    {
+      title: 'What’s New',
+      body: 'After an update, Reflect now shows what changed. This is the first one.',
+      platforms: ['desktop', 'ios'],
+    },
+  ],
+}
