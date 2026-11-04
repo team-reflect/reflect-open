@@ -95,8 +95,7 @@ export function watchScrollSettle({
   // The current mouse press, from `pointerdown` until its release scroll stops.
   let press: AbortController | undefined
   // The current touch gesture, from the first finger down until the last lifts.
-  let gesture: AbortController | undefined
-  let gestureSignal = signal
+  let gesture = new AbortController()
 
   const isTouching = (): boolean => fingers.size > 0 || mouseDragging
   const endSnapTail = (): void => {
@@ -132,17 +131,15 @@ export function watchScrollSettle({
     (event: TouchEvent) => {
       if (fingers.size === 0) {
         gesture = new AbortController()
-        gestureSignal = anySignal([signal, gesture.signal])
       }
       for (const touch of event.changedTouches) {
         fingers.add(touch.identifier)
       }
-      // A finger lifts with `touchend` on the node it landed on. When that
-      // node leaves the document mid-gesture, the event no longer bubbles to
-      // the element, so the listener goes on the node itself.
+      // `touchend` fires on the node the finger landed on, and does not bubble
+      // to `element` once that node is removed, so the listeners go on the node.
       const target = event.target as HTMLElement | null
-      target?.addEventListener('touchend', release, { passive: true, signal: gestureSignal })
-      target?.addEventListener('touchcancel', release, { passive: true, signal: gestureSignal })
+      target?.addEventListener('touchend', release, { passive: true, signal: gesture.signal })
+      target?.addEventListener('touchcancel', release, { passive: true, signal: gesture.signal })
       endSnapTail()
       fingerScroll = true
       scrolledSinceTouch = false
@@ -156,7 +153,7 @@ export function watchScrollSettle({
       fingers.delete(touch.identifier)
     }
     if (fingers.size === 0) {
-      gesture?.abort()
+      gesture.abort()
     }
     if (isTouching()) {
       return
@@ -215,6 +212,7 @@ export function watchScrollSettle({
     () => {
       clearTimeout(timer)
       clearTimeout(snapTailTimer)
+      gesture.abort()
     },
     { once: true },
   )
