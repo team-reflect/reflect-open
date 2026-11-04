@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.17.0...v0.18.0-beta.1) (2026-11-04)
+
+
+### Features
+
+* **mobile:** show the remaining trial days ([#1932](https://github.com/team-reflect/reflect-open/issues/1932)) ([ecafd7b](https://github.com/team-reflect/reflect-open/commit/ecafd7bd1c4f2655c317d47d906087877d4b8143))
+
+
+### Bug Fixes
+
+* **mobile:** fill over-swiped swipe rows with the last action color ([#1933](https://github.com/team-reflect/reflect-open/issues/1933)) ([7f4bb85](https://github.com/team-reflect/reflect-open/commit/7f4bb85c346b90f5eb2b20e31a49943ad00734d6))
+
 ## [0.17.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.17.0-beta.5...v0.17.0-beta.6) (2026-11-04)
 
 
