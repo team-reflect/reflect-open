@@ -1,16 +1,14 @@
-import {
-  startTransition,
-  useState,
-  ViewTransition,
-  type CSSProperties,
-  type ReactElement,
-} from 'react'
-import { Check, Mail, Star } from 'lucide-react'
-import { marketingVersion } from '@reflect/core'
+import { startTransition, useState, ViewTransition, type ReactElement, type ReactNode } from 'react'
+import { SiDiscord, SiGithub } from '@icons-pack/react-simple-icons'
+import { Mail, Star } from 'lucide-react'
 import type { FeedbackChannel } from '@reflect/app'
-import { DiscordIcon } from '@/components/icons/discord-icon.tsx'
-import { GitHubIcon } from '@/components/icons/github-icon.tsx'
+import { marketingVersion } from '@reflect/core'
+import { GraphPattern } from '@/components/icons/graph-pattern.tsx'
+import { Badge } from '@/components/ui/badge.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { riseIn, WhatsNewItems } from '@/components/whats-new/whats-new-items.tsx'
 import { useStore } from '@/lib/use-store.ts'
+import { cn } from '@/lib/utils.ts'
 import {
   Drawer,
   DrawerBody,
@@ -21,47 +19,34 @@ import {
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import './whats-new-drawer.css'
 
+const ICON_CLASS = 'size-5 text-accent dark:text-accent-hover'
+
 const FEEDBACK_CHANNELS: readonly {
   channel: FeedbackChannel
   label: string
   icon: ReactElement
 }[] = [
-  { channel: 'discord', label: 'Discord', icon: <DiscordIcon className="size-5" /> },
-  { channel: 'github', label: 'GitHub', icon: <GitHubIcon className="size-5" /> },
-  { channel: 'email', label: 'Email', icon: <Mail className="size-5" strokeWidth={1.75} /> },
+  { channel: 'discord', label: 'Discord', icon: <SiDiscord aria-hidden className={ICON_CLASS} /> },
+  { channel: 'github', label: 'GitHub', icon: <SiGithub aria-hidden className={ICON_CLASS} /> },
+  { channel: 'email', label: 'Email', icon: <Mail className={ICON_CLASS} strokeWidth={1.75} /> },
 ]
 
-/**
- * The style that puts a `whats-new-rise` line at `index` in the stagger.
- */
-function riseAt(index: number): CSSProperties {
-  return { '--whats-new-index': index } as CSSProperties
-}
+const PRIMARY_CLASS = 'h-12 w-full rounded-xl text-base font-semibold'
 
 /**
- * A faint piece of the brand graph that runs off the header card's corner.
+ * The tinted card at the top of each page, with the brand graph in its corner.
  */
-function GraphPattern(): ReactElement {
+function HeaderCard({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <svg
-      aria-hidden
-      viewBox="0 0 140 120"
-      overflow="visible"
-      className="whats-new-graph"
-      fill="none"
+    <div
+      className={cn(
+        'relative isolate flex flex-col items-start overflow-hidden rounded-2xl bg-accent/5 p-5 ring-1 ring-accent/10 ring-inset dark:bg-accent/15 dark:ring-accent/20',
+        className,
+      )}
     >
-      <g stroke="currentColor" strokeWidth="1.1" strokeLinecap="round">
-        <path d="M24 30 L66 18 L112 36 L94 78 L52 70 Z" />
-        <path d="M66 18 L52 70 M112 36 L150 14 M94 78 L150 108 M52 70 L36 130 M24 30 L-10 58 M66 18 L74 -10" />
-      </g>
-      <g fill="currentColor">
-        <circle cx="66" cy="18" r="4" />
-        <circle cx="112" cy="36" r="5" />
-        <circle cx="94" cy="78" r="3.5" />
-        <circle cx="52" cy="70" r="4.5" />
-        <circle cx="24" cy="30" r="3" />
-      </g>
-    </svg>
+      <GraphPattern className="absolute top-0 -right-2 -z-10 h-28 w-32 text-accent/15 mask-radial-from-35% mask-radial-to-80% mask-radial-at-top-right dark:text-accent-hover/15" />
+      {children}
+    </div>
   )
 }
 
@@ -82,6 +67,8 @@ export function WhatsNewDrawer(): ReactElement {
     setRated(false)
     whatsNew.dismiss()
   }
+  const headerRise = riseIn(0)
+  const continueRise = riseIn(items.length + 1)
   return (
     <Drawer
       open={gate.kind === 'whatsNew'}
@@ -95,38 +82,27 @@ export function WhatsNewDrawer(): ReactElement {
         <ViewTransition key={page} enter="whats-new-page-in" exit="whats-new-page-out">
           <div data-whats-new className="flex min-h-0 flex-col">
             {page === 'whatsNew' ? (
-              <DrawerBody className="whats-new gap-0 pt-6">
-                <header className="whats-new-rise whats-new-card" style={riseAt(0)}>
-                  <GraphPattern />
-                  <p className="whats-new-eyebrow">New in Reflect</p>
-                  <DrawerTitle className="whats-new-heading mt-1.5 px-0 pt-0">
-                    What’s new
-                  </DrawerTitle>
-                  <DrawerDescription className="whats-new-version mt-4">
-                    Version {marketingVersion(platform.appVersion)}
-                  </DrawerDescription>
-                </header>
-                <ul className="mt-4 flex flex-col">
-                  {items.map((item, index) => (
-                    <li
-                      key={item.title}
-                      className="whats-new-rise whats-new-item flex gap-3.5 px-1 py-3.5"
-                      style={riseAt(index + 1)}
-                    >
-                      <span className="whats-new-check">
-                        <Check className="size-3.5" strokeWidth={2.75} />
-                      </span>
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <p className="font-medium text-text">{item.title}</p>
-                        <p className="leading-snug text-text-secondary">{item.body}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  className="whats-new-rise whats-new-primary mt-5"
-                  style={riseAt(items.length + 1)}
+              <DrawerBody className="gap-0 pt-6">
+                <div className={headerRise.className} style={headerRise.style}>
+                  <HeaderCard>
+                    <p className="text-sm font-semibold text-accent dark:text-accent-hover">
+                      New in Reflect
+                    </p>
+                    <DrawerTitle className="mt-1.5 px-0 pt-0 text-2xl leading-tight font-semibold tracking-tight text-text">
+                      What’s new
+                    </DrawerTitle>
+                    <DrawerDescription className="mt-4">
+                      <Badge variant="secondary" className="h-6 px-2.5 tabular-nums">
+                        Version {marketingVersion(platform.appVersion)}
+                      </Badge>
+                    </DrawerDescription>
+                  </HeaderCard>
+                </div>
+                <WhatsNewItems items={items} riseFrom={1} className="mt-4 px-1" />
+                <Button
+                  variant="raised"
+                  className={cn('mt-5', PRIMARY_CLASS, continueRise.className)}
+                  style={continueRise.style}
                   onClick={() => {
                     if (review.shouldAsk()) {
                       startTransition(() => {
@@ -138,28 +114,27 @@ export function WhatsNewDrawer(): ReactElement {
                   }}
                 >
                   Continue
-                </button>
+                </Button>
               </DrawerBody>
             ) : (
-              <DrawerBody className="whats-new gap-0 pt-6">
-                <div className="whats-new-card">
-                  <GraphPattern />
-                  <div aria-hidden className="whats-new-stars flex gap-1">
+              <DrawerBody className="gap-0 pt-6">
+                <HeaderCard>
+                  <div aria-hidden className="flex gap-1 text-accent dark:text-accent-hover">
                     {[0, 1, 2, 3, 4].map((index) => (
-                      <Star key={index} className="size-4" strokeWidth={1.5} />
+                      <Star key={index} className="size-4 fill-current" strokeWidth={1.5} />
                     ))}
                   </div>
-                  <DrawerTitle className="whats-new-heading mt-3 px-0 pt-0">
+                  <DrawerTitle className="mt-3 px-0 pt-0 text-2xl leading-tight font-semibold tracking-tight text-text">
                     Enjoying Reflect?
                   </DrawerTitle>
-                  <DrawerDescription className="whats-new-copy mt-2">
+                  <DrawerDescription className="mt-2 max-w-68 text-base/relaxed text-text-secondary">
                     We’re a small, independent team. Every App Store rating helps new people find
                     Reflect.
                   </DrawerDescription>
-                </div>
-                <button
-                  type="button"
-                  className="whats-new-primary mt-5"
+                </HeaderCard>
+                <Button
+                  variant="raised"
+                  className={cn('mt-5', PRIMARY_CLASS)}
                   onClick={() => {
                     if (rated) {
                       review.writeReview()
@@ -169,26 +144,34 @@ export function WhatsNewDrawer(): ReactElement {
                     }
                   }}
                 >
-                  <Star className="size-4" strokeWidth={2} />
+                  <Star />
                   {rated ? 'Write a review' : 'Rate Reflect'}
-                </button>
-                <p className="whats-new-divider mt-5">Or tell us directly</p>
+                </Button>
+                <p className="mt-5 flex items-center gap-3 text-sm text-text-secondary">
+                  <span aria-hidden className="h-px flex-1 bg-border" />
+                  Or tell us directly
+                  <span aria-hidden className="h-px flex-1 bg-border" />
+                </p>
                 <div className="mt-2.5 grid grid-cols-3 gap-2">
                   {FEEDBACK_CHANNELS.map(({ channel, label, icon }) => (
-                    <button
+                    <Button
                       key={channel}
-                      type="button"
-                      className="whats-new-channel"
+                      variant="outline"
+                      className="h-auto min-h-15 flex-col gap-1 rounded-xl text-xs"
                       onClick={() => review.sendFeedback(channel)}
                     >
                       {icon}
-                      <span>{label}</span>
-                    </button>
+                      {label}
+                    </Button>
                   ))}
                 </div>
-                <button type="button" className="whats-new-quiet mt-3 self-center" onClick={close}>
+                <Button
+                  variant="ghost"
+                  className="mt-3 h-11 self-center px-5 text-base text-text-secondary"
+                  onClick={close}
+                >
                   Not now
-                </button>
+                </Button>
               </DrawerBody>
             )}
           </div>
