@@ -558,14 +558,14 @@ export function MobileSettings(): ReactElement {
           <SettingsGroup header="Feedback">
             {isIos ? <SettingsActionRow label="Rate Reflect" onPress={review.writeReview} /> : null}
             <SettingsActionRow
-              label="Join the Discord Community"
+              label="Join the Discord community"
               onPress={() => review.sendFeedback('discord')}
             />
             <SettingsActionRow
-              label="Report a Bug on GitHub"
+              label="Report a bug on GitHub"
               onPress={() => review.sendFeedback('github')}
             />
-            <SettingsActionRow label="Email Support" onPress={() => review.sendFeedback('email')} />
+            <SettingsActionRow label="Email support" onPress={() => review.sendFeedback('email')} />
           </SettingsGroup>
 
           <SettingsGroup header="About">
