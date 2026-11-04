@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTestUpdateService } from '@reflect/app/testing'
-import { createTestLoggerService } from '@reflect/core/testing'
+import { act } from '@/test-utils/act.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import type { MockToastAddOptions } from '@/test-utils/toast.ts'
-import { attachUpdateToasts } from './update-toasts.ts'
+import { UpdateToasts } from './update-toasts.ts'
 
 const toast = vi.hoisted(() => ({
   add: vi.fn<(options: MockToastAddOptions) => string>(),
@@ -16,12 +17,12 @@ afterEach(() => {
   toast.close.mockClear()
 })
 
-describe('attachUpdateToasts', () => {
-  it('shows an install action when an update is available', () => {
+describe('UpdateToasts', () => {
+  it('shows an install action when an update is available', async () => {
     const update = createTestUpdateService()
-    attachUpdateToasts(update, createTestLoggerService())
+    await renderInApp(<UpdateToasts />, { appServices: { update }, servicesOnly: true })
 
-    update.setState({ phase: 'available', version: '1.2.3' })
+    await act(() => update.setState({ phase: 'available', version: '1.2.3' }))
 
     expect(toast.add).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -39,13 +40,13 @@ describe('attachUpdateToasts', () => {
     expect(update.calls).toEqual(['install'])
   })
 
-  it('updates the same toast while downloading and when ready', () => {
+  it('updates the same toast while downloading and when ready', async () => {
     const update = createTestUpdateService()
-    attachUpdateToasts(update, createTestLoggerService())
+    await renderInApp(<UpdateToasts />, { appServices: { update }, servicesOnly: true })
     expect(toast.close).toHaveBeenCalledWith('reflect-update')
 
-    update.setState({ phase: 'available', version: '1.2.3' })
-    update.setState({ phase: 'downloading', version: '1.2.3', percent: 42 })
+    await act(() => update.setState({ phase: 'available', version: '1.2.3' }))
+    await act(() => update.setState({ phase: 'downloading', version: '1.2.3', percent: 42 }))
     expect(toast.add).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: 'reflect-update',
@@ -62,7 +63,7 @@ describe('attachUpdateToasts', () => {
     expect(Object.hasOwn(downloadingOptions ?? {}, 'actionProps')).toBe(true)
     expect(downloadingOptions?.actionProps).toBeUndefined()
 
-    update.setState({ phase: 'ready', version: '1.2.3' })
+    await act(() => update.setState({ phase: 'ready', version: '1.2.3' }))
     expect(toast.add).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: 'reflect-update',
@@ -73,15 +74,17 @@ describe('attachUpdateToasts', () => {
     expect(toast.add.mock.lastCall?.[0]?.actionProps?.children).toBe('Restart')
   })
 
-  it('surfaces install errors but ignores check-only failures', () => {
+  it('surfaces install errors but ignores check-only failures', async () => {
     const update = createTestUpdateService()
-    attachUpdateToasts(update, createTestLoggerService())
+    await renderInApp(<UpdateToasts />, { appServices: { update }, servicesOnly: true })
 
-    update.setState({ phase: 'error', message: 'offline', during: 'check' })
+    await act(() => update.setState({ phase: 'error', message: 'offline', during: 'check' }))
     expect(toast.close).toHaveBeenCalledWith('reflect-update')
     expect(toast.add).not.toHaveBeenCalled()
 
-    update.setState({ phase: 'error', message: 'signature failed', during: 'install' })
+    await act(() => {
+      update.setState({ phase: 'error', message: 'signature failed', during: 'install' })
+    })
     expect(toast.add).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'reflect-update',
@@ -97,12 +100,15 @@ describe('attachUpdateToasts', () => {
     expect(update.calls).toEqual(['retryAction', 'install'])
   })
 
-  it('stops mirroring after detach', () => {
+  it('stops mirroring after unmount', async () => {
     const update = createTestUpdateService()
-    const detach = attachUpdateToasts(update, createTestLoggerService())
-    detach()
+    const { unmount } = await renderInApp(<UpdateToasts />, {
+      appServices: { update },
+      servicesOnly: true,
+    })
+    await unmount()
 
-    update.setState({ phase: 'available', version: '1.2.3' })
+    await act(() => update.setState({ phase: 'available', version: '1.2.3' }))
     expect(toast.add).not.toHaveBeenCalled()
   })
 })

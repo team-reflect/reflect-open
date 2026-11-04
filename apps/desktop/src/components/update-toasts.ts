@@ -1,7 +1,10 @@
+import { useEffect } from 'react'
 import type { MaybePromise } from '@reflect/utils'
 import type { UpdateService, UpdateState } from '@reflect/app'
 import type { LoggerService } from '@reflect/core'
 import { toast } from '@/components/ui/toast.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 const UPDATE_TOAST_ID = 'reflect-update'
 // `timeout: 0` disables Base UI's auto-dismiss; the dismissible flag hides the
@@ -92,12 +95,13 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
 
 /**
  * Mirrors the auto-update lifecycle into the global toast surface (Plan 15).
- * A plain service subscriber: the toast calls run inside the service's own
- * transitions (check results, download progress callbacks), not in a React
- * render cycle. Returns a detach.
  */
-export function attachUpdateToasts(update: UpdateService, logger: LoggerService): () => void {
-  const sync = (): void => showUpdateToast(update.get(), update, logger)
-  sync()
-  return update.subscribe(sync)
+export function UpdateToasts(): null {
+  const { update } = useAppServices()
+  const { logger } = useCoreServices()
+  const state = useStore(update)
+  useEffect(() => {
+    showUpdateToast(state, update, logger)
+  }, [state, update, logger])
+  return null
 }
