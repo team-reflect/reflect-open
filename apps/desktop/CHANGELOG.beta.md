@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.18.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.3...v0.18.0-beta.4) (2026-11-04)
+
+
+### Features
+
+* **desktop:** offer What's New in a toast after an update ([#1963](https://github.com/team-reflect/reflect-open/issues/1963)) ([982c4f1](https://github.com/team-reflect/reflect-open/commit/982c4f133d60c546c125b9f8a5d6de4e12884dcb))
+
+
+### Bug Fixes
+
+* **desktop:** keep What's New items during the close animation ([#1962](https://github.com/team-reflect/reflect-open/issues/1962)) ([cade3ef](https://github.com/team-reflect/reflect-open/commit/cade3efb0463ff8abdf7924794942c597e2d56ef))
+* **mobile:** make the week strip scroll smoothly ([#1957](https://github.com/team-reflect/reflect-open/issues/1957)) ([8e1baca](https://github.com/team-reflect/reflect-open/commit/8e1bacab1862004267b3f4720d01a5b2bc4e2d92))
+
 ## [0.18.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.2...v0.18.0-beta.3) (2026-11-04)
 
 
