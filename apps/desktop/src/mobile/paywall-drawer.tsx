@@ -32,8 +32,9 @@ interface PurchaseVariables {
 const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 
 /**
- * The paywall as a near full-screen drawer. It ignores every request to
- * close, so a swipe scrolls the sheet back open.
+ * The paywall as a near full-screen drawer that ignores every request to
+ * close: a tap above the sheet and Escape do nothing, and a swipe scrolls the
+ * sheet back open.
  */
 export function PaywallDrawer({ open }: { open: boolean }): ReactElement {
   return (

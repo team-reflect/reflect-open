@@ -27,7 +27,8 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * The router mounts per graph exactly as on desktop; `MobileScreen` renders
  * the current route (daily spine, note pages), so wiki-link and date-link
  * taps navigate for real. The keyboard effects and the checkbox-haptic
- * listener mount here so they cover every screen's inputs.
+ * listener mount here so they cover every screen's inputs, and the paywall
+ * drawer mounts beside the surface so it can cover any of them.
  */
 export function MobileApp(): ReactElement {
   return (
@@ -51,11 +52,14 @@ function KeyboardEffects(): null {
   return null
 }
 
-// Subscription verification runs beside startup, never in its critical
-// path: while StoreKit or settings are unresolved the gate stays hidden and
-// the local app boots normally. A settled negative answer opens the paywall
-// over the current surface later; a purchase closes it.
-function MobileOverlay(): ReactElement | null {
+/**
+ * The paywall drawer over every surface. Subscription verification runs beside
+ * startup, never in its critical path: while StoreKit or settings are
+ * unresolved the gate stays hidden and the local app boots normally. A settled
+ * negative answer opens the paywall later; a purchase closes it. A leaf, so a
+ * gate change re-renders only this component.
+ */
+function MobileOverlay(): ReactElement {
   const paywallGate = usePaywallGate()
   return <PaywallDrawer open={paywallGate === 'show'} />
 }
