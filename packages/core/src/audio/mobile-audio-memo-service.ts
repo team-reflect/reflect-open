@@ -410,7 +410,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
   }
 
   #hapticImpactLight(): void {
-    void this.#deps.haptics.impactLight().catch(() => {})
+    void this.#deps.haptics.impactLight()
   }
 
   /**
