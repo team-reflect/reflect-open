@@ -291,9 +291,9 @@ export function watchScrollSettle({
       }
       suppressNextClick()
       // Snap turned back on moves the element to its snap position at the next
-      // layout, which the read forces. Safari makes that move a jump, so snap
-      // goes off again within the same task, before a frame paints, and stays
-      // off until the smooth scroll there stops.
+      // layout, which the read forces. Safari makes that move a jump
+      // (docs/mobile-motion.md), so snap goes off again within the same task,
+      // before a frame paints, and stays off until the smooth scroll there stops.
       const from = position()
       element.style.scrollSnapType = ''
       const end = position()
