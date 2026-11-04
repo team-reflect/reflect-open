@@ -38,6 +38,11 @@ interface SwipeRowProps {
    * Classes for the opaque surface that covers the actions.
    */
   surfaceClassName: string
+  /**
+   * CSS color behind the actions, seen when an over-swipe pulls them past
+   * the trailing edge. Match the last action, e.g. `var(--color-destructive)`.
+   */
+  overscrollColor: string
   children: ReactNode
 }
 
@@ -57,6 +62,7 @@ export function SwipeRow({
   actions,
   className,
   surfaceClassName,
+  overscrollColor,
   children,
 }: SwipeRowProps): ReactElement {
   const reducedMotion = usePrefersReducedMotion()
@@ -137,6 +143,13 @@ export function SwipeRow({
   )
 
   const actionsStyle = useMemo(() => ({ width: actionWidth }), [actionWidth])
+  // Only the trailing `actionWidth` is colored, so a leading over-swipe shows nothing.
+  const scrollerStyle = useMemo(
+    () => ({
+      background: `linear-gradient(to left, ${overscrollColor} ${actionWidth}px, transparent ${actionWidth}px)`,
+    }),
+    [overscrollColor, actionWidth],
+  )
 
   return (
     <div
@@ -145,6 +158,7 @@ export function SwipeRow({
       // Marks a horizontal scroller.
       data-scroll-x=""
       onPointerDown={onPointerDown}
+      style={scrollerStyle}
       className={cn(
         'flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
         className,
