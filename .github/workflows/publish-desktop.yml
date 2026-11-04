@@ -1,4 +1,4 @@
-name: Publish app
+name: Publish desktop
 
 on:
   workflow_call:

@@ -85,13 +85,13 @@ jobs:
       CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
       CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
-  publish-app-stable:
+  publish-desktop-stable:
     name: Publish stable
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
     permissions:
       contents: write
-    uses: ./.github/workflows/publish-app.yml
+    uses: ./.github/workflows/publish-desktop.yml
     with:
       tag: ${{ needs.release-please.outputs.stable_tag }}
       commit: ${{ needs.release-please.outputs.stable_commit }}
@@ -106,13 +106,13 @@ jobs:
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-  publish-app-beta:
+  publish-desktop-beta:
     name: Publish beta
     needs: release-please
     if: needs.release-please.outputs.beta_created == 'true'
     permissions:
       contents: write
-    uses: ./.github/workflows/publish-app.yml
+    uses: ./.github/workflows/publish-desktop.yml
     with:
       tag: ${{ needs.release-please.outputs.beta_tag }}
       commit: ${{ needs.release-please.outputs.beta_commit }}
