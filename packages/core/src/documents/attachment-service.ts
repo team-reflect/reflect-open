@@ -16,6 +16,7 @@ import type { NoteFileService } from '../graph/note-file-service.ts'
 import { isAttachmentPath, isSafeVisibleGraphPath } from '../graph/paths.ts'
 import type { FileMeta } from '../graph/schemas.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
+import type { LoggerService } from '../ports/logger-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { WritableStore, type Store } from '../store.ts'
 import { formatBytes } from '../lib/format-bytes.ts'
@@ -333,6 +334,7 @@ export interface AttachmentServiceDeps {
   readonly clock: ClockService
   readonly platform: FileSrcSource
   readonly graphSession: GraphSessionSource
+  readonly logger: LoggerService
 }
 
 class AttachmentServiceImpl implements AttachmentService {
@@ -355,7 +357,7 @@ class AttachmentServiceImpl implements AttachmentService {
 
   watchCatalog(generation: number): Unlisten {
     const { fileChanges } = this.#deps
-    this.#loadCatalog(generation).catch(() => {})
+    void this.#warnOnListingFailure(this.#loadCatalog(generation))
     const stopChanges = fileChanges.subscribe(({ changes }) => {
       if (changes.some((change) => isAttachmentPath(change.path))) {
         this.#relist(generation)
@@ -611,7 +613,18 @@ class AttachmentServiceImpl implements AttachmentService {
 
   #relist(generation: number): void {
     if (this.#entry?.generation === generation) {
-      this.#list(this.#entry).catch(() => {})
+      void this.#warnOnListingFailure(this.#list(this.#entry))
+    }
+  }
+
+  /**
+   * Wait for a background listing and log its failure. The last catalog stays.
+   */
+  async #warnOnListingFailure(listing: Promise<AttachmentCatalog>): Promise<void> {
+    try {
+      await listing
+    } catch (error) {
+      this.#deps.logger.warn('listing attachments failed:', error)
     }
   }
 
