@@ -1,7 +1,9 @@
-import { useState, type ReactElement } from 'react'
+import { useMemo, useState, type ReactElement } from 'react'
 import { dateAtIndex } from '@reflect/app'
 import { DaySlide } from '@/mobile/day-slide.tsx'
+import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useDayCarousel } from '@/mobile/use-day-carousel.ts'
+import { cn } from '@/lib/utils.ts'
 
 interface DayCarouselProps {
   /** The selected day (from the route). Drives the carousel position. */
@@ -22,23 +24,20 @@ interface DayCarouselProps {
   /** Settle on a day — the parent turns this into a daily-route navigation. */
   onSelect: (date: string) => void
   /**
-   * A swipe's destination day, announced at pointer-up while the snap
-   * animation still plays — for chrome (the calendar strip and its month
-   * title) that should move with the gesture, ahead of the route. The key
-   * identifies the source arrival so the receiver can reject stale updates.
+   * The day nearest the scroller during a swipe, announced as the swipe passes
+   * half a page — for chrome (the calendar strip and its month title) that
+   * should move with the gesture, ahead of the route. The key identifies the
+   * source arrival so the receiver can reject stale updates.
    */
   onTarget: (date: string, navigationKey: string) => void
 }
 
-/** Slides within this many of the selection mount an editor; the rest are
- *  empty spacers Embla can still measure (bounds webview memory). */
-const MOUNT_RADIUS = 1
-
 /**
  * V1's swipeable day carousel: horizontal paging between daily notes. The slide
- * window, Embla wiring, and route↔slide sync all live in {@link useDayCarousel};
- * this component just renders the slides, mounting a {@link DaySlide} only near
- * the selection and leaving the rest as empty spacers. Each day's scroll offset
+ * window, scroller position, and route↔slide sync all live in
+ * {@link useDayCarousel}; this component renders a native horizontal scroller
+ * with one empty snap cell per day, and a {@link DaySlide} over each cell in
+ * the mounted range. Each day's scroll offset
  * lives in a carousel-owned map so it survives its slide unmounting (V1's
  * per-slide scroll preservation).
  */
@@ -52,7 +51,7 @@ export function DayCarousel({
   onSelect,
   onTarget,
 }: DayCarouselProps): ReactElement {
-  const { emblaRef, dayWindow, selectedIndex } = useDayCarousel(
+  const { scrollerRef, dayWindow, selectedIndex, mountedRange } = useDayCarousel(
     date,
     navigationKey,
     onSelect,
@@ -61,30 +60,51 @@ export function DayCarousel({
   // One mutable map for the carousel's life; the identity never changes, so
   // holding it in state (read during render) rather than a ref is safe.
   const [scrollMemory] = useState(() => new Map<string, number>())
+  const keyboardVisible = useKeyboardVisible()
+  const cells = useMemo(() => {
+    return Array.from({ length: dayWindow.count }, (_, index) => (
+      <div
+        key={dateAtIndex(dayWindow, index)}
+        className="h-full w-full shrink-0 snap-start snap-always"
+      />
+    ))
+  }, [dayWindow])
+  const mountedIndexes = Array.from(
+    { length: mountedRange.high - mountedRange.low + 1 },
+    (_, offset) => mountedRange.low + offset,
+  )
 
   return (
-    /* `overflow: clip`: not a scroll container, so a stray scrollLeft write
-       (ProseMirror's caret reveal) cannot offset the transform-positioned
-       belt. Inline so pre-iOS-16 falls back to the class's `hidden`, healed
-       by the scroll guard in useDayCarousel. */
-    <div className="min-h-0 flex-1 overflow-hidden" style={{ overflow: 'clip' }} ref={emblaRef}>
-      <div className="flex h-full">
-        {Array.from({ length: dayWindow.count }, (_, index) => {
+    <div
+      ref={scrollerRef}
+      data-scroll-x
+      className={cn(
+        'min-h-0 flex-1 snap-x snap-mandatory scrollbar-none overflow-y-hidden overscroll-x-contain',
+        // No swiping between days while the software keyboard is up (V1
+        // parity: horizontal drags would fight text selection and the caret).
+        keyboardVisible ? 'overflow-x-hidden' : 'overflow-x-auto',
+      )}
+    >
+      <div className="relative flex h-full">
+        {cells}
+        {mountedIndexes.map((index) => {
           const day = dateAtIndex(dayWindow, index)
-          const mounted = Math.abs(index - selectedIndex) <= MOUNT_RADIUS
           return (
-            <div key={day} className="min-w-0 flex-[0_0_100%]">
-              {mounted ? (
-                <DaySlide
-                  day={day}
-                  today={today}
-                  selected={index === selectedIndex}
-                  scrollMemory={scrollMemory}
-                  scrollResetSeq={scrollResetSeq}
-                  focusRequested={focusDate === day && index === selectedIndex}
-                  onFocusConsumed={onFocusConsumed}
-                />
-              ) : null}
+            <div
+              key={day}
+              data-day={day}
+              className="absolute inset-y-0 w-full"
+              style={{ left: `${index * 100}%` }}
+            >
+              <DaySlide
+                day={day}
+                today={today}
+                selected={index === selectedIndex}
+                scrollMemory={scrollMemory}
+                scrollResetSeq={scrollResetSeq}
+                focusRequested={focusDate === day && index === selectedIndex}
+                onFocusConsumed={onFocusConsumed}
+              />
             </div>
           )
         })}

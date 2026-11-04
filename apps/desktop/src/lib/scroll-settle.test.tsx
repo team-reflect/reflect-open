@@ -408,6 +408,23 @@ describe('watchScrollSettle', () => {
 
       expect(element.scrollLeft).toBe(0)
     })
+
+    it('starts no drag with a `null` drag handle', async () => {
+      const element = mountSnapScroller()
+      watchScrollSettle({
+        element,
+        onSettle: vi.fn(),
+        signal: listeners.controller.signal,
+        dragHandle: null,
+      })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, 45)
+      await mouse.up()
+
+      expect(element.scrollLeft).toBe(0)
+    })
   })
 
   it('stops reporting after abort', async () => {

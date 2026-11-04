@@ -29,12 +29,12 @@ function summary(overrides: Partial<GraphImportSummary> = {}): GraphImportSummar
 /**
  * A service whose native import stays pending until `pendingImport` settles.
  */
-function setup(options?: { graph?: GraphInfo | null }) {
+function setup(options?: { graph?: GraphInfo | null; cancel?: () => Promise<null> }) {
   const pendingImport = Promise.withResolvers<GraphImportSummary>()
   const ipc = createTestIpcBridgeService({
     commands: {
       graph_import_reflect_v1_zip: () => pendingImport.promise,
-      graph_import_cancel: () => null,
+      graph_import_cancel: options?.cancel ?? (() => null),
     },
   })
   const fileChanges = createTestFileChangeService()
@@ -201,6 +201,18 @@ describe('V1ImportService', () => {
 
     expect(context.service.get()).toEqual({ phase: 'idle' })
     expect(context.fileChanges.ownWrites()).toEqual([])
+  })
+
+  it('logs a cancel that the native side rejects', async () => {
+    const context = setup({ cancel: () => Promise.reject(new Error('bridge down')) })
+
+    context.service.start('/tmp/reflect-v1.zip')
+    context.service.cancel()
+    await settle()
+
+    expect(context.logger.getWarnings().map((entry) => entry.message)).toEqual([
+      'cancelling the import failed:',
+    ])
   })
 
   it('surfaces failures with the native message', async () => {

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.18.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.1...v0.18.0-beta.2) (2026-11-04)
+
+
+### Features
+
+* show What's New after an update ([#1944](https://github.com/team-reflect/reflect-open/issues/1944)) ([2f6759d](https://github.com/team-reflect/reflect-open/commit/2f6759dbe47ec313dc397dfb955bbd272f689452))
+
+
+### Bug Fixes
+
+* **core:** log a failed V1 import cancel ([#1951](https://github.com/team-reflect/reflect-open/issues/1951)) ([b69decb](https://github.com/team-reflect/reflect-open/commit/b69decb358d278fb166ed8d27da351fb897a6aed))
+* **core:** log failed background attachment listings ([#1948](https://github.com/team-reflect/reflect-open/issues/1948)) ([405a402](https://github.com/team-reflect/reflect-open/commit/405a40280751d3d7fc80e205efc157e83b2eae73))
+* **core:** log failed deletes of discarded audio memo segments ([#1950](https://github.com/team-reflect/reflect-open/issues/1950)) ([3ed8844](https://github.com/team-reflect/reflect-open/commit/3ed88445259bbf8f902fc8fba4c4c5430420c4fa))
+
 ## [0.18.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.17.0...v0.18.0-beta.1) (2026-11-04)
 
 

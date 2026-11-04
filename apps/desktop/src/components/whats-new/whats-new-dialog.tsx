@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { WhatsNewItems } from './whats-new-items.tsx'
 
 /**
  * The desktop What's New dialog, open while the What's New gate shows. Every
@@ -30,18 +31,12 @@ export function WhatsNewDialog(): ReactElement {
       }}
     >
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>What’s New</DialogTitle>
+        <DialogHeader className="gap-1.5">
+          <p className="text-xs font-semibold text-accent dark:text-accent-hover">New in Reflect</p>
+          <DialogTitle className="text-xl font-semibold tracking-tight">What’s new</DialogTitle>
           <DialogDescription>Version {marketingVersion(platform.appVersion)}</DialogDescription>
         </DialogHeader>
-        <ul className="flex flex-col gap-3">
-          {gate.items?.map((item) => (
-            <li key={item.title}>
-              <p className="font-medium text-text">{item.title}</p>
-              <p className="text-text-muted">{item.body}</p>
-            </li>
-          ))}
-        </ul>
+        <WhatsNewItems items={gate.items ?? []} />
         <DialogFooter>
           <Button onClick={whatsNew.dismiss}>Continue</Button>
         </DialogFooter>

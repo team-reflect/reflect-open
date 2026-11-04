@@ -154,7 +154,7 @@ class V1ImportServiceImpl implements V1ImportService {
     if (state.phase === 'running') {
       this.#state.set({ ...state, cancelling: true })
     }
-    void this.#cancelNative().catch(() => {})
+    void this.#cancelNative()
   }
 
   dismiss(): void {
@@ -168,7 +168,7 @@ class V1ImportServiceImpl implements V1ImportService {
     return () => {
       this.#attached = false
       if (this.#running) {
-        void this.#cancelNative().catch(() => {})
+        void this.#cancelNative()
       }
     }
   }
@@ -197,9 +197,14 @@ class V1ImportServiceImpl implements V1ImportService {
 
   /**
    * Cancel the running import (a no-op when none runs); the pending import call rejects.
+   * Never rejects: a failure is logged and the import runs on.
    */
   async #cancelNative(): Promise<void> {
-    await this.#deps.ipc.call('graph_import_cancel', {}, voidSchema)
+    try {
+      await this.#deps.ipc.call('graph_import_cancel', {}, voidSchema)
+    } catch (cause) {
+      this.#deps.logger.warn('cancelling the import failed:', cause)
+    }
   }
 
   /**

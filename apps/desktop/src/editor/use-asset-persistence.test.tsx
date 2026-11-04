@@ -7,6 +7,7 @@ import {
   createTestAttachmentService,
   createTestClockService,
   createTestFileChangeService,
+  createTestLoggerService,
   createTestNoteFileService,
   createTestProgressPort,
   createTestPlatformService,
@@ -151,6 +152,7 @@ describe('useAssetPersistence', () => {
       clock,
       platform: createTestPlatformService(),
       graphSession,
+      logger: createTestLoggerService(),
     })
     const view = await renderPersistence({ generation: 3, path: 'notes/a.md' })
 

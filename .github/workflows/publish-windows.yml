@@ -28,7 +28,7 @@ defaults:
 
 jobs:
   windows:
-    name: Build Windows ${{ matrix.name }}
+    name: ${{ matrix.name }}
     if: github.repository == 'team-reflect/reflect-open'
     environment: release_app
     runs-on: ${{ matrix.runner }}
@@ -76,11 +76,17 @@ jobs:
           compression-level: 0
           retention-days: 30
 
-      # Uploads clobber, so a failed run can be retried.
+      # Uploads clobber, so a failed upload can be retried.
       - name: Upload the assets to the draft release
         working-directory: ${{ runner.temp }}/windows-artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
-        run: gh release upload "$TAG" ./* --clobber
+        run: |
+          for attempt in 1 2 3; do
+            gh release upload "$TAG" ./* --clobber && exit 0
+            echo "::warning::gh release upload failed (attempt $attempt)"
+            sleep $((attempt * 10))
+          done
+          exit 1

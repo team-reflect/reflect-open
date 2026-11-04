@@ -45,4 +45,11 @@ impl<R: Runtime> AppStore<R> {
             .run_mobile_plugin("presentOfferCodeRedeemSheet", ())
             .map_err(Into::into)
     }
+
+    /// Ask StoreKit for its review prompt. The system decides whether it shows.
+    pub fn request_review(&self) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("requestReview", ())
+            .map_err(Into::into)
+    }
 }

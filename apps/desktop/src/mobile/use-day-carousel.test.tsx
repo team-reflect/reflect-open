@@ -1,102 +1,24 @@
+import { page } from 'vitest/browser'
 import { act } from '@/test-utils/act.ts'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useState, type ReactElement } from 'react'
+import { describe, expect, it, vi } from 'vitest'
 import { createDayWindow, dateAtIndex } from '@reflect/app'
-import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { DayCarousel } from '@/mobile/day-carousel.tsx'
+import '@/test-utils/locator.ts'
+import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
+import { scrollElement, touch } from '@/test-utils/scroll.ts'
 import {
   CAROUSEL_RADIUS,
   reconcileCarousel,
   shouldRecenter,
-  useDayCarousel,
   type ReconcileInput,
 } from './use-day-carousel.ts'
 
 /**
- * The carousel's follow-the-route decision in isolation — Embla pointer
- * gestures can't be driven under jsdom, so the branchy reconciliation that the
- * integration test can only reach indirectly is pinned here as pure logic —
- * plus the hook's swipe wiring driven through a fake Embla API firing the
- * events a real gesture would.
+ * The carousel's follow-the-route decision as pure logic, plus the real
+ * carousel driven through native scrolls: a finger scroll stands in for a
+ * swipe, since nothing in the carousel handles touches itself.
  */
-const embla = vi.hoisted(() => {
-  const handlers = new Map<string, Set<(api: unknown) => void>>()
-  let selected = 0
-  const rootEl = document.createElement('div')
-
-  const api = {
-    selectedScrollSnap: (): number => selected,
-    rootNode: (): HTMLElement => rootEl,
-    on: (event: string, handler: (api: unknown) => void) => {
-      let registered = handlers.get(event)
-      if (!registered) {
-        registered = new Set()
-        handlers.set(event, registered)
-      }
-      registered.add(handler)
-      return api
-    },
-    off: (event: string, handler: (api: unknown) => void) => {
-      handlers.get(event)?.delete(handler)
-      return api
-    },
-    scrollTo: vi.fn((index: number, jump?: boolean) => {
-      const changed = selected !== index
-      // Embla 8.6's instant path renders (and can emit `settle`) before it
-      // updates the selected index and emits `select`. Model that re-entrancy:
-      // a Today sync must ignore the old arrival's settle callback.
-      if (changed && jump === true) {
-        emit('settle')
-      }
-      selected = index
-      if (changed) {
-        emit('select')
-      }
-    }),
-    reInit: vi.fn((options?: { startIndex?: number }) => {
-      if (options?.startIndex !== undefined) {
-        selected = options.startIndex
-      }
-    }),
-  }
-
-  function emit(event: string): void {
-    for (const handler of handlers.get(event) ?? []) {
-      handler(api)
-    }
-  }
-
-  return {
-    api,
-    /** Target `index` and fire select, as pointer-up does mid-animation. */
-    selectAt(index: number): void {
-      selected = index
-      emit('select')
-    },
-    /** Land on `index` and fire select + settle, as a finished swipe would. */
-    settleAt(index: number): void {
-      selected = index
-      emit('select')
-      emit('settle')
-    },
-    /** Fire settle at the carousel's current target. */
-    settle(): void {
-      emit('settle')
-    },
-    reset(): void {
-      handlers.clear()
-      selected = 0
-      api.scrollTo.mockClear()
-      api.reInit.mockClear()
-    },
-  }
-})
-
-vi.mock('embla-carousel-react', () => ({
-  default: () => [() => {}, embla.api],
-}))
-
-afterEach(() => {
-  embla.reset()
-})
 
 const base: ReconcileInput = {
   index: 10,
@@ -191,120 +113,269 @@ describe('shouldRecenter', () => {
 })
 
 describe('useDayCarousel', () => {
-  /** The anchor day sits at {@link CAROUSEL_RADIUS} — the window's center. */
+  /** The anchor day sits at {@link CAROUSEL_RADIUS}, the window's center. */
   const DATE = '2026-06-12'
   const CENTER = CAROUSEL_RADIUS
-  const NAVIGATION_KEY = `0:0:${DATE}`
+  const WIDTH = 390
   const initialWindow = createDayWindow(DATE, {
     past: CAROUSEL_RADIUS,
     future: CAROUSEL_RADIUS,
   })
 
-  async function mountCarousel() {
-    const onSelect = vi.fn()
-    const onTarget = vi.fn()
-    const hook = await renderHookInApp(
-      (
-        { date, navigationKey }: { date: string; navigationKey: string } = {
-          date: DATE,
-          navigationKey: NAVIGATION_KEY,
-        },
-      ) => useDayCarousel(date, navigationKey, onSelect, onTarget),
-      {
-        initialProps: { date: DATE, navigationKey: NAVIGATION_KEY },
-      },
-    )
-    return { ...hook, onSelect, onTarget }
+  interface Route {
+    date: string
+    navigationKey: string
   }
 
-  it('follows the swipe target at select, so the next neighbor mounts mid-animation', async () => {
-    const { result, onSelect } = await mountCarousel()
+  const routeTo = (date: string, seq: number): Route => ({ date, navigationKey: `${seq}:${date}` })
 
-    // Pointer-up: the target is known but the snap animation is still playing.
-    await act(() => embla.selectAt(CENTER + 1))
+  async function mountCarousel() {
+    const onSelect = vi.fn<(date: string) => void>()
+    const onTarget = vi.fn<(date: string, navigationKey: string) => void>()
+    const navigate: { current: (route: Route) => void } = { current: () => {} }
+    const resize: { current: (width: number) => void } = { current: () => {} }
+    let seq = 0
+    // Stands in for the router: a settled day comes back as the new route.
+    function Harness(): ReactElement {
+      const [route, setRoute] = useState(() => routeTo(DATE, seq))
+      const [width, setWidth] = useState(WIDTH)
+      navigate.current = setRoute
+      resize.current = setWidth
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', width, height: 600 }}>
+          <DayCarousel
+            date={route.date}
+            navigationKey={route.navigationKey}
+            today={DATE}
+            scrollResetSeq={0}
+            focusDate={null}
+            onFocusConsumed={() => {}}
+            onSelect={(day) => {
+              onSelect(day)
+              setRoute(routeTo(day, ++seq))
+            }}
+            onTarget={onTarget}
+          />
+        </div>
+      )
+    }
+    const screen = await renderInApp(<Harness />, { platform: MOBILE_PLATFORM })
+    const scroller = screen.container.querySelector<HTMLElement>('[data-scroll-x]')!
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(CENTER * WIDTH))
+    return {
+      ...screen,
+      scroller,
+      onSelect,
+      onTarget,
+      navigate: async (date: string) => {
+        await act(() => navigate.current(routeTo(date, ++seq)))
+      },
+      resize: async (width: number) => {
+        await act(() => resize.current(width))
+      },
+    }
+  }
 
-    expect(result.current.selectedIndex).toBe(CENTER + 1)
-    expect(onSelect).not.toHaveBeenCalled()
-  })
-
-  it('announces the target day at select, ahead of the settle-time report', async () => {
-    const { onTarget, onSelect } = await mountCarousel()
-
-    await act(() => embla.selectAt(CENTER + 1))
-
-    // The strip (and its month title) follow this while the snap animates;
-    // the route only moves at settle.
-    expect(onTarget).toHaveBeenCalledExactlyOnceWith('2026-06-13', NAVIGATION_KEY)
-    expect(onSelect).not.toHaveBeenCalled()
-  })
+  const slide = (day: string): Element | null => {
+    return page.locate(`[data-day="${CSS.escape(day)}"]`).query()
+  }
 
   it('reports the landed day only when the swipe settles', async () => {
-    const { result, onSelect } = await mountCarousel()
+    const { scroller, onSelect } = await mountCarousel()
 
-    await act(() => embla.settleAt(CENTER + 1))
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 1) * WIDTH, behavior: 'instant' }))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(onSelect).not.toHaveBeenCalled()
 
+    await touch(scroller, 'end')
+    await act(() => scroller.dispatchEvent(new Event('scrollend')))
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-13'))
+    expect(scroller.scrollLeft).toBe((CENTER + 1) * WIDTH)
+  })
+
+  it('mounts the next day and announces the target once a swipe passes half a page', async () => {
+    const { scroller, onSelect, onTarget } = await mountCarousel()
+    expect(slide('2026-06-14')).toBeNull()
+
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 0.6) * WIDTH, behavior: 'instant' }))
+
+    await vi.waitFor(() => expect(slide('2026-06-14')).not.toBeNull())
+    expect(onTarget).toHaveBeenCalledExactlyOnceWith('2026-06-13', `0:${DATE}`)
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(slide('2026-06-11')).not.toBeNull()
+
+    await act(() => scroller.scrollTo({ left: (CENTER + 1) * WIDTH, behavior: 'instant' }))
+    await touch(scroller, 'end')
+    await act(() => scroller.dispatchEvent(new Event('scrollend')))
+
+    // The settle drops the slide that fell out of the range.
+    await vi.waitFor(() => expect(slide('2026-06-11')).toBeNull())
     expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-13')
-    expect(result.current.selectedIndex).toBe(CENTER + 1)
+    expect(slide('2026-06-14')).not.toBeNull()
   })
 
-  it('leaves the carousel alone when the settled swipe echoes back as `date`', async () => {
-    const { rerender } = await mountCarousel()
-    await act(() => embla.settleAt(CENTER + 1))
+  it('does not remount a day when a swipe goes back and forth over the middle', async () => {
+    const { scroller } = await mountCarousel()
 
-    await rerender({ date: '2026-06-13', navigationKey: '1:1:2026-06-13' })
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 0.6) * WIDTH, behavior: 'instant' }))
+    await vi.waitFor(() => expect(slide('2026-06-14')).not.toBeNull())
+    const next = slide('2026-06-14')
 
-    expect(embla.api.scrollTo).not.toHaveBeenCalled()
-    expect(embla.api.reInit).not.toHaveBeenCalled()
+    for (const page of [0.4, 0.6, 0.4]) {
+      await act(() => scroller.scrollTo({ left: (CENTER + page) * WIDTH, behavior: 'instant' }))
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    }
+
+    expect(slide('2026-06-14')).toBe(next)
+    await touch(scroller, 'end')
   })
 
-  it('scrolls to an external in-window selection without reporting it back', async () => {
-    const { result, rerender, onSelect } = await mountCarousel()
+  it('leaves the scroller alone when the settled swipe echoes back as the route', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+    const scrollTo = vi.spyOn(scroller, 'scrollTo')
 
-    await rerender({ date: '2026-06-20', navigationKey: '1:1:2026-06-20' })
+    await scrollElement({ element: scroller, left: (CENTER + 1) * WIDTH, touch: true })
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledOnce())
 
-    expect(embla.api.scrollTo).toHaveBeenCalledExactlyOnceWith(CENTER + 8, true)
-    expect(result.current.selectedIndex).toBe(CENTER + 8)
+    // The test's own scroll is the only one.
+    expect(scrollTo).toHaveBeenCalledOnce()
+    expect(scroller.scrollLeft).toBe((CENTER + 1) * WIDTH)
+  })
+
+  it('jumps to an external in-window selection without reporting it back', async () => {
+    const { scroller, onSelect, navigate } = await mountCarousel()
+
+    await navigate('2026-06-20')
+
+    expect(scroller.scrollLeft).toBe((CENTER + 8) * WIDTH)
+    expect(slide('2026-06-20')).not.toBeNull()
+    await new Promise((resolve) => setTimeout(resolve, 200))
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('cancels a pending swipe when Today re-arrives at the unchanged route date', async () => {
-    const { result, rerender, onSelect, onTarget } = await mountCarousel()
+  it('cancels a swipe in progress when Today re-arrives at the unchanged route date', async () => {
+    const { scroller, onSelect, navigate } = await mountCarousel()
 
-    // Pointer-up has aimed away from Today, but the route is still Today until
-    // Embla settles. This is the window in which the fading Today button can
-    // be tapped.
-    await act(() => embla.selectAt(CENTER + 1))
-    expect(result.current.selectedIndex).toBe(CENTER + 1)
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 0.6) * WIDTH, behavior: 'instant' }))
+    await vi.waitFor(() => expect(slide('2026-06-14')).not.toBeNull())
 
-    // The Today tap is a date-preserving router arrival. It must still issue
-    // an instant horizontal sync, superseding the pending snap.
-    await rerender({ date: DATE, navigationKey: `0:1:${DATE}` })
-    expect(embla.api.scrollTo).toHaveBeenCalledExactlyOnceWith(CENTER, true)
-    expect(result.current.selectedIndex).toBe(CENTER)
-    // The instant jump emitted stale settle/select events through the old
-    // listener, but neither may publish another target or route selection.
-    expect(onTarget).toHaveBeenCalledTimes(1)
+    await navigate(DATE)
+
+    expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
+    expect(slide('2026-06-14')).toBeNull()
+    await touch(scroller, 'end')
+    await new Promise((resolve) => setTimeout(resolve, 200))
     expect(onSelect).not.toHaveBeenCalled()
-
-    await act(() => embla.settle())
-    expect(onSelect).not.toHaveBeenCalled()
-    expect(onTarget).toHaveBeenCalledTimes(1)
-    expect(result.current.selectedIndex).toBe(CENTER)
   })
 
-  it('re-centers the window when a swipe settles near an edge', async () => {
-    const { result, onSelect } = await mountCarousel()
-    const nearEnd = initialWindow.count - 10
+  it('re-centers the window when a swipe settles near an edge, keeping the slide', async () => {
+    const { scroller, onSelect, navigate } = await mountCarousel()
+    const nearStart = 29
+    const landed = dateAtIndex(initialWindow, nearStart)
+    // Within the window, so the jump does not re-anchor it.
+    await navigate(dateAtIndex(initialWindow, nearStart + 1))
+    const kept = slide(landed)
+    expect(kept).not.toBeNull()
 
-    await act(() => embla.settleAt(nearEnd))
+    await scrollElement({ element: scroller, left: nearStart * WIDTH, touch: true })
 
-    const landed = dateAtIndex(initialWindow, nearEnd)
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(CENTER * WIDTH))
     expect(onSelect).toHaveBeenCalledExactlyOnceWith(landed)
-    expect(result.current.dayWindow).toEqual(
-      createDayWindow(landed, {
-        past: CAROUSEL_RADIUS,
-        future: CAROUSEL_RADIUS,
-      }),
-    )
+    expect(slide(landed)).toBe(kept)
+    // On screen, over the cell the scroller rests on.
+    expect(kept!.getBoundingClientRect().left).toBeCloseTo(scroller.getBoundingClientRect().left)
+  })
+
+  it('pulls a scroll that no finger started back to the selected day', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+
+    await act(() => {
+      scroller.scrollLeft = (CENTER + 1) * WIDTH
+    })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(CENTER * WIDTH))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('aligns a swipe that comes to rest between two days', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+    // WebKit can rest off a snap point; without snapping, any engine can.
+    scroller.style.scrollSnapType = 'none'
+
+    await scrollElement({ element: scroller, left: (CENTER + 1) * WIDTH + 30, touch: true })
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe((CENTER + 1) * WIDTH))
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-13')
+  })
+
+  it('lands a second swipe that starts before the first settles on a mounted slide', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 1) * WIDTH, behavior: 'instant' }))
+    await touch(scroller, 'end')
+    // The second finger lands inside the quiet time, before any settle.
+    await touch(scroller, 'start')
+    await act(() => scroller.scrollTo({ left: (CENTER + 2) * WIDTH, behavior: 'instant' }))
+    await vi.waitFor(() => expect(slide('2026-06-14')).not.toBeNull())
+    await touch(scroller, 'end')
+    await act(() => scroller.dispatchEvent(new Event('scrollend')))
+
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-14'))
+    expect(scroller.scrollLeft).toBe((CENTER + 2) * WIDTH)
+  })
+
+  it('stays on the same day when the page width changes', async () => {
+    const { scroller, onSelect, resize } = await mountCarousel()
+    // Without snapping, only the carousel moves the scroller.
+    scroller.style.scrollSnapType = 'none'
+
+    await resize(500)
+
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(CENTER * 500))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('leaves the scroller to a finger that is down when the page width changes', async () => {
+    const { scroller, resize } = await mountCarousel()
+    scroller.style.scrollSnapType = 'none'
+
+    await touch(scroller, 'start')
+    await resize(500)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
+    await touch(scroller, 'end')
+  })
+
+  it('stops horizontal scrolling while the software keyboard is up', async () => {
+    const { scroller, appServices } = await mountCarousel()
+    expect(getComputedStyle(scroller).overflowX).toBe('auto')
+
+    await act(() => appServices.keyboard.publish(300))
+
+    expect(getComputedStyle(scroller).overflowX).toBe('hidden')
+    expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
+  })
+
+  it('blurs an editor left focused on the day a swipe leaves', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+    const editor = await vi.waitFor(() => {
+      const element = slide(DATE)?.querySelector<HTMLElement>('[contenteditable="true"]')
+      expect(element).toBeTruthy()
+      return element!
+    })
+    await act(() => editor.focus({ preventScroll: true }))
+    expect(slide(DATE)!.contains(document.activeElement)).toBe(true)
+
+    await scrollElement({ element: scroller, left: (CENTER + 1) * WIDTH, touch: true })
+
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledOnce())
+    expect(slide(DATE)!.contains(document.activeElement)).toBe(false)
   })
 })
