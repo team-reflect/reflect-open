@@ -48,21 +48,36 @@ export interface WhatsNewInputs {
    */
   readonly blocked: boolean
   readonly launch: WhatsNewLaunch
+  /**
+   * Offer What's New first, and show it only once the user accepts.
+   */
+  readonly offerFirst: boolean
+  /**
+   * The user accepted the offer in this session.
+   */
+  readonly accepted: boolean
 }
 
 /**
  * `wait` shows nothing for now; `skip` shows nothing and marks the version
- * seen; `show` shows the items.
+ * seen; `offer` asks the user first; `show` shows the items.
  */
-export type WhatsNewDecision = 'wait' | 'skip' | 'show'
+export type WhatsNewDecision = 'wait' | 'skip' | 'offer' | 'show'
 
 /**
- * Whether to show What's New.
+ * Whether to offer or show What's New.
  */
-export type WhatsNewGate = { readonly kind: 'hidden' } | { readonly kind: 'whatsNew' }
+export type WhatsNewGate =
+  | { readonly kind: 'hidden' }
+  | { readonly kind: 'offer' }
+  | { readonly kind: 'whatsNew' }
 
-const HIDDEN: WhatsNewGate = { kind: 'hidden' }
-const SHOWN: WhatsNewGate = { kind: 'whatsNew' }
+const GATES: Record<WhatsNewDecision, WhatsNewGate> = {
+  wait: { kind: 'hidden' },
+  skip: { kind: 'hidden' },
+  offer: { kind: 'offer' },
+  show: { kind: 'whatsNew' },
+}
 
 /**
  * What to do with What's New for the given inputs.
@@ -80,7 +95,7 @@ export function decideWhatsNew(inputs: WhatsNewInputs): WhatsNewDecision {
   if (inputs.launch === 'openedAfterSetup' || inputs.items.length === 0) {
     return 'skip'
   }
-  return 'show'
+  return inputs.offerFirst && !inputs.accepted ? 'offer' : 'show'
 }
 
 function selectIsOverride(value: string | null): boolean {
@@ -96,7 +111,7 @@ export interface WhatsNewService {
    */
   readonly items: readonly WhatsNewItem[]
   /**
-   * Whether to show What's New.
+   * Whether to offer or show What's New.
    */
   readonly gate: Store<WhatsNewGate>
   /**
@@ -104,6 +119,14 @@ export interface WhatsNewService {
    */
   readonly override: Store<boolean>
   setOverride: (next: boolean) => void
+  /**
+   * Turns the offer into What's New itself.
+   */
+  accept: () => void
+  /**
+   * Marks the current version as seen while it is still only offered.
+   */
+  decline: () => void
   /**
    * Marks the current version as seen and turns the override off.
    */
@@ -126,11 +149,16 @@ export interface WhatsNewServiceDeps {
    */
   readonly blocked: Store<boolean>
   readonly content: Readonly<Record<string, readonly WhatsNewItem[]>>
+  /**
+   * Offer What's New first instead of showing it right away.
+   */
+  readonly offerFirst: boolean
 }
 
 class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
   readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
+  readonly #accepted = new WritableStore(false)
   readonly #decision: Store<WhatsNewDecision>
   readonly items: readonly WhatsNewItem[]
   readonly gate: Store<WhatsNewGate>
@@ -138,7 +166,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
 
   constructor(deps: WhatsNewServiceDeps) {
     this.#deps = deps
-    const { storage, platform, window, blocked, content } = deps
+    const { storage, platform, window, blocked, content, offerFirst } = deps
     const isMainWindow = window.isMainWindow()
     const items = (content[marketingVersion(platform.appVersion)] ?? []).filter((item) => {
       return item.platforms.includes(platform.appPlatform)
@@ -149,8 +177,14 @@ class WhatsNewServiceImpl implements WhatsNewService {
       selectIsOverride,
     )
     this.#decision = combineStores(
-      [storage.local.store(WHATS_NEW_SEEN_STORAGE_KEY), this.override, blocked, this.#launch],
-      (seen, override, blockedValue, launch) => {
+      [
+        storage.local.store(WHATS_NEW_SEEN_STORAGE_KEY),
+        this.override,
+        blocked,
+        this.#launch,
+        this.#accepted,
+      ],
+      (seen, override, blockedValue, launch, accepted) => {
         return decideWhatsNew({
           isMainWindow,
           isDev: platform.isDev,
@@ -159,14 +193,26 @@ class WhatsNewServiceImpl implements WhatsNewService {
           override,
           blocked: blockedValue,
           launch,
+          offerFirst,
+          accepted,
         })
       },
     )
-    this.gate = deriveStore(this.#decision, (decision) => (decision === 'show' ? SHOWN : HIDDEN))
+    this.gate = deriveStore(this.#decision, (decision) => GATES[decision])
   }
 
   readonly setOverride = (next: boolean): void => {
     this.#deps.storage.session.set(WHATS_NEW_OVERRIDE_STORAGE_KEY, next ? 'true' : null)
+  }
+
+  readonly accept = (): void => {
+    this.#accepted.set(true)
+  }
+
+  readonly decline = (): void => {
+    if (this.#decision.get() === 'offer') {
+      this.#markSeen()
+    }
   }
 
   readonly dismiss = (): void => {

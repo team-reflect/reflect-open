@@ -16,6 +16,8 @@ function createFakeWhatsNew() {
     gate,
     override: new WritableStore(false),
     setOverride: () => {},
+    accept: () => {},
+    decline: () => {},
     dismiss: () => {
       dismissed += 1
       gate.set({ kind: 'hidden' })

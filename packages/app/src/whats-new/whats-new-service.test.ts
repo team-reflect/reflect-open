@@ -30,6 +30,8 @@ const INPUTS: WhatsNewInputs = {
   override: false,
   blocked: false,
   launch: 'opened',
+  offerFirst: false,
+  accepted: false,
 }
 
 function decide(inputs: Partial<WhatsNewInputs>) {
@@ -69,6 +71,13 @@ describe('decideWhatsNew', () => {
     )
     expect(decide({ override: true, items: [] })).toBe('wait')
   })
+
+  it('offers an unseen version first until the user accepts, but not with the override', () => {
+    expect(decide({ offerFirst: true })).toBe('offer')
+    expect(decide({ offerFirst: true, accepted: true })).toBe('show')
+    expect(decide({ offerFirst: true, override: true })).toBe('show')
+    expect(decide({ offerFirst: true, seen: true })).toBe('wait')
+  })
 })
 
 interface SetupOptions {
@@ -76,6 +85,7 @@ interface SetupOptions {
   seen?: string
   appPlatform?: 'desktop' | 'ios'
   status?: GraphStatus
+  offerFirst?: boolean
 }
 
 function setup(options: SetupOptions = {}) {
@@ -97,6 +107,7 @@ function setup(options: SetupOptions = {}) {
     graphSession,
     blocked: new WritableStore(false),
     content: CONTENT,
+    offerFirst: options.offerFirst ?? false,
   })
   const stop = whatsNew.start()
   const setStatus = (status: GraphStatus) => graphSession.setState({ status })
@@ -156,6 +167,23 @@ describe('createWhatsNewService', () => {
     whatsNew.dismiss()
     expect(whatsNew.override.get()).toBe(false)
     expect(whatsNew.gate.get().kind).toBe('hidden')
+  })
+
+  it('offers first, and shows once accepted without marking the version seen', () => {
+    const { whatsNew, seen } = setup({ seen: '0.19.0', offerFirst: true })
+    expect(whatsNew.gate.get().kind).toBe('offer')
+
+    whatsNew.accept()
+    expect(whatsNew.gate.get().kind).toBe('whatsNew')
+    whatsNew.decline()
+    expect(seen()).toBe('0.19.0')
+  })
+
+  it('marks the version seen when the offer is declined', () => {
+    const { whatsNew, seen } = setup({ seen: '0.19.0', offerFirst: true })
+    whatsNew.decline()
+    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(seen()).toBe('0.19.1')
   })
 
   it('stops following the launch', () => {

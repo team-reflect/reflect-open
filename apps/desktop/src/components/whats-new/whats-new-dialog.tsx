@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { marketingVersion } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import {
@@ -12,15 +12,18 @@ import {
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { WhatsNewItems } from './whats-new-items.tsx'
+import { attachWhatsNewToast } from './whats-new-toast.ts'
 
 /**
- * The desktop What's New dialog, open while the What's New gate shows. Every
- * way of closing it marks the version seen.
+ * The desktop What's New: a toast that offers it, then the dialog. Every way
+ * of closing the dialog marks the version seen.
  */
 export function WhatsNewDialog(): ReactElement {
   const { whatsNew } = useAppServices()
   const { platform } = useCoreServices()
   const gate = useStore(whatsNew.gate)
+  const version = marketingVersion(platform.appVersion)
+  useEffect(() => attachWhatsNewToast(whatsNew, version), [whatsNew, version])
   return (
     <Dialog
       open={gate.kind === 'whatsNew'}
@@ -34,7 +37,7 @@ export function WhatsNewDialog(): ReactElement {
         <DialogHeader className="gap-1.5">
           <p className="text-xs font-semibold text-accent dark:text-accent-hover">New in Reflect</p>
           <DialogTitle className="text-xl font-semibold tracking-tight">What’s new</DialogTitle>
-          <DialogDescription>Version {marketingVersion(platform.appVersion)}</DialogDescription>
+          <DialogDescription>Version {version}</DialogDescription>
         </DialogHeader>
         <WhatsNewItems items={whatsNew.items} />
         <DialogFooter>
