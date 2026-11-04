@@ -38,9 +38,9 @@ const DISCORD_URL = 'https://reflect.app/discord'
 const NEW_GITHUB_ISSUE_URL = 'https://github.com/team-reflect/reflect-open/issues/new'
 
 /**
- * Where feedback goes: an email to support, the Discord server, or a GitHub issue.
+ * Where feedback goes: the Discord server, a GitHub issue, or an email to support.
  */
-export type FeedbackChannel = 'email' | 'discord' | 'github'
+export type FeedbackChannel = 'discord' | 'github' | 'email'
 
 /**
  * Everything {@link decideAskForReview} reads.

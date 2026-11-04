@@ -88,14 +88,14 @@ export function WhatsNewDrawer(): ReactElement {
                 </Button>
                 <p className="pt-2 text-center text-sm text-text-muted">Or send us feedback</p>
                 <div className="grid grid-cols-3 gap-2">
-                  <Button variant="outline" onClick={() => review.sendFeedback('email')}>
-                    Email
-                  </Button>
                   <Button variant="outline" onClick={() => review.sendFeedback('discord')}>
                     Discord
                   </Button>
                   <Button variant="outline" onClick={() => review.sendFeedback('github')}>
                     GitHub
+                  </Button>
+                  <Button variant="outline" onClick={() => review.sendFeedback('email')}>
+                    Email
                   </Button>
                 </div>
                 <Button className="w-full" variant="ghost" onClick={close}>

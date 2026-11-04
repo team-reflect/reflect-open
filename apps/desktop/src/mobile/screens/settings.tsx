@@ -555,22 +555,25 @@ export function MobileSettings(): ReactElement {
             </SettingsGroup>
           ) : null}
 
+          <SettingsGroup header="Feedback">
+            {isIos ? <SettingsActionRow label="Rate Reflect" onPress={review.writeReview} /> : null}
+            <SettingsActionRow
+              label="Join the Discord Community"
+              onPress={() => review.sendFeedback('discord')}
+            />
+            <SettingsActionRow
+              label="Report a Bug on GitHub"
+              onPress={() => review.sendFeedback('github')}
+            />
+            <SettingsActionRow label="Email Support" onPress={() => review.sendFeedback('email')} />
+          </SettingsGroup>
+
           <SettingsGroup header="About">
+            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsValueRow
               label="Notes"
               value={notes === undefined ? '…' : String(notes.length)}
             />
-            {isIos ? <SettingsActionRow label="Rate Reflect" onPress={review.writeReview} /> : null}
-            <SettingsActionRow label="Email Support" onPress={() => review.sendFeedback('email')} />
-            <SettingsActionRow
-              label="Join the Discord"
-              onPress={() => review.sendFeedback('discord')}
-            />
-            <SettingsActionRow
-              label="Report an Issue on GitHub"
-              onPress={() => review.sendFeedback('github')}
-            />
-            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsNavRow
               label="Open Source Licenses"
               onPress={() => navigate({ kind: 'licenses' })}

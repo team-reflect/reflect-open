@@ -72,10 +72,10 @@ describe('WhatsNewDrawer', () => {
 
     await userEvent.click(page.getByRole('button', { name: 'Rate Reflect' }))
     await userEvent.click(page.getByRole('button', { name: 'Write a review' }))
-    await userEvent.click(page.getByRole('button', { name: 'Email' }))
     await userEvent.click(page.getByRole('button', { name: 'Discord' }))
     await userEvent.click(page.getByRole('button', { name: 'GitHub' }))
-    expect(calls).toEqual(['requestReview', 'writeReview', 'email', 'discord', 'github'])
+    await userEvent.click(page.getByRole('button', { name: 'Email' }))
+    expect(calls).toEqual(['requestReview', 'writeReview', 'discord', 'github', 'email'])
 
     await userEvent.click(page.getByRole('button', { name: 'Not now' }))
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
