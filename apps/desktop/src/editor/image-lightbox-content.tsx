@@ -27,7 +27,11 @@ export function ImageLightboxContent({
     imageRef,
     finishSettle,
     imageStyle,
-  } = useImageDismissDrag({ active: true, enabled: mobileSurface, onClose })
+  } = useImageDismissDrag({
+    active: true,
+    enabled: mobileSurface,
+    onClose,
+  })
 
   return (
     <>
