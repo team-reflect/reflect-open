@@ -81,6 +81,7 @@ export function SwipeableNoteRow({
         onBeginInteraction={beginInteraction}
         className="h-full"
         surfaceClassName="bg-background"
+        overscrollColor={row.canDelete ? 'var(--color-destructive)' : 'var(--color-accent)'}
         actions={
           <>
             <SwipeActionButton

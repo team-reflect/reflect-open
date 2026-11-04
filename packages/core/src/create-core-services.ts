@@ -119,6 +119,10 @@ import {
   createAppStoreEnvironmentService,
   type AppStoreEnvironmentService,
 } from './monetization/app-store-environment-service.ts'
+import {
+  createInstallClockService,
+  type InstallClockService,
+} from './monetization/install-clock-service.ts'
 import { createPaywallService, type PaywallService } from './monetization/paywall-service.ts'
 import {
   createSubscriptionService,
@@ -523,7 +527,11 @@ export interface MobileServices {
    */
   readonly appStoreEnvironment: AppStoreEnvironmentService
   /**
-   * Whether the paywall replaces the app, and the actions that lift it.
+   * Time since this device's first launch, which schedules the paywall.
+   */
+  readonly installClock: InstallClockService
+  /**
+   * Whether the paywall covers the app, and the actions that lift it.
    */
   readonly paywall: PaywallService
   /**
@@ -609,6 +617,7 @@ export const coreServiceFactories = {
   appStore: createAppStoreService,
   subscription: createSubscriptionService,
   appStoreEnvironment: createAppStoreEnvironmentService,
+  installClock: createInstallClockService,
   haptics: createHapticsService,
   nativeAction: createNativeActionService,
   paywall: createPaywallService,
@@ -900,16 +909,19 @@ export function composeCoreServices(
     const appStore = create.appStore({ ipc })
     const subscription = create.subscription({ iap, storage, clock, platform, logger })
     const appStoreEnvironment = create.appStoreEnvironment({ appStore, storage, platform })
+    const installClock = create.installClock({ secretStore, clock, activity, platform, logger })
     const haptics = create.haptics({ ipc, logger })
     const nativeAction = create.nativeAction({ audioRecorder, clock, platform, logger })
     return {
       haptics,
       subscription,
       appStoreEnvironment,
+      installClock,
       paywall: create.paywall({
         subscription,
         classicAccess,
         appStoreEnvironment,
+        installClock,
         iap,
         appStore,
         platform,

@@ -27,6 +27,7 @@ function Harness({ initiallyRevealed = false }: { initiallyRevealed?: boolean })
         onBeginInteraction={onBeginInteraction}
         className="h-12"
         surfaceClassName="bg-background"
+        overscrollColor="red"
         actions={
           <button type="button" style={{ width: ACTION_WIDTH }} onClick={onAction}>
             Delete

@@ -27,6 +27,8 @@ import {
   SettingsValueRow,
   type SegmentedOption,
 } from '@/mobile/settings-list.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
 import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
@@ -45,6 +47,7 @@ import {
   type AiPrompt,
   type AiProviderConfig,
   type EditorTextSize,
+  type PaywallPhase,
   type ThemePreference,
   type TimeFormat,
   type WeekStartDay,
@@ -69,6 +72,30 @@ import {
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
+
+const PAYWALL_PHASE_OPTIONS: readonly SegmentedOption<PaywallPhase | 'off'>[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'skippable', label: 'Skippable' },
+  { value: 'required', label: 'Required' },
+]
+
+/**
+ * Simulates a paywall phase for this session, so a TestFlight build can walk
+ * through every phase.
+ */
+function PaywallPhaseRow(): ReactElement {
+  const { paywall } = useMobileServices()
+  const override = useStore(paywall.phaseOverride)
+  return (
+    <SettingsSegmentedRow
+      label="Paywall"
+      value={override ?? 'off'}
+      options={PAYWALL_PHASE_OPTIONS}
+      onChange={(next) => paywall.setPhaseOverride(next === 'off' ? null : next)}
+    />
+  )
+}
 
 const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
   { value: 'system', label: 'System' },
@@ -526,6 +553,9 @@ export function MobileSettings(): ReactElement {
                   label="Environment"
                   value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
                 />
+              ) : null}
+              {isIos && (environment.value === 'Sandbox' || environment.value === 'Xcode') ? (
+                <PaywallPhaseRow />
               ) : null}
               <SettingsSwitchRow
                 label="Performance HUD"
