@@ -145,13 +145,12 @@ export function SwipeRow({
   )
 
   const actionsStyle = useMemo(() => ({ width: actionWidth }), [actionWidth])
-  const scrollerStyle = useMemo(
-    () => { return ({
-        '--swipe-row-overscroll-color': overscrollColor,
-        '--swipe-row-action-width': `${actionWidth}px`,
-      }) as CSSProperties },
-    [overscrollColor, actionWidth],
-  )
+  const scrollerStyle = useMemo(() => {
+    return {
+      '--swipe-row-overscroll-color': overscrollColor,
+      '--swipe-row-action-width': `${actionWidth}px`,
+    } as CSSProperties
+  }, [overscrollColor, actionWidth])
 
   return (
     <div
