@@ -161,7 +161,13 @@ export function SwipeRow({
       >
         {actions}
       </div>
-      <span aria-hidden className="w-0 flex-none snap-end" />
+      <span
+        // The open snap point: `snap-end` stops the row at scrollLeft = actionWidth.
+        // 1px wide because WebKit ignores zero-width snap areas; `-ml-px` cancels
+        // the extra pixel. See also
+        aria-hidden
+        className="w-0 flex-none snap-end"
+      ></span>
     </div>
   )
 }
