@@ -617,6 +617,26 @@ describe('MobileSettings', () => {
 })
 
 describe('MobileSettings subscription', () => {
+  it('simulates a paywall phase from the debug group on a TestFlight install', async () => {
+    const view = await mount({ ios: true })
+    const version = page.getByText('Version', { exact: true })
+    await expect.element(version).toBeVisible()
+    const row = version.element()
+    if (!(row instanceof HTMLElement)) {
+      throw new TypeError('The version row is not an HTML element.')
+    }
+
+    for (let i = 0; i < 10; i++) {
+      await act(() => {
+        row.click()
+      })
+    }
+    await userEvent.click(page.getByRole('radio', { name: 'Required' }))
+
+    expect(view.core.mobile.paywall.phaseOverride.get()).toBe('required')
+    await expect.element(page.getByRole('radio', { name: 'Required' })).toBeChecked()
+  })
+
   it('offers Subscribe until a plan is active', async () => {
     await mount({ ios: true })
 
