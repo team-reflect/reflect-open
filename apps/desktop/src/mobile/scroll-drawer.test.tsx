@@ -162,23 +162,22 @@ describe('ScrollDrawer', () => {
   })
 
   describe('when not dismissible', () => {
-    it('opens at the open snap point, one pull distance from the top', async () => {
+    it('opens at the end of a one-pixel scroll range', async () => {
       await renderInApp(<Harness dismissible={false} />)
       const scroller = await openScroller()
-      const pull = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 5
 
       expect(scroller.scrollTop).toBe(openTop(scroller))
-      expect(openTop(scroller)).toBeCloseTo(pull, 0)
+      expect(openTop(scroller)).toBeCloseTo(1, 0)
     })
 
-    it('springs back open after a pull', async () => {
+    it('stays open after a pull', async () => {
       const onOpenChange = vi.fn()
       await renderInApp(<Harness dismissible={false} onOpenChange={onOpenChange} />)
       const scroller = await openScroller()
       await scrollElement({ element: scroller, top: 0, touch: true })
 
-      await vi.waitFor(() => expect(scroller.scrollTop).toBe(openTop(scroller)))
       expect(onOpenChange).not.toHaveBeenCalled()
+      await expect.element(page.getByRole('dialog')).toBeVisible()
     })
 
     it('ignores a tap above the sheet and Escape', async () => {

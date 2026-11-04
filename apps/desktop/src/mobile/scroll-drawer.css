@@ -39,27 +39,30 @@
   scroll-snap-align: end;
 }
 
+/* Keeps WebKit's rubber-band bounce, which `none` turns off, without chaining
+   the scroll to the page. */
 .scroll-drawer-fixed {
-  --drawer-pull: 5rem;
+  overscroll-behavior-y: contain;
+  scroll-snap-type: none;
 }
 
-/* Exactly one pull distance taller than the scrollport. */
+/* One pixel taller than the scrollport: just enough to scroll, so a pull
+   rubber-bands instead of moving the sheet. */
 .scroll-drawer-track {
   flex: none;
   display: flex;
   flex-direction: column;
-  height: calc(100% + var(--drawer-pull));
+  height: calc(100% + 1px);
 }
 
 .scroll-drawer-fixed .scroll-drawer-spacer {
   flex: 1 0 0;
   height: auto;
-  scroll-snap-align: none;
 }
 
 /* Percentages resolve against the taller track. */
 .scroll-drawer-fixed .scroll-drawer-slide {
-  max-height: calc(100% - 6rem - var(--drawer-pull));
+  max-height: calc(100% - 6rem - 1px);
 }
 
 .scroll-drawer-backdrop {

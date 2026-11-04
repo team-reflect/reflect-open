@@ -50,7 +50,7 @@ export interface DrawerProps {
   onOpenChange: (open: boolean) => void
   /**
    * Whether a swipe, a tap above the sheet, or Escape may close the drawer.
-   * When `false`, the sheet pulls down a little and springs back. Defaults to
+   * When `false`, a pull only rubber-bands the sheet. Defaults to
    * `true`.
    */
   dismissible?: boolean | undefined
@@ -227,8 +227,8 @@ function DrawerSheet({
 }
 
 /**
- * A sheet that never closes. Its track is one pull distance taller than the
- * scroller and only the open snap point remains, so a pull springs back.
+ * A sheet that never closes. Its track is one pixel taller than the scroller,
+ * so a pull rubber-bands where the platform does and barely moves it elsewhere.
  */
 function FixedDrawerSheet({ children }: { children?: ReactNode | undefined }): ReactElement {
   const scrollerRef = useRef<HTMLDivElement>(null)
