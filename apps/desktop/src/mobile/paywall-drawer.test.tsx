@@ -164,9 +164,7 @@ describe('PaywallDrawer modes', () => {
   it('has no Later button and reassures when required', async () => {
     const view = await mount('required')
 
-    await expect
-      .element(view.getByRole('dialog', { name: 'Keep writing with Reflect Pro' }))
-      .toBeVisible()
+    await expect.element(view.getByRole('dialog', { name: 'Unlock Reflect Pro' })).toBeVisible()
     await expect.element(view.getByText('Cancel in two taps.')).toBeVisible()
     await expect.element(view.getByText('Your notes stay yours.')).toBeVisible()
     await expect.element(view.getByText('Private by default.')).toBeVisible()
@@ -194,7 +192,7 @@ describe('PaywallDrawer modes', () => {
 
   it('stays open on Escape when required', async () => {
     const view = await mount('required')
-    const dialog = view.getByRole('dialog', { name: 'Keep writing with Reflect Pro' })
+    const dialog = view.getByRole('dialog', { name: 'Unlock Reflect Pro' })
     await expect.element(dialog).toBeVisible()
 
     await userEvent.keyboard('{Escape}')

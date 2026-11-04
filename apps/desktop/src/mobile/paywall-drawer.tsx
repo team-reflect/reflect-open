@@ -354,7 +354,7 @@ function RequiredHeader(): ReactElement {
     <header className="flex flex-col gap-4 pt-4">
       <div className="flex items-center gap-4">
         <AppIcon />
-        <DrawerTitle className={TITLE_CLASS}>Keep writing with Reflect Pro</DrawerTitle>
+        <DrawerTitle className={TITLE_CLASS}>Unlock Reflect Pro</DrawerTitle>
       </div>
       <p className="text-sm leading-6 text-text-secondary">
         Your free period has ended. Subscribe to keep using Reflect on iPhone and iPad.
@@ -368,8 +368,8 @@ function RequiredHeader(): ReactElement {
             >
               <Check className="size-3" strokeWidth={3} />
             </span>
-            <span>
-              <span className="font-medium">{item.title}</span>{' '}
+            <span className="flex flex-col">
+              <span className="font-medium">{item.title}</span>
               <span className="text-text-secondary">{item.detail}</span>
             </span>
           </li>
