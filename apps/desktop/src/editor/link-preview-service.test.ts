@@ -14,7 +14,7 @@ import {
 } from '@reflect/core/testing'
 
 /**
- * The boundaries of the resolver pipeline that `useLinkPreview` gets from `LinkPreviewService`.
+ * The boundaries of the resolver pipeline that `NotePane` gets from `LinkPreviewService`.
  */
 interface LinkPreviewResolverDependencies {
   /**

@@ -22,7 +22,6 @@ import { useNoteDocument } from '@/editor/use-note-document.ts'
 import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items.ts'
 import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
-import { useLinkPreview } from '@/editor/use-link-preview.ts'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview.tsx'
 import { useXPostPreload } from '@/editor/use-x-post-preload.ts'
@@ -141,7 +140,7 @@ export function NotePaneComponent({
   const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
   const editorDefaultBullet = useEditorDefaultBullet()
   const editorBulletAfterHeading = useEditorBulletAfterHeading()
-  const { noteCreation, platform } = useCoreServices()
+  const { noteCreation, platform, linkPreview } = useCoreServices()
   const dailyNote = isDaily(path)
   const policy = deferredCreationPolicy(path)
   const lazyCreate = lazy && policy.lazyCreatable
@@ -185,7 +184,11 @@ export function NotePaneComponent({
   const onLinkClick = useMarkdownLinkClick(path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
-  const resolveLinkPreview = useLinkPreview(graph === null ? null : path)
+  const hasGraph = graph !== null
+  const resolveLinkPreview = useMemo(
+    () => (hasGraph ? linkPreview.createResolver(path) : undefined),
+    [hasGraph, linkPreview, path],
+  )
 
   const bindEditor = document.bindEditor
   const aiEditorRef = useRef<NoteEditorHandle | null>(null)
