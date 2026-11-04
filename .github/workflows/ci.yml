@@ -33,7 +33,7 @@ jobs:
           echo "draft=$PR_IS_DRAFT" >> "$GITHUB_OUTPUT"
           echo "stack-middle=$PR_IS_STACK_MIDDLE" >> "$GITHUB_OUTPUT"
 
-  check-node:
+  lint-node:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
     runs-on: ubuntu-24.04
@@ -202,7 +202,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [classify, check-node, test-node, test-chromium, lint-rust, test-rust]
+    needs: [classify, lint-node, test-node, test-chromium, lint-rust, test-rust]
 
     steps:
       # A PR in the middle of a stack skips its jobs on purpose: the top PR of

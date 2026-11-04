@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   testflight:
-    name: TestFlight
+    name: Build and upload
     if: github.repository == 'team-reflect/reflect-open'
     environment: release_app
     runs-on: xcode-27

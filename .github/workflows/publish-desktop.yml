@@ -71,7 +71,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   testflight:
-    name: iOS
+    name: TestFlight
     uses: ./.github/workflows/publish-testflight.yml
     with:
       commit: ${{ inputs.commit }}
