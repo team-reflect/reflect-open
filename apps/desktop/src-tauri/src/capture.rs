@@ -406,12 +406,19 @@ fn relay_shared_spools(shared_inbox: &Path, root: &Path) -> AppResult<u32> {
         }
     }
     let mut relayed = 0;
+    // Every envelope gets its attempt: one that keeps failing must not
+    // strand the ones `read_dir` happens to yield after it.
+    let mut first_error = None;
     for name in envelopes {
-        if relay_shared_spool(shared_inbox, root, &name)? {
-            relayed += 1;
+        match relay_shared_spool(shared_inbox, root, &name) {
+            Ok(true) => relayed += 1,
+            Ok(false) => {}
+            Err(err) => {
+                first_error.get_or_insert(err);
+            }
         }
     }
-    Ok(relayed)
+    first_error.map_or(Ok(relayed), Err)
 }
 
 /// Relay one committed envelope, its screenshot first, so the drain never
@@ -903,6 +910,29 @@ mod tests {
         assert_eq!(fs::read(inbox.join("7c9e6679.jpg")).unwrap(), b"jpeg-bytes");
         assert!(inbox.join("7c9e6679.json").is_file());
         assert_eq!(fs::read_dir(&shared_inbox).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn relay_attempts_every_envelope_past_a_failure() {
+        // Each envelope takes a turn failing, so one of the two runs fails
+        // the first envelope `read_dir` yields.
+        for (failing, other) in [("aaaaaaaa", "bbbbbbbb"), ("bbbbbbbb", "aaaaaaaa")] {
+            let shared = tempfile::tempdir().unwrap();
+            let graph = tempfile::tempdir().unwrap();
+            let shared_inbox = shared.path().join(SHARED_INBOX_DIR);
+            fs::create_dir_all(&shared_inbox).unwrap();
+            fs::write(shared_inbox.join(format!("{failing}.json")), "{}").unwrap();
+            fs::write(shared_inbox.join(format!("{other}.json")), "{}").unwrap();
+            // A directory where the envelope lands fails its write.
+            let inbox = graph.path().join(INBOX_DIR);
+            fs::create_dir_all(inbox.join(format!("{failing}.json"))).unwrap();
+
+            assert!(relay_shared_spools(&shared_inbox, graph.path()).is_err());
+
+            assert!(shared_inbox.join(format!("{failing}.json")).is_file());
+            assert!(inbox.join(format!("{other}.json")).is_file());
+            assert!(!shared_inbox.join(format!("{other}.json")).exists());
+        }
     }
 
     #[test]

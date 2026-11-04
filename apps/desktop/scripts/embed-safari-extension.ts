@@ -7,12 +7,13 @@
 // Needs Xcode and XcodeGen (`brew install xcodegen`).
 //
 //   --app=<path>        The built app, for example from `pnpm tauri:build:dev`
-//   --identity=<name>   Codesign identity. Default: $APPLE_SIGNING_IDENTITY,
-//                       else ad-hoc. Use the identity the app was signed
-//                       with: its restricted entitlements stay tied to it.
-//                       An ad-hoc signature loads in Safari (with Develop >
-//                       Allow Unsigned Extensions) but cannot use the App
-//                       Group, which only the owning team's signature can.
+//   --identity=<name>   Codesign identity. Default: $APPLE_SIGNING_IDENTITY.
+//                       Use the identity the app was signed with: its
+//                       restricted entitlements stay tied to it. `-` signs
+//                       ad-hoc, for UI work only: it loads in Safari (with
+//                       Develop > Allow Unsigned Extensions) but cannot save,
+//                       because only the owning team's signature can use the
+//                       App Group.
 //   --team=<id>         The identity's Team ID, which prefixes the App Group.
 //                       Default: Reflect's team.
 //
@@ -181,7 +182,10 @@ async function main(): Promise<void> {
     throw new Error('Pass --app=<path to the built Reflect.app>')
   }
   const app = resolve(values.app)
-  const identity = values.identity ?? process.env.APPLE_SIGNING_IDENTITY ?? '-'
+  const identity = values.identity ?? process.env.APPLE_SIGNING_IDENTITY
+  if (identity === undefined) {
+    throw new Error('Pass --identity=<name> or set APPLE_SIGNING_IDENTITY (`-` signs ad-hoc)')
+  }
   const identifier = await readInfo(app, 'CFBundleIdentifier')
   const group = `${values.team}.${identifier}`
   // Not part of Xcode or its command-line tools; fail before any build step.
