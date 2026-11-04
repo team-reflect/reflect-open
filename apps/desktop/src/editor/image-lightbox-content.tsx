@@ -24,8 +24,8 @@ export function ImageLightboxContent({
     backdropRef,
     backdropStyle,
     handlers,
-    imageRef,
     finishSettle,
+    imageRef,
     imageStyle,
   } = useImageDismissDrag({
     active: true,
