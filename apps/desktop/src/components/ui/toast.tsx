@@ -140,9 +140,11 @@ function ToastDescription({ className, ...props }: ToastPrimitive.Description.Pr
   )
 }
 
+const toastActionRender = <Button variant="outline" size="sm" />
+
 function ToastAction({
   className,
-  render = <Button variant="outline" size="sm" />,
+  render = toastActionRender,
   ...props
 }: ToastPrimitive.Action.Props): ReactElement {
   return (
@@ -155,10 +157,12 @@ function ToastAction({
   )
 }
 
+const toastCloseRender = <Button variant="ghost" size="icon-sm" />
+
 function ToastClose({
   className,
   children,
-  render = <Button variant="ghost" size="icon-sm" />,
+  render = toastCloseRender,
   ...props
 }: ToastPrimitive.Close.Props): ReactElement {
   return (
