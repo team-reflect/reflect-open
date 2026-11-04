@@ -33,6 +33,15 @@ export const WRITE_REVIEW_URL = 'https://apps.apple.com/app/id6787385615?action=
 
 const FEEDBACK_EMAIL = 'support@reflect.app'
 
+const DISCORD_URL = 'https://reflect.app/discord'
+
+const NEW_GITHUB_ISSUE_URL = 'https://github.com/team-reflect/reflect-open/issues/new'
+
+/**
+ * Where feedback goes: an email to support, the Discord server, or a GitHub issue.
+ */
+export type FeedbackChannel = 'email' | 'discord' | 'github'
+
 /**
  * Everything {@link decideAskForReview} reads.
  */
@@ -94,9 +103,9 @@ export interface ReviewService {
    */
   writeReview: () => void
   /**
-   * Opens a feedback email to support.
+   * Opens the given feedback channel.
    */
-  sendFeedback: () => void
+  sendFeedback: (channel: FeedbackChannel) => void
 }
 
 export interface ReviewServiceDeps {
@@ -161,13 +170,23 @@ class ReviewServiceImpl implements ReviewService {
     this.#deps.opener.openUrlSync(WRITE_REVIEW_URL)
   }
 
-  readonly sendFeedback = (): void => {
-    const { platform, opener } = this.#deps
+  readonly sendFeedback = (channel: FeedbackChannel): void => {
+    this.#deps.opener.openUrlSync(this.#feedbackUrl(channel))
+  }
+
+  #feedbackUrl(channel: FeedbackChannel): string {
+    if (channel === 'discord') {
+      return DISCORD_URL
+    }
+    if (channel === 'github') {
+      return NEW_GITHUB_ISSUE_URL
+    }
+    const { platform } = this.#deps
     const subject = encodeURIComponent('Reflect feedback')
     const body = encodeURIComponent(
       `\n\n--\nReflect ${platform.appVersion} on ${platform.appPlatform}`,
     )
-    opener.openUrlSync(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`)
+    return `mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`
   }
 
   async #tryRequestReview(appStore: MobileServices['appStore']): Promise<void> {

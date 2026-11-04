@@ -119,13 +119,17 @@ describe('createReviewService', () => {
     expect(storage.local.get(REVIEW_REQUESTED_AT_STORAGE_KEY)).toBeNull()
   })
 
-  it('opens the write-review page and a feedback email', () => {
+  it('opens the write-review page and each feedback channel', () => {
     const { review, opener } = setup()
     review.writeReview()
-    review.sendFeedback()
+    review.sendFeedback('email')
+    review.sendFeedback('discord')
+    review.sendFeedback('github')
     expect(opener.openedUrls()).toEqual([
       WRITE_REVIEW_URL,
       'mailto:support@reflect.app?subject=Reflect%20feedback&body=%0A%0A--%0AReflect%200.20.0%20on%20ios',
+      'https://reflect.app/discord',
+      'https://github.com/team-reflect/reflect-open/issues/new',
     ])
   })
 })
