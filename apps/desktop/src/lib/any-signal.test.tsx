@@ -8,7 +8,7 @@ import { anySignal } from '@/lib/any-signal.ts'
 async function collectGarbage(): Promise<void> {
   const probe = new WeakRef({})
   for (let round = 0; round < 30 || probe.deref(); round++) {
-    if (round === 300) {
+    if (round === 60) {
       throw new Error('The garbage collector did not run')
     }
     // A new task: `deref()` keeps the probe alive until the current one ends.
