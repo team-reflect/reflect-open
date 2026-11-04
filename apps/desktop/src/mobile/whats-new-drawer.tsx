@@ -1,4 +1,12 @@
-import { startTransition, useState, ViewTransition, type ReactElement, type ReactNode } from 'react'
+import {
+  startTransition,
+  useEffect,
+  useRef,
+  useState,
+  ViewTransition,
+  type ReactElement,
+  type ReactNode,
+} from 'react'
 import { SiDiscord, SiGithub } from '@icons-pack/react-simple-icons'
 import { Mail, Star } from 'lucide-react'
 import type { FeedbackChannel, WhatsNewItem } from '@reflect/app'
@@ -97,8 +105,21 @@ function WhatsNewPages({
   const [rated, setRated] = useState(false)
   const headerRise = riseIn(0)
   const continueRise = riseIn(items.length + 1)
+  // The drawer can close while `shouldAsk()` waits; a closed drawer must not
+  // start the review page's cooldown.
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   const next = async (): Promise<void> => {
-    if (await review.shouldAsk()) {
+    const ask = await review.shouldAsk()
+    if (!mounted.current) {
+      return
+    }
+    if (ask) {
       review.markShown()
       startTransition(() => {
         setPage('review')
