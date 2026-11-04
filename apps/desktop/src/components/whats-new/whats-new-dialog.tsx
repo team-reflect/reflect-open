@@ -36,7 +36,7 @@ export function WhatsNewDialog(): ReactElement {
           <DialogTitle className="text-xl font-semibold tracking-tight">What’s new</DialogTitle>
           <DialogDescription>Version {marketingVersion(platform.appVersion)}</DialogDescription>
         </DialogHeader>
-        <WhatsNewItems items={gate.items ?? []} />
+        <WhatsNewItems items={whatsNew.items} />
         <DialogFooter>
           <Button onClick={whatsNew.dismiss}>Continue</Button>
         </DialogFooter>

@@ -109,7 +109,8 @@ describe('createWhatsNewService', () => {
     const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0', status: 'loading' })
     expect(whatsNew.gate.get().kind).toBe('hidden')
     setStatus('ready')
-    expect(whatsNew.gate.get()).toEqual({ kind: 'whatsNew', items: [ITEM_2, ITEM_3] })
+    expect(whatsNew.gate.get().kind).toBe('whatsNew')
+    expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])
 
     whatsNew.dismiss()
     expect(whatsNew.gate.get().kind).toBe('hidden')
@@ -118,7 +119,8 @@ describe('createWhatsNewService', () => {
 
   it('shows every item of a beta so far, once per full version', () => {
     const beta = setup({ appPlatform: 'ios', version: '0.19.1-beta.2', seen: '0.19.1-beta.1' })
-    expect(beta.whatsNew.gate.get()).toEqual({ kind: 'whatsNew', items: [ITEM_1, ITEM_3] })
+    expect(beta.whatsNew.gate.get().kind).toBe('whatsNew')
+    expect(beta.whatsNew.items).toEqual([ITEM_1, ITEM_3])
     const stable = setup({ appPlatform: 'ios', seen: '0.19.1-beta.2' })
     expect(stable.whatsNew.gate.get().kind).toBe('whatsNew')
   })

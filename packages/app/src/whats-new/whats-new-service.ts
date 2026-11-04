@@ -57,13 +57,12 @@ export interface WhatsNewInputs {
 export type WhatsNewDecision = 'wait' | 'skip' | 'show'
 
 /**
- * Whether to show What's New, and its items.
+ * Whether to show What's New.
  */
-export type WhatsNewGate =
-  | { readonly kind: 'hidden'; readonly items?: undefined }
-  | { readonly kind: 'whatsNew'; readonly items: readonly WhatsNewItem[] }
+export type WhatsNewGate = { readonly kind: 'hidden' } | { readonly kind: 'whatsNew' }
 
 const HIDDEN: WhatsNewGate = { kind: 'hidden' }
+const SHOWN: WhatsNewGate = { kind: 'whatsNew' }
 
 /**
  * What to do with What's New for the given inputs.
@@ -93,7 +92,11 @@ function selectIsOverride(value: string | null): boolean {
  */
 export interface WhatsNewService {
   /**
-   * Whether to show What's New, and its items.
+   * The current version's items for this platform.
+   */
+  readonly items: readonly WhatsNewItem[]
+  /**
+   * Whether to show What's New.
    */
   readonly gate: Store<WhatsNewGate>
   /**
@@ -129,6 +132,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
   readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
   readonly #decision: Store<WhatsNewDecision>
+  readonly items: readonly WhatsNewItem[]
   readonly gate: Store<WhatsNewGate>
   readonly override: Store<boolean>
 
@@ -139,7 +143,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
     const items = (content[marketingVersion(platform.appVersion)] ?? []).filter((item) => {
       return item.platforms.includes(platform.appPlatform)
     })
-    const shown: WhatsNewGate = { kind: 'whatsNew', items }
+    this.items = items
     this.override = deriveStore(
       storage.session.store(WHATS_NEW_OVERRIDE_STORAGE_KEY),
       selectIsOverride,
@@ -158,7 +162,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
         })
       },
     )
-    this.gate = deriveStore(this.#decision, (decision) => (decision === 'show' ? shown : HIDDEN))
+    this.gate = deriveStore(this.#decision, (decision) => (decision === 'show' ? SHOWN : HIDDEN))
   }
 
   readonly setOverride = (next: boolean): void => {

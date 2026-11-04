@@ -81,7 +81,7 @@ export function WhatsNewDrawer(): ReactElement {
       }}
     >
       <DrawerContent>
-        <WhatsNewPages items={gate.items ?? []} onClose={whatsNew.dismiss} />
+        <WhatsNewPages items={whatsNew.items} onClose={whatsNew.dismiss} />
       </DrawerContent>
     </Drawer>
   )
