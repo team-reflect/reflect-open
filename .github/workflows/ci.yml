@@ -81,9 +81,11 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    name: test-chromium (${{ matrix.shard }}/3)
+        reduced-motion: [reduce, no-preference]
+    name: test-chromium (${{ matrix.reduced-motion }}, ${{ matrix.shard }}/3)
     env:
       REFLECT_TEST_BROWSER: chromium
+      REFLECT_TEST_REDUCED_MOTION: ${{ matrix.reduced-motion }}
       # Chromium on Linux does not promptly free the iframe of a finished
       # test file (https://issues.chromium.org/issues/530892387), so one
       # browser process grows by 10 to 30 MB per file and dies near 2.5 GB,

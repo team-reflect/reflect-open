@@ -25,6 +25,9 @@ page, and Playwright emulates focus per page. CI runs the browser project on Chr
 and on WebKit, because the Tauri webview is WebKit.
 `pnpm --filter @reflect/desktop test:install` downloads both browsers.
 `REFLECT_TEST_BROWSER=webkit` selects WebKit, and `DEBUG=1` opens a headed browser.
+The browser emulates `prefers-reduced-motion: reduce`.
+`REFLECT_TEST_REDUCED_MOTION=no-preference` turns it off, so animations run.
+CI runs Chromium both ways.
 
 ## Console output fails tests
 

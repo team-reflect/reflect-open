@@ -4,9 +4,11 @@ import { playwrightCommands } from 'vitest-browser-commands'
 import { defineDesktopProject } from './vitest.shared.ts'
 
 const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
+const reducedMotion =
+  process.env.REFLECT_TEST_REDUCED_MOTION === 'no-preference' ? 'no-preference' : 'reduce'
 
 if (process.env.CI) {
-  console.log('Running in CI mode with browser:', browserName)
+  console.log('Running in CI mode with browser:', browserName, 'reduced motion:', reducedMotion)
 }
 
 export default defineDesktopProject({
@@ -24,7 +26,7 @@ export default defineDesktopProject({
       viewport: { width: 900, height: 600 },
       provider: playwright({
         contextOptions: {
-          reducedMotion: 'reduce',
+          reducedMotion,
           hasTouch: true,
           ...(browserName === 'chromium'
             ? { permissions: ['clipboard-read', 'clipboard-write'] }
