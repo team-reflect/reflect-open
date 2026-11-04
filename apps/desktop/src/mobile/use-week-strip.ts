@@ -138,6 +138,17 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
     }
   })
 
+  // A focused day in another week (keyboard Tab) shows that week, so the
+  // settle of the focus scroll keeps it on screen.
+  const handleFocus = useEffectEvent((scroller: HTMLElement, target: EventTarget | null) => {
+    const index = [...scroller.children].findIndex(
+      (row) => target instanceof Node && row.contains(target),
+    )
+    if (index !== -1 && index !== displayedIndexRef.current) {
+      scrollToWeek(index)
+    }
+  })
+
   useEffect(() => {
     const scroller = scrollerRef.current
     if (!scroller) {
@@ -152,6 +163,9 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
     // After the watch, whose own listener decides whether this scroll is the user's.
     scroller.addEventListener('scroll', () => handleScroll(scroller, watch.isUserScroll()), {
       passive: true,
+      signal: controller.signal,
+    })
+    scroller.addEventListener('focusin', (event) => handleFocus(scroller, event.target), {
       signal: controller.signal,
     })
     // Rotation and split view change the page width: stay on the same week,

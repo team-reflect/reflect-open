@@ -59,7 +59,9 @@ async function mountStrip(options?: { reducedMotion?: boolean }) {
               scrollSnapAlign: 'start',
               scrollSnapStop: 'always',
             }}
-          />
+          >
+            <button type="button">day</button>
+          </div>
         ))}
       </div>
     )
@@ -130,6 +132,19 @@ describe('useWeekStrip', () => {
 
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ANCHOR * WIDTH))
     expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR))
+  })
+
+  it('shows the week of a day that keyboard focus moves to', async () => {
+    const { scroller, strip } = await mountStrip()
+
+    await act(() => {
+      scroller.children[ANCHOR + 2]?.querySelector('button')?.focus()
+    })
+
+    expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 2))
+    await vi.waitFor(() => expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
   })
 
   it('follows an in-window date change without snapping back while browsing', async () => {
