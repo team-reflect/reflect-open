@@ -357,7 +357,7 @@ class AttachmentServiceImpl implements AttachmentService {
 
   watchCatalog(generation: number): Unlisten {
     const { fileChanges } = this.#deps
-    void this.#warnOnListingFailure(this.#loadCatalog(generation))
+    this.#loadCatalog(generation).catch(() => {})
     const stopChanges = fileChanges.subscribe(({ changes }) => {
       if (changes.some((change) => isAttachmentPath(change.path))) {
         this.#relist(generation)
@@ -589,6 +589,7 @@ class AttachmentServiceImpl implements AttachmentService {
         return catalog
       },
       (error: unknown) => {
+        this.#deps.logger.warn('listing attachments failed:', error)
         if (target.listing === listing) {
           target.listing = null
         }
@@ -613,18 +614,7 @@ class AttachmentServiceImpl implements AttachmentService {
 
   #relist(generation: number): void {
     if (this.#entry?.generation === generation) {
-      void this.#warnOnListingFailure(this.#list(this.#entry))
-    }
-  }
-
-  /**
-   * Wait for a background listing and log its failure. The last catalog stays.
-   */
-  async #warnOnListingFailure(listing: Promise<AttachmentCatalog>): Promise<void> {
-    try {
-      await listing
-    } catch (error) {
-      this.#deps.logger.warn('listing attachments failed:', error)
+      this.#list(this.#entry).catch(() => {})
     }
   }
 
