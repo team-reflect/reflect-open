@@ -19,6 +19,7 @@ import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { useIapRestoreRedeem } from '@/mobile/use-iap-restore-redeem.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
+import { doNothing } from '@reflect/utils'
 
 type PurchasePlan = 'monthly' | 'yearly'
 
@@ -35,7 +36,7 @@ const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
  */
 export function PaywallDrawer({ open }: { open: boolean }): ReactElement {
   return (
-    <Drawer open={open} onOpenChange={() => {}} dismissible={false}>
+    <Drawer open={open} onOpenChange={doNothing} dismissible={false}>
       <DrawerContent>
         <PaywallContent />
       </DrawerContent>
