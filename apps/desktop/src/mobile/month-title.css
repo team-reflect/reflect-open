@@ -13,19 +13,19 @@
  */
 
 .month-title-enter-up {
-  animation: month-title-enter-up 500ms var(--ease-standard);
+  animation: month-title-enter-up var(--duration-month-title) var(--ease-standard);
 }
 
 .month-title-enter-down {
-  animation: month-title-enter-down 500ms var(--ease-standard);
+  animation: month-title-enter-down var(--duration-month-title) var(--ease-standard);
 }
 
 .month-title-exit-up {
-  animation: month-title-exit-up 500ms var(--ease-standard) forwards;
+  animation: month-title-exit-up var(--duration-month-title) var(--ease-standard) forwards;
 }
 
 .month-title-exit-down {
-  animation: month-title-exit-down 500ms var(--ease-standard) forwards;
+  animation: month-title-exit-down var(--duration-month-title) var(--ease-standard) forwards;
 }
 
 @keyframes month-title-enter-up {

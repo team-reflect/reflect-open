@@ -136,6 +136,14 @@ Cascade layer order, low to high priority.
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Motion tokens: easing curves and durations. */
+@theme {
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-sheet: 450ms;
+  --duration-stack: 350ms;
+  --duration-month-title: 500ms;
+}
+
 /* The DS shadow tokens share Tailwind's `--shadow-*` theme namespace, so a
    direct `--shadow-sm: var(--shadow-sm)` mapping would make Tailwind emit a
    self-referential (circular, thus invalid) variable into `@layer theme`.
