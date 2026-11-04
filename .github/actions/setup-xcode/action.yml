@@ -5,19 +5,13 @@ inputs:
   version:
     description: Xcode version
     required: false
-    default: '27.2'
+    default: '27.1'
 runs:
   using: composite
   steps:
     - name: List installed Xcode versions
       shell: bash
-      run: |
-        for app in /Applications/Xcode*.app; do
-          echo "======="
-          echo "$app"
-          realpath "$app"
-          plutil -extract ProductBuildVersion raw "$app/Contents/version.plist"
-        done
+      run: ls -d /Applications/Xcode*.app
 
     - name: Print the Xcode version before
       shell: bash
