@@ -1,27 +1,11 @@
+import { Profiler } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import type { LightboxController } from '@meowdown/react'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
+import { act } from '@/test-utils/act.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MediaLightbox } from './media-lightbox.tsx'
-
-// The Playwright context pins prefers-reduced-motion to reduce, so the
-// reduced-motion query stays stubbed to exercise both settings.
-function installMatchMedia(reducedMotion: boolean): void {
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: vi.fn((query: string): MediaQueryList => ({
-      matches: reducedMotion && query === '(prefers-reduced-motion: reduce)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  })
-}
 
 function makeLightbox(close: () => void): LightboxController {
   return {
@@ -38,12 +22,35 @@ interface RenderedLightbox {
   image: HTMLImageElement
   backdrop: HTMLElement | null
   closeChrome: HTMLElement
+  openChrome: HTMLElement
+  /** React commits inside the lightbox so far. */
+  getCommitCount: () => number
+  /** Re-render the lightbox with a new `onOpenImage`, like an unrelated parent update. */
+  rerender: () => Promise<void>
 }
 
-async function renderMobileLightbox(): Promise<RenderedLightbox> {
+async function renderMobileLightbox(options?: {
+  reducedMotion?: boolean
+}): Promise<RenderedLightbox> {
   const onClose = vi.fn()
-  await renderInApp(<MediaLightbox lightbox={makeLightbox(onClose)} onOpenImage={vi.fn()} />, {
+  const lightbox = makeLightbox(onClose)
+  let commitCount = 0
+  const renderLightbox = () => (
+    <Profiler
+      id="lightbox"
+      onRender={() => {
+        commitCount += 1
+      }}
+    >
+      <MediaLightbox lightbox={lightbox} onOpenImage={vi.fn()} />
+    </Profiler>
+  )
+  const systemPreferences = createTestSystemPreferencesService({
+    reducedMotion: options?.reducedMotion ?? false,
+  })
+  const screen = await renderInApp(renderLightbox(), {
     platform: MOBILE_PLATFORM,
+    appServices: { systemPreferences },
   })
 
   const dialog = page.getByRole('dialog', { name: 'Image preview' })
@@ -62,6 +69,10 @@ async function renderMobileLightbox(): Promise<RenderedLightbox> {
   if (!(closeChrome instanceof HTMLElement)) {
     throw new TypeError('close chrome missing')
   }
+  const openChrome = page.getByRole('button', { name: 'Open', exact: true }).element().parentElement
+  if (!(openChrome instanceof HTMLElement)) {
+    throw new TypeError('open chrome missing')
+  }
   // Let the dialog's enter animation finish so drag activation samples the
   // settled full-viewport rect, not a mid-zoom one.
   await vi.waitFor(() => {
@@ -74,6 +85,11 @@ async function renderMobileLightbox(): Promise<RenderedLightbox> {
     image,
     backdrop: backdrop instanceof HTMLElement ? backdrop : null,
     closeChrome,
+    openChrome,
+    getCommitCount: () => commitCount,
+    rerender: async () => {
+      await screen.rerender(renderLightbox())
+    },
   }
 }
 
@@ -104,7 +120,6 @@ function swallowTransitionEnd(event: Event): void {
 }
 
 beforeEach(() => {
-  installMatchMedia(false)
   document.addEventListener('transitionend', swallowTransitionEnd, { capture: true })
 })
 
@@ -129,7 +144,7 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
   })
 
   it('fades the backdrop and chrome with drag progress', async () => {
-    const { preview, backdrop, closeChrome } = await renderMobileLightbox()
+    const { preview, backdrop, closeChrome, openChrome } = await renderMobileLightbox()
     expect(backdrop).not.toBeNull()
 
     touchDown(preview, 180, 120)
@@ -142,6 +157,52 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
     })
     expect(Number.parseFloat(closeChrome.style.opacity)).toBeCloseTo(1 - progress * 2, 5)
     expect(closeChrome.style.pointerEvents).toBe('none')
+    expect(Number.parseFloat(openChrome.style.opacity)).toBeCloseTo(1 - progress * 2, 5)
+  })
+
+  it('follows the finger without a React commit per move', async () => {
+    const { preview, image, backdrop, getCommitCount } = await renderMobileLightbox()
+    const commitsBefore = getCommitCount()
+
+    await act(() => {
+      touchDown(preview, 180, 120)
+      firePointer(preview, 'pointermove', { pointerId: 1, clientX: 182, clientY: 180 })
+      for (let i = 1; i <= 5; i++) {
+        firePointer(preview, 'pointermove', { pointerId: 1, clientX: 182, clientY: 180 + i * 20 })
+      }
+    })
+
+    expect(image.style.transform).toContain('translate3d(0px, 100px, 0px)')
+    expect(backdrop!.style.opacity).not.toBe('')
+    expect(getCommitCount()).toBe(commitsBefore)
+
+    await act(() => {
+      firePointer(preview, 'pointerup', { pointerId: 1, clientX: 182, clientY: 280 })
+    })
+    expect(getCommitCount()).toBeGreaterThan(commitsBefore)
+  })
+
+  it('keeps the dragged position when the lightbox re-renders mid-drag', async () => {
+    const { preview, image, backdrop, closeChrome, rerender, getCommitCount } =
+      await renderMobileLightbox()
+
+    touchDown(preview, 180, 120)
+    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 182, clientY: 180 })
+    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 190, clientY: 260 })
+    expect(image.style.transform).toContain('translate3d(8px, 80px, 0px)')
+    expect(backdrop!.style.opacity).not.toBe('')
+    expect(closeChrome.style.opacity).not.toBe('')
+    const transform = image.style.transform
+    const backdropOpacity = backdrop!.style.opacity
+    const chromeOpacity = closeChrome.style.opacity
+    const commitsBefore = getCommitCount()
+
+    await rerender()
+
+    expect(getCommitCount()).toBeGreaterThan(commitsBefore)
+    expect(image.style.transform).toBe(transform)
+    expect(backdrop!.style.opacity).toBe(backdropOpacity)
+    expect(closeChrome.style.opacity).toBe(chromeOpacity)
   })
 
   it('dismisses past the distance threshold, sliding out along the drag vector', async () => {
@@ -204,7 +265,7 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
   })
 
   it('springs back after a short drag and suppresses the trailing tap', async () => {
-    const { preview, image, backdrop, onClose } = await renderMobileLightbox()
+    const { preview, image, backdrop, closeChrome, onClose } = await renderMobileLightbox()
 
     touchDown(preview, 100, 100)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 102, clientY: 130 })
@@ -223,6 +284,9 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
     await vi.waitFor(() => {
       expect(image.style.transform).toBe('')
     })
+    expect(backdrop!.style.opacity).toBe('')
+    expect(closeChrome.style.opacity).toBe('')
+    expect(closeChrome.style.pointerEvents).toBe('')
     fireClick(preview)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -287,14 +351,18 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
   })
 
   it('skips the settle animation under reduced motion and clears suppression', async () => {
-    installMatchMedia(true)
-    const { preview, image, onClose } = await renderMobileLightbox()
+    const { preview, image, backdrop, closeChrome, onClose } = await renderMobileLightbox({
+      reducedMotion: true,
+    })
 
     touchDown(preview, 100, 100)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 102, clientY: 130 })
     firePointer(preview, 'pointerup', { pointerId: 1, clientX: 102, clientY: 130 })
 
     expect(image.style.transform).toBe('')
+    expect(backdrop!.style.opacity).toBe('')
+    expect(closeChrome.style.opacity).toBe('')
+    expect(closeChrome.style.pointerEvents).toBe('')
 
     fireClick(preview)
     expect(onClose).not.toHaveBeenCalled()

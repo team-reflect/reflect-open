@@ -4,14 +4,13 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { exec } from 'tinyexec'
-import { z } from 'zod'
+import packageJson from '../package.json' with { type: 'json' }
 
 export const APP_DIR = join(import.meta.dirname, '..')
 const ROOT_DIR = join(APP_DIR, '..', '..')
@@ -28,7 +27,6 @@ export const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit' } }
 const BETA_OVERLAY = 'tauri.beta.conf.json'
 const SENTRY_DSN_PATTERN =
   /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/
-const PackageJsonSchema = z.object({ version: z.string().min(1) })
 
 export function log(message: string): void {
   console.log(`[release] ${message}`)
@@ -77,19 +75,13 @@ export function assertSentryDsn(): void {
   }
 }
 
-/** The app version from `apps/desktop/package.json`, the single version source. */
-export function readAppVersion(): string {
-  const packageJson: unknown = JSON.parse(readFileSync(join(APP_DIR, 'package.json'), 'utf8'))
-  return PackageJsonSchema.parse(packageJson).version
-}
-
 /**
  * The Tauri config overlay of the flavor to build, or null for the stable
  * flavor (the base config). A prerelease version builds the beta flavor, so a
  * build always matches its updater feed.
  */
 export function getFlavorOverlay(): string | null {
-  return readAppVersion().includes('-') ? BETA_OVERLAY : null
+  return packageJson.version.includes('-') ? BETA_OVERLAY : null
 }
 
 /** The `--config` arguments that select the flavor. */

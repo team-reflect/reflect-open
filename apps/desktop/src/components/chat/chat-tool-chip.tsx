@@ -1,15 +1,20 @@
 import { Fragment, type MouseEvent, type ReactElement, type ReactNode } from 'react'
 import { CalendarDays, FileText, History, Paperclip, Search } from 'lucide-react'
-import { isTagName, isToolPending, type AssistantPart, type NoteHitSummary } from '@reflect/core'
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
-import { routeForPath } from '@/routing/route.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { isModEvent } from '@meowdown/core'
-import { useDateFormat } from '@/hooks/use-date-format.ts'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
-import { formatShortDate } from '@/lib/dates.ts'
+import {
+  isTagName,
+  isToolPending,
+  type AssistantPart,
+  type NoteHitSummary,
+  formatShortDate,
+} from '@reflect/core'
+import { routeForPath } from '@reflect/app'
 
 interface ChatToolChipProps {
   part: Extract<AssistantPart, { kind: 'tool' }>
@@ -79,7 +84,7 @@ function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
  * UI that knows tool names — new tools extend `tools.ts` and this switch.
  */
 export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const navigateNoteLink = useNoteLinkNavigation()
   const openNote = (path: string, event: MouseEvent<HTMLButtonElement>): void => {
     navigateNoteLink({ target: routeForPath(path), openInNewWindow: isModEvent(event) })

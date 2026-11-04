@@ -1,16 +1,16 @@
 import { useId, useState, type ReactElement } from 'react'
-import { errorMessage } from '@reflect/core'
-import { getIsComposing } from '@meowdown/core'
-import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
-import { Input } from '@/components/ui/input.tsx'
-import { Spinner } from '@/components/ui/spinner.tsx'
 import {
+  errorMessage,
   DEFAULT_GRAPH_NAME,
   cleanGraphName,
   graphRootForName,
   isGraphNameTaken,
-} from '@/lib/graph-names.ts'
+} from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
+import { Input } from '@/components/ui/input.tsx'
+import { Spinner } from '@/components/ui/spinner.tsx'
 
 interface NewGraphDrawerProps {
   open: boolean

@@ -1,8 +1,6 @@
 import { z, type ZodType } from 'zod'
 import type { IpcBridgeService, PluginSubscription } from './ipc-service.ts'
 
-export type { PluginSubscription } from './ipc-service.ts'
-
 /**
  * Typed bindings for the first-party plugins (`plugins/tauri-plugin-*`).
  * A plugin's commands are declared one per command (args type plus result

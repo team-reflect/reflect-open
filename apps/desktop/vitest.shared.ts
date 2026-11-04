@@ -8,9 +8,6 @@ export function defineDesktopProject(project: {
 }): ViteUserConfig {
   return defineProject({
     plugins: [react({ compiler: true }), ...(project.plugins ?? [])],
-    define: {
-      __REFLECT_VERSION__: JSON.stringify('0.0.0-test'),
-    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

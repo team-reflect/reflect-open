@@ -32,7 +32,8 @@ export {
   type InlineWikiLink,
   type InlineSegment,
 } from './scan.ts'
-export { appendBlock, wikiLinkSafe, setTaskDueDate, clearTaskDueDate } from './edit.ts'
+export { wikiLinkSafe, setTaskDueDate, clearTaskDueDate } from './edit.ts'
+export { appendBlock } from './append-section.ts'
 export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle.ts'
 export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title.ts'
 export { canonicalEmail, canonicalEmails, extractEmailFields } from './email-fields.ts'

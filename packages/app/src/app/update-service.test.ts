@@ -65,7 +65,7 @@ describe('createUpdateService', () => {
 
   it('starts idle and does not check until started', () => {
     const { service, updater } = setup()
-    expect(service.getState()).toEqual({ phase: 'idle' })
+    expect(service.get()).toEqual({ phase: 'idle' })
     expect(updater.calls).toEqual([])
   })
 
@@ -85,14 +85,14 @@ describe('createUpdateService', () => {
     const { service, clock } = setup({ available: { version: '0.3.0' } })
     service.start()
     await clock.advance(0)
-    expect(service.getState()).toEqual({ phase: 'available', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'available', version: '0.3.0' })
   })
 
   it('auto-check failures are silent: back to idle, app unaffected', async () => {
     const { service, clock, logger } = setup({ failCheck: 'offline' })
     service.start()
     await clock.advance(0)
-    expect(service.getState()).toEqual({ phase: 'idle' })
+    expect(service.get()).toEqual({ phase: 'idle' })
     expect(logger.getWarnings()).toEqual([
       { message: 'update check failed (ignored)', cause: new Error('offline') },
     ])
@@ -122,11 +122,11 @@ describe('createUpdateService', () => {
   it('manual check surfaces up-to-date and errors', async () => {
     const { service, updater } = setup()
     await service.checkNow()
-    expect(service.getState()).toEqual({ phase: 'upToDate' })
+    expect(service.get()).toEqual({ phase: 'upToDate' })
 
     updater.configure({ failCheck: 'release endpoint unreachable' })
     await service.checkNow()
-    expect(service.getState()).toEqual({
+    expect(service.get()).toEqual({
       phase: 'error',
       message: 'release endpoint unreachable',
       during: 'check',
@@ -137,21 +137,21 @@ describe('createUpdateService', () => {
     const { service, updater } = setup({ available: { version: '0.3.0' }, holdInstall: true })
     const states: string[] = []
     service.subscribe(() => {
-      const state = service.getState()
+      const state = service.get()
       if (state.phase === 'downloading') {
         states.push(`downloading:${state.percent}`)
       }
     })
     await service.checkNow()
     const installing = service.install()
-    expect(service.getState()).toEqual({ phase: 'downloading', version: '0.3.0', percent: null })
+    expect(service.get()).toEqual({ phase: 'downloading', version: '0.3.0', percent: null })
     updater.progress(50)
-    expect(service.getState()).toEqual({ phase: 'downloading', version: '0.3.0', percent: 50 })
+    expect(service.get()).toEqual({ phase: 'downloading', version: '0.3.0', percent: 50 })
     updater.finishInstall()
     await installing
     expect(states).toContain('downloading:50')
     expect(states).toContain('downloading:100')
-    expect(service.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'ready', version: '0.3.0' })
   })
 
   it('a rejected payload (bad signature) surfaces as a plain error', async () => {
@@ -161,7 +161,7 @@ describe('createUpdateService', () => {
     })
     await service.checkNow()
     await service.install()
-    expect(service.getState()).toEqual({
+    expect(service.get()).toEqual({
       phase: 'error',
       message: 'signature verification failed',
       during: 'install',
@@ -177,34 +177,60 @@ describe('createUpdateService', () => {
     updater.configure({})
     const second = service.checkNow()
     await service.install()
-    expect(service.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'ready', version: '0.3.0' })
 
     releaseSecond()
     await second
-    expect(service.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'ready', version: '0.3.0' })
   })
 
   it('a silent re-check answering "no update" keeps an already-found update available', async () => {
     const { service, updater, clock } = setup({ available: { version: '0.3.0' } })
     service.start()
     await clock.advance(0)
-    expect(service.getState()).toEqual({ phase: 'available', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'available', version: '0.3.0' })
 
     // A silent check never enters a visible "checking" phase.
     const phases: string[] = []
     service.subscribe(() => {
-      phases.push(service.getState().phase)
+      phases.push(service.get().phase)
     })
 
     // e.g. the release is mid-edit and the manifest transiently lists nothing.
     updater.configure({})
     await clock.advance(SIX_HOURS_MS)
     expect(checkCount(updater)).toBe(2)
-    expect(service.getState()).toEqual({ phase: 'available', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'available', version: '0.3.0' })
     expect(phases).not.toContain('checking')
 
     await service.install()
-    expect(service.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'ready', version: '0.3.0' })
+  })
+
+  it('keeps the state and stays quiet when a silent check finds nothing', async () => {
+    const { service, clock } = setup()
+    service.start()
+    await clock.advance(0)
+    const state = service.get()
+    let calls = 0
+    service.subscribe(() => {
+      calls += 1
+    })
+
+    await clock.advance(SIX_HOURS_MS)
+    expect(service.get()).toBe(state)
+    expect(calls).toBe(0)
+  })
+
+  it('stops notifying after unsubscribe', async () => {
+    const { service } = setup()
+    let calls = 0
+    const unsubscribe = service.subscribe(() => {
+      calls += 1
+    })
+    unsubscribe()
+    await service.checkNow()
+    expect(calls).toBe(0)
   })
 
   it('a failed re-check keeps an already-found update available', async () => {
@@ -215,13 +241,47 @@ describe('createUpdateService', () => {
     updater.configure({ failCheck: 'offline' })
     await clock.advance(SIX_HOURS_MS)
     expect(checkCount(updater)).toBe(2)
-    expect(service.getState()).toEqual({ phase: 'available', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'available', version: '0.3.0' })
+  })
+
+  it('a re-check that finds an update closes the one it replaces', async () => {
+    const { service, updater, clock } = setup({ available: { version: '0.3.0' } })
+    service.start()
+    await clock.advance(0)
+
+    updater.configure({ available: { version: '0.3.1' } })
+    await clock.advance(SIX_HOURS_MS)
+    expect(updater.calls).toEqual(['check', 'check', 'close'])
+    expect(service.get()).toEqual({ phase: 'available', version: '0.3.1' })
+  })
+
+  it('a manual check answering "no update" closes the found update', async () => {
+    const { service, updater } = setup({ available: { version: '0.3.0' } })
+    await service.checkNow()
+
+    updater.configure({})
+    await service.checkNow()
+    expect(updater.calls).toEqual(['check', 'check', 'close'])
+    expect(service.get()).toEqual({ phase: 'upToDate' })
+  })
+
+  it('a check resolving after an install starts closes the update it found', async () => {
+    const { service, updater } = setup({ available: { version: '0.3.0' } })
+    await service.checkNow()
+
+    const releaseSecond = updater.holdNextCheck()
+    const second = service.checkNow()
+    await service.install()
+    releaseSecond()
+    await second
+    expect(updater.calls).toEqual(['check', 'check', 'downloadAndInstall', 'close'])
+    expect(service.get()).toEqual({ phase: 'ready', version: '0.3.0' })
   })
 
   it('install without a found update is a no-op', async () => {
     const { service, updater } = setup()
     await service.install()
-    expect(service.getState()).toEqual({ phase: 'idle' })
+    expect(service.get()).toEqual({ phase: 'idle' })
     expect(updater.calls).toEqual([])
   })
 
@@ -238,7 +298,7 @@ describe('createUpdateService', () => {
     updater.configure({ available: { version: '0.3.0' } })
     await service.retryAction()
     expect(updater.calls).toEqual(['check', 'downloadAndInstall', 'downloadAndInstall'])
-    expect(service.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
+    expect(service.get()).toEqual({ phase: 'ready', version: '0.3.0' })
   })
 
   it('retryAction checks again after a failed check', async () => {
@@ -247,7 +307,7 @@ describe('createUpdateService', () => {
     updater.configure({})
     await service.retryAction()
     expect(updater.calls).toEqual(['check', 'check'])
-    expect(service.getState()).toEqual({ phase: 'upToDate' })
+    expect(service.get()).toEqual({ phase: 'upToDate' })
   })
 
   it('dispose stops the interval', async () => {
@@ -273,7 +333,7 @@ describe('createUpdateService without an updater', () => {
     service.start()
     await service.checkNow()
     expect(service.supported).toBe(false)
-    expect(service.getState()).toEqual({ phase: 'idle' })
+    expect(service.get()).toEqual({ phase: 'idle' })
   })
 })
 describe('createTestUpdateService', () => {

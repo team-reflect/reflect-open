@@ -70,11 +70,11 @@ importers:
         specifier: ^0.78.0
         version: 0.78.0(typescript@6.0.3)
       '@meowdown/react':
-        specifier: ^0.82.2
-        version: 0.82.2(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)
+        specifier: ^0.82.3
+        version: 0.82.3(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)
       '@ocavue/utils':
-        specifier: ^1.9.0
-        version: 1.9.0
+        specifier: ^1.11.0
+        version: 1.11.0
       '@post-embed/schema':
         specifier: ^0.5.2
         version: 0.5.2(typescript@6.0.3)
@@ -109,11 +109,11 @@ importers:
         specifier: ^2.12.4
         version: 2.12.4
       '@tauri-apps/plugin-deep-link':
-        specifier: ^2.6.2
-        version: 2.6.2
+        specifier: ^2.6.3
+        version: 2.6.3
       '@tauri-apps/plugin-dialog':
-        specifier: ^2.8.3
-        version: 2.8.3
+        specifier: ^2.8.4
+        version: 2.8.4
       '@tauri-apps/plugin-http':
         specifier: ^2.8.3
         version: 2.8.3
@@ -127,8 +127,8 @@ importers:
         specifier: ^2.4.0
         version: 2.4.0
       '@tauri-apps/plugin-updater':
-        specifier: ^2.14.0
-        version: 2.14.0
+        specifier: ^2.14.1
+        version: 2.14.1
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -138,18 +138,12 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.3.0)(@types/react@19.3.0)(react-dom@19.3.1)(react@19.3.1)
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.3.1)
       lucide-react:
         specifier: ^1.59.0
         version: 1.61.0(@types/react@19.3.0)(react@19.3.1)
-      pretty-ms:
-        specifier: ^10.0.0
-        version: 10.0.0
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -194,8 +188,8 @@ importers:
         specifier: ^4.3.3
         version: 4.3.3(vite@8.3.5)
       '@tauri-apps/cli':
-        specifier: ^2.12.3
-        version: 2.12.3
+        specifier: ^2.12.4
+        version: 2.12.4
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
@@ -315,17 +309,14 @@ importers:
   packages/app:
     dependencies:
       '@ocavue/utils':
-        specifier: ^1.9.0
-        version: 1.9.0
+        specifier: ^1.11.0
+        version: 1.11.0
       '@reflect/core':
         specifier: workspace:*
         version: link:../core
       '@reflect/utils':
         specifier: workspace:*
         version: link:../utils
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -349,8 +340,8 @@ importers:
         specifier: ^0.78.0
         version: 0.78.0(typescript@6.0.3)
       '@ocavue/utils':
-        specifier: ^1.9.0
-        version: 1.9.0
+        specifier: ^1.11.0
+        version: 1.11.0
       '@post-embed/exporter':
         specifier: ^0.5.0
         version: 0.5.0(typescript@6.0.3)
@@ -369,9 +360,6 @@ importers:
       '@reflect/utils':
         specifier: workspace:*
         version: link:../utils
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
       kysely:
         specifier: ^0.28.18
         version: 0.28.18
@@ -389,8 +377,8 @@ importers:
         version: 4.6.7
     devDependencies:
       '@ai-sdk/provider':
-        specifier: ^4.0.34
-        version: 4.0.34
+        specifier: ^4.0.35
+        version: 4.0.35
       '@ocavue/tsconfig':
         specifier: ^0.7.1
         version: 0.7.1
@@ -441,20 +429,20 @@ importers:
   packages/modules:
     dependencies:
       '@ai-sdk/anthropic':
-        specifier: ^4.0.88
-        version: 4.0.88(zod@4.6.7)
+        specifier: ^4.0.94
+        version: 4.0.94(zod@4.6.7)
       '@ai-sdk/google':
-        specifier: ^4.0.105
-        version: 4.0.105(zod@4.6.7)
+        specifier: ^4.0.109
+        version: 4.0.109(zod@4.6.7)
       '@ai-sdk/openai':
-        specifier: ^4.0.102
-        version: 4.0.102(zod@4.6.7)
+        specifier: ^4.0.106
+        version: 4.0.106(zod@4.6.7)
       '@ai-sdk/openai-compatible':
-        specifier: ^3.0.78
-        version: 3.0.78(zod@4.6.7)
+        specifier: ^3.0.82
+        version: 3.0.82(zod@4.6.7)
       ai:
-        specifier: ^7.0.153
-        version: 7.0.153(zod@4.6.7)
+        specifier: ^7.0.159
+        version: 7.0.159(zod@4.6.7)
     devDependencies:
       '@ocavue/tsconfig':
         specifier: ^0.7.1
@@ -467,6 +455,16 @@ importers:
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3)(vite@8.3.5)
 
   packages/utils:
+    dependencies:
+      '@date-fns/utc':
+        specifier: ^2.1.1
+        version: 2.1.1
+      date-fns:
+        specifier: ^4.4.0
+        version: 4.4.0
+      pretty-ms:
+        specifier: ^10.0.0
+        version: 10.0.0
     devDependencies:
       '@ocavue/tsconfig':
         specifier: ^0.7.1
@@ -483,44 +481,44 @@ packages:
   '@1natsu/wait-element@4.2.0':
     resolution: {integrity: sha512-Om0Q+WE9mNrpY4AwMTvkFiYHv8VM7TML3PvOqXy+w6kAjLjKhGYHYX+305+a6J8RVpds9s7IF2Z5aOPYwULFNw==}
 
-  '@ai-sdk/anthropic@4.0.88':
-    resolution: {integrity: sha512-7h/rI3jLCfLbQsjVt37Q5PCEGOHrpVgrO2zl+y///UpUcWfiRDcqk8DL7br//OFxiEhyxgeIoU/5ulsN1llOyg==}
+  '@ai-sdk/anthropic@4.0.94':
+    resolution: {integrity: sha512-gD0KmsUZTRuhiYleM2SdMrY0c7m+VeRckLX2VVPnEAlQmaKqSw8+noHiK5ED+SHy4tuDf9VQqcHxlGeObzMNyw==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/gateway@4.0.126':
-    resolution: {integrity: sha512-gOrvnfrWxslTws5puMe+CvEDjZ0rxbpQYLZgdngQl1g/z3mRc5sllcflVAhy2xJSZacrWtsXwua+NJoc/IKZDw==}
+  '@ai-sdk/gateway@4.0.132':
+    resolution: {integrity: sha512-ppStDEz96g+JEuxGiVTP29OKBjPyYZXRxs38wnq3427U2QbZtxe6TukrgSAAq0n4yaHvSvVAWJY9kBlW8XudYg==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/google@4.0.105':
-    resolution: {integrity: sha512-CTeWVshKJKilEWQwqrjHG6GYUE0f/BbeDDUtRestAoH9vEf0f1YariQYbu69fPJGa6itc0pMdqvHzTWqAVD1OA==}
+  '@ai-sdk/google@4.0.109':
+    resolution: {integrity: sha512-BZd6F2vI53t1xb1Qtzfr6zDkUR7unzmKpI3UhDp9TxDl+JLw2DLRiTGWBeaqLJEdjt5myS4yqzjIhI9cDC9bfw==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai-compatible@3.0.78':
-    resolution: {integrity: sha512-8r+qmbIf2YzPbkzlQibbetOmR4GdA/jAHtSJPhUbp6ZMG3PT6cBKwf/85TDyStyPTKtkFZ1qe1ytml3zu69EZQ==}
+  '@ai-sdk/openai-compatible@3.0.82':
+    resolution: {integrity: sha512-wey0CbujWRkZbbrJjw/GJHyjXpt0v44PQKaTGTVGmigqnM057G7GQHDyZQQj9O0lICY5qJxzpn4wCSftT8BSQg==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai@4.0.102':
-    resolution: {integrity: sha512-8hvs5UO6OgGSR0HASptyopqoJYgdCccVfksUlBLeJ8/h2KoKYU2ZiFjArOkS6ciJbmnDz3G+Zoo4KiI4rlQSoA==}
+  '@ai-sdk/openai@4.0.106':
+    resolution: {integrity: sha512-xBhSJCrgeTMZ4kCKABX8BJFtp5ZIJSS2qxvGMALA34TMyR6OVMe93cpU0mGWPFaVwPsWy2DWKb5+x7gkJ9SJ8w==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@5.0.68':
-    resolution: {integrity: sha512-SASuC1DqSdWoYyYfpxbgPKm9VCnMP1VTahWY7WEYzi2QDmFdbw4runqmH7NKC33iB/INo+XbaN2hH3dXHSNQZw==}
+  '@ai-sdk/provider-utils@5.0.72':
+    resolution: {integrity: sha512-M6QAztI84jWumQSvKcGOL91DxhChsWxn3D3gYtV0/7E1TPQg9BmLdIerOolUC/jghQbMlQrHyzp0hqdIhUZ2Rw==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider@4.0.34':
-    resolution: {integrity: sha512-Ip7ZQBq/FiGpM1mmOVseTtX9PBjnzo0bLC41WTgBSBBRUBz6LhNFGbYaNUzI6hPm6ll1oNSPOAZc/q/z+3QZEQ==}
+  '@ai-sdk/provider@4.0.35':
+    resolution: {integrity: sha512-yBz6fmLS8MSCIzy7NiHEUAq56ZLD4ZA1GR6bpXBxgbwUacP1La7LuwAr/xy9jSzthem4F8Xu2OrhvU/JrE9fYA==}
     engines: {node: '>=22'}
 
   '@aklinker1/rollup-plugin-visualizer@5.12.0':
@@ -850,6 +848,9 @@ packages:
   '@csstools/css-tokenizer@4.0.2':
     resolution: {integrity: sha512-OoKoR0f76dCY666JlcbhmVTs2drYj1GUXZTYTcbUgJjh9Nv41aFfZ21bPQTERm5+L5cBDo466NltB2lplS5GBw==}
     engines: {node: '>=20.19.0'}
+
+  '@date-fns/utc@2.1.1':
+    resolution: {integrity: sha512-SlJDfG6RPeEX8wEVv6ZB3kak4MmbtyiI2qX/5zuKdordbrhB/iaJ58GVMZgJ6P1sJaM1gMgENFYYeg1JWrCFrA==}
 
   '@dnd-kit/accessibility@3.1.1':
     resolution: {integrity: sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==}
@@ -1337,8 +1338,8 @@ packages:
   '@meowdown/markdown@0.78.0':
     resolution: {integrity: sha512-Ca8UTMbUm+349u9Duudm9bOyGfu/kHHuAPu1d/zJsHc6eDVu3VgXVQsDbiJS4B1p1sE87W4z757n06ziSMtmsA==}
 
-  '@meowdown/react@0.82.2':
-    resolution: {integrity: sha512-P1CP6Do767O3YNNRAje9fFxvVxdEMbFGBTpAVXVkFKHDrixTXDJFKnAV3U6ckzGxuig4OmwykQ5X7VqqKlXxvw==}
+  '@meowdown/react@0.82.3':
+    resolution: {integrity: sha512-xNZzVF+tjQuxa4QnmEPoyWexBNVrfrW9OJXX5uh3qSpoHBIg4IFZ3IfuHq2KmFAXFAf7NVkXUidFYybWgHuKEQ==}
     peerDependencies:
       react: ^19.3.0
       react-dom: ^19.3.0
@@ -1386,8 +1387,8 @@ packages:
   '@ocavue/tsconfig@0.7.1':
     resolution: {integrity: sha512-jw1LPUqi/f043s61WOYEWWA6P1ZSSYXR3KJXcNxBXXrxiUXhEAbuEBUmi6Qs8NduIVU3xCkbaYw5BU3UyL3G3A==}
 
-  '@ocavue/utils@1.9.0':
-    resolution: {integrity: sha512-fHE+6t6Z0YfFnu5uiaKRRXoIo8NCTVBdT+b9SjMQydDTqTxHpvhNFvXsIUkYlJMyBQZjEpCyGlUfP+wscAmR1w==}
+  '@ocavue/utils@1.11.0':
+    resolution: {integrity: sha512-9mJkG0Hj0bBJZq4eL/jk4H+gU2xgi5ZsXcMFbXdBOqlzKQ0GHu+7ZbMYW92sYdpjWbzKaXchGM1v9TF7b9k6gQ==}
 
   '@opentelemetry/api@1.9.1':
     resolution: {integrity: sha512-gLyJlPHPZYdAk1JENA9LeHejZe1Ti77/pTeFm/nMXmQH/HFZlcS/O2XJB+L8fkbrNSqhdtlvjBVjxwUYanNH5Q==}
@@ -2725,87 +2726,87 @@ packages:
   '@tauri-apps/api@2.12.4':
     resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
 
-  '@tauri-apps/cli-darwin-arm64@2.12.3':
-    resolution: {integrity: sha512-xmVNoJOOKzKLj7GLHXmXLimRby9M42aBIJa0sB80N7o24eKV5JiVmToKTRLVH9yhL05GZ/B6rSSOmbzNFJwBAA==}
+  '@tauri-apps/cli-darwin-arm64@2.12.4':
+    resolution: {integrity: sha512-OxqKSckIkoJ6vX2AjifIJpTasFC0Hbdoo7gEiCmAjauABO3U8m2MRsLWe+QTiBwDx1mIrvgA+rvI7tvDnbnHVg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@tauri-apps/cli-darwin-x64@2.12.3':
-    resolution: {integrity: sha512-URd+0usfmUQQyb5kNPiKt2OT8gp7oGU7QR+qOppB6e35mpVBFFVNhWc9oWb3p0u71fDJ09DpF4T6m9xYxoIB8g==}
+  '@tauri-apps/cli-darwin-x64@2.12.4':
+    resolution: {integrity: sha512-fz76/77wMMJOaaUN6n3CybRG0P/MTEjjqYk81mGPyhi9m6Ue5T+LWBnJP/AkPooNatBPI2vtulGqomyMJ44lCQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@tauri-apps/cli-linux-arm-gnueabihf@2.12.3':
-    resolution: {integrity: sha512-0kwUVx2LbmOoTRlwF1oDww7th4/NSluv4ZBQ6KRZsFKg4g0TlTcIiJ0VehqkQYUeC9xIT1Mk6XtF52mI155VSQ==}
+  '@tauri-apps/cli-linux-arm-gnueabihf@2.12.4':
+    resolution: {integrity: sha512-K0w8Bof6Lt8QKLAYhRy0yy36ZH5iA/35VuSOvnxyjvCUZ+A3JKsUTlALviH/sVgAlisaPzzmeJSH8XOn4Q2HBA==}
     engines: {node: '>= 10'}
     cpu: [arm]
     os: [linux]
 
-  '@tauri-apps/cli-linux-arm64-gnu@2.12.3':
-    resolution: {integrity: sha512-gKSGDx6fx+HBLQmG6guChFdisbrCSdx9Yli+j5teOa64gm1CeM+C6NLru5Pj3ZkkEep05BmCFjxvX+cjqAycZQ==}
+  '@tauri-apps/cli-linux-arm64-gnu@2.12.4':
+    resolution: {integrity: sha512-j5rOnjmRUwWrm1oosf0zBYl4D+fqydgUROFCk0hvKZxvbTT8SOERes0QB7rBV/XWNy+kM6pCKzb3oSm2sRglzg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@tauri-apps/cli-linux-arm64-musl@2.12.3':
-    resolution: {integrity: sha512-Yr59qMy/gcvAfBuFdCGlAmGiLsYWMFDbsP4bAI6iNBzcJTGrYWZGeiQhGDo29MQwfF/NUBqyM2qljXu5tZ6wjQ==}
+  '@tauri-apps/cli-linux-arm64-musl@2.12.4':
+    resolution: {integrity: sha512-aOue3Fy6Jb7+oWcfAVUsVHfeTybSCt2CZoU06aO4jv4d2Ks/KnaTPwMAK3CLEduGOvBLY1lbBBrIyomqLLH5Sg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@tauri-apps/cli-linux-riscv64-gnu@2.12.3':
-    resolution: {integrity: sha512-jKr0/REBMnLKC0OwPQZkyge0mKDaNZ0b/AbfGwVyCgFfwS730EVLfVDo3nt7MUu6jJaytRq08+xSj5qfy+U1+Q==}
+  '@tauri-apps/cli-linux-riscv64-gnu@2.12.4':
+    resolution: {integrity: sha512-Fx6GShY/RvST+t6LMlTHAwd66+1tEaAAGrnU7cysVfaiRP1BKng5Vl6rVmO6rSLOA1Sp1dRzNYM4f0OWQGb7qA==}
     engines: {node: '>= 10'}
     cpu: [riscv64]
     os: [linux]
     libc: [glibc]
 
-  '@tauri-apps/cli-linux-x64-gnu@2.12.3':
-    resolution: {integrity: sha512-gTkEqJAGCMROGanxHnzaJzQ+/rXl39HWVg0/hDODS1wDWBGqoceqGC6Qm1+mQbyT11xnsB8mKu/gyVID/YpFIw==}
+  '@tauri-apps/cli-linux-x64-gnu@2.12.4':
+    resolution: {integrity: sha512-tNzZSa79Z1nRpHxEpQ38lsAFpKlFlYvoXzjTV+lRRn/zSf3wrdUC3wnLcq2XEadchPu4ttK0zivhYzr+XGD19Q==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@tauri-apps/cli-linux-x64-musl@2.12.3':
-    resolution: {integrity: sha512-T2dTxL1svRym71fZtaW4pZYXbthbfFsEJr1NeOUg/p7laWXZbUt/8DMSZf8recu9f7+1F/Lv00HtzsEu6vDO9w==}
+  '@tauri-apps/cli-linux-x64-musl@2.12.4':
+    resolution: {integrity: sha512-jmZ1pr0xEqUhuEusWtt9Yt+GF6lCnGHUmIL+KIknpbjK/XQ2qkhDBhaxK/JMHM2A8dAacVXCxXJk2EXpwhQUfA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@tauri-apps/cli-win32-arm64-msvc@2.12.3':
-    resolution: {integrity: sha512-eoiQwpEZWbpsVHcM9BAzqqe4TCHszvr3rsM7pUQ4ofLK0lF1i1d/jX0Qo5DYMqcrUtwQuDdDuOCbcT0Izf1VwQ==}
+  '@tauri-apps/cli-win32-arm64-msvc@2.12.4':
+    resolution: {integrity: sha512-fGo8pgEHZxdSYgZ/J98m1usJ7NHKmKbq7k6uT0x1rpOq6Bg2YVzzpaAblWk710f5LHYBJIL5QIFS5IrD+4gmTg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@tauri-apps/cli-win32-ia32-msvc@2.12.3':
-    resolution: {integrity: sha512-kE+KUg6Dbbkgvcw0m99wJVIToFQzJqpMBAXah74WqxaLzssNwSTUccrHp6+QVzMhjQP330tvekFmnQF+0NbE6Q==}
+  '@tauri-apps/cli-win32-ia32-msvc@2.12.4':
+    resolution: {integrity: sha512-ezl8sQIcjYsye3TUnTH5VcWmWzccZASlQm7hlZt0dYyj1XD0qpVW47u2xYVrIKui0F8uQv/7QGZixdWiClBsbg==}
     engines: {node: '>= 10'}
     cpu: [ia32]
     os: [win32]
 
-  '@tauri-apps/cli-win32-x64-msvc@2.12.3':
-    resolution: {integrity: sha512-L7wndWAgX2mLW7alswpL3d1R0P9FN2WYBgHaQkAYEBxHHGkY4vFX9CjcRQ1LAxDAMIJxrY7/aDziFJeChS84NQ==}
+  '@tauri-apps/cli-win32-x64-msvc@2.12.4':
+    resolution: {integrity: sha512-DJhDeCqjLDNMWYFy7ZS8cfeAHX2RK0RbQMLiA3bMVVkXRDJ4NBYiHriGqsUhsr9iG41aTb+dJGkFPmPw1gWwVw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
 
-  '@tauri-apps/cli@2.12.3':
-    resolution: {integrity: sha512-f7/LsY74SVb1ChmOPw1ajOpxii0GSzDAgmWHRci8JUYuuai04rXsSbFobpmB0sP2DdlvMD/B5ZotEn8GOGMRUg==}
+  '@tauri-apps/cli@2.12.4':
+    resolution: {integrity: sha512-JI9bHfudSRJikGOrjbXEm6RjzzvmKuLc+JixB1NE8hNzQkNlCCIC3pTES3uypkR9lxHrsbxzcnSwhI2IxBQphw==}
     engines: {node: '>= 10'}
     hasBin: true
 
-  '@tauri-apps/plugin-deep-link@2.6.2':
-    resolution: {integrity: sha512-uMsF1VQt1OdYq3jDGsSBlBdtbTp6o7WYFYFnjiNuLfFpBvZsdH0XnolJoSzBOlTzhroROBUys/j1y1PQqdiMZA==}
+  '@tauri-apps/plugin-deep-link@2.6.3':
+    resolution: {integrity: sha512-L+fjyGe5RPBtfh3VUSl1HslC0/xW7frDvdsZk37d9UdqOpKwD9P0PmblSk7Q/WCiAEHZ9J9Pn7VyiecBBdiy/A==}
 
-  '@tauri-apps/plugin-dialog@2.8.3':
-    resolution: {integrity: sha512-Hd/yBfk2R5v2MFrz/0VArSXeh8xKLLXGunqSiTtcHKn1zNZwaKujuA0VSwUvNfwC4hDoF1PveS+gBDNe3nHspw==}
+  '@tauri-apps/plugin-dialog@2.8.4':
+    resolution: {integrity: sha512-+6ZOiXenOaxXwb8qCbBPdT2jX2cFPaVVHGIskrpmJLpmWj+qKRTD6X/z9x7hTdSQn7NedcoXCkWGej4a7dC4lw==}
 
   '@tauri-apps/plugin-http@2.8.3':
     resolution: {integrity: sha512-MrgCnnxSnzxkMX+Tk1XXB8rSI9hfhUHQmtbn0EpflEDcSx04K1BDfrv51tcK27SCuU/B1j8sNHL0UZur/1iqKA==}
@@ -2819,8 +2820,8 @@ packages:
   '@tauri-apps/plugin-process@2.4.0':
     resolution: {integrity: sha512-GddrmsSLAYrLa/yTXlXK/YRDzUgYeeOnUXTbiyvJWkmI424RmDPD3FVLeqcon7rv6O6ZfhBilcrHWnSo7o6hIQ==}
 
-  '@tauri-apps/plugin-updater@2.14.0':
-    resolution: {integrity: sha512-gdylJ9tger4hkyOn24QZd6MNOKVo2Eh53iw5th2Qj1vKTR/+u4PIwJWuiis5hohYvobn6iOvlnALfrqIPSzh7Q==}
+  '@tauri-apps/plugin-updater@2.14.1':
+    resolution: {integrity: sha512-Hr7nlBm1wT6xbwzjZ/S36YULazu8MNlj5vvOwMl47fXI7HTa5Bjl1PbDEwVHaZTAKzE1VZsUy35UqnbrQxmYQw==}
 
   '@topcli/prompts@4.0.0':
     resolution: {integrity: sha512-kkKYPb4k/6kRdnESt77B5vJrrYnYHIYczwv0P1c+tfN/IWEx3KZeKEHoUq7sImIyBEXWdA2uakIroD9pmRJziQ==}
@@ -3114,8 +3115,8 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
-  ai@7.0.153:
-    resolution: {integrity: sha512-Ib8v374jWn9FXsjADXodRaP7fsMutlmPsbTLT5gYBDyadFcF9XxfYX1CSSxgSvE1r06MmOeYVwvQjFb3CcBi1Q==}
+  ai@7.0.159:
+    resolution: {integrity: sha512-4e/BwDoKJlMNYZaqERcTbGte+4TwroN9qKnCprog/XVfD9InzVPlhCviDhN452JIRrRsYg9BT0WsQ2C3Ds2mVQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -6636,47 +6637,47 @@ snapshots:
       defu: 6.1.7
       many-keys-map: 3.0.3
 
-  '@ai-sdk/anthropic@4.0.88(zod@4.6.7)':
+  '@ai-sdk/anthropic@4.0.94(zod@4.6.7)':
     dependencies:
-      '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.68(zod@4.6.7)
+      '@ai-sdk/provider': 4.0.35
+      '@ai-sdk/provider-utils': 5.0.72(zod@4.6.7)
       zod: 4.6.7
 
-  '@ai-sdk/gateway@4.0.126(zod@4.6.7)':
+  '@ai-sdk/gateway@4.0.132(zod@4.6.7)':
     dependencies:
-      '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.68(zod@4.6.7)
+      '@ai-sdk/provider': 4.0.35
+      '@ai-sdk/provider-utils': 5.0.72(zod@4.6.7)
       '@vercel/oidc': 3.2.0
       zod: 4.6.7
 
-  '@ai-sdk/google@4.0.105(zod@4.6.7)':
+  '@ai-sdk/google@4.0.109(zod@4.6.7)':
     dependencies:
-      '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.68(zod@4.6.7)
+      '@ai-sdk/provider': 4.0.35
+      '@ai-sdk/provider-utils': 5.0.72(zod@4.6.7)
       zod: 4.6.7
 
-  '@ai-sdk/openai-compatible@3.0.78(zod@4.6.7)':
+  '@ai-sdk/openai-compatible@3.0.82(zod@4.6.7)':
     dependencies:
-      '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.68(zod@4.6.7)
+      '@ai-sdk/provider': 4.0.35
+      '@ai-sdk/provider-utils': 5.0.72(zod@4.6.7)
       zod: 4.6.7
 
-  '@ai-sdk/openai@4.0.102(zod@4.6.7)':
+  '@ai-sdk/openai@4.0.106(zod@4.6.7)':
     dependencies:
-      '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.68(zod@4.6.7)
+      '@ai-sdk/provider': 4.0.35
+      '@ai-sdk/provider-utils': 5.0.72(zod@4.6.7)
       zod: 4.6.7
 
-  '@ai-sdk/provider-utils@5.0.68(zod@4.6.7)':
+  '@ai-sdk/provider-utils@5.0.72(zod@4.6.7)':
     dependencies:
-      '@ai-sdk/provider': 4.0.34
+      '@ai-sdk/provider': 4.0.35
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.0
       undici: 7.30.1
       zod: 4.6.7
 
-  '@ai-sdk/provider@4.0.34':
+  '@ai-sdk/provider@4.0.35':
     dependencies:
       json-schema: 0.4.0
 
@@ -6693,7 +6694,7 @@ snapshots:
 
   '@aria-ui/core@0.2.1':
     dependencies:
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       '@zag-js/dom-query': 1.46.0
       alien-signals: 3.2.1
       server-dom-shim: 1.1.0
@@ -7221,6 +7222,8 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.2': {}
 
+  '@date-fns/utc@2.1.1': {}
+
   '@dnd-kit/accessibility@3.1.1(react@19.3.1)':
     dependencies:
       react: 19.3.1
@@ -7726,7 +7729,7 @@ snapshots:
       '@lezer/highlight': 1.2.5
       '@meowdown/embed': 0.3.1(typescript@6.0.3)
       '@meowdown/markdown': 0.78.0(typescript@6.0.3)
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       '@post-embed/exporter': 0.5.0(typescript@6.0.3)
       '@post-embed/schema': 0.5.2(typescript@6.0.3)
       '@post-embed/types': 0.5.0
@@ -7786,13 +7789,13 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@meowdown/react@0.82.2(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)':
+  '@meowdown/react@0.82.3(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(@types/react@19.3.0)(date-fns@4.4.0)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(react-dom@19.3.1)(react@19.3.1)(supports-color@8.1.1)(typescript@6.0.3)':
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.3.0)(date-fns@4.4.0)(react-dom@19.3.1)(react@19.3.1)
       '@meowdown/core': 0.83.0(@lezer/common@1.5.4)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)(supports-color@8.1.1)(typescript@6.0.3)
       '@meowdown/embed': 0.3.1(typescript@6.0.3)
       '@meowdown/markdown': 0.78.0(typescript@6.0.3)
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       '@post-embed/types': 0.5.0
       '@prosekit/core': 0.13.4(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)
       '@prosekit/pm': 0.1.21
@@ -7907,7 +7910,7 @@ snapshots:
 
   '@ocavue/tsconfig@0.7.1': {}
 
-  '@ocavue/utils@1.9.0': {}
+  '@ocavue/utils@1.11.0': {}
 
   '@opentelemetry/api@1.9.1':
     optional: true
@@ -8270,7 +8273,7 @@ snapshots:
 
   '@post-embed/exporter@0.5.0(typescript@6.0.3)':
     dependencies:
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       '@post-embed/schema': 0.5.2(typescript@6.0.3)
       '@post-embed/types': 0.5.0
       '@standard-schema/spec': 1.1.0
@@ -8293,7 +8296,7 @@ snapshots:
 
   '@prosekit/core@0.13.4(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)':
     dependencies:
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       '@prosekit/pm': 0.1.21
       orderedmap: 2.1.1
       prosemirror-splittable: 1.1.0(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)
@@ -8305,7 +8308,7 @@ snapshots:
 
   '@prosekit/extensions@0.18.5(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)':
     dependencies:
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       '@prosekit/core': 0.13.4(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)
       '@prosekit/pm': 0.1.21
       prosemirror-changeset: 2.4.4
@@ -8379,7 +8382,7 @@ snapshots:
       '@aria-ui/elements': 0.2.0
       '@aria-ui/utils': 0.1.8
       '@floating-ui/dom': 1.8.0
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       '@prosekit/core': 0.13.4(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)
       '@prosekit/extensions': 0.18.5(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@shikijs/types@4.5.0)(@types/hast@3.0.5)(prosemirror-model@1.25.12)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.4)(prosemirror-view@1.42.8)
       '@prosekit/pm': 0.1.21
@@ -8404,7 +8407,7 @@ snapshots:
 
   '@prosemirror-adapter/core@0.5.5':
     dependencies:
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       prosemirror-model: 1.25.12
       prosemirror-state: 1.4.4
       prosemirror-view: 1.42.8
@@ -8869,58 +8872,58 @@ snapshots:
 
   '@tauri-apps/api@2.12.4': {}
 
-  '@tauri-apps/cli-darwin-arm64@2.12.3':
+  '@tauri-apps/cli-darwin-arm64@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-darwin-x64@2.12.3':
+  '@tauri-apps/cli-darwin-x64@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-linux-arm-gnueabihf@2.12.3':
+  '@tauri-apps/cli-linux-arm-gnueabihf@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-linux-arm64-gnu@2.12.3':
+  '@tauri-apps/cli-linux-arm64-gnu@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-linux-arm64-musl@2.12.3':
+  '@tauri-apps/cli-linux-arm64-musl@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-linux-riscv64-gnu@2.12.3':
+  '@tauri-apps/cli-linux-riscv64-gnu@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-linux-x64-gnu@2.12.3':
+  '@tauri-apps/cli-linux-x64-gnu@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-linux-x64-musl@2.12.3':
+  '@tauri-apps/cli-linux-x64-musl@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-win32-arm64-msvc@2.12.3':
+  '@tauri-apps/cli-win32-arm64-msvc@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-win32-ia32-msvc@2.12.3':
+  '@tauri-apps/cli-win32-ia32-msvc@2.12.4':
     optional: true
 
-  '@tauri-apps/cli-win32-x64-msvc@2.12.3':
+  '@tauri-apps/cli-win32-x64-msvc@2.12.4':
     optional: true
 
-  '@tauri-apps/cli@2.12.3':
+  '@tauri-apps/cli@2.12.4':
     optionalDependencies:
-      '@tauri-apps/cli-darwin-arm64': 2.12.3
-      '@tauri-apps/cli-darwin-x64': 2.12.3
-      '@tauri-apps/cli-linux-arm-gnueabihf': 2.12.3
-      '@tauri-apps/cli-linux-arm64-gnu': 2.12.3
-      '@tauri-apps/cli-linux-arm64-musl': 2.12.3
-      '@tauri-apps/cli-linux-riscv64-gnu': 2.12.3
-      '@tauri-apps/cli-linux-x64-gnu': 2.12.3
-      '@tauri-apps/cli-linux-x64-musl': 2.12.3
-      '@tauri-apps/cli-win32-arm64-msvc': 2.12.3
-      '@tauri-apps/cli-win32-ia32-msvc': 2.12.3
-      '@tauri-apps/cli-win32-x64-msvc': 2.12.3
+      '@tauri-apps/cli-darwin-arm64': 2.12.4
+      '@tauri-apps/cli-darwin-x64': 2.12.4
+      '@tauri-apps/cli-linux-arm-gnueabihf': 2.12.4
+      '@tauri-apps/cli-linux-arm64-gnu': 2.12.4
+      '@tauri-apps/cli-linux-arm64-musl': 2.12.4
+      '@tauri-apps/cli-linux-riscv64-gnu': 2.12.4
+      '@tauri-apps/cli-linux-x64-gnu': 2.12.4
+      '@tauri-apps/cli-linux-x64-musl': 2.12.4
+      '@tauri-apps/cli-win32-arm64-msvc': 2.12.4
+      '@tauri-apps/cli-win32-ia32-msvc': 2.12.4
+      '@tauri-apps/cli-win32-x64-msvc': 2.12.4
 
-  '@tauri-apps/plugin-deep-link@2.6.2':
+  '@tauri-apps/plugin-deep-link@2.6.3':
     dependencies:
       '@tauri-apps/api': 2.12.4
 
-  '@tauri-apps/plugin-dialog@2.8.3':
+  '@tauri-apps/plugin-dialog@2.8.4':
     dependencies:
       '@tauri-apps/api': 2.12.4
 
@@ -8940,7 +8943,7 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.12.4
 
-  '@tauri-apps/plugin-updater@2.14.0':
+  '@tauri-apps/plugin-updater@2.14.1':
     dependencies:
       '@tauri-apps/api': 2.12.4
 
@@ -9304,11 +9307,11 @@ snapshots:
 
   acorn@8.17.0: {}
 
-  ai@7.0.153(zod@4.6.7):
+  ai@7.0.159(zod@4.6.7):
     dependencies:
-      '@ai-sdk/gateway': 4.0.126(zod@4.6.7)
-      '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.68(zod@4.6.7)
+      '@ai-sdk/gateway': 4.0.132(zod@4.6.7)
+      '@ai-sdk/provider': 4.0.35
+      '@ai-sdk/provider-utils': 5.0.72(zod@4.6.7)
       zod: 4.6.7
 
   ajv-formats@2.1.1:
@@ -11857,7 +11860,7 @@ snapshots:
 
   prosemirror-drop-indicator@0.1.4:
     dependencies:
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       prosemirror-model: 1.25.12
       prosemirror-state: 1.4.4
       prosemirror-view: 1.42.8
@@ -11923,7 +11926,7 @@ snapshots:
 
   prosemirror-math@0.2.2:
     dependencies:
-      '@ocavue/utils': 1.9.0
+      '@ocavue/utils': 1.11.0
       prosemirror-enter-rules: 0.1.6
       prosemirror-inputrules: 1.5.1
       prosemirror-model: 1.25.12

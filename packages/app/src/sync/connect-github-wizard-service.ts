@@ -3,11 +3,13 @@ import {
   githubAppInstallUrl,
   newRepoUrl,
   parseRepoInput,
+  WritableStore,
   type GithubConnector,
   type ClockService,
   type GithubRepoRef,
   type GithubAuthService,
   type GithubUser,
+  type Store,
   type TimerHandle,
   type Unlisten,
 } from '@reflect/core'
@@ -97,9 +99,7 @@ export interface ConnectGithubWizardState {
  * the install already covers connects with no detour. PAT users reach repos
  * by token scope, not an installation, so they get token-scope guidance.
  */
-export interface ConnectGithubWizardService {
-  getState: () => ConnectGithubWizardState
-  subscribe: (listener: () => void) => Unlisten
+export interface ConnectGithubWizardService extends Store<ConnectGithubWizardState> {
   /**
    * Mount the wizard: the repo-existence poll only runs between this call
    * and the returned function. Detaching cancels future ticks but not one
@@ -167,9 +167,8 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
   readonly #deps: ConnectGithubWizardDeps
   readonly #options: ConnectGithubWizardOptions
   readonly #pollIntervalMs: number
-  readonly #listeners = new Set<() => void>()
   #fields: WizardFields
-  #state: ConnectGithubWizardState
+  readonly #state: WritableStore<ConnectGithubWizardState>
   #attached = 0
   #stopPoll: (() => void) | null = null
 
@@ -190,20 +189,16 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
       pending: false,
       error: null,
     }
-    this.#state = this.#derive()
+    this.#state = new WritableStore(this.#derive())
   }
 
-  readonly getState = (): ConnectGithubWizardState => this.#state
+  readonly get = (): ConnectGithubWizardState => this.#state.get()
 
-  readonly subscribe = (listener: () => void): Unlisten => {
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
     // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (): void => {
+    return this.#state.subscribe(() => {
       listener()
-    }
-    this.#listeners.add(deliver)
-    return () => {
-      this.#listeners.delete(deliver)
-    }
+    })
   }
 
   attach(): Unlisten {
@@ -445,11 +440,9 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
 
   #patch(next: Partial<WizardFields>): void {
     this.#fields = { ...this.#fields, ...next }
-    this.#state = this.#derive()
+    const state = this.#derive()
     this.#syncPoll()
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(state)
   }
 
   /**

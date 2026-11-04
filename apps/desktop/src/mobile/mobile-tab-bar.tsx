@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef, type ReactElement } from 'react'
-import { CircleCheck, Files, MessageSquare, SquarePen } from 'lucide-react'
+import { CircleCheck, Files, SquarePen } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import type { Route } from '@/routing/route.ts'
+import type { Route } from '@reflect/app'
 
-export type MobileTab = 'daily' | 'all' | 'tasks' | 'chat'
+export type MobileTab = 'daily' | 'all' | 'tasks'
 
 /** The tab whose root screen a route shows, or `null` for stacked screens. */
 export function tabRootFor(route: Route): MobileTab | null {
@@ -18,8 +18,6 @@ export function tabRootFor(route: Route): MobileTab | null {
       return 'all'
     case 'tasks':
       return 'tasks'
-    case 'chat':
-      return 'chat'
     default:
       return null
   }
@@ -32,8 +30,9 @@ interface MobileTabBarProps {
 
 /**
  * The V1-parity bottom tab bar: Daily (the chronological spine), All
- * (every note + search), and Tasks (every open checkbox, grouped). It sits at
- * the very bottom of the shell. In V1 the
+ * (every note + search), and Tasks (every open checkbox, grouped). Chat is
+ * not a tab: it is a stacked screen reached from All, where asking sits next
+ * to searching. The bar sits at the very bottom of the shell. In V1 the
  * software keyboard simply covered it; the shell root now ends at the
  * keyboard's top, so the shell hides the bar while the keyboard is up to
  * keep that behavior.
@@ -88,12 +87,6 @@ export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement
         icon={<CircleCheck className="size-5" />}
         active={tab === 'tasks'}
         onClick={() => onSelect('tasks')}
-      />
-      <TabButton
-        label="Chat"
-        icon={<MessageSquare className="size-5" />}
-        active={tab === 'chat'}
-        onClick={() => onSelect('chat')}
       />
     </nav>
   )

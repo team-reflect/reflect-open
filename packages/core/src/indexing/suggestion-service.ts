@@ -16,8 +16,6 @@ import {
   type WikiSuggestion,
 } from './suggest.ts'
 
-export type { WikiLinkSuggestionResult } from './queries-shared.ts'
-
 /**
  * How many ranked-in-SQL rows each candidate query hands to the in-memory ranker.
  */

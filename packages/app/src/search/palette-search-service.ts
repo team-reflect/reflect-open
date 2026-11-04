@@ -1,6 +1,5 @@
 import {
   dateFromDailyPath,
-  localIsoDate,
   parseSearchQuery,
   updatedPresetFilter,
   type ClockService,
@@ -48,12 +47,6 @@ export interface PaletteSectionsInput {
  */
 export interface PaletteSearchService<Context = unknown> {
   /**
-   * Today's local calendar date as `YYYY-MM-DD`, read from the wall clock.
-   * The generated date suggestions are relative to it, so callers that cache
-   * {@link suggestTitles} make it part of the cache identity.
-   */
-  today(): string
-  /**
    * Title suggestions for `text` (at most 8), generated date phrases merged in.
    */
   suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]>
@@ -88,10 +81,6 @@ class PaletteSearchServiceImpl<Context> implements PaletteSearchService<Context>
 
   constructor(deps: PaletteSearchServiceDeps<Context>) {
     this.#deps = deps
-  }
-
-  today(): string {
-    return localIsoDate(new Date(this.#deps.clock.now()))
   }
 
   async suggestTitles(text: string, dateContext: DateSuggestionContext): Promise<WikiSuggestion[]> {

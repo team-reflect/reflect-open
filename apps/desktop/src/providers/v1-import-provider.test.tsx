@@ -10,6 +10,7 @@ import {
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { useV1Import, V1ImportProvider } from './v1-import-provider.tsx'
 
 const GRAPH: GraphInfo = { root: '/graphs/notes', name: 'Notes', generation: 42 }
@@ -28,7 +29,8 @@ function summary(overrides: Partial<GraphImportSummary> = {}): GraphImportSummar
 }
 
 function Probe(): ReactElement {
-  const { state, startImport } = useV1Import()
+  const { service, startImport } = useV1Import()
+  const state = useStore(service)
   return (
     <button type="button" onClick={() => startImport('/tmp/reflect-v1.zip')}>
       start ({state.phase})

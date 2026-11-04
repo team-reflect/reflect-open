@@ -1,18 +1,16 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { Command } from 'cmdk'
-import { displayNoteTitle, parseHighlights } from '@reflect/core'
 import { CalendarDays, FileText } from 'lucide-react'
 import { getIsComposing, isModEvent } from '@meowdown/core'
 import { Kbd } from '@/components/kbd.tsx'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
-import { formatDayLabel } from '@/lib/dates.ts'
+import { displayNoteTitle, parseHighlights, formatDayLabel } from '@reflect/core'
+import { routeForPath, type NoteEntry } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
-import { routeForPath } from '@/routing/route.ts'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons.ts'
-import type { NoteEntry } from './entries.ts'
 import { NotePreview } from './note-preview.tsx'
 import { usePalette } from './palette-provider.tsx'
 import { usePaletteResults } from './use-palette-results.ts'
@@ -57,7 +55,7 @@ interface PendingNoteOpen {
 
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
   const { open, query, setQuery, closePalette } = usePalette()
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
   const navigateNoteLink = useNoteLinkNavigation()
   // cmdk's `onSelect` exposes only the selected value, not its originating
@@ -224,12 +222,12 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                               {entry.phrase !== null
                                 ? entry.phrase
                                 : entry.date !== null
-                                  ? formatDayLabel(entry.date, settings.dateFormat)
+                                  ? formatDayLabel(entry.date, dateFormat)
                                   : displayNoteTitle(entry.title)}
                             </span>
                             {entry.phrase !== null && entry.date !== null ? (
                               <span className="block truncate text-xs text-text-muted">
-                                {formatDayLabel(entry.date, settings.dateFormat)}
+                                {formatDayLabel(entry.date, dateFormat)}
                               </span>
                             ) : null}
                             {entry.alias !== null ? (
@@ -283,7 +281,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                   // A stable key keeps the preview pane mounted as the highlight
                   // moves between results (↑/↓): the entry prop updates and the
                   // query refetches by its own path-scoped key, so an arrow-key
-                  // press no longer unmounts/remounts the whole preview subtree.
+                  // press does not remount the preview subtree.
                   <NotePreview key="note-preview" entry={selectedNote} />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-text-muted">

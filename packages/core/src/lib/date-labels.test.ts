@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest'
+import {
+  formatDayLabel,
+  formatFullDate,
+  formatMonthDay,
+  formatRecencyLabel,
+  formatShortDate,
+  formatTimeOfDay,
+} from './date-labels.ts'
+
+describe('date labels', () => {
+  it('formatDayLabel renders the V1 daily-subject format per the date format', () => {
+    expect(formatDayLabel('2026-06-09', 'mdy')).toBe('Tue, June 9th, 2026')
+    expect(formatDayLabel('2026-06-09', 'dmy')).toBe('Tue, 9th June, 2026')
+    expect(formatDayLabel('2026-06-09', 'iso')).toBe('2026-06-09')
+    expect(formatDayLabel('2026-05-31', 'mdy')).toBe('Sun, May 31st, 2026')
+  })
+
+  it('renders the calendar day of the date key in any time zone', () => {
+    // `Pacific/Apia` had no local 2011-12-30.
+    expect(formatDayLabel('2011-12-30', 'mdy')).toBe('Fri, December 30th, 2011')
+    expect(formatDayLabel('2011-12-30', 'dmy')).toBe('Fri, 30th December, 2011')
+    expect(formatDayLabel('2011-12-30', 'iso')).toBe('2011-12-30')
+    expect(formatShortDate('2011-12-30', 'iso')).toBe('2011-12-30')
+    expect(formatMonthDay('2011-12-30', 'iso')).toBe('2011-12-30')
+  })
+
+  it('formatFullDate spells the date out per the date format', () => {
+    expect(formatFullDate(new Date(2026, 5, 10), 'mdy')).toBe('June 10th, 2026')
+    expect(formatFullDate(new Date(2026, 5, 10), 'dmy')).toBe('10th June, 2026')
+    expect(formatFullDate(new Date(2026, 5, 10), 'iso')).toBe('2026-06-10')
+    expect(formatFullDate(new Date(2026, 0, 1), 'mdy')).toBe('January 1st, 2026')
+    expect(formatFullDate(new Date(2026, 0, 22), 'dmy')).toBe('22nd January, 2026')
+  })
+
+  it('formatShortDate renders compact dates per the date format', () => {
+    expect(formatShortDate('2026-06-09', 'mdy')).toBe('6/9/2026')
+    expect(formatShortDate('2026-06-09', 'dmy')).toBe('9/6/2026')
+    expect(formatShortDate('2026-06-09', 'iso')).toBe('2026-06-09')
+  })
+
+  it('renders a date-shaped string that names no real day as itself', () => {
+    expect(formatDayLabel('2026-13-45', 'mdy')).toBe('2026-13-45')
+    expect(formatShortDate('2026-02-31', 'dmy')).toBe('2026-02-31')
+    expect(formatMonthDay('2026-13-45', 'mdy')).toBe('2026-13-45')
+  })
+
+  it('formatMonthDay drops the year per the date format', () => {
+    expect(formatMonthDay('2026-06-09', 'mdy')).toBe('Jun 9')
+    expect(formatMonthDay('2026-06-09', 'dmy')).toBe('9 Jun')
+    expect(formatMonthDay('2026-06-09', 'iso')).toBe('2026-06-09')
+  })
+
+  describe('formatTimeOfDay', () => {
+    it('renders 12-hour times with lowercase am/pm', () => {
+      expect(formatTimeOfDay(new Date(2026, 5, 10, 20, 22), '12h')).toBe('8:22pm')
+      expect(formatTimeOfDay(new Date(2026, 5, 10, 9, 5), '12h')).toBe('9:05am')
+      expect(formatTimeOfDay(new Date(2026, 5, 10, 0, 0), '12h')).toBe('12:00am')
+    })
+
+    it('renders 24-hour times zero-padded', () => {
+      expect(formatTimeOfDay(new Date(2026, 5, 10, 20, 22), '24h')).toBe('20:22')
+      expect(formatTimeOfDay(new Date(2026, 5, 10, 9, 5), '24h')).toBe('09:05')
+      expect(formatTimeOfDay(new Date(2026, 5, 10, 0, 0), '24h')).toBe('00:00')
+    })
+  })
+
+  describe('formatRecencyLabel', () => {
+    // Wednesday, June 10 2026, 9:00pm local.
+    const now = new Date(2026, 5, 10, 21, 0)
+    const mdy = { timeFormat: '12h', dateFormat: 'mdy' } as const
+    const dmy = { timeFormat: '24h', dateFormat: 'dmy' } as const
+    const iso = { timeFormat: '24h', dateFormat: 'iso' } as const
+
+    it('shows the time for a timestamp today, honoring the time format', () => {
+      expect(formatRecencyLabel(new Date(2026, 5, 10, 20, 22).getTime(), mdy, now)).toBe('8:22pm')
+      expect(formatRecencyLabel(new Date(2026, 5, 10, 9, 5).getTime(), mdy, now)).toBe('9:05am')
+      expect(formatRecencyLabel(new Date(2026, 5, 10, 20, 22).getTime(), dmy, now)).toBe('20:22')
+      expect(formatRecencyLabel(new Date(2026, 5, 10, 9, 5).getTime(), dmy, now)).toBe('09:05')
+    })
+
+    it('shows the weekday within the current week', () => {
+      expect(formatRecencyLabel(new Date(2026, 5, 8, 13, 0).getTime(), mdy, now)).toBe('Mon')
+      expect(formatRecencyLabel(new Date(2026, 5, 8, 13, 0).getTime(), dmy, now)).toBe('Mon')
+      expect(formatRecencyLabel(new Date(2026, 5, 8, 13, 0).getTime(), iso, now)).toBe('Mon')
+    })
+
+    it('shows the short date beyond the current week, honoring the date format', () => {
+      expect(formatRecencyLabel(new Date(2026, 5, 3, 13, 0).getTime(), mdy, now)).toBe('6/3/2026')
+      expect(formatRecencyLabel(new Date(2026, 5, 3, 13, 0).getTime(), dmy, now)).toBe('3/6/2026')
+      expect(formatRecencyLabel(new Date(2026, 5, 3, 13, 0).getTime(), iso, now)).toBe('2026-06-03')
+      expect(formatRecencyLabel(new Date(2025, 11, 31, 13, 0).getTime(), mdy, now)).toBe(
+        '12/31/2025',
+      )
+      expect(formatRecencyLabel(new Date(2025, 11, 31, 13, 0).getTime(), dmy, now)).toBe(
+        '31/12/2025',
+      )
+    })
+  })
+})

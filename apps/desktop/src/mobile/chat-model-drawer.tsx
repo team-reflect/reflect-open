@@ -1,8 +1,8 @@
 import { useMemo, type ReactElement } from 'react'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { groupModelOptions } from '@/lib/chat-model-groups.ts'
 import { SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
-import { useChatSession } from '@/providers/chat-provider.tsx'
+import { useChatActions, useChatModels } from '@/providers/chat-provider.tsx'
 
 interface ChatModelDrawerProps {
   open: boolean
@@ -16,7 +16,8 @@ interface ChatModelDrawerProps {
  * `selectModel` (the same `chatModelSelection` settings key) and closes.
  */
 export function ChatModelDrawer({ open, onOpenChange }: ChatModelDrawerProps): ReactElement {
-  const { providers, modelOptions, activeModel, selectModel } = useChatSession()
+  const { providers, modelOptions, activeModel } = useChatModels()
+  const { selectModel } = useChatActions()
   const groups = useMemo(
     () => groupModelOptions(modelOptions, providers),
     [modelOptions, providers],

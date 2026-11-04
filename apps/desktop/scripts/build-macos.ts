@@ -23,6 +23,7 @@ import { parseArgs } from 'node:util'
 import { apply as applyMergePatch } from 'tiny-merge-patch'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
+import packageJson from '../package.json' with { type: 'json' }
 import {
   assertDsyms,
   assertSentryDsn,
@@ -31,7 +32,6 @@ import {
   getHostTriple,
   INHERIT,
   log,
-  readAppVersion,
   resolveApiKey,
   runTauri,
   runWithTempDir,
@@ -123,7 +123,7 @@ function resolveBundle(target: string): Bundle {
     throw new Error(`unsupported target "${target}"`)
   }
   const { productName, identifier, bundle } = readTauriConfig()
-  const version = readAppVersion()
+  const version = packageJson.version
   const bundleDir = join(TARGET_DIR, target, 'release', 'bundle')
   const app = join(bundleDir, 'macos', `${productName}.app`)
   const macosDir = join(app, 'Contents', 'MacOS')

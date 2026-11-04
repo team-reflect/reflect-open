@@ -1,9 +1,8 @@
 import { useState, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import type { CalendarEvent } from '@reflect/core'
-import { formatTimeOfDay } from '@/lib/dates.ts'
+import { type CalendarEvent, formatTimeOfDay } from '@reflect/core'
 import { useCalendarChangeInvalidation, useDayEvents } from '@/lib/use-calendar.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useCalendarEnabled, useTimeFormat } from '@/providers/settings-provider.tsx'
 import { AddMeetingDialog } from './add-meeting-dialog.tsx'
 import { SidebarSection } from './sidebar-section.tsx'
 
@@ -21,8 +20,9 @@ interface DailyEventsSectionProps {
  * events — an empty box would just advertise an absent feature.
  */
 export function DailyEventsSection({ date }: DailyEventsSectionProps): ReactElement | null {
-  const { settings } = useSettings()
-  useCalendarChangeInvalidation(settings.calendarEnabled)
+  const calendarEnabled = useCalendarEnabled()
+  const timeFormat = useTimeFormat()
+  useCalendarChangeInvalidation(calendarEnabled)
   const events = useDayEvents(date)
   const [pendingEvent, setPendingEvent] = useState<CalendarEvent | null>(null)
 
@@ -45,7 +45,7 @@ export function DailyEventsSection({ date }: DailyEventsSectionProps): ReactElem
                 {event.title}
               </span>
               <span className="flex-none text-xs tabular-nums text-text-muted">
-                {formatTimeOfDay(new Date(event.startsAt), settings.timeFormat)}
+                {formatTimeOfDay(new Date(event.startsAt), timeFormat)}
               </span>
               <span
                 aria-hidden

@@ -36,7 +36,7 @@ describe('DeepLinkIntakeService.resolve', () => {
       date: '2026-07-01',
     })
     expect(resolveNoteTarget).not.toHaveBeenCalled()
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('resolves a note target to its path', async () => {
@@ -83,7 +83,7 @@ describe('DeepLinkIntakeService.resolve', () => {
     rejectResolve(new Error('old index disappeared'))
 
     await expect(pending).resolves.toEqual({ kind: 'none' })
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('drops a resolution that finished after the link became stale', async () => {
@@ -97,7 +97,7 @@ describe('DeepLinkIntakeService.resolve', () => {
     pendingResolve.resolve('notes/project-x.md')
 
     await expect(pending).resolves.toEqual({ kind: 'none' })
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('surfaces a failure on a URL the grammar rejects', async () => {
@@ -130,12 +130,12 @@ describe('DeepLinkIntakeService.resolve', () => {
     expect(envelope.capturedAt).toBe('2026-07-01T12:00:00.000Z')
     expect(generation).toBe(3)
     expect(progress.started()).toMatchObject([{ label: 'Added to today', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('spools into the given graph session', async () => {
     const { service, graphSession, captureInbox } = setup()
-    const pinned = graphSession.getState().session
+    const pinned = graphSession.get().session
     graphSession.setGraph({ generation: 8 })
 
     await service.resolve('reflect://append?text=milk', { session: pinned })
@@ -152,7 +152,7 @@ describe('DeepLinkIntakeService.resolve', () => {
     expect(envelope.kind).toBe('task')
     expect(envelope.text).toBe('buy milk')
     expect(progress.started()).toMatchObject([{ label: 'Task added to today', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('spools a checkbox envelope for a checkbox link', async () => {
@@ -164,7 +164,7 @@ describe('DeepLinkIntakeService.resolve', () => {
     expect(envelope.kind).toBe('checkbox')
     expect(envelope.text).toBe('pack a bag')
     expect(progress.started()).toMatchObject([{ label: 'Checkbox added to today', ended: true }])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('surfaces a capture with no graph open instead of spooling it', async () => {

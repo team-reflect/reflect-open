@@ -22,6 +22,7 @@ import type {
 } from '../indexing/index-lifecycle-service.ts'
 import { buildIndexedNote } from '../indexing/indexed-note.ts'
 import type { SnippetTask } from '../indexing/snippet-tasks.ts'
+import { WritableStore } from '../store.ts'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
 import {
   createNodeTestDatabaseService,
@@ -92,29 +93,6 @@ let reconciledListeners: Set<(event: IndexReconciledEvent) => MaybePromise<void>
 
 const openGraph = createGraphSession({ root: '/g', name: 'g', generation: 7, indexGeneration: 1 })
 
-/**
- * A graph session source over `read`, plus a way to report a switch to its subscribers.
- */
-function sessionSource(read: () => GraphSession | null): TaskServiceDeps['graphSession'] & {
-  notify: () => void
-} {
-  const listeners = new Set<() => void>()
-  return {
-    getState: () => ({ session: read() }),
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    notify: () => {
-      for (const listener of listeners) {
-        listener()
-      }
-    },
-  }
-}
-
 function createTasks(
   graphSession: TaskServiceDeps['graphSession'],
   role: TaskServiceDeps['role'] = 'main',
@@ -169,7 +147,7 @@ beforeEach(() => {
   logger = createTestLoggerService()
   appliedListeners = new Set()
   reconciledListeners = new Set()
-  tasks = createTasks(sessionSource(() => openGraph))
+  tasks = createTasks(new WritableStore({ session: openGraph }))
 })
 
 const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -578,7 +556,7 @@ describe('snippet tasks', () => {
     expect(
       tasks.resolveSnippetTask(anchors, { index: 1, checked: false, text: 'square box' }),
     ).toBe(anchors[1])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('refuses a drifted click and reports it', () => {
@@ -590,7 +568,7 @@ describe('snippet tasks', () => {
       tasks.resolveSnippetTask(anchors, { index: 9, checked: false, text: 'do it' }),
     ).toBeNull()
     expect(
-      progress.getAll().map((operation) => [operation.label, operation.status, operation.message]),
+      progress.get().map((operation) => [operation.label, operation.status, operation.message]),
     ).toEqual([
       ['Updating task', 'failed', 'The note has changed — try again in a moment.'],
       ['Updating task', 'failed', 'The note has changed — try again in a moment.'],
@@ -605,7 +583,7 @@ describe('snippet tasks', () => {
       checked: false,
     })
     expect(noteFile.getWrites('notes/a.md')).toEqual(['+ [x] do it\n'])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('reports a failed toggle, labelled for its direction, and rethrows', async () => {
@@ -623,29 +601,33 @@ describe('snippet tasks', () => {
 describe('no graph open', () => {
   it('rejects writes and skips snippet toggles', async () => {
     noteFile.set('notes/a.md', '+ [ ] do it\n')
-    const closed = createTasks(sessionSource(() => null))
+    const closed = createTasks(new WritableStore({ session: null }))
 
     await expect(closed.writeTask(task, [{ kind: 'toggle' }])).rejects.toThrow('No graph is open.')
     await closed.toggleSnippetTask('notes/a.md', { locator: task, checked: false })
     expect(noteFile.writes()).toEqual([])
-    expect(progress.getAll()).toEqual([])
+    expect(progress.get()).toEqual([])
   })
 
   it('stops a batch once its graph is replaced', async () => {
     noteFile.set('notes/a.md', '+ [ ] one\n+ [ ] two\n')
     const controller = new AbortController()
-    let session = createGraphSession(
-      { root: '/g', name: 'g', generation: 7, indexGeneration: 1 },
-      controller.signal,
-    )
-    const switching = createTasks(sessionSource(() => session))
+    const source = new WritableStore<{ session: GraphSession | null }>({
+      session: createGraphSession(
+        { root: '/g', name: 'g', generation: 7, indexGeneration: 1 },
+        controller.signal,
+      ),
+    })
+    const switching = createTasks(source)
     const one = makeOpenTask({ notePath: 'notes/a.md', astPath: [0], markdown: 'one' })
     const two = makeOpenTask({ notePath: 'notes/a.md', astPath: [1], markdown: 'two' })
     const writeTask = switching.writeTask.bind(switching)
     vi.spyOn(switching, 'writeTask').mockImplementation(async (task, actions) => {
       const result = await writeTask(task, actions)
       controller.abort()
-      session = createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 })
+      source.set({
+        session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
+      })
       return result
     })
 
@@ -660,19 +642,21 @@ describe('recently completed', () => {
 
   it('keeps completed rows as checked copies, scoped to their graph', () => {
     tasks.markRecentlyCompleted('/g', [a])
-    expect(tasks.getRecentlyCompleted('/g')).toEqual([{ ...a, checked: true }])
+    expect(tasks.recentlyCompleted.get()).toEqual({ root: '/g', tasks: [{ ...a, checked: true }] })
     expect(tasks.hasRecentlyCompleted('/g', getTaskKey(a))).toBe(true)
-    expect(tasks.getRecentlyCompleted('/other')).toEqual([])
     expect(tasks.hasRecentlyCompleted('/other', getTaskKey(a))).toBe(false)
 
     // Marking for another graph discards the previous graph's rows.
     tasks.markRecentlyCompleted('/other', [b])
-    expect(tasks.getRecentlyCompleted('/g')).toEqual([])
+    expect(tasks.recentlyCompleted.get()).toEqual({
+      root: '/other',
+      tasks: [{ ...b, checked: true }],
+    })
   })
 
   it('notifies subscribers on every change until they unsubscribe', () => {
     let calls = 0
-    const unsubscribe = tasks.subscribeRecentlyCompleted(() => {
+    const unsubscribe = tasks.recentlyCompleted.subscribe(() => {
       calls += 1
     })
     tasks.markRecentlyCompleted('/g', [a, b])
@@ -692,20 +676,20 @@ describe('recently completed', () => {
       { ...a, checked: false, updatedAt: 11 },
       { ...b, checked: false, updatedAt: 10 },
     ])
-    expect(tasks.getRecentlyCompleted('/g').map(getTaskKey)).toEqual([getTaskKey(b)])
+    expect(tasks.recentlyCompleted.get().tasks.map(getTaskKey)).toEqual([getTaskKey(b)])
   })
 
   it('re-keys struck rows a note write moved', () => {
     tasks.markRecentlyCompleted('/g', [a])
     const from = { astPath: [0], markdown: 'a', breadcrumbs: [], checked: true }
     tasks.relocateRecentlyCompleted('/g', 'notes/a.md', [{ from, to: { ...from, astPath: [2] } }])
-    expect(tasks.getRecentlyCompleted('/g').map((row) => row.astPath)).toEqual([[2]])
+    expect(tasks.recentlyCompleted.get().tasks.map((row) => row.astPath)).toEqual([[2]])
   })
 
   it('is separate per service', () => {
     tasks.markRecentlyCompleted('/g', [a])
-    const other = createTasks(sessionSource(() => openGraph))
-    expect(other.getRecentlyCompleted('/g')).toEqual([])
+    const other = createTasks(new WritableStore({ session: openGraph }))
+    expect(other.recentlyCompleted.get().tasks).toEqual([])
   })
 })
 
@@ -727,7 +711,7 @@ describe('task list state', () => {
   it('reads the open tasks on the first subscription, not before', async () => {
     seedNotes(database, [{ path: 'notes/a.md', markdown: '+ [ ] one\n+ [x] done\n' }])
     const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks')
-    expect(tasks.getState()).toEqual({
+    expect(tasks.get()).toEqual({
       open: undefined,
       completed: undefined,
       openFailed: false,
@@ -741,9 +725,9 @@ describe('task list state', () => {
     })
     await flushMicrotasks()
 
-    expect(tasks.getState().open?.map((row) => row.markdown)).toEqual(['one'])
-    expect(tasks.getState().completed).toBeUndefined()
-    expect(tasks.getState()).toBe(tasks.getState())
+    expect(tasks.get().open?.map((row) => row.markdown)).toEqual(['one'])
+    expect(tasks.get().completed).toBeUndefined()
+    expect(tasks.get()).toBe(tasks.get())
     expect(changes).toBe(1)
   })
 
@@ -754,7 +738,7 @@ describe('task list state', () => {
 
     const release = tasks.includeCompleted()
     await flushMicrotasks()
-    expect(tasks.getState().completed).toEqual([one])
+    expect(tasks.get().completed).toEqual([one])
 
     release()
     await tasks.refresh()
@@ -765,11 +749,11 @@ describe('task list state', () => {
     const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockRejectedValue(new Error('no index'))
     tasks.subscribe(() => {})
     await flushMicrotasks()
-    expect(tasks.getState()).toMatchObject({ open: undefined, openFailed: true })
+    expect(tasks.get()).toMatchObject({ open: undefined, openFailed: true })
 
     getOpenTasks.mockResolvedValue([one])
     await tasks.refresh()
-    expect(tasks.getState()).toMatchObject({ open: [one], openFailed: false })
+    expect(tasks.get()).toMatchObject({ open: [one], openFailed: false })
   })
 
   it('applies the optimistic patch before the write starts', async () => {
@@ -779,12 +763,12 @@ describe('task list state', () => {
 
     const completing = tasks.completeTasks([one])
 
-    expect(tasks.getState().open).toEqual([two])
-    expect(tasks.getRecentlyCompleted('/g')).toEqual([{ ...one, checked: true }])
+    expect(tasks.get().open).toEqual([two])
+    expect(tasks.recentlyCompleted.get().tasks).toEqual([{ ...one, checked: true }])
     expect(writeTask).toHaveBeenCalledWith(one, [{ kind: 'toggle' }])
     write.resolve(written)
     await completing
-    expect(tasks.getState().open).toEqual([two])
+    expect(tasks.get().open).toEqual([two])
   })
 
   it('drops a read in flight when a bulk action patches the rows', async () => {
@@ -799,7 +783,7 @@ describe('task list state', () => {
     await refreshing
     await flushMicrotasks()
 
-    expect(tasks.getState().open).toEqual([two])
+    expect(tasks.get().open).toEqual([two])
   })
 
   it('restores the rows and rethrows when a single write fails', async () => {
@@ -807,10 +791,10 @@ describe('task list state', () => {
     vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
 
     const editing = tasks.editTask(one, 'edited')
-    expect(tasks.getState().open?.[0]).toMatchObject({ markdown: 'edited', text: 'edited' })
+    expect(tasks.get().open?.[0]).toMatchObject({ markdown: 'edited', text: 'edited' })
 
     await expect(editing).rejects.toThrow('disk full')
-    expect(tasks.getState().open).toEqual([one, two])
+    expect(tasks.get().open).toEqual([one, two])
   })
 
   it('restores the struck row when an edit-and-reopen write fails', async () => {
@@ -821,13 +805,13 @@ describe('task list state', () => {
 
     const reopening = tasks.editAndToggleTask(struck, 'edited')
     expect(tasks.hasRecentlyCompleted('/g', getTaskKey(one))).toBe(false)
-    expect(tasks.getState().open).toEqual([
+    expect(tasks.get().open).toEqual([
       { ...struck, checked: false, markdown: 'edited', text: 'edited' },
     ])
 
     await expect(reopening).rejects.toThrow('disk full')
-    expect(tasks.getState().open).toEqual([])
-    expect(tasks.getRecentlyCompleted('/g')).toEqual([struck])
+    expect(tasks.get().open).toEqual([])
+    expect(tasks.recentlyCompleted.get().tasks).toEqual([struck])
   })
 
   it('re-reads instead of restoring when a batch fails', async () => {
@@ -839,8 +823,8 @@ describe('task list state', () => {
     await flushMicrotasks()
 
     expect(getOpenTasks).toHaveBeenCalledTimes(2)
-    expect(tasks.getState().open).toEqual([one])
-    expect(tasks.getRecentlyCompleted('/g')).toEqual([])
+    expect(tasks.get().open).toEqual([one])
+    expect(tasks.recentlyCompleted.get().tasks).toEqual([])
   })
 
   it('keeps a checked task struck when its delete fails', async () => {
@@ -850,10 +834,10 @@ describe('task list state', () => {
     vi.spyOn(tasks, 'writeTask').mockRejectedValue(new Error('disk full'))
 
     const deleting = tasks.deleteTasks([struck])
-    expect(tasks.getRecentlyCompleted('/g')).toEqual([])
+    expect(tasks.recentlyCompleted.get().tasks).toEqual([])
 
     await expect(deleting).rejects.toThrow('disk full')
-    expect(tasks.getRecentlyCompleted('/g')).toEqual([struck])
+    expect(tasks.recentlyCompleted.get().tasks).toEqual([struck])
   })
 
   it('re-keys the rows a write moved and adds the inserted row', async () => {
@@ -868,7 +852,7 @@ describe('task list state', () => {
     const created = await tasks.addTask(one)
 
     expect(created).toMatchObject({ notePath: 'notes/a.md', astPath: [0], markdown: '' })
-    expect(tasks.getState().open?.map((row) => [row.markdown, row.astPath])).toEqual([
+    expect(tasks.get().open?.map((row) => [row.markdown, row.astPath])).toEqual([
       ['one', [1]],
       ['two', [0]],
       ['', [0]],
@@ -886,7 +870,7 @@ describe('task list state', () => {
     read.resolve([one, two])
     await refreshing
 
-    expect(tasks.getState().open?.[0]).toMatchObject({ markdown: 'edited' })
+    expect(tasks.get().open?.[0]).toMatchObject({ markdown: 'edited' })
   })
 
   it('re-reads on index changes while subscribed, at most once per throttle window', async () => {
@@ -901,8 +885,10 @@ describe('task list state', () => {
     await clock.advance(3_000)
     expect(getOpenTasks).toHaveBeenCalledTimes(3)
 
-    // Unsubscribed, a change only marks the rows stale for the next subscriber.
+    // Unsubscribed, the service stops listening and the next subscriber reads again.
     unsubscribe()
+    expect(appliedListeners.size).toBe(0)
+    expect(reconciledListeners.size).toBe(0)
     await clock.advance(3_000)
     emitApplied()
     await flushMicrotasks()
@@ -912,15 +898,39 @@ describe('task list state', () => {
     expect(getOpenTasks).toHaveBeenCalledTimes(4)
   })
 
+  it('keeps reading while one subscription is left, however often another unsubscribes', async () => {
+    const { getOpenTasks, unsubscribe } = await subscribed()
+    tasks.subscribe(() => {})
+    unsubscribe()
+    unsubscribe()
+
+    emitApplied()
+    await flushMicrotasks()
+    expect(getOpenTasks).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the state on an equal read and apart from the recently-completed set', async () => {
+    await subscribed()
+    const state = tasks.get()
+    const listener = vi.fn()
+    tasks.subscribe(listener)
+    const struckListener = vi.fn()
+    tasks.recentlyCompleted.subscribe(struckListener)
+
+    // The spy answers with the same rows, so the read changes nothing.
+    await tasks.refresh()
+    tasks.markRecentlyCompleted('/g', [one])
+    expect(tasks.get()).toBe(state)
+    expect(listener).not.toHaveBeenCalled()
+    expect(struckListener).toHaveBeenCalledTimes(1)
+  })
+
   it('re-reads on an index:written broadcast in a note window only', async () => {
     for (const [role, reads] of [
       ['main', 1],
       ['note-window', 2],
     ] as const) {
-      tasks = createTasks(
-        sessionSource(() => openGraph),
-        role,
-      )
+      tasks = createTasks(new WritableStore({ session: openGraph }), role)
       const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([one])
       tasks.subscribe(() => {})
       await flushMicrotasks()
@@ -949,24 +959,23 @@ describe('task list state', () => {
   })
 
   it('drops the rows on a graph switch and reads the new graph', async () => {
-    let session: GraphSession | null = openGraph
-    const source = sessionSource(() => session)
+    const source = new WritableStore<{ session: GraphSession | null }>({ session: openGraph })
     const switching = createTasks(source)
     const getOpenTasks = vi.spyOn(switching, 'getOpenTasks').mockResolvedValue([one])
     switching.subscribe(() => {})
     await flushMicrotasks()
-    expect(switching.getState().open).toEqual([one])
+    expect(switching.get().open).toEqual([one])
 
     getOpenTasks.mockResolvedValue([two])
-    session = createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 })
-    source.notify()
-    expect(switching.getState().open).toBeUndefined()
+    source.set({
+      session: createGraphSession({ root: '/h', name: 'h', generation: 8, indexGeneration: 1 }),
+    })
+    expect(switching.get().open).toBeUndefined()
     await flushMicrotasks()
-    expect(switching.getState().open).toEqual([two])
+    expect(switching.get().open).toEqual([two])
 
-    session = null
-    source.notify()
-    expect(switching.getState().open).toBeUndefined()
+    source.set({ session: null })
+    expect(switching.get().open).toBeUndefined()
     await switching.refresh()
     expect(getOpenTasks).toHaveBeenCalledTimes(2)
   })

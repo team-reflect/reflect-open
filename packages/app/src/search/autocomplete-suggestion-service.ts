@@ -5,8 +5,6 @@ import {
   displayNoteTitle,
   errorMessage,
   formatDayLabel,
-  localIsoDate,
-  type ClockService,
   type ContactMatch,
   type ContactsService,
   type GraphSessionService,
@@ -16,6 +14,7 @@ import {
   type PersonNoteService,
   type SettingsService,
   type SuggestionService,
+  type TodayService,
 } from '@reflect/core'
 import type { OperationsService } from '../app/operations-service.ts'
 import { Counter, isNotNullish } from '@ocavue/utils'
@@ -77,7 +76,7 @@ export interface AutocompleteSuggestionServiceDeps {
   readonly contacts: ContactsService
   readonly personNotes: PersonNoteService
   readonly settings: SettingsService
-  readonly clock: ClockService
+  readonly today: TodayService
   readonly operations: OperationsService
   readonly logger: LoggerService
   readonly graphSession: GraphSessionService
@@ -91,8 +90,8 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
   }
 
   async suggestLinks(query: string): Promise<WikiLinkMenuItem[]> {
-    const { suggestions, contacts, settings, clock, operations, logger, graphSession } = this.#deps
-    const session = graphSession.getState().session
+    const { suggestions, contacts, settings, today, operations, logger, graphSession } = this.#deps
+    const session = graphSession.get().session
     if (session === null) {
       return []
     }
@@ -103,7 +102,7 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
     // integration is on and the permission readable.
     const contactsInMenu = contacts.canLookup(current)
     const dateContext = {
-      today: localIsoDate(new Date(clock.now())),
+      today: today.get(),
       dateFormat,
       weekStartDay,
     }

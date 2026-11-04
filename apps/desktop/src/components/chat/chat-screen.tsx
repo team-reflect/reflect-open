@@ -2,8 +2,8 @@ import type { ReactElement } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { imageFilesFrom } from '@/lib/chat-attachments.ts'
-import { useChatSession } from '@/providers/chat-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { ChatInput } from './chat-input.tsx'
 import { ChatTurnList } from './chat-turn-list.tsx'
 
@@ -12,15 +12,16 @@ import { ChatTurnList } from './chat-turn-list.tsx'
  * Read-only first wave: the assistant answers questions grounded in the
  * graph via search/read tools and cites notes as wiki links — it never
  * writes. With no AI provider configured the view is one call-to-action into
- * Settings; the conversation itself lives in {@link useChatSession}, so
+ * Settings; the conversation itself lives in the graph's `ChatSession`, so
  * navigating away and back keeps it.
  *
  * The whole view accepts dropped images — aiming for the composer exactly
  * shouldn't be required — and queues them as the next message's attachments.
  */
 export function ChatScreen(): ReactElement {
-  const { providers, attachImages } = useChatSession()
-  const { navigate } = useRouter()
+  const providers = useChatProviders()
+  const { attachImages } = useChatActions()
+  const { navigate } = useRouterActions()
 
   if (providers.length === 0) {
     return (

@@ -8,6 +8,7 @@ import type { ProgressPort } from '../ports/progress-port.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
+import { combineStores, WritableStore, type Store } from '../store.ts'
 import {
   createIndexLifecycleService,
   type IndexAppliedEvent,
@@ -72,6 +73,10 @@ export interface TestIndexLifecycleService extends IndexLifecycleService {
    */
   setFileProgress(progress: IndexFileProgress | null): void
   /**
+   * Report `progress` over the real one; `null` follows the real one again.
+   */
+  setProgress(progress: IndexLifecycleProgress | null): void
+  /**
    * The index generation of every `rebuildVisibly` request with an open index, in order.
    */
   rebuilds(): readonly number[]
@@ -83,19 +88,34 @@ export interface TestIndexLifecycleService extends IndexLifecycleService {
   emitApplied(changes: readonly FileChange[] | null, generation: number): void
 }
 
+function selectSeededProgress(
+  real: IndexLifecycleProgress,
+  seed: IndexLifecycleProgress | null,
+): IndexLifecycleProgress {
+  return seed ?? real
+}
+
 class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
   readonly #inner: IndexLifecycleService
   readonly #graphSession: IndexLifecycleDeps['graphSession']
   readonly #rebuildLog: number[] = []
-  readonly #seededListeners = new Set<() => void>()
   readonly #appliedListeners = new Set<(event: IndexAppliedEvent) => void>()
-  #seeded: { progress: IndexFileProgress | null } | null = null
+  /**
+   * The inner file progress, or a value seeded since it last changed.
+   */
+  readonly #fileProgress: WritableStore<IndexFileProgress | null>
+  readonly fileProgress: Store<IndexFileProgress | null>
+  readonly #progressSeed = new WritableStore<IndexLifecycleProgress | null>(null)
+  readonly progress: Store<IndexLifecycleProgress>
 
   constructor(inner: IndexLifecycleService, graphSession: IndexLifecycleDeps['graphSession']) {
     this.#inner = inner
+    this.progress = combineStores([inner.progress, this.#progressSeed], selectSeededProgress)
     this.#graphSession = graphSession
-    inner.subscribeFileProgress(() => {
-      this.#seeded = null
+    this.#fileProgress = new WritableStore(inner.fileProgress.get())
+    this.fileProgress = this.#fileProgress
+    inner.fileProgress.subscribe(() => {
+      this.#fileProgress.set(inner.fileProgress.get())
     })
   }
 
@@ -139,10 +159,6 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     return this.#inner.followActivity()
   }
 
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten {
-    return this.#inner.onProgress(listener)
-  }
-
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten {
     const unlisten = this.#inner.onApplied(listener)
     this.#appliedListeners.add(listener)
@@ -169,29 +185,12 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     return this.#inner.onMoved(listener)
   }
 
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten {
-    return this.#inner.onFileProgress(listener)
-  }
-
   onStalePlaceholders(listener: (paths: readonly string[]) => void): Unlisten {
     return this.#inner.onStalePlaceholders(listener)
   }
 
-  readonly fileProgress = (): IndexFileProgress | null => {
-    return this.#seeded !== null ? this.#seeded.progress : this.#inner.fileProgress()
-  }
-
-  readonly subscribeFileProgress = (listener: () => void): Unlisten => {
-    const unlisten = this.#inner.subscribeFileProgress(listener)
-    this.#seededListeners.add(listener)
-    return () => {
-      unlisten()
-      this.#seededListeners.delete(listener)
-    }
-  }
-
   rebuildVisibly(): Promise<void> {
-    const generation = this.#graphSession.getState().session?.indexGeneration ?? null
+    const generation = this.#graphSession.get().session?.indexGeneration ?? null
     if (generation !== null) {
       this.#rebuildLog.push(generation)
     }
@@ -218,10 +217,11 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
   }
 
   setFileProgress(progress: IndexFileProgress | null): void {
-    this.#seeded = { progress }
-    for (const listener of this.#seededListeners) {
-      listener()
-    }
+    this.#fileProgress.set(progress)
+  }
+
+  setProgress(progress: IndexLifecycleProgress | null): void {
+    this.#progressSeed.set(progress)
   }
 
   rebuilds(): readonly number[] {
@@ -244,7 +244,7 @@ export function createTestIndexLifecycleService(
   const database = options?.database ?? createNodeTestDatabaseService()
   const clock = options?.clock ?? createTestClockService()
   const graphSession = options?.graphSession ?? {
-    getState: () => ({ session: null }),
+    get: () => ({ session: null }),
     subscribe: () => () => {},
   }
   const inner = createIndexLifecycleService({

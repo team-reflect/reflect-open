@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MONTH_TITLE_TRANSITION_MS, MonthTitle } from './month-title.tsx'
 
@@ -59,7 +60,9 @@ describe('MonthTitle', () => {
 
   it('swaps instantly under reduced motion', async () => {
     const view = await renderInApp(<MonthTitle month="2026-06" />, {
-      platform: { reducedMotion: true },
+      appServices: {
+        systemPreferences: createTestSystemPreferencesService({ reducedMotion: true }),
+      },
     })
     await view.rerender(<MonthTitle month="2026-07" />)
 

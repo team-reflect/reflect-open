@@ -2,7 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import type { Unlisten } from '../unlisten.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Settings } from '../settings/schema.ts'
 import {
   contactMatchSchema,
@@ -12,13 +12,6 @@ import {
   type ContactsAuthorization,
 } from './commands.ts'
 import { pickContactLinkSuggestions } from './match.ts'
-
-export {
-  contactMatchSchema,
-  contactsAuthorizationSchema,
-  type ContactMatch,
-  type ContactsAuthorization,
-} from './commands.ts'
 
 /**
  * The Rust `contacts` capability: live Apple Contacts (`CNContactStore`)
@@ -51,15 +44,7 @@ export interface ContactsState {
  * Live reads of the OS address book, and the permission state as a store.
 
  */
-export interface ContactsService {
-  /**
-   * The current {@link ContactsState}; the same object until it changes.
-   */
-  getState: () => ContactsState
-  /**
-   * Listen for state changes; returns the unsubscribe.
-   */
-  subscribe: (listener: () => void) => Unlisten
+export interface ContactsService extends Store<ContactsState> {
   /**
    * Re-read the permission state. Never prompts and never rejects: a failed
    * read keeps the last state.
@@ -123,24 +108,15 @@ export interface ContactsServiceDeps {
 
 class ContactsServiceImpl implements ContactsService {
   readonly #deps: ContactsServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #state: ContactsState = { authorization: null }
+  readonly #state = new WritableStore<ContactsState>(
+    { authorization: null },
+    (a, b) => a.authorization === b.authorization,
+  )
+  readonly get = this.#state.get
+  readonly subscribe = this.#state.subscribe
 
   constructor(deps: ContactsServiceDeps) {
     this.#deps = deps
-  }
-
-  readonly getState = (): ContactsState => this.#state
-
-  readonly subscribe = (listener: () => void): Unlisten => {
-    // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (): void => {
-      listener()
-    }
-    this.#listeners.add(deliver)
-    return () => {
-      this.#listeners.delete(deliver)
-    }
   }
 
   async refresh(): Promise<void> {
@@ -156,13 +132,7 @@ class ContactsServiceImpl implements ContactsService {
       logger.warn('failed to read the contacts permission', cause)
       return
     }
-    if (authorization === this.#state.authorization) {
-      return
-    }
-    this.#state = { authorization }
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set({ authorization })
   }
 
   async requestAccess(): Promise<boolean> {
@@ -174,7 +144,7 @@ class ContactsServiceImpl implements ContactsService {
   }
 
   canLookup(settings: Pick<Settings, 'contactsEnabled'>): boolean {
-    return contactsCanLookup(this.#state, settings)
+    return contactsCanLookup(this.#state.get(), settings)
   }
 
   lookupPeople(query: string): Promise<ContactMatch[]> {

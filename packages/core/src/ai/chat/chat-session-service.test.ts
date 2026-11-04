@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { formatIsoDate } from '@reflect/utils'
+import { createTodayService } from '../../daily/today-service.ts'
 import { createGraphSession } from '../../graph/graph-session.ts'
 import type { EmbedStatus } from '../../embeddings/embedding-runtime-service.ts'
 import type { GraphInfo } from '../../graph/schemas.ts'
@@ -121,7 +123,7 @@ async function setup(options: SetupOptions = {}) {
     options.embedStatus === undefined ? {} : { status: options.embedStatus },
   )
   const logger = createTestLoggerService()
-  const clock = createTestClockService({ now: NOW, today: '2026-10-13' })
+  const clock = createTestClockService({ now: NOW })
   const service = createChatSessionService({
     chatEngine,
     chatHistory: options.history?.(chatHistory) ?? chatHistory,
@@ -136,6 +138,7 @@ async function setup(options: SetupOptions = {}) {
     embeddingRuntime,
     settings,
     clock,
+    today: createTodayService({ clock }),
     id,
     imageCodec: createTestImageCodec(),
     logger,
@@ -179,8 +182,8 @@ describe('ChatSession persistence', () => {
     const { session } = await setup({ conversations: [stored()] })
     session.attach()
 
-    await vi.waitFor(() => expect(session.getState().turns).toEqual([RESTORED_TURN]))
-    expect(session.getState().activeConversationId).toBe('conv-1')
+    await vi.waitFor(() => expect(session.get().turns).toEqual([RESTORED_TURN]))
+    expect(session.get().activeConversationId).toBe('conv-1')
   })
 
   it('starts fresh when the latest conversation idled past the cutoff', async () => {
@@ -200,15 +203,15 @@ describe('ChatSession persistence', () => {
     await flush()
 
     expect(loads).toBe(0)
-    expect(session.getState().turns).toEqual([])
-    expect(session.getState().activeConversationId).not.toBe('conv-1')
+    expect(session.get().turns).toEqual([])
+    expect(session.get().activeConversationId).not.toBe('conv-1')
   })
 
   it('does not resume before the session is attached', async () => {
     const { session } = await setup({ conversations: [stored()] })
     await flush()
 
-    expect(session.getState().turns).toEqual([])
+    expect(session.get().turns).toEqual([])
   })
 
   it('saves the user half at send and the settled turn after the stream', async () => {
@@ -224,7 +227,7 @@ describe('ChatSession persistence', () => {
     expect(saves).toHaveLength(2)
     expect(saves[0]).toMatchObject({
       generation: 7,
-      conversation: { id: session.getState().activeConversationId, title: 'hello there' },
+      conversation: { id: session.get().activeConversationId, title: 'hello there' },
       turn: { userText: 'hello there', responseMessages: [], status: 'streaming' },
     })
     expect(saves[1]).toMatchObject({
@@ -234,7 +237,7 @@ describe('ChatSession persistence', () => {
         parts: [{ kind: 'text', text: 'Hi.' }],
       },
     })
-    expect(session.getState().status).toBe('idle')
+    expect(session.get().status).toBe('idle')
   })
 
   it('backstops a reply-less turn with a notice, in the state and in the save', async () => {
@@ -259,14 +262,14 @@ describe('ChatSession persistence', () => {
     await flush()
 
     const notice = { kind: 'notice', tone: 'info', text: NO_REPLY_NOTICE }
-    expect(session.getState().turns.at(-1)?.parts.at(-1)).toEqual(notice)
+    expect(session.get().turns.at(-1)?.parts.at(-1)).toEqual(notice)
     expect(chatHistory.getSaves().at(-1)?.turn.parts.at(-1)).toEqual(notice)
   })
 
   it('saves later turns into the restored conversation', async () => {
     const { session, chatHistory } = await setup({ conversations: [stored()] })
     session.attach()
-    await vi.waitFor(() => expect(session.getState().turns).toHaveLength(1))
+    await vi.waitFor(() => expect(session.get().turns).toHaveLength(1))
 
     await session.send('and today?')
     await flush()
@@ -280,7 +283,7 @@ describe('ChatSession persistence', () => {
   it('sends the derived history, the key, and the local date to the engine', async () => {
     const { session, chatEngine, chatGraphContext } = await setup({ conversations: [stored()] })
     session.attach()
-    await vi.waitFor(() => expect(session.getState().turns).toHaveLength(1))
+    await vi.waitFor(() => expect(session.get().turns).toHaveLength(1))
 
     await session.send('and today?')
 
@@ -289,7 +292,7 @@ describe('ChatSession persistence', () => {
     expect(chatEngine.calls()[0]).toMatchObject({
       config: MODEL,
       apiKey: 'sk-test',
-      today: '2026-10-13',
+      today: formatIsoDate(new Date(NOW)),
       context: { graphName: 'test-graph' },
       messages: [
         { role: 'user', content: 'what did I write yesterday?' },
@@ -348,11 +351,104 @@ describe('ChatSession persistence', () => {
     const { session } = await setup()
 
     session.setDraft('half-typed question')
-    expect(session.getState().draft).toBe('half-typed question')
+    expect(session.get().draft).toBe('half-typed question')
 
     await session.send('half-typed question')
-    expect(session.getState().draft).toBe('')
-    expect(session.getState().turns.at(-1)?.userText).toBe('half-typed question')
+    expect(session.get().draft).toBe('')
+    expect(session.get().turns.at(-1)?.userText).toBe('half-typed question')
+  })
+
+  it('asks in a fresh conversation and leaves the composer draft and images alone', async () => {
+    const { session, chatEngine } = await setup()
+    await session.send('earlier question')
+    const earlierConversation = session.get().activeConversationId
+    session.setDraft('half-typed follow-up')
+    await session.attachImages([
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'cat.png', { type: 'image/png' }),
+    ])
+    const queued = session.get().attachments
+
+    await session.ask('what did I decide about pricing?')
+
+    expect(session.get().activeConversationId).not.toBe(earlierConversation)
+    expect(session.get().turns).toMatchObject([
+      { userText: 'what did I decide about pricing?', attachments: [] },
+    ])
+    expect(chatEngine.calls().at(-1)?.messages.at(-1)).toEqual({
+      role: 'user',
+      content: 'what did I decide about pricing?',
+    })
+    expect(session.get().draft).toBe('half-typed follow-up')
+    expect(session.get().attachments).toEqual(queued)
+  })
+
+  it('reopens the open conversation when asked the question it began with', async () => {
+    const { session, chatEngine } = await setup()
+    await session.ask('what did I decide about pricing?')
+    await session.send('and the student discount?')
+    const askedConversation = session.get().activeConversationId
+
+    await session.ask('  what did I decide about pricing?  ')
+
+    expect(session.get().activeConversationId).toBe(askedConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual([
+      'what did I decide about pricing?',
+      'and the student discount?',
+    ])
+    expect(chatEngine.calls()).toHaveLength(2)
+  })
+
+  it('asks afresh when the open conversation began with the same words and a photo', async () => {
+    const { session, chatEngine } = await setup()
+    await session.attachImages([
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'cat.png', { type: 'image/png' }),
+    ])
+    await session.send('what is this?')
+    const photoConversation = session.get().activeConversationId
+
+    await session.ask('what is this?')
+
+    expect(session.get().activeConversationId).not.toBe(photoConversation)
+    expect(session.get().turns).toMatchObject([{ userText: 'what is this?', attachments: [] }])
+    expect(chatEngine.calls()).toHaveLength(2)
+  })
+
+  it('abandons a history switch still loading when an Ask reopens the conversation', async () => {
+    const pendingLoad = Promise.withResolvers<ChatTurn[]>()
+    const { session } = await setup({
+      history: (history) => {
+        return overrideHistory(history, { loadConversation: () => pendingLoad.promise })
+      },
+    })
+    await session.ask('what did I decide about pricing?')
+    const askedConversation = session.get().activeConversationId
+
+    const openDone = session.openConversation('conv-9')
+    await session.ask('what did I decide about pricing?')
+    pendingLoad.resolve([RESTORED_TURN])
+    await openDone
+
+    expect(session.get().activeConversationId).toBe(askedConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual([
+      'what did I decide about pricing?',
+    ])
+  })
+
+  it('keeps the open conversation when asked nothing, or with no model to ask', async () => {
+    const { session, chatEngine } = await setup()
+    await session.send('earlier question')
+    const earlierConversation = session.get().activeConversationId
+
+    await session.ask('   ')
+    expect(session.get().activeConversationId).toBe(earlierConversation)
+
+    const unconfigured = await setup({ settings: { aiProviders: [], defaultAiProviderId: null } })
+    const unconfiguredConversation = unconfigured.session.get().activeConversationId
+    await unconfigured.session.ask('what did I decide?')
+
+    expect(unconfigured.session.get().activeConversationId).toBe(unconfiguredConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual(['earlier question'])
+    expect(chatEngine.calls()).toHaveLength(1)
   })
 
   it('rejects a second send while the first one is in flight', async () => {
@@ -361,7 +457,7 @@ describe('ChatSession persistence', () => {
     await Promise.all([session.send('one'), session.send('two')])
 
     expect(chatEngine.calls()).toHaveLength(1)
-    expect(session.getState().turns.map((turn) => turn.userText)).toEqual(['one'])
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual(['one'])
   })
 
   it('surfaces a missing key as an error notice, without a provider call', async () => {
@@ -370,7 +466,7 @@ describe('ChatSession persistence', () => {
     await session.send('hello')
 
     expect(chatEngine.calls()).toEqual([])
-    expect(session.getState().turns.at(-1)).toMatchObject({
+    expect(session.get().turns.at(-1)).toMatchObject({
       status: 'done',
       parts: [{ kind: 'notice', tone: 'error' }],
     })
@@ -395,8 +491,8 @@ describe('ChatSession persistence', () => {
 
     await session.openConversation('conv-9')
 
-    expect(session.getState().activeConversationId).toBe('conv-9')
-    expect(session.getState().turns).toEqual([RESTORED_TURN])
+    expect(session.get().activeConversationId).toBe('conv-9')
+    expect(session.get().turns).toEqual([RESTORED_TURN])
   })
 
   it('abandons a switch when a send settled while the rows loaded', async () => {
@@ -410,29 +506,29 @@ describe('ChatSession persistence', () => {
         return overrideHistory(history, { loadConversation: () => pendingLoad.promise })
       },
     })
-    const homeConversation = session.getState().activeConversationId
+    const homeConversation = session.get().activeConversationId
 
     const openDone = session.openConversation('conv-9')
     await session.send('hello')
-    expect(session.getState().turns.at(-1)?.status).toBe('done')
+    expect(session.get().turns.at(-1)?.status).toBe('done')
 
     pendingLoad.resolve([RESTORED_TURN])
     await openDone
 
-    expect(session.getState().activeConversationId).toBe(homeConversation)
-    expect(session.getState().turns.map((turn) => turn.userText)).toEqual(['hello'])
+    expect(session.get().activeConversationId).toBe(homeConversation)
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual(['hello'])
   })
 
   it('deleting the active conversation starts a fresh chat', async () => {
     const { session, chatHistory } = await setup({ conversations: [stored()] })
     session.attach()
-    await vi.waitFor(() => expect(session.getState().activeConversationId).toBe('conv-1'))
+    await vi.waitFor(() => expect(session.get().activeConversationId).toBe('conv-1'))
 
     await session.deleteConversation('conv-1')
 
     expect(chatHistory.getDeletes()).toEqual(['conv-1'])
-    expect(session.getState().turns).toEqual([])
-    expect(session.getState().activeConversationId).not.toBe('conv-1')
+    expect(session.get().turns).toEqual([])
+    expect(session.get().activeConversationId).not.toBe('conv-1')
   })
 
   it('never saves into a conversation deleted mid-stream', async () => {
@@ -479,7 +575,7 @@ describe('ChatSession persistence', () => {
     })
 
     await session.send('hello')
-    const sentInto = session.getState().activeConversationId
+    const sentInto = session.get().activeConversationId
 
     const deleteDone = session.deleteConversation(sentInto)
     await flush()
@@ -502,7 +598,7 @@ describe('ChatSession persistence', () => {
     await session.send('hello')
     await flush()
 
-    expect(session.getState().turns.map((turn) => turn.userText)).toEqual(['hello'])
+    expect(session.get().turns.map((turn) => turn.userText)).toEqual(['hello'])
     expect(logger.getErrors()).toContainEqual({
       message: 'chat: saving the turn failed:',
       cause: 'disk full',
@@ -520,7 +616,7 @@ describe('ChatSession persistence', () => {
     await flush()
     expect(changes).toBe(2)
 
-    await session.deleteConversation(session.getState().activeConversationId)
+    await session.deleteConversation(session.get().activeConversationId)
     expect(changes).toBe(3)
 
     stop()
@@ -537,11 +633,11 @@ describe('ChatSession graph binding', () => {
 
     await session.send('hello')
     await flush()
-    await session.deleteConversation(session.getState().activeConversationId)
+    await session.deleteConversation(session.get().activeConversationId)
 
     expect(chatHistory.getSaves()).toEqual([])
     expect(chatHistory.getDeletes()).toEqual([])
-    expect(session.getState().turns).toEqual([])
+    expect(session.get().turns).toEqual([])
   })
 
   it('aborts the in-flight turn when the session detaches', async () => {
@@ -572,13 +668,47 @@ describe('ChatSession state', () => {
       notified += 1
     })
 
-    const first = session.getState()
-    expect(session.getState()).toBe(first)
+    const first = session.get()
+    expect(session.get()).toBe(first)
 
     session.setDraft('hi')
     expect(notified).toBe(1)
-    expect(session.getState()).not.toBe(first)
-    expect(session.getState().draft).toBe('hi')
+    expect(session.get()).not.toBe(first)
+    expect(session.get().draft).toBe('hi')
+
+    const second = session.get()
+    session.setDraft('hi')
+    expect(notified).toBe(1)
+    expect(session.get()).toBe(second)
+
+    stop()
+    session.setDraft('hello')
+    expect(notified).toBe(1)
+  })
+
+  it('keeps the model fields when the local state changes', async () => {
+    const { session } = await setup()
+    const first = session.get()
+
+    session.setDraft('hi')
+
+    expect(session.get().providers).toBe(first.providers)
+    expect(session.get().modelOptions).toBe(first.modelOptions)
+    expect(session.get().activeModel).toBe(first.activeModel)
+  })
+
+  it('keeps the state and stays silent when unrelated settings change', async () => {
+    const { session, settings } = await setup()
+    let notified = 0
+    const stop = session.subscribe(() => {
+      notified += 1
+    })
+    const first = session.get()
+
+    settings.update({ editorFullWidth: true })
+
+    expect(notified).toBe(0)
+    expect(session.get()).toBe(first)
     stop()
   })
 
@@ -587,9 +717,9 @@ describe('ChatSession state', () => {
       settings: { chatModelSelection: { configId: 'm1', modelId: 'gpt-5.5' } },
     })
 
-    expect(session.getState().activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
-    expect(session.getState().providers).toEqual([MODEL])
-    expect(session.getState().modelOptions.map((option) => option.configId)).toContain('m1')
+    expect(session.get().activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
+    expect(session.get().providers).toEqual([MODEL])
+    expect(session.get().modelOptions.map((option) => option.configId)).toContain('m1')
   })
 
   it('persists a picked model and applies it to the session', async () => {
@@ -598,13 +728,15 @@ describe('ChatSession state', () => {
     session.subscribe(() => {
       notified += 1
     })
-    expect(session.getState().activeModel).toEqual(MODEL)
+    expect(session.get().activeModel).toEqual(MODEL)
+    const { modelOptions } = session.get()
 
     session.selectModel({ configId: 'm1', modelId: 'gpt-5.5' })
 
     expect(settings.get().chatModelSelection).toEqual({ configId: 'm1', modelId: 'gpt-5.5' })
     expect(notified).toBe(1)
-    expect(session.getState().activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
+    expect(session.get().activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
+    expect(session.get().modelOptions).toBe(modelOptions)
   })
 
   it('falls back to the default model when the persisted selection dangles', async () => {
@@ -612,7 +744,7 @@ describe('ChatSession state', () => {
       settings: { chatModelSelection: { configId: 'gone', modelId: 'gpt-5.5' } },
     })
 
-    expect(session.getState().activeModel).toEqual(MODEL)
+    expect(session.get().activeModel).toEqual(MODEL)
   })
 
   it('queues image attachments and drops a removed one', async () => {
@@ -621,7 +753,7 @@ describe('ChatSession state', () => {
     await session.attachImages([
       new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'cat.png', { type: 'image/png' }),
     ])
-    const [attachment] = session.getState().attachments
+    const [attachment] = session.get().attachments
     expect(attachment).toMatchObject({
       name: 'cat.png',
       mediaType: 'image/png',
@@ -629,6 +761,6 @@ describe('ChatSession state', () => {
     })
 
     session.removeAttachment(attachment?.id ?? '')
-    expect(session.getState().attachments).toEqual([])
+    expect(session.get().attachments).toEqual([])
   })
 })

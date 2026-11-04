@@ -6,14 +6,10 @@ import { getIsComposing } from '@meowdown/core'
 import { CommandItem, CommandList } from '@/components/ui/command.tsx'
 import { INPUT_CLASS_NAME } from '@/components/ui/input.tsx'
 import { Popover, PopoverContent } from '@/components/ui/popover.tsx'
-import {
-  buildAutocompleteEntries,
-  type AutocompleteEntry,
-} from '@/editor/wiki-autocomplete-entries.ts'
-import { useContactsState } from '@/hooks/use-contacts-state.ts'
+import { buildAutocompleteEntries, type AutocompleteEntry } from '@reflect/app'
+import { useContactsCanLookup } from '@/hooks/use-contacts-state.ts'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const SUGGESTION_LIMIT = 6
@@ -64,12 +60,9 @@ function entryAttendee(entry: AutocompleteEntry): MeetingAttendee {
  * passed to its Input, so an external `htmlFor` can never reach it.
  */
 export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): ReactElement {
-  const { graph } = useGraph()
-  const { settings } = useSettings()
-  const { contacts, meetings } = useCoreServices()
-  // Re-render when the permission state changes; the gate reads it.
-  useContactsState()
-  const contactsInMenu = contacts.canLookup(settings)
+  const graph = useGraphInfo()
+  const { meetings } = useCoreServices()
+  const contactsInMenu = useContactsCanLookup()
 
   const [query, setQuery] = useState('')
   const [dismissed, setDismissed] = useState(false)

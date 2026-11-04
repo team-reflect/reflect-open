@@ -124,13 +124,13 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
 
   async function savePat(): Promise<void> {
     const token = patValue.trim()
-    if (token.length === 0) {
-      pat.setError('Paste a token first.')
-      return
-    }
     // Keychain writes can fail (locked keychain, denied access) and GitHub
-    // can reject the token — the action envelope surfaces both inline.
+    // can reject the token — the action envelope surfaces both inline, and
+    // the empty-token check goes through the same envelope.
     await pat.run(async () => {
+      if (token.length === 0) {
+        throw new Error('Paste a token first.')
+      }
       await githubAuth.save({ kind: 'pat', token })
       await verifyAndFinish()
     })

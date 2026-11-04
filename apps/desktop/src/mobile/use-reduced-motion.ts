@@ -1,4 +1,4 @@
-import { useCallback, useSyncExternalStore } from 'react'
+import { useStore } from '@/lib/use-store.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -6,11 +6,5 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * gesture settles switch to instant cuts while this is true.
  */
 export function usePrefersReducedMotion(): boolean {
-  const { platform } = useAppServices()
-  const subscribe = useCallback(
-    (onChange: () => void) => platform.subscribeReducedMotion(onChange),
-    [platform],
-  )
-  const getSnapshot = useCallback(() => platform.prefersReducedMotion(), [platform])
-  return useSyncExternalStore(subscribe, getSnapshot)
+  return useStore(useAppServices().systemPreferences.reducedMotion)
 }

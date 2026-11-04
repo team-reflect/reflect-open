@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { foldTag, isTagName } from '@reflect/core'
 import { X } from 'lucide-react'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useAllNotesFilterTags, useSettingsService } from '@/providers/settings-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsSection } from './section.tsx'
 
@@ -20,10 +20,10 @@ function normalizeTagInput(value: string): string {
  * here hides the tab, never the notes.
  */
 export function AllNotesSection(): ReactElement {
-  const { settings, updateSettings } = useSettings()
+  const settingsService = useSettingsService()
   const [draft, setDraft] = useState('')
   const [draftError, setDraftError] = useState<string | null>(null)
-  const tags = settings.allNotesFilterTags
+  const tags = useAllNotesFilterTags()
 
   const addTag = (): void => {
     const tag = normalizeTagInput(draft)
@@ -40,14 +40,18 @@ export function AllNotesSection(): ReactElement {
       return
     }
     setDraft('')
-    if (tags.some((existing) => foldTag(existing) === tag)) {
-      return
-    }
-    updateSettings({ allNotesFilterTags: [...tags, tag] })
+    settingsService.updateWith((current) => {
+      if (current.allNotesFilterTags.some((existing) => foldTag(existing) === tag)) {
+        return {}
+      }
+      return { allNotesFilterTags: [...current.allNotesFilterTags, tag] }
+    })
   }
 
   const removeTag = (tag: string): void => {
-    updateSettings({ allNotesFilterTags: tags.filter((existing) => existing !== tag) })
+    settingsService.updateWith((current) => ({
+      allNotesFilterTags: current.allNotesFilterTags.filter((existing) => existing !== tag),
+    }))
   }
 
   return (

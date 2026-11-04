@@ -7,10 +7,11 @@ import {
   aiProviderRequiresApiKey,
   isPlainHttpRemoteBaseUrl,
   type AiProviderId,
+  type NewAiProvider,
 } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import {
   Select,
@@ -21,8 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select.tsx'
 import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit.ts'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { AiProviderConsent } from '@/mobile/ai-provider-consent.tsx'
-import type { NewAiProvider } from '@/hooks/use-ai-providers.ts'
 
 interface AddAiProviderDrawerProps {
   open: boolean
@@ -70,22 +71,18 @@ function AddAiProviderSheet({
   const [apiKey, setApiKey] = useState('')
   const [isDefault, setIsDefault] = useState(false)
   const [consented, setConsented] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
   const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
     onAdd,
     onDone: onClose,
   })
+  // `submit` reports its own failures and never rejects, so only `pending` is used.
+  const { run, pending: submitting } = useAsyncAction()
   const provider = aiProvider(providerId)
   const isOpenAICompatible = provider.id === 'openai-compatible'
   const apiKeyRequired = aiProviderRequiresApiKey(provider.id)
 
   const submitDraft = async (): Promise<void> => {
-    setSubmitting(true)
-    try {
-      await submit({ provider: providerId, model, baseUrl, apiKey, isDefault })
-    } finally {
-      setSubmitting(false)
-    }
+    await run(() => submit({ provider: providerId, model, baseUrl, apiKey, isDefault }))
   }
 
   const submitDisabled =

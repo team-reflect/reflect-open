@@ -2,42 +2,77 @@ import { createContext, use, useEffect, useMemo, type ReactNode } from 'react'
 import type { GraphBootService } from '@reflect/app'
 import type {
   AppPlatform,
+  GraphInfo,
   GraphServices,
-  GraphSessionService,
+  GraphSession,
   GraphSessionState,
+  GraphStatus,
+  IndexLifecycleProgress,
+  RecentGraph,
 } from '@reflect/core'
+import { useSelector } from '@/lib/use-store.ts'
 import {
   GraphServicesProvider,
   useAppServices,
   useCoreServices,
 } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
-import { useMobileGraphBoot, type MobileGraphBoot } from './use-mobile-graph-boot.ts'
-
-export type { GraphStatus } from '@reflect/core'
 
 /**
- * The graph context surface: the session state and its actions, the
- * mobile-only slice documented on {@link MobileGraphBoot}, and the platform.
+ * The graph context surface: the graph actions and the platform. All of them
+ * are stable; read the session state through the slice hooks below.
  */
-type GraphContextValue = GraphSessionState<GraphServices> &
-  Pick<GraphBootService, 'pickAndOpen' | 'chooseGraph' | 'openRecent' | 'deleteGraph'> &
-  Pick<GraphSessionService, 'refreshIndex'> &
-  MobileGraphBoot & {
-    /**
-     * `GraphBootService.createGraphAt`.
-     */
-    createAt: GraphBootService['createGraphAt']
-    /**
-     * `GraphBootService.forgetRecent`.
-     */
-    forget: GraphBootService['forgetRecent']
-    /**
-     * Which UI family the shell was built for (Plan 19's root gate), fixed at
-     * boot; gates platform-only surfaces like the iOS subscription paywall.
-     */
-    platform: AppPlatform
-  }
+type GraphContextValue = Pick<
+  GraphBootService,
+  'pickAndOpen' | 'chooseGraph' | 'openRecent' | 'deleteGraph'
+> & {
+  /**
+   * `GraphBootService.createGraphAt`.
+   */
+  createAt: GraphBootService['createGraphAt']
+  /**
+   * `GraphBootService.forgetRecent`.
+   */
+  forget: GraphBootService['forgetRecent']
+  /**
+   * Which UI family the shell was built for (Plan 19's root gate), fixed at
+   * boot; gates platform-only surfaces like the iOS subscription paywall.
+   */
+  platform: AppPlatform
+}
+
+type State = GraphSessionState<GraphServices>
+
+function selectStatus(state: State): GraphStatus {
+  return state.status
+}
+
+function selectGraph(state: State): GraphInfo | null {
+  return state.graph
+}
+
+function selectIndexGeneration(state: State): number | null {
+  return state.indexGeneration
+}
+
+function selectReconciling(progress: IndexLifecycleProgress): boolean {
+  return progress === 'reconciling'
+}
+
+function selectError(state: State): string | null {
+  return state.error
+}
+
+function selectRecents(state: State): RecentGraph[] {
+  return state.recents
+}
+
+function selectSession(state: State): GraphSession | null {
+  return state.session
+}
+
+function selectServices(state: State): GraphServices | null {
+  return state.services
+}
 
 const GraphContext = createContext<GraphContextValue | null>(null)
 
@@ -52,8 +87,7 @@ const GraphContext = createContext<GraphContextValue | null>(null)
  * sandbox `Documents/` — and only the *kind* is persisted. Absolute paths are
  * **derived fresh every launch** because iOS container paths change across
  * restore/update, so a persisted recent would point at a dead path.
- * `platform` selects the bootstrap; everything downstream of the open is
- * shared.
+ * Everything downstream of the open is shared.
  */
 export function GraphProvider({
   children,
@@ -63,55 +97,101 @@ export function GraphProvider({
   platform?: AppPlatform
 }) {
   const { graphSession: session } = useCoreServices()
-  const { graphBoot } = useAppServices()
-  const state = useServiceState(session, session.getState)
+  const { graphBoot, mobileOnboarding } = useAppServices()
+  const services = useSelector(session, selectServices)
 
   // Desktop main-window boot reopens the most recent graph or shows the
   // chooser; a secondary note window adopts the main window's graph. Mobile
-  // opens through its hook below.
+  // opens through the onboarding service below.
   useEffect(() => graphBoot.boot(), [graphBoot])
 
-  // The mobile bootstrap + onboarding slice (Plans 19/21) lives in its own
-  // service; it opens and parks through the session.
-  const mobile = useMobileGraphBoot()
+  // The mobile bootstrap + onboarding (Plans 19/21) lives in its own
+  // service; it opens and parks through the session. Inert on desktop.
+  useEffect(() => mobileOnboarding.boot(), [mobileOnboarding])
 
   const value = useMemo<GraphContextValue>(
     () => ({
-      ...state,
-      ...mobile,
       pickAndOpen: () => graphBoot.pickAndOpen(),
       chooseGraph: () => graphBoot.chooseGraph(),
       openRecent: (root) => graphBoot.openRecent(root),
       deleteGraph: () => graphBoot.deleteGraph(),
-      refreshIndex: () => session.refreshIndex(),
       createAt: (root) => graphBoot.createGraphAt(root),
       forget: (root) => graphBoot.forgetRecent(root),
       platform,
     }),
-    [session, graphBoot, state, mobile, platform],
+    [graphBoot, platform],
   )
 
   return (
     <GraphContext value={value}>
-      <GraphServicesProvider services={state.services}>{children}</GraphServicesProvider>
+      <GraphServicesProvider services={services}>{children}</GraphServicesProvider>
     </GraphContext>
   )
 }
 
 /**
- * Access the active graph + open/choose actions. Use within a GraphProvider.
+ * The graph open/choose actions and the platform. Use within a GraphProvider.
  */
-export function useGraph(): GraphContextValue {
-  const context = useMaybeGraph()
+export function useGraphActions(): GraphContextValue {
+  const context = use(GraphContext)
   if (!context) {
-    throw new Error('useGraph must be used within a GraphProvider')
+    throw new Error('useGraphActions must be used within a GraphProvider')
   }
   return context
 }
 
 /**
- * The active graph + open/choose actions, or `null` outside a GraphProvider.
+ * A slice of the core graph session's state.
  */
-export function useMaybeGraph(): GraphContextValue | null {
-  return use(GraphContext)
+function useGraphSelector<T>(selector: (state: State) => T): T {
+  return useSelector(useCoreServices().graphSession, selector)
+}
+
+/**
+ * The lifecycle status of the active graph.
+ */
+export function useGraphStatus(): GraphStatus {
+  return useGraphSelector(selectStatus)
+}
+
+/**
+ * The open graph, or `null` while none is open.
+ */
+export function useGraphInfo(): GraphInfo | null {
+  return useGraphSelector(selectGraph)
+}
+
+/**
+ * The open index session generation (`GraphSessionState.indexGeneration`).
+ */
+export function useIndexGeneration(): number | null {
+  return useGraphSelector(selectIndexGeneration)
+}
+
+/**
+ * True while the background index reconcile is running.
+ */
+export function useGraphIndexing(): boolean {
+  return useSelector(useCoreServices().indexLifecycle.progress, selectReconciling)
+}
+
+/**
+ * The last error of the graph flows, or `null`.
+ */
+export function useGraphError(): string | null {
+  return useGraphSelector(selectError)
+}
+
+/**
+ * The recently opened graphs.
+ */
+export function useGraphRecents(): RecentGraph[] {
+  return useGraphSelector(selectRecents)
+}
+
+/**
+ * The open graph as one object, or `null` while none is open.
+ */
+export function useGraphSession(): GraphSession | null {
+  return useGraphSelector(selectSession)
 }

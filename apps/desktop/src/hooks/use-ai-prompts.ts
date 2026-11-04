@@ -1,8 +1,6 @@
 import type { AiPrompt, AiPromptDraft } from '@reflect/core'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import { useServiceState } from '@/services/use-service-state.ts'
-
-export type { AiPromptDraft } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 
 interface UseAiPromptsValue {
   prompts: AiPrompt[]
@@ -16,7 +14,7 @@ interface UseAiPromptsValue {
  */
 export function useAiPrompts(): UseAiPromptsValue {
   const { aiPrompts: service } = useCoreServices()
-  const prompts = useServiceState(service, service.list)
+  const prompts = useStore(service)
   return {
     prompts,
     addPrompt: (draft) => service.add(draft),

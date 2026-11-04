@@ -1,3 +1,4 @@
+import { isDeepEqual } from '@ocavue/utils'
 import type { MaybePromise } from '@reflect/utils'
 import { safeParseJson } from '@reflect/utils'
 import pkceChallenge from 'pkce-challenge'
@@ -9,6 +10,7 @@ import type { ActivityPort } from '../ports/activity-port.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { AppError, isAppError } from '../errors.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { WebAuthService } from '../ipc/web-auth-service.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
@@ -95,11 +97,11 @@ export interface ClassicAccessServiceDeps {
 }
 
 /**
- * Reflect Open access through a paid Reflect Classic account.
+ * Reflect Open access through a paid Reflect Classic account. On iOS, while
+ * the state has a subscriber, it reads the stored access and, while that
+ * holds a token, rechecks it now and whenever the page turns visible.
  */
-export interface ClassicAccessService {
-  getState: () => ClassicAccessState
-  subscribe: (listener: () => void) => Unlisten
+export interface ClassicAccessService extends Store<ClassicAccessState> {
   /**
    * This device's stored access, without contacting Reflect Classic.
    */
@@ -120,11 +122,6 @@ export interface ClassicAccessService {
    * Forgets this device's access.
    */
   signOut(): MaybePromise<void>
-  /**
-   * On iOS, reads the stored access now and, while it holds a token, rechecks
-   * it now and whenever the page turns visible. Elsewhere it does nothing.
-   */
-  start(): Unlisten
 }
 
 const meSchema = z.object({
@@ -178,20 +175,35 @@ export function classicAccessUntil(
 
 class ClassicAccessServiceImpl implements ClassicAccessService {
   readonly #deps: ClassicAccessServiceDeps
-  readonly #listeners = new Set<() => void>()
-  #state: ClassicAccessState = { access: null, active: false, isLoading: true }
+  readonly #state = new WritableStore<ClassicAccessState>(
+    {
+      access: null,
+      active: false,
+      isLoading: true,
+    },
+    isDeepEqual,
+  )
   #pendingLoad: Promise<ClassicAccess | null> | null = null
+  #stopWork: Unlisten | null = null
+  #stopRechecks: Unlisten | null = null
 
   constructor(deps: ClassicAccessServiceDeps) {
     this.#deps = deps
   }
 
-  readonly getState = (): ClassicAccessState => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    this.#listeners.add(listener)
+  readonly subscribe = (listener: VoidFunction): Unlisten => {
+    const unsubscribe = this.#state.subscribe(listener)
+    if (this.#deps.platform.appPlatform === 'ios') {
+      this.#stopWork ??= this.#startWork()
+    }
     return () => {
-      this.#listeners.delete(listener)
+      unsubscribe()
+      if (!this.#state.subscribed()) {
+        this.#stopWork?.()
+        this.#stopWork = null
+      }
     }
   }
 
@@ -250,44 +262,45 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
     this.#publish(null)
   }
 
-  start(): Unlisten {
-    const { activity, platform, logger } = this.#deps
-    if (platform.appPlatform !== 'ios') return () => {}
+  #startWork(): Unlisten {
     this.read().catch((error: unknown) => {
-      logger.error('Reading the Reflect Classic access failed', error)
+      this.#deps.logger.error('Reading the Reflect Classic access failed', error)
     })
-    let stopRechecks: Unlisten | null = null
-    const followToken = (): void => {
-      const hasToken = this.#state.access?.token != null
-      if (hasToken && stopRechecks === null) {
-        const recheckNow = (): void => {
-          this.load().catch((error: unknown) => {
-            logger.error('Reading the Reflect Classic access failed', error)
-          })
-        }
-        recheckNow()
-        stopRechecks = activity.subscribeVisible(recheckNow)
-      } else if (!hasToken && stopRechecks !== null) {
-        stopRechecks()
-        stopRechecks = null
-      }
-    }
-    followToken()
-    const unsubscribe = this.subscribe(followToken)
+    this.#followToken()
     return () => {
-      unsubscribe()
-      stopRechecks?.()
+      this.#stopRechecks?.()
+      this.#stopRechecks = null
+    }
+  }
+
+  /**
+   * Rechecks now and on every visible page while the access holds a token.
+   */
+  #followToken(): void {
+    const { activity, logger } = this.#deps
+    const hasToken = this.get().access?.token != null
+    if (hasToken && this.#stopRechecks === null) {
+      const recheckNow = (): void => {
+        this.load().catch((error: unknown) => {
+          logger.error('Reading the Reflect Classic access failed', error)
+        })
+      }
+      recheckNow()
+      this.#stopRechecks = activity.subscribeVisible(recheckNow)
+    } else if (!hasToken && this.#stopRechecks !== null) {
+      this.#stopRechecks()
+      this.#stopRechecks = null
     }
   }
 
   #publish(access: ClassicAccess | null): void {
-    this.#state = {
+    this.#state.set({
       access,
       active: access !== null && isClassicAccessActive(access, this.#deps.clock.now()),
       isLoading: false,
-    }
-    for (const listener of this.#listeners) {
-      listener()
+    })
+    if (this.#stopWork !== null) {
+      this.#followToken()
     }
   }
 
@@ -420,11 +433,9 @@ class ClassicAccessServiceImpl implements ClassicAccessService {
       this.#publish(access)
       return access
     } catch (error) {
-      if (this.#state.isLoading) {
-        this.#state = { ...this.#state, isLoading: false }
-        for (const listener of this.#listeners) {
-          listener()
-        }
+      const state = this.get()
+      if (state.isLoading) {
+        this.#state.set({ ...state, isLoading: false })
       }
       throw error
     }

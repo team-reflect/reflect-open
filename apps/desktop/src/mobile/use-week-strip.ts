@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import type { WeekStartDay } from '@reflect/core'
-import { createWeekWindow, weekAtIndex, weekIndexOf, type WeekWindow } from '@/mobile/calendar.ts'
+import { createWeekWindow, weekAtIndex, weekIndexOf, type WeekWindow } from '@reflect/app'
 
 /**
  * How close (in weeks) a settled page may get to a window edge before the

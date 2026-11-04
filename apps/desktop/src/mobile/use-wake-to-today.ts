@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -10,7 +10,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  * backgrounded case.
  */
 export function useWakeToToday(): void {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const { dailyNotes } = useCoreServices()
   useEffect(() => {
     return dailyNotes.subscribeWakeOnNewDay(() => {

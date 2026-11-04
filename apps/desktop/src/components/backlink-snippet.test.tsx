@@ -91,7 +91,7 @@ describe('BacklinkSnippet task checkboxes', () => {
     expect((boxes[1] as HTMLInputElement).checked).toBe(true)
     await userEvent.click(boxes[1]!, { force: true })
     expect(writeTask).not.toHaveBeenCalled()
-    expect(operations.getAll()).toEqual([])
+    expect(operations.get()).toEqual([])
     await view.unmount()
   })
 

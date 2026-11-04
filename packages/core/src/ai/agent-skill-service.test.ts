@@ -4,9 +4,11 @@ import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createAgentSkillService } from './agent-skill-service.ts'
 import { createGraphSession, type GraphSession } from '../graph/graph-session.ts'
 
-function graphAt(generation: number): { getState: () => { session: GraphSession | null } } {
-  const session = createGraphSession({ root: '/g', name: 'g', generation, indexGeneration: 1 })
-  return { getState: () => ({ session }) }
+function graphAt(generation: number): { get: () => { session: GraphSession | null } } {
+  const value = {
+    session: createGraphSession({ root: '/g', name: 'g', generation, indexGeneration: 1 }),
+  }
+  return { get: () => value }
 }
 
 const STATUS = {
@@ -38,10 +40,8 @@ describe('createAgentSkillService', () => {
 
   it('rejects a mutation when no graph is open', async () => {
     const ipc = createTestIpcBridgeService({ commands: {} })
-    const skill = createAgentSkillService({
-      ipc,
-      graphSession: { getState: () => ({ session: null }) },
-    })
+    const closed = { session: null }
+    const skill = createAgentSkillService({ ipc, graphSession: { get: () => closed } })
 
     await expect(skill.install()).rejects.toThrow('No graph is open.')
     expect(ipc.calls()).toEqual([])

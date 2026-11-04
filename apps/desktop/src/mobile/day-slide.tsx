@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
-import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane.tsx'
-import { formatDayLabel } from '@/lib/dates.ts'
+import { dailyPath, formatDayLabel } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks.tsx'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'
 import { useScrollRestore } from '@/mobile/use-scroll-restore.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
 
 interface DaySlideProps {
   /** The slide's ISO day — its daily note path and scroll-memory key. */
@@ -53,7 +52,7 @@ export function DaySlide({
   focusRequested,
   onFocusConsumed,
 }: DaySlideProps): ReactElement {
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const { handleScroll, resetToTop, cancelRestore } = useScrollRestore({
@@ -122,7 +121,7 @@ export function DaySlide({
             day === today && 'text-accent',
           )}
         >
-          {formatDayLabel(day, settings.dateFormat)}
+          {formatDayLabel(day, dateFormat)}
         </h2>
         <NotePane
           path={dailyPath(day)}

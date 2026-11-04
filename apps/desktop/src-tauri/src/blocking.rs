@@ -14,7 +14,20 @@ where
     T: Send + 'static,
     F: FnOnce() -> AppResult<T> + Send + 'static,
 {
-    tauri::async_runtime::spawn_blocking(task)
+    tauri::async_runtime::spawn_blocking(move || drain_autoreleased(task))
         .await
         .map_err(|err| AppError::io(format!("blocking task panicked: {err}")))?
+}
+
+/// Run `task` inside an autorelease pool. Blocking-pool threads have no pool
+/// of their own, so Objective-C objects autoreleased there would otherwise
+/// stay alive until the thread exits.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn drain_autoreleased<T>(task: impl FnOnce() -> T) -> T {
+    objc2::rc::autoreleasepool(|_| task())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+fn drain_autoreleased<T>(task: impl FnOnce() -> T) -> T {
+    task()
 }

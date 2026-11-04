@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { canPromptForContacts, contactsAccessNotice, isContactsAvailable } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useContactsState } from '@/hooks/use-contacts-state.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useContactsEnabled } from '@/providers/settings-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { CalendarIntegrationField } from './calendar-integration-field.tsx'
 import { SettingsSection } from './section.tsx'
@@ -19,15 +20,14 @@ import { SettingsSwitchField } from './switch-field.tsx'
  * {@link useVisibleSettingsSections}.
  */
 export function IntegrationsSection(): ReactElement | null {
-  const { settings } = useSettings()
+  const contactsEnabled = useContactsEnabled()
   const { contacts, contactSuggestions } = useCoreServices()
   const { opener, calendarEvents } = useAppServices()
   const { authorization } = useContactsState()
-  const [isPrompting, setIsPrompting] = useState(false)
+  const prompt = useAsyncAction()
 
   // The user grants access in System Settings, not in the app, so re-read the
   // permission whenever the window regains focus while the integration is on.
-  const contactsEnabled = settings.contactsEnabled
   useEffect(() => {
     if (!contactsEnabled) {
       return
@@ -49,20 +49,15 @@ export function IntegrationsSection(): ReactElement | null {
   // `denied` points at System Settings; `prompt` offers the OS prompt again
   // (enabled but never asked), suppressed while a prompt is up so it doesn't
   // flash under the OS dialog on a fresh toggle.
-  const notice = contactsAccessNotice(settings, authorization, isPrompting)
+  const notice = contactsAccessNotice({ contactsEnabled }, authorization, prompt.pending)
   const showDenied = notice === 'denied'
   const showPrompt = notice === 'prompt'
 
   async function promptForAccess(): Promise<void> {
-    setIsPrompting(true)
-    try {
-      // A failed prompt (e.g. it timed out unanswered) isn't surfaced here —
-      // the refreshed status is the truth, and a denied/restricted answer
-      // shows the System Settings pointer below.
-      await contactSuggestions.requestAccess()
-    } finally {
-      setIsPrompting(false)
-    }
+    // A failed prompt (e.g. it timed out unanswered) isn't surfaced here:
+    // the refreshed status is the truth, and a denied/restricted answer
+    // shows the System Settings pointer below.
+    await prompt.run(() => contactSuggestions.requestAccess())
   }
 
   async function enableContacts(): Promise<void> {
@@ -79,7 +74,7 @@ export function IntegrationsSection(): ReactElement | null {
           <SettingsSwitchField
             legend="Contacts"
             description="Suggest a contact's email and phone when a note's title matches their name."
-            checked={settings.contactsEnabled}
+            checked={contactsEnabled}
             onCheckedChange={(checked) => {
               if (checked) {
                 void enableContacts()

@@ -3,7 +3,9 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { StorageService } from '../ports/storage-service.ts'
 import type { GraphSessionState } from '../graph/graph-session-service.ts'
 import type { IndexLifecycleService } from '../indexing/index-lifecycle-service.ts'
+import { deriveStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
+import type { Settings } from '../settings/schema.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import type { EmbeddingIndexService } from './embedding-index-service.ts'
 import type { EmbeddingRuntimeService, EmbedStatus } from './embedding-runtime-service.ts'
@@ -23,10 +25,7 @@ const SIMILAR_NOTES_LIMIT = 6
  * The open graph as {@link SemanticSearchService} reads it; a `GraphSessionService` is one.
 
  */
-export interface SemanticSearchGraphSource {
-  getState: () => Pick<GraphSessionState, 'graph' | 'indexGeneration'>
-  subscribe: (listener: () => void) => Unlisten
-}
+export type SemanticSearchGraphSource = Store<Pick<GraphSessionState, 'graph' | 'indexGeneration'>>
 
 /**
  * The user-facing side of the optional local semantic search (Plan 09). The
@@ -106,6 +105,10 @@ export interface SemanticSearchServiceDeps {
   readonly logger: LoggerService
 }
 
+function selectSemanticSearchEnabled(settings: Settings): boolean {
+  return settings.semanticSearchEnabled
+}
+
 class SemanticSearchServiceImpl implements SemanticSearchService {
   readonly #deps: SemanticSearchServiceDeps
   readonly #stopFollowingRebuilds: () => void
@@ -146,7 +149,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
         return
       }
       const enabled = settings.get().semanticSearchEnabled && this.#mainWindow
-      const status = embeddingRuntime.lastStatus()
+      const status = embeddingRuntime.get()
 
       const nextLoadGate = `${enabled} ${status.status}`
       if (nextLoadGate !== loadGate) {
@@ -158,7 +161,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
 
       // embed_apply/embed_remove are gated on the INDEX session generation, not
       // the file-write generation in GraphInfo — the counters are independent.
-      const { graph, indexGeneration: generation } = graphSession.getState()
+      const { graph, indexGeneration: generation } = graphSession.get()
       const target =
         enabled && status.status === 'ready' && generation !== null && graph !== null
           ? {
@@ -186,7 +189,7 @@ class SemanticSearchServiceImpl implements SemanticSearchService {
     }
 
     const unlisteners = [
-      settings.subscribe(react),
+      deriveStore(settings, selectSemanticSearchEnabled).subscribe(react),
       embeddingRuntime.subscribe(react),
       graphSession.subscribe(react),
     ]

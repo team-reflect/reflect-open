@@ -1,5 +1,6 @@
+import { formatIsoDate } from '@reflect/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { captureIdentity, captureLocalDate, type CaptureIdentity } from './capture-identity.ts'
+import { captureIdentity, type CaptureIdentity } from './capture-identity.ts'
 import {
   createCaptureLinkRepairService,
   repairCaptureLinks,
@@ -143,7 +144,7 @@ describe('CaptureLinkRepairService', () => {
     const capturedAt = new Date(CAPTURED_AT.getTime() - 31 * 24 * 60 * 60 * 1000)
     const { identity, source } = await captureNote({ capturedAt })
     noteFile.set(identity.notePath, source)
-    const oldDaily = `daily/${captureLocalDate(capturedAt)}.md`
+    const oldDaily = `daily/${formatIsoDate(capturedAt)}.md`
     const daily = `- [[${identity.base}|www.instagram.com]]\n`
     noteFile.set(oldDaily, daily)
     const read = vi.spyOn(noteFile, 'read')
@@ -152,6 +153,25 @@ describe('CaptureLinkRepairService', () => {
 
     expect(noteFile.files().get(oldDaily)).toBe(daily)
     expect(read).not.toHaveBeenCalled()
+  })
+
+  it('counts the repair window in calendar days across a DST change', async () => {
+    const capturedAt = new Date(2026, 2, 1, 12, 0, 0, 0)
+    const { identity, source } = await captureNote({ capturedAt })
+    noteFile.set(identity.notePath, source)
+    const oldDaily = `daily/${formatIsoDate(capturedAt)}.md`
+    const daily = `- [[${identity.base}|www.instagram.com]]\n`
+    noteFile.set(oldDaily, daily)
+    const lateNight = createCaptureLinkRepairService({
+      noteFile,
+      openDocuments,
+      clock: createTestClockService({ now: new Date(2026, 3, 1, 0, 30).getTime() }),
+      logger: createTestLoggerService(),
+    })
+
+    await lateNight.sweep(3)
+
+    expect(noteFile.files().get(oldDaily)).toBe(daily)
   })
 
   it('repairs a private daily, which only changes local text', async () => {

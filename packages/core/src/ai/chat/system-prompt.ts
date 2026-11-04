@@ -1,4 +1,5 @@
-import type { CloudGraphContext, CloudSafe } from '../../privacy/checkers.ts'
+import type { CloudGraphContext } from '../../privacy/privacy-service.ts'
+import type { CloudSafe } from '../../privacy/cloud-safe.ts'
 import { normalizeChatSystemPrompt } from '../../settings/schema.ts'
 
 /**

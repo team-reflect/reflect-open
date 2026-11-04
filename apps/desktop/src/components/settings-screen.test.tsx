@@ -2,7 +2,6 @@ import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { page, userEvent } from 'vitest/browser'
 import type { Locator } from 'vitest/browser'
-import { DEFAULT_SETTINGS, type GraphSessionService, type Settings } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestEmbeddingRuntimeService,
@@ -11,7 +10,12 @@ import {
   type TestEmbeddingRuntimeService,
   type TestOpenGraph,
 } from '@reflect/core/testing'
-import { formatFullDate } from '@/lib/dates.ts'
+import {
+  DEFAULT_SETTINGS,
+  type GraphSessionService,
+  type Settings,
+  formatFullDate,
+} from '@reflect/core'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
@@ -579,6 +583,22 @@ describe('SettingsScreen', () => {
           allNotesFilterTags: ['person'],
         },
       ])
+    })
+  })
+
+  it('removes two filter tags clicked before a re-render', async () => {
+    stored = { allNotesFilterTags: ['book', 'person'] }
+    await renderScreen()
+    await expectLocatorToHaveCount(page.getByText('#link'), 0)
+    await expect.element(page.getByText('#book')).toBeInTheDocument()
+    const removeBook = page.getByRole('button', { name: 'Remove book' }).element()
+    const removePerson = page.getByRole('button', { name: 'Remove person' }).element()
+
+    removeBook.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    removePerson.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    await vi.waitFor(() => {
+      expect(saved().at(-1)).toEqual({ ...DEFAULT_SETTINGS, allNotesFilterTags: [] })
     })
   })
 

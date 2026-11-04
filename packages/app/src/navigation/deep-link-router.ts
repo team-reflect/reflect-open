@@ -96,13 +96,13 @@ class DeepLinkRouterImpl implements DeepLinkRouter {
   }
 
   handle(url: string, io: DeepLinkIo): Promise<void> {
-    return this.#handleIn(url, io, this.#deps.graphSession.getState().session)
+    return this.#handleIn(url, io, this.#deps.graphSession.get().session)
   }
 
   serve(session: DeepLinkSession): Unlisten {
     const { intake, logger, graphSession } = this.#deps
     const { navigate } = session
-    const graph = graphSession.getState().session
+    const graph = graphSession.get().session
     return intake.onUrl((url) => {
       const link = parseDeepLink(url)
       // Capture and rejected URLs do not express a navigation intent, so they

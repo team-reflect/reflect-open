@@ -141,8 +141,11 @@ import { createNoteFileService, type NoteFileService } from './graph/note-file-s
 import {
   createGraphSessionService,
   type GraphSessionService,
+  type GraphSessionState,
 } from './graph/graph-session-service.ts'
+import type { Store } from './store.ts'
 import { createDailyNoteService, type DailyNoteService } from './daily/daily-note-service.ts'
+import { createTodayService, type TodayService } from './daily/today-service.ts'
 import { createAttachmentService, type AttachmentService } from './documents/attachment-service.ts'
 import { createNoteMoveService, type NoteMoveService } from './documents/note-move-service.ts'
 import {
@@ -163,10 +166,8 @@ import {
   createNotePreviewService,
   type NotePreviewService,
 } from './documents/note-preview-service.ts'
-import {
-  createNoteSessionService,
-  type NoteSessionService,
-} from './documents/note-session-service.ts'
+import { createNoteSessionService } from './documents/note-session-service.ts'
+import type { NoteSessionService } from './documents/note-session-types.ts'
 import {
   createOpenDocumentsService,
   type OpenDocumentsService,
@@ -227,7 +228,7 @@ import { createBackgroundReconcilerFactory } from './reconcile/background-reconc
 import type { ClockService } from './ports/clock-service.ts'
 import type { HttpService } from './ports/http-service.ts'
 import { createSystemIdService, type IdService } from './ports/id-service.ts'
-import { isMobilePlatform } from './ports/platform-facts.ts'
+import { isMobilePlatform, type PlatformFacts } from './ports/platform-facts.ts'
 import type { ActivityPort } from './ports/activity-port.ts'
 import type { ProgressPort } from './ports/progress-port.ts'
 import { createUnavailableImageCodec, type ImageCodecService } from './ports/image-codec-service.ts'
@@ -239,7 +240,6 @@ import {
   type PersistenceFlushService,
 } from './graph/persistence-flush-service.ts'
 import { appleFileSrc, type FileSrcConverter } from './ports/file-src.ts'
-import type { PlatformFacts } from './ports/platform-facts.ts'
 import { createWebStorageService, type StorageService } from './ports/storage-service.ts'
 import type { GraphServices, GraphServicesDeps } from './create-graph-services.ts'
 import type { AudioRecorderService } from './audio/audio-recorder-service.ts'
@@ -257,7 +257,7 @@ export interface CoreServices {
    */
   readonly logger: LoggerService
   /**
-   * Wall time, monotonic time, the local date, and timers.
+   * Wall time, monotonic time, and timers.
    */
   readonly clock: ClockService
   /**
@@ -412,6 +412,10 @@ export interface CoreServices {
    * The optimistic read overlay for note index rows.
    */
   readonly noteRows: NoteRowService
+  /**
+   * The local calendar date, notified whenever it changes.
+   */
+  readonly today: TodayService
   /**
    * The date questions about notes: today, which days have a daily note, and the wake onto a new day.
    */
@@ -664,6 +668,7 @@ export const coreServiceFactories = {
   transcriptEnrichment: createTranscriptEnrichmentService,
   audioMemo: createAudioMemoService,
   chatHistory: createChatHistoryService,
+  today: createTodayService,
   dailyNotes: createDailyNoteService,
   noteTools: createNoteToolsService,
   chatEngine: createChatEngineService,
@@ -925,7 +930,10 @@ export function composeCoreServices(
   const assetStore = create.assetStore({ ipc, clock, fileChanges })
   const openDocuments = create.openDocuments({ fileChanges })
   // Read at call time: the graph session is built later.
-  const lateGraphSession = { getState: () => graphSession.getState() }
+  const lateGraphSession: Store<GraphSessionState<GraphServices>> = {
+    get: () => graphSession.get(),
+    subscribe: (listener) => graphSession.subscribe(listener),
+  }
   const indexQuery = create.indexQuery({ database })
   const wikiResolver = create.wikiResolver({ database })
   const backlinks = create.backlinks({ database, noteFile, graphSession: lateGraphSession })
@@ -960,8 +968,7 @@ export function composeCoreServices(
   const noteDocuments = create.noteDocuments({
     openDocuments,
     noteFile,
-    // Read at call time: the graph session is built later.
-    graphSession: { getState: () => graphSession.getState() },
+    graphSession: lateGraphSession,
   })
   const noteMove = create.noteMove({ ipc, indexStore, openDocuments, logger })
   const captureInbox = create.captureInbox({ ipc })
@@ -988,21 +995,15 @@ export function composeCoreServices(
     clock,
     logger,
     progress,
-    // Read at call time: the graph session is built on this lifecycle.
-    graphSession: {
-      getState: () => graphSession.getState(),
-      subscribe: (listener) => graphSession.subscribe(listener),
-    },
+    // The graph session is built on this lifecycle.
+    graphSession: lateGraphSession,
     activity,
     platform,
     role: adapters.role,
   })
   const noteRows = create.noteRows({
-    // Read at call time: the graph session is built on these rows.
-    graphSession: {
-      getState: () => graphSession.getState(),
-      subscribe: (listener) => graphSession.subscribe(listener),
-    },
+    // The graph session is built on these rows.
+    graphSession: lateGraphSession,
   })
   const icloudNative = create.icloudNative({ ipc, logger })
   const graphSession = create.graphSession({
@@ -1100,6 +1101,7 @@ export function composeCoreServices(
       ? buildMobileServices()
       : null
   const chatHistory = create.chatHistory({ ipc, database, logger })
+  const today = create.today({ clock })
   const dailyNotes = create.dailyNotes({ database, clock, activity })
   const noteTools = create.noteTools({
     retrieval,
@@ -1280,6 +1282,7 @@ export function composeCoreServices(
       graphSession,
     }),
     noteRows,
+    today,
     dailyNotes,
     templates: create.templates({
       noteFile,
@@ -1327,6 +1330,7 @@ export function composeCoreServices(
       embeddingRuntime,
       settings,
       clock,
+      today,
       id,
       imageCodec,
       logger,

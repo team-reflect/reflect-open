@@ -6,7 +6,11 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header.tsx'
 import { OnboardingIcloudSection } from '@/mobile/onboarding-icloud-section.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import {
+  useMobileStorageInfo,
+  useMobileStorageResolving,
+} from '@/providers/use-mobile-graph-boot.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 /** Which control kicked off the in-flight choice, so only that one shows the
  * spinner/pending label (every button still disables). Container graph roots
@@ -26,13 +30,15 @@ type PendingChoice = string | null
  * root and records the flag + storage kind + graph name.
  *
  * The screen renders before the iCloud container has resolved (the boot no
- * longer waits on it — see `useMobileGraphBoot`): while
+ * longer waits on it — see `useMobileStorageResolving`): while
  * `mobileStorageResolving` is set the iCloud card shows a pending row
  * instead of vanishing, since a null container root only means "signed out"
  * once the lookup finished.
  */
 export function MobileOnboardingScreen(): ReactElement {
-  const { mobileStorageInfo, mobileStorageResolving, completeOnboarding } = useGraph()
+  const { mobileOnboarding } = useAppServices()
+  const mobileStorageInfo = useMobileStorageInfo()
+  const mobileStorageResolving = useMobileStorageResolving()
   const action = useAsyncAction()
   const [pendingChoice, setPendingChoice] = useState<PendingChoice>(null)
 
@@ -44,8 +50,18 @@ export function MobileOnboardingScreen(): ReactElement {
   const icloudGraphs = mobileStorageInfo?.icloudGraphRoots ?? []
 
   function runChoice(choice: Exclude<PendingChoice, null>, task: () => Promise<void>): void {
-    setPendingChoice(choice)
-    void action.run(task).finally(() => setPendingChoice(null))
+    void action
+      .run(async () => {
+        // Only a run that actually starts marks its button.
+        setPendingChoice(choice)
+        await task()
+      })
+      .then((ran) => {
+        // `run` never rejects, so this covers failure too.
+        if (ran) {
+          setPendingChoice(null)
+        }
+      })
   }
 
   return (
@@ -73,9 +89,15 @@ export function MobileOnboardingScreen(): ReactElement {
               graphs={icloudGraphs}
               busy={action.pending}
               pendingChoice={pendingChoice}
-              onOpen={(root) => runChoice(root, () => completeOnboarding('icloud', root))}
+              onOpen={(root) => {
+                runChoice(root, () => {
+                  return mobileOnboarding.completeOnboarding('icloud', root)
+                })
+              }}
               onCreate={(root) => {
-                runChoice('icloud-create', () => completeOnboarding('icloud', root))
+                runChoice('icloud-create', () => {
+                  return mobileOnboarding.completeOnboarding('icloud', root)
+                })
               }}
             />
           ) : (
@@ -87,7 +109,7 @@ export function MobileOnboardingScreen(): ReactElement {
               variant="ghost"
               size="sm"
               className="text-text-secondary"
-              onClick={() => runChoice('local', () => completeOnboarding('local'))}
+              onClick={() => runChoice('local', () => mobileOnboarding.completeOnboarding('local'))}
               disabled={action.pending || mobileStorageInfo === null}
             >
               {pendingChoice === 'local' ? (

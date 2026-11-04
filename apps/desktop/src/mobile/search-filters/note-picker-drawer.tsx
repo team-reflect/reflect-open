@@ -2,12 +2,12 @@ import { useDeferredValue, useState, type ReactElement } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { parseSearchQuery } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { queryKeys } from '@/lib/query-client.ts'
 import { SearchInput } from '@/mobile/search-input.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import type { NoteFilterRef } from './filter-state.ts'
+import type { NoteFilterRef } from '@reflect/app'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
 const PICKER_LIMIT = 20
@@ -34,7 +34,7 @@ export function NotePickerDrawer({
   current,
   onPick,
 }: NotePickerDrawerProps): ReactElement {
-  const { graph } = useGraph()
+  const graph = useGraphInfo()
   const { search } = useCoreServices()
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
@@ -70,14 +70,18 @@ export function NotePickerDrawer({
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>{title}</DrawerTitle>
-        <DrawerBody className="px-4">
-          <SearchInput
-            placeholder="Find a note…"
-            aria-label="Find a note"
-            value={query}
-            onValueChange={setQuery}
-          />
-          <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* One scroller, so a drag at its top still closes the sheet. The search
+            field sticks to its top instead (no top fade, which would dim it). */}
+        <DrawerBody className="px-4 scroll-fade-t-0">
+          <div className="sticky top-0 z-10 bg-popover">
+            <SearchInput
+              placeholder="Find a note…"
+              aria-label="Find a note"
+              value={query}
+              onValueChange={setQuery}
+            />
+          </div>
+          <div className="flex-1">
             {hits !== undefined && hits.length === 0 && (
               <p className="py-6 text-center text-sm text-text-muted">No matches</p>
             )}
