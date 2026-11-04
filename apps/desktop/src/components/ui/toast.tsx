@@ -140,6 +140,7 @@ function ToastDescription({ className, ...props }: ToastPrimitive.Description.Pr
   )
 }
 
+// Module-level so React Compiler can optimize the component: it skips JSX default parameters.
 const toastActionRender = <Button variant="outline" size="sm" />
 
 function ToastAction({
@@ -157,6 +158,7 @@ function ToastAction({
   )
 }
 
+// Module-level so React Compiler can optimize the component: it skips JSX default parameters.
 const toastCloseRender = <Button variant="ghost" size="icon-sm" />
 
 function ToastClose({
