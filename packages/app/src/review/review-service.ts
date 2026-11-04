@@ -77,7 +77,10 @@ function selectIsOverride(value: string | null): boolean {
 }
 
 function parseRequestedAt(value: string | null): number | null {
-  const time = value === null ? Number.NaN : Number(value)
+  if (value === null) {
+    return null
+  }
+  const time = Number(value)
   return Number.isFinite(time) ? time : null
 }
 

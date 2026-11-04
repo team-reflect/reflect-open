@@ -31,9 +31,15 @@ function createFakeReview() {
     override: new WritableStore(false),
     setOverride: () => {},
     shouldAsk: () => true,
-    requestReview: () => calls.push('requestReview'),
-    writeReview: () => calls.push('writeReview'),
-    sendFeedback: (channel) => calls.push(channel),
+    requestReview: () => {
+      calls.push('requestReview')
+    },
+    writeReview: () => {
+      calls.push('writeReview')
+    },
+    sendFeedback: (channel) => {
+      calls.push(channel)
+    },
   }
   return { review, calls }
 }
