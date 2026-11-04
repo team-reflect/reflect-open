@@ -1,8 +1,10 @@
+import { page } from 'vitest/browser'
 import { act } from '@/test-utils/act.ts'
 import { useState, type ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { createDayWindow, dateAtIndex } from '@reflect/app'
 import { DayCarousel } from '@/mobile/day-carousel.tsx'
+import '@/test-utils/locator.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
 import {
@@ -175,7 +177,7 @@ describe('useDayCarousel', () => {
   }
 
   const slide = (day: string): HTMLElement | null => {
-    return document.querySelector<HTMLElement>(`[data-day="${CSS.escape(day)}"]`)
+    return page.locate(`[data-day="${CSS.escape(day)}"]`).query()
   }
 
   it('reports the landed day only when the swipe settles', async () => {
