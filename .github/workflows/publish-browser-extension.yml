@@ -70,8 +70,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
-          gh release upload "$TAG" --clobber \
-            "apps/extension/.output/reflect-capture-${EXTENSION_VERSION}-chrome-unpacked.zip"
+          zip="apps/extension/.output/reflect-capture-${EXTENSION_VERSION}-chrome-unpacked.zip"
+          for attempt in 1 2 3; do
+            gh release upload "$TAG" "$zip" --clobber && exit 0
+            echo "::warning::gh release upload failed (attempt $attempt)"
+            sleep $((attempt * 10))
+          done
+          exit 1
 
       - name: Append the install instructions and publish the release
         env:
