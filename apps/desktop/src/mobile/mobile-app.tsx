@@ -34,6 +34,7 @@ export function MobileApp(): ReactElement {
     <>
       <KeyboardEffects />
       <MobileSurface />
+      <MobileOverlay />
     </>
   )
 }
@@ -50,28 +51,20 @@ function KeyboardEffects(): null {
   return null
 }
 
-/**
- * The current surface with the paywall drawer over it.
- */
-function MobileSurface(): ReactElement {
+// Subscription verification runs beside startup, never in its critical
+// path: while StoreKit or settings are unresolved the gate stays hidden and
+// the local app boots normally. A settled negative answer opens the paywall
+// over the current surface later; a purchase closes it.
+function MobileOverlay(): ReactElement | null {
   const paywallGate = usePaywallGate()
-
-  // Subscription verification runs beside startup, never in its critical
-  // path: while StoreKit or settings are unresolved the gate stays hidden and
-  // the local app boots normally. A settled negative answer opens the paywall
-  // over the current surface later; a purchase closes it.
-  return (
-    <>
-      <MobileSurfaceContent />
-      <PaywallDrawer open={paywallGate === 'show'} />
-    </>
-  )
+  const open = paywallGate === 'show'
+  return open ? <PaywallDrawer open={open} /> : null
 }
 
 /**
  * The onboarding, loading, and error gates in front of the routed shell.
  */
-function MobileSurfaceContent(): ReactElement {
+function MobileSurface(): ReactElement {
   const { quitPolicy } = useAppServices()
   const status = useGraphStatus()
   const graph = useGraphInfo()
