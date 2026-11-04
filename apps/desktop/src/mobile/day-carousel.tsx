@@ -79,7 +79,7 @@ export function DayCarousel({
       ref={scrollerRef}
       data-scroll-x
       className={cn(
-        'min-h-0 flex-1 snap-x snap-mandatory scrollbar-none overflow-y-hidden overscroll-x-contain',
+        'pager-x min-h-0 flex-1',
         // No swiping between days while the software keyboard is up (V1
         // parity: horizontal drags would fight text selection and the caret).
         keyboardVisible ? 'overflow-x-hidden' : 'overflow-x-auto',

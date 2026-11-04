@@ -41,6 +41,12 @@ Cascade layer order, low to high priority.
   );
 }
 
+/* Horizontal snap pager without a visible scrollbar. Each pager sets its own
+   `overflow-x`. */
+@utility pager-x {
+  @apply snap-x snap-mandatory scrollbar-none overflow-y-hidden overscroll-x-contain;
+}
+
 /* Controls that sit inside the overlaid macOS title-bar drag strip must share
    the strip's z-index so they win by tree order without jumping above overlays. */
 @utility window-drag-control {

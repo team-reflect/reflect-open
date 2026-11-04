@@ -160,10 +160,7 @@ export function SwipeRow({
       data-scroll-x=""
       onPointerDown={onPointerDown}
       style={scrollerStyle}
-      className={cn(
-        'swipe-row flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
-        className,
-      )}
+      className={cn('swipe-row pager-x flex overflow-x-auto', className)}
     >
       <div className={cn('relative z-10 w-full flex-none snap-start', surfaceClassName)}>
         {children}
