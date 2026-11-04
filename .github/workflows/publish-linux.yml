@@ -28,7 +28,7 @@ defaults:
 
 jobs:
   linux:
-    name: ${{ matrix.name }}
+    name: Linux ${{ matrix.name }}
     if: github.repository == 'team-reflect/reflect-open'
     environment: release_app
     runs-on: ${{ matrix.runner }}
