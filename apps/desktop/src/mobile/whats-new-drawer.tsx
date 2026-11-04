@@ -107,16 +107,16 @@ function WhatsNewPages({
   const continueRise = riseIn(items.length + 1)
   // The drawer can close while `shouldAsk()` waits; a closed drawer must not
   // start the review page's cooldown.
-  const mounted = useRef(false)
+  const mountedRef = useRef(false)
   useEffect(() => {
-    mounted.current = true
+    mountedRef.current = true
     return () => {
-      mounted.current = false
+      mountedRef.current = false
     }
   }, [])
   const next = async (): Promise<void> => {
     const ask = await review.shouldAsk()
-    if (!mounted.current) {
+    if (!mountedRef.current) {
       return
     }
     if (ask) {
