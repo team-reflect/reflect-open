@@ -94,11 +94,13 @@ export interface ReviewService {
   readonly override: Store<boolean>
   setOverride: (next: boolean) => void
   /**
-   * Whether the review page should follow What's New right now.
+   * Whether the review page should follow What's New right now. Waits for
+   * this launch's App Store environment.
    */
-  shouldAsk(): boolean
+  shouldAsk(): Promise<boolean>
   /**
-   * Asks StoreKit for its review prompt and starts the cooldown.
+   * Asks StoreKit for its review prompt, and starts the cooldown once the
+   * request reaches it.
    */
   requestReview: () => void
   /**
@@ -144,14 +146,14 @@ class ReviewServiceImpl implements ReviewService {
     this.#deps.storage.session.set(REVIEW_OVERRIDE_STORAGE_KEY, next ? 'true' : null)
   }
 
-  shouldAsk(): boolean {
+  async shouldAsk(): Promise<boolean> {
     const { storage, clock, platform, classicAccess, mobile, versions } = this.#deps
-    if (mobile === null) {
+    if (mobile === null || platform.appPlatform !== 'ios') {
       return false
     }
     return decideAskForReview({
       marked: versions.has(marketingVersion(platform.appVersion)),
-      environment: mobile.appStoreEnvironment.get().value,
+      environment: await mobile.appStoreEnvironment.environment(),
       paid: mobile.subscription.get().value !== null || classicAccess.get().active,
       requestedAt: parseRequestedAt(storage.local.get(REVIEW_REQUESTED_AT_STORAGE_KEY)),
       now: clock.now(),
@@ -160,12 +162,10 @@ class ReviewServiceImpl implements ReviewService {
   }
 
   readonly requestReview = (): void => {
-    const { storage, clock, mobile } = this.#deps
+    const { mobile } = this.#deps
     if (mobile === null) {
       return
     }
-    // StoreKit never says whether the prompt showed, so every tap counts.
-    storage.local.set(REVIEW_REQUESTED_AT_STORAGE_KEY, String(clock.now()))
     void this.#tryRequestReview(mobile.appStore)
   }
 
@@ -195,6 +195,10 @@ class ReviewServiceImpl implements ReviewService {
   async #tryRequestReview(appStore: MobileServices['appStore']): Promise<void> {
     try {
       await appStore.requestReview()
+      // StoreKit never says whether the prompt showed, so every call that
+      // reached it counts.
+      const { storage, clock } = this.#deps
+      storage.local.set(REVIEW_REQUESTED_AT_STORAGE_KEY, String(clock.now()))
     } catch (cause: unknown) {
       this.#deps.logger.error('failed to request a review:', errorMessage(cause))
     }

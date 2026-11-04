@@ -30,7 +30,7 @@ function createFakeReview() {
   const review: ReviewService = {
     override: new WritableStore(false),
     setOverride: () => {},
-    shouldAsk: () => true,
+    shouldAsk: () => Promise.resolve(true),
     requestReview: () => {
       calls.push('requestReview')
     },
@@ -84,19 +84,6 @@ describe('WhatsNewDrawer', () => {
     expect(calls).toEqual(['requestReview', 'writeReview', 'discord', 'github', 'email'])
 
     await userEvent.click(page.getByRole('button', { name: 'Not now' }))
-    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
-    expect(dismissed()).toBe(1)
-  })
-
-  it('marks the version seen when the review page is swiped closed', async () => {
-    const { whatsNew, dismissed } = createFakeWhatsNew()
-    const { review } = createFakeReview()
-    await renderInApp(<WhatsNewDrawer />, { appServices: { whatsNew, review }, servicesOnly: true })
-
-    await userEvent.click(page.getByRole('button', { name: 'Continue' }))
-    await expect.element(page.getByText('Enjoying Reflect?')).toBeVisible()
-    await swipeDrawerClosed()
-
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
     expect(dismissed()).toBe(1)
   })

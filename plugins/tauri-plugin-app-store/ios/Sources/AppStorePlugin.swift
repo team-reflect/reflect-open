@@ -89,10 +89,6 @@ class AppStorePlugin: Plugin {
   /// TestFlight) and reports nothing back.
   @MainActor
   @objc public func requestReview(_ invoke: Invoke) async throws {
-    guard #available(iOS 16.0, *) else {
-      invoke.reject("requestReview needs iOS 16")
-      return
-    }
     guard
       let scene = UIApplication.shared.connectedScenes
         .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene

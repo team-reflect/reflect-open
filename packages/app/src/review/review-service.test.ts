@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   createTestAppStoreEnvironmentService,
   createTestAppStoreService,
@@ -70,7 +70,9 @@ describe('decideAskForReview', () => {
   })
 })
 
-function setup(options: { version?: string; mobile?: boolean } = {}) {
+function setup(
+  options: { version?: string; mobile?: boolean; appPlatform?: 'ios' | 'android' } = {},
+) {
   const storage = createTestStorageService()
   const appStore = createTestAppStoreService()
   const opener = createTestOpenerService()
@@ -78,7 +80,7 @@ function setup(options: { version?: string; mobile?: boolean } = {}) {
     storage,
     clock: createTestClockService({ now: NOW }),
     platform: createTestPlatformService({
-      appPlatform: 'ios',
+      appPlatform: options.appPlatform ?? 'ios',
       appVersion: options.version ?? '0.20.0',
     }),
     logger: createTestLoggerService(),
@@ -98,23 +100,29 @@ function setup(options: { version?: string; mobile?: boolean } = {}) {
 }
 
 describe('createReviewService', () => {
-  it('matches a beta to its marketing version', () => {
-    expect(setup({ version: '0.20.0-beta.2' }).review.shouldAsk()).toBe(true)
-    expect(setup({ version: '0.21.0' }).review.shouldAsk()).toBe(false)
+  it('matches a beta to its marketing version', async () => {
+    expect(await setup({ version: '0.20.0-beta.2' }).review.shouldAsk()).toBe(true)
+    expect(await setup({ version: '0.21.0' }).review.shouldAsk()).toBe(false)
   })
 
-  it('requests the prompt and starts the cooldown', () => {
+  it('requests the prompt and starts the cooldown', async () => {
     const { review, storage, appStore } = setup()
     review.requestReview()
     expect(appStore.calls()).toEqual(['requestReview'])
-    expect(storage.local.get(REVIEW_REQUESTED_AT_STORAGE_KEY)).toBe(String(NOW))
-    expect(review.shouldAsk()).toBe(false)
+    await vi.waitFor(() => {
+      expect(storage.local.get(REVIEW_REQUESTED_AT_STORAGE_KEY)).toBe(String(NOW))
+    })
+    expect(await review.shouldAsk()).toBe(false)
   })
 
-  it('never asks without the StoreKit services, even with the override', () => {
+  it('never asks outside iOS, even with the override', async () => {
+    const android = setup({ appPlatform: 'android' }).review
+    android.setOverride(true)
+    expect(await android.shouldAsk()).toBe(false)
+
     const { review, storage } = setup({ mobile: false })
     review.setOverride(true)
-    expect(review.shouldAsk()).toBe(false)
+    expect(await review.shouldAsk()).toBe(false)
     review.requestReview()
     expect(storage.local.get(REVIEW_REQUESTED_AT_STORAGE_KEY)).toBeNull()
   })
