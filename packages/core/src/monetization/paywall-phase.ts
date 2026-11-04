@@ -1,7 +1,7 @@
 /**
  * Days after the first launch during which the paywall stays hidden.
  */
-export const PAYWALL_HIDDEN_DAYS = 7
+export const PAYWALL_HIDDEN_DAYS = 2
 
 /**
  * Days after `PAYWALL_HIDDEN_DAYS` during which the paywall shows at most once
