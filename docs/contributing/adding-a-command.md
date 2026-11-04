@@ -2,11 +2,7 @@
 
 How a value travels from Rust to a React component. **Adding a command is two
 things: the Rust command, and a method on the core service that owns the
-domain.** The in-tree example is `app_version`: a `#[tauri::command]` in
-`lib.rs`, bound as `AppInfoService.version()`
-(`packages/core/src/ports/app-info-service.ts`), and read in React by
-`useAppVersion()` (`apps/desktop/src/hooks/use-app-version.ts`). This guide
-walks the same path with a hypothetical `note_stat` command.
+domain.** This guide walks the path with a hypothetical `note_stat` command.
 
 ```text
 React component / hook        useCoreServices()

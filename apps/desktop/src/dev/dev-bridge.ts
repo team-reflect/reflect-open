@@ -129,8 +129,6 @@ class DevBridgeImpl implements IpcBridge {
   #runCommand(command: string, args: Record<string, unknown>): unknown {
     const { files, index, assets } = this.#deps
     switch (command) {
-      case 'app_version':
-        return '0.0.0-dev'
       case 'background_task_begin':
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.

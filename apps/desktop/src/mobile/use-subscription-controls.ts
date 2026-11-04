@@ -72,9 +72,8 @@ export function useSubscriptionControls(): SubscriptionControls {
     restorePending: iap.restoreMutation.isPending,
     redeemPending: iap.redeemMutation.isPending,
     removeClassicVerificationPending: classicSignOut.isPending,
-    // The request flips the paywall gate to 'show', which opens the paywall
-    // drawer immediately, also outside the App Store, where the gate
-    // otherwise never shows the paywall at all.
+    // The request opens the paywall drawer over the app, also outside the App
+    // Store. It is skippable unless the free period has ended.
     subscribe: () => {
       setPaywallRequested(true)
     },

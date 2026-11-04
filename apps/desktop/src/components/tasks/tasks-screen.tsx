@@ -81,7 +81,7 @@ export function TasksScreen(): ReactElement {
   const [query, setQuery] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
-  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const { open, completed, openFailed, completedFailed } = useStore(taskService)
   useEffect(
@@ -98,7 +98,7 @@ export function TasksScreen(): ReactElement {
   // must wait for both — else a graph with only completed tasks flashes "No
   // tasks to show." while the completed query is still loading.
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
-  const { onScroll } = useScrollRestoration(scrollElement, ready)
+  const { onScroll } = useScrollRestoration(scrollRef, ready)
 
   // This session's completed tasks, still showing struck until archived —
   // reconciled against the open read so a task reopened at its source note
@@ -307,7 +307,7 @@ export function TasksScreen(): ReactElement {
           onOpenChange={setFiltersOpen}
         />
       </header>
-      <div ref={setScrollElement} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
+      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
         {isError ? (
           <p role="alert" className="px-4 py-6 text-sm text-text-muted lg:px-12">
             Couldn’t load tasks.

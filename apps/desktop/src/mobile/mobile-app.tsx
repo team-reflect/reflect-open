@@ -3,9 +3,11 @@ import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
 import { PaywallDrawer } from '@/mobile/paywall-drawer.tsx'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
+import { WhatsNewDrawer } from '@/mobile/whats-new-drawer.tsx'
 import {
   useKeyboardCaretReveal,
   useKeyboardFieldReveal,
@@ -53,15 +55,24 @@ function KeyboardEffects(): null {
 }
 
 /**
- * The paywall drawer over every surface. Subscription verification runs beside
- * startup, never in its critical path: while StoreKit or settings are
- * unresolved the gate stays hidden and the local app boots normally. A settled
- * negative answer opens the paywall later; a purchase closes it. A leaf, so a
- * gate change re-renders only this component.
+ * The What's New and paywall drawers over every surface. What's New waits
+ * while the paywall shows or may show, so the two never open together.
+ * Subscription verification runs beside startup, never in its critical path:
+ * while StoreKit or settings are unresolved the gate stays hidden and the
+ * local app boots normally. A settled
+ * negative answer opens the paywall later. A purchase closes it, and so does
+ * Later on a skippable paywall. A leaf, so a gate change re-renders only this
+ * component.
  */
 function MobileOverlay(): ReactElement {
+  const { paywall } = useMobileServices()
   const paywallGate = usePaywallGate()
-  return <PaywallDrawer open={paywallGate === 'show'} />
+  return (
+    <>
+      <WhatsNewDrawer />
+      <PaywallDrawer gate={paywallGate} onDismiss={paywall.dismissSkippable} />
+    </>
+  )
 }
 
 /**

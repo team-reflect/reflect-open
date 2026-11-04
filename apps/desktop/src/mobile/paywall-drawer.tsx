@@ -1,7 +1,20 @@
+import { useState, type ReactElement } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Check } from 'lucide-react'
+import {
+  IAP_PRODUCT_IDS,
+  PAYWALL_HIDDEN_DAYS,
+  PAYWALL_SKIPPABLE_DAYS,
+  formatFullDate,
+  getPaywallDaysLeft,
+  getPaywallRequiredAt,
+  type PaywallPhase,
+} from '@reflect/core'
 import appIcon from '@/assets/app-icon.png'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { mutationKeys, mutationScopeIds, queryKeys } from '@/lib/query-client.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { ClassicMemberDrawer } from '@/mobile/classic-member-drawer.tsx'
 import { ClassicSignInProgress } from '@/mobile/classic-sign-in-progress.tsx'
@@ -14,14 +27,12 @@ import {
   useClassicSignIn,
 } from '@/mobile/use-classic-access.ts'
 import { useIapRestoreRedeem } from '@/mobile/use-iap-restore-redeem.ts'
-import { useAppServices } from '@/services/services-provider.tsx'
-import { IAP_PRODUCT_IDS } from '@reflect/core'
-import { doNothing } from '@reflect/utils'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { Check } from 'lucide-react'
-import { useState, type ReactElement } from 'react'
+import { useDateFormat } from '@/providers/settings-provider.tsx'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 type PurchasePlan = 'monthly' | 'yearly'
+
+type PaywallMode = Exclude<PaywallPhase, 'hidden'>
 
 interface PurchaseVariables {
   plan: PurchasePlan
@@ -31,22 +42,48 @@ interface PurchaseVariables {
 /** V1 web page that hands a paying Reflect member their free-year offer code. */
 const CLAIM_FREE_YEAR_URL = 'https://reflect.app/claim-reflect-open'
 
+const FREE_DAYS = PAYWALL_HIDDEN_DAYS + PAYWALL_SKIPPABLE_DAYS
+
+interface PaywallDrawerProps {
+  gate: PaywallPhase
+  /**
+   * Called when the skippable paywall is swiped away or the user taps Later.
+   */
+  onDismiss: () => void
+}
+
 /**
- * The paywall as a near full-screen drawer that ignores every request to
- * close: a tap above the sheet and Escape do nothing, and a swipe scrolls the
- * sheet back open.
+ * The paywall as a near full-screen drawer. Closing a skippable paywall calls
+ * `onDismiss`. A required one ignores every request to close: a tap above the
+ * sheet and Escape do nothing, and a swipe scrolls the sheet back open.
  */
-export function PaywallDrawer({ open }: { open: boolean }): ReactElement {
+export function PaywallDrawer({ gate, onDismiss }: PaywallDrawerProps): ReactElement {
+  // The last open mode, so the exit animation keeps its content.
+  const [mode, setMode] = useState<PaywallMode>(gate === 'skippable' ? 'skippable' : 'required')
+  if (gate !== 'hidden' && gate !== mode) {
+    setMode(gate)
+  }
   return (
-    <Drawer open={open} onOpenChange={doNothing}>
+    <Drawer
+      open={gate !== 'hidden'}
+      onOpenChange={(open) => {
+        if (!open && mode === 'skippable') onDismiss()
+      }}
+    >
       <DrawerContent>
-        <PaywallContent />
+        <PaywallContent mode={mode} onLater={onDismiss} />
       </DrawerContent>
     </Drawer>
   )
 }
 
-function PaywallContent(): ReactElement {
+function PaywallContent({
+  mode,
+  onLater,
+}: {
+  mode: PaywallMode
+  onLater: () => void
+}): ReactElement {
   const { paywall } = useMobileServices()
   const { opener } = useAppServices()
   const [selectedPlan, setSelectedPlan] = useState<PurchasePlan>('yearly')
@@ -63,11 +100,6 @@ function PaywallContent(): ReactElement {
   const productsFailed =
     products.status === 'error' ||
     (products.status === 'success' && (yearly === null || monthly === null))
-  const selectedPrice =
-    selectedPlan === 'yearly'
-      ? `${yearly?.formattedPrice ?? ''}/year`
-      : `${monthly?.formattedPrice ?? ''}/month`
-
   const purchaseMutation = useMutation({
     mutationKey: mutationKeys.iap.purchase,
     scope: { id: mutationScopeIds.iapAction },
@@ -117,19 +149,8 @@ function PaywallContent(): ReactElement {
   }
 
   return (
-    <DrawerBody className="gap-6 px-5 pt-6">
-      <header className="flex flex-col gap-4">
-        <img src={appIcon} alt="" draggable={false} className="size-11 rounded-xl" />
-        <div className="space-y-2">
-          <DrawerTitle className="px-0 pt-0 text-[28px] font-semibold leading-tight tracking-tight">
-            Unlock Reflect Pro
-          </DrawerTitle>
-          <p className="text-sm leading-6 text-text-secondary">
-            Notes, tasks, search, and AI. Everything Reflect does on your Mac, now on your iPhone
-            and iPad.
-          </p>
-        </div>
-      </header>
+    <DrawerBody className="gap-6 px-5 pt-2">
+      {mode === 'skippable' ? <SkippableHeader onLater={onLater} /> : <RequiredHeader />}
 
       {products.status === 'pending' ? (
         <div className="flex justify-center py-8">
@@ -173,12 +194,10 @@ function PaywallContent(): ReactElement {
               onClick={subscribe}
             >
               {purchasingPlan !== null ? <Spinner className="size-4" /> : null}
-              Start 7-day free trial
+              Subscribe
             </Button>
             <p className="text-center text-xs leading-5 text-text-muted">
-              7 days free, then {selectedPrice}.
-              <br />
-              Cancel anytime in the App Store.
+              Renews automatically until canceled. Cancel anytime in the App Store.
             </p>
           </div>
         </div>
@@ -249,6 +268,116 @@ function PaywallContent(): ReactElement {
       />
       <ClassicSignInProgress signIn={classicSignIn} />
     </DrawerBody>
+  )
+}
+
+function AppIcon(): ReactElement {
+  return <img src={appIcon} alt="" draggable={false} className="size-11 shrink-0 rounded-xl" />
+}
+
+const TITLE_CLASS = 'px-0 pt-0 text-2xl leading-tight font-semibold tracking-tight'
+
+function SkippableHeader({ onLater }: { onLater: () => void }): ReactElement {
+  const { installClock } = useMobileServices()
+  const { clock } = useCoreServices()
+  const dateFormat = useDateFormat()
+  const { firstLaunchAt } = useStore(installClock)
+  // 0 when the first launch is unknown, or when Debug simulates the skippable
+  // phase on an older install. Both leave out the countdown.
+  const daysLeft = firstLaunchAt === null ? 0 : getPaywallDaysLeft(firstLaunchAt, clock.now())
+
+  return (
+    <header className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
+        {daysLeft === 0 ? (
+          <span />
+        ) : (
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+            {daysLeft === 1 ? '1 free day left' : `${daysLeft} free days left`}
+          </span>
+        )}
+        <button type="button" className="text-base font-medium text-primary" onClick={onLater}>
+          Later
+        </button>
+      </div>
+      <div className="flex items-center gap-4">
+        <AppIcon />
+        <DrawerTitle className={TITLE_CLASS}>Enjoying Reflect?</DrawerTitle>
+      </div>
+      <p className="text-sm leading-6 text-text-secondary">
+        Subscribe to keep your notes, tasks, search, and AI on iPhone and iPad.
+      </p>
+      {firstLaunchAt !== null && daysLeft > 0 ? (
+        <div className="flex flex-col gap-2">
+          <div
+            role="progressbar"
+            aria-label="Free days used"
+            aria-valuemin={0}
+            aria-valuemax={FREE_DAYS}
+            aria-valuenow={FREE_DAYS - daysLeft}
+            className="h-1.5 overflow-hidden rounded-full bg-border"
+          >
+            <div
+              className="h-full rounded-full bg-primary"
+              style={{ width: `${((FREE_DAYS - daysLeft) / FREE_DAYS) * 100}%` }}
+            />
+          </div>
+          <div className="flex justify-between gap-4 text-xs text-text-muted">
+            <span>
+              Day {Math.min(FREE_DAYS, FREE_DAYS - daysLeft + 1)} of {FREE_DAYS}
+            </span>
+            <span>
+              Free until {formatFullDate(new Date(getPaywallRequiredAt(firstLaunchAt)), dateFormat)}
+            </span>
+          </div>
+        </div>
+      ) : null}
+    </header>
+  )
+}
+
+const REASSURANCES = [
+  {
+    title: 'Cancel in two taps.',
+    detail: 'Any time in Settings › Apple ID › Subscriptions.',
+  },
+  {
+    title: 'Your notes stay yours.',
+    detail: 'They are Markdown files you can open in Files, subscribed or not.',
+  },
+  {
+    title: 'Private by default.',
+    detail: 'Notes stay on your devices. Sync with iCloud or your own Git server.',
+  },
+]
+
+function RequiredHeader(): ReactElement {
+  return (
+    <header className="flex flex-col gap-4 pt-4">
+      <div className="flex items-center gap-4">
+        <AppIcon />
+        <DrawerTitle className={TITLE_CLASS}>Unlock Reflect Pro</DrawerTitle>
+      </div>
+      <p className="text-sm leading-6 text-text-secondary">
+        Your free period has ended. Subscribe to keep using Reflect on iPhone and iPad.
+      </p>
+      <ul className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4">
+        {REASSURANCES.map((item) => (
+          <li key={item.title} className="flex items-start gap-3 text-sm leading-5">
+            <span
+              aria-hidden
+              className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+            >
+              <Check className="size-3" strokeWidth={3} />
+            </span>
+            <span className="flex flex-col">
+              <span className="font-medium">{item.title}</span>
+              <span className="text-text-secondary">{item.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </header>
   )
 }
 
