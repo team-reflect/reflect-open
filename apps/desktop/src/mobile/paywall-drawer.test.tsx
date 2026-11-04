@@ -194,9 +194,9 @@ describe('PaywallDrawer modes', () => {
   )
 
   it('renders nothing while hidden', async () => {
-    await mount('hidden')
+    const view = await mount('hidden')
 
-    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    await expect.element(view.getByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('stays open on Escape when required', async () => {
