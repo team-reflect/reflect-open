@@ -71,7 +71,7 @@ jobs:
           manifest-file: .github/release-please/manifest.extension.json
 
   publish-browser-extension:
-    name: Submit the Chrome extension
+    name: Publish the browser extension
     needs: release-please
     if: needs.release-please.outputs.extension_created == 'true'
     permissions:
@@ -85,13 +85,13 @@ jobs:
       CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
       CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
-  publish-desktop-stable:
-    name: Publish the stable desktop release
+  publish-app-stable:
+    name: Publish stable
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
     permissions:
       contents: write
-    uses: ./.github/workflows/publish-desktop.yml
+    uses: ./.github/workflows/publish-app.yml
     with:
       tag: ${{ needs.release-please.outputs.stable_tag }}
       commit: ${{ needs.release-please.outputs.stable_commit }}
@@ -106,13 +106,13 @@ jobs:
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-  publish-desktop-beta:
-    name: Publish the beta desktop release
+  publish-app-beta:
+    name: Publish beta
     needs: release-please
     if: needs.release-please.outputs.beta_created == 'true'
     permissions:
       contents: write
-    uses: ./.github/workflows/publish-desktop.yml
+    uses: ./.github/workflows/publish-app.yml
     with:
       tag: ${{ needs.release-please.outputs.beta_tag }}
       commit: ${{ needs.release-please.outputs.beta_commit }}

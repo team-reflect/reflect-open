@@ -1,4 +1,4 @@
-name: Publish desktop
+name: Publish app
 
 on:
   workflow_call:
@@ -36,7 +36,7 @@ permissions:
 
 jobs:
   macos:
-    name: Build the macOS release
+    name: macOS
     uses: ./.github/workflows/publish-macos.yml
     with:
       tag: ${{ inputs.tag }}
@@ -53,7 +53,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   windows:
-    name: Build the Windows installer
+    name: Windows
     uses: ./.github/workflows/publish-windows.yml
     with:
       tag: ${{ inputs.tag }}
@@ -62,7 +62,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   linux:
-    name: Build the Linux packages
+    name: Linux
     uses: ./.github/workflows/publish-linux.yml
     with:
       tag: ${{ inputs.tag }}
@@ -71,7 +71,7 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
   testflight:
-    name: Upload the release to TestFlight
+    name: iOS
     uses: ./.github/workflows/publish-testflight.yml
     with:
       commit: ${{ inputs.commit }}
@@ -83,7 +83,7 @@ jobs:
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
   finalize:
-    name: Finalize the release
+    name: Finalize
     needs: [macos, windows, linux]
     if: github.repository == 'team-reflect/reflect-open'
     runs-on: ubuntu-24.04
