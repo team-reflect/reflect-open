@@ -23,7 +23,7 @@ export function WhatsNewDialog(): ReactElement {
   const gate = useStore(whatsNew.gate)
   return (
     <Dialog
-      open={gate.kind === 'whatsNew'}
+      open={gate === 'shown'}
       onOpenChange={(open) => {
         if (!open) {
           whatsNew.dismiss()

@@ -7,7 +7,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { WhatsNewDrawer } from './whats-new-drawer.tsx'
 
 function createFakeWhatsNew() {
-  const gate = new WritableStore<WhatsNewGate>({ kind: 'whatsNew' })
+  const gate = new WritableStore<WhatsNewGate>('shown')
   let dismissed = 0
   const whatsNew: WhatsNewService = {
     items: [{ title: 'Chat in the All tab', body: 'Ask your notes anywhere.', platforms: ['ios'] }],
@@ -16,7 +16,7 @@ function createFakeWhatsNew() {
     setOverride: () => {},
     dismiss: () => {
       dismissed += 1
-      gate.set({ kind: 'hidden' })
+      gate.set('hidden')
     },
     start: () => () => {},
   }

@@ -59,10 +59,7 @@ export type WhatsNewDecision = 'wait' | 'skip' | 'show'
 /**
  * Whether to show What's New.
  */
-export type WhatsNewGate = { readonly kind: 'hidden' } | { readonly kind: 'whatsNew' }
-
-const HIDDEN: WhatsNewGate = { kind: 'hidden' }
-const SHOWN: WhatsNewGate = { kind: 'whatsNew' }
+export type WhatsNewGate = 'hidden' | 'shown'
 
 /**
  * What to do with What's New for the given inputs.
@@ -162,7 +159,9 @@ class WhatsNewServiceImpl implements WhatsNewService {
         })
       },
     )
-    this.gate = deriveStore(this.#decision, (decision) => (decision === 'show' ? SHOWN : HIDDEN))
+    this.gate = deriveStore(this.#decision, (decision): WhatsNewGate => {
+      return decision === 'show' ? 'shown' : 'hidden'
+    })
   }
 
   readonly setOverride = (next: boolean): void => {

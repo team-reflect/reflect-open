@@ -73,7 +73,7 @@ export function WhatsNewDrawer(): ReactElement {
   const gate = useStore(whatsNew.gate)
   return (
     <Drawer
-      open={gate.kind === 'whatsNew'}
+      open={gate === 'shown'}
       onOpenChange={(open) => {
         if (!open) {
           whatsNew.dismiss()

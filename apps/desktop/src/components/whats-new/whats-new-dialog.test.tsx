@@ -7,7 +7,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { WhatsNewDialog } from './whats-new-dialog.tsx'
 
 function createFakeWhatsNew() {
-  const gate = new WritableStore<WhatsNewGate>({ kind: 'whatsNew' })
+  const gate = new WritableStore<WhatsNewGate>('shown')
   let dismissed = 0
   const whatsNew: WhatsNewService = {
     items: [
@@ -18,7 +18,7 @@ function createFakeWhatsNew() {
     setOverride: () => {},
     dismiss: () => {
       dismissed += 1
-      gate.set({ kind: 'hidden' })
+      gate.set('hidden')
     },
     start: () => () => {},
   }
