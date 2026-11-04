@@ -14,7 +14,7 @@ import {
 import { usePaywallGate } from '@/mobile/use-paywall-gate.ts'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics.ts'
 import { useGraphError, useGraphInfo, useGraphStatus } from '@/providers/graph-provider.tsx'
-import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
+import { useNeedsOnboarding } from '@/providers/use-mobile-graph-boot.ts'
 import { RouterProvider } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
@@ -26,20 +26,41 @@ import { useAppServices } from '@/services/services-provider.tsx'
  *
  * The router mounts per graph exactly as on desktop; `MobileScreen` renders
  * the current route (daily spine, note pages), so wiki-link and date-link
- * taps navigate for real. The keyboard-height mirror lives here so every
- * screen inherits `--keyboard-height`; the field/caret reveals and the
- * checkbox-haptic listener mount here so they cover every screen's inputs.
+ * taps navigate for real. The keyboard effects and the checkbox-haptic
+ * listener mount here so they cover every screen's inputs.
  */
 export function MobileApp(): ReactElement {
+  return (
+    <>
+      <KeyboardEffects />
+      <MobileSurface />
+    </>
+  )
+}
+
+/**
+ * The keyboard-height mirror (so every screen inherits `--keyboard-height`)
+ * and the field/caret reveals. A leaf, so a keyboard height change re-renders
+ * only this component.
+ */
+function KeyboardEffects(): null {
+  useKeyboardHeightVar()
+  useKeyboardFieldReveal()
+  useKeyboardCaretReveal()
+  return null
+}
+
+/**
+ * The paywall, onboarding, loading, and error gates in front of the routed
+ * shell.
+ */
+function MobileSurface(): ReactElement {
   const { quitPolicy } = useAppServices()
   const status = useGraphStatus()
   const graph = useGraphInfo()
   const error = useGraphError()
-  const { needsOnboarding } = useMobileGraphBoot()
+  const needsOnboarding = useNeedsOnboarding()
   const paywallGate = usePaywallGate()
-  useKeyboardHeightVar()
-  useKeyboardFieldReveal()
-  useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the

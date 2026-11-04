@@ -17,14 +17,9 @@ export interface EditorAutocomplete {
 }
 
 /**
- * The editor's `[[` and `#` autocomplete, shared by every note editor (the
- * note pane and the Tasks view's inline editor). meowdown owns the menu UI;
- * the rows come from `AutocompleteSuggestionService`. Both handlers are no-ops
- * without an open graph.
- *
- * A consumer wires whichever menus it wants — the note pane and the task editor
- * both take `onWikilinkSearch` and `onTagSearch` — so returning both here never
- * forces a menu onto an editor that doesn't pass it through.
+ * The editor's `[[` and `#` autocomplete. meowdown owns the menu UI; the rows
+ * come from `AutocompleteSuggestionService`. Both handlers are no-ops without
+ * an open graph.
  */
 export function useEditorAutocomplete(): EditorAutocomplete {
   const graph = useGraphInfo()

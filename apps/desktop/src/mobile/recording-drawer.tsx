@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { formatElapsed } from '@reflect/utils'
 import { useStore } from '@/lib/use-store.ts'
 import {
@@ -13,7 +13,7 @@ import {
   useMobileAudioMemoPhase,
 } from '@/mobile/audio-memo-provider.tsx'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 
 /**
  * The recording sheet (V1's recording modal as a bottom drawer): waveform +
@@ -69,7 +69,7 @@ interface LiveRecordingControlsProps {
 }
 
 function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
 
   return (
     <div className="flex flex-col items-center gap-4 px-4 pb-2 text-center">

@@ -2,7 +2,8 @@ import type { ReactElement } from 'react'
 import type { ThemePreference } from '@reflect/core'
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
-import { useSettingsService, useThemeSetting } from '@/providers/settings-provider.tsx'
+import { useThemeSetting } from '@/providers/settings-provider.tsx'
+import { useAppServices } from '@/services/services-provider.tsx'
 import { SettingsField } from './field.tsx'
 import { SettingsOptionCard } from './option-card.tsx'
 import { SettingsSection } from './section.tsx'
@@ -20,13 +21,11 @@ const THEME_OPTIONS: ThemeOption[] = [
 ]
 
 /**
- * Theme picker as radio cards (the original app's idiom). Edits the settings
- * document directly — the ThemeEffect applies whatever is persisted, so
- * this section needs no theme context of its own.
+ * Theme picker as radio cards.
  */
 export function AppearanceSection(): ReactElement {
   const theme = useThemeSetting()
-  const settingsService = useSettingsService()
+  const { theme: themeService } = useAppServices()
 
   return (
     <SettingsSection id="appearance">
@@ -48,7 +47,7 @@ export function AppearanceSection(): ReactElement {
                   name="theme"
                   value={value}
                   checked={selected}
-                  onChange={() => settingsService.update({ theme: value })}
+                  onChange={() => themeService.setPreference(value)}
                   className="sr-only"
                 />
                 <Icon aria-hidden strokeWidth={1.75} className="size-4" />

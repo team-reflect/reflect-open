@@ -303,7 +303,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       contacts: core.contacts,
       personNotes: core.personNotes,
       settings: core.settings,
-      clock: core.clock,
+      today: core.today,
       operations: host.operations,
       logger: core.logger,
       graphSession: core.graphSession,

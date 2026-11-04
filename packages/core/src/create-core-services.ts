@@ -1102,7 +1102,7 @@ export function composeCoreServices(
       : null
   const chatHistory = create.chatHistory({ ipc, database, logger })
   const today = create.today({ clock })
-  const dailyNotes = create.dailyNotes({ database, clock, today, activity })
+  const dailyNotes = create.dailyNotes({ database, clock, activity })
   const noteTools = create.noteTools({
     retrieval,
     noteFile,

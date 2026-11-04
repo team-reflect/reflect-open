@@ -16,10 +16,6 @@ export interface KeyValueStore {
    */
   set(key: string, value: string | null): void
   /**
-   * Calls `listener` after every change to `key` made through this store.
-   */
-  subscribe(key: string, listener: () => void): () => void
-  /**
    * The value of `key` as a `Store`. The same key returns the same store.
    */
   store(key: string): Store<string | null>
@@ -68,10 +64,6 @@ class WebKeyValueStore implements KeyValueStore {
       this.#warn('writing', key, error)
     }
     this.#store(key).set(value)
-  }
-
-  subscribe(key: string, listener: () => void): () => void {
-    return this.#store(key).subscribe(listener)
   }
 
   store(key: string): Store<string | null> {

@@ -22,7 +22,7 @@ export type RouterNavigate = (route: Route, options?: NavigateOptions) => void
  * history.
  */
 
-interface RouterValue {
+interface RouterState {
   route: Route
   /** Stable identity of the current history entry (changes on back/forward). */
   entryId: number
@@ -43,9 +43,6 @@ interface RouterValue {
    * moves clear it, so it can never leak onto a later, unrelated arrival.
    */
   arrivalFocusEditor: boolean
-  navigate: RouterNavigate
-  back: () => void
-  forward: () => void
   canBack: boolean
   canForward: boolean
   /**
@@ -54,6 +51,15 @@ interface RouterValue {
    * a pushed note so the back-swipe gesture reveals a live screen.
    */
   backRoute: Route | null
+}
+
+/**
+ * The router's navigation callbacks, stable for the provider's lifetime.
+ */
+interface RouterActions {
+  navigate: RouterNavigate
+  back: () => void
+  forward: () => void
   /** Record the active view's scroll position on the current history entry. */
   saveScrollState: (position: ScrollPosition) => void
   /**
@@ -67,7 +73,13 @@ interface RouterValue {
   savedScroll: () => ScrollPosition | null
 }
 
+/**
+ * The route state together with the navigation callbacks.
+ */
+type RouterValue = RouterState & RouterActions
+
 const RouterContext = createContext<RouterValue | null>(null)
+const RouterActionsContext = createContext<RouterActions | null>(null)
 
 interface RouterProviderProps {
   /** The launch route; defaults to today (the daily note is the spine). */
@@ -144,26 +156,30 @@ export function RouterProvider({
   )
   const savedScroll = useCallback(() => navigation.savedScroll(renderedRef.current), [navigation])
 
+  const actions = useMemo<RouterActions>(
+    () => ({ navigate, back, forward, saveScrollState, clearScrollState, savedScroll }),
+    [navigate, back, forward, saveScrollState, clearScrollState, savedScroll],
+  )
+
   const value = useMemo<RouterValue>(
     () => ({
       route: state.route,
       entryId: state.entryId,
       arrivalSeq: state.arrivalSeq,
       arrivalFocusEditor: state.arrivalFocusEditor,
-      navigate,
-      back,
-      forward,
       canBack: state.canBack,
       canForward: state.canForward,
       backRoute: state.backRoute,
-      saveScrollState,
-      clearScrollState,
-      savedScroll,
+      ...actions,
     }),
-    [state, navigate, back, forward, saveScrollState, clearScrollState, savedScroll],
+    [state, actions],
   )
 
-  return <RouterContext value={value}>{children}</RouterContext>
+  return (
+    <RouterActionsContext value={actions}>
+      <RouterContext value={value}>{children}</RouterContext>
+    </RouterActionsContext>
+  )
 }
 
 /** Access the current route + navigation. Use within a RouterProvider. */
@@ -171,6 +187,18 @@ export function useRouter(): RouterValue {
   const context = use(RouterContext)
   if (!context) {
     throw new Error('useRouter must be used within a RouterProvider')
+  }
+  return context
+}
+
+/**
+ * Access the navigation callbacks without subscribing to route changes. Use
+ * within a RouterProvider.
+ */
+export function useRouterActions(): RouterActions {
+  const context = use(RouterActionsContext)
+  if (!context) {
+    throw new Error('useRouterActions must be used within a RouterProvider')
   }
   return context
 }

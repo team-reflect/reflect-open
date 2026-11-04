@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createGraphSession, type GraphRole, type GraphServicesDeps } from '@reflect/core'
+import {
+  createGraphSession,
+  WritableStore,
+  type GraphRole,
+  type GraphServicesDeps,
+} from '@reflect/core'
 import {
   createNodeTestDatabaseService,
   createTestCoreServices,
@@ -164,36 +169,22 @@ describe('createAppGraphServices', () => {
 
 describe('whileActive', () => {
   it('opens while active and closes on the change and on stop', () => {
-    let active = false
-    const listeners = new Set<() => void>()
+    const active = new WritableStore(false)
     const events: string[] = []
-    const stop = whileActive(
-      () => active,
-      (listener) => {
-        listeners.add(listener)
-        return () => {
-          listeners.delete(listener)
-        }
-      },
-      () => {
-        events.push('open')
-        return () => {
-          events.push('close')
-        }
-      },
-    )
-    const notify = () => {
-      for (const listener of listeners) {
-        listener()
+    const stop = whileActive(active, () => {
+      events.push('open')
+      return () => {
+        events.push('close')
       }
-    }
+    })
     expect(events).toEqual([])
-    active = true
-    notify()
-    notify()
+    active.set(true)
     expect(events).toEqual(['open'])
-    stop()
+    active.set(false)
     expect(events).toEqual(['open', 'close'])
-    expect(listeners.size).toBe(0)
+    active.set(true)
+    stop()
+    expect(events).toEqual(['open', 'close', 'open', 'close'])
+    expect(active.subscribed()).toBe(false)
   })
 })

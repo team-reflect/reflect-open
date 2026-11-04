@@ -13,9 +13,9 @@ import { ChatModelDrawer } from '@/mobile/chat-model-drawer.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import {
   useChatActions,
+  useChatActiveModel,
   useChatAttachments,
   useChatDraft,
-  useChatModels,
   useChatStatus,
 } from '@/providers/chat-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -32,7 +32,7 @@ import { useRouter } from '@/routing/router.tsx'
 export function MobileChatComposer(): ReactElement {
   const { arrivalSeq, arrivalFocusEditor } = useRouter()
   const status = useChatStatus()
-  const { activeModel } = useChatModels()
+  const activeModel = useChatActiveModel()
   const draft = useChatDraft()
   const attachments = useChatAttachments()
   const { setDraft, attachImages, removeAttachment, send, stop } = useChatActions()

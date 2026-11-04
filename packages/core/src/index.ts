@@ -40,13 +40,7 @@ export {
   type GitHostConnector,
   type GitHostSignIn,
 } from './sync/git-host-connector.ts'
-export {
-  classifyRemote,
-  githubRemoteUrl,
-  githubRepoOf,
-  redactRemoteUrl,
-  type GitRemote,
-} from './sync/remote-url.ts'
+export { classifyRemote, githubRepoOf, redactRemoteUrl, type GitRemote } from './sync/remote-url.ts'
 export { type GitHostCredentialService } from './sync/git-host-credential-service.ts'
 export { isICloudRoot } from './sync/icloud-sync-service.ts'
 export { type GistPublishService } from './sync/gist-publish-service.ts'
@@ -106,11 +100,7 @@ export {
   type FrontmatterPatch,
 } from './documents/note-session-frontmatter.ts'
 export { type ChatModelSelection } from './settings/schema.ts'
-export {
-  type CloudGraphContext,
-  cloudSafeLinkHref,
-  notePrivate,
-} from './privacy/privacy-service.ts'
+export { type CloudGraphContext } from './privacy/privacy-service.ts'
 export { type CloudSafe } from './privacy/cloud-safe.ts'
 export {
   calendarEventSchema,
@@ -196,6 +186,7 @@ export { createSearchService, type SearchService } from './indexing/search-servi
 export { createSuggestionService, type SuggestionService } from './indexing/suggestion-service.ts'
 export {
   type IndexFileProgress,
+  type IndexLifecycleProgress,
   type IndexLifecycleService,
 } from './indexing/index-lifecycle-service.ts'
 export { type AiPromptDraft, type AiPromptService } from './ai/ai-prompt-service.ts'
@@ -263,12 +254,10 @@ export {
   clampSidebarWidth,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeTranscriptionPrompt,
-  TIME_FORMATS,
   timeFormatSchema,
   DATE_FORMATS,
   dateFormatSchema,
   weekStartDaySchema,
-  getWeekStartWeekday,
   getUserWeekStart,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,

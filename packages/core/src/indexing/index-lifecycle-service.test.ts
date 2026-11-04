@@ -20,6 +20,7 @@ import { createTestActivityPort } from '../testing/shell.ts'
 import {
   createIndexLifecycleService,
   type IndexAppliedEvent,
+  type IndexFileProgress,
   type IndexLifecycleProgress,
   type IndexReconciledEvent,
 } from './index-lifecycle-service.ts'
@@ -160,11 +161,11 @@ function setup(options?: {
   const applied: IndexAppliedEvent[] = []
   const reconciled: IndexReconciledEvent[] = []
   const moved: Array<[string, string]> = []
-  const fileProgress: Array<[number, number, number]> = []
+  const fileProgress: Array<IndexFileProgress | null> = []
   const stalePlaceholders: string[][] = []
   const order: string[] = []
-  index.onProgress((stage) => {
-    progress.push(stage)
+  index.progress.subscribe(() => {
+    progress.push(index.progress.get())
   })
   index.onApplied((event) => {
     applied.push(event)
@@ -177,8 +178,8 @@ function setup(options?: {
   index.onMoved((from, to) => {
     moved.push([from, to])
   })
-  index.onFileProgress((done, total, worked) => {
-    fileProgress.push([done, total, worked])
+  index.fileProgress.subscribe(() => {
+    fileProgress.push(index.fileProgress.get())
   })
   index.onStalePlaceholders((paths) => {
     stalePlaceholders.push([...paths])
@@ -662,14 +663,10 @@ describe('file progress', () => {
 
   it('publishes the running pass and clears once it goes live', async () => {
     const { index, fileProgress } = setupLargePass()
-    const seen: Array<ReturnType<typeof index.fileProgress.get>> = []
-    const unsubscribe = index.fileProgress.subscribe(() => {
-      seen.push(index.fileProgress.get())
-    })
     expect(index.fileProgress.get()).toBeNull()
     const atLive: Array<ReturnType<typeof index.fileProgress.get>> = []
-    index.onProgress((progress) => {
-      if (progress === 'live') {
+    index.progress.subscribe(() => {
+      if (index.progress.get() === 'live') {
         atLive.push(index.fileProgress.get())
       }
     })
@@ -678,11 +675,6 @@ describe('file progress', () => {
     await index.settled()
 
     expect(fileProgress).toEqual([
-      [16, 32, 15],
-      [32, 32, 31],
-      [32, 32, 32],
-    ])
-    expect(seen).toEqual([
       { done: 16, total: 32, worked: 15 },
       { done: 32, total: 32, worked: 31 },
       { done: 32, total: 32, worked: 32 },
@@ -690,8 +682,7 @@ describe('file progress', () => {
     ])
     expect(atLive).toEqual([null])
     index.suspend()
-    expect(seen).toHaveLength(4) // already clear: no notification
-    unsubscribe()
+    expect(fileProgress).toHaveLength(4) // already clear: no notification
   })
 
   it('stops reporting file progress once the pass is superseded', async () => {
@@ -706,7 +697,7 @@ describe('file progress', () => {
     index.sync(sessionAt(5, opened.signal))
     await index.settled()
 
-    expect(fileProgress).toEqual([[16, 32, 15]])
+    expect(fileProgress).toEqual([{ done: 16, total: 32, worked: 15 }])
   })
 
   it('a test lifecycle seeds file progress for its subscribers', () => {

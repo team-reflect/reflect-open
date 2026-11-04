@@ -4,6 +4,7 @@ import {
   composeVisibleTaskGroups,
   getTaskKey,
   todaysDailyTarget,
+  WritableStore,
   type InsertTaskTarget,
   type OpenTask,
 } from '@reflect/core'
@@ -53,7 +54,7 @@ export function MobileTasks(): ReactElement {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   // The one row whose swipe actions are showing (its getTaskKey), across all groups.
-  const [revealedTaskKey, setRevealedTaskKey] = useState<string | null>(null)
+  const [revealedRow] = useState(() => new WritableStore<string | null>(null))
   // The sheet's task sticks around after close so the exit animation has
   // content; `sheetOpen` alone drives visibility.
   const [editingTask, setEditingTask] = useState<OpenTask | null>(null)
@@ -192,7 +193,7 @@ export function MobileTasks(): ReactElement {
       ) : (
         <div
           className="min-h-0 flex-1 overflow-y-auto px-safe pb-24"
-          onScroll={() => setRevealedTaskKey(null)}
+          onScroll={() => revealedRow.set(null)}
         >
           {groups.map((group) => (
             <MobileTaskGroup
@@ -205,8 +206,7 @@ export function MobileTasks(): ReactElement {
               togglePending={actions.isPending}
               onOpen={(path) => navigate(routeForPath(path))}
               onDelete={(task) => actions.remove([task])}
-              revealedTaskKey={revealedTaskKey}
-              setRevealedTaskKey={setRevealedTaskKey}
+              revealedRow={revealedRow}
             />
           ))}
         </div>

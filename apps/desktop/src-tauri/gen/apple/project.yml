@@ -260,8 +260,8 @@ targets:
       properties:
         # The share sheet's row label (the icon comes from the host app).
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        CFBundleShortVersionString: 0.6.0
-        CFBundleVersion: 0.6.0.8
+        CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           # Storyboard-less principal class; `@objc(ShareViewController)`
@@ -333,8 +333,8 @@ targets:
       path: RecordingWidget/Info.plist
       properties:
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        CFBundleShortVersionString: 0.6.0
-        CFBundleVersion: 0.6.0.8
+        CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     # The widget needs no capability of its own, but the release pipeline

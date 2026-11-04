@@ -4,7 +4,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { xPostQueryOptions } from '@/editor/use-x-post-resolver.ts'
 import { queryClient } from '@/lib/query-client.ts'
-import { useMaybeGraphInfo } from '@/providers/graph-provider.tsx'
+import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 // Longest wait before mounting anyway; cold-start archive reads measured up to 258 ms.
@@ -17,7 +17,7 @@ const PRELOAD_BUDGET_MS = 300
  */
 export function useXPostPreload(markdown: string | null): boolean {
   const { embedMedia } = useCoreServices()
-  const root = useMaybeGraphInfo()?.root ?? null
+  const root = useGraphInfo()?.root ?? null
   const queries = useMemo(() => {
     if (markdown === null || root === null) return []
     const ids = new Set<string>()

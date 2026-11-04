@@ -165,10 +165,10 @@ export interface IndexLifecycleService {
    */
   followActivity(): Unlisten
   /**
-   * Listen as the sync pass progresses. Bailed (superseded) passes emit
+   * How far the sync pass has progressed. A bailed (superseded) pass changes
    * nothing further: the newer open's pass owns the indicator.
    */
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten
+  readonly progress: Store<IndexLifecycleProgress>
   /**
    * Listen for changes the index applied: once when a sync pass commits
    * (`changes: null`), then per watcher batch (notes and asset files, even
@@ -214,12 +214,6 @@ export interface IndexLifecycleService {
    */
   onMoved(listener: (from: string, to: string) => void): Unlisten
   /**
-   * Listen as a sync pass advances through the file listing (`done`,
-   * `total`, `worked`): the substrate for a "Preparing your notes… 400 of
-   * 3,000" surface during a first index. Superseded passes stop reporting.
-   */
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten
-  /**
    * Listen for iCloud-evicted notes whose content the index lacks (see
    * `IndexPassOptions.onStalePlaceholders`). The app requests targeted
    * downloads for exactly these paths.
@@ -227,7 +221,7 @@ export interface IndexLifecycleService {
   onStalePlaceholders(listener: (paths: readonly string[]) => void): Unlisten
   /**
    * The running sync pass's file progress, or `null` when no pass is
-   * reconciling. Published apart from {@link IndexLifecycleService.onProgress}
+   * reconciling. Published apart from {@link IndexLifecycleService.progress}
    * on purpose: ticks arrive several times a second during a first index, and
    * only the status pill should re-render per tick.
    */
@@ -290,11 +284,9 @@ export interface IndexLifecycleDeps extends IndexingDeps {
 
 class IndexLifecycleServiceImpl implements IndexLifecycleService {
   readonly #deps: IndexLifecycleDeps
-  readonly #progressListeners = new Set<(progress: IndexLifecycleProgress) => void>()
   readonly #appliedListeners = new Set<(event: IndexAppliedEvent) => void>()
   readonly #reconciledListeners = new Set<(event: IndexReconciledEvent) => MaybePromise<void>>()
   readonly #movedListeners = new Set<(from: string, to: string) => void>()
-  readonly #fileProgressListeners = new Set<(done: number, total: number, worked: number) => void>()
   readonly #stalePlaceholderListeners = new Set<(paths: readonly string[]) => void>()
   readonly #indexer: NoteIndexer
   readonly #liveIndex: LiveIndex
@@ -303,6 +295,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     (a, b) => a?.done === b?.done && a?.total === b?.total && a?.worked === b?.worked,
   )
   readonly fileProgress: Store<IndexFileProgress | null> = this.#fileProgress
+  readonly #progress = new WritableStore<IndexLifecycleProgress>('idle')
+  readonly progress: Store<IndexLifecycleProgress> = this.#progress
   #abort: AbortController | null = null
   #done: Promise<void> = Promise.resolve()
   #suspended = false
@@ -382,9 +376,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
             passWorked = worked
             if (!isStale()) {
               this.#fileProgress.set({ done: progressDone, total, worked })
-              for (const listener of this.#fileProgressListeners) {
-                listener(progressDone, total, worked)
-              }
             }
           },
         })
@@ -556,10 +547,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     }
   }
 
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten {
-    return attach(this.#progressListeners, listener)
-  }
-
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten {
     return attach(this.#appliedListeners, listener)
   }
@@ -593,10 +580,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   onMoved(listener: (from: string, to: string) => void): Unlisten {
     return attach(this.#movedListeners, listener)
-  }
-
-  onFileProgress(listener: (done: number, total: number, worked: number) => void): Unlisten {
-    return attach(this.#fileProgressListeners, listener)
   }
 
   onStalePlaceholders(listener: (paths: readonly string[]) => void): Unlisten {
@@ -650,9 +633,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (progress !== 'reconciling') {
       this.#fileProgress.set(null) // the pass finished (or went idle): clear the pill
     }
-    for (const listener of this.#progressListeners) {
-      listener(progress)
-    }
+    this.#progress.set(progress)
   }
 
   #emitMoved(from: string, to: string): void {

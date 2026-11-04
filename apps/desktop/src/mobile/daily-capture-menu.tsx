@@ -16,7 +16,7 @@ import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { useNewTaskSheet } from '@/mobile/use-new-task-sheet.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 const ACTIONS_ID = 'daily-capture-actions'
@@ -41,7 +41,7 @@ export function DailyCaptureMenu(): ReactElement {
   const phase = useMobileAudioMemoPhase()
   const available = useMobileAudioMemoAvailable()
   const newTask = useNewTaskSheet()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   const recording = phase === 'recording' || phase === 'requesting'
   const audioLabel =
     phase === 'error' ? 'Show audio memo error' : recording ? 'Stop recording' : 'Record audio memo'

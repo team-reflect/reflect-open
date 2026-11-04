@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import type { ClassicAccess, ClassicSignInResult } from '@reflect/core'
 import { mutationKeys, mutationScopeIds } from '@/lib/query-client.ts'
@@ -18,8 +18,6 @@ export function useClassicAccess(): {
   const { classicAccess: classic, platform } = useCoreServices()
   const enabled = platform.appPlatform === 'ios'
   const state = useStore(classic)
-
-  useEffect(() => classic.start(), [classic])
 
   return {
     value: enabled ? state.access : null,

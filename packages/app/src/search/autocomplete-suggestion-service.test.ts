@@ -3,6 +3,7 @@ import {
   contactsCanLookup,
   createPersonNoteService,
   createSuggestionService,
+  createTodayService,
   createWikiResolverService,
   lookupContactPeople,
   type ContactMatch,
@@ -65,7 +66,9 @@ async function setup(options?: SetupOptions) {
   const logger = createTestLoggerService()
   const settings = createTestSettingsService(options?.settings ?? {}, { progress: operations })
   await settings.whenLoaded()
-  const clock = createTestClockService({ now: new Date(2026, 5, 9, 12).getTime() })
+  const today = createTodayService({
+    clock: createTestClockService({ now: new Date(2026, 5, 9, 12).getTime() }),
+  })
   const contacts = createTestContactsService({ contacts: options?.contacts ?? [] })
   let authorization: ContactsAuthorization | null = null
   const lookupByName = async (name: string): Promise<ContactMatch[]> => {
@@ -136,7 +139,7 @@ async function setup(options?: SetupOptions) {
     contacts,
     personNotes,
     settings,
-    clock,
+    today,
     operations,
     logger,
     graphSession,
@@ -171,7 +174,7 @@ async function settle(): Promise<void> {
 }
 
 describe('AutocompleteSuggestionService.suggestLinks', () => {
-  it('asks the index for 8 link targets, with the date context of the settings and the clock', async () => {
+  it('asks the index for 8 link targets, with the date context of the settings and today', async () => {
     const { suggest, linkQueries } = await setup({
       settings: { dateFormat: 'dmy', weekStartDay: 'sunday' },
     })
@@ -581,7 +584,7 @@ describe('AutocompleteSuggestionService.suggestLinks', () => {
         noteCreation,
       }),
       settings: createTestSettingsService(),
-      clock: createTestClockService(),
+      today: createTodayService({ clock: createTestClockService() }),
       operations: createTestOperationsService(),
       logger: createTestLoggerService(),
       graphSession: createTestGraphSessionService({ graph: {} }),

@@ -26,7 +26,7 @@ export type ChatActions = Omit<ChatSession, 'get' | 'subscribe' | 'attach'>
 /**
  * The model fields of the chat session state.
  */
-export type ChatModels = Pick<ChatSessionState, 'providers' | 'modelOptions' | 'activeModel'>
+type ChatModels = Pick<ChatSessionState, 'providers' | 'modelOptions' | 'activeModel'>
 
 function selectTurns(state: ChatSessionState): ChatTurn[] {
   return state.turns
@@ -80,16 +80,16 @@ export function useChatActions(): ChatActions {
   const session = useChat()
   return useMemo(
     (): ChatActions => ({
-      selectModel: (selection) => session.selectModel(selection),
-      setDraft: (text) => session.setDraft(text),
-      attachImages: (files) => session.attachImages(files),
-      removeAttachment: (id) => session.removeAttachment(id),
-      send: (text) => session.send(text),
-      stop: () => session.stop(),
-      newChat: () => session.newChat(),
-      ask: (question) => session.ask(question),
-      openConversation: (id) => session.openConversation(id),
-      deleteConversation: (id) => session.deleteConversation(id),
+      selectModel: session.selectModel,
+      setDraft: session.setDraft,
+      attachImages: session.attachImages,
+      removeAttachment: session.removeAttachment,
+      send: session.send,
+      stop: session.stop,
+      newChat: session.newChat,
+      ask: session.ask,
+      openConversation: session.openConversation,
+      deleteConversation: session.deleteConversation,
     }),
     [session],
   )
@@ -136,6 +136,13 @@ export function useChatStatus(): ChatStatus {
  */
 export function useChatProviders(): ChatModels['providers'] {
   return useSelector(useChat(), selectProviders)
+}
+
+/**
+ * The model the next message is sent with.
+ */
+export function useChatActiveModel(): ChatModels['activeModel'] {
+  return useSelector(useChat(), selectActiveModel)
 }
 
 /**

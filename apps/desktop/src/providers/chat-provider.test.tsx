@@ -19,8 +19,8 @@ import {
 import {
   useActiveConversationId,
   useChatActions,
+  useChatActiveModel,
   useChatDraft,
-  useChatModels,
   useChatStatus,
   useChatTurns,
   type ChatActions,
@@ -59,7 +59,7 @@ function SessionProbe(): ReactElement | null {
   const status = useChatStatus()
   const draft = useChatDraft()
   const activeConversationId = useActiveConversationId()
-  const { activeModel } = useChatModels()
+  const activeModel = useChatActiveModel()
 
   useLayoutEffect(() => {
     sessionRef.current = { ...actions, turns, status, draft, activeConversationId, activeModel }

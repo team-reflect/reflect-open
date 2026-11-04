@@ -8,9 +8,8 @@ import {
   useGraphRecents,
   useGraphStatus,
   useIndexGeneration,
-  useMaybeGraphInfo,
 } from '@/providers/graph-provider.tsx'
-import { useMobileGraphBoot } from '@/providers/use-mobile-graph-boot.ts'
+import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
 import { useDateFormat, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useGitSyncState } from '@/providers/sync-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
@@ -24,7 +23,7 @@ function Probe(): ReactElement {
   const indexGeneration = useIndexGeneration()
   const indexing = useGraphIndexing()
   const recents = useGraphRecents()
-  const { mobileStorageKind } = useMobileGraphBoot()
+  const mobileStorageKind = useMobileStorageKind()
   const dateFormat = useDateFormat()
   const settingsService = useSettingsService()
   const { route, navigate } = useRouter()
@@ -72,11 +71,13 @@ describe('renderInApp', () => {
   it('reports the graph, the graph state and a later graph switch', async () => {
     const { core } = await renderInApp(<Probe />, {
       graph: { root: '/g', generation: 3, indexGeneration: 7 },
-      graphState: { indexing: true, recents: [{ root: '/g', name: 'g', openedMs: 1 }] },
+      graphState: { recents: [{ root: '/g', name: 'g', openedMs: 1 }] },
+      indexing: true,
     })
     await expect.element(page.getByTestId('graph')).toHaveTextContent('ready /g 3 7 indexing 1 -')
 
     core.graphSession.setGraph(null)
+    core.indexLifecycle.setProgress(null)
     await expect.element(page.getByTestId('graph')).toHaveTextContent('choosing none - - idle 1 -')
   })
 
@@ -133,7 +134,7 @@ describe('renderInApp', () => {
   })
 
   it('mounts only the services with `servicesOnly`, and registers the app commands', async () => {
-    const { result, appServices: appLayer } = await renderHookInApp(() => useMaybeGraphInfo(), {
+    const { result, appServices: appLayer } = await renderHookInApp(() => useGraphInfo(), {
       servicesOnly: true,
     })
 

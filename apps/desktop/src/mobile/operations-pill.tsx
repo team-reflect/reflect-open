@@ -1,7 +1,13 @@
 import type { ReactElement } from 'react'
-import { useStore } from '@/lib/use-store.ts'
+import { isShallowEqual } from '@ocavue/utils'
+import type { Operation } from '@reflect/core'
+import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useAppServices } from '@/services/services-provider.tsx'
+
+function selectAttention(operations: readonly Operation[]): Operation[] {
+  return operations.filter((operation) => operation.status !== 'running')
+}
 
 /**
  * Failed and warning background operations as tappable pills (Plan 19
@@ -15,8 +21,7 @@ import { useAppServices } from '@/services/services-provider.tsx'
  */
 export function MobileOperationsPills(): ReactElement | null {
   const { operations } = useAppServices()
-  const all = useStore(operations)
-  const attention = all.filter((operation) => operation.status !== 'running')
+  const attention = useSelector(operations, selectAttention, isShallowEqual)
 
   if (attention.length === 0) {
     return null

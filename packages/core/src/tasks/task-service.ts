@@ -1,3 +1,4 @@
+import { isShallowEqual } from '@ocavue/utils'
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import { requireGraphSession, type GraphRole, type GraphSession } from '../graph/graph-session.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -183,7 +184,8 @@ export interface TaskService extends Store<TaskListState> {
   /**
    * Call `listener` whenever {@link TaskService.get} changes. The first
    * subscription reads the open tasks; while any listener is subscribed, an
-   * index change re-reads them.
+   * index change re-reads them. While nothing is subscribed, the service does
+   * not follow the index, and the next subscription reads the rows again.
    */
   subscribe: (listener: VoidFunction) => Unlisten
   /**
@@ -405,15 +407,6 @@ const EMPTY_STATE: TaskListState = {
   completedFailed: false,
 }
 
-function isSameTaskListState(a: TaskListState, b: TaskListState): boolean {
-  return (
-    a.open === b.open &&
-    a.completed === b.completed &&
-    a.openFailed === b.openFailed &&
-    a.completedFailed === b.completedFailed
-  )
-}
-
 /**
  * Spacing between index-change re-reads while the index applies batch after batch.
  */
@@ -469,15 +462,15 @@ class TaskServiceImpl implements TaskService {
   readonly #deps: TaskServiceDeps
   readonly #recentlyCompleted = new WritableStore<RecentlyCompleted>(
     { root: null, tasks: EMPTY },
-    (a, b) => a.root === b.root && a.tasks === b.tasks,
+    isShallowEqual,
   )
   readonly recentlyCompleted: Store<RecentlyCompleted> = this.#recentlyCompleted
-  readonly #state = new WritableStore<TaskListState>(EMPTY_STATE, isSameTaskListState)
+  readonly #state = new WritableStore<TaskListState>(EMPTY_STATE, isShallowEqual)
   #sessionKey: string | null = null
   #open: TaskListSlot = emptySlot()
   #completed: TaskListSlot = emptySlot()
   #completedHolds = 0
-  #attached = false
+  #sources: Unlisten | null = null
   #lastRefreshAt = -Infinity
   #trailingRefresh: TimerHandle | null = null
 
@@ -500,15 +493,20 @@ class TaskServiceImpl implements TaskService {
   readonly get = this.#state.get
 
   readonly subscribe = (listener: VoidFunction): Unlisten => {
-    this.#attach()
     const unlisten = this.#state.subscribe(listener)
+    this.#sources ??= this.#startSources()
     this.#syncSession()
     this.#loadStale()
-    return unlisten
+    return () => {
+      unlisten()
+      if (!this.#state.subscribed()) {
+        this.#sources?.()
+        this.#sources = null
+      }
+    }
   }
 
   async refresh(): Promise<void> {
-    this.#attach()
     this.#syncSession()
     const reads = [this.#readOpen()]
     if (this.#completedHolds > 0) {
@@ -520,7 +518,6 @@ class TaskServiceImpl implements TaskService {
   }
 
   includeCompleted(): Unlisten {
-    this.#attach()
     this.#completedHolds += 1
     this.#syncSession()
     this.#loadStale()
@@ -882,35 +879,47 @@ class TaskServiceImpl implements TaskService {
   }
 
   /**
-   * Listen for index changes and graph switches, once, on first use.
+   * Listen for index changes and graph switches. The returned function stops
+   * listening and marks the rows stale, since later changes go unseen.
    */
-  #attach(): void {
-    if (this.#attached) {
-      return
-    }
-    this.#attached = true
-    const { graphSession, indexLifecycle, role, ipc, logger } = this.#deps
-    graphSession.subscribe(() => {
-      if (this.#adoptSession()) {
-        this.#publish()
-        this.#loadStale()
-      }
-    })
-    indexLifecycle.onApplied(() => this.#throttledInvalidate())
-    // A manual rebuild skips the watcher pipeline and its applied events.
-    indexLifecycle.onReconciled((event) => {
-      if (event.source !== 'sync') {
-        this.#invalidate()
-      }
-    })
+  #startSources(): Unlisten {
+    const { graphSession, indexLifecycle, role, ipc, logger, clock } = this.#deps
+    const unlisteners = [
+      graphSession.subscribe(() => {
+        if (this.#adoptSession()) {
+          this.#publish()
+          this.#loadStale()
+        }
+      }),
+      indexLifecycle.onApplied(() => this.#throttledInvalidate()),
+      // A manual rebuild skips the watcher pipeline and its applied events.
+      indexLifecycle.onReconciled((event) => {
+        if (event.source !== 'sync') {
+          this.#invalidate()
+        }
+      }),
+    ]
     if (role !== 'main') {
       // A note window runs no indexer; the main window's committed writes reach it here.
-      listenNow(
-        () => ipc.listen(INDEX_WRITTEN_EVENT, () => this.#throttledInvalidate()),
-        (cause) => {
-          logger.error(`${INDEX_WRITTEN_EVENT} listener failed:`, cause)
-        },
+      unlisteners.push(
+        listenNow(
+          () => ipc.listen(INDEX_WRITTEN_EVENT, () => this.#throttledInvalidate()),
+          (cause) => {
+            logger.error(`${INDEX_WRITTEN_EVENT} listener failed:`, cause)
+          },
+        ),
       )
+    }
+    return () => {
+      for (const unlisten of unlisteners) {
+        unlisten()
+      }
+      if (this.#trailingRefresh !== null) {
+        clock.clearTimeout(this.#trailingRefresh)
+        this.#trailingRefresh = null
+      }
+      this.#open.stale = true
+      this.#completed.stale = true
     }
   }
 
