@@ -319,6 +319,19 @@ export {
 } from './monetization/app-store-environment-service.ts'
 export { createPaywallService, type PaywallGate } from './monetization/paywall-service.ts'
 export {
+  PAYWALL_HIDDEN_DAYS,
+  PAYWALL_SKIPPABLE_DAYS,
+  getPaywallDaysLeft,
+  getPaywallPhase,
+  getPaywallRequiredAt,
+  type PaywallPhase,
+} from './monetization/paywall-phase.ts'
+export {
+  createInstallClockService,
+  type InstallClockService,
+  type InstallClockState,
+} from './monetization/install-clock-service.ts'
+export {
   IAP_PRODUCT_IDS,
   createIapService,
   type IapProduct,
