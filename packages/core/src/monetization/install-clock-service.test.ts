@@ -109,27 +109,28 @@ describe('InstallClockService', () => {
 
     await clock.advance(1)
     activity.emitVisible()
-    await vi.waitFor(() =>
-      expect(stored()).toEqual({ firstLaunchAt: NOW, lastSeenAt: NOW + HOUR_MS }),
-    )
+    await vi.waitFor(() => {
+      expect(stored()).toEqual({ firstLaunchAt: NOW, lastSeenAt: NOW + HOUR_MS })
+    })
   })
 
   it('reads as hidden without writing when the keychain fails, then retries', async () => {
-    const failing: SecretStoreService = {
-      get: vi.fn(() => Promise.reject(new Error('keychain locked'))),
-      set: vi.fn(() => Promise.resolve()),
-      delete: vi.fn(() => Promise.resolve()),
-    }
-    const installClock = service({ secretStore: failing })
+    const get = vi.fn(() => Promise.reject(new Error('keychain locked')))
+    const set = vi.fn(() => Promise.resolve())
+    const installClock = service({
+      secretStore: { get, set, delete: vi.fn(() => Promise.resolve()) },
+    })
 
     await settled(installClock)
 
     expect(installClock.get()).toMatchObject({ phase: 'hidden', firstLaunchAt: null })
-    expect(failing.set).not.toHaveBeenCalled()
+    expect(set).not.toHaveBeenCalled()
 
     activity.emitVisible()
-    await vi.waitFor(() => expect(failing.get).toHaveBeenCalledTimes(2))
-    expect(failing.set).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      expect(get).toHaveBeenCalledTimes(2)
+    })
+    expect(set).not.toHaveBeenCalled()
   })
 
   it('replaces an unreadable record', async () => {
