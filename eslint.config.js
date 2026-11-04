@@ -124,8 +124,6 @@ const DESKTOP_VI_MOCK_ALLOW = [
   '@/editor/note-editor.tsx',
   // The read-only Markdown renderer loads the same editor stack.
   '@/editor/markdown-preview.tsx',
-  // The carousel engine measures real layout; tests script its API.
-  'embla-carousel-react',
 ]
 
 /** Extra specifiers for one desktop test file, each with its reason. */

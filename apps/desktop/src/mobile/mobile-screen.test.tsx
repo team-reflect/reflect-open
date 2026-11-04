@@ -291,7 +291,7 @@ describe('MobileShell', () => {
   it('selects a day in another week straight from the pageable strip', async () => {
     const today = getIsoToday()
     // Two weeks out: its cell lives on a different week slide of the strip,
-    // which the strip renders (and Embla pages) rather than a single week.
+    // which the strip renders (and pages) rather than a single week.
     const nextFortnight = addDaysToIsoDate(today, 14)
     const view = await mount({ kind: 'today' })
 
