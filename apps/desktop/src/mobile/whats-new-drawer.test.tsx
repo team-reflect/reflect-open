@@ -1,24 +1,24 @@
 import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it } from 'vitest'
-import type { ReviewService, WhatsNewGate, WhatsNewService } from '@reflect/app'
+import type { ReviewService, WhatsNewPhase, WhatsNewService } from '@reflect/app'
 import { WritableStore } from '@reflect/core'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { WhatsNewDrawer } from './whats-new-drawer.tsx'
 
 function createFakeWhatsNew() {
-  const gate = new WritableStore<WhatsNewGate>({ kind: 'whatsNew' })
+  const phase = new WritableStore<WhatsNewPhase>('shown')
   let dismissed = 0
   const whatsNew: WhatsNewService = {
     items: [{ title: 'Chat in the All tab', body: 'Ask your notes anywhere.', platforms: ['ios'] }],
-    gate,
+    phase,
     override: new WritableStore(false),
     setOverride: () => {},
     accept: () => {},
     decline: () => {},
     dismiss: () => {
       dismissed += 1
-      gate.set({ kind: 'hidden' })
+      phase.set('hidden')
     },
     start: () => () => {},
   }
