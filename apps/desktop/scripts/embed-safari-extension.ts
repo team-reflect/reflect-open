@@ -183,7 +183,7 @@ async function main(): Promise<void> {
   }
   const app = resolve(values.app)
   const identity = values.identity ?? process.env.APPLE_SIGNING_IDENTITY
-  if (identity === undefined) {
+  if (!identity) {
     throw new Error('Pass --identity=<name> or set APPLE_SIGNING_IDENTITY (`-` signs ad-hoc)')
   }
   const identifier = await readInfo(app, 'CFBundleIdentifier')

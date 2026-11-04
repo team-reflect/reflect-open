@@ -414,6 +414,7 @@ fn relay_shared_spools(shared_inbox: &Path, root: &Path) -> AppResult<u32> {
             Ok(true) => relayed += 1,
             Ok(false) => {}
             Err(err) => {
+                tracing::warn!(envelope = %name, ?err, "shared inbox relay failed");
                 first_error.get_or_insert(err);
             }
         }
