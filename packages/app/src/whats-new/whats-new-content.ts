@@ -20,5 +20,15 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'After an update, Reflect now shows what changed. This is the first one.',
       platforms: ['desktop', 'ios'],
     },
+    {
+      title: 'Smoother everywhere',
+      body: 'Swiping between days, the week strip, swipe back, swipe actions on rows, bottom sheets, and dragging images all feel smoother.',
+      platforms: ['ios'],
+    },
+    {
+      title: 'Depth behind sheets',
+      body: 'The page now shrinks behind an open sheet, like other iOS apps.',
+      platforms: ['ios'],
+    },
   ],
 }
