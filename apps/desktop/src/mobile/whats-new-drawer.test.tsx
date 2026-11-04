@@ -31,6 +31,9 @@ function createFakeReview() {
     override: new WritableStore(false),
     setOverride: () => {},
     shouldAsk: () => Promise.resolve(true),
+    markShown: () => {
+      calls.push('markShown')
+    },
     requestReview: () => {
       calls.push('requestReview')
     },
@@ -81,7 +84,14 @@ describe('WhatsNewDrawer', () => {
     await userEvent.click(page.getByRole('button', { name: 'Discord' }))
     await userEvent.click(page.getByRole('button', { name: 'GitHub' }))
     await userEvent.click(page.getByRole('button', { name: 'Email' }))
-    expect(calls).toEqual(['requestReview', 'writeReview', 'discord', 'github', 'email'])
+    expect(calls).toEqual([
+      'markShown',
+      'requestReview',
+      'writeReview',
+      'discord',
+      'github',
+      'email',
+    ])
 
     await userEvent.click(page.getByRole('button', { name: 'Not now' }))
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()

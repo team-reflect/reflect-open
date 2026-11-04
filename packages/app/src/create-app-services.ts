@@ -59,7 +59,7 @@ import {
 } from './graph/mobile-onboarding-service.ts'
 import { createGraphBootService, type GraphBootService } from './graph/graph-boot-service.ts'
 import { createReviewService, type ReviewService } from './review/review-service.ts'
-import { ASK_FOR_REVIEW_VERSIONS, WHATS_NEW } from './whats-new/whats-new-content.ts'
+import { WHATS_NEW } from './whats-new/whats-new-content.ts'
 import { createWhatsNewService, type WhatsNewService } from './whats-new/whats-new-service.ts'
 
 /**
@@ -352,7 +352,6 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       opener,
       classicAccess: core.classicAccess,
       mobile: core.mobile,
-      versions: ASK_FOR_REVIEW_VERSIONS,
     }),
   }
 }

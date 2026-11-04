@@ -1,7 +1,6 @@
 import {
   deriveStore,
   errorMessage,
-  marketingVersion,
   type AppStoreEnvironment,
   type ClockService,
   type CoreServices,
@@ -19,6 +18,11 @@ import type { OpenerService } from '../app/opener-service.ts'
 export const REVIEW_REQUESTED_AT_STORAGE_KEY = 'reflect.review.requested-at'
 
 /**
+ * When the review page last showed, in epoch milliseconds.
+ */
+export const REVIEW_SHOWN_AT_STORAGE_KEY = 'reflect.review.shown-at'
+
+/**
  * Forces the review page on for QA, for this session only.
  */
 export const REVIEW_OVERRIDE_STORAGE_KEY = 'reflect.review.override'
@@ -28,6 +32,11 @@ export const REVIEW_OVERRIDE_STORAGE_KEY = 'reflect.review.override'
  * prompt quota period.
  */
 export const REVIEW_COOLDOWN_MS = 365 * 24 * 60 * 60 * 1000
+
+/**
+ * How long the review page stays away after it showed without a rating.
+ */
+export const REVIEW_SHOWN_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000
 
 export const WRITE_REVIEW_URL = 'https://apps.apple.com/app/id6787385615?action=write-review'
 
@@ -46,16 +55,13 @@ export type FeedbackChannel = 'discord' | 'github' | 'email'
  * Everything {@link decideAskForReview} reads.
  */
 export interface ReviewInputs {
-  /**
-   * The current marketing version is marked for a review request.
-   */
-  readonly marked: boolean
   readonly environment: AppStoreEnvironment
   /**
    * The user has an App Store subscription or Reflect Classic access.
    */
   readonly paid: boolean
   readonly requestedAt: number | null
+  readonly shownAt: number | null
   readonly now: number
   readonly override: boolean
 }
@@ -67,16 +73,21 @@ export function decideAskForReview(inputs: ReviewInputs): boolean {
   if (inputs.override) {
     return true
   }
-  const cooledDown =
-    inputs.requestedAt === null || inputs.now - inputs.requestedAt >= REVIEW_COOLDOWN_MS
-  return inputs.marked && inputs.environment === 'Production' && inputs.paid && cooledDown
+  const since = (time: number | null, cooldown: number): boolean =>
+    time === null || inputs.now - time >= cooldown
+  return (
+    inputs.environment === 'Production' &&
+    inputs.paid &&
+    since(inputs.requestedAt, REVIEW_COOLDOWN_MS) &&
+    since(inputs.shownAt, REVIEW_SHOWN_COOLDOWN_MS)
+  )
 }
 
 function selectIsOverride(value: string | null): boolean {
   return value === 'true'
 }
 
-function parseRequestedAt(value: string | null): number | null {
+function parseTime(value: string | null): number | null {
   if (value === null) {
     return null
   }
@@ -98,6 +109,10 @@ export interface ReviewService {
    * this launch's App Store environment.
    */
   shouldAsk(): Promise<boolean>
+  /**
+   * Records that the review page showed, which keeps it away for 30 days.
+   */
+  markShown: () => void
   /**
    * Asks StoreKit for its review prompt, and starts the cooldown once the
    * request reaches it.
@@ -124,10 +139,6 @@ export interface ReviewServiceDeps {
    * The StoreKit services; `null` where there is no App Store.
    */
   readonly mobile: Pick<MobileServices, 'appStore' | 'appStoreEnvironment' | 'subscription'> | null
-  /**
-   * The marketing versions that ask for a review.
-   */
-  readonly versions: ReadonlySet<string>
 }
 
 class ReviewServiceImpl implements ReviewService {
@@ -147,18 +158,23 @@ class ReviewServiceImpl implements ReviewService {
   }
 
   async shouldAsk(): Promise<boolean> {
-    const { storage, clock, platform, classicAccess, mobile, versions } = this.#deps
+    const { storage, clock, platform, classicAccess, mobile } = this.#deps
     if (mobile === null || platform.appPlatform !== 'ios') {
       return false
     }
     return decideAskForReview({
-      marked: versions.has(marketingVersion(platform.appVersion)),
       environment: await mobile.appStoreEnvironment.environment(),
       paid: mobile.subscription.get().value !== null || classicAccess.get().active,
-      requestedAt: parseRequestedAt(storage.local.get(REVIEW_REQUESTED_AT_STORAGE_KEY)),
+      requestedAt: parseTime(storage.local.get(REVIEW_REQUESTED_AT_STORAGE_KEY)),
+      shownAt: parseTime(storage.local.get(REVIEW_SHOWN_AT_STORAGE_KEY)),
       now: clock.now(),
       override: this.override.get(),
     })
+  }
+
+  readonly markShown = (): void => {
+    const { storage, clock } = this.#deps
+    storage.local.set(REVIEW_SHOWN_AT_STORAGE_KEY, String(clock.now()))
   }
 
   readonly requestReview = (): void => {

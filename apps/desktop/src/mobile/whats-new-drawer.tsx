@@ -99,6 +99,7 @@ function WhatsNewPages({
   const continueRise = riseIn(items.length + 1)
   const next = async (): Promise<void> => {
     if (await review.shouldAsk()) {
+      review.markShown()
       startTransition(() => {
         setPage('review')
       })

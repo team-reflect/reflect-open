@@ -15,6 +15,8 @@ import {
   decideAskForReview,
   REVIEW_COOLDOWN_MS,
   REVIEW_REQUESTED_AT_STORAGE_KEY,
+  REVIEW_SHOWN_AT_STORAGE_KEY,
+  REVIEW_SHOWN_COOLDOWN_MS,
   WRITE_REVIEW_URL,
   type ReviewInputs,
 } from './review-service.ts'
@@ -22,10 +24,10 @@ import {
 const NOW = 1_800_000_000_000
 
 const INPUTS: ReviewInputs = {
-  marked: true,
   environment: 'Production',
   paid: true,
   requestedAt: null,
+  shownAt: null,
   now: NOW,
   override: false,
 }
@@ -35,44 +37,43 @@ function decide(inputs: Partial<ReviewInputs>) {
 }
 
 describe('decideAskForReview', () => {
-  it('asks a paying App Store user on a marked version', () => {
+  it('asks a paying App Store user', () => {
     expect(decide({})).toBe(true)
   })
 
   it('does not ask when any condition fails', () => {
     const cases: Partial<ReviewInputs>[] = [
-      { marked: false },
       { environment: 'Sandbox' },
       { environment: 'Xcode' },
       { environment: null },
       { paid: false },
       { requestedAt: NOW - REVIEW_COOLDOWN_MS + 1 },
+      { shownAt: NOW - REVIEW_SHOWN_COOLDOWN_MS + 1 },
     ]
     for (const inputs of cases) {
       expect(decide(inputs)).toBe(false)
     }
   })
 
-  it('asks again once the cooldown ends', () => {
+  it('asks again once each cooldown ends', () => {
     expect(decide({ requestedAt: NOW - REVIEW_COOLDOWN_MS })).toBe(true)
+    expect(decide({ shownAt: NOW - REVIEW_SHOWN_COOLDOWN_MS })).toBe(true)
   })
 
   it('asks with the override despite every condition', () => {
     expect(
       decide({
         override: true,
-        marked: false,
         environment: 'Sandbox',
         paid: false,
         requestedAt: NOW,
+        shownAt: NOW,
       }),
     ).toBe(true)
   })
 })
 
-function setup(
-  options: { version?: string; mobile?: boolean; appPlatform?: 'ios' | 'android' } = {},
-) {
+function setup(options: { mobile?: boolean; appPlatform?: 'ios' | 'android' } = {}) {
   const storage = createTestStorageService()
   const appStore = createTestAppStoreService()
   const opener = createTestOpenerService()
@@ -81,7 +82,7 @@ function setup(
     clock: createTestClockService({ now: NOW }),
     platform: createTestPlatformService({
       appPlatform: options.appPlatform ?? 'ios',
-      appVersion: options.version ?? '0.20.0',
+      appVersion: '0.20.0',
     }),
     logger: createTestLoggerService(),
     opener,
@@ -94,15 +95,17 @@ function setup(
             appStoreEnvironment: createTestAppStoreEnvironmentService('Production'),
             subscription: createTestSubscriptionService({ value: 'monthly' }),
           },
-    versions: new Set(['0.20.0']),
   })
   return { review, storage, appStore, opener }
 }
 
 describe('createReviewService', () => {
-  it('matches a beta to its marketing version', async () => {
-    expect(await setup({ version: '0.20.0-beta.2' }).review.shouldAsk()).toBe(true)
-    expect(await setup({ version: '0.21.0' }).review.shouldAsk()).toBe(false)
+  it('asks, then stays away once the page shows', async () => {
+    const { review, storage } = setup()
+    expect(await review.shouldAsk()).toBe(true)
+    review.markShown()
+    expect(storage.local.get(REVIEW_SHOWN_AT_STORAGE_KEY)).toBe(String(NOW))
+    expect(await review.shouldAsk()).toBe(false)
   })
 
   it('requests the prompt and starts the cooldown', async () => {
