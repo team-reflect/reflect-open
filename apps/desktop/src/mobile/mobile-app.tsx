@@ -3,6 +3,7 @@ import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
 import { PaywallDrawer } from '@/mobile/paywall-screen.tsx'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
@@ -54,6 +55,7 @@ function KeyboardEffects(): null {
  * The current surface with the paywall drawer over it.
  */
 function MobileSurface(): ReactElement {
+  const { paywall } = useMobileServices()
   const paywallGate = usePaywallGate()
 
   // Subscription verification runs beside startup, never in its critical
@@ -63,7 +65,7 @@ function MobileSurface(): ReactElement {
   return (
     <>
       <MobileSurfaceContent />
-      <PaywallDrawer gate={paywallGate === 'show' ? 'required' : 'hidden'} onDismiss={() => {}} />
+      <PaywallDrawer gate={paywallGate} onDismiss={paywall.dismissSkippable} />
     </>
   )
 }

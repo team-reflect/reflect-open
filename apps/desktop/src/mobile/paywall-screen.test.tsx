@@ -124,6 +124,7 @@ beforeEach(() => {
         subscription,
         classicAccess,
         appStoreEnvironment: base.mobile.appStoreEnvironment,
+        installClock,
         iap,
         appStore,
         platform: base.platform,

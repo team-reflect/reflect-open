@@ -921,6 +921,7 @@ export function composeCoreServices(
         subscription,
         classicAccess,
         appStoreEnvironment,
+        installClock,
         iap,
         appStore,
         platform,

@@ -7,7 +7,7 @@ import { useMobileServices } from '@/mobile/mobile-services.ts'
 /**
  * Whether to render the paywall. Mounting starts the subscription, Reflect
  * Classic, and install-channel checks that the gate reads. It re-renders only
- * when the gate changes.
+ * when the gate changes. Opening the skippable paywall records today's date.
  */
 export function usePaywallGate(): PaywallGate {
   const { paywall, appStoreEnvironment } = useMobileServices()
@@ -15,5 +15,11 @@ export function usePaywallGate(): PaywallGate {
   useEffect(() => {
     void appStoreEnvironment.environment()
   }, [appStoreEnvironment])
-  return useStore(paywall.gate)
+  const gate = useStore(paywall.gate)
+  useEffect(() => {
+    if (gate === 'skippable') {
+      paywall.markSkippableShown()
+    }
+  }, [gate, paywall])
+  return gate
 }
