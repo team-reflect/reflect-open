@@ -164,7 +164,7 @@ export function SwipeRow({
       <span
         // The open snap point: `snap-end` stops the row at scrollLeft = actionWidth.
         // 1px wide because WebKit ignores zero-width snap areas; `-ml-px` cancels
-        // the extra pixel. See also
+        // the extra pixel. See also https://github.com/team-reflect/reflect-open/pull/1926
         aria-hidden
         className="-ml-px w-px flex-none snap-end"
       ></span>
