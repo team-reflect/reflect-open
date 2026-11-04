@@ -161,6 +161,15 @@ describe('PaywallDrawer modes', () => {
     expect(view.getByRole('progressbar').query()).toBeNull()
   })
 
+  it('leaves out the countdown when the free days have run out', async () => {
+    installClock.setState({ firstLaunchAt: services.clock.now() - 100 * DAY_MS })
+    const view = await mount('skippable')
+
+    await expect.element(view.getByRole('button', { name: 'Later' })).toBeVisible()
+    expect(view.getByText(/free days? left/).query()).toBeNull()
+    expect(view.getByRole('progressbar').query()).toBeNull()
+  })
+
   it('has no Later button and reassures when required', async () => {
     const view = await mount('required')
 

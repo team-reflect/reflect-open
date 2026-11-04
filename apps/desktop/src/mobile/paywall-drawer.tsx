@@ -282,12 +282,14 @@ function SkippableHeader({ onLater }: { onLater: () => void }): ReactElement {
   const { clock } = useCoreServices()
   const dateFormat = useDateFormat()
   const { firstLaunchAt } = useStore(installClock)
-  const daysLeft = firstLaunchAt === null ? null : getPaywallDaysLeft(firstLaunchAt, clock.now())
+  // 0 when the first launch is unknown, or when Debug simulates the skippable
+  // phase on an older install. Both leave out the countdown.
+  const daysLeft = firstLaunchAt === null ? 0 : getPaywallDaysLeft(firstLaunchAt, clock.now())
 
   return (
     <header className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
-        {daysLeft === null ? (
+        {daysLeft === 0 ? (
           <span />
         ) : (
           <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
@@ -305,7 +307,7 @@ function SkippableHeader({ onLater }: { onLater: () => void }): ReactElement {
       <p className="text-sm leading-6 text-text-secondary">
         Subscribe to keep your notes, tasks, search, and AI on iPhone and iPad.
       </p>
-      {firstLaunchAt !== null && daysLeft !== null ? (
+      {firstLaunchAt !== null && daysLeft > 0 ? (
         <div className="flex flex-col gap-2">
           <div
             role="progressbar"
