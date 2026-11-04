@@ -107,55 +107,55 @@ function setup(options: SetupOptions = {}) {
 describe('createWhatsNewService', () => {
   it('shows the items for the platform once the graph opens, and hides once dismissed', () => {
     const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0', status: 'loading' })
-    expect(whatsNew.gate.get()).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     setStatus('ready')
-    expect(whatsNew.gate.get()).toBe('shown')
+    expect(whatsNew.phase.get()).toBe('shown')
     expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])
 
     whatsNew.dismiss()
-    expect(whatsNew.gate.get()).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBe('0.19.1')
   })
 
   it('shows every item of a beta so far, once per full version', () => {
     const beta = setup({ appPlatform: 'ios', version: '0.19.1-beta.2', seen: '0.19.1-beta.1' })
-    expect(beta.whatsNew.gate.get()).toBe('shown')
+    expect(beta.whatsNew.phase.get()).toBe('shown')
     expect(beta.whatsNew.items).toEqual([ITEM_1, ITEM_3])
     const stable = setup({ appPlatform: 'ios', seen: '0.19.1-beta.2' })
-    expect(stable.whatsNew.gate.get()).toBe('shown')
+    expect(stable.whatsNew.phase.get()).toBe('shown')
   })
 
   it('marks the version seen without showing after the graph chooser', () => {
     const { whatsNew, setStatus, seen } = setup({ status: 'loading' })
     setStatus('choosing')
     setStatus('ready')
-    expect(whatsNew.gate.get()).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBe('0.19.1')
   })
 
   it('ignores a graph switch after the first open', () => {
     const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0' })
     setStatus('choosing')
-    expect(whatsNew.gate.get()).toBe('shown')
+    expect(whatsNew.phase.get()).toBe('shown')
     expect(seen()).toBe('0.19.0')
   })
 
   it('marks a version without items seen at start', () => {
     const { whatsNew, seen } = setup({ version: '0.20.0', seen: '0.19.1' })
-    expect(whatsNew.gate.get()).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBe('0.20.0')
   })
 
   it('shows a seen version with the override, which dismiss turns off', () => {
     const { whatsNew } = setup({ seen: '0.19.1' })
-    expect(whatsNew.gate.get()).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
 
     whatsNew.setOverride(true)
-    expect(whatsNew.gate.get()).toBe('shown')
+    expect(whatsNew.phase.get()).toBe('shown')
 
     whatsNew.dismiss()
     expect(whatsNew.override.get()).toBe(false)
-    expect(whatsNew.gate.get()).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
   })
 
   it('stops following the launch', () => {
@@ -163,7 +163,7 @@ describe('createWhatsNewService', () => {
     stop()
     setStatus('choosing')
     setStatus('ready')
-    expect(whatsNew.gate.get()).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBeNull()
   })
 })

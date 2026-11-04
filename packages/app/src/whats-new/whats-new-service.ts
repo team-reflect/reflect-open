@@ -57,9 +57,9 @@ export interface WhatsNewInputs {
 export type WhatsNewDecision = 'wait' | 'skip' | 'show'
 
 /**
- * Whether to show What's New.
+ * Whether What's New is hidden or shown.
  */
-export type WhatsNewGate = 'hidden' | 'shown'
+export type WhatsNewPhase = 'hidden' | 'shown'
 
 /**
  * What to do with What's New for the given inputs.
@@ -93,9 +93,9 @@ export interface WhatsNewService {
    */
   readonly items: readonly WhatsNewItem[]
   /**
-   * Whether to show What's New.
+   * Whether What's New is hidden or shown.
    */
-  readonly gate: Store<WhatsNewGate>
+  readonly phase: Store<WhatsNewPhase>
   /**
    * Whether QA forces What's New on in this session.
    */
@@ -130,7 +130,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
   readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
   readonly #decision: Store<WhatsNewDecision>
   readonly items: readonly WhatsNewItem[]
-  readonly gate: Store<WhatsNewGate>
+  readonly phase: Store<WhatsNewPhase>
   readonly override: Store<boolean>
 
   constructor(deps: WhatsNewServiceDeps) {
@@ -159,7 +159,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
         })
       },
     )
-    this.gate = deriveStore(this.#decision, (decision): WhatsNewGate => {
+    this.phase = deriveStore(this.#decision, (decision): WhatsNewPhase => {
       return decision === 'show' ? 'shown' : 'hidden'
     })
   }
