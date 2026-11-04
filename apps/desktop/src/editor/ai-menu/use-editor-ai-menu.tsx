@@ -26,7 +26,7 @@ import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useNoteRow } from '@/hooks/use-note-row.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -104,7 +104,7 @@ export function useEditorAiMenu({
   const { providers } = useAiProviders()
   const { selectionTransform } = useCoreServices()
   const { prompts } = useAiPrompts()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
 
   const runRef = useRef<ActiveRun | null>(null)
   // The staged placement of the current run — state (not just the ref) so the
