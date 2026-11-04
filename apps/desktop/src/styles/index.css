@@ -633,7 +633,11 @@ html:root {
    shadcn form controls carry their own focus-visible ring (border + ring
    utilities), so the global outline above would stack a second ring on top.
    Its rule is unlayered, so a Tailwind utility can't opt out, so do it here. */
-:where([data-slot='input'], [data-slot='textarea'], [cmdk-input]):focus-visible {
+:where(
+  [data-slot='input'],
+  [data-slot='textarea'],
+  [data-slot='input-group-control']
+):focus-visible {
   outline: none;
 }
 
@@ -675,7 +679,7 @@ html:root {
   width: 40%;
   flex-shrink: 0;
 }
-.reflect-palette-group [cmdk-group-heading] {
+.reflect-palette-group-label {
   padding: 0.375rem 0.625rem 0.125rem;
   font-size: 0.6875rem;
   font-weight: 600;
@@ -688,7 +692,7 @@ html:root {
   border-radius: 0.375rem;
   cursor: pointer;
 }
-.reflect-palette-item[data-selected='true'] {
+.reflect-palette-item[data-highlighted] {
   background: var(--accent-soft, rgb(99 102 241 / 12%));
 }
 .reflect-palette-empty {
