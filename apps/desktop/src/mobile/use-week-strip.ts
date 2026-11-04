@@ -77,6 +77,7 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
   const followedDateRef = useRef(date)
 
   const count = useEffectEvent(() => weekWindow.count)
+  const shownIndex = useEffectEvent(() => displayedIndex)
   const prefersReducedMotion = useEffectEvent(() => reducedMotion)
 
   // Re-center the window when paging settles near an edge, keeping the
@@ -96,7 +97,7 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
     const controller = new AbortController()
     pagerRef.current = attachSnapPager({
       element: scroller,
-      index: weekWindow.anchorIndex,
+      index: shownIndex(),
       count,
       prefersReducedMotion,
       onIndex: setDisplayedIndex,
