@@ -115,15 +115,16 @@ export function MobileShell(): ReactElement {
 
   return (
     <SafeAreaBoundary>
-      {/* Shrinks behind an open drawer. It is viewport-sized, so the
-          `position: fixed` children it contains while scaled keep their place. */}
+      {/* Shrinks behind an open drawer. While scaled, it is the containing
+          block of `position: fixed` descendants, so it is viewport-sized:
+          they keep their layout and scale with the shell. */}
       <div className="drawer-depth-target h-dvh w-screen bg-surface-app">
         {/* The shell yields to the software keyboard by height (Plan 19,
-          decision 8): the root ends at the keyboard's top, so every screen's
-          layout sees the true visible viewport. Only `position: fixed`
-          elements need `--keyboard-height` themselves. */}
+            decision 8): the root ends at the keyboard's top, so every screen's
+            layout sees the true visible viewport. Only `position: fixed`
+            elements need `--keyboard-height` themselves. */}
         <div
-          className="flex w-screen flex-col"
+          className="flex flex-col"
           style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
         >
           <div className="min-h-0 flex-1">
@@ -138,10 +139,10 @@ export function MobileShell(): ReactElement {
             </Suspense>
           </div>
           {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
-          would ride above the keyboard instead, so it hides while typing.
-          Its slot goes to the formatting toolbar, which — sitting at the
-          bottom of a root that ends at the keyboard's top — lands exactly
-          on the keyboard edge with no fixed positioning. */}
+              would ride above the keyboard instead, so it hides while typing.
+              Its slot goes to the formatting toolbar, which — sitting at the
+              bottom of a root that ends at the keyboard's top — lands exactly
+              on the keyboard edge with no fixed positioning. */}
           {keyboardVisible ? (
             <MobileFormattingToolbar />
           ) : (

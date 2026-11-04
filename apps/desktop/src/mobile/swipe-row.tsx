@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -12,6 +13,7 @@ import {
 import { watchScrollSettle, type ScrollSettleWatch } from '@/lib/scroll-settle.ts'
 import { cn } from '@/lib/utils.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
+import './swipe-row.css'
 
 interface SwipeRowProps {
   /**
@@ -143,11 +145,12 @@ export function SwipeRow({
   )
 
   const actionsStyle = useMemo(() => ({ width: actionWidth }), [actionWidth])
-  // Only the trailing `actionWidth` is colored, so a leading over-swipe shows nothing.
   const scrollerStyle = useMemo(
-    () => ({
-      background: `linear-gradient(to left, ${overscrollColor} ${actionWidth}px, transparent ${actionWidth}px)`,
-    }),
+    () =>
+      ({
+        '--swipe-row-overscroll-color': overscrollColor,
+        '--swipe-row-action-width': `${actionWidth}px`,
+      }) as CSSProperties,
     [overscrollColor, actionWidth],
   )
 
@@ -160,7 +163,7 @@ export function SwipeRow({
       onPointerDown={onPointerDown}
       style={scrollerStyle}
       className={cn(
-        'flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
+        'swipe-row flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
         className,
       )}
     >
@@ -168,6 +171,7 @@ export function SwipeRow({
         {children}
       </div>
       <div
+        data-slot="swipe-row-actions"
         className="sticky right-0 flex flex-none"
         style={actionsStyle}
         aria-hidden={!revealed || undefined}
