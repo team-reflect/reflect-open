@@ -27,7 +27,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     },
     {
       title: 'Depth behind sheets',
-      body: 'The page now shrinks behind an open sheet, like other iOS apps.',
+      body: 'When a sheet opens, the page behind it steps back, so you always know where you are.',
       platforms: ['ios'],
     },
   ],
