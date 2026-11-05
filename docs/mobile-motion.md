@@ -63,7 +63,7 @@ assumption in Safari or in the iOS simulator
   in Chromium cannot catch the iOS behavior. Verified: Chromium.
 - So a pager can shift its pages only at rest. A check for a finger in the React commit cannot
   prevent this: the native pan starts while the main thread is busy, and the `touchstart` waits
-  until the commit ends (inferred from the native scrolling above, not probed directly).
+  until the commit ends (inferred, not probed directly).
 
 ### Resize
 
