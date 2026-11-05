@@ -146,7 +146,9 @@ interface SettingsMenuRowProps<Value extends string> {
 
 /**
  * A row showing the current choice of a small closed set. A transparent
- * native `<select>` covers the row, so a tap opens the platform's menu.
+ * native `<select>` covers the row's trailing half, so a tap there opens the
+ * platform's menu. iOS anchors the menu to the `<select>`'s rect, so a
+ * full-width `<select>` would center the menu on the screen.
  */
 export function SettingsMenuRow<Value extends string>({
   label,
@@ -171,7 +173,7 @@ export function SettingsMenuRow<Value extends string>({
             onChange(next.value)
           }
         }}
-        className="absolute inset-0 appearance-none text-base opacity-0"
+        className="absolute inset-y-0 right-0 left-1/2 appearance-none text-base opacity-0"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
