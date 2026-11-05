@@ -19,7 +19,7 @@
 }
 
 /* In dark mode the page and cards use the app's own surfaces instead of
-   UIKit's black and #1C1C1E, so they match the header and the tab bar. */
+   UIKit's black and #1C1C1E, so the page matches the header and the tab bar. */
 .dark {
   --ios-grouped-background: var(--surface-app);
   --ios-grouped-cell: var(--surface);

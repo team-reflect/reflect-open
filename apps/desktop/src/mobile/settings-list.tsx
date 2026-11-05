@@ -48,9 +48,8 @@ export function SettingsGroup({
       {/* The font size is set here, not on the rows: `cn` would drop a
           `text-ios-body` row class next to a `text-primary` color class.
           On a grouped-background screen (`data-ios-grouped`) the card is a
-          borderless cell in light mode. Sheets, and dark mode (where the
-          card and the page share the app's surface color), keep a border. */}
-      <div className="overflow-hidden rounded-ios-card border border-border bg-surface text-ios-body in-data-ios-grouped:border-0 in-data-ios-grouped:bg-ios-grouped-cell dark:in-data-ios-grouped:border">
+          borderless cell. Sheets keep a border. */}
+      <div className="overflow-hidden rounded-ios-card border border-border bg-surface text-ios-body in-data-ios-grouped:border-0 in-data-ios-grouped:bg-ios-grouped-cell">
         {children}
       </div>
       {footer != null ? (
