@@ -12,7 +12,7 @@ import {
 import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
 import { useDateFormat, useSettingsService } from '@/providers/settings-provider.tsx'
 import { useGitSyncState } from '@/providers/sync-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useGraphServices } from '@/services/services-provider.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MOBILE_PLATFORM, renderHookInApp, renderInApp } from './render-in-app.tsx'
@@ -26,7 +26,8 @@ function Probe(): ReactElement {
   const mobileStorageKind = useMobileStorageKind()
   const dateFormat = useDateFormat()
   const settingsService = useSettingsService()
-  const { route, navigate } = useRouter()
+  const { route } = useRouterState()
+  const { navigate } = useRouterActions()
   const sync = useGitSyncState()
   return (
     <div>

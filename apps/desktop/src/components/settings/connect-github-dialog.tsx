@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
-import type { ConnectWizardStep } from '@reflect/app'
+import { useMaybeGraphServices } from '@/services/services-provider.tsx'
+import type { ConnectGithubWizardDeps, ConnectWizardStep } from '@reflect/app'
 
 interface ConnectGithubDialogProps {
   /** A suggested name for a newly created backup repo (from the graph name). */
@@ -26,6 +27,7 @@ const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
   repo: 'Sync this graph through a private GitHub repository.',
   auth: 'Sign in so Reflect can sync with it.',
   finish: 'Connecting your repository…',
+  connected: 'Connected.',
 }
 
 /**
@@ -35,12 +37,26 @@ const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
  * consent gate). The mobile drawer renders the same hook; flow changes belong
  * there, not here.
  */
-export function ConnectGithubDialog({
+export function ConnectGithubDialog(props: ConnectGithubDialogProps): ReactElement | null {
+  // Connect is offered only while the graph runs git sync, which has a connector.
+  const connector = useMaybeGraphServices()?.githubConnector ?? null
+  return connector === null ? null : <ConnectGithubDialogContent {...props} connector={connector} />
+}
+
+function ConnectGithubDialogContent({
+  connector,
   suggestedRepoName,
   onClose,
   pollIntervalMs = 3000,
-}: ConnectGithubDialogProps): ReactElement {
-  const wizard = useConnectGithubWizard({ suggestedRepoName, onClose, pollIntervalMs })
+}: ConnectGithubDialogProps & {
+  connector: ConnectGithubWizardDeps['connector']
+}): ReactElement {
+  const { state, wizard } = useConnectGithubWizard({
+    connector,
+    suggestedRepoName,
+    onConnected: onClose,
+    pollIntervalMs,
+  })
 
   return (
     <Dialog
@@ -54,25 +70,25 @@ export function ConnectGithubDialog({
       <DialogContent showCloseButton={false} className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Connect GitHub</DialogTitle>
-          <DialogDescription>{STEP_DESCRIPTIONS[wizard.step]}</DialogDescription>
+          <DialogDescription>{STEP_DESCRIPTIONS[state.step]}</DialogDescription>
         </DialogHeader>
 
-        {wizard.step === 'repo' ? (
+        {state.step === 'repo' ? (
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm text-text">
                 <input
                   type="radio"
                   name="repo-mode"
-                  checked={wizard.mode === 'create'}
+                  checked={state.mode === 'create'}
                   onChange={() => wizard.setMode('create')}
                 />
                 Create a new private repository
               </label>
-              {wizard.mode === 'create' ? (
+              {state.mode === 'create' ? (
                 <Input
                   autoFocus
-                  value={wizard.repoName}
+                  value={state.repoName}
                   onChange={(event) => wizard.setRepoName(event.target.value)}
                   className="ml-6 w-auto"
                   aria-label="New repository name"
@@ -82,15 +98,15 @@ export function ConnectGithubDialog({
                 <input
                   type="radio"
                   name="repo-mode"
-                  checked={wizard.mode === 'existing'}
+                  checked={state.mode === 'existing'}
                   onChange={() => wizard.setMode('existing')}
                 />
                 Use an existing repository
               </label>
-              {wizard.mode === 'existing' ? (
+              {state.mode === 'existing' ? (
                 <Input
                   autoFocus
-                  value={wizard.existingRepo}
+                  value={state.existingRepo}
                   onChange={(event) => wizard.setExistingRepo(event.target.value)}
                   placeholder="owner/name"
                   className="ml-6 w-auto"
@@ -104,17 +120,19 @@ export function ConnectGithubDialog({
           </div>
         ) : null}
 
-        {wizard.step === 'auth' ? (
+        {state.step === 'auth' ? (
           <GithubAuthStep
             onAuthed={wizard.onAuthed}
-            repoName={wizard.mode === 'create' ? wizard.repoName.trim() : undefined}
+            repoName={state.choice.kind === 'create' ? state.choice.name : undefined}
           />
         ) : null}
 
-        {wizard.step === 'finish' ? <ConnectGithubFinishStep wizard={wizard} layout="row" /> : null}
+        {state.step === 'finish' ? (
+          <ConnectGithubFinishStep state={state} wizard={wizard} layout="row" />
+        ) : null}
 
-        {wizard.step !== 'finish' && wizard.error !== null ? (
-          <InlineAlert tone="error">{wizard.error}</InlineAlert>
+        {state.step === 'repo' && state.error !== null ? (
+          <InlineAlert tone="error">{state.error}</InlineAlert>
         ) : null}
       </DialogContent>
     </Dialog>

@@ -7,7 +7,7 @@ import { useNoteWindowTitle } from '@/hooks/use-note-window-title.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { dailyPath, displayNoteTitle, formatDayLabel } from '@reflect/core'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 
 /**
  * A secondary note window's whole surface: the routed view, full-bleed — no
@@ -20,7 +20,7 @@ import { useRouter } from '@/routing/router.tsx'
  * placeholder behavior).
  */
 export function NoteWindowContent(): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   const dateFormat = useDateFormat()
   const today = useToday()
   const dailyDate = route.kind === 'daily' ? route.date : route.kind === 'today' ? today : null
@@ -40,7 +40,7 @@ export function NoteWindowContent(): ReactElement {
   )
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-surface text-text">
+    <div className="relative h-screen w-screen overflow-hidden bg-surface-canvas text-text">
       {dailyDate !== null ? (
         <SingleNoteView
           path={dailyPath(dailyDate)}

@@ -1,4 +1,4 @@
-import { useRouter, type RouterNavigate } from '@/routing/router.tsx'
+import { type RouterNavigate, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import {
   createTestAppServices,
@@ -30,7 +30,7 @@ const navigateRef: RefObject<RouterNavigate | null> = createRef()
 
 function Host({ readOnly = false }: { readOnly?: boolean }): ReactNode {
   const lastHandler = useWikiLinkNavigation({ readOnly })
-  const navigate = useRouter().navigate
+  const navigate = useRouterActions().navigate
 
   useLayoutEffect(() => {
     lastHandlerRef.current = lastHandler
@@ -50,7 +50,7 @@ function Host({ readOnly = false }: { readOnly?: boolean }): ReactNode {
 }
 
 function RouteProbe(): ReactNode {
-  const { route, arrivalFocusEditor } = useRouter()
+  const { route, arrivalFocusEditor } = useRouterState()
   return (
     <output data-testid="route" data-focus={String(arrivalFocusEditor)}>
       {JSON.stringify(route)}

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.18.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.5...v0.18.0-beta.6) (2026-11-05)
+
+
+### Features
+
+* **design-system:** split the editor canvas from cards ([#2000](https://github.com/team-reflect/reflect-open/issues/2000)) ([65e3127](https://github.com/team-reflect/reflect-open/commit/65e3127b315659be917527a81fc1ea6b2ed1fc42))
+* **mobile:** native switches and grouped settings ([#2001](https://github.com/team-reflect/reflect-open/issues/2001)) ([450afe1](https://github.com/team-reflect/reflect-open/commit/450afe11fba04aa8ca73a9c43776e68e93b5bc86))
+* **mobile:** use native select menus in settings ([#1993](https://github.com/team-reflect/reflect-open/issues/1993)) ([76b3b9d](https://github.com/team-reflect/reflect-open/commit/76b3b9d93a7bbc57751820dc3d32ad3e6be1c43d))
+* **mobile:** use the native date picker in the task sheet ([#1996](https://github.com/team-reflect/reflect-open/issues/1996)) ([06a5b43](https://github.com/team-reflect/reflect-open/commit/06a5b4389fa7aff5f735b893e2ba55b8c6f4b1b6))
+* **mobile:** use the native month picker on the daily header ([#1994](https://github.com/team-reflect/reflect-open/issues/1994)) ([1eb267d](https://github.com/team-reflect/reflect-open/commit/1eb267d51072b088b9497c723af9026d426a650c))
+
+
+### Bug Fixes
+
+* **desktop:** stop saving scroll to a pending entry ([#1991](https://github.com/team-reflect/reflect-open/issues/1991)) ([158b9f2](https://github.com/team-reflect/reflect-open/commit/158b9f291d3213b861dd22e56d1de80fd0ee578b))
+
 ## [0.18.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.4...v0.18.0-beta.5) (2026-11-05)
 
 

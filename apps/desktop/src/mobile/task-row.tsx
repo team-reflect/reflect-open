@@ -83,7 +83,7 @@ export function MobileTaskRow({
         onReveal={reveal}
         onClose={close}
         onBeginInteraction={beginInteraction}
-        surfaceClassName="bg-surface"
+        surfaceClassName="bg-surface-canvas"
         overscrollColor="var(--color-destructive)"
         actions={
           <>

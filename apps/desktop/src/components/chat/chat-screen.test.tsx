@@ -21,7 +21,7 @@ import {
   type TestOpenGraph,
 } from '@reflect/core/testing'
 import { useChatActions, type ChatActions } from '@/providers/chat-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ChatScreen } from './chat-screen.tsx'
@@ -121,7 +121,7 @@ function SendProbe(): ReactElement | null {
 }
 
 function RouteProbe(): ReactElement | null {
-  const { route } = useRouter()
+  const { route } = useRouterState()
 
   useLayoutEffect(() => {
     probedRouteRef.current = route

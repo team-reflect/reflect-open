@@ -14,7 +14,7 @@ import {
 } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 type DailyRoute = Extract<Route, { kind: 'today' }> | Extract<Route, { kind: 'daily' }>
 
@@ -33,7 +33,8 @@ function dailyRouteFrom(route: Route): DailyRoute | null {
  * double-tapping it, goes back to the list.
  */
 export function MobileShell(): ReactElement {
-  const { route, navigate, entryId, backRoute } = useRouter()
+  const { route, entryId, backRoute } = useRouterState()
+  const { navigate } = useRouterActions()
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
@@ -120,7 +121,7 @@ export function MobileShell(): ReactElement {
           layout sees the true visible viewport. Only `position: fixed`
           elements need `--keyboard-height` themselves. */}
       <div
-        className="flex w-screen flex-col"
+        className="mobile-shell flex w-screen flex-col"
         style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
       >
         <div className="min-h-0 flex-1">

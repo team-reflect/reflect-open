@@ -80,9 +80,9 @@ export function MobileTaskGroup({
   return (
     <section>
       {/* `z-20` paints the stuck header above the rows' `z-10` swipe surfaces.
-          `bg-surface` is opaque, so rows do not show through the translucent
+          `bg-surface-canvas` is opaque, so rows do not show through the translucent
           dark-mode `bg-surface-sunken`. */}
-      <div className="sticky top-0 z-20 bg-surface">
+      <div className="sticky top-0 z-20 bg-surface-canvas">
         <div className="flex items-center gap-2 bg-surface-sunken px-4 py-1.5">
           <h2 className={cn('flex min-w-0 items-center gap-2 text-sm font-medium', colorClass)}>
             {icon}

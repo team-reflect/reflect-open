@@ -112,7 +112,7 @@ headings (`40–72px`).
 
 **Color.**
 - **App:** near-white canvas (`#fff` surfaces on a `#f8fafa` app bg) or deep-navy dark
-  mode (`hsl(224 49% 8%)` ≈ `#0a0f1e`). Neutrals are **cool greys** (the "coolgray"
+  mode (`hsl(224 49% 8%)` ≈ `#0a0f1e` canvas, lighter `#161d30` cards and popovers). Neutrals are **cool greys** (the "coolgray"
   ramp). **Indigo `#4F46E5` is the only saturated accent** — solid buttons, selected
   state, focus. Secondary actions use soft indigo (`#e0e7ff` bg / `#4338ca` text).
   Destructive is red-500. That's the whole palette — restraint is the point.
