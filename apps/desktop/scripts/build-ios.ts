@@ -7,7 +7,7 @@
 //   --flavor=beta|stable      Defaults to beta for a prerelease version, else stable
 //   --no-sign                 Unsigned archive without credentials. It cannot be installed
 
-import { existsSync, readdirSync } from 'node:fs'
+import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
@@ -21,11 +21,14 @@ import {
   resolveApiKey,
   runTauri,
   runWithTempDir,
+  TAURI_SRC_DIR,
 } from './helpers.ts'
 
 interface IosFlavor {
   bundleIdentifier: string
   appGroup: string
+  /** The app's entitlements file, relative to `gen/apple`. */
+  appEntitlements: string
   /** `--config` arguments for `tauri ios build`, which writes `identifier` into the app target. */
   configArgs: string[]
   /**
@@ -40,12 +43,14 @@ const FLAVORS = {
   stable: {
     bundleIdentifier: 'app.reflect.ios',
     appGroup: 'group.app.reflect',
+    appEntitlements: 'reflect-open_iOS/reflect-open_iOS.entitlements',
     configArgs: [],
     xcodeEnv: {},
   },
   beta: {
     bundleIdentifier: 'app.reflect.ios.beta',
     appGroup: 'group.app.reflect.beta',
+    appEntitlements: 'reflect-open_iOS/reflect-open_iOS.beta.entitlements',
     configArgs: ['--config', join('src-tauri', 'tauri.ios.beta.conf.json')],
     xcodeEnv: {
       TAURI_REFLECT_IOS_DISPLAY_NAME: 'Reflect Beta',
@@ -71,6 +76,13 @@ function resolveFlavorName(option: string): FlavorName {
   }
   throw new Error(`invalid flavor "${option}": expected beta or stable`)
 }
+const APPLE_DIR = join(TAURI_SRC_DIR, 'gen', 'apple')
+/** Tauri derives this path from the scheme name. */
+const TAURI_APP_ENTITLEMENTS_PATH = join(
+  APPLE_DIR,
+  'reflect-open_iOS',
+  'reflect-open_iOS.entitlements',
+)
 const APP_BINARY_PATH = join(IOS_ARCHIVE_PATH, 'Products', 'Applications', 'Reflect.app', 'Reflect')
 const DSYM_PATH = join(IOS_ARCHIVE_PATH, 'dSYMs', 'Reflect.app.dSYM')
 
@@ -129,6 +141,25 @@ async function assertIpa(flavor: IosFlavor): Promise<void> {
   })
 }
 
+/**
+ * Before export, `tauri ios build` re-signs the archived app with
+ * `reflect-open_iOS/reflect-open_iOS.entitlements`, whatever
+ * `CODE_SIGN_ENTITLEMENTS` says. Puts the flavor's file there during `run`.
+ */
+async function withAppEntitlements(flavor: IosFlavor, run: () => Promise<void>): Promise<void> {
+  const flavorPath = join(APPLE_DIR, flavor.appEntitlements)
+  if (flavorPath === TAURI_APP_ENTITLEMENTS_PATH) {
+    return await run()
+  }
+  const original = readFileSync(TAURI_APP_ENTITLEMENTS_PATH)
+  copyFileSync(flavorPath, TAURI_APP_ENTITLEMENTS_PATH)
+  try {
+    await run()
+  } finally {
+    writeFileSync(TAURI_APP_ENTITLEMENTS_PATH, original)
+  }
+}
+
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
@@ -170,7 +201,7 @@ async function main(): Promise<void> {
       args.push('--export-method', 'app-store-connect')
       env.APPLE_API_KEY_PATH = apiKey.keyPath
     }
-    await runTauri(args, env)
+    await withAppEntitlements(flavor, () => runTauri(args, env))
   })
   if (!noSign) {
     await assertIpa(flavor)
