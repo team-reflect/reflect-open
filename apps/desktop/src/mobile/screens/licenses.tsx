@@ -1,11 +1,12 @@
 import type { ReactElement } from 'react'
 import { LicenseList } from '@/components/licenses/license-list.tsx'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /** The Open Source Licenses screen (route kind `licenses`), pushed from Settings. */
 export function MobileLicenses(): ReactElement {
-  const { back, canBack, navigate } = useRouter()
+  const { canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
       <MobileScreenHeader

@@ -148,6 +148,7 @@ export {
 export {
   type NavigateOptions,
   type NavigationService,
+  type NavigationState,
   type ScrollPosition,
 } from './navigation/navigation-service.ts'
 export {

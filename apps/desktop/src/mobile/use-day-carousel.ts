@@ -28,6 +28,10 @@ import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
  * audit's finding at the old ~1-year radius). 90 keeps 60 swipes of
  * headroom from center before a re-anchor at {@link RECENTER_MARGIN},
  * far beyond a realistic swipe burst, at a quarter of the belt.
+ *
+ * The window does not re-center on every day change: that would shift the
+ * cells after each swipe, and on iOS a shift that lands during the next
+ * gesture moves the scroller to another day (docs/mobile-motion.md).
  */
 export const CAROUSEL_RADIUS = 90
 

@@ -10,7 +10,7 @@ import {
 } from '@reflect/core/testing'
 import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
 import { createTestSystemPreferencesService } from '@reflect/app/testing'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -137,7 +137,7 @@ function asTextArea(element: Element): HTMLTextAreaElement {
 }
 
 function RouteProbe(): ReactNode {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
