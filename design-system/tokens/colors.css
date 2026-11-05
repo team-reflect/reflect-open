@@ -66,9 +66,10 @@
   /* ============================================================
      SEMANTIC ALIASES — light (default) app theme
      ============================================================ */
-  --surface: #ffffff; /* cards, editor canvas        */
+  --surface: #ffffff; /* cards, popovers, sheets     */
+  --surface-canvas: #ffffff; /* editor canvas, list pages   */
   --surface-sunken: var(--coolgray-50); /* sidebar, rails              */
-  --surface-app: #f8fafa; /* whole-app background        */
+  --surface-app: #f8fafa; /* window, grouped pages       */
   --surface-hover: rgba(229, 231, 235, 0.5); /* menu/list hover (gray-200/50)*/
   --surface-active: rgba(229, 231, 235, 0.5); /* today's calendar square     */
   --surface-inverse: hsl(222.2 47.4% 11.2%); /* selected calendar square  */
@@ -111,7 +112,8 @@
    Deep navy, indigo-500 brand, near-white text.
    ============================================================ */
 .dark {
-  --surface: #0b1020;
+  --surface: #161d30; /* hsl(224 37% 14%)            */
+  --surface-canvas: #0a0f1e; /* hsl(224 49% 8%)             */
   --surface-sunken: rgba(31, 41, 55, 0.3);
   --surface-app: #0a0f1e; /* hsl(224 49% 8%)             */
   --surface-hover: rgba(255, 255, 255, 0.03);

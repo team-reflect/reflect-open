@@ -10,7 +10,7 @@ import type {
 } from '@reflect/core'
 import { createTestCoreServices } from '@reflect/core/testing'
 import type { ReactNode } from 'react'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -43,7 +43,7 @@ function createCore() {
 let core: ReturnType<typeof createCore>
 
 function RouteProbe(): ReactNode {
-  const { route, arrivalFocusEditor } = useRouter()
+  const { route, arrivalFocusEditor } = useRouterState()
   return (
     <output data-testid="route" data-focus={String(arrivalFocusEditor)}>
       {JSON.stringify(route)}

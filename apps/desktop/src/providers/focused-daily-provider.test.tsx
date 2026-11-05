@@ -1,7 +1,7 @@
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import {
   FocusedDailyProvider,
@@ -49,7 +49,7 @@ describe('useDailyContextTarget', () => {
     return {
       target: useDailyContextTarget(),
       setFocused: useSetFocusedDailyDate(),
-      navigate: useRouter().navigate,
+      navigate: useRouterActions().navigate,
     }
   }
 

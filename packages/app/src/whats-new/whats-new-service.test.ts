@@ -30,6 +30,8 @@ const INPUTS: WhatsNewInputs = {
   override: false,
   blocked: false,
   launch: 'opened',
+  offerFirst: false,
+  accepted: false,
 }
 
 function decide(inputs: Partial<WhatsNewInputs>) {
@@ -69,6 +71,13 @@ describe('decideWhatsNew', () => {
     )
     expect(decide({ override: true, items: [] })).toBe('wait')
   })
+
+  it('offers an unseen version first until the user accepts, but not with the override', () => {
+    expect(decide({ offerFirst: true })).toBe('offer')
+    expect(decide({ offerFirst: true, accepted: true })).toBe('show')
+    expect(decide({ offerFirst: true, override: true })).toBe('show')
+    expect(decide({ offerFirst: true, seen: true })).toBe('wait')
+  })
 })
 
 interface SetupOptions {
@@ -76,6 +85,7 @@ interface SetupOptions {
   seen?: string
   appPlatform?: 'desktop' | 'ios'
   status?: GraphStatus
+  offerFirst?: boolean
 }
 
 function setup(options: SetupOptions = {}) {
@@ -97,6 +107,7 @@ function setup(options: SetupOptions = {}) {
     graphSession,
     blocked: new WritableStore(false),
     content: CONTENT,
+    offerFirst: options.offerFirst ?? false,
   })
   const stop = whatsNew.start()
   const setStatus = (status: GraphStatus) => graphSession.setState({ status })
@@ -107,53 +118,72 @@ function setup(options: SetupOptions = {}) {
 describe('createWhatsNewService', () => {
   it('shows the items for the platform once the graph opens, and hides once dismissed', () => {
     const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0', status: 'loading' })
-    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     setStatus('ready')
-    expect(whatsNew.gate.get()).toEqual({ kind: 'whatsNew', items: [ITEM_2, ITEM_3] })
+    expect(whatsNew.phase.get()).toBe('shown')
+    expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])
 
     whatsNew.dismiss()
-    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBe('0.19.1')
   })
 
   it('shows every item of a beta so far, once per full version', () => {
     const beta = setup({ appPlatform: 'ios', version: '0.19.1-beta.2', seen: '0.19.1-beta.1' })
-    expect(beta.whatsNew.gate.get()).toEqual({ kind: 'whatsNew', items: [ITEM_1, ITEM_3] })
+    expect(beta.whatsNew.phase.get()).toBe('shown')
+    expect(beta.whatsNew.items).toEqual([ITEM_1, ITEM_3])
     const stable = setup({ appPlatform: 'ios', seen: '0.19.1-beta.2' })
-    expect(stable.whatsNew.gate.get().kind).toBe('whatsNew')
+    expect(stable.whatsNew.phase.get()).toBe('shown')
   })
 
   it('marks the version seen without showing after the graph chooser', () => {
     const { whatsNew, setStatus, seen } = setup({ status: 'loading' })
     setStatus('choosing')
     setStatus('ready')
-    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBe('0.19.1')
   })
 
   it('ignores a graph switch after the first open', () => {
     const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0' })
     setStatus('choosing')
-    expect(whatsNew.gate.get().kind).toBe('whatsNew')
+    expect(whatsNew.phase.get()).toBe('shown')
     expect(seen()).toBe('0.19.0')
   })
 
   it('marks a version without items seen at start', () => {
     const { whatsNew, seen } = setup({ version: '0.20.0', seen: '0.19.1' })
-    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBe('0.20.0')
   })
 
   it('shows a seen version with the override, which dismiss turns off', () => {
     const { whatsNew } = setup({ seen: '0.19.1' })
-    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
 
     whatsNew.setOverride(true)
-    expect(whatsNew.gate.get().kind).toBe('whatsNew')
+    expect(whatsNew.phase.get()).toBe('shown')
 
     whatsNew.dismiss()
     expect(whatsNew.override.get()).toBe(false)
-    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
+  })
+
+  it('offers first, and shows once accepted without marking the version seen', () => {
+    const { whatsNew, seen } = setup({ seen: '0.19.0', offerFirst: true })
+    expect(whatsNew.phase.get()).toBe('offered')
+
+    whatsNew.accept()
+    expect(whatsNew.phase.get()).toBe('shown')
+    whatsNew.decline()
+    expect(seen()).toBe('0.19.0')
+  })
+
+  it('marks the version seen when the offer is declined', () => {
+    const { whatsNew, seen } = setup({ seen: '0.19.0', offerFirst: true })
+    whatsNew.decline()
+    expect(whatsNew.phase.get()).toBe('hidden')
+    expect(seen()).toBe('0.19.1')
   })
 
   it('stops following the launch', () => {
@@ -161,7 +191,7 @@ describe('createWhatsNewService', () => {
     stop()
     setStatus('choosing')
     setStatus('ready')
-    expect(whatsNew.gate.get().kind).toBe('hidden')
+    expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBeNull()
   })
 })

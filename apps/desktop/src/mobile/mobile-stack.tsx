@@ -1,6 +1,6 @@
 import {
   useCallback,
-  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -11,12 +11,9 @@ import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
-import { RouterFreeze, useRouter } from '@/routing/router.tsx'
+import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import './mobile-stack.css'
 
-/** Mirrors the animation durations in mobile-stack.css. */
-const TRANSITION_MS = 350
 /** The stacked card's leading-edge shadow, visible while it slides. */
 const CARD_SHADOW = '-8px 0 24px rgb(0 0 0 / 0.18)'
 
@@ -238,8 +235,8 @@ interface MobileStackProps {
  * remount it on a canceled swipe.
  */
 export function MobileStack(props: MobileStackProps): ReactElement {
-  const { route, entryId, backRoute, canBack, back, navigate } = useRouter()
-  const reducedMotion = usePrefersReducedMotion()
+  const { route, entryId, backRoute, canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
   const containerRef = useRef<HTMLDivElement>(null)
   const pagerRef = useRef<HTMLDivElement>(null)
   const scrimRef = useRef<HTMLDivElement>(null)
@@ -257,7 +254,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     setArrival({ route, entryId })
     setPoppedByGesture(false)
     setTransition(
-      poppedByGesture || reducedMotion
+      poppedByGesture
         ? { kind: 'none' }
         : transitionFor(arrival, { route, entryId }, backRoute ?? { kind: 'today' }),
     )
@@ -280,40 +277,29 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     setTransition((current) => (current.kind === 'none' ? current : { kind: 'none' }))
   }, [])
 
-  // `animationend` is the fast path; this backstops a missed event.
-  useEffect(() => {
-    if (transition.kind === 'none') {
+  // A transition finishes when the CSS animations on the layers and the scrim
+  // finish. Under reduced motion they have none, so it finishes before the
+  // browser paints. Animations inside a screen (editor UI etc.) do not count.
+  useLayoutEffect(() => {
+    const node = containerRef.current
+    if (transition.kind === 'none' || !node) {
       return
     }
-    const timer = setTimeout(finishTransition, TRANSITION_MS + 80)
-    return () => clearTimeout(timer)
-  }, [transition, finishTransition])
-
-  // The completion listener lives on the container as a native listener:
-  // React's synthetic animation events register vendor-detected names and
-  // never fire in some hosts. The event bubbles; the class guard keeps
-  // animations inside a screen (editor UI etc.) from ending a navigation.
-  // Layers only, never the scrim: exactly one layer animates per transition,
-  // so the layer's own end is the single source of truth, and the scrim's
-  // ending first must not cut the card's slide short.
-  useEffect(() => {
-    const node = containerRef.current
-    if (!node) {
+    const animations = Array.from(
+      node.querySelectorAll('.mobile-stack-layer, .mobile-stack-scrim'),
+    ).flatMap((element) => element.getAnimations())
+    if (animations.length === 0) {
+      finishTransition()
       return
     }
     const controller = new AbortController()
-    node.addEventListener(
-      'animationend',
-      (event) => {
-        const { target } = event
-        if (target instanceof HTMLElement && target.classList.contains('mobile-stack-layer')) {
-          finishTransition()
-        }
-      },
-      { signal: controller.signal },
-    )
+    void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+      if (!controller.signal.aborted) {
+        finishTransition()
+      }
+    })
     return () => controller.abort()
-  }, [finishTransition])
+  }, [transition, finishTransition])
 
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below
@@ -364,7 +350,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
             <div
               key={layer.key}
               className={cn(
-                'mobile-stack-layer sticky left-0 h-full w-full shrink-0 bg-background',
+                'mobile-stack-layer sticky left-0 h-full w-full shrink-0 bg-surface-canvas',
                 className,
               )}
               style={style}

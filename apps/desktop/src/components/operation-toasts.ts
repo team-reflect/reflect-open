@@ -1,6 +1,8 @@
-import type { OperationsService } from '@reflect/app'
+import { useEffect, useRef } from 'react'
 import type { LoggerService, Operation } from '@reflect/core'
-import { toast } from '@/components/ui/toast.tsx'
+import { useToastController, type ToastController } from '@/lib/use-toasts.ts'
+import { useStore } from '@/lib/use-store.ts'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The desktop face of the operations store (foundations hardening): a small,
@@ -8,11 +10,6 @@ import { toast } from '@/components/ui/toast.tsx'
  * the rename rewrite is the first tenant; indexing/sync states can migrate
  * here as they're touched. Mobile renders the same store as pills instead
  * ({@link MobileOperationsPills}).
- *
- * A plain subscriber, not a React component: store listeners run synchronously
- * inside the mutation that reported the event (`startOperation`, `handle.fail`,
- * ...), so every toast call happens in the originating event handler's own
- * call stack rather than in a render-then-effect cycle.
  */
 
 // `timeout: 0` disables Base UI's auto-dismiss (the store owns lingering and
@@ -37,7 +34,11 @@ function descriptionFor(operation: Operation): string | undefined {
   return operation.description ?? undefined
 }
 
-function showOperationToast(operation: Operation, logger: LoggerService): void {
+function showOperationToast(
+  toastController: ToastController,
+  operation: Operation,
+  logger: LoggerService,
+): void {
   const operationAction = operation.action
   const actionProps = operationAction
     ? {
@@ -59,40 +60,39 @@ function showOperationToast(operation: Operation, logger: LoggerService): void {
 
   switch (operation.status) {
     case 'failed':
-      toast.add({ ...options, type: 'error' })
+      toastController.add({ ...options, type: 'error' })
       break
     case 'warning':
-      toast.add({ ...options, type: 'warning' })
+      toastController.add({ ...options, type: 'warning' })
       break
     case 'running':
       // Explicit undefined clears a stale error/warning icon if the same
       // operation id returns to running (`add()` merges by id).
-      toast.add({ ...options, type: undefined })
+      toastController.add({ ...options, type: undefined })
       break
   }
 }
 
 /**
- * Start mirroring `operations` into toasts; returns a detach.
+ * Mirrors the operations store into toasts.
  */
-export function attachOperationToasts(
-  operations: OperationsService,
-  logger: LoggerService,
-): () => void {
-  let shownIds = new Set<number>()
-  const sync = (): void => {
-    const current = operations.get()
+export function OperationToasts(): null {
+  const { operations } = useAppServices()
+  const { logger } = useCoreServices()
+  const toastController = useToastController()
+  const current = useStore(operations)
+  const shownIdsRef = useRef(new Set<number>())
+  useEffect(() => {
     const nextIds = new Set(current.map((operation) => operation.id))
-    for (const id of shownIds) {
+    for (const id of shownIdsRef.current) {
       if (!nextIds.has(id)) {
-        toast.close(`operation-${id}`)
+        toastController.close(`operation-${id}`)
       }
     }
     for (const operation of current) {
-      showOperationToast(operation, logger)
+      showOperationToast(toastController, operation, logger)
     }
-    shownIds = nextIds
-  }
-  sync()
-  return operations.subscribe(sync)
+    shownIdsRef.current = nextIds
+  }, [toastController, current, logger])
+  return null
 }

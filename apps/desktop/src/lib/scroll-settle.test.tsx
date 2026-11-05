@@ -54,6 +54,22 @@ describe('watchScrollSettle', () => {
     expect(watch.isUserScroll()).toBe(true)
   })
 
+  it('stops touching when a finger lifts from a removed node', async () => {
+    const element = mountScroller()
+    const watch = watchScrollSettle({
+      element,
+      onSettle: vi.fn(),
+      signal: listeners.controller.signal,
+    })
+    const child = element.firstElementChild!
+
+    await touch(child, 'start')
+    child.remove()
+    await touch(child, 'end')
+
+    expect(watch.isTouching()).toBe(false)
+  })
+
   it('reports on touchend with no scroll after it once the element is settled', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
@@ -247,6 +263,25 @@ describe('watchScrollSettle', () => {
       expect(watch.isUserScroll()).toBe(true)
       expect(watch.isTouching()).toBe(false)
       expect(onClick).not.toHaveBeenCalled()
+    })
+
+    it('settles at the snap target nearest the release, not only at an end', async () => {
+      const element = mountSnapScroller()
+      element.firstElementChild?.insertAdjacentHTML(
+        'beforeend',
+        '<i style="position: absolute; left: 60px; width: 1px; scroll-snap-align: start"></i>',
+      )
+      const onSettle = vi.fn()
+      watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, 45)
+      expect(element.scrollLeft).toBe(50)
+      await mouse.up()
+
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(element.scrollLeft).toBe(60)
     })
 
     it('leaves a click under the drag distance alone', async () => {

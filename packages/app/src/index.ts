@@ -36,7 +36,7 @@ export {
   type ThemeState,
 } from './settings/theme-service.ts'
 export { type WhatsNewItem } from './whats-new/whats-new-content.ts'
-export { type WhatsNewGate, type WhatsNewService } from './whats-new/whats-new-service.ts'
+export { type WhatsNewPhase, type WhatsNewService } from './whats-new/whats-new-service.ts'
 export { type FeedbackChannel, type ReviewService } from './review/review-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
@@ -60,6 +60,8 @@ export {
   type ConnectGithubWizardDeps,
   type ConnectGithubWizardOptions,
   type ConnectGithubWizardService,
+  type ConnectGithubWizardState,
+  type ConnectRepoChoice,
   type ConnectWizardStep,
 } from './sync/connect-github-wizard-service.ts'
 export {
@@ -145,6 +147,7 @@ export {
 export {
   type NavigateOptions,
   type NavigationService,
+  type NavigationState,
   type ScrollPosition,
 } from './navigation/navigation-service.ts'
 export {

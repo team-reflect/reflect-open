@@ -12,7 +12,12 @@ import type {
 import type { ClockService } from '../ports/clock-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
 import { sameState, type GitSyncService, type GitSyncState } from '../sync/git-sync-service.ts'
-import type { ConnectExistingResult, GithubConnector } from '../sync/github-connector.ts'
+import type {
+  ConnectExistingRepoOptions,
+  ConnectExistingResult,
+  ConnectNewRepoOptions,
+  GithubConnector,
+} from '../sync/github-connector.ts'
 import type {
   ConnectGitHostInput,
   GitHostConnector,
@@ -573,14 +578,17 @@ class TestGithubConnectorImpl implements TestGithubConnector {
     return Promise.resolve('connected')
   }
 
-  async connectNewRepo(name: string): Promise<'connected' | 'manualCreateNeeded'> {
+  async connectNewRepo(
+    name: string,
+    options?: ConnectNewRepoOptions,
+  ): Promise<'connected' | 'manualCreateNeeded'> {
     this.#log.push({ method: 'connectNewRepo', name })
-    return await this.#connectNew(name)
+    return await this.#connectNew(name, options)
   }
 
   async connectExistingRepo(
     ref: GithubRepoRef,
-    connectOptions?: { allowPublic?: boolean | undefined },
+    connectOptions?: ConnectExistingRepoOptions,
   ): Promise<ConnectExistingResult> {
     this.#log.push({
       method: 'connectExistingRepo',

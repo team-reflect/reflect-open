@@ -14,7 +14,7 @@ import {
 } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 type DailyRoute = Extract<Route, { kind: 'today' }> | Extract<Route, { kind: 'daily' }>
 
@@ -33,7 +33,8 @@ function dailyRouteFrom(route: Route): DailyRoute | null {
  * double-tapping it, goes back to the list.
  */
 export function MobileShell(): ReactElement {
-  const { route, navigate, entryId, backRoute } = useRouter()
+  const { route, entryId, backRoute } = useRouterState()
+  const { navigate } = useRouterActions()
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
@@ -115,40 +116,35 @@ export function MobileShell(): ReactElement {
 
   return (
     <SafeAreaBoundary>
-      {/* Shrinks behind an open drawer. While scaled, it is the containing
-          block of `position: fixed` descendants, so it is viewport-sized:
-          they keep their layout and scale with the shell. */}
-      <div className="drawer-depth-target h-dvh w-screen bg-surface-app">
-        {/* The shell yields to the software keyboard by height (Plan 19,
-            decision 8): the root ends at the keyboard's top, so every screen's
-            layout sees the true visible viewport. Only `position: fixed`
-            elements need `--keyboard-height` themselves. */}
-        <div
-          className="flex flex-col"
-          style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
-        >
-          <div className="min-h-0 flex-1">
-            {/* A stable boundary lets route transitions retain the current screen while lazy code loads. */}
-            <Suspense fallback={<LoadingScreen />}>
-              <MobileStack
-                allQuery={allQuery}
-                onAllQueryChange={setAllQuery}
-                allFilters={allFilters}
-                onAllFiltersChange={setAllFilters}
-              />
-            </Suspense>
-          </div>
-          {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
-              would ride above the keyboard instead, so it hides while typing.
-              Its slot goes to the formatting toolbar, which — sitting at the
-              bottom of a root that ends at the keyboard's top — lands exactly
-              on the keyboard edge with no fixed positioning. */}
-          {keyboardVisible ? (
-            <MobileFormattingToolbar />
-          ) : (
-            <MobileTabBar tab={tab} onSelect={handleTabSelect} />
-          )}
+      {/* The shell yields to the software keyboard by height (Plan 19,
+          decision 8): the root ends at the keyboard's top, so every screen's
+          layout sees the true visible viewport. Only `position: fixed`
+          elements need `--keyboard-height` themselves. */}
+      <div
+        className="mobile-shell flex w-screen flex-col"
+        style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
+      >
+        <div className="min-h-0 flex-1">
+          {/* A stable boundary lets route transitions retain the current screen while lazy code loads. */}
+          <Suspense fallback={<LoadingScreen />}>
+            <MobileStack
+              allQuery={allQuery}
+              onAllQueryChange={setAllQuery}
+              allFilters={allFilters}
+              onAllFiltersChange={setAllFilters}
+            />
+          </Suspense>
         </div>
+        {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
+          would ride above the keyboard instead, so it hides while typing.
+          Its slot goes to the formatting toolbar, which — sitting at the
+          bottom of a root that ends at the keyboard's top — lands exactly
+          on the keyboard edge with no fixed positioning. */}
+        {keyboardVisible ? (
+          <MobileFormattingToolbar />
+        ) : (
+          <MobileTabBar tab={tab} onSelect={handleTabSelect} />
+        )}
       </div>
     </SafeAreaBoundary>
   )

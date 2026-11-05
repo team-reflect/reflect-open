@@ -12,7 +12,7 @@ import { act } from '@/test-utils/act.ts'
 import type { DayScrollPosition } from '@reflect/app'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterHandlers, useRouterActions } from '@/routing/router.tsx'
 import { getIsoToday } from '@reflect/utils'
 import { createSystemClock, type ClockService, formatDayLabel } from '@reflect/core'
 import { createDayWindow, dateAtIndex, indexOfDate } from '@reflect/app'
@@ -71,7 +71,7 @@ function fixedClock(): ReturnType<typeof createTestClockService> {
  * Records `position` on the current history entry, as the stream's scroll would.
  */
 function SaveScrollProbe({ position }: { position: DayScrollPosition }): ReactElement | null {
-  const { saveScrollState } = useRouter()
+  const { saveScrollState } = useRouterHandlers()
   useEffect(() => {
     saveScrollState(position)
   }, [saveScrollState, position])
@@ -116,7 +116,7 @@ async function expectDayAtTop(date: string, offset = 0): Promise<void> {
 }
 
 function NavigateTodayProbe({ onReady }: { onReady: (navigateToday: () => void) => void }): null {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   useEffect(() => {
     onReady(() => navigate({ kind: 'today' }))
   }, [navigate, onReady])
@@ -128,7 +128,7 @@ function NavigateTodayProbe({ onReady }: { onReady: (navigateToday: () => void) 
  * mounted instance.
  */
 function RoutedStream(): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return (
     <DailyStream
       target={route.kind === 'daily' ? { kind: 'date', date: route.date } : { kind: 'today' }}
@@ -142,9 +142,9 @@ function RoutedStream(): ReactElement {
 function RouterProbe({
   routerRef,
 }: {
-  routerRef: RefObject<ReturnType<typeof useRouter> | null>
+  routerRef: RefObject<ReturnType<typeof useRouterActions> | null>
 }): null {
-  const router = useRouter()
+  const router = useRouterActions()
   useLayoutEffect(() => {
     routerRef.current = router
   })
@@ -170,7 +170,7 @@ describe('DailyStream', () => {
   })
 
   it('restores a day it scrolled to before its window grew back', async () => {
-    const routerRef: RefObject<ReturnType<typeof useRouter> | null> = createRef()
+    const routerRef: RefObject<ReturnType<typeof useRouterActions> | null> = createRef()
     const view = await renderStream(
       <>
         <RouterProbe routerRef={routerRef} />

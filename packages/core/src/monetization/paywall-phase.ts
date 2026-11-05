@@ -1,13 +1,13 @@
 /**
  * Days after the first launch during which the paywall stays hidden.
  */
-export const PAYWALL_HIDDEN_DAYS = 2
+export const PAYWALL_HIDDEN_DAYS = 1
 
 /**
  * Days after `PAYWALL_HIDDEN_DAYS` during which the paywall shows at most once
  * a day and can be skipped.
  */
-export const PAYWALL_SKIPPABLE_DAYS = 7
+export const PAYWALL_SKIPPABLE_DAYS = 6
 
 export const DAY_MS = 24 * 60 * 60 * 1000
 

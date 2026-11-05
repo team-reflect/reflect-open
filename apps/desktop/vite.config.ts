@@ -29,9 +29,15 @@ const platform: 'mobile' | 'desktop' | '' = (() => {
 })()
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
-    react({ compiler: { reportDiagnostics: true } }),
+    react({
+      compiler: {
+        reportDiagnostics: true,
+        // Fail the build on any component or hook the compiler skips. Dev keeps warnings so a work-in-progress edit does not break HMR.
+        panicThreshold: command === 'build' ? 'all_errors' : 'none',
+      },
+    }),
 
     tailwindcss(),
     sentryVitePlugin({
@@ -102,4 +108,4 @@ export default defineConfig({
         }
       : {}),
   },
-})
+}))

@@ -6,7 +6,7 @@ import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
 import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /**
  * The Chat screen (Plan 23): desktop's dedicated chat view as a card pushed
@@ -23,7 +23,8 @@ export function MobileChat(): ReactElement {
   const providers = useChatProviders()
   const hasTurns = useHasChatTurns()
   const { newChat } = useChatActions()
-  const { navigate, back, canBack } = useRouter()
+  const { canBack } = useRouterState()
+  const { navigate, back } = useRouterActions()
   const [historyOpen, setHistoryOpen] = useState(false)
   const hasProvider = providers.length > 0
 

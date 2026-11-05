@@ -20,5 +20,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'After an update, Reflect now shows what changed. This is the first one.',
       platforms: ['desktop', 'ios'],
     },
+    {
+      title: 'Faster, smoother gestures',
+      body: 'Swipes, sheets, and image dragging respond faster and move more smoothly.',
+      platforms: ['ios'],
+    },
   ],
 }

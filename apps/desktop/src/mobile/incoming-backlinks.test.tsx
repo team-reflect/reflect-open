@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { BacklinkContext, BacklinkService } from '@reflect/core'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import type { ReactNode } from 'react'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -25,7 +25,7 @@ function answerBacklinks(contexts: BacklinkContext[]): void {
 }
 
 function RouteProbe(): ReactNode {
-  const { route, arrivalFocusEditor } = useRouter()
+  const { route, arrivalFocusEditor } = useRouterState()
   return (
     <output data-testid="route" data-focus={String(arrivalFocusEditor)}>
       {JSON.stringify(route)}

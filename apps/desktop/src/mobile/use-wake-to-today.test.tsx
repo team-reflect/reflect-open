@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { useWakeToToday } from './use-wake-to-today.ts'
 
@@ -13,7 +13,7 @@ import { useWakeToToday } from './use-wake-to-today.ts'
 
 function Probe(): ReactElement {
   useWakeToToday()
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return <output>{route.kind === 'daily' ? `daily:${route.date}` : route.kind}</output>
 }
 

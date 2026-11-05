@@ -21,12 +21,12 @@ import { createTestStorageService, type TestStorageService } from '../testing/st
 import {
   PAYWALL_PHASE_OVERRIDE_STORAGE_KEY,
   PAYWALL_REQUESTED_STORAGE_KEY,
-  PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY,
+  PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY,
   createPaywallService,
   type PaywallService,
 } from './paywall-service.ts'
 
-const TODAY = '2026-11-04'
+const DAY_INDEX = 3
 
 const YEARLY = { productId: IAP_PRODUCT_IDS.yearly, formattedPrice: '$99.99' }
 const MONTHLY = { productId: IAP_PRODUCT_IDS.monthly, formattedPrice: '$9.99' }
@@ -43,7 +43,7 @@ beforeEach(() => {
   subscription = createTestSubscriptionService()
   classicAccess = createTestClassicAccessService()
   appStoreEnvironment = createTestAppStoreEnvironmentService('Production')
-  installClock = createTestInstallClockService({ phase: 'required', today: TODAY })
+  installClock = createTestInstallClockService({ phase: 'required', dayIndex: DAY_INDEX })
   iap = createTestIapService({ products: [YEARLY, MONTHLY] })
   appStore = createTestAppStoreService()
   storage = createTestStorageService()
@@ -81,10 +81,10 @@ describe('PaywallService.gate', () => {
     const paywall = service()
     expect(paywall.gate.get()).toBe('skippable')
 
-    storage.local.set(PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY, TODAY)
+    storage.local.set(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY, String(DAY_INDEX))
     expect(paywall.gate.get()).toBe('hidden')
 
-    installClock.setState({ today: '2026-11-05' })
+    installClock.setState({ dayIndex: DAY_INDEX + 1 })
     expect(paywall.gate.get()).toBe('skippable')
   })
 
@@ -228,7 +228,7 @@ describe('PaywallService skippable paywall', () => {
 
     paywall.markSkippableShown()
 
-    expect(storage.local.get(PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY)).toBe(TODAY)
+    expect(storage.local.get(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY)).toBe(String(DAY_INDEX))
     expect(paywall.gate.get()).toBe('skippable')
 
     paywall.dismissSkippable()
@@ -242,7 +242,7 @@ describe('PaywallService skippable paywall', () => {
     const paywall = service()
     paywall.markSkippableShown()
 
-    installClock.setState({ today: '2026-11-05' })
+    installClock.setState({ dayIndex: DAY_INDEX + 1 })
     expect(paywall.gate.get()).toBe('skippable')
     paywall.dismissSkippable()
 

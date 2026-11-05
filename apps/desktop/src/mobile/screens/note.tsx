@@ -6,7 +6,7 @@ import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { NoteActionsMenu } from '@/mobile/note-actions-menu.tsx'
 import { cn } from '@/lib/utils.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /**
  * One note, opened from a wiki link, the new-note action, or (later) search
@@ -20,7 +20,8 @@ import { useRouter } from '@/routing/router.tsx'
  * lands on today instead.
  */
 export function MobileNote({ path }: { path: string }): ReactElement {
-  const { back, canBack, navigate } = useRouter()
+  const { canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
   const untitled = isUntitledNotePath(path)
 
   return (

@@ -35,7 +35,7 @@ import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useNoteRows } from '@/hooks/note-row-overlay.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /** A search hit resolved into the shared row shape. */
 export function rowForHit(hit: FilteredSearchHit, dateFormat: DateFormat): NoteRowModel {
@@ -100,7 +100,8 @@ export function MobileAllNotes({
 }: MobileAllNotesProps): ReactElement {
   const graph = useGraphInfo()
   const { noteList, search } = useCoreServices()
-  const { navigate, back, arrivalSeq, arrivalFocusEditor } = useRouter()
+  const { arrivalSeq, arrivalFocusEditor } = useRouterState()
+  const { navigate, back } = useRouterActions()
   const enabled = graph !== null
 
   // The All-tab double-tap (`focusEditor` arrivals) lands in the search bar,

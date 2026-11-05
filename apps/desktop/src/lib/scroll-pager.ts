@@ -1,5 +1,5 @@
 /** The scroller's page width, unrounded (`clientWidth` is a whole number). */
-function pageWidth(scroller: HTMLElement): number {
+export function pageWidth(scroller: HTMLElement): number {
   return scroller.getBoundingClientRect().width
 }
 

@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.18.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.4...v0.18.0-beta.5) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** keep swipe-row actions under the row on iOS 26 ([#1984](https://github.com/team-reflect/reflect-open/issues/1984)) ([5304053](https://github.com/team-reflect/reflect-open/commit/53040533319f6cc445a3577b80c67a0e2cf7ae14))
+* **mobile:** keep Tasks group headers above rows ([#1980](https://github.com/team-reflect/reflect-open/issues/1980)) ([e071eab](https://github.com/team-reflect/reflect-open/commit/e071eabf0ab076c9b9bbeabfe21486f70847187f))
+* **mobile:** keep the scroll indicator above Tasks and All rows ([#1981](https://github.com/team-reflect/reflect-open/issues/1981)) ([9f9cd9b](https://github.com/team-reflect/reflect-open/commit/9f9cd9be548fcc640a17243160a87ef2ab451331))
+* **mobile:** make off-screen day slides inert ([#1972](https://github.com/team-reflect/reflect-open/issues/1972)) ([15a32e4](https://github.com/team-reflect/reflect-open/commit/15a32e47e92a6e4a63cc13309c18167aab531878))
+* **mobile:** paint swipe-row over-swipe color only while touched ([#1979](https://github.com/team-reflect/reflect-open/issues/1979)) ([fd993e9](https://github.com/team-reflect/reflect-open/commit/fd993e996a0eabb05d0e0a4a5339e50668d07098))
+* **mobile:** remove drawer depth effect ([#1982](https://github.com/team-reflect/reflect-open/issues/1982)) ([1c7b58c](https://github.com/team-reflect/reflect-open/commit/1c7b58c8e51a69fb44e409d950960ede42b78492))
+* **mobile:** settle after a finger lifts from a removed node ([#1969](https://github.com/team-reflect/reflect-open/issues/1969)) ([a6ca461](https://github.com/team-reflect/reflect-open/commit/a6ca461c0628b0ae48848b53ac501c7c8c8c2020))
+
+## [0.18.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.3...v0.18.0-beta.4) (2026-11-04)
+
+
+### Features
+
+* **desktop:** offer What's New in a toast after an update ([#1963](https://github.com/team-reflect/reflect-open/issues/1963)) ([982c4f1](https://github.com/team-reflect/reflect-open/commit/982c4f133d60c546c125b9f8a5d6de4e12884dcb))
+
+
+### Bug Fixes
+
+* **desktop:** keep What's New items during the close animation ([#1962](https://github.com/team-reflect/reflect-open/issues/1962)) ([cade3ef](https://github.com/team-reflect/reflect-open/commit/cade3efb0463ff8abdf7924794942c597e2d56ef))
+* **mobile:** make the week strip scroll smoothly ([#1957](https://github.com/team-reflect/reflect-open/issues/1957)) ([8e1baca](https://github.com/team-reflect/reflect-open/commit/8e1bacab1862004267b3f4720d01a5b2bc4e2d92))
+
+## [0.18.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.2...v0.18.0-beta.3) (2026-11-04)
+
+
+### Features
+
+* **mobile:** add drawer depth effect ([#1954](https://github.com/team-reflect/reflect-open/issues/1954)) ([6b18f5a](https://github.com/team-reflect/reflect-open/commit/6b18f5adfde72b51ff414b41575424f49abb3651))
+* **mobile:** invite users to send feedback ([#1947](https://github.com/team-reflect/reflect-open/issues/1947)) ([5912d17](https://github.com/team-reflect/reflect-open/commit/5912d1703f6ff066a9cda85d256b1c870cb784c2))
+
+
+### Bug Fixes
+
+* **mobile:** make swiping between days smoother ([#1939](https://github.com/team-reflect/reflect-open/issues/1939)) ([15aebea](https://github.com/team-reflect/reflect-open/commit/15aebea8e523661af563c978070cd6a1e735a22b))
+
 ## [0.18.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.1...v0.18.0-beta.2) (2026-11-04)
 
 
