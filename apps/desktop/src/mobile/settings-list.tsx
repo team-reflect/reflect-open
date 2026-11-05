@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import { Check, ChevronRight, type LucideIcon } from 'lucide-react'
+import { Check, ChevronRight, ChevronsUpDown, type LucideIcon } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Switch } from '@/components/ui/switch.tsx'
 import { cn } from '@/lib/utils.ts'
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils.ts'
  * rounded section cards with hairline row separators, a small muted header
  * above and an explanatory footer below (the platform's Settings idiom).
  * Rows come in the standard shapes — static value, disclosure (chevron),
- * switch, inline segmented choice, action, and checkmark selection.
+ * switch, menu choice, action, and checkmark selection.
  */
 
 const ROW_CLASS = 'flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-[15px]'
@@ -122,52 +122,53 @@ export function SettingsSwitchRow({
   )
 }
 
-export interface SegmentedOption<Value extends string> {
+export interface SettingsMenuOption<Value extends string> {
   value: Value
   label: string
 }
 
-interface SettingsSegmentedRowProps<Value extends string> {
+interface SettingsMenuRowProps<Value extends string> {
   label: string
   value: Value
-  options: readonly SegmentedOption<Value>[]
+  options: readonly SettingsMenuOption<Value>[]
   onChange: (value: Value) => void
 }
 
-/** A row with an inline segmented control for a small closed choice. */
-export function SettingsSegmentedRow<Value extends string>({
+/**
+ * A row showing the current choice of a small closed set. A transparent
+ * native `<select>` covers the row, so a tap opens the platform's menu.
+ */
+export function SettingsMenuRow<Value extends string>({
   label,
   value,
   options,
   onChange,
-}: SettingsSegmentedRowProps<Value>): ReactElement {
+}: SettingsMenuRowProps<Value>): ReactElement {
   return (
-    <div className={cn(ROW_CLASS, 'justify-between')}>
-      <span className="min-w-0 truncate">{label}</span>
-      <div
-        role="radiogroup"
+    <div className={cn(ROW_CLASS, 'relative')}>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="shrink-0 text-text-muted">
+        {options.find((option) => option.value === value)?.label}
+      </span>
+      <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-text-muted" strokeWidth={1.75} />
+      <select
         aria-label={label}
-        className="flex shrink-0 rounded-lg bg-secondary p-0.5"
+        value={value}
+        onChange={(event) => {
+          const picked = event.currentTarget.value
+          const next = options.find((option) => option.value === picked)
+          if (next !== undefined) {
+            onChange(next.value)
+          }
+        }}
+        className="absolute inset-0 appearance-none text-base opacity-0"
       >
-        {options.map((option) => {
-          const selected = option.value === value
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => onChange(option.value)}
-              className={cn(
-                'rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors',
-                selected ? 'bg-background shadow-sm' : 'text-text-muted',
-              )}
-            >
-              {option.label}
-            </button>
-          )
-        })}
-      </div>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }
