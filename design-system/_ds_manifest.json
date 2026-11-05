@@ -408,6 +408,12 @@
     },
     { "name": "--surface", "value": "#ffffff", "kind": "color", "definedIn": "tokens/colors.css" },
     {
+      "name": "--surface-canvas",
+      "value": "#ffffff",
+      "kind": "color",
+      "definedIn": "tokens/colors.css"
+    },
+    {
       "name": "--surface-sunken",
       "value": "var(--coolgray-50)",
       "kind": "color",
@@ -531,7 +537,14 @@
     },
     {
       "name": "--surface",
-      "value": "#0b1020",
+      "value": "#161d30",
+      "kind": "color",
+      "definedIn": "tokens/colors.css",
+      "scope": ".dark"
+    },
+    {
+      "name": "--surface-canvas",
+      "value": "#0a0f1e",
       "kind": "color",
       "definedIn": "tokens/colors.css",
       "scope": ".dark"
