@@ -152,8 +152,8 @@ export function RouterProvider({
     [navigate, back, forward],
   )
 
-  const routerState = useMemo<RouterState>(
-    () => ({
+  const routerState = useMemo<RouterState>(() => {
+    return {
       route: state.route,
       entryId: state.entryId,
       arrivalSeq: state.arrivalSeq,
@@ -164,9 +164,8 @@ export function RouterProvider({
       saveScrollState,
       clearScrollState,
       savedScroll,
-    }),
-    [state, saveScrollState, clearScrollState, savedScroll],
-  )
+    }
+  }, [state, saveScrollState, clearScrollState, savedScroll])
 
   return (
     <RouterActionsContext value={routerActions}>
