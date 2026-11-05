@@ -1,10 +1,5 @@
 import { lazy, Suspense, type ReactElement } from 'react'
 
-/**
- * WebKit's switch attribute (Safari 17.4+), which React's input types lack.
- */
-const SWITCH_ATTRIBUTE = { switch: '' }
-
 const BaseUiSwitch = lazy(async () => {
   const { Switch } = await import('@/components/ui/switch.tsx')
   return { default: Switch }
@@ -41,7 +36,10 @@ function NativeSwitch({
   return (
     <input
       type="checkbox"
-      {...SWITCH_ATTRIBUTE}
+
+      /* @ts-expect-error: WebKit's switch attribute (Safari 17.4+), which React's input types lack. */
+      switch=""
+
       role="switch"
       checked={checked}
       onChange={(event) => onCheckedChange(event.currentTarget.checked)}
