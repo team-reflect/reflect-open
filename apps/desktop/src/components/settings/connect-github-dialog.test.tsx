@@ -102,10 +102,14 @@ describe('ConnectGithubDialog', () => {
     await vi.waitFor(() => {
       expect(sync.connectExistingRepo).toHaveBeenCalledWith(
         { owner: 'alex', name: 'my-notes' },
-        { allowPublic: false },
+        { allowPublic: false, signal: expect.any(AbortSignal) },
       )
     })
-    await vi.waitFor(() => expect(sync.connectNewRepo).toHaveBeenCalledWith('my-notes'))
+    await vi.waitFor(() =>
+      expect(sync.connectNewRepo).toHaveBeenCalledWith('my-notes', {
+        signal: expect.any(AbortSignal),
+      }),
+    )
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -138,7 +142,7 @@ describe('ConnectGithubDialog', () => {
     await vi.waitFor(() => {
       expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'g-backup' },
-        { allowPublic: false },
+        { allowPublic: false, signal: expect.any(AbortSignal) },
       )
     })
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -215,7 +219,7 @@ describe('ConnectGithubDialog', () => {
     await vi.waitFor(() => {
       expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'public-notes' },
-        { allowPublic: true },
+        { allowPublic: true, signal: expect.any(AbortSignal) },
       )
     })
     expect(onClose).toHaveBeenCalled()
@@ -255,7 +259,7 @@ describe('ConnectGithubDialog', () => {
     await vi.waitFor(() => {
       expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'notes' },
-        { allowPublic: false },
+        { allowPublic: false, signal: expect.any(AbortSignal) },
       )
     })
     expect(onClose).toHaveBeenCalled()
@@ -308,7 +312,7 @@ describe('ConnectGithubDialog', () => {
     await vi.waitFor(() => {
       expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'notes' },
-        { allowPublic: false },
+        { allowPublic: false, signal: expect.any(AbortSignal) },
       )
     })
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())

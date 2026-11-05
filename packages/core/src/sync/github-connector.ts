@@ -10,6 +10,17 @@ import type { GithubRepoRef } from './types.ts'
  */
 export type ConnectExistingResult = 'connected' | 'needsPublicConfirm' | 'notFound'
 
+export interface ConnectNewRepoOptions {
+  /**
+   * Aborting it rejects before the graph's remote changes.
+   */
+  readonly signal?: AbortSignal | undefined
+}
+
+export interface ConnectExistingRepoOptions extends ConnectNewRepoOptions {
+  readonly allowPublic?: boolean | undefined
+}
+
 /**
  * Connects the open graph to a GitHub repository through the REST API and
  * the GitHub account: the one place the sync domain speaks GitHub.
@@ -21,7 +32,10 @@ export interface GithubConnector {
    * (fine-grained PATs can't call `POST /user/repos`) — the dialog falls
    * back to the prefilled github.com/new handoff and connects afterwards.
    */
-  connectNewRepo(name: string): Promise<'connected' | 'manualCreateNeeded'>
+  connectNewRepo(
+    name: string,
+    options?: ConnectNewRepoOptions,
+  ): Promise<'connected' | 'manualCreateNeeded'>
   /**
    * Connect an existing repo. A public repo returns `needsPublicConfirm`
    * unless `allowPublic` — everything in the graph (including `private:
@@ -29,7 +43,7 @@ export interface GithubConnector {
    */
   connectExistingRepo(
     ref: GithubRepoRef,
-    options?: { allowPublic?: boolean | undefined },
+    options?: ConnectExistingRepoOptions,
   ): Promise<ConnectExistingResult>
 }
 
@@ -46,13 +60,18 @@ class GithubConnectorImpl implements GithubConnector {
     this.#deps = deps
   }
 
-  async connectNewRepo(name: string): Promise<'connected' | 'manualCreateNeeded'> {
+  async connectNewRepo(
+    name: string,
+    options: ConnectNewRepoOptions = {},
+  ): Promise<'connected' | 'manualCreateNeeded'> {
     const { githubRepos, gitSync } = this.#deps
+    options.signal?.throwIfAborted()
     const token = await this.#requireToken()
     const repo = await githubRepos.createRepo(token, name, { isPrivate: true })
     if (repo === null) {
       return 'manualCreateNeeded' // fine-grained PATs can't create repos
     }
+    options.signal?.throwIfAborted()
     const [owner, repoName, ...rest] = repo.fullName.split('/')
     if (owner === undefined || repoName === undefined || rest.length > 0) {
       throw new AppError('parse', `unexpected repository name from GitHub: ${repo.fullName}`)
@@ -65,9 +84,10 @@ class GithubConnectorImpl implements GithubConnector {
 
   async connectExistingRepo(
     ref: GithubRepoRef,
-    connectOptions: { allowPublic?: boolean | undefined } = {},
+    connectOptions: ConnectExistingRepoOptions = {},
   ): Promise<ConnectExistingResult> {
     const { githubRepos, gitSync } = this.#deps
+    connectOptions.signal?.throwIfAborted()
     const token = await this.#requireToken()
     const repo = await githubRepos.getRepo(token, ref)
     if (repo === null) {
@@ -76,6 +96,7 @@ class GithubConnectorImpl implements GithubConnector {
     if (!repo.isPrivate && connectOptions.allowPublic !== true) {
       return 'needsPublicConfirm'
     }
+    connectOptions.signal?.throwIfAborted()
     // The repo's default branch is where its existing history lives — the
     // local branch must match or sync would fork a parallel branch.
     await gitSync.connectRemote(githubRemoteUrl(ref), repo.defaultBranch)

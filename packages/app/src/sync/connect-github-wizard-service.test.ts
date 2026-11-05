@@ -4,6 +4,7 @@ import {
   createTestGithubConnector,
   createTestClockService,
   createTestGithubAuthService,
+  type GithubConnectorCall,
   type TestGithubConnector,
   type TestClockService,
 } from '@reflect/core/testing'
@@ -28,6 +29,7 @@ let clock: TestClockService
 let lifecycle: TestLifecycleService
 let opener: TestOpenerService
 let connector: TestGithubConnector
+let detach: () => void
 
 beforeEach(() => {
   clock = createTestClockService()
@@ -48,12 +50,19 @@ function scriptExisting(...results: ConnectExistingResult[]): void {
   })
 }
 
-function existingCalls(): unknown[] {
-  return connector.calls().filter((call) => call.method === 'connectExistingRepo')
+type ExistingCall = Extract<GithubConnectorCall, { method: 'connectExistingRepo' }>
+
+function existingCalls(): ExistingCall[] {
+  return connector
+    .calls()
+    .filter((call): call is ExistingCall => call.method === 'connectExistingRepo')
 }
 
+/**
+ * A mounted wizard; `detach` unmounts it.
+ */
 function createWizard(auth: GithubAuth = PAT): ConnectGithubWizardService {
-  return createConnectGithubWizardService(
+  const wizard = createConnectGithubWizardService(
     {
       connector,
       githubAuth: createTestGithubAuthService({ auth }),
@@ -63,6 +72,8 @@ function createWizard(auth: GithubAuth = PAT): ConnectGithubWizardService {
     },
     { suggestedRepoName: 'g-backup' },
   )
+  detach = wizard.attach()
+  return wizard
 }
 
 /**
@@ -361,6 +372,7 @@ describe('createConnectGithubWizardService', () => {
       gate.resolve('connected')
       await flush()
       expect(wizard.get().step).toBe('repo')
+      expect(existingCalls().some((call) => call.allowPublic)).toBe(false)
     })
 
     it('back to the repo step while a poll check is in flight', async () => {
@@ -387,13 +399,42 @@ describe('createConnectGithubWizardService', () => {
       const gate = Promise.withResolvers<ConnectExistingResult>()
       connector.onConnectExistingRepo(() => gate.promise)
       const wizard = createWizard()
-      const detach = wizard.attach()
       await signIn(wizard)
 
       detach()
       gate.resolve('connected')
       await flush()
       expect(wizard.get()).toMatchObject({ step: 'finish', view: { kind: 'connecting' } })
+    })
+
+    it('a sign-in that finishes after detach starts nothing', async () => {
+      connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
+      scriptExisting('notFound')
+      const wizard = createWizard()
+      wizard.continueFromRepo()
+
+      detach()
+      wizard.onAuthed(ALEX)
+      await flush()
+      expect(wizard.get().step).toBe('auth')
+      expect(connector.calls()).toEqual([])
+      await advance(POLL_MS * 2)
+      expect(connector.calls()).toEqual([])
+      expect(clock.pendingTimers()).toBe(0)
+    })
+
+    it('the connector gets the flow signal', async () => {
+      let signal: AbortSignal | undefined
+      connector.onConnectExistingRepo((_ref, options) => {
+        signal = options?.signal
+        return Promise.resolve('needsPublicConfirm')
+      })
+      const wizard = createWizard()
+      await signIn(wizard)
+
+      expect(signal?.aborted).toBe(false)
+      wizard.backToRepo()
+      expect(signal?.aborted).toBe(true)
     })
   })
 })

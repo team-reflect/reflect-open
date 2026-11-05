@@ -13,6 +13,7 @@ import {
   type Store,
   type Unlisten,
 } from '@reflect/core'
+import { createDeferred } from '@reflect/utils'
 import type { AppLifecycleService } from '../app/lifecycle-service.ts'
 import type { OpenerService } from '../app/opener-service.ts'
 import { pollUntil } from './poll-until.ts'
@@ -99,7 +100,8 @@ export interface ConnectGithubWizardOptions {
  */
 export interface ConnectGithubWizardService extends Store<ConnectGithubWizardState> {
   /**
-   * Mount the wizard. The returned function aborts the running connect.
+   * Mount the wizard. `onAuthed` is ignored while it is not mounted, and the
+   * returned function aborts the running connect.
    */
   readonly attach: () => Unlisten
   readonly setMode: (mode: 'create' | 'existing') => void
@@ -154,6 +156,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
   readonly #state: WritableStore<ConnectGithubWizardState>
   // Kept across steps, so going back to the repo step keeps the input.
   #form: RepoForm
+  #attached = 0
   #flow: AbortController | null = null
   #confirmPublic: (() => void) | null = null
 
@@ -178,8 +181,17 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
   }
 
   readonly attach = (): Unlisten => {
+    this.#attached += 1
+    let detached = false
     return () => {
-      this.#flow?.abort()
+      if (detached) {
+        return
+      }
+      detached = true
+      this.#attached -= 1
+      if (this.#attached === 0) {
+        this.#flow?.abort()
+      }
     }
   }
 
@@ -220,7 +232,8 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
 
   readonly onAuthed = (user: GithubUser): void => {
     const state = this.#state.get()
-    if (state.step !== 'auth') {
+    // The sign-in step can finish after the surface closed: nothing may start then.
+    if (state.step !== 'auth' || this.#attached === 0) {
       return
     }
     const flow = new AbortController()
@@ -287,7 +300,8 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
 
   /**
    * Connect `choice`, resolving once connected. Every await settles only while
-   * `signal` is live, so an aborted flow never writes state.
+   * `signal` is live, so an aborted flow never writes state, and the connector
+   * gets `signal` so an aborted flow never changes the graph's remote.
    */
   async #connect(choice: ConnectRepoChoice, user: GithubUser, signal: AbortSignal): Promise<void> {
     const { connector, githubAuth, clock, lifecycle } = this.#deps
@@ -298,10 +312,10 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
     }
     const repo = choice.kind === 'create' ? { owner: user.login, name: choice.name } : choice.ref
 
-    let result = await settle(connector.connectExistingRepo(repo, { allowPublic: false }))
+    let result = await settle(connector.connectExistingRepo(repo, { allowPublic: false, signal }))
     if (result === 'notFound') {
       if (choice.kind === 'create') {
-        if ((await settle(connector.connectNewRepo(choice.name))) === 'connected') {
+        if ((await settle(connector.connectNewRepo(choice.name, { signal }))) === 'connected') {
           return
         }
         const authKind = (await settle(githubAuth.load()))?.kind ?? null
@@ -320,14 +334,15 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
         this.#show({ kind: 'grantAccess', repo })
       }
       result = await pollUntil(
-        () => connector.connectExistingRepo(repo, { allowPublic: false }),
+        () => connector.connectExistingRepo(repo, { allowPublic: false, signal }),
         (value) => value !== 'notFound',
         { intervalMs: this.#pollIntervalMs, clock, lifecycle, signal },
       )
     }
     if (result === 'needsPublicConfirm') {
       await this.#askConsent(repo, signal)
-      result = await settle(connector.connectExistingRepo(repo, { allowPublic: true }))
+      signal.throwIfAborted()
+      result = await settle(connector.connectExistingRepo(repo, { allowPublic: true, signal }))
     }
     if (result !== 'connected') {
       throw new AppError('notFound', 'Repository not found.')
@@ -338,8 +353,8 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
    * Show the public-repo consent question. Resolves on `confirmPublic`, rejects on abort.
    */
   #askConsent(repo: GithubRepoRef, signal: AbortSignal): Promise<void> {
-    const { promise, resolve, reject } = Promise.withResolvers<void>()
-    this.#confirmPublic = resolve
+    const { promise, resolve, reject } = createDeferred<void>()
+    this.#confirmPublic = () => resolve()
     signal.addEventListener(
       'abort',
       () => {
