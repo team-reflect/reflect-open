@@ -62,7 +62,7 @@
 		</dict>
 	</dict>
 	<key>ReflectSentryDSN</key>
-	<string>$(REFLECT_SENTRY_DSN)</string>
+	<string>$(TAURI_REFLECT_SENTRY_DSN)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

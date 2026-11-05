@@ -35,7 +35,7 @@ builds read the same names from environment variables. No PAT is needed.
 | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | Export the certificate and its key as `.p12` from Keychain Access, then `base64 -i certificate.p12`. The password is the export password. |
 | `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_CONTENT` | An App Store Connect API key. The content is the `.p8` file, raw or base64. |
 | `TAURI_SIGNING_PRIVATE_KEY` | The updater key (no password). **Losing it strands every installed app.** To rotate, generate a pair with `pnpm tauri signer generate` and ship the new pubkey in a release signed with the old key. |
-| `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | The production Sentry project. Local builds read the DSN as `VITE_SENTRY_DSN`, and iOS also as `REFLECT_SENTRY_DSN`. Never give the token a `VITE_` prefix: it must not enter an app bundle. |
+| `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | The production Sentry project. Local builds read the DSN as `VITE_SENTRY_DSN`, and iOS also as `TAURI_REFLECT_SENTRY_DSN` (`tauri ios build` passes only `TAURI_*` variables on to Xcode). Never give the token a `VITE_` prefix: it must not enter an app bundle. |
 
 ## macOS
 
