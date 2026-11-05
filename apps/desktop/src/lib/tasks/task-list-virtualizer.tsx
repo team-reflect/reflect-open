@@ -69,7 +69,9 @@ interface StickyHeaders {
 
 const StickyHeadersContext = createContext<StickyHeaders>({ headers: new Set(), active: -1 })
 
-const HEADER_STYLE: CSSProperties = { zIndex: 1 }
+// Every header paints over the rows, and the next header over the stuck one.
+// WebKit paints a sticky item over a later item at the same `z-index`.
+const HEADER_STYLE: CSSProperties = { zIndex: 2 }
 
 const STUCK_HEADER_STYLE: CSSProperties = { zIndex: 1, position: 'sticky', top: 0 }
 
