@@ -1,0 +1,28 @@
+name: TestFlight beta
+
+# Builds the current master commit as the beta flavor and uploads it to the
+# Reflect Beta TestFlight app, without a release. The build keeps the version
+# of the last release; its build number (the commit count) tells it apart.
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  testflight:
+    name: TestFlight beta
+    # The release_app environment only allows master.
+    if: github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/publish-testflight.yml
+    with:
+      commit: ${{ github.sha }}
+      flavor: beta
+    secrets:
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}

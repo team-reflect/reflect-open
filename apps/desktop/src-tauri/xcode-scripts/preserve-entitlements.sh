@@ -9,20 +9,14 @@ if [ -f "$ENV_LOCAL" ]; then
   . "$ENV_LOCAL"
 fi
 
-# The path is derived from TARGET_NAME + CONFIGURATION rather than read from
+# The path comes from REFLECT_CODE_SIGN_ENTITLEMENTS rather than
 # $CODE_SIGN_ENTITLEMENTS: skip-codesign builds are exactly the flow where
 # tauri blanks that setting on the xcodebuild command line (cargo-mobile2
 # src/apple/target.rs passes CODE_SIGN_ENTITLEMENTS="" when skipping
-# codesign), and a command-line override beats every target setting. Debug
-# picks the .dev entitlements (dev App Group), everything else the release
-# file.
+# codesign), and a command-line override beats every target setting. Each
+# configuration sets REFLECT_CODE_SIGN_ENTITLEMENTS to its flavor's file.
 if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
-  if [ "${CONFIGURATION:?}" = "debug" ]; then
-    ENTITLEMENTS="${SRCROOT:?}/${TARGET_NAME:?}/${TARGET_NAME:?}.dev.entitlements"
-  else
-    ENTITLEMENTS="${SRCROOT:?}/${TARGET_NAME:?}/${TARGET_NAME:?}.entitlements"
-  fi
   /usr/bin/codesign --force --sign - \
-    --entitlements "$ENTITLEMENTS" \
+    --entitlements "${SRCROOT:?}/${REFLECT_CODE_SIGN_ENTITLEMENTS:?}" \
     "${CODESIGNING_FOLDER_PATH:?}"
 fi

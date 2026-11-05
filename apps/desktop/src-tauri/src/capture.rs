@@ -317,29 +317,19 @@ pub fn capture_inbox_reject(
 // extension) cannot reach the graph folder, so they spool into their App
 // Group container and the app relays each spool file into the graph inbox.
 
-/// The App Group the iOS share extension spools into. Must match the
-/// `com.apple.security.application-groups` entitlement on the app and the
-/// extension targets (`ios.project.yml`) and `groupId` in
-/// `CaptureInbox.swift`. Debug builds are the dev flavor and use their own
-/// group so a dev install never drains the production app's inbox; the Xcode
-/// debug configuration compiles the Rust dev profile, so `debug_assertions`
-/// tracks the flavor exactly.
-#[cfg(all(target_os = "ios", debug_assertions))]
-const SHARED_GROUP_ID: &str = "group.app.reflect.dev";
-#[cfg(all(target_os = "ios", not(debug_assertions)))]
-const SHARED_GROUP_ID: &str = "group.app.reflect";
+/// The Info.plist key naming an App Group, per flavor so dev, beta, and stable
+/// never drain each other's inbox. It matches the
+/// `com.apple.security.application-groups` entitlement. On iOS it sits in the
+/// app's Info.plist (`ios.project.yml`), and `CaptureInbox.swift` reads the
+/// same key from the extension's. On macOS it sits in the Safari app
+/// extension's, set when `scripts/embed-safari-extension.ts` builds it.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+const APP_GROUP_KEY: &str = "ReflectAppGroup";
 
 /// The Safari app extension's bundle inside `Contents/PlugIns/`
 /// (`safari-extension/project.yml`).
 #[cfg(target_os = "macos")]
 const SAFARI_APPEX: &str = "SafariExtension.appex";
-
-/// The app extension's Info.plist key naming its App Group. The group is
-/// per flavor and team-prefixed (`<team>.<app bundle id>`), set when
-/// `scripts/embed-safari-extension.ts` builds and signs the app extension,
-/// so the relay reads it back instead of keeping a second copy.
-#[cfg(target_os = "macos")]
-const SAFARI_APP_GROUP_KEY: &str = "ReflectAppGroup";
 
 /// The spool directory inside the App Group container. The extensions
 /// create it lazily; a missing directory relays as zero.
@@ -473,6 +463,16 @@ fn quarantine_shared_spool(shared_inbox: &Path, name: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// The App Group `bundle` names under [`APP_GROUP_KEY`].
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+fn bundle_app_group(bundle: &objc2_foundation::NSBundle) -> Option<String> {
+    use objc2_foundation::NSString;
+    let key = NSString::from_str(APP_GROUP_KEY);
+    let value = bundle.objectForInfoDictionaryKey(&key)?;
+    let group = value.downcast::<NSString>().ok()?.to_string();
+    (!group.is_empty()).then_some(group)
+}
+
 /// `<App Group container>/inbox`, or `None` when the container is
 /// unavailable (a build without the App Group entitlement).
 #[cfg(any(target_os = "ios", target_os = "macos"))]
@@ -485,10 +485,11 @@ fn group_inbox_dir(group: &str) -> Option<PathBuf> {
     Some(PathBuf::from(path).join(SHARED_INBOX_DIR))
 }
 
-/// The shared inbox the iOS share extension writes.
+/// The shared inbox the iOS share extension writes. `None` for a build
+/// without the `ReflectAppGroup` key.
 #[cfg(target_os = "ios")]
 fn shared_inbox_dir() -> Option<PathBuf> {
-    group_inbox_dir(SHARED_GROUP_ID)
+    group_inbox_dir(&bundle_app_group(&objc2_foundation::NSBundle::mainBundle())?)
 }
 
 /// The shared inbox the Safari app extension writes. `None` unless this
@@ -501,8 +502,7 @@ fn shared_inbox_dir() -> Option<PathBuf> {
     let plug_ins = NSBundle::mainBundle().builtInPlugInsPath()?.to_string();
     let appex_path = PathBuf::from(plug_ins).join(SAFARI_APPEX);
     let appex = NSBundle::bundleWithPath(&NSString::from_str(appex_path.to_str()?))?;
-    let group = appex.objectForInfoDictionaryKey(&NSString::from_str(SAFARI_APP_GROUP_KEY))?;
-    group_inbox_dir(&group.downcast_ref::<NSString>()?.to_string())
+    group_inbox_dir(&bundle_app_group(&appex)?)
 }
 
 /// Every other platform's capture producers write the graph inbox directly.

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.7...v0.18.0-beta.8) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** fix `SceneEntryPoints.swift` syntax error ([#2005](https://github.com/team-reflect/reflect-open/issues/2005)) ([5d661d9](https://github.com/team-reflect/reflect-open/commit/5d661d9ae7eb7015a3c34971687d58ed67144682))
+
 ## [0.18.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.6...v0.18.0-beta.7) (2026-11-05)
 
 
