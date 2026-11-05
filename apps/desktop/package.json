@@ -35,7 +35,7 @@
     "@icons-pack/react-simple-icons": "^13.15.1",
     "@meowdown/core": "^0.83.0",
     "@meowdown/markdown": "^0.78.0",
-    "@meowdown/react": "^0.82.3",
+    "@meowdown/react": "^0.83.0",
     "@ocavue/utils": "^1.11.0",
     "@post-embed/schema": "^0.5.2",
     "@post-embed/types": "^0.5.0",
