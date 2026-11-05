@@ -99,7 +99,6 @@ private enum SceneEntryPoints {
 //   remaining job is the quick action.
 // - Verify on a device or simulator: with the app not running, open
 //   `reflect://record-audio`. The recording sheet must open once.
-    if !options.urlContexts.isEmpty {
       if !options.urlContexts.isEmpty {
         scene.delegate?.scene?(scene, openURLContexts: options.urlContexts)
       }
