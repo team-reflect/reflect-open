@@ -1,4 +1,12 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
 import {
   composeVisibleTaskGroups,
@@ -10,6 +18,9 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs.tsx'
+import { flattenTaskGroups, type TaskListItem } from '@/lib/tasks/task-list-items.ts'
+import { TaskListVirtualizer } from '@/lib/tasks/task-list-virtualizer.tsx'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
 import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
@@ -19,7 +30,8 @@ import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { SearchInput } from '@/mobile/search-input.tsx'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
-import { MobileTaskGroup } from '@/mobile/task-group.tsx'
+import { MobileTaskGroupHeader } from '@/mobile/task-group-header.tsx'
+import { MOBILE_TASK_ROW_HEIGHT, MobileTaskRow } from '@/mobile/task-row.tsx'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
@@ -94,6 +106,8 @@ export function MobileTasks(): ReactElement {
     () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
     [open, completed, recentlyCompleted, filters, needle, today],
   )
+  const { items, headerIndexes } = useMemo(() => flattenTaskGroups(groups), [groups])
+  const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
 
   // The sheet edits the task's *live* row, not the snapshot taken when it
   // opened: a mutation or reindex can rewrite the row (raw, checked) while
@@ -111,27 +125,71 @@ export function MobileTasks(): ReactElement {
     )
   }, [groups, editingTask])
 
-  const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
-    if (options?.haptic !== false) {
-      hapticImpactLight(haptics)
-    }
-    setAutoFocusEditor(options?.autoFocus === true)
-    setEditingTask(task)
-    setSheetOpen(true)
-  }
+  const editTask = useCallback(
+    (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
+      if (options?.haptic !== false) {
+        hapticImpactLight(haptics)
+      }
+      setAutoFocusEditor(options?.autoFocus === true)
+      setEditingTask(task)
+      setSheetOpen(true)
+    },
+    [haptics],
+  )
 
   // The group headers' "+" (V1): drop any search filter so the new row is
   // visible, write it, then open its quick-edit sheet with the editor focused
   // so typing starts immediately.
-  const onAdd = (target: InsertTaskTarget): void => {
-    hapticImpactLight(haptics)
-    setQuery('')
-    void actions.insert(target).then((created) => {
-      if (created !== null) {
-        editTask(created, { autoFocus: true, haptic: false })
+  const onAdd = useCallback(
+    (target: InsertTaskTarget): void => {
+      hapticImpactLight(haptics)
+      setQuery('')
+      void actions.insert(target).then((created) => {
+        if (created !== null) {
+          editTask(created, { autoFocus: true, haptic: false })
+        }
+      })
+    },
+    [haptics, actions, editTask],
+  )
+
+  const openNote = useCallback((path: string) => navigate(routeForPath(path)), [navigate])
+
+  const renderItem = useCallback(
+    (item: TaskListItem): ReactElement => {
+      switch (item.kind) {
+        case 'header':
+          return (
+            <MobileTaskGroupHeader
+              key={item.key}
+              group={item.group}
+              today={today}
+              onAdd={onAdd}
+              onOpen={openNote}
+            />
+          )
+        case 'breadcrumbs':
+          return (
+            <TaskBreadcrumbs key={item.key} breadcrumbs={item.labels} className="px-4 pb-1 pt-3" />
+          )
+        case 'task':
+          return (
+            <MobileTaskRow
+              key={item.key}
+              task={item.task}
+              showSource={item.showSource}
+              onEdit={editTask}
+              onToggle={() => actions.checkboxToggle(item.task)}
+              togglePending={actions.isPending}
+              revealedRow={revealedRow}
+              onOpenNote={() => openNote(item.task.notePath)}
+              onDelete={() => actions.remove([item.task])}
+            />
+          )
       }
-    })
-  }
+    },
+    [today, onAdd, openNote, editTask, actions, revealedRow],
+  )
 
   const archiveCompleted = (): void => {
     hapticImpactLight(haptics)
@@ -195,22 +253,18 @@ export function MobileTasks(): ReactElement {
           // A stacking context, so WebKit composites the sticky headers and row
           // surfaces inside this scroller, below the iOS scroll indicator.
           className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-24"
+          data-testid="tasks-scroll"
           onScroll={() => revealedRow.set(null)}
         >
-          {groups.map((group) => (
-            <MobileTaskGroup
-              key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
-              group={group}
-              today={today}
-              onAdd={onAdd}
-              onEdit={editTask}
-              onToggle={actions.checkboxToggle}
-              togglePending={actions.isPending}
-              onOpen={(path) => navigate(routeForPath(path))}
-              onDelete={(task) => actions.remove([task])}
-              revealedRow={revealedRow}
-            />
-          ))}
+          <TaskListVirtualizer
+            items={items}
+            headerIndexes={headerIndexes}
+            resetKey={resetKey}
+            itemSize={MOBILE_TASK_ROW_HEIGHT}
+            bufferSize={640}
+          >
+            {renderItem}
+          </TaskListVirtualizer>
         </div>
       )}
       <Button
@@ -229,7 +283,7 @@ export function MobileTasks(): ReactElement {
           onOpenChange={setSheetOpen}
           today={today}
           actions={actions}
-          onOpenNote={(path) => navigate(routeForPath(path))}
+          onOpenNote={openNote}
           autoFocusEditor={autoFocusEditor}
         />
       ) : null}

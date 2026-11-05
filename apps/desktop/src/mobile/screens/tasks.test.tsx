@@ -261,6 +261,40 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
+  it('mounts only the rows near the viewport and sticks the current group header', async () => {
+    getOpenTasks.mockResolvedValue(
+      Array.from({ length: 300 }, (_, i) => {
+        const note = Math.floor(i / 20)
+        return task({
+          text: `task ${i}`,
+          notePath: `notes/${note}.md`,
+          noteTitle: `Note ${note}`,
+          astPath: [i % 20],
+          updatedAt: 300 - note,
+        })
+      }),
+    )
+    const view = await renderScreen()
+    // The screen fills its container, which has no height of its own here.
+    view.container.style.height = '700px'
+
+    await view.findByText('task 0')
+    const scroller = view.getByTestId('tasks-scroll').element() as HTMLElement
+    await expect.poll(() => scroller.querySelectorAll('[data-task-key]').length).toBeLessThan(60)
+
+    // Each group is a 32px header over 20 rows of 49px; scroll into Note 2's rows.
+    await scrollElement({ element: scroller, top: 2 * (32 + 20 * 49) + 100 })
+    await expect
+      .poll(() => {
+        const stuck = [...scroller.querySelectorAll('li')].find(
+          (li) => li.style.position === 'sticky',
+        )
+        return stuck?.querySelector('button')?.textContent
+      })
+      .toBe('Note 2')
+    await view.unmount()
+  })
+
   it('renders one read-only breadcrumb per consecutive task context', async () => {
     getOpenTasks.mockResolvedValue([
       task({ astPath: [2], text: 'first', breadcrumbs: ['Project', 'Release'] }),

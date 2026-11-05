@@ -16,6 +16,11 @@ import { useDateFormat } from '@/providers/settings-provider.tsx'
  */
 const ACTION_WIDTH = SWIPE_ACTION_WIDTH * 2
 
+/**
+ * Height (px) of a single-line row: `min-h-12` plus the bottom border.
+ */
+export const MOBILE_TASK_ROW_HEIGHT = 49
+
 interface MobileTaskRowProps {
   task: OpenTask
   /**
@@ -76,7 +81,7 @@ export function MobileTaskRow({
   const edit = (): void => onEdit(task)
 
   return (
-    <li data-task-key={key} className="border-b border-border">
+    <div data-task-key={key} className="border-b border-border">
       <SwipeRow
         actionWidth={ACTION_WIDTH}
         revealed={revealed}
@@ -185,6 +190,6 @@ export function MobileTaskRow({
           </div>
         </div>
       </SwipeRow>
-    </li>
+    </div>
   )
 }
