@@ -350,7 +350,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
             <div
               key={layer.key}
               className={cn(
-                'mobile-stack-layer sticky left-0 h-full w-full shrink-0 bg-background',
+                'mobile-stack-layer sticky left-0 h-full w-full shrink-0 bg-surface-canvas',
                 className,
               )}
               style={style}

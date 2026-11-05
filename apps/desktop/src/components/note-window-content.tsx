@@ -40,7 +40,7 @@ export function NoteWindowContent(): ReactElement {
   )
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-surface text-text">
+    <div className="relative h-screen w-screen overflow-hidden bg-surface-canvas text-text">
       {dailyDate !== null ? (
         <SingleNoteView
           path={dailyPath(dailyDate)}

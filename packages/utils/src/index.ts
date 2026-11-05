@@ -27,6 +27,7 @@ export {
   startOfDay,
   type Weekday,
 } from './dates.ts'
+export { createDeferred, type Deferred } from './deferred.ts'
 export { doNothing } from './do-nothing.ts'
 export { formatDurationInWords, formatElapsed } from './durations.ts'
 export { safeParseJson } from './json.ts'

@@ -62,6 +62,7 @@ Cascade layer order, low to high priority.
    `.dark` / `.reflect-space` runtime theming intact. */
 @theme inline {
   --color-surface: var(--surface);
+  --color-surface-canvas: var(--surface-canvas);
   --color-surface-sunken: var(--surface-sunken);
   --color-surface-app: var(--surface-app);
   --color-surface-hover: var(--surface-hover);
@@ -201,6 +202,11 @@ Cascade layer order, low to high priority.
   --sidebar-accent-foreground: var(--text);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--focus-ring);
+}
+
+/* The light mobile canvas is off-white: a full-screen white page glares on a phone. */
+:root:not(.dark) .mobile-shell {
+  --surface-canvas: var(--surface-app);
 }
 
 html,
