@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.9...v0.18.0-beta.10) (2026-11-05)
+
+
+### Features
+
+* support all Mermaid diagram types ([#2016](https://github.com/team-reflect/reflect-open/issues/2016)) ([aeeb1e1](https://github.com/team-reflect/reflect-open/commit/aeeb1e14561deac20b81f72f93698183705485b6))
+
 ## [0.18.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.8...v0.18.0-beta.9) (2026-11-05)
 
 
