@@ -152,6 +152,34 @@ describe('SwipeRow', () => {
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ACTION_WIDTH))
   })
 
+  it('marks the row active from a pointer down until it settles closed', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+    expect(scroller).not.toHaveAttribute('data-active')
+
+    await pointer(view.getByText('Row').element(), 'pointerdown', 10, 10)
+    expect(scroller).toHaveAttribute('data-active')
+
+    await scrollElement({ element: scroller, left: ACTION_WIDTH, touch: true })
+    await expect.element(view.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(scroller).toHaveAttribute('data-active')
+
+    await scrollElement({ element: scroller, left: 0, touch: true })
+    await vi.waitFor(() => expect(scroller).not.toHaveAttribute('data-active'))
+  })
+
+  it('clears the active mark when a finger lifts from a closed row', async () => {
+    const view = await mount(<Harness />)
+    const scroller = getScroller(view.getByText('Row').element())
+
+    await pointer(view.getByText('Row').element(), 'pointerdown', 10, 10)
+    await touch(scroller, 'start')
+    expect(scroller).toHaveAttribute('data-active')
+    await touch(scroller, 'end')
+
+    expect(scroller).not.toHaveAttribute('data-active')
+  })
+
   it('reports the start of every interaction, a tap included', async () => {
     const view = await mount(<Harness />)
 

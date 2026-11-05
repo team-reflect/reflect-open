@@ -1,7 +1,10 @@
+import { useEffect } from 'react'
 import type { MaybePromise } from '@reflect/utils'
 import type { UpdateService, UpdateState } from '@reflect/app'
 import type { LoggerService } from '@reflect/core'
-import { toast } from '@/components/ui/toast.tsx'
+import { useToastController, type ToastController } from '@/lib/use-toasts.ts'
+import { useStore } from '@/lib/use-store.ts'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 const UPDATE_TOAST_ID = 'reflect-update'
 // `timeout: 0` disables Base UI's auto-dismiss; the dismissible flag hides the
@@ -23,10 +26,15 @@ async function runToastAction(
   }
 }
 
-function showUpdateToast(state: UpdateState, update: UpdateService, logger: LoggerService): void {
+function showUpdateToast(
+  toastController: ToastController,
+  state: UpdateState,
+  update: UpdateService,
+  logger: LoggerService,
+): void {
   switch (state.phase) {
     case 'available':
-      toast.add({
+      toastController.add({
         id: UPDATE_TOAST_ID,
         title: 'Update available',
         description: `Reflect ${state.version} is ready to install.`,
@@ -41,7 +49,7 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
       })
       break
     case 'downloading':
-      toast.add({
+      toastController.add({
         id: UPDATE_TOAST_ID,
         title: 'Downloading update',
         description: state.percent !== null ? `${state.percent}%` : 'Preparing…',
@@ -55,7 +63,7 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
       })
       break
     case 'ready':
-      toast.add({
+      toastController.add({
         id: UPDATE_TOAST_ID,
         title: 'Update ready',
         description: `Reflect ${state.version} will finish updating after restart.`,
@@ -69,7 +77,7 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
       break
     case 'error':
       if (state.during === 'install') {
-        toast.add({
+        toastController.add({
           id: UPDATE_TOAST_ID,
           title: 'Update failed',
           description: state.message,
@@ -81,23 +89,25 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
           },
         })
       } else {
-        toast.close(UPDATE_TOAST_ID)
+        toastController.close(UPDATE_TOAST_ID)
       }
       break
     default:
-      toast.close(UPDATE_TOAST_ID)
+      toastController.close(UPDATE_TOAST_ID)
       break
   }
 }
 
 /**
  * Mirrors the auto-update lifecycle into the global toast surface (Plan 15).
- * A plain service subscriber: the toast calls run inside the service's own
- * transitions (check results, download progress callbacks), not in a React
- * render cycle. Returns a detach.
  */
-export function attachUpdateToasts(update: UpdateService, logger: LoggerService): () => void {
-  const sync = (): void => showUpdateToast(update.get(), update, logger)
-  sync()
-  return update.subscribe(sync)
+export function UpdateToasts(): null {
+  const { update } = useAppServices()
+  const { logger } = useCoreServices()
+  const toastController = useToastController()
+  const state = useStore(update)
+  useEffect(() => {
+    showUpdateToast(toastController, state, update, logger)
+  }, [toastController, state, update, logger])
+  return null
 }

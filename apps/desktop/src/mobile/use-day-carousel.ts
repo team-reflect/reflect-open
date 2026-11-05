@@ -1,6 +1,5 @@
 import {
   startTransition,
-  useEffect,
   useEffectEvent,
   useLayoutEffect,
   useRef,
@@ -8,8 +7,8 @@ import {
   type RefObject,
 } from 'react'
 import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@reflect/app'
-import { nearestIndex, restOn } from '@/lib/scroll-pager.ts'
-import { watchScrollSettle, type ScrollSettleWatch } from '@/lib/scroll-settle.ts'
+import { attachSnapPager, type SnapPager } from '@/lib/snap-pager.ts'
+import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 
 /**
  * Days either side of the carousel anchor. A fixed **symmetric** window
@@ -175,8 +174,8 @@ interface CarouselNavigationState {
  * turns into a daily-route navigation). The route flows back in as `date` and
  * moves the scroller to match — guarded by {@link reconcileCarousel} so the
  * swipe's own echo doesn't redundantly re-scroll. A `date` beyond the window
- * re-anchors it. Scrolls that no finger or wheel started (a caret
- * reveal, a focus) are pulled back to the selected day.
+ * re-anchors it. The {@link attachSnapPager} pulls scrolls that no finger or
+ * wheel started (a caret reveal, a focus) back to the selected day.
  */
 export function useDayCarousel(
   date: string,
@@ -208,19 +207,18 @@ export function useDayCarousel(
     high: Math.min(dayWindow.count - 1, currentSelection.high + MOUNT_RADIUS),
   }
 
+  const pagerRef = useRef<SnapPager | null>(null)
+  const reducedMotion = usePrefersReducedMotion()
   // The day we last reported via onSelect — so the route echo it produces
   // doesn't trigger a redundant (momentum-cancelling) scroll.
   const reportedRef = useRef(date)
   // The window start we last reconciled against — a change means a re-anchor.
   const windowStartRef = useRef(dayWindow.start)
   const reconciledNavigationRef = useRef<CarouselNavigationState>({ navigationKey, date })
-  // The index the scroller rests on between gestures. Written before every
-  // programmatic scroll, so the scroll events it causes find nothing to heal.
-  const selectedIndexRef = useRef(routeIndex)
-  // The nearest index the current user scroll has reached.
-  const nearestRef = useRef(routeIndex)
-  // A user scroll has moved the scroller and has not settled.
-  const userScrollingRef = useRef(false)
+
+  const count = useEffectEvent(() => dayWindow.count)
+  const prefersReducedMotion = useEffectEvent(() => reducedMotion)
+  const initialIndex = useEffectEvent(() => routeIndex)
 
   // Passing half a page is the earliest point the swipe's day is known
   // without predicting the snap: the next day mounts while the browser keeps
@@ -228,17 +226,10 @@ export function useDayCarousel(
   // the settle, so dragging back and forth over the middle mounts nothing twice.
   // The strip update stays out of the mount's transition, so it does not wait
   // for the next day's editor to render.
-  const handleScroll = useEffectEvent((scroller: HTMLElement, watch: ScrollSettleWatch) => {
-    if (!watch.isUserScroll()) {
-      restOn(scroller, selectedIndexRef.current)
+  const handleIndex = useEffectEvent((nearest: number, byUser: boolean) => {
+    if (!byUser) {
       return
     }
-    userScrollingRef.current = true
-    const nearest = nearestIndex(scroller, dayWindow.count)
-    if (nearest === undefined || nearest === nearestRef.current) {
-      return
-    }
-    nearestRef.current = nearest
     onTarget(dateAtIndex(dayWindow, nearest), navigationKey)
     startTransition(() => {
       setSelection((current) => {
@@ -258,20 +249,7 @@ export function useDayCarousel(
   // edge also rebuilds the window around the current day; the report lands
   // in the same batch, so the follow effect sees the re-anchored window
   // together with the new `date` and moves the scroller onto the same day.
-  const handleSettle = useEffectEvent((scroller: HTMLElement, watch: ScrollSettleWatch) => {
-    userScrollingRef.current = false
-    if (!watch.isUserScroll()) {
-      restOn(scroller, selectedIndexRef.current)
-      return
-    }
-    const index = nearestIndex(scroller, dayWindow.count)
-    if (index === undefined) {
-      return
-    }
-    selectedIndexRef.current = index
-    nearestRef.current = index
-    // WebKit can come to rest between snap points.
-    restOn(scroller, index)
+  const handleUserSettle = useEffectEvent((index: number) => {
     const day = dateAtIndex(dayWindow, index)
     // An editor left focused on another day would scroll the carousel back to
     // reveal its caret.
@@ -290,33 +268,26 @@ export function useDayCarousel(
     }
   })
 
-  useEffect(() => {
+  // Attaches the pager, which rests on the route's day before the first paint.
+  useLayoutEffect(() => {
     const scroller = scrollerRef.current
     if (!scroller) {
       return
     }
     const controller = new AbortController()
-    const watch = watchScrollSettle({
+    pagerRef.current = attachSnapPager({
       element: scroller,
-      onSettle: () => handleSettle(scroller, watch),
-      signal: controller.signal,
+      index: initialIndex(),
+      count,
+      prefersReducedMotion,
       dragHandle: null,
+      onIndex: handleIndex,
+      onUserSettle: handleUserSettle,
+      signal: controller.signal,
     })
-    // After the watch, whose own listener decides whether this scroll is the user's.
-    const onScroll = (): void => handleScroll(scroller, watch)
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    // Rotation and split view change the page width: stay on the same day,
-    // unless a finger or its momentum owns the position (the settle aligns it).
-    const resize = new ResizeObserver(() => {
-      if (!watch.isTouching() && !userScrollingRef.current) {
-        restOn(scroller, selectedIndexRef.current)
-      }
-    })
-    resize.observe(scroller)
     return () => {
+      pagerRef.current = null
       controller.abort()
-      scroller.removeEventListener('scroll', onScroll)
-      resize.disconnect()
     }
   }, [])
 
@@ -335,22 +306,16 @@ export function useDayCarousel(
     }
   }, [date, dayWindow])
 
-  // Places the scroller on the route's day before the first paint.
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current
-    if (scroller) {
-      restOn(scroller, selectedIndexRef.current)
-    }
-  }, [])
-
   // Follow an external selection (calendar tap, Today, date link): jump, or
   // do nothing for our own swipe's echo — {@link reconcileCarousel} owns the
   // decision. A *layout* effect so the scroll and `selectedIndex` (which
-  // decides slide mounting) update before paint. An instant scroll also
-  // cancels any momentum still running.
+  // decides slide mounting) update before paint. Safari does not keep the
+  // snapped cell across a window rebuild (docs/mobile-motion.md), so the scroll
+  // must land in the same task. An instant scroll also cancels any momentum
+  // still running.
   useLayoutEffect(() => {
-    const scroller = scrollerRef.current
-    if (!scroller) {
+    const pager = pagerRef.current
+    if (!pager) {
       return
     }
     const previousNavigation = reconciledNavigationRef.current
@@ -370,10 +335,7 @@ export function useDayCarousel(
     }
     windowStartRef.current = dayWindow.start
     reportedRef.current = date
-    selectedIndexRef.current = sync.index
-    nearestRef.current = sync.index
-    userScrollingRef.current = false
-    restOn(scroller, sync.index)
+    pager.restOn(sync.index)
     setSelection(adoptSelection(navigationKey, sync.index))
   }, [date, dayWindow, navigationKey])
 
