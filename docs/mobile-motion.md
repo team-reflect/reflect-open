@@ -61,8 +61,10 @@ assumption in Safari or in the iOS simulator
   position. Verified: iOS.
 - Chromium keeps a write during a drag, and the drag goes on from the new position. Browser tests
   in Chromium cannot catch the iOS behavior. Verified: Chromium.
-- So a pager can shift its pages only at rest. A check for a finger in the React commit cannot
-  prevent this: the native pan starts while the main thread is busy, and the `touchstart` waits
+- So a pager can shift its pages in the DOM (for example, to re-center its window) only at rest.
+  A write without a DOM shift, such as a jump that cancels a swipe, is safe: it stops momentum, and
+  a drag overwrites it. A check for a finger in the React commit cannot prevent a mid-gesture
+  shift: the native pan starts while the main thread is busy, and the `touchstart` waits
   until the commit ends (inferred, not probed directly).
 
 ### Resize
