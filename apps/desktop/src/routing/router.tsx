@@ -103,17 +103,23 @@ interface NavigationProviderProps {
 function RouterActionsProvider({ navigation, children }: NavigationProviderProps): ReactElement {
   const navigate = useCallback(
     (route: Route, options?: NavigateOptions): void => {
-      startTransition(() => navigation.navigate(route, options))
+      startTransition(() => {
+        return navigation.navigate(route, options)
+      })
     },
     [navigation],
   )
 
   const back = useCallback((): void => {
-    startTransition(() => navigation.back())
+    startTransition(() => {
+      navigation.back()
+    })
   }, [navigation])
 
   const forward = useCallback((): void => {
-    startTransition(() => navigation.forward())
+    startTransition(() => {
+      navigation.forward()
+    })
   }, [navigation])
 
   const routerActions = useMemo<RouterActions>(
@@ -144,10 +150,9 @@ function RouterStateProvider({ navigation, children }: NavigationProviderProps):
 
   // A note file move (Plan 17) rewrites every history entry that points at
   // the old path, so the current route (and back/forward) follow the file.
-  useEffect(
-    () => noteMove.onMoved((from, to) => navigation.noteMoved(from, to)),
-    [navigation, noteMove],
-  )
+  useEffect(() => {
+    return noteMove.onMoved((from, to) => navigation.noteMoved(from, to))
+  }, [navigation, noteMove])
 
   return <RouterStateContext value={state}>{children}</RouterStateContext>
 }
@@ -163,14 +168,17 @@ function RouterHandlersProvider({ navigation, children }: NavigationProviderProp
   const { entryId, route } = useRouterState()
   const position = useMemo(() => ({ entryId, route }), [entryId, route])
   const saveScrollState = useCallback(
-    (scroll: ScrollPosition) => navigation.saveScrollState(scroll, position),
+    (scroll: ScrollPosition) => {
+      navigation.saveScrollState(scroll, position)
+    },
     [navigation, position],
   )
-  const clearScrollState = useCallback(
-    () => navigation.clearScrollState(position),
-    [navigation, position],
-  )
-  const savedScroll = useCallback(() => navigation.savedScroll(position), [navigation, position])
+  const clearScrollState = useCallback(() => {
+    navigation.clearScrollState(position)
+  }, [navigation, position])
+  const savedScroll = useCallback(() => {
+    return navigation.savedScroll(position)
+  }, [navigation, position])
 
   const routerHandlers = useMemo<RouterHandlers>(() => {
     return { saveScrollState, clearScrollState, savedScroll }
