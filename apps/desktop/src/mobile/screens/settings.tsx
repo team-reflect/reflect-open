@@ -70,7 +70,7 @@ import {
 } from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
 import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 const PAYWALL_PHASE_OPTIONS: readonly SettingsMenuOption<PaywallPhase | 'off'>[] = [
   { value: 'off', label: 'Off' },
@@ -181,7 +181,8 @@ function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
  * device's GitHub sign-in, independent of the graph.
  */
 export function MobileSettings(): ReactElement {
-  const { back, canBack, navigate } = useRouter()
+  const { canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
   const graph = useGraphInfo()
   const { platform } = useGraphActions()
   const mobileStorageKind = useMobileStorageKind()

@@ -31,7 +31,7 @@ const MobileTasks = lazy(async () => {
 
 interface MobileScreenProps {
   /**
-   * The route this screen renders. A prop rather than `useRouter()` because
+   * The route this screen renders. A prop rather than `useRouterState()` because
    * the stack ({@link MobileStack}) keeps more than one screen mounted at a
    * time — the current route plus the screen a back-swipe would reveal.
    */
