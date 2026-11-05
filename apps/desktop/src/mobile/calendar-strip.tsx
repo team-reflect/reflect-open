@@ -152,11 +152,7 @@ export function CalendarStrip({
           </Button>
         </div>
       </div>
-      <div
-        ref={scrollerRef}
-        data-scroll-x
-        className="flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain"
-      >
+      <div ref={scrollerRef} data-scroll-x className="pager-x flex overflow-x-auto">
         {Array.from({ length: weekWindow.count }, (_, index) => {
           const weekStart = weekAtIndex(weekWindow, index)
           const weekEnd = addDaysToIsoDate(weekStart, 6)

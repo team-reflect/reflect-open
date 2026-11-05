@@ -346,8 +346,10 @@ export function useDayCarousel(
   // Follow an external selection (calendar tap, Today, date link): jump, or
   // do nothing for our own swipe's echo — {@link reconcileCarousel} owns the
   // decision. A *layout* effect so the scroll and `selectedIndex` (which
-  // decides slide mounting) update before paint. An instant scroll also
-  // cancels any momentum still running.
+  // decides slide mounting) update before paint. Safari does not keep the
+  // snapped cell across a window rebuild (docs/mobile-motion.md), so the scroll
+  // must land in the same task. An instant scroll also cancels any momentum
+  // still running.
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
     if (!scroller) {

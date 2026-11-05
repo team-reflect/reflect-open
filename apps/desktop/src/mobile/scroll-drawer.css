@@ -5,11 +5,6 @@
  * UI's `data-starting-style` / `data-ending-style`.
  */
 
-:root {
-  --drawer-duration: 450ms;
-  --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
-}
-
 .scroll-drawer {
   position: absolute;
   inset: 0;
@@ -48,11 +43,11 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  transition: opacity var(--drawer-duration) var(--drawer-ease);
+  transition: opacity var(--duration-sheet) var(--ease-sheet);
 }
 
 .scroll-drawer-panel {
-  transition: translate var(--drawer-duration) var(--drawer-ease);
+  transition: translate var(--duration-sheet) var(--ease-sheet);
 }
 
 [data-starting-style] .scroll-drawer-panel,
@@ -68,7 +63,7 @@
 /* Base UI waits only for the popup's own animations before it unmounts, so the
    popup runs an invisible transition as long as the panel's. */
 .scroll-drawer-popup {
-  transition: opacity var(--drawer-duration);
+  transition: opacity var(--duration-sheet);
 }
 
 .scroll-drawer-popup[data-ending-style] {

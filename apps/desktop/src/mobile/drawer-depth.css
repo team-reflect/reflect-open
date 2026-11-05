@@ -14,8 +14,8 @@
   .drawer-depth-target {
     transform-origin: 50% 0;
     transition:
-      scale var(--drawer-duration) var(--drawer-ease),
-      translate var(--drawer-duration) var(--drawer-ease);
+      scale var(--duration-sheet) var(--ease-sheet),
+      translate var(--duration-sheet) var(--ease-sheet);
   }
 
   /* Kept until the last popup unmounts, so the exit transition stays framed. */

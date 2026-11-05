@@ -41,6 +41,12 @@ Cascade layer order, low to high priority.
   );
 }
 
+/* Horizontal snap pager without a visible scrollbar. Each pager sets its own
+   `overflow-x`. */
+@utility pager-x {
+  @apply snap-x snap-mandatory scrollbar-none overflow-y-hidden overscroll-x-contain;
+}
+
 /* Controls that sit inside the overlaid macOS title-bar drag strip must share
    the strip's z-index so they win by tree order without jumping above overlays. */
 @utility window-drag-control {
@@ -134,6 +140,14 @@ Cascade layer order, low to high priority.
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Motion tokens: easing curves and durations. */
+@theme {
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-sheet: 450ms;
+  --duration-stack: 350ms;
+  --duration-month-title: 500ms;
 }
 
 /* The DS shadow tokens share Tailwind's `--shadow-*` theme namespace, so a
