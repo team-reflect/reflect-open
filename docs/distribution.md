@@ -85,14 +85,27 @@ Apple Silicon, or Intel with the universal build.
 ### Build
 
 ```bash
-pnpm build:ios --build-number=<number>
+pnpm build:ios --build-number=<number> [--flavor=beta|stable]
 pnpm upload:testflight
 ```
 
+A prerelease version builds the beta flavor, like on desktop. `upload:testflight` finds the App
+Store Connect app from the IPA's bundle id.
+
+To ship the current `master` to Reflect Beta without a release, run the **TestFlight beta**
+workflow from the Actions tab. The build keeps the last release's version; its build number (the
+commit count) tells it apart.
+
 ### Install
 
-Testers join the [TestFlight beta](https://testflight.apple.com/join/j2eEz43d). Beta and stable
-upload to the same marketing version, without the `-beta.N` suffix.
+| | Stable | Beta |
+| --- | --- | --- |
+| App | Reflect, `app.reflect.ios` | Reflect Beta, `app.reflect.ios.beta` |
+| Ships to | App Store, and TestFlight for the team | TestFlight only |
+
+The two apps install side by side. They open the same iCloud notes, but local notes, keychain
+secrets, and settings are separate. Each uploads its marketing version without the `-beta.N`
+suffix.
 
 ### Requirements
 
@@ -111,8 +124,8 @@ iPhone or iPad. The minimum iOS version is `deploymentTarget` in
     -sdk iphoneos -configuration release -allowProvisioningUpdates build
   ```
 
-- **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`**: create the App Store
-  Connect app record. Do not reuse the old Capacitor app (`app.reflect.ReflectMobile`).
+- **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`** (or `.beta`): create the
+  App Store Connect app record. Do not reuse the old Capacitor app (`app.reflect.ReflectMobile`).
 - **Duplicate build number, or an older build shows as latest**: build numbers must be unique,
   and should increase, within one marketing version.
 - **A TestFlight feedback ZIP has no stack**: expected. Read Sentry, or ask for the `.ips`
