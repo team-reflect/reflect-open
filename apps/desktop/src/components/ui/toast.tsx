@@ -1,5 +1,5 @@
-import type { ReactElement, ReactNode } from 'react'
-import { Toast as ToastPrimitive } from '@base-ui/react/toast'
+import { createContext, use, type ReactElement, type ReactNode } from 'react'
+import { Toast as ToastPrimitive, type ToastManager } from '@base-ui/react/toast'
 
 import { cn } from '@/lib/utils.ts'
 import { Button } from '@/components/ui/button.tsx'
@@ -19,6 +19,25 @@ interface ToastData {
 }
 
 const toast = ToastPrimitive.createToastManager<ToastData>()
+
+/**
+ * The part of the toast manager that components call. A call only sends an
+ * event to the `Toaster`, so it never re-renders the caller.
+ */
+type ToastController = Pick<ToastManager<ToastData>, 'add' | 'close'>
+
+/**
+ * Holds the global {@link toast} manager by default. Tests provide a fake.
+ */
+const ToastControllerContext = createContext<ToastController>(toast)
+
+/**
+ * Returns the toast manager from {@link ToastControllerContext}. The value
+ * never changes, so reading it never re-renders.
+ */
+function useToasts(): ToastController {
+  return use(ToastControllerContext)
+}
 
 type ToasterPosition = 'bottom-right' | 'top-center'
 
@@ -273,6 +292,7 @@ export {
   ToastAction,
   ToastClose,
   ToastContent,
+  ToastControllerContext,
   ToastDescription,
   ToastPortal,
   ToastProvider,
@@ -281,5 +301,6 @@ export {
   createToastManager,
   toast,
   useToastManager,
+  useToasts,
 }
-export type { ToastData }
+export type { ToastController, ToastData }

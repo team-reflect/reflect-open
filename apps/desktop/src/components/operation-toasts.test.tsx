@@ -3,26 +3,25 @@ import { createTestOperationsService, type TestOperationsService } from '@reflec
 import type { TestLoggerService } from '@reflect/core/testing'
 import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import type { MockToastAddOptions } from '@/test-utils/toast.ts'
+import {
+  clickToastAction,
+  createTestToastController,
+  withToasts,
+  type TestToastController,
+} from '@/test-utils/toast.tsx'
 import { OperationToasts } from './operation-toasts.ts'
-
-const toast = vi.hoisted(() => ({
-  add: vi.fn<(options: MockToastAddOptions) => string>(),
-  close: vi.fn(),
-}))
-
-vi.mock('@/components/ui/toast.tsx', () => ({ toast }))
 
 let operations: TestOperationsService
 let logger: TestLoggerService
+let toasts: TestToastController
 
 beforeEach(async () => {
   operations = createTestOperationsService()
-  toast.add.mockClear()
-  toast.close.mockClear()
+  toasts = createTestToastController()
   const { core } = await renderInApp(<OperationToasts />, {
     appServices: { operations },
     servicesOnly: true,
+    wrapper: withToasts(toasts),
   })
   logger = core.logger
 })
@@ -31,7 +30,7 @@ describe('OperationToasts', () => {
   it('creates and updates a toast with a stable operation id', async () => {
     const handle = await act(() => operations.start('Rebuilding search index'))
 
-    expect(toast.add).toHaveBeenLastCalledWith(
+    expect(toasts.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', title: 'Rebuilding search index' }),
     )
 
@@ -39,7 +38,7 @@ describe('OperationToasts', () => {
       handle.progress(3, 12)
     })
 
-    expect(toast.add).toHaveBeenLastCalledWith(
+    expect(toasts.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', description: '3/12' }),
     )
   })
@@ -50,12 +49,12 @@ describe('OperationToasts', () => {
       handle.fail('disk full')
     })
 
-    expect(toast.add).toHaveBeenLastCalledWith(
+    expect(toasts.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', description: 'disk full', type: 'error' }),
     )
 
     await act(() => operations.clock.advance(9_200))
-    expect(toast.close).toHaveBeenCalledWith('operation-1')
+    expect(toasts.close).toHaveBeenCalledWith('operation-1')
   })
 
   it('passes optional action metadata to the toast', async () => {
@@ -65,7 +64,7 @@ describe('OperationToasts', () => {
       operations.start('Update available', { action: { label: 'Install', run }, persistent: true })
     })
 
-    expect(toast.add).toHaveBeenLastCalledWith(
+    expect(toasts.add).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: 'operation-1',
         timeout: 0,
@@ -73,22 +72,22 @@ describe('OperationToasts', () => {
       }),
     )
 
-    const options = toast.add.mock.lastCall?.[0]
+    const options = toasts.add.mock.lastCall?.[0]
     expect(options?.actionProps?.children).toBe('Install')
-    options?.actionProps?.onClick()
+    clickToastAction(options)
     expect(run).toHaveBeenCalledTimes(1)
   })
 
   it('does not remove the operation when a toast is dismissed', async () => {
     const handle = await act(() => operations.start('Saving settings'))
 
-    expect(toast.add.mock.lastCall?.[0]?.onClose).toBeUndefined()
+    expect(toasts.add.mock.lastCall?.[0]?.onClose).toBeUndefined()
 
     await act(() => {
       handle.fail('disk full')
     })
 
-    expect(toast.add).toHaveBeenLastCalledWith(
+    expect(toasts.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', description: 'disk full', type: 'error' }),
     )
   })
@@ -100,8 +99,8 @@ describe('OperationToasts', () => {
       operations.start('Update available', { action: { label: 'Install', run } })
     })
 
-    const options = toast.add.mock.lastCall?.[0]
-    options?.actionProps?.onClick()
+    const options = toasts.add.mock.lastCall?.[0]
+    clickToastAction(options)
     await vi.waitFor(() => {
       expect(logger.getErrors()).toEqual([{ message: 'operation action failed:', cause: error }])
     })

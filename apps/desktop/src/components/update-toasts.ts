@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { MaybePromise } from '@reflect/utils'
 import type { UpdateService, UpdateState } from '@reflect/app'
 import type { LoggerService } from '@reflect/core'
-import { toast } from '@/components/ui/toast.tsx'
+import { useToasts, type ToastController } from '@/components/ui/toast.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -26,7 +26,12 @@ async function runToastAction(
   }
 }
 
-function showUpdateToast(state: UpdateState, update: UpdateService, logger: LoggerService): void {
+function showUpdateToast(
+  toast: ToastController,
+  state: UpdateState,
+  update: UpdateService,
+  logger: LoggerService,
+): void {
   switch (state.phase) {
     case 'available':
       toast.add({
@@ -99,9 +104,10 @@ function showUpdateToast(state: UpdateState, update: UpdateService, logger: Logg
 export function UpdateToasts(): null {
   const { update } = useAppServices()
   const { logger } = useCoreServices()
+  const toasts = useToasts()
   const state = useStore(update)
   useEffect(() => {
-    showUpdateToast(state, update, logger)
-  }, [state, update, logger])
+    showUpdateToast(toasts, state, update, logger)
+  }, [toasts, state, update, logger])
   return null
 }

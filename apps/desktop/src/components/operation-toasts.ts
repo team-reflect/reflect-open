@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { LoggerService, Operation } from '@reflect/core'
-import { toast } from '@/components/ui/toast.tsx'
+import { useToasts, type ToastController } from '@/components/ui/toast.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -34,7 +34,11 @@ function descriptionFor(operation: Operation): string | undefined {
   return operation.description ?? undefined
 }
 
-function showOperationToast(operation: Operation, logger: LoggerService): void {
+function showOperationToast(
+  toast: ToastController,
+  operation: Operation,
+  logger: LoggerService,
+): void {
   const operationAction = operation.action
   const actionProps = operationAction
     ? {
@@ -75,19 +79,20 @@ function showOperationToast(operation: Operation, logger: LoggerService): void {
 export function OperationToasts(): null {
   const { operations } = useAppServices()
   const { logger } = useCoreServices()
+  const toasts = useToasts()
   const current = useStore(operations)
   const shownIdsRef = useRef(new Set<number>())
   useEffect(() => {
     const nextIds = new Set(current.map((operation) => operation.id))
     for (const id of shownIdsRef.current) {
       if (!nextIds.has(id)) {
-        toast.close(`operation-${id}`)
+        toasts.close(`operation-${id}`)
       }
     }
     for (const operation of current) {
-      showOperationToast(operation, logger)
+      showOperationToast(toasts, operation, logger)
     }
     shownIdsRef.current = nextIds
-  }, [current, logger])
+  }, [toasts, current, logger])
   return null
 }
