@@ -54,16 +54,13 @@ private enum FieldCap {
 }
 
 enum CaptureInbox {
-  /// Must match the `com.apple.security.application-groups` entitlement on
-  /// both targets, and `SHARED_GROUP_ID` in the app's Rust relay. Debug
-  /// builds are the dev flavor (see `ios.project.yml`) and use their own
-  /// group so a dev install never drains the production app's inbox; the
-  /// Rust side switches on `debug_assertions` the same way.
-  #if DEBUG
-  static let groupId = "group.app.reflect.dev"
-  #else
-  static let groupId = "group.app.reflect"
-  #endif
+  /// The flavor's App Group: `ReflectAppGroup` in the Info.plist of the
+  /// running bundle (the app or the share extension), which
+  /// `ios.project.yml` sets per flavor so dev, beta, and stable never drain
+  /// each other's inbox. It matches the
+  /// `com.apple.security.application-groups` entitlement, and the app's Rust
+  /// relay reads the same key.
+  static let groupId = Bundle.main.object(forInfoDictionaryKey: "ReflectAppGroup") as? String ?? ""
 
   /// Where envelopes spool inside the container; the Rust relay reads the
   /// same directory name (`SHARED_INBOX_DIR`).
@@ -158,6 +155,7 @@ enum CaptureInbox {
 
   private static func inboxUrl() throws -> URL {
     guard
+      !groupId.isEmpty,
       let container = FileManager.default.containerURL(
         forSecurityApplicationGroupIdentifier: groupId)
     else {
