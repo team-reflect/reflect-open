@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactElement } from 'react'
 
-const BaseUiSwitch = lazy(async () => {
+const WebSwitch = lazy(async () => {
   const { Switch } = await import('@/components/ui/switch.tsx')
   return { default: Switch }
 })
@@ -23,7 +23,7 @@ export function MobileSwitch(props: MobileSwitchProps): ReactElement {
   }
   return (
     <Suspense fallback={null}>
-      <BaseUiSwitch {...props} />
+      <WebSwitch {...props} />
     </Suspense>
   )
 }
