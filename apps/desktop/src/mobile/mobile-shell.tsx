@@ -121,7 +121,7 @@ export function MobileShell(): ReactElement {
           layout sees the true visible viewport. Only `position: fixed`
           elements need `--keyboard-height` themselves. */}
       <div
-        className="flex w-screen flex-col"
+        className="mobile-shell flex w-screen flex-col"
         style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
       >
         <div className="min-h-0 flex-1">
