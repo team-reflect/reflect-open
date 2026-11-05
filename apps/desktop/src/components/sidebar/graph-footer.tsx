@@ -22,7 +22,7 @@ import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'
 import { useGitSyncStore } from '@/providers/sync-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 const MENU_ITEM_CLASS = 'h-8 gap-2 px-2 py-0 text-[13px] text-text-secondary'
@@ -87,7 +87,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
   const indexing = useGraphIndexing()
   const { openRecent, chooseGraph } = useGraphActions()
   const { colorFor } = useGraphColors()
-  const { route } = useRouter()
+  const { route } = useRouterState()
   const settingsActive = route.kind === 'settings'
 
   return (

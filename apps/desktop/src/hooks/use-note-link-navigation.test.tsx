@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import { isModEvent } from '@meowdown/core'
 import { createTestWindowService } from '@reflect/app/testing'
 import { createTestCoreServices } from '@reflect/core/testing'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteLinkNavigation } from './use-note-link-navigation.ts'
@@ -49,12 +49,12 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
 }
 
 function RouteProbe(): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
 function ReopenCurrentRoute(): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   return (
     <button type="button" onClick={() => navigate({ kind: 'allNotes', tag: null })}>
       Reopen current route

@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
-import { RouterFreeze, useRouter } from '@/routing/router.tsx'
+import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import './mobile-stack.css'
 
 /** The stacked card's leading-edge shadow, visible while it slides. */
@@ -235,7 +235,8 @@ interface MobileStackProps {
  * remount it on a canceled swipe.
  */
 export function MobileStack(props: MobileStackProps): ReactElement {
-  const { route, entryId, backRoute, canBack, back, navigate } = useRouter()
+  const { route, entryId, backRoute, canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
   const containerRef = useRef<HTMLDivElement>(null)
   const pagerRef = useRef<HTMLDivElement>(null)
   const scrimRef = useRef<HTMLDivElement>(null)

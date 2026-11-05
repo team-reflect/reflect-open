@@ -9,7 +9,7 @@ import { NewGraphDrawer } from '@/mobile/new-graph-drawer.tsx'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -24,7 +24,8 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
  * added a graph since the last look.
  */
 export function MobileGraphs(): ReactElement {
-  const { back, canBack, navigate } = useRouter()
+  const { canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
   const graph = useGraphInfo()
   const { mobileOnboarding } = useAppServices()
   const [pendingRoot, setPendingRoot] = useState<string | null>(null)

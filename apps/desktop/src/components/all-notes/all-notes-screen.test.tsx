@@ -5,7 +5,7 @@ import { page, userEvent } from 'vitest/browser'
 import type { ReactElement } from 'react'
 import { buildIndexedNote, parseNote, type NoteFileService, type Settings } from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -74,13 +74,13 @@ function noteMarkdown(note: SeedNote): string {
 }
 
 function RoutedScreen(): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return <AllNotesScreen tag={route.kind === 'allNotes' ? route.tag : null} />
 }
 
 /** Navigates to the already-active route — the sidebar-click-while-here case. */
 function ReArrive(): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   return (
     <button
       type="button"

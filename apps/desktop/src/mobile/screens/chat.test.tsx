@@ -9,7 +9,7 @@ import {
   type TestChatEngineService,
 } from '@reflect/core/testing'
 import type { Route } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -53,7 +53,7 @@ function scriptTurn(events: ChatStreamEvent[]) {
 const probedRouteRef: RefObject<Route | null> = createRef()
 
 function RouteProbe(): null {
-  const { route } = useRouter()
+  const { route } = useRouterState()
 
   useLayoutEffect(() => {
     probedRouteRef.current = route
@@ -66,7 +66,7 @@ function RouteProbe(): null {
 }
 
 function FocusChatProbe(): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   return (
     <button type="button" onClick={() => navigate({ kind: 'chat' }, { focusEditor: true })}>
       focus chat input
