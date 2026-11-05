@@ -111,9 +111,9 @@
    Deep navy, indigo-500 brand, near-white text.
    ============================================================ */
 .dark {
-  --surface: #0b1020;
+  --surface: #161d30; /* hsl(224 37% 14%)            */
   --surface-sunken: rgba(31, 41, 55, 0.3);
-  --surface-app: #0a0f1e; /* hsl(224 49% 8%)             */
+  --surface-app: #05070f; /* hsl(228 50% 4%)             */
   --surface-hover: rgba(255, 255, 255, 0.03);
   --surface-active: rgba(55, 65, 81, 0.5); /* gray-700/50                 */
   --surface-inverse: var(--indigo-500);
