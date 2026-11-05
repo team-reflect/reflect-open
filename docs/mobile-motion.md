@@ -54,16 +54,16 @@ assumption in Safari or in the iOS simulator
 ### Scroll writes during a gesture
 
 - On iOS, after a finger touches down, the pan owns the position until the gesture ends. A
-  `scrollLeft` write lasts at most one frame: the next finger move puts the position back to the
+  `scrollLeft` write lasts only until the next finger move, which puts the position back to the
   touch-down position plus the finger offset. If the write came with a DOM shift (see above), the
   scroller shows a different element. Verified: iOS.
 - On iOS, a write during momentum stops the momentum, and the scroller snaps to the nearest snap
   position. Verified: iOS.
 - Chromium keeps a write during a drag, and the drag goes on from the new position. Browser tests
-  in Chromium cannot catch the iOS behavior.
-- So a pager can shift its pages only at rest. A finger that touches down while the main thread
-  runs a React commit is not yet known to JS (its `touchstart` waits in the queue), so a check for
-  a finger in the commit cannot prevent this.
+  in Chromium cannot catch the iOS behavior. Verified: Chromium.
+- So a pager can shift its pages only at rest. A check for a finger in the React commit cannot
+  prevent this: the native pan starts while the main thread is busy, and the `touchstart` waits
+  until the commit ends (inferred from the native scrolling above, not probed directly).
 
 ### Resize
 
