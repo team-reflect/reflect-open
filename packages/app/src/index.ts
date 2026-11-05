@@ -60,6 +60,8 @@ export {
   type ConnectGithubWizardDeps,
   type ConnectGithubWizardOptions,
   type ConnectGithubWizardService,
+  type ConnectGithubWizardState,
+  type ConnectRepoChoice,
   type ConnectWizardStep,
 } from './sync/connect-github-wizard-service.ts'
 export {
