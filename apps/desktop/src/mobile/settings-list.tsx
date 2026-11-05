@@ -1,8 +1,8 @@
 import type { ReactElement, ReactNode } from 'react'
 import { Check, ChevronRight, ChevronsUpDown, type LucideIcon } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { Switch } from '@/components/ui/switch.tsx'
 import { cn } from '@/lib/utils.ts'
-import { MobileSwitch } from '@/mobile/mobile-switch.tsx'
 
 /**
  * iOS-style inset-grouped list primitives for the mobile settings screens:
@@ -123,7 +123,7 @@ export function SettingsSwitchRow({
   return (
     <label className={ROW_CLASS}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <MobileSwitch
+      <Switch
         aria-describedby={descriptionId}
         checked={checked}
         onCheckedChange={onCheckedChange}
