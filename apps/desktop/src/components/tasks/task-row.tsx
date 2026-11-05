@@ -14,6 +14,11 @@ import { TaskEditor, type TaskNavigate } from './task-editor.tsx'
 import { TaskText } from './task-text.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 
+/**
+ * Height (px) of a single-line row: one 24px line, `py-2`, and the bottom border.
+ */
+export const TASK_ROW_HEIGHT = 41
+
 interface TaskRowProps {
   task: OpenTask
   /**
@@ -142,7 +147,7 @@ export function TaskRow({
     event.preventDefault()
     onSelect({ metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey })
   }
-  const selectFromRow = (event: MouseEvent<HTMLLIElement>): void => {
+  const selectFromRow = (event: MouseEvent<HTMLDivElement>): void => {
     if (editing) {
       return
     }
@@ -155,7 +160,7 @@ export function TaskRow({
   }
 
   return (
-    <li
+    <div
       data-task-key={getTaskKey(task)}
       onClick={selectFromRow}
       className={cn(
@@ -236,6 +241,6 @@ export function TaskRow({
           {noteLabel({ path: task.notePath, title: task.noteTitle })}
         </button>
       ) : null}
-    </li>
+    </div>
   )
 }

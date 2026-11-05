@@ -14,13 +14,15 @@ import {
   isSameTask,
   type InsertTaskTarget,
   type OpenTask,
-  type TaskGroup,
 } from '@reflect/core'
+import type { VirtualizerHandle } from 'virtua'
 import { Button } from '@/components/ui/button.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useNoteLinkNavigation, type ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed.ts'
-import { scrollTaskIntoView } from '@/lib/tasks/task-navigation.ts'
+import { flattenTaskGroups, type TaskListItem } from '@/lib/tasks/task-list-items.ts'
+import { TaskListVirtualizer } from '@/lib/tasks/task-list-virtualizer.tsx'
+import { scrollTaskIndexIntoView } from '@/lib/tasks/task-navigation.ts'
 import { useTaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers.ts'
 import { useTaskFilters } from '@/lib/tasks/task-filters.ts'
@@ -33,7 +35,9 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { routeForPath } from '@reflect/app'
 import { TaskFiltersMenu } from './task-filters-menu.tsx'
-import { TaskGroupSection } from './task-group-section.tsx'
+import { TaskBreadcrumbs } from './task-breadcrumbs.tsx'
+import { TASK_GROUP_HEADER_HEIGHT, TaskGroupHeader } from './task-group-header.tsx'
+import { TASK_ROW_HEIGHT, TaskRow } from './task-row.tsx'
 import { TaskScheduleCalendar } from './task-schedule-calendar.tsx'
 import { TaskToolbarCountBadge } from './task-toolbar-count-badge.tsx'
 import { isModEvent } from '@meowdown/core'
@@ -110,6 +114,11 @@ export function TasksScreen(): ReactElement {
     () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
     [open, completed, recentlyCompleted, filters, needle, today],
   )
+  const { items, headerIndexes, indexByTaskKey } = useMemo(
+    () => flattenTaskGroups(groups),
+    [groups],
+  )
+  const resetKey = useMemo(() => JSON.stringify([needle, filters]), [needle, filters])
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
@@ -126,9 +135,17 @@ export function TasksScreen(): ReactElement {
     setScheduleOpen(false)
   }
   const actions = useTaskActions()
+  const virtualizerRef = useRef<VirtualizerHandle>(null)
+  // Read by `scrollToKey`, which stays stable across renders.
+  const indexByTaskKeyRef = useRef(indexByTaskKey)
+  useLayoutEffect(() => {
+    indexByTaskKeyRef.current = indexByTaskKey
+  }, [indexByTaskKey])
   const scrollToKey = useCallback((key: string | null) => {
-    if (key !== null) {
-      scrollTaskIntoView(rootRef.current, key)
+    const handle = virtualizerRef.current
+    const index = key === null ? undefined : indexByTaskKeyRef.current.get(key)
+    if (handle !== null && index !== undefined) {
+      scrollTaskIndexIntoView(handle, index, TASK_GROUP_HEADER_HEIGHT)
     }
   }, [])
   const editHandlers = useTaskRowHandlers({ selection, actions, orderedTasks, scrollToKey })
@@ -211,6 +228,72 @@ export function TasksScreen(): ReactElement {
     },
     [navigateNoteLink],
   )
+  // The row being edited stays mounted while scrolled away: unmounting would
+  // flush its draft, and remounting would focus it and pull the scroll back.
+  const editingKey =
+    selection.selectedCount === 1 ? selection.selected.values().next().value : undefined
+  const editingIndex = editingKey === undefined ? undefined : indexByTaskKey.get(editingKey)
+  const keepMounted = useMemo(
+    () => (editingIndex === undefined ? undefined : [editingIndex]),
+    [editingIndex],
+  )
+
+  const renderItem = useCallback(
+    (item: TaskListItem): ReactElement => {
+      switch (item.kind) {
+        case 'header':
+          return (
+            <TaskGroupHeader
+              key={item.key}
+              group={item.group}
+              today={today}
+              onAdd={onAdd}
+              onOpen={openNote}
+            />
+          )
+        case 'breadcrumbs':
+          return (
+            <TaskBreadcrumbs
+              key={item.key}
+              breadcrumbs={item.labels}
+              onSelect={() => selection.select(item.taskKeys)}
+            />
+          )
+        case 'task': {
+          const { task } = item
+          const key = getTaskKey(task)
+          const selected = selection.isSelected(key)
+          const row = (
+            <TaskRow
+              key={item.key}
+              task={task}
+              showSource={item.showSource}
+              selected={selected}
+              editing={selection.isSoleSelected(key)}
+              taskActionPending={actions.isPending}
+              togglesSelection={selected && selection.selectedCount > 1}
+              onSelect={(event) => selection.clickSelect(key, event)}
+              onCheckboxToggle={() => actions.checkboxToggle(task)}
+              onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
+              {...editHandlers(task)}
+              convertControllerRef={convertControllerRef}
+              onOpen={openNote}
+            />
+          )
+          // The space between groups.
+          return item.groupEnd ? (
+            <div key={item.key} className="pb-6">
+              {row}
+            </div>
+          ) : (
+            row
+          )
+        }
+      }
+    },
+    [today, onAdd, openNote, selection, actions, onSelectionCheckboxToggle, editHandlers],
+  )
+
   useTaskKeyboard({
     selection,
     actions,
@@ -307,7 +390,12 @@ export function TasksScreen(): ReactElement {
           onOpenChange={setFiltersOpen}
         />
       </header>
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
+      <div
+        ref={scrollRef}
+        data-testid="tasks-scroll"
+        onScroll={onScroll}
+        className="min-h-0 flex-1 overflow-auto pb-8"
+      >
         {isError ? (
           <p role="alert" className="px-4 py-6 text-sm text-text-muted lg:px-12">
             Couldn’t load tasks.
@@ -317,23 +405,17 @@ export function TasksScreen(): ReactElement {
             {needle ? 'No matching tasks.' : 'No tasks to show.'}
           </p>
         ) : (
-          <div className="flex flex-col gap-5">
-            {groups.map((group: TaskGroup) => (
-              <TaskGroupSection
-                key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
-                group={group}
-                selection={selection}
-                editHandlers={editHandlers}
-                taskActionPending={actions.isPending}
-                onCheckboxToggle={actions.checkboxToggle}
-                onSelectionCheckboxToggle={onSelectionCheckboxToggle}
-                today={today}
-                onAdd={onAdd}
-                convertControllerRef={convertControllerRef}
-                onOpen={openNote}
-              />
-            ))}
-          </div>
+          <TaskListVirtualizer
+            ref={virtualizerRef}
+            items={items}
+            headerIndexes={headerIndexes}
+            resetKey={resetKey}
+            itemSize={TASK_ROW_HEIGHT}
+            bufferSize={600}
+            keepMounted={keepMounted}
+          >
+            {renderItem}
+          </TaskListVirtualizer>
         )}
       </div>
     </div>

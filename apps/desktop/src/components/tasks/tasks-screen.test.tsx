@@ -14,6 +14,7 @@ import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { scrollElement } from '@/test-utils/scroll.ts'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TasksScreen } from './tasks-screen.tsx'
 import { deepLinkForRoute } from '@reflect/app'
@@ -215,6 +216,22 @@ function renderScreen() {
 }
 
 const waitFor = vi.waitFor
+
+/**
+ * 300 open tasks, 20 in each of 15 notes; `Note 0` sorts first.
+ */
+function manyTasks(): OpenTask[] {
+  return Array.from({ length: 300 }, (_, i) => {
+    const note = Math.floor(i / 20)
+    return task({
+      text: `task ${i}`,
+      notePath: `notes/${note}.md`,
+      noteTitle: `Note ${note}`,
+      astPath: [i % 20],
+      updatedAt: 300 - note,
+    })
+  })
+}
 
 let storage: TestCoreServices['storage']
 
@@ -609,6 +626,49 @@ describe('TasksScreen', () => {
       expect(rect.top).toBeGreaterThanOrEqual(0)
       expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight)
     })
+    await view.unmount()
+  })
+
+  it('mounts only nearby rows and arrows to an unmounted row below the stuck header', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks())
+    const view = await renderScreen()
+    // The screen fills its container, which has no height of its own here.
+    view.container.style.height = '600px'
+    const scroller = view.getByTestId('tasks-scroll').element() as HTMLElement
+    await expect.poll(() => scroller.querySelectorAll('[data-task-key]').length).toBeLessThan(60)
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    for (let i = 0; i < 30; i++) {
+      await userEvent.keyboard('{ArrowDown}')
+    }
+
+    expect(view.getByTestId('task-editor').element().textContent).toContain('task 30')
+    await expect
+      .poll(() => {
+        const row = scroller.querySelector('[data-task-key="notes/1.md:[10]"]')
+        if (row === null) {
+          return false
+        }
+        const rect = row.getBoundingClientRect()
+        const frame = scroller.getBoundingClientRect()
+        return rect.top >= frame.top + 32 && rect.bottom <= frame.bottom
+      })
+      .toBe(true)
+    await view.unmount()
+  })
+
+  it('keeps the edited row mounted while it is scrolled away', async () => {
+    getOpenTasks.mockResolvedValue(manyTasks())
+    const view = await renderScreen()
+    view.container.style.height = '600px'
+    const scroller = view.getByTestId('tasks-scroll').element() as HTMLElement
+
+    await userEvent.click(await view.findByRole('button', { name: 'task 0' }))
+    const editor = view.getByTestId('task-editor').element()
+    await scrollElement({ element: scroller, top: scroller.scrollHeight })
+    await expect.poll(() => scroller.querySelector('[data-task-key="notes/1.md:[0]"]')).toBeNull()
+
+    expect(editor.isConnected).toBe(true)
     await view.unmount()
   })
 
