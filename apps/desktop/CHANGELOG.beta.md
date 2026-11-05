@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.18.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.8...v0.18.0-beta.9) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** keep the day carousel on its day when the editor focuses ([#2013](https://github.com/team-reflect/reflect-open/issues/2013)) ([7ed3e8c](https://github.com/team-reflect/reflect-open/commit/7ed3e8cdc39b86085798190adf2b0d7d341493df))
+* **mobile:** pass the native Sentry DSN ([#2010](https://github.com/team-reflect/reflect-open/issues/2010)) ([09ddd10](https://github.com/team-reflect/reflect-open/commit/09ddd108abb920d2a61c979fb5932ce65dfbd032))
+* **mobile:** sign the beta iOS app with its own entitlements ([#2011](https://github.com/team-reflect/reflect-open/issues/2011)) ([3985858](https://github.com/team-reflect/reflect-open/commit/39858585b748ef73edaba83d4505c14242802759))
+* **mobile:** upload the IPA to TestFlight before the dSYMs ([#2015](https://github.com/team-reflect/reflect-open/issues/2015)) ([3c3b13b](https://github.com/team-reflect/reflect-open/commit/3c3b13bab75561b2b2c805b5ef2ad63f9f1cdc75))
+
 ## [0.18.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.7...v0.18.0-beta.8) (2026-11-05)
 
 
