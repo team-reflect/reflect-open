@@ -147,7 +147,7 @@ export function RouterProvider({
   )
   const savedScroll = useCallback(() => navigation.savedScroll(position), [navigation, position])
 
-  const actions = useMemo<RouterActions>(
+  const routerActions = useMemo<RouterActions>(
     () => ({ navigate, back, forward }),
     [navigate, back, forward],
   )
@@ -169,7 +169,7 @@ export function RouterProvider({
   )
 
   return (
-    <RouterActionsContext value={actions}>
+    <RouterActionsContext value={routerActions}>
       <RouterStateContext value={routerState}>{children}</RouterStateContext>
     </RouterActionsContext>
   )
