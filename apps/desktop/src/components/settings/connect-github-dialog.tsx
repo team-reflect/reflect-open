@@ -51,7 +51,7 @@ function ConnectGithubDialogContent({
 }: ConnectGithubDialogProps & {
   connector: ConnectGithubWizardDeps['connector']
 }): ReactElement {
-  const wizard = useConnectGithubWizard({
+  const { state, wizard } = useConnectGithubWizard({
     connector,
     suggestedRepoName,
     onConnected: onClose,
@@ -70,25 +70,25 @@ function ConnectGithubDialogContent({
       <DialogContent showCloseButton={false} className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Connect GitHub</DialogTitle>
-          <DialogDescription>{STEP_DESCRIPTIONS[wizard.step]}</DialogDescription>
+          <DialogDescription>{STEP_DESCRIPTIONS[state.step]}</DialogDescription>
         </DialogHeader>
 
-        {wizard.step === 'repo' ? (
+        {state.step === 'repo' ? (
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm text-text">
                 <input
                   type="radio"
                   name="repo-mode"
-                  checked={wizard.mode === 'create'}
+                  checked={state.mode === 'create'}
                   onChange={() => wizard.setMode('create')}
                 />
                 Create a new private repository
               </label>
-              {wizard.mode === 'create' ? (
+              {state.mode === 'create' ? (
                 <Input
                   autoFocus
-                  value={wizard.repoName}
+                  value={state.repoName}
                   onChange={(event) => wizard.setRepoName(event.target.value)}
                   className="ml-6 w-auto"
                   aria-label="New repository name"
@@ -98,15 +98,15 @@ function ConnectGithubDialogContent({
                 <input
                   type="radio"
                   name="repo-mode"
-                  checked={wizard.mode === 'existing'}
+                  checked={state.mode === 'existing'}
                   onChange={() => wizard.setMode('existing')}
                 />
                 Use an existing repository
               </label>
-              {wizard.mode === 'existing' ? (
+              {state.mode === 'existing' ? (
                 <Input
                   autoFocus
-                  value={wizard.existingRepo}
+                  value={state.existingRepo}
                   onChange={(event) => wizard.setExistingRepo(event.target.value)}
                   placeholder="owner/name"
                   className="ml-6 w-auto"
@@ -120,17 +120,19 @@ function ConnectGithubDialogContent({
           </div>
         ) : null}
 
-        {wizard.step === 'auth' ? (
+        {state.step === 'auth' ? (
           <GithubAuthStep
             onAuthed={wizard.onAuthed}
-            repoName={wizard.mode === 'create' ? wizard.repoName.trim() : undefined}
+            repoName={state.choice.kind === 'create' ? state.choice.name : undefined}
           />
         ) : null}
 
-        {wizard.step === 'finish' ? <ConnectGithubFinishStep wizard={wizard} layout="row" /> : null}
+        {state.step === 'finish' ? (
+          <ConnectGithubFinishStep state={state} wizard={wizard} layout="row" />
+        ) : null}
 
-        {wizard.step !== 'finish' && wizard.error !== null ? (
-          <InlineAlert tone="error">{wizard.error}</InlineAlert>
+        {state.step === 'repo' && state.error !== null ? (
+          <InlineAlert tone="error">{state.error}</InlineAlert>
         ) : null}
       </DialogContent>
     </Dialog>

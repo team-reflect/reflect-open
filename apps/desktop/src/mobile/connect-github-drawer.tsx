@@ -72,7 +72,7 @@ function ConnectWizardSheet({
 }): ReactElement {
   // Never derived from the graph name: the local graph's display name is the
   // sandbox folder's basename — literally "Documents".
-  const wizard = useConnectGithubWizard({
+  const { state, wizard } = useConnectGithubWizard({
     connector,
     suggestedRepoName: 'reflect-backup',
     onConnected: onClose,
@@ -85,28 +85,28 @@ function ConnectWizardSheet({
     <>
       <DrawerTitle>Connect GitHub</DrawerTitle>
       <DrawerBody>
-        <p className="text-xs text-text-muted">{STEP_DESCRIPTIONS[wizard.step]}</p>
+        <p className="text-xs text-text-muted">{STEP_DESCRIPTIONS[state.step]}</p>
 
-        {wizard.step === 'repo' ? (
+        {state.step === 'repo' ? (
           <>
             <div className="flex flex-col gap-2">
               <label className="flex min-h-11 items-center gap-3 text-[15px] text-text">
                 <input
                   type="radio"
                   name="repo-mode"
-                  checked={wizard.mode === 'create'}
+                  checked={state.mode === 'create'}
                   onChange={() => wizard.setMode('create')}
                 />
                 Create a new private repository
               </label>
-              {wizard.mode === 'create' ? (
+              {state.mode === 'create' ? (
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor={createNameId} className={FIELD_LABEL_CLASS}>
                     Repository name
                   </label>
                   <Input
                     id={createNameId}
-                    value={wizard.repoName}
+                    value={state.repoName}
                     enterKeyHint="go"
                     onChange={(event) => wizard.setRepoName(event.target.value)}
                     onKeyDown={(event) => {
@@ -124,19 +124,19 @@ function ConnectWizardSheet({
                 <input
                   type="radio"
                   name="repo-mode"
-                  checked={wizard.mode === 'existing'}
+                  checked={state.mode === 'existing'}
                   onChange={() => wizard.setMode('existing')}
                 />
                 Use an existing repository
               </label>
-              {wizard.mode === 'existing' ? (
+              {state.mode === 'existing' ? (
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor={existingRepoId} className={FIELD_LABEL_CLASS}>
                     Repository
                   </label>
                   <Input
                     id={existingRepoId}
-                    value={wizard.existingRepo}
+                    value={state.existingRepo}
                     placeholder="owner/name"
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -158,19 +158,19 @@ function ConnectWizardSheet({
           </>
         ) : null}
 
-        {wizard.step === 'auth' ? (
+        {state.step === 'auth' ? (
           <GithubAuthStep
             onAuthed={wizard.onAuthed}
-            repoName={wizard.mode === 'create' ? wizard.repoName.trim() : undefined}
+            repoName={state.choice.kind === 'create' ? state.choice.name : undefined}
           />
         ) : null}
 
-        {wizard.step === 'finish' ? (
-          <ConnectGithubFinishStep wizard={wizard} layout="stack" />
+        {state.step === 'finish' ? (
+          <ConnectGithubFinishStep state={state} wizard={wizard} layout="stack" />
         ) : null}
 
-        {wizard.step !== 'finish' && wizard.error !== null ? (
-          <InlineAlert tone="error">{wizard.error}</InlineAlert>
+        {state.step === 'repo' && state.error !== null ? (
+          <InlineAlert tone="error">{state.error}</InlineAlert>
         ) : null}
       </DrawerBody>
     </>

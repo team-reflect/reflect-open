@@ -70,9 +70,9 @@ describe('pollUntil', () => {
 
   it('never overlaps checks: the next wait starts when the check settles', async () => {
     const gate = Promise.withResolvers<string>()
-    const check = vi.fn(() =>
-      check.mock.calls.length === 1 ? gate.promise : Promise.resolve('done'),
-    )
+    const check = vi.fn(() => {
+      return check.mock.calls.length === 1 ? gate.promise : Promise.resolve('done')
+    })
     const promise = pollUntil(check, (value) => value === 'done', {
       intervalMs: POLL_MS,
       clock,

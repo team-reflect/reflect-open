@@ -89,6 +89,15 @@ async function signIn(wizard: ConnectGithubWizardService): Promise<void> {
   await flush()
 }
 
+/**
+ * Sign in with a new repo that the token cannot create, parking on the create guide.
+ */
+async function parkOnCreateGuide(wizard: ConnectGithubWizardService): Promise<void> {
+  connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
+  await signIn(wizard)
+  expect(wizard.get()).toMatchObject({ step: 'finish', view: { kind: 'createGuide' } })
+}
+
 describe('createConnectGithubWizardService', () => {
   it('starts on the repo step with the suggested name', () => {
     const wizard = createWizard()
@@ -97,10 +106,6 @@ describe('createConnectGithubWizardService', () => {
       mode: 'create',
       repoName: 'g-backup',
       existingRepo: '',
-      user: null,
-      authKind: null,
-      finishView: { kind: 'idle' },
-      pending: false,
       error: null,
     })
   })
@@ -121,7 +126,10 @@ describe('createConnectGithubWizardService', () => {
 
     wizard.setExistingRepo('alex/notes')
     wizard.continueFromRepo()
-    expect(wizard.get()).toMatchObject({ step: 'auth', error: null })
+    expect(wizard.get()).toEqual({
+      step: 'auth',
+      choice: { kind: 'existing', ref: { owner: 'alex', name: 'notes' } },
+    })
   })
 
   it('notifies subscribers on every change until they unsubscribe', () => {
@@ -153,13 +161,7 @@ describe('createConnectGithubWizardService', () => {
         allowPublic: false,
       },
     ])
-    expect(wizard.get()).toMatchObject({
-      step: 'connected',
-      user: ALEX,
-      authKind: 'pat',
-      pending: false,
-      error: null,
-    })
+    expect(wizard.get()).toEqual({ step: 'connected' })
   })
 
   it('shows connecting while the connect is in flight', async () => {
@@ -168,10 +170,15 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     await signIn(wizard)
 
-    expect(wizard.get()).toMatchObject({ pending: true, finishView: { kind: 'connecting' } })
+    expect(wizard.get()).toEqual({
+      step: 'finish',
+      user: ALEX,
+      view: { kind: 'connecting' },
+      openError: null,
+    })
     gate.resolve('connected')
     await flush()
-    expect(wizard.get()).toMatchObject({ pending: false, finishView: { kind: 'idle' } })
+    expect(wizard.get().step).toBe('connected')
   })
 
   it('API-creates a new repo that does not exist yet', async () => {
@@ -185,15 +192,11 @@ describe('createConnectGithubWizardService', () => {
 
   it('hands off to github.com/new and connects by polling — no button to click', async () => {
     scriptExisting('notFound', 'notFound', 'connected')
-    connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
-    const detach = wizard.attach()
-    await signIn(wizard)
+    await parkOnCreateGuide(wizard)
 
-    expect(wizard.get().finishView).toEqual({
-      kind: 'createGuide',
-      owner: 'alex',
-      name: 'g-backup',
+    expect(wizard.get()).toMatchObject({
+      view: { kind: 'createGuide', repo: { owner: 'alex', name: 'g-backup' }, authKind: 'pat' },
     })
     expect(existingCalls()).toHaveLength(1)
 
@@ -208,15 +211,17 @@ describe('createConnectGithubWizardService', () => {
     expect(existingCalls()).toHaveLength(3)
     expect(wizard.get().step).toBe('connected')
 
-    // Connected: the loop ended for good.
+    // Connected: the poll ended for good.
     await advance(POLL_MS * 3)
     expect(existingCalls()).toHaveLength(3)
-    detach()
+    expect(clock.pendingTimers()).toBe(0)
   })
 
-  it('opens the prefilled github.com/new page for the chosen name', async () => {
+  it('opens the prefilled github.com/new page and the install page', async () => {
+    scriptExisting('notFound')
     const wizard = createWizard()
     wizard.setRepoName(' my notes ')
+    await parkOnCreateGuide(wizard)
     wizard.openCreatePage()
     wizard.openInstallPage()
     await flush()
@@ -224,56 +229,58 @@ describe('createConnectGithubWizardService', () => {
     expect(opener.openedUrls()).toHaveLength(2)
     expect(opener.openedUrls()[0]).toContain('github.com/new')
     expect(opener.openedUrls()[0]).toContain('my')
-    expect(wizard.get().error).toBeNull()
+    expect(wizard.get()).toMatchObject({ openError: null })
+    wizard.backToRepo()
   })
 
   it('surfaces the URL to visit by hand when the browser cannot open', async () => {
+    scriptExisting('notFound')
     opener.failWith(new AppError('io', 'no handler'))
     const wizard = createWizard()
+    await parkOnCreateGuide(wizard)
     wizard.openInstallPage()
     await flush()
 
-    expect(wizard.get().error).toMatch(
+    const state = wizard.get()
+    expect(state).toMatchObject({ view: { kind: 'createGuide' } })
+    expect(state.step === 'finish' ? state.openError : null).toMatch(
       /^Couldn’t open the browser — visit https:\/\/.* yourself\.$/,
     )
+    wizard.backToRepo()
   })
 
   it('an app sign-in that cannot see the repo lands on grant access and polls', async () => {
     scriptExisting('notFound', 'connected')
     const wizard = createWizard(APP)
-    const detach = wizard.attach()
     wizard.setMode('existing')
     wizard.setExistingRepo('team/notes')
     await signIn(wizard)
 
     expect(wizard.get()).toMatchObject({
-      authKind: 'app',
-      error: null,
-      finishView: { kind: 'grantAccess', repo: { owner: 'team', name: 'notes' } },
+      view: { kind: 'grantAccess', repo: { owner: 'team', name: 'notes' } },
     })
     expect(connector.calls().some((call) => call.method === 'connectNewRepo')).toBe(false)
 
     await advance(POLL_MS)
     expect(wizard.get().step).toBe('connected')
-    detach()
   })
 
   it('a PAT sign-in that cannot see the repo gets token-scope guidance, no poll', async () => {
     scriptExisting('notFound')
     const wizard = createWizard(PAT)
-    const detach = wizard.attach()
     wizard.setMode('existing')
     wizard.setExistingRepo('team/notes')
     await signIn(wizard)
 
     expect(wizard.get()).toMatchObject({
-      finishView: { kind: 'idle' },
-      error: 'Repository not found. Check the name and your token’s repository access.',
+      view: {
+        kind: 'failed',
+        error: 'Repository not found. Check the name and your token’s repository access.',
+      },
     })
     await advance(POLL_MS * 2)
     expect(existingCalls()).toHaveLength(1)
     expect(clock.pendingTimers()).toBe(0)
-    detach()
   })
 
   it('demands explicit consent before connecting a public repo', async () => {
@@ -281,13 +288,12 @@ describe('createConnectGithubWizardService', () => {
     const wizard = createWizard()
     await signIn(wizard)
 
-    expect(wizard.get().finishView).toEqual({
-      kind: 'publicConfirm',
-      repo: { owner: 'alex', name: 'g-backup' },
+    expect(wizard.get()).toMatchObject({
+      view: { kind: 'publicConfirm', repo: { owner: 'alex', name: 'g-backup' } },
     })
-    expect(wizard.get().step).toBe('finish')
 
     wizard.confirmPublic()
+    expect(wizard.get()).toMatchObject({ view: { kind: 'connecting' } })
     await flush()
     expect(connector.calls().at(-1)).toEqual({
       method: 'connectExistingRepo',
@@ -299,37 +305,34 @@ describe('createConnectGithubWizardService', () => {
 
   it('a poll that finds a public repo stops for consent', async () => {
     scriptExisting('notFound', 'needsPublicConfirm')
-    connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
-    const detach = wizard.attach()
-    await signIn(wizard)
+    await parkOnCreateGuide(wizard)
 
     await advance(POLL_MS)
-    // The consent question outranks the create guide, and the poll is over.
-    expect(wizard.get().finishView).toMatchObject({ kind: 'publicConfirm' })
+    expect(wizard.get()).toMatchObject({ view: { kind: 'publicConfirm' } })
     await advance(POLL_MS * 3)
     expect(existingCalls()).toHaveLength(2)
     expect(clock.pendingTimers()).toBe(0)
-    detach()
+    wizard.backToRepo()
   })
 
-  it('back to the repo step clears every parked handoff', async () => {
+  it('back to the repo step stops the poll and keeps the input', async () => {
     scriptExisting('notFound')
-    connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
     const wizard = createWizard()
-    const detach = wizard.attach()
-    await signIn(wizard)
-    expect(wizard.get().finishView).toMatchObject({ kind: 'createGuide' })
+    wizard.setRepoName('my-notes')
+    await parkOnCreateGuide(wizard)
 
     wizard.backToRepo()
-    expect(wizard.get()).toMatchObject({
+    expect(wizard.get()).toEqual({
       step: 'repo',
+      mode: 'create',
+      repoName: 'my-notes',
+      existingRepo: '',
       error: null,
-      finishView: { kind: 'idle' },
     })
     await advance(POLL_MS * 2)
     expect(existingCalls()).toHaveLength(1)
-    detach()
+    expect(clock.pendingTimers()).toBe(0)
   })
 
   it('captures a failed connect as a display message', async () => {
@@ -340,105 +343,57 @@ describe('createConnectGithubWizardService', () => {
     await signIn(wizard)
 
     expect(wizard.get()).toMatchObject({
-      pending: false,
-      error: 'Connect GitHub first (no credential stored)',
-      finishView: { kind: 'idle' },
+      step: 'finish',
+      view: { kind: 'failed', error: 'Connect GitHub first (no credential stored)' },
     })
-    expect(wizard.get().step).toBe('finish')
   })
 
-  describe('the repo-existence poll', () => {
-    async function parkOnCreateGuide(): Promise<ConnectGithubWizardService> {
-      scriptExisting('notFound')
-      connector.onConnectNewRepo(() => Promise.resolve('manualCreateNeeded'))
+  describe('a stale result never changes the wizard', () => {
+    it('back to the repo step while the consented connect is in flight', async () => {
+      scriptExisting('needsPublicConfirm')
       const wizard = createWizard()
       await signIn(wizard)
-      expect(wizard.get().finishView).toMatchObject({ kind: 'createGuide' })
-      return wizard
-    }
-
-    it('runs only while the wizard is attached', async () => {
-      const wizard = await parkOnCreateGuide()
-      await advance(POLL_MS * 2)
-      expect(existingCalls()).toHaveLength(1)
-
-      const detach = wizard.attach()
-      await advance(POLL_MS)
-      expect(existingCalls()).toHaveLength(2)
-
-      detach()
-      await advance(POLL_MS * 2)
-      expect(existingCalls()).toHaveLength(2)
-      expect(clock.pendingTimers()).toBe(0)
-    })
-
-    it('never overlaps ticks: the next wait starts when the tick settles', async () => {
-      const wizard = await parkOnCreateGuide()
       const gate = Promise.withResolvers<ConnectExistingResult>()
       connector.onConnectExistingRepo(() => gate.promise)
-      const detach = wizard.attach()
 
-      await advance(POLL_MS)
-      expect(existingCalls()).toHaveLength(2)
-      await advance(POLL_MS * 3)
-      expect(existingCalls()).toHaveLength(2)
-
-      gate.resolve('notFound')
+      wizard.confirmPublic()
+      wizard.backToRepo()
+      gate.resolve('connected')
       await flush()
-      await advance(POLL_MS)
-      expect(existingCalls()).toHaveLength(3)
-      detach()
+      expect(wizard.get().step).toBe('repo')
     })
 
-    it('a failing tick keeps the loop alive', async () => {
-      const wizard = await parkOnCreateGuide()
-      connector.onConnectExistingRepo(() => Promise.reject(new AppError('network', 'offline')))
-      const detach = wizard.attach()
-
+    it('back to the repo step while a poll check is in flight', async () => {
+      scriptExisting('notFound')
+      const wizard = createWizard()
+      await parkOnCreateGuide(wizard)
+      const gate = Promise.withResolvers<ConnectExistingResult>()
+      connector.onConnectExistingRepo(() => gate.promise)
       await advance(POLL_MS)
-      await advance(POLL_MS)
-      expect(existingCalls()).toHaveLength(3)
-      // A poll failure is silent: the handoff stays on screen.
-      expect(wizard.get()).toMatchObject({ error: null, finishView: { kind: 'createGuide' } })
-      detach()
-    })
-
-    it('pauses while hidden and resumes with an immediate tick on return', async () => {
-      const wizard = await parkOnCreateGuide()
-      const detach = wizard.attach()
-
-      lifecycle.emitHidden()
-      await advance(POLL_MS * 3)
-      expect(existingCalls()).toHaveLength(1)
-
-      lifecycle.emitVisible()
       expect(existingCalls()).toHaveLength(2)
-      detach()
-    })
 
-    it('does not start a wait while hidden', async () => {
-      lifecycle.setHidden(true)
-      const wizard = await parkOnCreateGuide()
-      const detach = wizard.attach()
-      expect(clock.pendingTimers()).toBe(0)
+      wizard.backToRepo()
+      gate.resolve('needsPublicConfirm')
+      await flush()
+      expect(wizard.get().step).toBe('repo')
 
-      lifecycle.emitVisible()
-      expect(existingCalls()).toHaveLength(2)
-      detach()
-    })
-
-    it("a tick's stop ends the loop for good, across hide and show", async () => {
-      const wizard = await parkOnCreateGuide()
+      // A new attempt starts clean.
       scriptExisting('connected')
-      const detach = wizard.attach()
-      await advance(POLL_MS)
-      expect(existingCalls()).toHaveLength(2)
+      await signIn(wizard)
+      expect(wizard.get().step).toBe('connected')
+    })
 
-      lifecycle.emitHidden()
-      lifecycle.emitVisible()
-      await advance(POLL_MS * 2)
-      expect(existingCalls()).toHaveLength(2)
+    it('detach while a check is in flight', async () => {
+      const gate = Promise.withResolvers<ConnectExistingResult>()
+      connector.onConnectExistingRepo(() => gate.promise)
+      const wizard = createWizard()
+      const detach = wizard.attach()
+      await signIn(wizard)
+
       detach()
+      gate.resolve('connected')
+      await flush()
+      expect(wizard.get()).toMatchObject({ step: 'finish', view: { kind: 'connecting' } })
     })
   })
 })
