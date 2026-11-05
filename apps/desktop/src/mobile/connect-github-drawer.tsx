@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
-import type { ConnectWizardStep } from '@reflect/app'
+import { useMaybeGraphServices } from '@/services/services-provider.tsx'
+import type { ConnectGithubWizardDeps, ConnectWizardStep } from '@reflect/app'
 
 interface ConnectGithubDrawerProps {
   open: boolean
@@ -20,6 +21,7 @@ const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
   repo: 'Sync this graph with Reflect on your other devices through a private GitHub repository.',
   auth: 'Sign in so Reflect can sync with it.',
   finish: 'Connecting your repository…',
+  connected: 'Connected.',
 }
 
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
@@ -41,11 +43,17 @@ export function ConnectGithubDrawer({
   onOpenChange,
   pollIntervalMs,
 }: ConnectGithubDrawerProps): ReactElement {
+  // Connect is offered only while the graph runs git sync, which has a connector.
+  const connector = useMaybeGraphServices()?.githubConnector ?? null
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Connect GitHub">
-        {open ? (
-          <ConnectWizardSheet onClose={() => onOpenChange(false)} pollIntervalMs={pollIntervalMs} />
+        {open && connector !== null ? (
+          <ConnectWizardSheet
+            connector={connector}
+            onClose={() => onOpenChange(false)}
+            pollIntervalMs={pollIntervalMs}
+          />
         ) : null}
       </DrawerContent>
     </Drawer>
@@ -54,17 +62,20 @@ export function ConnectGithubDrawer({
 
 /** The sheet body — separate so each open starts a fresh wizard. */
 function ConnectWizardSheet({
+  connector,
   onClose,
   pollIntervalMs,
 }: {
+  connector: ConnectGithubWizardDeps['connector']
   onClose: () => void
   pollIntervalMs?: number | undefined
 }): ReactElement {
   // Never derived from the graph name: the local graph's display name is the
   // sandbox folder's basename — literally "Documents".
   const wizard = useConnectGithubWizard({
+    connector,
     suggestedRepoName: 'reflect-backup',
-    onClose,
+    onConnected: onClose,
     pollIntervalMs,
   })
   const createNameId = useId()

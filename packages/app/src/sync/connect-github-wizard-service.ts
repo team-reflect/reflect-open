@@ -16,7 +16,7 @@ import {
 import type { AppLifecycleService } from '../app/lifecycle-service.ts'
 import type { OpenerService } from '../app/opener-service.ts'
 
-export type ConnectWizardStep = 'repo' | 'auth' | 'finish'
+export type ConnectWizardStep = 'repo' | 'auth' | 'finish' | 'connected'
 
 /**
  * Which credential the sign-in stored — decides the can't-find-repo remedy.
@@ -44,10 +44,6 @@ export interface ConnectGithubWizardOptions {
    * A suggested name for a newly created backup repo.
    */
   suggestedRepoName: string
-  /**
-   * Called once the repository is connected (the surface dismisses itself).
-   */
-  onClose: () => void
   /**
    * Delay between repo-existence polls on the create/grant handoffs (test hook).
    */
@@ -139,7 +135,7 @@ export interface ConnectGithubWizardService extends Store<ConnectGithubWizardSta
  * The services a {@link ConnectGithubWizardService} runs on.
  */
 export interface ConnectGithubWizardDeps {
-  readonly connect: Pick<GithubConnector, 'connectNewRepo' | 'connectExistingRepo'>
+  readonly connector: Pick<GithubConnector, 'connectNewRepo' | 'connectExistingRepo'>
   readonly githubAuth: GithubAuthService
   readonly opener: OpenerService
   readonly lifecycle: AppLifecycleService
@@ -165,7 +161,6 @@ interface WizardFields {
 
 class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
   readonly #deps: ConnectGithubWizardDeps
-  readonly #options: ConnectGithubWizardOptions
   readonly #pollIntervalMs: number
   #fields: WizardFields
   readonly #state: WritableStore<ConnectGithubWizardState>
@@ -174,7 +169,6 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
 
   constructor(deps: ConnectGithubWizardDeps, options: ConnectGithubWizardOptions) {
     this.#deps = deps
-    this.#options = options
     this.#pollIntervalMs = options.pollIntervalMs ?? 3000
     this.#fields = {
       step: 'repo',
@@ -332,9 +326,9 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
     if (target === null) {
       return 'stop'
     }
-    const result = await this.#deps.connect.connectExistingRepo(target, { allowPublic: false })
+    const result = await this.#deps.connector.connectExistingRepo(target, { allowPublic: false })
     if (result === 'connected') {
-      this.#options.onClose()
+      this.#patch({ step: 'connected' })
       return 'stop'
     }
     if (result === 'needsPublicConfirm') {
@@ -464,7 +458,7 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
     forUser: GithubUser,
     finishOptions: { allowPublic?: boolean; kind?: ConnectAuthKind } = {},
   ): Promise<void> {
-    const { connect } = this.#deps
+    const { connector } = this.#deps
     // The choices this attempt was started with: a change made while it is in
     // flight belongs to the next attempt.
     const kind = finishOptions.kind ?? this.#fields.authKind
@@ -487,11 +481,11 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
         return
       }
       this.#patch({ showCreateGuide: false, showGrantAccess: false })
-      const result = await connect.connectExistingRepo(ref, {
+      const result = await connector.connectExistingRepo(ref, {
         allowPublic: finishOptions.allowPublic ?? false,
       })
       if (result === 'connected') {
-        this.#options.onClose()
+        this.#patch({ step: 'connected' })
         return
       }
       if (result === 'needsPublicConfirm') {
@@ -516,9 +510,9 @@ class ConnectGithubWizardServiceImpl implements ConnectGithubWizardService {
       }
       // A new repo that doesn't exist yet: create it — by API when the token
       // can, by the guided handoff (plus polling) otherwise.
-      const created = await connect.connectNewRepo(ref.name)
+      const created = await connector.connectNewRepo(ref.name)
       if (created === 'connected') {
-        this.#options.onClose()
+        this.#patch({ step: 'connected' })
         return
       }
       this.#patch({ showCreateGuide: true })

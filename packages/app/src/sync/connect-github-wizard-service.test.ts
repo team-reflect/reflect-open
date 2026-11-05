@@ -28,14 +28,12 @@ let clock: TestClockService
 let lifecycle: TestLifecycleService
 let opener: TestOpenerService
 let connector: TestGithubConnector
-let onClose: ReturnType<typeof vi.fn<() => void>>
 
 beforeEach(() => {
   clock = createTestClockService()
   lifecycle = createTestLifecycleService()
   opener = createTestOpenerService()
   connector = createTestGithubConnector()
-  onClose = vi.fn<() => void>()
 })
 
 /**
@@ -57,13 +55,13 @@ function existingCalls(): unknown[] {
 function createWizard(auth: GithubAuth = PAT): ConnectGithubWizardService {
   return createConnectGithubWizardService(
     {
-      connect: connector,
+      connector,
       githubAuth: createTestGithubAuthService({ auth }),
       opener,
       lifecycle,
       clock,
     },
-    { suggestedRepoName: 'g-backup', onClose },
+    { suggestedRepoName: 'g-backup' },
   )
 }
 
@@ -142,7 +140,7 @@ describe('createConnectGithubWizardService', () => {
     expect(listener).toHaveBeenCalledOnce()
   })
 
-  it('connects an existing repo under the signed-in owner and closes', async () => {
+  it('connects an existing repo under the signed-in owner', async () => {
     const wizard = createWizard()
     wizard.setRepoName('  my-notes  ')
     await signIn(wizard)
@@ -155,9 +153,8 @@ describe('createConnectGithubWizardService', () => {
         allowPublic: false,
       },
     ])
-    expect(onClose).toHaveBeenCalledOnce()
     expect(wizard.get()).toMatchObject({
-      step: 'finish',
+      step: 'connected',
       user: ALEX,
       authKind: 'pat',
       pending: false,
@@ -177,13 +174,13 @@ describe('createConnectGithubWizardService', () => {
     expect(wizard.get()).toMatchObject({ pending: false, finishView: { kind: 'idle' } })
   })
 
-  it('API-creates a new repo that does not exist yet and closes', async () => {
+  it('API-creates a new repo that does not exist yet', async () => {
     scriptExisting('notFound')
     const wizard = createWizard()
     await signIn(wizard)
 
     expect(connector.calls().at(-1)).toEqual({ method: 'connectNewRepo', name: 'g-backup' })
-    expect(onClose).toHaveBeenCalledOnce()
+    expect(wizard.get().step).toBe('connected')
   })
 
   it('hands off to github.com/new and connects by polling — no button to click', async () => {
@@ -205,11 +202,11 @@ describe('createConnectGithubWizardService', () => {
     expect(existingCalls()).toHaveLength(1)
     await advance(1)
     expect(existingCalls()).toHaveLength(2)
-    expect(onClose).not.toHaveBeenCalled()
+    expect(wizard.get().step).toBe('finish')
 
     await advance(POLL_MS)
     expect(existingCalls()).toHaveLength(3)
-    expect(onClose).toHaveBeenCalledOnce()
+    expect(wizard.get().step).toBe('connected')
 
     // Connected: the loop ended for good.
     await advance(POLL_MS * 3)
@@ -257,7 +254,7 @@ describe('createConnectGithubWizardService', () => {
     expect(connector.calls().some((call) => call.method === 'connectNewRepo')).toBe(false)
 
     await advance(POLL_MS)
-    expect(onClose).toHaveBeenCalledOnce()
+    expect(wizard.get().step).toBe('connected')
     detach()
   })
 
@@ -288,7 +285,7 @@ describe('createConnectGithubWizardService', () => {
       kind: 'publicConfirm',
       repo: { owner: 'alex', name: 'g-backup' },
     })
-    expect(onClose).not.toHaveBeenCalled()
+    expect(wizard.get().step).toBe('finish')
 
     wizard.confirmPublic()
     await flush()
@@ -297,7 +294,7 @@ describe('createConnectGithubWizardService', () => {
       ref: { owner: 'alex', name: 'g-backup' },
       allowPublic: true,
     })
-    expect(onClose).toHaveBeenCalledOnce()
+    expect(wizard.get().step).toBe('connected')
   })
 
   it('a poll that finds a public repo stops for consent', async () => {
@@ -347,7 +344,7 @@ describe('createConnectGithubWizardService', () => {
       error: 'Connect GitHub first (no credential stored)',
       finishView: { kind: 'idle' },
     })
-    expect(onClose).not.toHaveBeenCalled()
+    expect(wizard.get().step).toBe('finish')
   })
 
   describe('the repo-existence poll', () => {

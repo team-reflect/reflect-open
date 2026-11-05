@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/dialog.tsx'
 import { Input } from '@/components/ui/input.tsx'
 import { useConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
-import type { ConnectWizardStep } from '@reflect/app'
+import { useMaybeGraphServices } from '@/services/services-provider.tsx'
+import type { ConnectGithubWizardDeps, ConnectWizardStep } from '@reflect/app'
 
 interface ConnectGithubDialogProps {
   /** A suggested name for a newly created backup repo (from the graph name). */
@@ -26,6 +27,7 @@ const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
   repo: 'Sync this graph through a private GitHub repository.',
   auth: 'Sign in so Reflect can sync with it.',
   finish: 'Connecting your repository…',
+  connected: 'Connected.',
 }
 
 /**
@@ -35,12 +37,26 @@ const STEP_DESCRIPTIONS: Record<ConnectWizardStep, string> = {
  * consent gate). The mobile drawer renders the same hook; flow changes belong
  * there, not here.
  */
-export function ConnectGithubDialog({
+export function ConnectGithubDialog(props: ConnectGithubDialogProps): ReactElement | null {
+  // Connect is offered only while the graph runs git sync, which has a connector.
+  const connector = useMaybeGraphServices()?.githubConnector ?? null
+  return connector === null ? null : <ConnectGithubDialogContent {...props} connector={connector} />
+}
+
+function ConnectGithubDialogContent({
+  connector,
   suggestedRepoName,
   onClose,
   pollIntervalMs = 3000,
-}: ConnectGithubDialogProps): ReactElement {
-  const wizard = useConnectGithubWizard({ suggestedRepoName, onClose, pollIntervalMs })
+}: ConnectGithubDialogProps & {
+  connector: ConnectGithubWizardDeps['connector']
+}): ReactElement {
+  const wizard = useConnectGithubWizard({
+    connector,
+    suggestedRepoName,
+    onConnected: onClose,
+    pollIntervalMs,
+  })
 
   return (
     <Dialog

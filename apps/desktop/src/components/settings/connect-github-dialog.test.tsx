@@ -120,7 +120,7 @@ describe('ConnectGithubDialog', () => {
   })
 
   it('hands off to github.com/new and connects by polling — no button to click', async () => {
-    sync.connectExistingRepo.mockResolvedValueOnce('notFound').mockResolvedValueOnce('notFound')
+    sync.connectExistingRepo.mockResolvedValue('notFound')
     sync.connectNewRepo.mockResolvedValueOnce('manualCreateNeeded')
     const onClose = await renderWizard()
 
@@ -132,6 +132,7 @@ describe('ConnectGithubDialog', () => {
     expect(openedUrls).toHaveBeenCalledWith(
       expect.stringContaining('https://github.com/new?name=g-backup'),
     )
+    sync.connectExistingRepo.mockResolvedValue('connected')
 
     // Once the repo exists, a poll connects it — the user clicks nothing.
     await vi.waitFor(() => {
@@ -281,9 +282,8 @@ describe('ConnectGithubDialog', () => {
     // access is the expected step (not an error), and the poll connects once it
     // lands — no retry button, no token language.
     storeCredential(appCredential())
-    sync.connectExistingRepo
-      .mockResolvedValueOnce('notFound') // initial lookup: app can't see it yet
-      .mockResolvedValueOnce('notFound') // poll: access still not granted
+    // The app can't see the repo until access is granted.
+    sync.connectExistingRepo.mockResolvedValue('notFound')
     const onClose = await renderWizard()
 
     await page.getByRole('radio', { name: /use an existing repository/i }).click()
@@ -302,6 +302,7 @@ describe('ConnectGithubDialog', () => {
     expect(openedUrls).toHaveBeenCalledWith(
       'https://github.com/apps/reflect-github-app/installations/new',
     )
+    sync.connectExistingRepo.mockResolvedValue('connected')
 
     // Back from the browser with access granted — the poll connects, no click.
     await vi.waitFor(() => {

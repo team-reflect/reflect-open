@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   createConnectGithubWizardService,
   type ConnectAuthKind,
   type ConnectFinishView,
+  type ConnectGithubWizardDeps,
   type ConnectGithubWizardOptions,
   type ConnectWizardStep,
 } from '@reflect/app'
 import type { GithubUser } from '@reflect/core'
 import { useStore } from '@/lib/use-store.ts'
-import { useGitSyncActions } from '@/providers/sync-provider.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export interface ConnectGithubWizard {
@@ -56,52 +56,54 @@ export interface ConnectGithubWizard {
   openInstallPage: () => void
 }
 
+export interface UseConnectGithubWizardOptions extends ConnectGithubWizardOptions {
+  /**
+   * The open graph's GitHub connector. A new connector starts a new wizard.
+   */
+  connector: ConnectGithubWizardDeps['connector']
+  /**
+   * Called once the repository is connected (the surface dismisses itself).
+   */
+  onConnected: () => void
+}
+
 /**
  * The "Connect GitHub" wizard for one mounted surface: a thin React shell
  * over app's `ConnectGithubWizardService`, which owns the whole state
  * machine (repo → sign-in → connect, with the create-handoff/grant-access
  * polls and the public-repo consent gate). Desktop's dialog and mobile's
  * drawer drive the identical flow through it.
- *
- * The connect actions are the ones of {@link useGitSyncActions}.
  */
 export function useConnectGithubWizard({
+  connector,
   suggestedRepoName,
-  onClose,
+  onConnected,
   pollIntervalMs = 3000,
-}: ConnectGithubWizardOptions): ConnectGithubWizard {
-  const sync = useGitSyncActions()
+}: UseConnectGithubWizardOptions): ConnectGithubWizard {
   const { githubAuth, clock } = useCoreServices()
   const { opener, lifecycle } = useAppServices()
-  // The wizard lives as long as the surface; it always calls the latest
-  // actions and `onClose` without being rebuilt every render.
-  const latestRef = useRef({ sync, onClose })
-  useEffect(() => {
-    latestRef.current = { sync, onClose }
-  })
-
-  const [wizard] = useState(() => {
+  const create = () => {
     return createConnectGithubWizardService(
-      {
-        connect: {
-          connectNewRepo: (name) => latestRef.current.sync.connectNewRepo(name),
-          connectExistingRepo: (ref, options) => {
-            return latestRef.current.sync.connectExistingRepo(ref, options)
-          },
-        },
-        githubAuth,
-        opener,
-        lifecycle,
-        clock,
-      },
-      { suggestedRepoName, onClose: () => latestRef.current.onClose(), pollIntervalMs },
+      { connector, githubAuth, opener, lifecycle, clock },
+      { suggestedRepoName, pollIntervalMs },
     )
-  })
+  }
+  const [entry, setEntry] = useState(() => ({ connector, wizard: create() }))
+  if (entry.connector !== connector) {
+    setEntry({ connector, wizard: create() })
+  }
+  const { wizard } = entry
 
   // The repo-existence poll only runs while the surface is mounted.
   useEffect(() => wizard.attach(), [wizard])
 
   const state = useStore(wizard)
+
+  useEffect(() => {
+    if (state.step === 'connected') {
+      onConnected()
+    }
+  }, [state.step, onConnected])
 
   const actions = useMemo(
     () => ({
