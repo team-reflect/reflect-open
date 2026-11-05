@@ -91,15 +91,25 @@ export function SwipeRow({
       return
     }
     const controller = new AbortController()
+    // Ends the over-swipe color once the row rests closed.
+    const deactivateIfClosed = (): void => {
+      if (Math.round(scroller.scrollLeft) === 0) {
+        delete scroller.dataset.active
+      }
+    }
     watchRef.current = watchScrollSettle({
       element: scroller,
-      onSettle: () => reportSettled(scroller),
+      onSettle: () => {
+        deactivateIfClosed()
+        reportSettled(scroller)
+      },
       signal: controller.signal,
     })
     // A finger that lifts without moving the row leaves no settle report, so
     // the placement it held back runs again. These listeners run after the
     // watch's own, so `isTouching` is already up to date.
     const placeHeld = (): void => {
+      deactivateIfClosed()
       if (heldAtRef.current === scroller.scrollLeft) {
         setLifts((count) => count + 1)
       }
@@ -139,6 +149,8 @@ export function SwipeRow({
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>): void => {
       if (event.isPrimary) {
+        // Turns on the over-swipe color behind the actions.
+        event.currentTarget.dataset.active = ''
         onBeginInteraction()
       }
     },
