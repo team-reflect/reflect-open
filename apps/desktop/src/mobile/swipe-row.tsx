@@ -175,7 +175,15 @@ export function SwipeRow({
       style={scrollerStyle}
       className={cn('swipe-row pager-x flex overflow-x-auto', className)}
     >
-      <div className={cn('relative z-10 w-full flex-none snap-start', surfaceClassName)}>
+      <div
+        // `will-change-transform` gives the surface its own compositing layer, so
+        // WebKit keeps it above the sticky actions inside a stacking context
+        // (iOS 26 misorders them under virtua's `contain: layout` items).
+        className={cn(
+          'relative z-10 w-full flex-none snap-start will-change-transform',
+          surfaceClassName,
+        )}
+      >
         {children}
       </div>
       <div
