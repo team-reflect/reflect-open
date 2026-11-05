@@ -1,10 +1,10 @@
 // Builds the iOS app and checks the IPA and its dSYM. `pnpm upload:testflight`
 // uploads the result. See docs/distribution.md.
 //
-//   pnpm build:ios --build-number=<digits> [--flavor=beta|stable]
+//   pnpm build:ios --build-number=<digits> --flavor=beta|stable
 //
 //   --build-number=<digits>   Required
-//   --flavor=beta|stable      Defaults to beta for a prerelease version, else stable
+//   --flavor=beta|stable      Required
 //   --no-sign                 Unsigned archive without credentials. It cannot be installed
 
 import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -68,9 +68,6 @@ const FLAVORS = {
 type FlavorName = keyof typeof FLAVORS
 
 function resolveFlavorName(option: string): FlavorName {
-  if (option === '') {
-    return packageJson.version.includes('-') ? 'beta' : 'stable'
-  }
   if (option === 'beta' || option === 'stable') {
     return option
   }

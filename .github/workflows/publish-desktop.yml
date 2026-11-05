@@ -75,6 +75,7 @@ jobs:
     uses: ./.github/workflows/publish-testflight.yml
     with:
       commit: ${{ inputs.commit }}
+      flavor: stable
     secrets:
       APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
