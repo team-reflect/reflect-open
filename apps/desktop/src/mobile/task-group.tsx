@@ -121,7 +121,14 @@ export function MobileTaskGroup({
       <ul className="flex flex-col">
         {contexts.map((context) => (
           <Fragment key={getTaskKey(context.tasks[0]!)}>
-            <TaskBreadcrumbs breadcrumbs={context.visibleBreadcrumbs} className="px-4 pb-1 pt-3" />
+            {context.visibleBreadcrumbs.length > 0 ? (
+              <li>
+                <TaskBreadcrumbs
+                  breadcrumbs={context.visibleBreadcrumbs}
+                  className="px-4 pb-1 pt-3"
+                />
+              </li>
+            ) : null}
             {context.tasks.map((task) => (
               <MobileTaskRow
                 key={getTaskKey(task)}
