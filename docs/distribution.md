@@ -85,12 +85,12 @@ Apple Silicon, or Intel with the universal build.
 ### Build
 
 ```bash
-pnpm build:ios --build-number=<number> [--flavor=beta|stable]
+pnpm build:ios --build-number=<number> --flavor=beta|stable
 pnpm upload:testflight
 ```
 
-A prerelease version builds the beta flavor, like on desktop. `upload:testflight` finds the App
-Store Connect app from the IPA's bundle id.
+`--flavor` is required. A release (beta or stable) uploads the stable flavor to Reflect.
+`upload:testflight` finds the App Store Connect app from the IPA's bundle id.
 
 To ship the current `master` to Reflect Beta without a release, run the **TestFlight beta**
 workflow from the Actions tab. The build keeps the last release's version; its build number (the

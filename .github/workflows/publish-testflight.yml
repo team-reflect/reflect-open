@@ -8,10 +8,9 @@ on:
         required: true
         type: string
       flavor:
-        description: beta or stable. Empty derives it from the version in apps/desktop/package.json.
-        required: false
+        description: beta or stable
+        required: true
         type: string
-        default: ''
     secrets:
       APPLE_API_KEY:
         required: true
@@ -95,7 +94,7 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           TAURI_REFLECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           FLAVOR: ${{ inputs.flavor }}
-        run: pnpm build:ios --build-number="$BUILD_NUMBER" ${FLAVOR:+--flavor="$FLAVOR"}
+        run: pnpm build:ios --build-number="$BUILD_NUMBER" --flavor="$FLAVOR"
 
       - name: Upload to TestFlight
         env:

@@ -32,7 +32,7 @@ jobs:
             command: pnpm build:macos --target=universal-apple-darwin --no-sign
           - name: ios
             os: xcode-27
-            command: pnpm build:ios --build-number=1 --no-sign
+            command: pnpm build:ios --build-number=1 --flavor=stable --no-sign
           - name: windows
             os: windows-2025
             command: pnpm build:windows
