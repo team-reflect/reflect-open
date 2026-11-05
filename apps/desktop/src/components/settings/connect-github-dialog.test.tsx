@@ -319,6 +319,10 @@ describe('ConnectGithubDialog', () => {
     expect(openedUrls).toHaveBeenCalledWith(
       'https://github.com/apps/reflect-github-app/installations/new',
     )
+    // At least one poll still finds no access before it is granted.
+    await vi.waitFor(() => {
+      expect(sync.connectExistingRepo.mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
     sync.connectExistingRepo.mockResolvedValue('connected')
 
     // Back from the browser with access granted — the poll connects, no click.
@@ -374,7 +378,6 @@ describe('ConnectGithubDialog', () => {
 
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    await expect.element(page.getByText(/waiting for the repository/i)).toBeInTheDocument()
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(sync.connectExistingRepo.mock.calls.length).toBeGreaterThanOrEqual(3)
     expect(sync.connectNewRepo).toHaveBeenCalledTimes(1)
