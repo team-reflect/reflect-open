@@ -16,7 +16,7 @@ import {
   useMaybeGraphServices,
 } from '@/services/services-provider.tsx'
 import { focusedNotePathForRoute } from '@reflect/app'
-import { useRouterActions, useRouterState } from './router.tsx'
+import { useRouterActions, useRouterState, useRouterHandlers } from './router.tsx'
 
 /**
  * App-scope keyboard shortcuts, driven by the command registry (Plan 08): a
@@ -48,7 +48,8 @@ const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
 export function useAppShortcuts(): CommandContext {
   const services = useCoreServices()
   const appServices = useAppServices()
-  const { route, clearScrollState } = useRouterState()
+  const { route } = useRouterState()
+  const { clearScrollState } = useRouterHandlers()
   const { navigate, back, forward } = useRouterActions()
   const { platform, semanticSearch } = services
   const { commands, nativeMenu } = appServices

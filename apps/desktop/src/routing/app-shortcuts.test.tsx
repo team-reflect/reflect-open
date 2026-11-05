@@ -36,7 +36,7 @@ import { MOD_KEY, NON_MOD_KEY } from '@/test-utils/mod-key.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAppShortcuts } from './app-shortcuts.ts'
-import { useRouterActions, useRouterState } from './router.tsx'
+import { useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
 
 const GRAPH = { root: '/g', name: 'g', generation: 1 } satisfies TestOpenGraph
 
@@ -119,6 +119,7 @@ async function shortcutsHook() {
         context,
         setFocusedDailyDate: useSetFocusedDailyDate(),
         routerState: useRouterState(),
+        routerHandlers: useRouterHandlers(),
         routerActions: useRouterActions(),
         palette: usePalette(),
         noteFind: useNoteFind(),
@@ -278,15 +279,15 @@ describe('app shortcuts', () => {
 
   it('⌘N from today makes back re-anchor Daily instead of restoring stale scroll', async () => {
     const { result } = await shortcutsHook()
-    await act(() => result.current.routerState.saveScrollState(735))
-    expect(result.current.routerState.savedScroll()).toBe(735)
+    await act(() => result.current.routerHandlers.saveScrollState(735))
+    expect(result.current.routerHandlers.savedScroll()).toBe(735)
 
     await act(() => press('n'))
     expect(result.current.routerState.route.kind).toBe('note')
 
     await act(() => press('['))
     expect(result.current.routerState.route).toEqual({ kind: 'today' })
-    expect(result.current.routerState.savedScroll()).toBeNull()
+    expect(result.current.routerHandlers.savedScroll()).toBeNull()
   })
 
   it('⌘⇧O opens the current note in a new window', async () => {

@@ -5,20 +5,27 @@ import { createTestCoreServices, type TestCoreServices } from '@reflect/core/tes
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { Route } from '@reflect/app'
-import { RouterFreeze, useRouterActions, useRouterState } from './router.tsx'
+import { RouterFreeze, useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
 
 /**
- * The router state and actions under the app's `RouterProvider`, mounted on
+ * The router state, handlers, and actions under the app's `RouterProvider`, mounted on
  * `initialRoute`.
  */
 function routerHook(
   initialRoute?: Route,
   core: TestCoreServices = createTestCoreServices({ database: createWasmTestDatabaseService() }),
 ) {
-  return renderHookInApp(() => ({ state: useRouterState(), actions: useRouterActions() }), {
-    core,
-    ...(initialRoute === undefined ? {} : { route: initialRoute }),
-  })
+  return renderHookInApp(
+    () => ({
+      state: useRouterState(),
+      handlers: useRouterHandlers(),
+      actions: useRouterActions(),
+    }),
+    {
+      core,
+      ...(initialRoute === undefined ? {} : { route: initialRoute }),
+    },
+  )
 }
 
 // The history itself is covered by the app layer's `navigation-service.test.ts`; these
@@ -66,42 +73,42 @@ describe('router', () => {
   it('a new mount starts a fresh history', async () => {
     const first = await routerHook()
     await act(() => first.result.current.actions.navigate({ kind: 'tasks' }))
-    await act(() => first.result.current.state.saveScrollState(40))
+    await act(() => first.result.current.handlers.saveScrollState(40))
     await first.unmount()
 
     const { result } = await routerHook(undefined, first.core)
     expect(result.current.state.route).toEqual({ kind: 'today' })
     expect(result.current.state.canBack).toBe(false)
     expect(result.current.state.arrivalSeq).toBe(0)
-    expect(result.current.state.savedScroll()).toBeNull()
+    expect(result.current.handlers.savedScroll()).toBeNull()
   })
 
   it('restores a saved scroll offset on back/forward, per entry', async () => {
     const { result } = await routerHook()
-    await act(() => result.current.state.saveScrollState(120)) // scrolling on today
+    await act(() => result.current.handlers.saveScrollState(120)) // scrolling on today
     await act(() => result.current.actions.navigate({ kind: 'note', path: 'notes/a.md' }))
-    expect(result.current.state.savedScroll()).toBeNull() // fresh entry: no offset yet
+    expect(result.current.handlers.savedScroll()).toBeNull() // fresh entry: no offset yet
 
-    await act(() => result.current.state.saveScrollState(40))
+    await act(() => result.current.handlers.saveScrollState(40))
     await act(() => result.current.actions.back())
-    expect(result.current.state.savedScroll()).toBe(120) // today's offset restored
+    expect(result.current.handlers.savedScroll()).toBe(120) // today's offset restored
 
     await act(() => result.current.actions.forward())
-    expect(result.current.state.savedScroll()).toBe(40) // the note's own offset
+    expect(result.current.handlers.savedScroll()).toBe(40) // the note's own offset
   })
 
   it('can clear the active entry scroll offset without changing routes', async () => {
     const { result } = await routerHook()
     const entryId = result.current.state.entryId
     const arrivals = result.current.state.arrivalSeq
-    await act(() => result.current.state.saveScrollState(120))
+    await act(() => result.current.handlers.saveScrollState(120))
 
-    await act(() => result.current.state.clearScrollState())
+    await act(() => result.current.handlers.clearScrollState())
 
     expect(result.current.state.route).toEqual({ kind: 'today' })
     expect(result.current.state.entryId).toBe(entryId)
     expect(result.current.state.arrivalSeq).toBe(arrivals)
-    expect(result.current.state.savedScroll()).toBeNull()
+    expect(result.current.handlers.savedScroll()).toBeNull()
   })
 
   it('saves scroll on the entry on screen while a transition is pending', async () => {
@@ -116,15 +123,16 @@ describe('router', () => {
       suspended = true
       return then(...args)
     }
-    let committed: ReturnType<typeof useRouterState> | null = null
+    let committed: ReturnType<typeof useRouterHandlers> | null = null
     let actions: ReturnType<typeof useRouterActions> | null = null
     function Screen(): ReactElement {
       const state = useRouterState()
+      const handlers = useRouterHandlers()
       const routerActions = useRouterActions()
       useEffect(() => {
-        committed = state
+        committed = handlers
         actions = routerActions
-      }, [state, routerActions])
+      }, [handlers, routerActions])
       if (state.route.kind === 'tasks') {
         use(tasksReady)
       }

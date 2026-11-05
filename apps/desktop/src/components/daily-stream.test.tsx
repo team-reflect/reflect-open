@@ -12,7 +12,7 @@ import { act } from '@/test-utils/act.ts'
 import type { DayScrollPosition } from '@reflect/app'
 import { createTestCoreServices, createTestClockService } from '@reflect/core/testing'
 import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { useRouterState, useRouterActions } from '@/routing/router.tsx'
+import { useRouterState, useRouterHandlers, useRouterActions } from '@/routing/router.tsx'
 import { getIsoToday } from '@reflect/utils'
 import { createSystemClock, type ClockService, formatDayLabel } from '@reflect/core'
 import { createDayWindow, dateAtIndex, indexOfDate } from '@reflect/app'
@@ -71,7 +71,7 @@ function fixedClock(): ReturnType<typeof createTestClockService> {
  * Records `position` on the current history entry, as the stream's scroll would.
  */
 function SaveScrollProbe({ position }: { position: DayScrollPosition }): ReactElement | null {
-  const { saveScrollState } = useRouterState()
+  const { saveScrollState } = useRouterHandlers()
   useEffect(() => {
     saveScrollState(position)
   }, [saveScrollState, position])
