@@ -1,4 +1,5 @@
 import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import appIcon from '@/assets/app-icon.png'
 import { useQuery } from '@tanstack/react-query'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
@@ -19,6 +20,7 @@ import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
 import {
   SettingsActionRow,
   SettingsGroup,
+  SettingsHeroRow,
   SettingsNavRow,
   SettingsMenuRow,
   SettingsSelectRow,
@@ -296,23 +298,24 @@ export function MobileSettings(): ReactElement {
 
   const storageLabel =
     mobileStorageKind === 'icloud'
-      ? 'iCloud Drive'
+      ? 'Stored in iCloud Drive'
       : mobileStorageKind === 'local'
-        ? 'This device'
+        ? 'Stored on this device'
         : undefined
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
+    <div data-ios-grouped="" className="flex h-full w-screen flex-col pt-safe">
       <MobileScreenHeader
         title="Settings"
         onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
       />
-      <main className="min-h-0 flex-1 overflow-y-auto px-safe pb-safe">
-        <div className="flex flex-col gap-6 px-4 py-4">
-          <SettingsGroup header="Graph">
-            <SettingsNavRow
-              label={graph?.name ?? '—'}
-              value={storageLabel}
+      <main className="min-h-0 flex-1 overflow-y-auto bg-[#F2F2F7] px-safe pb-safe font-[-apple-system,BlinkMacSystemFont,system-ui,sans-serif] text-black antialiased dark:bg-black dark:text-white">
+        <div className="flex flex-col gap-8 px-4 py-5">
+          <SettingsGroup>
+            <SettingsHeroRow
+              title={graph?.name ?? '—'}
+              subtitle={storageLabel}
+              media={<img src={appIcon} alt="" className="size-full object-cover" />}
               onPress={() => navigate({ kind: 'graphs' })}
             />
           </SettingsGroup>

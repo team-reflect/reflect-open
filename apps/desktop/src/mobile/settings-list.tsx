@@ -12,11 +12,22 @@ import { MobileSwitch } from '@/mobile/mobile-switch.tsx'
  * switch, menu choice, action, and checkmark selection.
  */
 
-const ROW_CLASS = 'flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-[15px]'
+/**
+ * iOS 26 metrics: 52px rows, 17px body text, a hairline separator inset to
+ * the text start and hidden under the last row of a card.
+ */
+const ROW_CLASS = cn(
+  'relative flex min-h-13 w-full items-center gap-3 px-5 py-3 text-[17px] leading-[22px] tracking-[-0.43px]',
+  'after:pointer-events-none after:absolute after:right-0 after:bottom-0 after:left-5 after:h-[0.5px] after:bg-[rgb(60_60_67/0.29)] last:after:hidden dark:after:bg-[rgb(84_84_88/0.65)]',
+)
 const PRESSABLE_ROW_CLASS = cn(
   ROW_CLASS,
-  'text-left transition-colors active:bg-secondary/70 disabled:opacity-50',
+  'text-left transition-colors duration-150 active:bg-[#D1D1D6]/70 disabled:opacity-40 dark:active:bg-[#3A3A3C]',
 )
+/** iOS `secondaryLabel`: values and captions. */
+const SECONDARY_LABEL_CLASS = 'text-[rgb(60_60_67/0.6)] dark:text-[rgb(235_235_245/0.6)]'
+/** iOS `tertiaryLabel`: chevrons. */
+const TERTIARY_LABEL_CLASS = 'text-[rgb(60_60_67/0.3)] dark:text-[rgb(235_235_245/0.3)]'
 
 interface SettingsGroupProps {
   /** Small muted caption above the card (iOS section header). */
@@ -38,13 +49,20 @@ export function SettingsGroup({
   return (
     <section className="flex flex-col">
       {header !== undefined ? (
-        <h2 className="px-4 pb-1.5 text-[13px] font-medium text-text-muted">{header}</h2>
+        <h2 className={cn('px-5 pb-[7px] text-[13px] leading-[18px]', SECONDARY_LABEL_CLASS)}>
+          {header}
+        </h2>
       ) : null}
-      <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+      {/* On a grouped-background screen (`data-ios-grouped`) the card is a
+          borderless white / #1C1C1E cell; elsewhere (sheets) it keeps a border. */}
+      <div className="overflow-hidden rounded-[26px] border border-border bg-surface in-data-ios-grouped:border-0 in-data-ios-grouped:bg-white dark:in-data-ios-grouped:bg-[#1C1C1E]">
         {children}
       </div>
       {footer != null ? (
-        <p id={footerId} className="px-4 pt-1.5 text-[13px] text-text-muted">
+        <p
+          id={footerId}
+          className={cn('px-5 pt-[7px] text-[13px] leading-[18px]', SECONDARY_LABEL_CLASS)}
+        >
           {footer}
         </p>
       ) : null}
@@ -66,7 +84,7 @@ export function SettingsValueRow({
   return (
     <div className={ROW_CLASS} onClick={onPress}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 text-text-muted tabular-nums">{value}</span>
+      <span className={cn('shrink-0 tabular-nums', SECONDARY_LABEL_CLASS)}>{value}</span>
     </div>
   )
 }
@@ -89,8 +107,14 @@ export function SettingsNavRow({
   return (
     <button type="button" className={PRESSABLE_ROW_CLASS} onClick={onPress} disabled={disabled}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {value !== undefined ? <span className="shrink-0 text-text-muted">{value}</span> : null}
-      <ChevronRight aria-hidden className="size-4 shrink-0 text-text-muted" strokeWidth={1.75} />
+      {value !== undefined ? (
+        <span className={cn('max-w-[55%] shrink-0 truncate', SECONDARY_LABEL_CLASS)}>{value}</span>
+      ) : null}
+      <ChevronRight
+        aria-hidden
+        className={cn('-mr-1 size-[18px] shrink-0', TERTIARY_LABEL_CLASS)}
+        strokeWidth={2.6}
+      />
     </button>
   )
 }
@@ -147,10 +171,10 @@ export function SettingsMenuRow<Value extends string>({
   return (
     <div className={cn(ROW_CLASS, 'relative')}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="shrink-0 text-text-muted">
+      <span className={cn('flex shrink-0 items-center gap-1', SECONDARY_LABEL_CLASS)}>
         {options.find((option) => option.value === value)?.label}
+        <ChevronsUpDown aria-hidden className="-mr-1 size-[15px] shrink-0" strokeWidth={2.4} />
       </span>
-      <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-text-muted" strokeWidth={1.75} />
       <select
         aria-label={label}
         value={value}
@@ -206,7 +230,7 @@ export function SettingsActionRow({
       {pending === true ? (
         <Spinner />
       ) : Icon !== undefined ? (
-        <Icon aria-hidden className="size-4 shrink-0" strokeWidth={1.75} />
+        <Icon aria-hidden className="size-5 shrink-0" strokeWidth={2} />
       ) : null}
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </button>
@@ -243,8 +267,63 @@ export function SettingsSelectRow({
       {pending === true ? (
         <Spinner />
       ) : selected ? (
-        <Check aria-hidden className="size-4 shrink-0 text-primary" strokeWidth={2} />
+        <Check aria-hidden className="-mr-0.5 size-5 shrink-0 text-primary" strokeWidth={2.75} />
       ) : null}
+    </button>
+  )
+}
+
+interface SettingsHeroRowProps {
+  title: string
+  subtitle?: string | undefined
+  /** The large leading tile (an app icon, an avatar, a glyph). */
+  media: ReactNode
+  onPress: () => void
+  disabled?: boolean
+}
+
+/**
+ * The prominent first row of a settings screen (like the Apple Account row in
+ * iOS Settings): a large tile, a semibold title, a muted subtitle, and a
+ * chevron. Use it alone in a group without a header.
+ */
+export function SettingsHeroRow({
+  title,
+  subtitle,
+  media,
+  onPress,
+  disabled,
+}: SettingsHeroRowProps): ReactElement {
+  return (
+    <button
+      type="button"
+      className={cn(PRESSABLE_ROW_CLASS, 'gap-4 py-3.5 pl-4')}
+      onClick={onPress}
+      disabled={disabled}
+    >
+      <span className="flex size-15 shrink-0 items-center justify-center overflow-hidden rounded-[15px]">
+        {media}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate text-[17px] leading-[22px] font-semibold tracking-[-0.43px]">
+          {title}
+        </span>
+        {subtitle !== undefined ? (
+          <span
+            className={cn(
+              'truncate text-[15px] leading-5 tracking-[-0.23px]',
+              SECONDARY_LABEL_CLASS,
+            )}
+          >
+            {subtitle}
+          </span>
+        ) : null}
+      </span>
+      <ChevronRight
+        aria-hidden
+        className={cn('-mr-1 size-[18px] shrink-0', TERTIARY_LABEL_CLASS)}
+        strokeWidth={2.6}
+      />
     </button>
   )
 }
