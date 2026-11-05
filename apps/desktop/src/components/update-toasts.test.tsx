@@ -5,15 +5,15 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import {
   clickToastAction,
   createTestToastController,
-  withToasts,
+  withToastController,
   type TestToastController,
 } from '@/test-utils/toast.tsx'
 import { UpdateToasts } from './update-toasts.ts'
 
-let toasts: TestToastController
+let toastController: TestToastController
 
 beforeEach(() => {
-  toasts = createTestToastController()
+  toastController = createTestToastController()
 })
 
 describe('UpdateToasts', () => {
@@ -22,12 +22,12 @@ describe('UpdateToasts', () => {
     await renderInApp(<UpdateToasts />, {
       appServices: { update },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
 
     await act(() => update.setState({ phase: 'available', version: '1.2.3' }))
 
-    expect(toasts.add).toHaveBeenCalledWith(
+    expect(toastController.add).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'reflect-update',
         title: 'Update available',
@@ -37,7 +37,7 @@ describe('UpdateToasts', () => {
       }),
     )
 
-    const options = toasts.add.mock.lastCall?.[0]
+    const options = toastController.add.mock.lastCall?.[0]
     expect(options?.actionProps?.children).toBe('Install')
     clickToastAction(options)
     expect(update.calls).toEqual(['install'])
@@ -48,13 +48,13 @@ describe('UpdateToasts', () => {
     await renderInApp(<UpdateToasts />, {
       appServices: { update },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
-    expect(toasts.close).toHaveBeenCalledWith('reflect-update')
+    expect(toastController.close).toHaveBeenCalledWith('reflect-update')
 
     await act(() => update.setState({ phase: 'available', version: '1.2.3' }))
     await act(() => update.setState({ phase: 'downloading', version: '1.2.3', percent: 42 }))
-    expect(toasts.add).toHaveBeenLastCalledWith(
+    expect(toastController.add).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: 'reflect-update',
         title: 'Downloading update',
@@ -66,19 +66,19 @@ describe('UpdateToasts', () => {
     // The downloading toast must explicitly clear the action: `add()` merges
     // options into the same-id toast, so without this the "Install" button
     // from the `available` phase would linger as a clickable control.
-    const downloadingOptions = toasts.add.mock.lastCall?.[0]
+    const downloadingOptions = toastController.add.mock.lastCall?.[0]
     expect(Object.hasOwn(downloadingOptions ?? {}, 'actionProps')).toBe(true)
     expect(downloadingOptions?.actionProps).toBeUndefined()
 
     await act(() => update.setState({ phase: 'ready', version: '1.2.3' }))
-    expect(toasts.add).toHaveBeenLastCalledWith(
+    expect(toastController.add).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: 'reflect-update',
         title: 'Update ready',
         type: 'success',
       }),
     )
-    expect(toasts.add.mock.lastCall?.[0]?.actionProps?.children).toBe('Restart')
+    expect(toastController.add.mock.lastCall?.[0]?.actionProps?.children).toBe('Restart')
   })
 
   it('surfaces install errors but ignores check-only failures', async () => {
@@ -86,17 +86,17 @@ describe('UpdateToasts', () => {
     await renderInApp(<UpdateToasts />, {
       appServices: { update },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
 
     await act(() => update.setState({ phase: 'error', message: 'offline', during: 'check' }))
-    expect(toasts.close).toHaveBeenCalledWith('reflect-update')
-    expect(toasts.add).not.toHaveBeenCalled()
+    expect(toastController.close).toHaveBeenCalledWith('reflect-update')
+    expect(toastController.add).not.toHaveBeenCalled()
 
     await act(() => {
       update.setState({ phase: 'error', message: 'signature failed', during: 'install' })
     })
-    expect(toasts.add).toHaveBeenCalledWith(
+    expect(toastController.add).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'reflect-update',
         title: 'Update failed',
@@ -105,7 +105,7 @@ describe('UpdateToasts', () => {
       }),
     )
 
-    const options = toasts.add.mock.lastCall?.[0]
+    const options = toastController.add.mock.lastCall?.[0]
     expect(options?.actionProps?.children).toBe('Retry install')
     clickToastAction(options)
     expect(update.calls).toEqual(['retryAction', 'install'])
@@ -116,11 +116,11 @@ describe('UpdateToasts', () => {
     const { unmount } = await renderInApp(<UpdateToasts />, {
       appServices: { update },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
     await unmount()
 
     await act(() => update.setState({ phase: 'available', version: '1.2.3' }))
-    expect(toasts.add).not.toHaveBeenCalled()
+    expect(toastController.add).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,4 @@
-import type { ToastController } from '@/components/ui/toast.tsx'
+import type { ToastController } from '@/lib/use-toasts.ts'
 import { formatElapsed } from '@reflect/utils'
 
 const REMINDER_TOAST_ID = 'audio-memo-reminder'
@@ -10,11 +10,11 @@ const REMINDER_TOAST_ID = 'audio-memo-reminder'
  * later reminder replaces the earlier one instead of stacking.
  */
 export function showRecordingReminder(
-  toasts: ToastController,
+  toastController: ToastController,
   elapsedMs: number,
   stop: () => void,
 ): void {
-  toasts.add({
+  toastController.add({
     id: REMINDER_TOAST_ID,
     title: 'Still recording',
     description: formatElapsed(elapsedMs),
@@ -30,6 +30,6 @@ export function showRecordingReminder(
  * claiming a session is running, and its stop control would land on whatever
  * recording started next.
  */
-export function dismissRecordingReminder(toasts: ToastController): void {
-  toasts.close(REMINDER_TOAST_ID)
+export function dismissRecordingReminder(toastController: ToastController): void {
+  toastController.close(REMINDER_TOAST_ID)
 }

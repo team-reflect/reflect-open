@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.tsx'
-import { useToasts } from '@/components/ui/toast.tsx'
+import { useToastController } from '@/lib/use-toasts.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { WhatsNewItems } from './whats-new-items.tsx'
@@ -24,15 +24,15 @@ const WHATS_NEW_TOAST_TIMEOUT_MS = 10_000
 export function WhatsNewDialog(): ReactElement {
   const { whatsNew } = useAppServices()
   const { platform } = useCoreServices()
-  const toasts = useToasts()
+  const toastController = useToastController()
   const phase = useStore(whatsNew.phase)
   const version = marketingVersion(platform.appVersion)
   useEffect(() => {
     if (phase !== 'offered') {
-      toasts.close(WHATS_NEW_TOAST_ID)
+      toastController.close(WHATS_NEW_TOAST_ID)
       return
     }
-    toasts.add({
+    toastController.add({
       id: WHATS_NEW_TOAST_ID,
       title: `Reflect updated to ${version}`,
       description: 'See what’s new in this version.',
@@ -42,11 +42,11 @@ export function WhatsNewDialog(): ReactElement {
         children: 'What’s new',
         onClick: () => {
           whatsNew.accept()
-          toasts.close(WHATS_NEW_TOAST_ID)
+          toastController.close(WHATS_NEW_TOAST_ID)
         },
       },
     })
-  }, [toasts, phase, version, whatsNew])
+  }, [toastController, phase, version, whatsNew])
   return (
     <Dialog
       open={phase === 'shown'}

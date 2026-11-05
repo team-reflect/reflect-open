@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { MaybePromise } from '@reflect/utils'
 import type { UpdateService, UpdateState } from '@reflect/app'
 import type { LoggerService } from '@reflect/core'
-import { useToasts, type ToastController } from '@/components/ui/toast.tsx'
+import { useToastController, type ToastController } from '@/lib/use-toasts.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -27,14 +27,14 @@ async function runToastAction(
 }
 
 function showUpdateToast(
-  toast: ToastController,
+  toastController: ToastController,
   state: UpdateState,
   update: UpdateService,
   logger: LoggerService,
 ): void {
   switch (state.phase) {
     case 'available':
-      toast.add({
+      toastController.add({
         id: UPDATE_TOAST_ID,
         title: 'Update available',
         description: `Reflect ${state.version} is ready to install.`,
@@ -49,7 +49,7 @@ function showUpdateToast(
       })
       break
     case 'downloading':
-      toast.add({
+      toastController.add({
         id: UPDATE_TOAST_ID,
         title: 'Downloading update',
         description: state.percent !== null ? `${state.percent}%` : 'Preparing…',
@@ -63,7 +63,7 @@ function showUpdateToast(
       })
       break
     case 'ready':
-      toast.add({
+      toastController.add({
         id: UPDATE_TOAST_ID,
         title: 'Update ready',
         description: `Reflect ${state.version} will finish updating after restart.`,
@@ -77,7 +77,7 @@ function showUpdateToast(
       break
     case 'error':
       if (state.during === 'install') {
-        toast.add({
+        toastController.add({
           id: UPDATE_TOAST_ID,
           title: 'Update failed',
           description: state.message,
@@ -89,11 +89,11 @@ function showUpdateToast(
           },
         })
       } else {
-        toast.close(UPDATE_TOAST_ID)
+        toastController.close(UPDATE_TOAST_ID)
       }
       break
     default:
-      toast.close(UPDATE_TOAST_ID)
+      toastController.close(UPDATE_TOAST_ID)
       break
   }
 }
@@ -104,10 +104,10 @@ function showUpdateToast(
 export function UpdateToasts(): null {
   const { update } = useAppServices()
   const { logger } = useCoreServices()
-  const toasts = useToasts()
+  const toastController = useToastController()
   const state = useStore(update)
   useEffect(() => {
-    showUpdateToast(toasts, state, update, logger)
-  }, [toasts, state, update, logger])
+    showUpdateToast(toastController, state, update, logger)
+  }, [toastController, state, update, logger])
   return null
 }

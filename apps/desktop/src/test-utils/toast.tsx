@@ -1,11 +1,8 @@
 import type { MouseEvent, ReactNode } from 'react'
 import type { ToastManagerAddOptions } from '@base-ui/react/toast'
 import { vi, type Mock } from 'vitest'
-import {
-  ToastControllerContext,
-  type ToastController,
-  type ToastData,
-} from '@/components/ui/toast.tsx'
+import type { ToastData } from '@/components/ui/toast.tsx'
+import { ToastControllerContext, type ToastController } from '@/lib/use-toasts.ts'
 
 type ToastOptions = ToastManagerAddOptions<ToastData>
 
@@ -46,10 +43,14 @@ export function createTestToastController(): TestToastController {
 }
 
 /**
- * Returns a `wrapper` for `renderInApp` that provides `toasts`.
+ * Returns a `wrapper` for `renderInApp` that provides `toastController`.
  */
-export function withToasts(toasts: ToastController): (children: ReactNode) => ReactNode {
-  return (children) => <ToastControllerContext value={toasts}>{children}</ToastControllerContext>
+export function withToastController(
+  toastController: ToastController,
+): (children: ReactNode) => ReactNode {
+  return (children) => (
+    <ToastControllerContext value={toastController}>{children}</ToastControllerContext>
+  )
 }
 
 /**

@@ -6,22 +6,22 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import {
   clickToastAction,
   createTestToastController,
-  withToasts,
+  withToastController,
   type TestToastController,
 } from '@/test-utils/toast.tsx'
 import { OperationToasts } from './operation-toasts.ts'
 
 let operations: TestOperationsService
 let logger: TestLoggerService
-let toasts: TestToastController
+let toastController: TestToastController
 
 beforeEach(async () => {
   operations = createTestOperationsService()
-  toasts = createTestToastController()
+  toastController = createTestToastController()
   const { core } = await renderInApp(<OperationToasts />, {
     appServices: { operations },
     servicesOnly: true,
-    wrapper: withToasts(toasts),
+    wrapper: withToastController(toastController),
   })
   logger = core.logger
 })
@@ -30,7 +30,7 @@ describe('OperationToasts', () => {
   it('creates and updates a toast with a stable operation id', async () => {
     const handle = await act(() => operations.start('Rebuilding search index'))
 
-    expect(toasts.add).toHaveBeenLastCalledWith(
+    expect(toastController.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', title: 'Rebuilding search index' }),
     )
 
@@ -38,7 +38,7 @@ describe('OperationToasts', () => {
       handle.progress(3, 12)
     })
 
-    expect(toasts.add).toHaveBeenLastCalledWith(
+    expect(toastController.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', description: '3/12' }),
     )
   })
@@ -49,12 +49,12 @@ describe('OperationToasts', () => {
       handle.fail('disk full')
     })
 
-    expect(toasts.add).toHaveBeenLastCalledWith(
+    expect(toastController.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', description: 'disk full', type: 'error' }),
     )
 
     await act(() => operations.clock.advance(9_200))
-    expect(toasts.close).toHaveBeenCalledWith('operation-1')
+    expect(toastController.close).toHaveBeenCalledWith('operation-1')
   })
 
   it('passes optional action metadata to the toast', async () => {
@@ -64,7 +64,7 @@ describe('OperationToasts', () => {
       operations.start('Update available', { action: { label: 'Install', run }, persistent: true })
     })
 
-    expect(toasts.add).toHaveBeenLastCalledWith(
+    expect(toastController.add).toHaveBeenLastCalledWith(
       expect.objectContaining({
         id: 'operation-1',
         timeout: 0,
@@ -72,7 +72,7 @@ describe('OperationToasts', () => {
       }),
     )
 
-    const options = toasts.add.mock.lastCall?.[0]
+    const options = toastController.add.mock.lastCall?.[0]
     expect(options?.actionProps?.children).toBe('Install')
     clickToastAction(options)
     expect(run).toHaveBeenCalledTimes(1)
@@ -81,13 +81,13 @@ describe('OperationToasts', () => {
   it('does not remove the operation when a toast is dismissed', async () => {
     const handle = await act(() => operations.start('Saving settings'))
 
-    expect(toasts.add.mock.lastCall?.[0]?.onClose).toBeUndefined()
+    expect(toastController.add.mock.lastCall?.[0]?.onClose).toBeUndefined()
 
     await act(() => {
       handle.fail('disk full')
     })
 
-    expect(toasts.add).toHaveBeenLastCalledWith(
+    expect(toastController.add).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'operation-1', description: 'disk full', type: 'error' }),
     )
   })
@@ -99,7 +99,7 @@ describe('OperationToasts', () => {
       operations.start('Update available', { action: { label: 'Install', run } })
     })
 
-    const options = toasts.add.mock.lastCall?.[0]
+    const options = toastController.add.mock.lastCall?.[0]
     clickToastAction(options)
     await vi.waitFor(() => {
       expect(logger.getErrors()).toEqual([{ message: 'operation action failed:', cause: error }])

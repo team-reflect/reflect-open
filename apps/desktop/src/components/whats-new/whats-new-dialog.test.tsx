@@ -7,15 +7,15 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import {
   clickToastAction,
   createTestToastController,
-  withToasts,
+  withToastController,
   type TestToastController,
 } from '@/test-utils/toast.tsx'
 import { WhatsNewDialog } from './whats-new-dialog.tsx'
 
-let toasts: TestToastController
+let toastController: TestToastController
 
 beforeEach(() => {
-  toasts = createTestToastController()
+  toastController = createTestToastController()
 })
 
 function createFakeWhatsNew(initial: WhatsNewPhase = 'shown') {
@@ -51,7 +51,7 @@ describe('WhatsNewDialog', () => {
     await renderInApp(<WhatsNewDialog />, {
       appServices: { whatsNew },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
 
     await expect.element(page.getByText('Chat in the All tab')).toBeVisible()
@@ -66,7 +66,7 @@ describe('WhatsNewDialog', () => {
     await renderInApp(<WhatsNewDialog />, {
       appServices: { whatsNew },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
     await expect.element(page.getByText('Chat in the All tab')).toBeVisible()
 
@@ -83,7 +83,7 @@ describe('WhatsNewDialog', () => {
     await renderInApp(<WhatsNewDialog />, {
       appServices: { whatsNew },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
 
     await expect.element(page.getByRole('dialog')).toBeVisible()
@@ -98,10 +98,10 @@ describe('WhatsNewDialog', () => {
     await renderInApp(<WhatsNewDialog />, {
       appServices: { whatsNew },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
 
-    expect(toasts.add).toHaveBeenCalledWith(
+    expect(toastController.add).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'reflect-whats-new', timeout: 10_000 }),
     )
     expect(document.querySelector('[role="dialog"]')).toBeNull()
@@ -112,10 +112,10 @@ describe('WhatsNewDialog', () => {
     await renderInApp(<WhatsNewDialog />, {
       appServices: { whatsNew },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
 
-    const options = toasts.add.mock.lastCall?.[0]
+    const options = toastController.add.mock.lastCall?.[0]
     expect(options?.actionProps?.children).toBe('What’s new')
     await act(() => {
       clickToastAction(options)
@@ -124,7 +124,7 @@ describe('WhatsNewDialog', () => {
     // Closing the toast runs `onClose`. The real service ignores `decline`
     // after `accept`.
     expect(calls).toEqual(['accept', 'decline'])
-    expect(toasts.open()).toEqual([])
+    expect(toastController.open()).toEqual([])
     await expect.element(page.getByText('Chat in the All tab')).toBeVisible()
   })
 
@@ -133,10 +133,10 @@ describe('WhatsNewDialog', () => {
     await renderInApp(<WhatsNewDialog />, {
       appServices: { whatsNew },
       servicesOnly: true,
-      wrapper: withToasts(toasts),
+      wrapper: withToastController(toastController),
     })
 
-    toasts.close('reflect-whats-new')
+    toastController.close('reflect-whats-new')
 
     expect(calls).toEqual(['decline'])
   })

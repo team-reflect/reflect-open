@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { LoggerService, Operation } from '@reflect/core'
-import { useToasts, type ToastController } from '@/components/ui/toast.tsx'
+import { useToastController, type ToastController } from '@/lib/use-toasts.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -35,7 +35,7 @@ function descriptionFor(operation: Operation): string | undefined {
 }
 
 function showOperationToast(
-  toast: ToastController,
+  toastController: ToastController,
   operation: Operation,
   logger: LoggerService,
 ): void {
@@ -60,15 +60,15 @@ function showOperationToast(
 
   switch (operation.status) {
     case 'failed':
-      toast.add({ ...options, type: 'error' })
+      toastController.add({ ...options, type: 'error' })
       break
     case 'warning':
-      toast.add({ ...options, type: 'warning' })
+      toastController.add({ ...options, type: 'warning' })
       break
     case 'running':
       // Explicit undefined clears a stale error/warning icon if the same
       // operation id returns to running (`add()` merges by id).
-      toast.add({ ...options, type: undefined })
+      toastController.add({ ...options, type: undefined })
       break
   }
 }
@@ -79,20 +79,20 @@ function showOperationToast(
 export function OperationToasts(): null {
   const { operations } = useAppServices()
   const { logger } = useCoreServices()
-  const toasts = useToasts()
+  const toastController = useToastController()
   const current = useStore(operations)
   const shownIdsRef = useRef(new Set<number>())
   useEffect(() => {
     const nextIds = new Set(current.map((operation) => operation.id))
     for (const id of shownIdsRef.current) {
       if (!nextIds.has(id)) {
-        toasts.close(`operation-${id}`)
+        toastController.close(`operation-${id}`)
       }
     }
     for (const operation of current) {
-      showOperationToast(toasts, operation, logger)
+      showOperationToast(toastController, operation, logger)
     }
     shownIdsRef.current = nextIds
-  }, [toasts, current, logger])
+  }, [toastController, current, logger])
   return null
 }
