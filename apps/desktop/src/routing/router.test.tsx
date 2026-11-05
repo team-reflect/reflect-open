@@ -1,6 +1,6 @@
 import { act } from '@/test-utils/act.ts'
 import { describe, expect, it } from 'vitest'
-import type { ReactElement } from 'react'
+import { Suspense, use, useEffect, type ReactElement } from 'react'
 import { createTestCoreServices, type TestCoreServices } from '@reflect/core/testing'
 import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -101,6 +101,51 @@ describe('router', () => {
     expect(result.current.entryId).toBe(entryId)
     expect(result.current.arrivalSeq).toBe(arrivals)
     expect(result.current.savedScroll()).toBeNull()
+  })
+
+  it('saves scroll on the entry on screen while a transition is pending', async () => {
+    let resolveTasks = (): void => {}
+    const tasksReady = new Promise<void>((resolve) => {
+      resolveTasks = resolve
+    })
+    // React subscribes to the promise once a render suspends on it.
+    let suspended = false
+    const then = tasksReady.then.bind(tasksReady)
+    tasksReady.then = (...args) => {
+      suspended = true
+      return then(...args)
+    }
+    let committed: ReturnType<typeof useRouter> | null = null
+    function Screen(): ReactElement {
+      const router = useRouter()
+      useEffect(() => {
+        committed = router
+      }, [router])
+      if (router.route.kind === 'tasks') {
+        use(tasksReady)
+      }
+      return <div data-testid="screen">{router.route.kind}</div>
+    }
+
+    const view = await renderInApp(
+      <Suspense fallback={null}>
+        <Screen />
+      </Suspense>,
+    )
+    await expect.element(view.getByTestId('screen')).toMatchTextContent('today')
+
+    committed!.navigate({ kind: 'tasks' })
+    await expect.poll(() => suspended).toBe(true)
+    await expect.element(view.getByTestId('screen')).toMatchTextContent('today')
+    committed!.saveScrollState(120) // scrolling today while tasks loads
+
+    resolveTasks()
+    await expect.element(view.getByTestId('screen')).toMatchTextContent('tasks')
+    expect(committed!.savedScroll()).toBeNull()
+
+    committed!.back()
+    await expect.element(view.getByTestId('screen')).toMatchTextContent('today')
+    expect(committed!.savedScroll()).toBe(120)
   })
 
   it('useRouterActions does not re-render on navigation', async () => {

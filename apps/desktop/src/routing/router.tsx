@@ -5,7 +5,6 @@ import {
   use,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -51,6 +50,17 @@ interface RouterState {
    * a pushed note so the back-swipe gesture reveals a live screen.
    */
   backRoute: Route | null
+  /** Record the active view's scroll position on the history entry it renders. */
+  saveScrollState: (position: ScrollPosition) => void
+  /**
+   * Discard the current view's saved scroll positions — the active history
+   * entry's and, when the route belongs to a long-lived surface, the surface's
+   * too — so the view re-anchors when revisited through **any** door (⌘[ back
+   * or a `restoreSurfaceScroll` nav-tab return alike).
+   */
+  clearScrollState: () => void
+  /** The rendered entry's recorded position (present when revisited), or `null`. */
+  savedScroll: () => ScrollPosition | null
 }
 
 /**
@@ -60,17 +70,6 @@ interface RouterActions {
   navigate: RouterNavigate
   back: () => void
   forward: () => void
-  /** Record the active view's scroll position on the current history entry. */
-  saveScrollState: (position: ScrollPosition) => void
-  /**
-   * Discard the current view's saved scroll positions — the active history
-   * entry's and, when the route belongs to a long-lived surface, the surface's
-   * too — so the view re-anchors when revisited through **any** door (⌘[ back
-   * or a `restoreSurfaceScroll` nav-tab return alike).
-   */
-  clearScrollState: () => void
-  /** The current entry's recorded position (present when revisited), or `null`. */
-  savedScroll: () => ScrollPosition | null
 }
 
 /**
@@ -106,15 +105,6 @@ export function RouterProvider({
   // hook always updates synchronously, which would drop the transition and
   // flash the loading fallback of every lazily loaded screen.
   const [state, setState] = useState(() => navigation.get())
-  /**
-   * The state on screen, readable from scroll handlers without re-rendering.
-   */
-  const renderedRef = useRef(state)
-  // Written during render, not in an effect: descendant scroll-restoration
-  // effects read this (through saveScrollState/savedScroll) on the same
-  // commit, and React runs effects child-before-parent — so updating it in an
-  // effect here would lag a frame and restore or save the wrong entry's position.
-  renderedRef.current = state
 
   useEffect(() => {
     const sync = (): void => setState(navigation.get())
@@ -146,19 +136,25 @@ export function RouterProvider({
     [navigation, noteMove],
   )
 
+  // The scroll callbacks are bound to the entry this render shows. The
+  // service's current entry runs ahead of the screen while a transition is
+  // pending, and a render that suspends never commits, so neither can tell
+  // which entry the views on screen belong to.
+  const { entryId, route } = state
+  const position = useMemo(() => ({ entryId, route }), [entryId, route])
   const saveScrollState = useCallback(
-    (position: ScrollPosition) => navigation.saveScrollState(position, renderedRef.current),
-    [navigation],
+    (scroll: ScrollPosition) => navigation.saveScrollState(scroll, position),
+    [navigation, position],
   )
   const clearScrollState = useCallback(
-    () => navigation.clearScrollState(renderedRef.current),
-    [navigation],
+    () => navigation.clearScrollState(position),
+    [navigation, position],
   )
-  const savedScroll = useCallback(() => navigation.savedScroll(renderedRef.current), [navigation])
+  const savedScroll = useCallback(() => navigation.savedScroll(position), [navigation, position])
 
   const actions = useMemo<RouterActions>(
-    () => ({ navigate, back, forward, saveScrollState, clearScrollState, savedScroll }),
-    [navigate, back, forward, saveScrollState, clearScrollState, savedScroll],
+    () => ({ navigate, back, forward }),
+    [navigate, back, forward],
   )
 
   const value = useMemo<RouterValue>(
@@ -170,9 +166,12 @@ export function RouterProvider({
       canBack: state.canBack,
       canForward: state.canForward,
       backRoute: state.backRoute,
+      saveScrollState,
+      clearScrollState,
+      savedScroll,
       ...actions,
     }),
-    [state, actions],
+    [state, saveScrollState, clearScrollState, savedScroll, actions],
   )
 
   return (
@@ -215,9 +214,10 @@ interface RouterFreezeProps {
  * inert) beneath a note — without this, that screen would still observe
  * every navigation: a note push bumps `arrivalSeq`, which the daily surface
  * reads as a re-arrival and re-anchors its scroll while nobody is looking.
- * Frozen subtrees resume the live value the moment they surface again; the
+ * Frozen subtrees resume the live value the moment they surface again. The
  * navigation callbacks in the frozen snapshot stay valid because they are
- * stable for the provider's lifetime.
+ * stable for the provider's lifetime, and its scroll callbacks still point at
+ * the entry the subtree shows.
  */
 export function RouterFreeze({ frozen, children }: RouterFreezeProps): ReactElement {
   const live = useRouter()
