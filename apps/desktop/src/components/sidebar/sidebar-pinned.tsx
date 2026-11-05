@@ -13,7 +13,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useReorderPinnedNotes } from '@/hooks/use-reorder-pinned-notes.ts'
 import { routeForPath, routesEqual } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview.tsx'
 import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row.tsx'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
@@ -27,7 +27,7 @@ export function SidebarPinned(): ReactElement | null {
   const pinned = usePinnedNotes()
   const reorder = useReorderPinnedNotes(pinned)
   const noteLabel = useNoteLabel()
-  const { route } = useRouter()
+  const { route } = useRouterState()
   const [activePath, setActivePath] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const activeNote =

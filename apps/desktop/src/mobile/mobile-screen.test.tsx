@@ -15,7 +15,7 @@ import {
   clearFormattingToolbar,
   publishFormattingToolbar,
 } from '@/editor/formatting-toolbar-store.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { addDaysToIsoDate, getYearMonth, getIsoToday } from '@reflect/utils'
 import {
   type AiProviderConfig,
@@ -151,7 +151,7 @@ function mount(
 
 /** Stands in for a wiki-link tap: navigation arriving from inside a screen. */
 function NavProbe({ to }: { to: Route }): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   return (
     <button type="button" onClick={() => navigate(to)}>
       probe-navigate
