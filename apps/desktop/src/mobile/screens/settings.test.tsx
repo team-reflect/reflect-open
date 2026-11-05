@@ -169,10 +169,10 @@ describe('MobileSettings', () => {
     const user = userEvent
     const view = await mount()
 
-    await user.click(page.getByRole('radio', { name: 'Dark' }))
+    await user.selectOptions(page.getByRole('combobox', { name: 'Theme' }), 'Dark')
     await expectSettings(view, { theme: 'dark' })
 
-    await user.click(page.getByRole('radio', { name: 'Large' }))
+    await user.selectOptions(page.getByRole('combobox', { name: 'Text size' }), 'Large')
     await expectSettings(view, { editorTextSize: 'large' })
   })
 
@@ -196,13 +196,15 @@ describe('MobileSettings', () => {
     const user = userEvent
     const view = await mount()
 
-    await expect.element(page.getByRole('radio', { name: 'Monday' })).toBeChecked()
-    await expect.element(page.getByRole('radio', { name: '12-hour' })).toBeChecked()
+    const weekStart = page.getByRole('combobox', { name: 'Week start' })
+    const timeFormat = page.getByRole('combobox', { name: 'Time format' })
+    await expect.element(weekStart).toHaveValue('monday')
+    await expect.element(timeFormat).toHaveValue('12h')
 
-    await user.click(page.getByRole('radio', { name: 'Sunday' }))
+    await user.selectOptions(weekStart, 'Sunday')
     await expectSettings(view, { weekStartDay: 'sunday' })
 
-    await user.click(page.getByRole('radio', { name: '24-hour' }))
+    await user.selectOptions(timeFormat, '24-hour')
     await expectSettings(view, { timeFormat: '24h' })
   })
 
@@ -632,10 +634,11 @@ describe('MobileSettings subscription', () => {
         row.click()
       })
     }
-    await userEvent.click(page.getByRole('radio', { name: 'Required' }))
+    const phase = page.getByRole('combobox', { name: 'Paywall' })
+    await userEvent.selectOptions(phase, 'Required')
 
     expect(view.core.mobile.paywall.phaseOverride.get()).toBe('required')
-    await expect.element(page.getByRole('radio', { name: 'Required' })).toBeChecked()
+    await expect.element(phase).toHaveValue('required')
   })
 
   it('offers Subscribe until a plan is active', async () => {
