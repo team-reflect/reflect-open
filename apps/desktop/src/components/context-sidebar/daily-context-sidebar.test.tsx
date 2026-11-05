@@ -19,7 +19,7 @@ import {
   type TestNoteFileService,
   type TestStorageService,
 } from '@reflect/core/testing'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -37,7 +37,7 @@ let dailySource: string
 let noteFile: TestNoteFileService
 
 function RouteProbe(): ReactNode {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 

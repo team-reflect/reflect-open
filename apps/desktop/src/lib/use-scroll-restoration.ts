@@ -1,5 +1,5 @@
 import { useEffect, type RefObject, type UIEvent } from 'react'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 
 /**
  * Per-entry scroll memory for a route that owns its own scroll container — the
@@ -17,7 +17,7 @@ export function useScrollRestoration(
   elementRef: RefObject<HTMLElement | null>,
   ready: boolean,
 ): { onScroll: (event: UIEvent<HTMLElement>) => void } {
-  const { arrivalSeq, entryId, saveScrollState, savedScroll } = useRouter()
+  const { arrivalSeq, entryId, saveScrollState, savedScroll } = useRouterState()
   useEffect(() => {
     const element = elementRef.current
     if (ready && element) {

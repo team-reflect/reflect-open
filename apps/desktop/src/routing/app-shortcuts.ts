@@ -16,7 +16,7 @@ import {
   useMaybeGraphServices,
 } from '@/services/services-provider.tsx'
 import { focusedNotePathForRoute } from '@reflect/app'
-import { useRouter } from './router.tsx'
+import { useRouterActions, useRouterState } from './router.tsx'
 
 /**
  * App-scope keyboard shortcuts, driven by the command registry (Plan 08): a
@@ -48,7 +48,8 @@ const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
 export function useAppShortcuts(): CommandContext {
   const services = useCoreServices()
   const appServices = useAppServices()
-  const { route, navigate, back, forward, clearScrollState } = useRouter()
+  const { route, clearScrollState } = useRouterState()
+  const { navigate, back, forward } = useRouterActions()
   const { platform, semanticSearch } = services
   const { commands, nativeMenu } = appServices
   const focusedDailyDate = useFocusedDailyDate()

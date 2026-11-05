@@ -5,7 +5,7 @@ import { DailyCaptureMenu } from '@/mobile/daily-capture-menu.tsx'
 import { DayCarousel } from '@/mobile/day-carousel.tsx'
 import { useDailyArrivals } from '@/mobile/use-daily-arrivals.ts'
 import { useSwipeTarget } from '@/mobile/use-swipe-target.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /**
  * The mobile spine (Plan 19, V1 parity): a month header + week calendar strip
@@ -19,7 +19,8 @@ import { useRouter } from '@/routing/router.tsx'
  * day change scrolls the carousel rather than remounting it.
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
-  const { navigate, entryId, arrivalSeq, arrivalFocusEditor } = useRouter()
+  const { entryId, arrivalSeq, arrivalFocusEditor } = useRouterState()
+  const { navigate } = useRouterActions()
   // One live `today` for the whole surface: the strip marks today's cell and
   // the `select` below decide "is this today?" from the *same* value, so they
   // can't disagree across the midnight rollover (which would otherwise route a

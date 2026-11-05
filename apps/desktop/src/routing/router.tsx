@@ -72,12 +72,7 @@ interface RouterActions {
   forward: () => void
 }
 
-/**
- * The route state together with the navigation callbacks.
- */
-type RouterValue = RouterState & RouterActions
-
-const RouterContext = createContext<RouterValue | null>(null)
+const RouterStateContext = createContext<RouterState | null>(null)
 const RouterActionsContext = createContext<RouterActions | null>(null)
 
 interface RouterProviderProps {
@@ -157,7 +152,7 @@ export function RouterProvider({
     [navigate, back, forward],
   )
 
-  const value = useMemo<RouterValue>(
+  const routerState = useMemo<RouterState>(
     () => ({
       route: state.route,
       entryId: state.entryId,
@@ -169,23 +164,22 @@ export function RouterProvider({
       saveScrollState,
       clearScrollState,
       savedScroll,
-      ...actions,
     }),
-    [state, saveScrollState, clearScrollState, savedScroll, actions],
+    [state, saveScrollState, clearScrollState, savedScroll],
   )
 
   return (
     <RouterActionsContext value={actions}>
-      <RouterContext value={value}>{children}</RouterContext>
+      <RouterStateContext value={routerState}>{children}</RouterStateContext>
     </RouterActionsContext>
   )
 }
 
-/** Access the current route + navigation. Use within a RouterProvider. */
-export function useRouter(): RouterValue {
-  const context = use(RouterContext)
+/** Access the current route state. Use within a RouterProvider. */
+export function useRouterState(): RouterState {
+  const context = use(RouterStateContext)
   if (!context) {
-    throw new Error('useRouter must be used within a RouterProvider')
+    throw new Error('useRouterState must be used within a RouterProvider')
   }
   return context
 }
@@ -203,29 +197,29 @@ export function useRouterActions(): RouterActions {
 }
 
 interface RouterFreezeProps {
-  /** While true, the subtree keeps the last router value it saw unfrozen. */
+  /** While true, the subtree keeps the last router state it saw unfrozen. */
   frozen: boolean
   children: ReactNode
 }
 
 /**
- * Pin the router value a subtree sees while it is in the background. The
+ * Pin the router state a subtree sees while it is in the background. The
  * mobile stack keeps the screen `back()` would reveal mounted (hidden and
  * inert) beneath a note — without this, that screen would still observe
  * every navigation: a note push bumps `arrivalSeq`, which the daily surface
  * reads as a re-arrival and re-anchors its scroll while nobody is looking.
- * Frozen subtrees resume the live value the moment they surface again. The
- * navigation callbacks in the frozen snapshot stay valid because they are
- * stable for the provider's lifetime, and its scroll callbacks still point at
- * the entry the subtree shows.
+ * Frozen subtrees resume the live state the moment they surface again. The
+ * scroll callbacks in the frozen snapshot still point at the entry the
+ * subtree shows. The navigation callbacks are not frozen: they are stable for
+ * the provider's lifetime.
  */
 export function RouterFreeze({ frozen, children }: RouterFreezeProps): ReactElement {
-  const live = useRouter()
-  // The capture tracks the live value only while unfrozen — state adjusted
+  const live = useRouterState()
+  // The capture tracks the live state only while unfrozen — state adjusted
   // during render, so freezing pins exactly what the last unfrozen commit saw.
   const [captured, setCaptured] = useState(live)
   if (!frozen && captured !== live) {
     setCaptured(live)
   }
-  return <RouterContext value={frozen ? captured : live}>{children}</RouterContext>
+  return <RouterStateContext value={frozen ? captured : live}>{children}</RouterStateContext>
 }

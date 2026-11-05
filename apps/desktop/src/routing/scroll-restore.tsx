@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactElement, type ReactNode } from 'react'
 import { cn } from '@/lib/utils.ts'
-import { useRouter } from './router.tsx'
+import { useRouterState } from './router.tsx'
 
 interface ScrollRestoredProps {
   className?: string
@@ -19,7 +19,7 @@ interface ScrollRestoredProps {
  * static offsets, overflowing the frame into a second scrollbar.
  */
 export function ScrollRestored({ className, children }: ScrollRestoredProps): ReactElement {
-  const { entryId, saveScrollState, savedScroll } = useRouter()
+  const { entryId, saveScrollState, savedScroll } = useRouterState()
   const ref = useRef<HTMLDivElement | null>(null)
 
   // Re-run whenever the history entry changes (back/forward, or note→note in
