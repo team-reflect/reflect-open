@@ -85,15 +85,17 @@ class KeyboardPlugin: Plugin {
     let selector = NSSelectorFromString(
       "_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:")
     guard let method = class_getInstanceMethod(contentClass, selector) else { return }
-    typealias ElementDidFocus = @convention(c) (
-      AnyObject, Selector, UnsafeRawPointer, Bool, Bool, UInt, AnyObject?
-    ) -> Void
+    typealias ElementDidFocus =
+      @convention(c) (
+        AnyObject, Selector, UnsafeRawPointer, Bool, Bool, UInt, AnyObject?
+      ) -> Void
     let original = unsafeBitCast(method_getImplementation(method), to: ElementDidFocus.self)
-    let block: @convention(block) (
-      AnyObject, UnsafeRawPointer, Bool, Bool, UInt, AnyObject?
-    ) -> Void = { view, element, _, blurPreviousNode, activityStateChanges, userObject in
-      original(view, selector, element, true, blurPreviousNode, activityStateChanges, userObject)
-    }
+    let block:
+      @convention(block) (
+        AnyObject, UnsafeRawPointer, Bool, Bool, UInt, AnyObject?
+      ) -> Void = { view, element, _, blurPreviousNode, activityStateChanges, userObject in
+        original(view, selector, element, true, blurPreviousNode, activityStateChanges, userObject)
+      }
     method_setImplementation(method, imp_implementationWithBlock(block))
   }
 }
