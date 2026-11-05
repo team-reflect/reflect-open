@@ -1,4 +1,10 @@
-import { combineStores, WritableStore, type CoreServices, type Store } from '@reflect/core'
+import {
+  combineStores,
+  isMobilePlatform,
+  WritableStore,
+  type CoreServices,
+  type Store,
+} from '@reflect/core'
 import type { ClipboardService } from './app/clipboard-service.ts'
 import {
   createOpenerService,
@@ -354,6 +360,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       graphSession: core.graphSession,
       blocked: whatsNewBlocked(core),
       content: WHATS_NEW,
+      offerFirst: !isMobilePlatform(core.platform.appPlatform),
     }),
     review: createReviewService({
       storage: core.storage,

@@ -23,9 +23,9 @@ import type {
 export const PAYWALL_REQUESTED_STORAGE_KEY = 'reflect.paywall-requested'
 
 /**
- * The local ISO date on which the skippable paywall last opened.
+ * The install clock's `dayIndex` on which the skippable paywall last opened.
  */
-export const PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY = 'reflect.paywall.skippable-shown-on'
+export const PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY = 'reflect.paywall.skippable-shown-day'
 
 /**
  * A simulated phase for QA, for this session only.
@@ -100,7 +100,7 @@ interface GateInputs {
   readonly environment: AppStoreEnvironmentState
   readonly clock: InstallClockState
   readonly requested: boolean
-  readonly shownOn: string | null
+  readonly shownDay: string | null
   readonly override: PaywallPhase | null
 }
 
@@ -113,7 +113,7 @@ function computeGate({
   environment,
   clock,
   requested,
-  shownOn,
+  shownDay,
   override,
 }: GateInputs): PaywallPhase {
   if (active.value !== null || classic.active) {
@@ -131,7 +131,7 @@ function computeGate({
   if (phase === 'required') {
     return 'required'
   }
-  if (requested || (phase === 'skippable' && shownOn !== clock.today)) {
+  if (requested || (phase === 'skippable' && shownDay !== String(clock.dayIndex))) {
     return 'skippable'
   }
   return 'hidden'
@@ -181,12 +181,12 @@ class PaywallServiceImpl implements PaywallService {
         appStoreEnvironment,
         installClock,
         this.requested,
-        storage.local.store(PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY),
+        storage.local.store(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY),
         this.phaseOverride,
       ],
-      (active, classic, environment, clock, requested, shownOn, override) => {
+      (active, classic, environment, clock, requested, shownDay, override) => {
         return platform.appPlatform === 'ios'
-          ? computeGate({ active, classic, environment, clock, requested, shownOn, override })
+          ? computeGate({ active, classic, environment, clock, requested, shownDay, override })
           : 'hidden'
       },
     )
@@ -197,26 +197,26 @@ class PaywallServiceImpl implements PaywallService {
   }
 
   readonly markSkippableShown = (): void => {
-    // Open first, so the date never closes the paywall it records.
+    // Open first, so the day never closes the paywall it records.
     this.setRequested(true)
     this.#deps.storage.local.set(
-      PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY,
-      this.#deps.installClock.get().today,
+      PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY,
+      String(this.#deps.installClock.get().dayIndex),
     )
   }
 
   readonly dismissSkippable = (): void => {
-    // Records today again, so a paywall left open past midnight still closes.
+    // Records the day again, so a paywall left open into the next day still closes.
     this.#deps.storage.local.set(
-      PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY,
-      this.#deps.installClock.get().today,
+      PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY,
+      String(this.#deps.installClock.get().dayIndex),
     )
     this.setRequested(false)
   }
 
   readonly setPhaseOverride = (next: PaywallPhase | null): void => {
     const { storage } = this.#deps
-    storage.local.set(PAYWALL_SKIPPABLE_SHOWN_ON_STORAGE_KEY, null)
+    storage.local.set(PAYWALL_SKIPPABLE_SHOWN_DAY_STORAGE_KEY, null)
     this.setRequested(false)
     storage.session.set(PAYWALL_PHASE_OVERRIDE_STORAGE_KEY, next)
   }

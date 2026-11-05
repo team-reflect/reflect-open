@@ -7,7 +7,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { toast } from '@/components/ui/toast.tsx'
+import { useToastController } from '@/lib/use-toasts.ts'
 import type {
   PendingReplacementResolveHandler,
   SelectionMenuContext,
@@ -77,6 +77,7 @@ export function useEditorAiMenu({
   sessionEpoch,
   editorRef,
 }: EditorAiMenuOptions): EditorAiMenuValue {
+  const toastController = useToastController()
   const noteRow = useNoteRow(path)
   // The last privacy flag this session resolved, adjusted during render (the
   // note-pane seed pattern). A title-driven rename retargets the same note
@@ -145,7 +146,7 @@ export function useEditorAiMenu({
           setRunMode(null)
         }
         editorRef.current?.discardPendingReplacement()
-        toast.add({ type: 'error', title: message })
+        toastController.add({ type: 'error', title: message })
       }
 
       // The service picks the provider, gates the selection against the
@@ -170,7 +171,7 @@ export function useEditorAiMenu({
         // and the user decides with Accept/Discard.
       }
     },
-    [selectionTransform, path, isPrivate, editorRef],
+    [selectionTransform, path, isPrivate, editorRef, toastController],
   )
 
   const runPrompt = useCallback(

@@ -27,6 +27,7 @@ import {
 import { type Route, createWeekWindow, weekOf, formatMonthLabel } from '@reflect/app'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { dispatchTouch, scrollElement, touch } from '@/test-utils/scroll.ts'
+import { emulateReducedMotion } from '@/test-utils/reduced-motion.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -113,7 +114,8 @@ beforeEach(async () => {
   appServices = createTestAppServices(core)
   // The tests compute dates from the real clock.
   core.clock.setNow(Date.now())
-  // The browser context prefers reduced motion; the test preferences say the same.
+  // The browser and the test preferences both prefer reduced motion.
+  await emulateReducedMotion(true)
   appServices.systemPreferences.reducedMotion.set(true)
   dailyDatesInRange = vi.spyOn(core.dailyNotes, 'dailyDatesInRange').mockResolvedValue([])
   editorProbe.focusCalls = 0
@@ -173,9 +175,24 @@ function visibleLayer(view: BrowserView): HTMLElement {
   return visible
 }
 
-async function finishAnimation(element: Element): Promise<void> {
-  await act(() => {
-    fireEvent.animationEnd(element)
+/**
+ * Finishes the animations of the stack layers and the scrim until no layer
+ * slides.
+ */
+async function finishStackAnimations(view: BrowserView): Promise<void> {
+  await waitFor(async () => {
+    await act(async () => {
+      const animations = Array.from(
+        view.container.querySelectorAll('.mobile-stack-layer, .mobile-stack-scrim'),
+      ).flatMap((element) => element.getAnimations())
+      for (const animation of animations) {
+        animation.finish()
+      }
+      await Promise.allSettled(animations.map((animation) => animation.finished))
+    })
+    expect(
+      view.container.querySelector('.mobile-stack-slide-in, .mobile-stack-slide-out'),
+    ).toBeNull()
   })
 }
 
@@ -291,7 +308,7 @@ describe('MobileShell', () => {
   it('selects a day in another week straight from the pageable strip', async () => {
     const today = getIsoToday()
     // Two weeks out: its cell lives on a different week slide of the strip,
-    // which the strip renders (and Embla pages) rather than a single week.
+    // which the strip renders (and pages) rather than a single week.
     const nextFortnight = addDaysToIsoDate(today, 14)
     const view = await mount({ kind: 'today' })
 
@@ -888,15 +905,15 @@ describe('MobileShell', () => {
  * its origin (which stays mounted, hidden, and inert beneath it), popping
  * slides it out, and tab switches stay instant. The layers are pages of a
  * horizontal scroller, the current one last, and an edge back-swipe scrolls
- * it. Tests drive the `animationend` completions by hand, scroll the pager as
+ * it. Tests finish the animations by hand, scroll the pager as
  * a finger would, and read which screen the router lands on.
  */
 describe('MobileStack transitions & back pager', () => {
-  // The file's preferences prefer reduced motion, as the test browser does, which
-  // turns the stack's animations off. These tests are about the animated path,
-  // so they report the animating preference; the reduced-motion test below
-  // sets the other answer for itself.
-  beforeEach(() => {
+  // The file prefers reduced motion, which turns the stack's animations off.
+  // These tests are about the animated path, so they prefer full motion; the
+  // reduced-motion test below sets the other answer for itself.
+  beforeEach(async () => {
+    await emulateReducedMotion(false)
     appServices.systemPreferences.reducedMotion.set(false)
   })
 
@@ -904,7 +921,7 @@ describe('MobileStack transitions & back pager', () => {
   async function pushProbeNote(view: BrowserView): Promise<void> {
     const user = userEvent
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    await finishAnimation(stackLayers(view).at(-1)!)
+    await finishStackAnimations(view)
   }
 
   function pager(view: BrowserView): HTMLElement {
@@ -934,7 +951,7 @@ describe('MobileStack transitions & back pager', () => {
     ).toBe(formatMonthLabel(getYearMonth(getIsoToday())))
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeTruthy()
 
-    await finishAnimation(entering!)
+    await finishStackAnimations(view)
     // The animation class clears; the origin stays mounted for the back-swipe.
     expect(entering!.className).not.toContain('mobile-stack-slide-in')
     expect(stackLayers(view)).toHaveLength(2)
@@ -955,7 +972,7 @@ describe('MobileStack transitions & back pager', () => {
     expect(exiting.className).toContain('mobile-stack-slide-out')
     expect(exiting.getAttribute('aria-hidden')).toBe('true')
 
-    await finishAnimation(exiting)
+    await finishStackAnimations(view)
     expect(stackLayers(view)).toHaveLength(1)
   })
 
@@ -983,7 +1000,7 @@ describe('MobileStack transitions & back pager', () => {
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
     await pushProbeNote(view)
     await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
-    await finishAnimation(stackLayers(view).at(-1)!)
+    await finishStackAnimations(view)
     await waitFor(() => expect(stackLayers(view)).toHaveLength(1))
 
     await user.click(view.getByRole('button', { name: 'All' }))
@@ -1004,7 +1021,7 @@ describe('MobileStack transitions & back pager', () => {
 
     // Tapping All again, on its card, pops back to the list.
     await user.click(view.getByRole('button', { name: 'All' }))
-    await finishAnimation(stackLayers(view).at(-1)!)
+    await finishStackAnimations(view)
     await waitFor(() => {
       expect(stackLayers(view)).toHaveLength(1)
       expect(stackLayers(view)[0]!.querySelector('input[aria-label="Search notes"]')).not.toBeNull()
@@ -1026,7 +1043,7 @@ describe('MobileStack transitions & back pager', () => {
     await waitFor(() => {
       expect(stackLayers(view).at(-1)!.className).toContain('mobile-stack-slide-in')
     })
-    await finishAnimation(stackLayers(view).at(-1)!)
+    await finishStackAnimations(view)
 
     await user.click(view.getByRole('button', { name: 'Back' }))
     // Popping reveals the still-mounted source, re-seats today beneath it,
@@ -1037,11 +1054,12 @@ describe('MobileStack transitions & back pager', () => {
     expect(page.elementLocator(visibleLayer(view)).getByRole('heading').element().textContent).toBe(
       'Edit note',
     )
-    await finishAnimation(layers.at(-1)!)
+    await finishStackAnimations(view)
     expect(stackLayers(view)).toHaveLength(2)
   })
 
   it('cuts instantly under prefers-reduced-motion', async () => {
+    await emulateReducedMotion(true)
     appServices.systemPreferences.reducedMotion.set(true)
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
@@ -1261,7 +1279,7 @@ describe('MobileStack transitions & back pager', () => {
     core.noteFile.set('notes/source.md', 'see [[Target Note]]')
     const view = await mount({ kind: 'note', path: 'notes/source.md' })
     await userEvent.click(view.getByRole('button', { name: 'fake-wikilink' }))
-    await finishAnimation(stackLayers(view).at(-1)!)
+    await finishStackAnimations(view)
 
     await scrollElement({ element: pager(view), left: 0, touch: true })
     // The source becomes current over a freshly mounted today.

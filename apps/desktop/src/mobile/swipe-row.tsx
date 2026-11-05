@@ -91,24 +91,35 @@ export function SwipeRow({
       return
     }
     const controller = new AbortController()
+    // Ends the over-swipe color once the row rests closed.
+    const deactivateIfClosed = (): void => {
+      if (Math.round(scroller.scrollLeft) === 0) {
+        delete scroller.dataset.active
+      }
+    }
     watchRef.current = watchScrollSettle({
       element: scroller,
-      onSettle: () => reportSettled(scroller),
+      onSettle: () => {
+        deactivateIfClosed()
+        reportSettled(scroller)
+      },
       signal: controller.signal,
     })
     // A finger that lifts without moving the row leaves no settle report, so
     // the placement it held back runs again. These listeners run after the
     // watch's own, so `isTouching` is already up to date.
     const placeHeld = (): void => {
+      deactivateIfClosed()
       if (heldAtRef.current === scroller.scrollLeft) {
         setLifts((count) => count + 1)
       }
     }
-    scroller.addEventListener('touchend', placeHeld, { passive: true })
-    scroller.addEventListener('touchcancel', placeHeld, { passive: true })
+    scroller.addEventListener('touchend', placeHeld, { passive: true, signal: controller.signal })
+    scroller.addEventListener('touchcancel', placeHeld, {
+      passive: true,
+      signal: controller.signal,
+    })
     return () => {
-      scroller.removeEventListener('touchend', placeHeld)
-      scroller.removeEventListener('touchcancel', placeHeld)
       controller.abort()
       watchRef.current = null
     }
@@ -138,6 +149,8 @@ export function SwipeRow({
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>): void => {
       if (event.isPrimary) {
+        // Turns on the over-swipe color behind the actions.
+        event.currentTarget.dataset.active = ''
         onBeginInteraction()
       }
     },
@@ -160,16 +173,20 @@ export function SwipeRow({
       data-scroll-x=""
       onPointerDown={onPointerDown}
       style={scrollerStyle}
-      className={cn(
-        'swipe-row flex snap-x snap-mandatory scrollbar-none overflow-x-auto overflow-y-hidden overscroll-x-contain',
-        className,
-      )}
+      className={cn('swipe-row pager-x flex overflow-x-auto', className)}
     >
-      <div className={cn('relative z-10 w-full flex-none snap-start', surfaceClassName)}>
+      <div
+        // `will-change-transform` gives the surface its own compositing layer, so
+        // WebKit keeps it above the sticky actions inside a stacking context
+        // (iOS 26 misorders them under virtua's `contain: layout` items).
+        className={cn(
+          'relative z-10 w-full flex-none snap-start will-change-transform',
+          surfaceClassName,
+        )}
+      >
         {children}
       </div>
       <div
-        data-slot="swipe-row-actions"
         className="sticky right-0 flex flex-none"
         style={actionsStyle}
         aria-hidden={!revealed || undefined}

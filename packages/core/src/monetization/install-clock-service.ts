@@ -1,5 +1,5 @@
 import { isDeepEqual } from '@ocavue/utils'
-import { formatIsoDate, safeParseJson } from '@reflect/utils'
+import { safeParseJson } from '@reflect/utils'
 import { z } from 'zod'
 import type { ActivityPort } from '../ports/activity-port.ts'
 import type { ClockService } from '../ports/clock-service.ts'
@@ -8,7 +8,7 @@ import type { PlatformFacts } from '../ports/platform-facts.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
-import { getPaywallPhase, type PaywallPhase } from './paywall-phase.ts'
+import { DAY_MS, getPaywallPhase, type PaywallPhase } from './paywall-phase.ts'
 
 /**
  * The keychain entry holding this device's first launch.
@@ -39,9 +39,10 @@ export interface InstallClockState {
    */
   readonly firstLaunchAt: number | null
   /**
-   * The local ISO date of the latest time the app has seen.
+   * Whole days from the first launch to the latest time the app has seen; `0`
+   * while loading or when the keychain is unreadable.
    */
-  readonly today: string
+  readonly dayIndex: number
   readonly isLoading: boolean
 }
 
@@ -77,7 +78,7 @@ class InstallClockServiceImpl implements InstallClockService {
       {
         phase: this.#enabled ? null : 'hidden',
         firstLaunchAt: null,
-        today: formatIsoDate(new Date(deps.clock.now())),
+        dayIndex: 0,
         isLoading: this.#enabled,
       },
       isDeepEqual,
@@ -173,7 +174,7 @@ class InstallClockServiceImpl implements InstallClockService {
       this.#state.set({
         phase: 'hidden',
         firstLaunchAt: null,
-        today: formatIsoDate(new Date(now)),
+        dayIndex: 0,
         isLoading: false,
       })
       return
@@ -195,7 +196,7 @@ class InstallClockServiceImpl implements InstallClockService {
     this.#state.set({
       phase,
       firstLaunchAt: record.firstLaunchAt,
-      today: formatIsoDate(new Date(effectiveNow)),
+      dayIndex: Math.floor((effectiveNow - record.firstLaunchAt) / DAY_MS),
       isLoading: false,
     })
   }

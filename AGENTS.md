@@ -64,6 +64,14 @@ release-please owns the app version in `apps/desktop/package.json`. Never hand-e
 that version, the changelogs (`apps/desktop/CHANGELOG.md`,
 `apps/desktop/CHANGELOG.beta.md`), or the manifests under `.github/release-please/`.
 
+What's New is the in-app list of changes shown after an update. When a PR adds a
+feature or a change users will notice, add an item to `WHATS_NEW` in
+`packages/app/src/whats-new/whats-new-content.ts` in the same PR. Key it by the next
+marketing version (the version in `apps/desktop/package.json` without the prerelease
+suffix). Write a short title and a one-sentence body for users, and set `platforms`
+to where the change shows. Prefer to extend or merge an existing item over adding a
+near-duplicate. Skip internal changes, refactors, and small fixes.
+
 ### Running tests
 
 There are too many tests to run them all. Run only the ones for the logic you wrote:

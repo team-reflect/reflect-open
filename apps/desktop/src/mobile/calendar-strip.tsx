@@ -55,7 +55,10 @@ export function CalendarStrip({
   const { haptics } = useMobileServices()
   const weekStartDay = useWeekStartDay()
   const { navigate } = useRouterActions()
-  const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(date, weekStartDay)
+  const { scrollerRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(
+    date,
+    weekStartDay,
+  )
   const dailyNoteDates = useDailyNoteDates(
     weekWindow.start,
     addDaysToIsoDate(weekAtIndex(weekWindow, weekWindow.count - 1), 6),
@@ -149,27 +152,22 @@ export function CalendarStrip({
           </Button>
         </div>
       </div>
-      {/* `overflow: clip`: not a scroll container, so a stray scrollLeft write
-          cannot offset Embla's transform-positioned belt. Inline so pre-iOS-16
-          falls back to the class's `hidden`. */}
-      <div className="overflow-hidden" style={{ overflow: 'clip' }} ref={emblaRef}>
-        <div className="flex">
-          {Array.from({ length: weekWindow.count }, (_, index) => {
-            const weekStart = weekAtIndex(weekWindow, index)
-            const weekEnd = addDaysToIsoDate(weekStart, 6)
-            const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
-            return (
-              <WeekRow
-                key={weekStart}
-                weekStart={weekStart}
-                selectedDay={contains(date) ? date : null}
-                todayDay={contains(today) ? today : null}
-                dailyNoteDates={dailyNoteDates}
-                onSelect={onSelect}
-              />
-            )
-          })}
-        </div>
+      <div ref={scrollerRef} data-scroll-x className="pager-x flex overflow-x-auto">
+        {Array.from({ length: weekWindow.count }, (_, index) => {
+          const weekStart = weekAtIndex(weekWindow, index)
+          const weekEnd = addDaysToIsoDate(weekStart, 6)
+          const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
+          return (
+            <WeekRow
+              key={weekStart}
+              weekStart={weekStart}
+              selectedDay={contains(date) ? date : null}
+              todayDay={contains(today) ? today : null}
+              dailyNoteDates={dailyNoteDates}
+              onSelect={onSelect}
+            />
+          )
+        })}
       </div>
       <MonthPickerDrawer
         open={monthPickerOpen}

@@ -20,6 +20,7 @@ import {
   dismissRecordingReminder,
   showRecordingReminder,
 } from '@/components/audio-memo/recording-reminder.ts'
+import { useToastController } from '@/lib/use-toasts.ts'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
@@ -178,6 +179,7 @@ function NativeAudioMemoBridge({ children }: { children: ReactNode }): ReactElem
 function WebviewAudioMemoProvider({ graph, children }: AudioMemoProviderProps): ReactElement {
   const { audioMemo } = useCoreServices()
   const { collapsed, toggleSidebar } = useSidebar()
+  const toastController = useToastController()
 
   // Read at call time: the session outlives the renders that made these.
   const collapsedRef = useRef(collapsed)
@@ -196,8 +198,12 @@ function WebviewAudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
         reveal: () => {
           toggleSidebarRef.current()
         },
-        showReminder: showRecordingReminder,
-        dismissReminder: dismissRecordingReminder,
+        showReminder: (elapsedMs, stop) => {
+          showRecordingReminder(toastController, elapsedMs, stop)
+        },
+        dismissReminder: () => {
+          dismissRecordingReminder(toastController)
+        },
       },
     })
     setSession(next)
@@ -205,7 +211,7 @@ function WebviewAudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       next.dispose()
       setSession((current) => (current === next ? null : current))
     }
-  }, [audioMemo, graph.generation])
+  }, [audioMemo, toastController, graph.generation])
 
   const store = session ?? CLOSED_SESSION
 
