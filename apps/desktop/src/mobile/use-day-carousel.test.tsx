@@ -363,6 +363,22 @@ describe('useDayCarousel', () => {
     expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
   })
 
+  it('stays on the selected day when its editor is tapped', async () => {
+    const { scroller, onSelect } = await mountCarousel()
+    const editor = await vi.waitFor(() => {
+      const element = slide(DATE)?.querySelector<HTMLElement>('[contenteditable="true"]')
+      expect(element).toBeTruthy()
+      return element!
+    })
+    await touch(editor, 'start')
+    await touch(editor, 'end')
+    await act(() => editor.focus())
+
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
   it('blurs an editor left focused on the day a swipe leaves', async () => {
     const { scroller, onSelect } = await mountCarousel()
     const editor = await vi.waitFor(() => {
