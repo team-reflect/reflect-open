@@ -18,9 +18,11 @@
   --ios-separator: rgb(60 60 67 / 0.12);
 }
 
+/* In dark mode the page and cards use the app's own surfaces instead of
+   UIKit's black and #1C1C1E, so they match the header and the tab bar. */
 .dark {
-  --ios-grouped-background: rgb(0 0 0);
-  --ios-grouped-cell: rgb(28 28 30);
+  --ios-grouped-background: var(--surface-app);
+  --ios-grouped-cell: var(--surface);
   --ios-label: rgb(255 255 255);
   --ios-secondary-label: rgb(235 235 245 / 0.6);
   --ios-tertiary-label: rgb(235 235 245 / 0.3);
