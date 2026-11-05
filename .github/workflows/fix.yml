@@ -52,6 +52,9 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: cargo fmt --all
 
+      - name: Fix (Swift)
+        run: git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
+
       - name: Install cargo-about
         if: steps.changes.outputs.licenses == 'true'
         uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
@@ -63,3 +66,11 @@ jobs:
         run: pnpm gen:licenses
 
       - uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a # v1.3.4
+
+      # The autofix step fails the job when it pushes a fix, so these checks
+      # run on the fixed code in the next run.
+      - name: Lint (Swift)
+        run: git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
+
+      - name: Check (Swift)
+        run: git diff --exit-code '*.swift'
