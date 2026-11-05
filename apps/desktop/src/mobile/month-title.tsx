@@ -1,11 +1,7 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { formatMonthLabel } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './month-title.css'
-
-/** Mirrors the animation durations in month-title.css (the fallback timer). */
-export const MONTH_TITLE_TRANSITION_MS = 500
 
 interface OutgoingMonth {
   month: string
@@ -27,33 +23,35 @@ interface MonthTitleProps {
  * catching a mid-roll outgoing label.
  */
 export function MonthTitle({ month }: MonthTitleProps): ReactElement {
-  const reducedMotion = usePrefersReducedMotion()
   const [shown, setShown] = useState(month)
   const [outgoing, setOutgoing] = useState<OutgoingMonth | null>(null)
   // Adjust-on-render rather than an effect: the outgoing and incoming labels
   // must appear in the same paint or the roll flickers.
   if (shown !== month) {
     setShown(month)
-    setOutgoing(reducedMotion ? null : { month: shown, direction: month > shown ? 'up' : 'down' })
+    setOutgoing({ month: shown, direction: month > shown ? 'up' : 'down' })
   }
 
-  // The outgoing label leaves on `animationend` — a native listener, like
-  // the navigation stack's (React's synthetic animation events misfire in
-  // some WebKit/jsdom environments). The timer is the fallback for when the
-  // animation never runs (the reduced-motion media block).
+  // The outgoing label leaves when its CSS animations finish. Under reduced
+  // motion it has none, so it leaves before the browser paints.
   const outgoingRef = useRef<HTMLSpanElement | null>(null)
-  useEffect(() => {
-    if (!outgoing) {
+  useLayoutEffect(() => {
+    const element = outgoingRef.current
+    if (!outgoing || !element) {
       return
     }
-    const element = outgoingRef.current
-    const clear = (): void => setOutgoing(null)
-    element?.addEventListener('animationend', clear)
-    const timer = window.setTimeout(clear, MONTH_TITLE_TRANSITION_MS + 80)
-    return () => {
-      element?.removeEventListener('animationend', clear)
-      window.clearTimeout(timer)
+    const animations = element.getAnimations()
+    if (animations.length === 0) {
+      setOutgoing(null)
+      return
     }
+    const controller = new AbortController()
+    void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+      if (!controller.signal.aborted) {
+        setOutgoing(null)
+      }
+    })
+    return () => controller.abort()
   }, [outgoing])
 
   return (

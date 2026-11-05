@@ -326,7 +326,7 @@ describe('AllNotesScreen', () => {
     const view = await renderScreen()
 
     // `book` is pinned, so the combobox offers only `travel` (with its count).
-    await view.getByRole('button', { name: 'Custom' }).click()
+    await view.getByRole('combobox', { name: 'Custom' }).click()
     const listbox = page.getByRole('listbox')
     await expect.element(listbox).toMatchTextContent('#travel')
     await expect.element(listbox).toMatchTextContent('2')
@@ -340,7 +340,7 @@ describe('AllNotesScreen', () => {
     expect(view.getByText('Health Stacked').query()).toBeNull()
     // The trigger adopts the active custom tag.
     await expect
-      .element(view.getByRole('button', { name: /#travel/, expanded: false }))
+      .element(view.getByRole('combobox', { name: /#travel/, expanded: false }))
       .toBeInTheDocument()
     await view.getByRole('button', { name: 'Tue, June 9th, 2026' }).click()
     expect(probedRoute(view)).toEqual({ kind: 'daily', date: '2026-06-09' })
@@ -351,7 +351,7 @@ describe('AllNotesScreen', () => {
     const view = await renderScreen()
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    await view.getByRole('button', { name: 'Custom' }).click()
+    await view.getByRole('combobox', { name: 'Custom' }).click()
     const input = page.getByPlaceholder('Filter by any tag…')
 
     // An exact existing tag isn't duplicated as a "Filter by" item.
@@ -364,6 +364,10 @@ describe('AllNotesScreen', () => {
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'zettel' })
     await expect.element(view.getByText('No notes tagged #zettel.')).toBeInTheDocument()
+
+    // Reopening starts from an empty search.
+    await view.getByRole('combobox', { name: '#zettel' }).click()
+    await expect.element(page.getByPlaceholder('Filter by any tag…')).toHaveValue('')
     await view.unmount()
   })
 
@@ -371,13 +375,13 @@ describe('AllNotesScreen', () => {
     const view = await renderScreen()
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    await view.getByRole('button', { name: 'Custom' }).click()
+    await view.getByRole('combobox', { name: 'Custom' }).click()
     const input = page.getByPlaceholder('Filter by any tag…')
     await input.fill('TRAVEL')
 
-    // cmdk's default filter (command-score) folds case like `foldTag` does,
-    // so a differently-cased query keeps the existing facet reachable instead
-    // of dead-ending with a hidden list and a suppressed "Filter by" offer.
+    // Base UI's default filter folds case like `foldTag` does, so a
+    // differently-cased query keeps the existing facet reachable instead of
+    // dead-ending with a hidden list and a suppressed "Filter by" offer.
     await expect.element(page.getByRole('option', { name: /#travel/ })).toBeInTheDocument()
     expect(page.getByRole('option', { name: /Filter by/ }).query()).toBeNull()
 
@@ -520,7 +524,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     const view = await renderScreen()
     await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    await view.getByRole('button', { name: /Custom/ }).click()
+    await view.getByRole('combobox', { name: /Custom/ }).click()
     await page.getByRole('option', { name: /#travel/ }).click()
     await expect.element(view.getByText('Tue, June 9th, 2026')).toBeInTheDocument()
 

@@ -1,35 +1,34 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { MockToastAddOptions } from '@/test-utils/toast.ts'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  clickToastAction,
+  createTestToastController,
+  type TestToastController,
+} from '@/test-utils/toast.tsx'
 import { showRecordingReminder } from './recording-reminder.ts'
 
-const toast = vi.hoisted(() => ({
-  add: vi.fn<(options: MockToastAddOptions) => string>(),
-  close: vi.fn(),
-}))
+let toastController: TestToastController
 
-vi.mock('@/components/ui/toast.tsx', () => ({ toast }))
-
-afterEach(() => {
-  toast.add.mockClear()
+beforeEach(() => {
+  toastController = createTestToastController()
 })
 
 describe('showRecordingReminder', () => {
   it('shows the elapsed time with a stop action', () => {
     const stop = vi.fn()
-    showRecordingReminder(90 * 60_000, stop)
+    showRecordingReminder(toastController, 90 * 60_000, stop)
 
-    const options = toast.add.mock.lastCall?.[0]
+    const options = toastController.add.mock.lastCall?.[0]
     expect(options?.title).toBe('Still recording')
     expect(options?.description).toBe('1:30:00')
-    options?.actionProps?.onClick()
+    clickToastAction(options)
     expect(stop).toHaveBeenCalledTimes(1)
   })
 
   it('reuses one toast id so reminders replace each other', () => {
-    showRecordingReminder(30 * 60_000, vi.fn())
-    showRecordingReminder(60 * 60_000, vi.fn())
+    showRecordingReminder(toastController, 30 * 60_000, vi.fn())
+    showRecordingReminder(toastController, 60 * 60_000, vi.fn())
 
-    const ids = toast.add.mock.calls.map(([options]) => options.id)
+    const ids = toastController.add.mock.calls.map(([options]) => options.id)
     expect(new Set(ids).size).toBe(1)
   })
 })

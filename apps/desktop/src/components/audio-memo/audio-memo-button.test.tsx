@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { WritableStore, type AudioMemoSessionState } from '@reflect/core'
-import { AudioMemoContext, type AudioMemoContextValue } from '@/providers/audio-memo-provider.tsx'
+import { AudioMemoContext } from '@/providers/audio-memo-provider.tsx'
 import { AudioMemoButton } from './audio-memo-button.tsx'
 
 const IDLE: AudioMemoSessionState = {
@@ -22,7 +22,7 @@ const state = new WritableStore(IDLE)
 const elapsedMs = new WritableStore(0)
 const actions = { toggle: vi.fn(), cancel: vi.fn(), retry: vi.fn(), discard: vi.fn() }
 const session = { get: state.get, subscribe: state.subscribe, elapsedMs }
-let presentation: AudioMemoContextValue['presentation'] = 'popover'
+let presentation: 'popover' | 'sheet' = 'popover'
 
 function setMemo(patch: Partial<AudioMemoSessionState>): void {
   state.set({ ...state.get(), ...patch })

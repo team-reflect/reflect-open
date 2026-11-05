@@ -94,6 +94,8 @@ export function watchScrollSettle({
   let snapTailTimer: ReturnType<typeof setTimeout> | undefined
   // The current mouse press, from `pointerdown` until its release scroll stops.
   let press: AbortController | undefined
+  // The current touch gesture, from the first finger down until the last lifts.
+  let gesture = new AbortController()
 
   const isTouching = (): boolean => fingers.size > 0 || mouseDragging
   const endSnapTail = (): void => {
@@ -127,9 +129,17 @@ export function watchScrollSettle({
   element.addEventListener(
     'touchstart',
     (event: TouchEvent) => {
+      if (fingers.size === 0) {
+        gesture = new AbortController()
+      }
       for (const touch of event.changedTouches) {
         fingers.add(touch.identifier)
       }
+      // `touchend` fires on the node the finger landed on, and does not bubble
+      // to `element` once that node is removed, so the listeners go on the node.
+      const target = event.target as HTMLElement | null
+      target?.addEventListener('touchend', release, { passive: true, signal: gesture.signal })
+      target?.addEventListener('touchcancel', release, { passive: true, signal: gesture.signal })
       endSnapTail()
       fingerScroll = true
       scrolledSinceTouch = false
@@ -141,6 +151,9 @@ export function watchScrollSettle({
   const release = (event: TouchEvent): void => {
     for (const touch of event.changedTouches) {
       fingers.delete(touch.identifier)
+    }
+    if (fingers.size === 0) {
+      gesture.abort()
     }
     if (isTouching()) {
       return
@@ -156,8 +169,6 @@ export function watchScrollSettle({
       settleOrWait()
     }
   }
-  element.addEventListener('touchend', release, { passive: true, signal })
-  element.addEventListener('touchcancel', release, { passive: true, signal })
   element.addEventListener(
     'wheel',
     () => {
@@ -201,6 +212,7 @@ export function watchScrollSettle({
     () => {
       clearTimeout(timer)
       clearTimeout(snapTailTimer)
+      gesture.abort()
     },
     { once: true },
   )
@@ -291,9 +303,9 @@ export function watchScrollSettle({
       }
       suppressNextClick()
       // Snap turned back on moves the element to its snap position at the next
-      // layout, which the read forces. Safari makes that move a jump, so snap
-      // goes off again within the same task, before a frame paints, and stays
-      // off until the smooth scroll there stops.
+      // layout, which the read forces. Safari makes that move a jump
+      // (docs/mobile-motion.md), so snap goes off again within the same task,
+      // before a frame paints, and stays off until the smooth scroll there stops.
       const from = position()
       element.style.scrollSnapType = ''
       const end = position()

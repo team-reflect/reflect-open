@@ -54,6 +54,22 @@ describe('watchScrollSettle', () => {
     expect(watch.isUserScroll()).toBe(true)
   })
 
+  it('stops touching when a finger lifts from a removed node', async () => {
+    const element = mountScroller()
+    const watch = watchScrollSettle({
+      element,
+      onSettle: vi.fn(),
+      signal: listeners.controller.signal,
+    })
+    const child = element.firstElementChild!
+
+    await touch(child, 'start')
+    child.remove()
+    await touch(child, 'end')
+
+    expect(watch.isTouching()).toBe(false)
+  })
+
   it('reports on touchend with no scroll after it once the element is settled', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()

@@ -1,22 +1,21 @@
 import { page, userEvent } from 'vitest/browser'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { WhatsNewPhase, WhatsNewService } from '@reflect/app'
 import { WritableStore } from '@reflect/core'
 import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
-import type { MockToastAddOptions } from '@/test-utils/toast.ts'
+import {
+  clickToastAction,
+  createTestToastController,
+  withToastController,
+  type TestToastController,
+} from '@/test-utils/toast.tsx'
 import { WhatsNewDialog } from './whats-new-dialog.tsx'
 
-const toast = vi.hoisted(() => ({
-  add: vi.fn<(options: MockToastAddOptions) => string>(),
-  close: vi.fn(),
-}))
+let toastController: TestToastController
 
-vi.mock('@/components/ui/toast.tsx', () => ({ toast }))
-
-afterEach(() => {
-  toast.add.mockClear()
-  toast.close.mockClear()
+beforeEach(() => {
+  toastController = createTestToastController()
 })
 
 function createFakeWhatsNew(initial: WhatsNewPhase = 'shown') {
@@ -49,7 +48,11 @@ function createFakeWhatsNew(initial: WhatsNewPhase = 'shown') {
 describe('WhatsNewDialog', () => {
   it('shows the items and closes on Continue', async () => {
     const { whatsNew, dismissed } = createFakeWhatsNew()
-    await renderInApp(<WhatsNewDialog />, { appServices: { whatsNew }, servicesOnly: true })
+    await renderInApp(<WhatsNewDialog />, {
+      appServices: { whatsNew },
+      servicesOnly: true,
+      wrapper: withToastController(toastController),
+    })
 
     await expect.element(page.getByText('Chat in the All tab')).toBeVisible()
     await userEvent.click(page.getByRole('button', { name: 'Continue' }))
@@ -60,7 +63,11 @@ describe('WhatsNewDialog', () => {
 
   it('keeps the items while the dialog animates closed', async () => {
     const { whatsNew } = createFakeWhatsNew()
-    await renderInApp(<WhatsNewDialog />, { appServices: { whatsNew }, servicesOnly: true })
+    await renderInApp(<WhatsNewDialog />, {
+      appServices: { whatsNew },
+      servicesOnly: true,
+      wrapper: withToastController(toastController),
+    })
     await expect.element(page.getByText('Chat in the All tab')).toBeVisible()
 
     await act(() => whatsNew.dismiss())
@@ -73,7 +80,11 @@ describe('WhatsNewDialog', () => {
 
   it('marks the version seen on Escape', async () => {
     const { whatsNew, dismissed } = createFakeWhatsNew()
-    await renderInApp(<WhatsNewDialog />, { appServices: { whatsNew }, servicesOnly: true })
+    await renderInApp(<WhatsNewDialog />, {
+      appServices: { whatsNew },
+      servicesOnly: true,
+      wrapper: withToastController(toastController),
+    })
 
     await expect.element(page.getByRole('dialog')).toBeVisible()
     await userEvent.keyboard('{Escape}')
@@ -84,9 +95,13 @@ describe('WhatsNewDialog', () => {
 
   it('offers What’s New in a toast that times out', async () => {
     const { whatsNew } = createFakeWhatsNew('offered')
-    await renderInApp(<WhatsNewDialog />, { appServices: { whatsNew }, servicesOnly: true })
+    await renderInApp(<WhatsNewDialog />, {
+      appServices: { whatsNew },
+      servicesOnly: true,
+      wrapper: withToastController(toastController),
+    })
 
-    expect(toast.add).toHaveBeenCalledWith(
+    expect(toastController.add).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'reflect-whats-new', timeout: 10_000 }),
     )
     expect(document.querySelector('[role="dialog"]')).toBeNull()
@@ -94,22 +109,34 @@ describe('WhatsNewDialog', () => {
 
   it('opens the dialog from the toast action', async () => {
     const { whatsNew, calls } = createFakeWhatsNew('offered')
-    await renderInApp(<WhatsNewDialog />, { appServices: { whatsNew }, servicesOnly: true })
+    await renderInApp(<WhatsNewDialog />, {
+      appServices: { whatsNew },
+      servicesOnly: true,
+      wrapper: withToastController(toastController),
+    })
 
-    const options = toast.add.mock.lastCall?.[0]
+    const options = toastController.add.mock.lastCall?.[0]
     expect(options?.actionProps?.children).toBe('What’s new')
-    await act(() => options?.actionProps?.onClick())
+    await act(() => {
+      clickToastAction(options)
+    })
 
-    expect(calls).toEqual(['accept'])
-    expect(toast.close).toHaveBeenCalledWith('reflect-whats-new')
+    // Closing the toast runs `onClose`. The real service ignores `decline`
+    // after `accept`.
+    expect(calls).toEqual(['accept', 'decline'])
+    expect(toastController.open()).toEqual([])
     await expect.element(page.getByText('Chat in the All tab')).toBeVisible()
   })
 
   it('declines the offer when the toast closes any other way', async () => {
     const { whatsNew, calls } = createFakeWhatsNew('offered')
-    await renderInApp(<WhatsNewDialog />, { appServices: { whatsNew }, servicesOnly: true })
+    await renderInApp(<WhatsNewDialog />, {
+      appServices: { whatsNew },
+      servicesOnly: true,
+      wrapper: withToastController(toastController),
+    })
 
-    toast.add.mock.lastCall?.[0]?.onClose?.()
+    toastController.close('reflect-whats-new')
 
     expect(calls).toEqual(['decline'])
   })
