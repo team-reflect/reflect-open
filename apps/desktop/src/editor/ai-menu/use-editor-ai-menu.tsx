@@ -72,6 +72,21 @@ interface ActiveRun {
   context: SelectionMenuContext
 }
 
+/**
+ * Runs `callback` for each value of `iterable` and stops when it returns
+ * `false`. React Compiler cannot compile a `for await` loop and skips any
+ * component or hook that contains one, so the loop lives in this module-level
+ * function, which the compiler does not touch.
+ */
+async function forEachAsync<T>(
+  iterable: AsyncIterable<T>,
+  callback: (value: T) => boolean | void,
+): Promise<void> {
+  for await (const value of iterable) {
+    if (callback(value) === false) return
+  }
+}
+
 export function useEditorAiMenu({
   path,
   sessionEpoch,
@@ -159,17 +174,17 @@ export function useEditorAiMenu({
         model: modelOverride,
         signal: run.controller.signal,
       })
-      for await (const event of events) {
-        if (runRef.current !== run) return
+      await forEachAsync(events, (event) => {
+        if (runRef.current !== run) return false
         if (event.type === 'text-delta') {
           editorRef.current?.appendPendingReplacementText(event.text)
         } else if (event.type === 'error') {
           fail(event.message)
-          return
+          return false
         }
         // 'complete' and 'aborted' need no action: the preview holds the text
         // and the user decides with Accept/Discard.
-      }
+      })
     },
     [selectionTransform, path, isPrivate, editorRef, toastController],
   )
