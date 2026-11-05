@@ -13,10 +13,15 @@ export interface SnapPagerOptions {
   count: () => number
   prefersReducedMotion: () => boolean
   /**
-   * The shown page changed. A user scroll shows the nearest page, and
-   * `show` or `restOn` shows its target at once.
+   * Where a mouse drag may start, or `null` for no mouse drag. Defaults to
+   * `element`.
    */
-  onIndex: (index: number) => void
+  dragHandle?: HTMLElement | null | undefined
+  /**
+   * The shown page changed. A user scroll shows the nearest page
+   * (`byUser` is true), and `show` or `restOn` shows its target at once.
+   */
+  onIndex: (index: number, byUser: boolean) => void
   /**
    * A user scroll came to rest on page `index`.
    */
@@ -40,15 +45,18 @@ export interface SnapPager {
 }
 
 /**
- * Owns the shown page of a snapping horizontal scroller. It rests on the
- * shown page after a scroll that no user started and after a resize, and
- * reports the page a user scroll comes to rest on.
+ * Owns the shown page of a snapping horizontal scroller. It pulls a scroll
+ * that neither a user nor `show` started back to the shown page, stays on the
+ * shown page after a resize, and reports the page a user scroll comes to rest
+ * on. A scroll that comes to rest on the page `show` targets counts as
+ * `show`'s, even when a finger or wheel moved the scroller on the way.
  */
 export function attachSnapPager({
   element,
   index: initialIndex,
   count,
   prefersReducedMotion,
+  dragHandle,
   onIndex,
   onUserSettle,
   signal,
@@ -56,39 +64,46 @@ export function attachSnapPager({
   let index = initialIndex
   // A user scroll has moved the scroller and has not settled.
   let userScrolling = false
+  // The page a running `show` scroll moves to.
+  let expected: number | undefined
 
-  const setIndex = (next: number): void => {
+  const setIndex = (next: number, byUser: boolean): void => {
     if (next !== index) {
       index = next
-      onIndex(next)
+      onIndex(next, byUser)
     }
   }
 
   const show = (next: number): void => {
-    setIndex(next)
+    setIndex(next, false)
     userScrolling = false
-    element.scrollTo({
-      left: next * pageWidth(element),
-      behavior: prefersReducedMotion() ? 'instant' : 'smooth',
-    })
+    const left = next * pageWidth(element)
+    if (Math.abs(element.scrollLeft - left) < 1) {
+      return
+    }
+    expected = next
+    element.scrollTo({ left, behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
   }
 
   const watch = watchScrollSettle({
     element,
     signal,
+    dragHandle,
     onSettle: () => {
       userScrolling = false
-      if (!watch.isUserScroll()) {
-        restOn(element, index)
+      const nearest = nearestIndex(element, count())
+      const target = expected
+      expected = undefined
+      if (nearest === undefined) {
         return
       }
-      const nearest = nearestIndex(element, count())
-      if (nearest === undefined) {
+      if (nearest === target || !watch.isUserScroll()) {
+        restOn(element, index)
         return
       }
       // WebKit can come to rest between snap points.
       restOn(element, nearest)
-      setIndex(nearest)
+      setIndex(nearest, true)
       onUserSettle(nearest)
     },
   })
@@ -98,12 +113,15 @@ export function attachSnapPager({
     'scroll',
     () => {
       if (!watch.isUserScroll()) {
+        if (expected === undefined) {
+          restOn(element, index)
+        }
         return
       }
       userScrolling = true
       const nearest = nearestIndex(element, count())
       if (nearest !== undefined) {
-        setIndex(nearest)
+        setIndex(nearest, true)
       }
     },
     { passive: true, signal },
@@ -113,6 +131,9 @@ export function attachSnapPager({
   element.addEventListener(
     'focusin',
     (event) => {
+      if (userScrolling) {
+        return
+      }
       const target = event.target
       const page = [...element.children].findIndex(
         (child) => target instanceof Node && child.contains(target),
@@ -140,8 +161,9 @@ export function attachSnapPager({
     index: () => index,
     show,
     restOn: (next) => {
-      setIndex(next)
+      setIndex(next, false)
       userScrolling = false
+      expected = undefined
       restOn(element, next)
     },
   }
