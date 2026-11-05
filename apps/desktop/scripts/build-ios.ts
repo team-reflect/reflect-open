@@ -149,7 +149,7 @@ async function assertIpa(flavor: IosFlavor): Promise<void> {
 async function withAppEntitlements(flavor: IosFlavor, run: () => Promise<void>): Promise<void> {
   const flavorPath = join(APPLE_DIR, flavor.appEntitlements)
   if (flavorPath === TAURI_APP_ENTITLEMENTS_PATH) {
-    return run()
+    return await run()
   }
   const original = readFileSync(TAURI_APP_ENTITLEMENTS_PATH)
   copyFileSync(flavorPath, TAURI_APP_ENTITLEMENTS_PATH)
