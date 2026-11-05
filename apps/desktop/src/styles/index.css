@@ -16,6 +16,7 @@ Cascade layer order, low to high priority.
 @import 'shadcn/tailwind.css';
 @import '@meowdown/core/style.css';
 @import '@meowdown/react/style.css';
+@import './ios.css';
 
 /* Tailwind v4 dark variant keyed to the design-system `.dark` scope set by the
    ThemeEffect on <html>. */

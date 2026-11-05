@@ -1,0 +1,77 @@
+/* iOS look for the mobile screens that copy UIKit's inset-grouped list
+   (Settings). Every value is UIKit's own, so the screens match native iOS. */
+
+/* UIKit semantic colors. Values from
+   https://github.com/Innei/apple-uikit-colors/blob/9520b5177cbc3969cd35c60debc480527d49f326/packages/uikit-colors/index.ts#L42-L97
+   Checked against `UIColor.resolvedColor(with:)` on iOS 27.2. */
+:root {
+  --ios-grouped-background: rgb(242 242 247); /* systemGroupedBackground */
+  --ios-grouped-cell: rgb(255 255 255); /* secondarySystemGroupedBackground */
+  --ios-label: rgb(0 0 0); /* label */
+  --ios-secondary-label: rgb(60 60 67 / 0.6); /* secondaryLabel */
+  --ios-tertiary-label: rgb(60 60 67 / 0.3); /* tertiaryLabel */
+  /* systemGray4, the color of a highlighted (pressed) list cell. From
+     https://github.com/Innei/apple-uikit-colors/blob/9520b5177cbc3969cd35c60debc480527d49f326/packages/uikit-colors/index.ts#L17 */
+  --ios-cell-pressed: rgb(209 209 214);
+  /* separator. iOS 26 changed it, so this is `UIColor.separator` on iOS 27.2,
+     not the older value in the file above. */
+  --ios-separator: rgb(60 60 67 / 0.12);
+}
+
+.dark {
+  --ios-grouped-background: rgb(0 0 0);
+  --ios-grouped-cell: rgb(28 28 30);
+  --ios-label: rgb(255 255 255);
+  --ios-secondary-label: rgb(235 235 245 / 0.6);
+  --ios-tertiary-label: rgb(235 235 245 / 0.3);
+  /* https://github.com/Innei/apple-uikit-colors/blob/9520b5177cbc3969cd35c60debc480527d49f326/packages/uikit-colors/index.ts#L37 */
+  --ios-cell-pressed: rgb(58 58 60);
+  --ios-separator: rgb(84 84 88 / 0.5);
+}
+
+@theme inline {
+  --color-ios-grouped-background: var(--ios-grouped-background);
+  --color-ios-grouped-cell: var(--ios-grouped-cell);
+  --color-ios-label: var(--ios-label);
+  --color-ios-secondary-label: var(--ios-secondary-label);
+  --color-ios-tertiary-label: var(--ios-tertiary-label);
+  --color-ios-cell-pressed: var(--ios-cell-pressed);
+  --color-ios-separator: var(--ios-separator);
+}
+
+@theme {
+  --font-ios: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* Body, Subheadline and Footnote at the default Dynamic Type size, from
+     https://developer.apple.com/design/human-interface-guidelines/typography
+     No letter-spacing: WebKit's `-apple-system` already applies SF Pro's
+     tracking, so the text is as wide as `UIFont.systemFont` text. */
+  --text-ios-body: 17px;
+  --text-ios-body--line-height: 22px;
+  --text-ios-subheadline: 15px;
+  --text-ios-subheadline--line-height: 20px;
+  --text-ios-footnote: 13px;
+  --text-ios-footnote--line-height: 18px;
+
+  /* A card of `UICollectionLayoutListConfiguration(appearance: .insetGrouped)`
+     on iOS 27.2. */
+  --radius-ios-card: 26px;
+}
+
+/* A list row's bottom separator, like an inset-grouped list on iOS 27.2: it
+   starts at the text (20px in), runs to the card's edge, and is hidden under
+   the card's last row. The row must be `relative`. */
+@utility ios-row-separator {
+  &::after {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset-inline: 20px 0;
+    bottom: 0;
+    height: 0.5px;
+    background-color: var(--ios-separator);
+  }
+  &:last-child::after {
+    display: none;
+  }
+}

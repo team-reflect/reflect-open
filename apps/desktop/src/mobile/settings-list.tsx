@@ -13,21 +13,15 @@ import { MobileSwitch } from '@/mobile/mobile-switch.tsx'
  */
 
 /**
- * iOS 26 metrics: 52px rows, 17px body text, a hairline separator inset to
- * the text start and hidden under the last row of a card.
+ * A row of UIKit's inset-grouped list on iOS 27.2: 52px tall, with the text
+ * 20px in. The iOS tokens live in `styles/ios.css`.
  */
-const ROW_CLASS = cn(
-  'relative flex min-h-13 w-full items-center gap-3 px-5 py-3 text-[17px] leading-[22px] tracking-[-0.43px]',
-  'after:pointer-events-none after:absolute after:right-0 after:bottom-0 after:left-5 after:h-[0.5px] after:bg-[rgb(60_60_67/0.29)] last:after:hidden dark:after:bg-[rgb(84_84_88/0.65)]',
-)
+const ROW_CLASS = 'ios-row-separator relative flex min-h-13 w-full items-center gap-3 px-5 py-3'
 const PRESSABLE_ROW_CLASS = cn(
   ROW_CLASS,
-  'text-left transition-colors duration-150 active:bg-[#D1D1D6]/70 disabled:opacity-40 dark:active:bg-[#3A3A3C]',
+  'text-left active:bg-ios-cell-pressed disabled:opacity-40',
 )
-/** iOS `secondaryLabel`: values and captions. */
-const SECONDARY_LABEL_CLASS = 'text-[rgb(60_60_67/0.6)] dark:text-[rgb(235_235_245/0.6)]'
-/** iOS `tertiaryLabel`: chevrons. */
-const TERTIARY_LABEL_CLASS = 'text-[rgb(60_60_67/0.3)] dark:text-[rgb(235_235_245/0.3)]'
+const CHEVRON_CLASS = '-mr-1 size-[18px] shrink-0 text-ios-tertiary-label'
 
 interface SettingsGroupProps {
   /** Small muted caption above the card (iOS section header). */
@@ -49,20 +43,17 @@ export function SettingsGroup({
   return (
     <section className="flex flex-col">
       {header !== undefined ? (
-        <h2 className={cn('px-5 pb-[7px] text-[13px] leading-[18px]', SECONDARY_LABEL_CLASS)}>
-          {header}
-        </h2>
+        <h2 className="px-5 pb-2 text-ios-footnote text-ios-secondary-label">{header}</h2>
       ) : null}
-      {/* On a grouped-background screen (`data-ios-grouped`) the card is a
-          borderless white / #1C1C1E cell; elsewhere (sheets) it keeps a border. */}
-      <div className="overflow-hidden rounded-[26px] border border-border bg-surface in-data-ios-grouped:border-0 in-data-ios-grouped:bg-white dark:in-data-ios-grouped:bg-[#1C1C1E]">
+      {/* The font size is set here, not on the rows: `cn` would drop a
+          `text-ios-body` row class next to a `text-primary` color class.
+          On a grouped-background screen (`data-ios-grouped`) the card is a
+          borderless cell; elsewhere (sheets) it keeps a border. */}
+      <div className="overflow-hidden rounded-ios-card border border-border bg-surface text-ios-body in-data-ios-grouped:border-0 in-data-ios-grouped:bg-ios-grouped-cell">
         {children}
       </div>
       {footer != null ? (
-        <p
-          id={footerId}
-          className={cn('px-5 pt-[7px] text-[13px] leading-[18px]', SECONDARY_LABEL_CLASS)}
-        >
+        <p id={footerId} className="px-5 pt-2 text-ios-footnote text-ios-secondary-label">
           {footer}
         </p>
       ) : null}
@@ -84,7 +75,7 @@ export function SettingsValueRow({
   return (
     <div className={ROW_CLASS} onClick={onPress}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className={cn('shrink-0 tabular-nums', SECONDARY_LABEL_CLASS)}>{value}</span>
+      <span className="shrink-0 text-ios-secondary-label tabular-nums">{value}</span>
     </div>
   )
 }
@@ -108,13 +99,9 @@ export function SettingsNavRow({
     <button type="button" className={PRESSABLE_ROW_CLASS} onClick={onPress} disabled={disabled}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {value !== undefined ? (
-        <span className={cn('max-w-[55%] shrink-0 truncate', SECONDARY_LABEL_CLASS)}>{value}</span>
+        <span className="max-w-[55%] shrink-0 truncate text-ios-secondary-label">{value}</span>
       ) : null}
-      <ChevronRight
-        aria-hidden
-        className={cn('-mr-1 size-[18px] shrink-0', TERTIARY_LABEL_CLASS)}
-        strokeWidth={2.6}
-      />
+      <ChevronRight aria-hidden className={CHEVRON_CLASS} strokeWidth={2.6} />
     </button>
   )
 }
@@ -171,7 +158,7 @@ export function SettingsMenuRow<Value extends string>({
   return (
     <div className={cn(ROW_CLASS, 'relative')}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className={cn('flex shrink-0 items-center gap-1', SECONDARY_LABEL_CLASS)}>
+      <span className="flex shrink-0 items-center gap-1 text-ios-secondary-label">
         {options.find((option) => option.value === value)?.label}
         <ChevronsUpDown aria-hidden className="-mr-1 size-[15px] shrink-0" strokeWidth={2.4} />
       </span>
@@ -305,25 +292,12 @@ export function SettingsHeroRow({
         {media}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-[17px] leading-[22px] font-semibold tracking-[-0.43px]">
-          {title}
-        </span>
+        <span className="truncate font-semibold">{title}</span>
         {subtitle !== undefined ? (
-          <span
-            className={cn(
-              'truncate text-[15px] leading-5 tracking-[-0.23px]',
-              SECONDARY_LABEL_CLASS,
-            )}
-          >
-            {subtitle}
-          </span>
+          <span className="truncate text-ios-subheadline text-ios-secondary-label">{subtitle}</span>
         ) : null}
       </span>
-      <ChevronRight
-        aria-hidden
-        className={cn('-mr-1 size-[18px] shrink-0', TERTIARY_LABEL_CLASS)}
-        strokeWidth={2.6}
-      />
+      <ChevronRight aria-hidden className={CHEVRON_CLASS} strokeWidth={2.6} />
     </button>
   )
 }

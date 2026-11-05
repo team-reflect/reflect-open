@@ -309,7 +309,7 @@ export function MobileSettings(): ReactElement {
         title="Settings"
         onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
       />
-      <main className="min-h-0 flex-1 overflow-y-auto bg-[#F2F2F7] px-safe pb-safe font-[-apple-system,BlinkMacSystemFont,system-ui,sans-serif] text-black antialiased dark:bg-black dark:text-white">
+      <main className="min-h-0 flex-1 overflow-y-auto bg-ios-grouped-background px-safe pb-safe font-ios text-ios-label antialiased">
         <div className="flex flex-col gap-8 px-4 py-5">
           <SettingsGroup>
             <SettingsHeroRow
