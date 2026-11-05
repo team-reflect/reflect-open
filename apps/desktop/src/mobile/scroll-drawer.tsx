@@ -18,7 +18,6 @@ import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 import { cn } from '@/lib/utils.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './scroll-drawer.css'
-import './drawer-depth.css'
 
 interface DrawerContextValue {
   open: boolean

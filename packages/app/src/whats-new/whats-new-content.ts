@@ -25,10 +25,5 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'Swipes, sheets, and image dragging respond faster and move more smoothly.',
       platforms: ['ios'],
     },
-    {
-      title: 'Sheets with depth',
-      body: 'Open sheets now float above the page, which steps back to give them room.',
-      platforms: ['ios'],
-    },
   ],
 }

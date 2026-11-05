@@ -179,7 +179,6 @@ export function SwipeRow({
         {children}
       </div>
       <div
-        data-slot="swipe-row-actions"
         className="sticky right-0 flex flex-none"
         style={actionsStyle}
         aria-hidden={!revealed || undefined}
