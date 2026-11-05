@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.18.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.4...v0.18.0-beta.5) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** keep swipe-row actions under the row on iOS 26 ([#1984](https://github.com/team-reflect/reflect-open/issues/1984)) ([5304053](https://github.com/team-reflect/reflect-open/commit/53040533319f6cc445a3577b80c67a0e2cf7ae14))
+* **mobile:** keep Tasks group headers above rows ([#1980](https://github.com/team-reflect/reflect-open/issues/1980)) ([e071eab](https://github.com/team-reflect/reflect-open/commit/e071eabf0ab076c9b9bbeabfe21486f70847187f))
+* **mobile:** keep the scroll indicator above Tasks and All rows ([#1981](https://github.com/team-reflect/reflect-open/issues/1981)) ([9f9cd9b](https://github.com/team-reflect/reflect-open/commit/9f9cd9be548fcc640a17243160a87ef2ab451331))
+* **mobile:** make off-screen day slides inert ([#1972](https://github.com/team-reflect/reflect-open/issues/1972)) ([15a32e4](https://github.com/team-reflect/reflect-open/commit/15a32e47e92a6e4a63cc13309c18167aab531878))
+* **mobile:** paint swipe-row over-swipe color only while touched ([#1979](https://github.com/team-reflect/reflect-open/issues/1979)) ([fd993e9](https://github.com/team-reflect/reflect-open/commit/fd993e996a0eabb05d0e0a4a5339e50668d07098))
+* **mobile:** remove drawer depth effect ([#1982](https://github.com/team-reflect/reflect-open/issues/1982)) ([1c7b58c](https://github.com/team-reflect/reflect-open/commit/1c7b58c8e51a69fb44e409d950960ede42b78492))
+* **mobile:** settle after a finger lifts from a removed node ([#1969](https://github.com/team-reflect/reflect-open/issues/1969)) ([a6ca461](https://github.com/team-reflect/reflect-open/commit/a6ca461c0628b0ae48848b53ac501c7c8c8c2020))
+
 ## [0.18.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.3...v0.18.0-beta.4) (2026-11-04)
 
 

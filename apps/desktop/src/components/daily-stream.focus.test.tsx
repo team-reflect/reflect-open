@@ -6,7 +6,7 @@ import { createSystemClock } from '@reflect/core'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { getIsoToday } from '@reflect/utils'
 import { createDayWindow, neighborDate, type NavigateOptions, type Route } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -95,7 +95,7 @@ beforeEach(() => {
 type Navigate = (route: Route, options?: NavigateOptions) => void
 
 function NavigateProbe({ onReady }: { onReady: (navigate: Navigate) => void }): null {
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
   useEffect(() => {
     onReady(navigate)
   }, [navigate, onReady])
@@ -107,7 +107,7 @@ function NavigateProbe({ onReady }: { onReady: (navigate: Navigate) => void }): 
  * mounted instance.
  */
 function RoutedStream(): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return (
     <DailyStream
       target={route.kind === 'daily' ? { kind: 'date', date: route.date } : { kind: 'today' }}

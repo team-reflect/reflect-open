@@ -25,8 +25,8 @@ first-party and MIT, so there is no copyleft constraint.
 | Routing (typed product routes + history) | **custom, no dependency** | 06 |
 | Dates (local "today", ISO keys, DST-safe) | `date-fns` (+ `date-fns-tz` if needed) | 06 |
 | List virtualization | `@tanstack/react-virtual` | 06 / 08 |
-| UI components | shadcn/ui (on Radix Primitives) | 07 / 08 / 10 / 15 |
-| Command palette (⌘K) | `cmdk` | 08 |
+| UI components | shadcn/ui (on Base UI) | 07 / 08 / 10 / 15 |
+| Command palette (⌘K) | Base UI `Autocomplete` | 08 |
 | AI provider (BYOK, streaming, multi-provider) | Vercel AI SDK (`ai` + `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`) | 10 |
 | Diff / patch | Not installed; patchsets deferred | 10 / 12 |
 | Chrome extension framework | WXT | 11 |

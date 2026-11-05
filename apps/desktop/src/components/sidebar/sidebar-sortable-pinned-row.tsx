@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { errorMessage, type PinnedNote } from '@reflect/core'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation.ts'
 import { routeForPath, routesEqual } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview.tsx'
 import { isModEvent } from '@meowdown/core'
@@ -17,7 +17,7 @@ interface SidebarSortablePinnedRowProps {
 export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
   note,
 }: SidebarSortablePinnedRowProps): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   const navigateNoteLink = useNoteLinkNavigation()
   const noteLabel = useNoteLabel()
   const { noteActions } = useCoreServices()

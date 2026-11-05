@@ -7,25 +7,24 @@
  * in lockstep like a ticker: same duration and curve on both, or the strip
  * shears apart. Opacity only softens the clip edges — the incoming label is
  * fully opaque well before it settles, the outgoing one holds full opacity
- * until it is mostly out. Durations mirror MONTH_TITLE_TRANSITION_MS in
- * month-title.tsx (the fallback timer that removes the outgoing label when
- * `animationend` never fires).
+ * until it is mostly out. month-title.tsx removes the outgoing label when
+ * its animation finishes.
  */
 
 .month-title-enter-up {
-  animation: month-title-enter-up 500ms var(--ease-standard);
+  animation: month-title-enter-up var(--duration-month-title) var(--ease-standard);
 }
 
 .month-title-enter-down {
-  animation: month-title-enter-down 500ms var(--ease-standard);
+  animation: month-title-enter-down var(--duration-month-title) var(--ease-standard);
 }
 
 .month-title-exit-up {
-  animation: month-title-exit-up 500ms var(--ease-standard) forwards;
+  animation: month-title-exit-up var(--duration-month-title) var(--ease-standard) forwards;
 }
 
 .month-title-exit-down {
-  animation: month-title-exit-down 500ms var(--ease-standard) forwards;
+  animation: month-title-exit-down var(--duration-month-title) var(--ease-standard) forwards;
 }
 
 @keyframes month-title-enter-up {
@@ -68,8 +67,7 @@
   }
 }
 
-/* Belt and braces: the component also skips the roll in JS under reduced
-   motion, but never animate even if a code path forgets to check. */
+/* Under reduced motion no animation runs, so the label swaps at once. */
 @media (prefers-reduced-motion: reduce) {
   .month-title-enter-up,
   .month-title-enter-down,

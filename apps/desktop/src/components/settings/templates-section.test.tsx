@@ -6,7 +6,7 @@ import { createTestWindowService } from '@reflect/app/testing'
 import { createTestCoreServices } from '@reflect/core/testing'
 import { deepLinkForRoute } from '@reflect/app'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TemplatesSection } from './templates-section.tsx'
@@ -14,7 +14,7 @@ import { TemplatesSection } from './templates-section.tsx'
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
 
 function RouteProbe(): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return (
     <output data-testid="route">
       {route.kind === 'note' ? `${route.kind}:${route.path}` : route.kind}

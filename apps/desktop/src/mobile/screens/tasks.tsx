@@ -24,7 +24,7 @@ import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 
@@ -47,7 +47,8 @@ export function MobileTasks(): ReactElement {
   const { haptics } = useMobileServices()
   const { tasks: taskService } = useCoreServices()
   const graph = useGraphInfo()
-  const { navigate, arrivalSeq, arrivalFocusEditor } = useRouter()
+  const { arrivalSeq, arrivalFocusEditor } = useRouterState()
+  const { navigate } = useRouterActions()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
   const [query, setQuery] = useState('')
@@ -192,7 +193,9 @@ export function MobileTasks(): ReactElement {
         </div>
       ) : (
         <div
-          className="min-h-0 flex-1 overflow-y-auto px-safe pb-24"
+          // A stacking context, so WebKit composites the sticky headers and row
+          // surfaces inside this scroller, below the iOS scroll indicator.
+          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-24"
           onScroll={() => revealedRow.set(null)}
         >
           {groups.map((group) => (

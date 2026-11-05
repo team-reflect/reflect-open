@@ -9,7 +9,7 @@ import {
 import type { OpenTask, TaskAction, TaskService, TaskWriteResult } from '@reflect/core'
 import { useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
 import { act } from '@/test-utils/act.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { MOD_KEY } from '@/test-utils/mod-key.ts'
 import '@/test-utils/locator.ts'
@@ -161,7 +161,7 @@ vi.mock('./task-editor', () => ({
 }))
 
 function RouteProbe(): ReactNode {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
