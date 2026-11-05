@@ -20,7 +20,9 @@ export function useScrollRestoration(
   const { arrivalSeq, entryId, saveScrollState, savedScroll } = useRouterState()
   useEffect(() => {
     const element = elementRef.current
-    if (ready && element) {
+    if (!element) return
+
+    if (ready) {
       const saved = savedScroll()
       element.scrollTop = typeof saved === 'number' ? saved : 0
     }
