@@ -1,11 +1,9 @@
-import { useDeferredValue, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
-import { Command as CommandPrimitive } from 'cmdk'
+import { useDeferredValue, useState, type ReactElement } from 'react'
+import { Autocomplete } from '@base-ui/react/autocomplete'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { aliasHint, displayNoteTitle, foldKey, type MeetingAttendee } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
-import { CommandItem, CommandList } from '@/components/ui/command.tsx'
-import { INPUT_CLASS_NAME } from '@/components/ui/input.tsx'
-import { Popover, PopoverContent } from '@/components/ui/popover.tsx'
+import { Input } from '@/components/ui/input.tsx'
 import { buildAutocompleteEntries, type AutocompleteEntry } from '@reflect/app'
 import { useContactsCanLookup } from '@/hooks/use-contacts-state.ts'
 import { queryKeys } from '@/lib/query-client.ts'
@@ -15,15 +13,16 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 const SUGGESTION_LIMIT = 6
 
 interface AttendeeComboboxProps {
+  /** The input's id, for the field label's `htmlFor`. */
+  id: string
   /** Attendees already chosen — kept out of the suggestion list. */
   attendees: readonly MeetingAttendee[]
   /** Adds one attendee. The caller owns dedup and the chip list. */
   onAdd: (attendee: MeetingAttendee) => void
 }
 
-/** cmdk item values are matched lowercased, so the key is minted that way. */
 function entryKey(entry: AutocompleteEntry): string {
-  return `${entry.kind}:${entryName(entry)}`.toLowerCase()
+  return `${entry.kind}:${entryName(entry)}`
 }
 
 /** The attendee name selecting this entry would add. */
@@ -54,20 +53,15 @@ function entryAttendee(entry: AutocompleteEntry): MeetingAttendee {
  * text verbatim when no suggestion is highlighted; Escape dismisses the
  * suggestions without closing the dialog. Daily-note suggestions are
  * filtered out — an attendee is a person, not a date.
- *
- * The input's accessible name comes from cmdk's own `label` mechanism (a
- * visually-hidden `<label>`): cmdk overrides any `id`/`aria-labelledby`
- * passed to its Input, so an external `htmlFor` can never reach it.
  */
-export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): ReactElement {
+export function AttendeeCombobox({ id, attendees, onAdd }: AttendeeComboboxProps): ReactElement {
   const graph = useGraphInfo()
   const { meetings } = useCoreServices()
   const contactsInMenu = useContactsCanLookup()
 
   const [query, setQuery] = useState('')
   const [dismissed, setDismissed] = useState(false)
-  const [highlighted, setHighlighted] = useState('')
-  const anchorRef = useRef<HTMLInputElement>(null)
+  const [highlighted, setHighlighted] = useState<AutocompleteEntry | undefined>(undefined)
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
 
@@ -119,7 +113,6 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const select = (entry: AutocompleteEntry): void => {
     onAdd(entryAttendee(entry))
     setQuery('')
-    setDismissed(false)
   }
 
   const addTyped = (): void => {
@@ -129,115 +122,104 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
     }
     onAdd({ name })
     setQuery('')
-    setDismissed(false)
-  }
-
-  const onKeyDown = (keyEvent: KeyboardEvent<HTMLInputElement>): void => {
-    if (getIsComposing()) {
-      // preventDefault keeps cmdk's root handler from selecting the highlighted
-      // entry on the Enter that commits the composition.
-      if (keyEvent.key === 'Enter') {
-        keyEvent.preventDefault()
-      }
-      return
-    }
-    if (keyEvent.key === 'Enter') {
-      // Ours alone: preventDefault stops the dialog form submitting,
-      // stopPropagation keeps cmdk's root handler from double-selecting.
-      keyEvent.preventDefault()
-      keyEvent.stopPropagation()
-      const entry =
-        open && entriesMatchInput
-          ? entries.find((candidate) => entryKey(candidate) === highlighted)
-          : undefined
-      const selected = entry ?? exactContact
-      if (selected !== undefined) {
-        select(selected)
-      } else {
-        addTyped()
-      }
-      return
-    }
-    if (keyEvent.key === 'Escape' && open) {
-      // Dismiss the suggestions only — the dialog must survive this Escape.
-      keyEvent.preventDefault()
-      keyEvent.stopPropagation()
-      setDismissed(true)
-    }
   }
 
   return (
-    <Popover
+    <Autocomplete.Root
+      items={entries}
+      // The service already ranked and filtered the rows.
+      mode="none"
+      itemToStringValue={entryName}
+      value={query}
+      onValueChange={(value, details) => {
+        // A picked row is added by its own onClick; the input clears instead of filling.
+        if (details.reason !== 'item-press') {
+          setQuery(value)
+          setDismissed(false)
+        }
+      }}
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           setDismissed(true)
         }
       }}
+      onItemHighlighted={setHighlighted}
+      autoHighlight
     >
-      <CommandPrimitive
-        label="Attendees"
-        shouldFilter={false}
-        loop
-        value={highlighted}
-        onValueChange={setHighlighted}
-      >
-        <CommandPrimitive.Input
-          ref={anchorRef}
-          value={query}
-          onValueChange={(value) => {
-            setQuery(value)
-            setDismissed(false)
-          }}
-          onKeyDown={onKeyDown}
-          onBlur={addTyped}
-          placeholder="Add attendee"
-          className={INPUT_CLASS_NAME}
-        />
-        <PopoverContent
-          align="start"
-          sideOffset={4}
-          anchor={anchorRef}
-          className="w-(--anchor-width) p-1"
-          // The input keeps focus for the popover's whole life: no focus
-          // steal on open/close, and no blur when a row is clicked (blur
-          // would add the half-typed text before onSelect adds the row's).
-          initialFocus={false}
-          finalFocus={false}
-          onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
-        >
-          <CommandList>
-            {entries.map((entry) => {
-              const hint = entry.kind === 'suggestion' ? aliasHint(entry.suggestion) : null
-              return (
-                <CommandItem
-                  key={entryKey(entry)}
-                  value={entryKey(entry)}
-                  onSelect={() => select(entry)}
-                >
-                  <span className="min-w-0 flex-1 truncate">
-                    {entry.kind === 'create'
-                      ? `Add “${entry.title}”`
-                      : entry.kind === 'suggestion'
-                        ? displayNoteTitle(entry.suggestion.target)
-                        : entryName(entry)}
-                  </span>
-                  {entry.kind === 'suggestion' && hint !== null && (
-                    <span className="truncate text-xs text-text-muted">
-                      {hint} → {displayNoteTitle(entry.suggestion.title)}
+      <Autocomplete.Input
+        id={id}
+        placeholder="Add attendee"
+        render={<Input />}
+        onBlur={addTyped}
+        onKeyDown={(keyEvent) => {
+          if (getIsComposing()) {
+            // The Enter that commits a composition must not pick the highlighted entry
+            // or submit the dialog form.
+            if (keyEvent.key === 'Enter') {
+              keyEvent.preventDefault()
+              keyEvent.preventBaseUIHandler()
+            }
+            return
+          }
+          if (keyEvent.key === 'Enter') {
+            // Ours alone: preventDefault stops the dialog form submitting, and the
+            // Base UI handler would pick a highlighted row that may be stale.
+            keyEvent.preventDefault()
+            keyEvent.preventBaseUIHandler()
+            const entry =
+              open &&
+              entriesMatchInput &&
+              highlighted !== undefined &&
+              entries.includes(highlighted)
+                ? highlighted
+                : undefined
+            const selected = entry ?? exactContact
+            if (selected !== undefined) {
+              select(selected)
+            } else {
+              addTyped()
+            }
+          }
+        }}
+      />
+      <Autocomplete.Portal>
+        <Autocomplete.Positioner align="start" sideOffset={4} className="isolate z-50">
+          <Autocomplete.Popup className="max-h-(--available-height) w-(--anchor-width) overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10">
+            <Autocomplete.List>
+              {(entry: AutocompleteEntry) => {
+                const hint = entry.kind === 'suggestion' ? aliasHint(entry.suggestion) : null
+                return (
+                  <Autocomplete.Item
+                    key={entryKey(entry)}
+                    value={entry}
+                    onClick={() => select(entry)}
+                    className="flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-highlighted:bg-surface-hover data-highlighted:text-foreground"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {entry.kind === 'create'
+                        ? `Add “${entry.title}”`
+                        : entry.kind === 'suggestion'
+                          ? displayNoteTitle(entry.suggestion.target)
+                          : entryName(entry)}
                     </span>
-                  )}
-                  {entry.kind === 'contact' && (
-                    <span className="truncate text-xs text-text-muted">
-                      {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
-                    </span>
-                  )}
-                </CommandItem>
-              )
-            })}
-          </CommandList>
-        </PopoverContent>
-      </CommandPrimitive>
-    </Popover>
+                    {entry.kind === 'suggestion' && hint !== null && (
+                      <span className="truncate text-xs text-text-muted">
+                        {hint} → {displayNoteTitle(entry.suggestion.title)}
+                      </span>
+                    )}
+                    {entry.kind === 'contact' && (
+                      <span className="truncate text-xs text-text-muted">
+                        {entry.contact.emails[0] ?? entry.contact.phones[0] ?? 'Contact'}
+                      </span>
+                    )}
+                  </Autocomplete.Item>
+                )
+              }}
+            </Autocomplete.List>
+          </Autocomplete.Popup>
+        </Autocomplete.Positioner>
+      </Autocomplete.Portal>
+    </Autocomplete.Root>
   )
 }

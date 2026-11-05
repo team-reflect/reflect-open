@@ -1,35 +1,17 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { useCommandState } from 'cmdk'
-import { ChevronsUpDownIcon } from 'lucide-react'
+import { useState, type ReactElement } from 'react'
+import { Combobox as ComboboxPrimitive } from '@base-ui/react/combobox'
 import { aiModelLabel, type AiModelOption, type AiProviderId } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button.tsx'
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.tsx'
-
-interface FilterCountSyncProps {
-  countRef: React.MutableRefObject<number>
-}
-
-/**
- * Tracks the cmdk filtered item count in a ref so the parent's keydown handler
- * (which fires long after render) always sees the latest value. Must be
- * rendered inside a {@link Command}.
- */
-function FilterCountSync({ countRef }: FilterCountSyncProps): null {
-  const count = useCommandState((state) => state.filtered.count)
-  useEffect(() => {
-    countRef.current = count
-  })
-  return null
-}
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from '@/components/ui/combobox.tsx'
 
 interface ModelComboboxProps {
   /** Currently selected model id (may be a custom string not in the catalog). */
@@ -46,8 +28,8 @@ interface ModelComboboxProps {
 
 /**
  * A combobox for selecting an AI model. Shows the provider's curated models
- * as quick-select options (searchable) and also accepts any arbitrary model
- * string — type a custom id and press Enter to confirm it.
+ * as quick-select options (searchable by label or id) and also accepts any
+ * arbitrary model string — type a custom id and press Enter to confirm it.
  */
 export function ModelCombobox({
   value,
@@ -56,95 +38,82 @@ export function ModelCombobox({
   onChange,
   ariaLabel = 'Default model',
 }: ModelComboboxProps): ReactElement {
-  const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
-  const filteredCountRef = useRef(models.length)
-
-  const clearInput = () => setInputValue('')
-  // Clear stale search text whenever the provider changes (popover close is
-  // handled in the open-change handler). Adjusting during render avoids a
-  // prop-syncing effect.
-  const [appliedProvider, setAppliedProvider] = useState(provider)
-  if (appliedProvider !== provider) {
-    setAppliedProvider(provider)
-    setInputValue('')
-  }
-
-  const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen)
-    if (!isOpen) clearInput()
-  }
-
-  const commit = (modelId: string) => {
-    onChange(modelId)
-    setOpen(false)
-    clearInput()
-  }
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (getIsComposing()) {
-      // preventDefault keeps cmdk's root handler from selecting the highlighted
-      // model on the Enter that commits the composition.
-      if (event.key === 'Enter') {
-        event.preventDefault()
-      }
-      return
-    }
-    if (event.key === 'Enter' && filteredCountRef.current === 0 && inputValue.trim()) {
-      event.preventDefault()
-      commit(inputValue.trim())
-    }
-  }
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger
+    <Combobox
+      items={models}
+      itemToStringLabel={(model: AiModelOption) => `${model.label} ${model.id}`}
+      value={models.find((model) => model.id === value) ?? null}
+      onValueChange={(model: AiModelOption | null) => {
+        if (model !== null) {
+          onChange(model.id)
+        }
+      }}
+      inputValue={inputValue}
+      onInputValueChange={setInputValue}
+      autoHighlight
+    >
+      <ComboboxTrigger
         render={
           <Button
             type="button"
             variant="outline"
-            role="combobox"
-            aria-expanded={open}
             aria-label={ariaLabel}
             className="w-full justify-between font-normal"
-          >
-            <span className="truncate">{aiModelLabel(provider, value)}</span>
-            <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
-          </Button>
-        }
-      />
-      <PopoverContent className="p-0" style={{ width: 'var(--anchor-width)' }} align="start">
-        <Command>
-          <FilterCountSync countRef={filteredCountRef} />
-          <CommandInput
-            placeholder="Search or type a model name…"
-            value={inputValue}
-            onValueChange={setInputValue}
-            onKeyDown={handleKeyDown}
           />
-          <CommandList>
-            <CommandEmpty>
-              Press <kbd className="rounded bg-muted px-1 py-0.5 font-mono text-xs">Enter</kbd> to
-              use &ldquo;{inputValue}&rdquo;
-            </CommandEmpty>
-            <CommandGroup>
-              {models.map((model) => (
-                <CommandItem
-                  key={model.id}
-                  value={`${model.label} ${model.id}`}
-                  onSelect={() => commit(model.id)}
-                  data-checked={model.id === value}
-                >
-                  {model.label}
-                  <span className="ml-auto font-mono text-xs text-muted-foreground">
-                    {model.id}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+        }
+      >
+        <span className="truncate">{aiModelLabel(provider, value)}</span>
+      </ComboboxTrigger>
+      <ComboboxContent>
+        <ModelSearchInput inputValue={inputValue} onCustom={onChange} />
+        <ComboboxEmpty>
+          Press <kbd className="rounded bg-muted px-1 py-0.5 font-mono text-xs">Enter</kbd> to use
+          &ldquo;{inputValue}&rdquo;
+        </ComboboxEmpty>
+        <ComboboxList>
+          {(model: AiModelOption) => (
+            <ComboboxItem key={model.id} value={model}>
+              {model.label}
+              <span className="ml-auto font-mono text-xs text-muted-foreground">{model.id}</span>
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  )
+}
+
+interface ModelSearchInputProps {
+  inputValue: string
+  /** Called with the typed text when no catalog model matches it. */
+  onCustom: (modelId: string) => void
+}
+
+function ModelSearchInput({ inputValue, onCustom }: ModelSearchInputProps): ReactElement {
+  // The combobox's own filter result, so custom entry follows its matching rules.
+  const filteredModels = ComboboxPrimitive.useFilteredItems<AiModelOption>()
+
+  return (
+    <ComboboxInput
+      showTrigger={false}
+      placeholder="Search or type a model name…"
+      onKeyDown={(event) => {
+        if (getIsComposing()) {
+          // The Enter that commits a composition must not pick the highlighted model.
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            event.preventBaseUIHandler()
+          }
+          return
+        }
+        // With no model left in the list, Enter takes the typed text as a custom id.
+        if (event.key === 'Enter' && filteredModels.length === 0 && inputValue.trim()) {
+          event.preventDefault()
+          onCustom(inputValue.trim())
+        }
+      }}
+    />
   )
 }

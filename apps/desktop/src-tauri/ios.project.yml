@@ -131,12 +131,20 @@ targets:
             CFBundleURLSchemes: [reflect]
         # The recording Live Activity (audio-memos wave 3).
         NSSupportsLiveActivities: true
-        # Home-screen quick action (audio-memos wave 3); handled by the
-        # recording plugin via the shortcut-item delegate hook.
+        # Home-screen quick action (audio-memos wave 3); the scene delegate
+        # receives it, and SceneEntryPoints.swift hands it to the recording
+        # plugin.
         UIApplicationShortcutItems:
           - UIApplicationShortcutItemType: app.reflect.record-audio
             UIApplicationShortcutItemTitle: Record audio
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAudio
+        # The system runs the app on the scene lifecycle either way; declaring
+        # it makes tao create its UIWindow inside the connected scene. A window
+        # created before the scene connects never gets an interface
+        # orientation, and UIKit then delivers trackpad scrolls unrotated: in
+        # landscape a vertical scroll reaches the webview as a horizontal one.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
         # Native Sentry DSN from the build environment; empty disables it.
         ReflectSentryDSN: $(REFLECT_SENTRY_DSN)

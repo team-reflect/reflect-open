@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils.ts'
 import { useDateFormat } from '@/providers/settings-provider.tsx'
 import { useToday } from '@/lib/use-today.ts'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterHandlers } from '@/routing/router.tsx'
 import { clamp } from '@ocavue/utils'
 
 /** The size guess virtua uses for a row it has not measured yet. */
@@ -51,7 +51,8 @@ const CONTENT_GUTTER = 'reflect-content-gutter'
  * is pure offset math.
  */
 export function DailyStream({ target }: DailyStreamProps): ReactElement {
-  const { arrivalSeq, arrivalFocusEditor, entryId, saveScrollState, savedScroll } = useRouter()
+  const { arrivalSeq, arrivalFocusEditor, entryId } = useRouterState()
+  const { saveScrollState, savedScroll } = useRouterHandlers()
   const virtualizerRef = useRef<VirtualizerHandle>(null)
   // The window anchors at today-on-mount and only grows back, when an arrival
   // lands before it. (`dayWindow`, not `window` — shadowing the DOM global here was a

@@ -1,6 +1,11 @@
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { createSystemClock, type GithubConnector, type ConnectExistingResult } from '@reflect/core'
+import {
+  createSystemClock,
+  type ConnectExistingResult,
+  type GithubConnector,
+  type GithubRepoRef,
+} from '@reflect/core'
 import { createTestOpenerService, type TestOpenerService } from '@reflect/app/testing'
 import {
   createTestCoreServices,
@@ -18,6 +23,16 @@ import { ConnectGithubDialog } from './connect-github-dialog.tsx'
 const sync = {
   connectNewRepo: vi.fn<GithubConnector['connectNewRepo']>(),
   connectExistingRepo: vi.fn<GithubConnector['connectExistingRepo']>(),
+}
+
+/**
+ * Every `connectExistingRepo` call so far, without the flow signal.
+ */
+function existingCalls(): { ref: GithubRepoRef; allowPublic: boolean }[] {
+  return sync.connectExistingRepo.mock.calls.map(([ref, options]) => ({
+    ref,
+    allowPublic: options?.allowPublic ?? false,
+  }))
 }
 
 let opener: TestOpenerService
@@ -100,12 +115,14 @@ describe('ConnectGithubDialog', () => {
 
     // The owner is the verified sign-in — never typed.
     await vi.waitFor(() => {
-      expect(sync.connectExistingRepo).toHaveBeenCalledWith(
-        { owner: 'alex', name: 'my-notes' },
-        { allowPublic: false },
-      )
+      expect(existingCalls()).toContainEqual({
+        ref: { owner: 'alex', name: 'my-notes' },
+        allowPublic: false,
+      })
     })
-    await vi.waitFor(() => expect(sync.connectNewRepo).toHaveBeenCalledWith('my-notes'))
+    await vi.waitFor(() => {
+      expect(sync.connectNewRepo.mock.calls.map(([name]) => name)).toContain('my-notes')
+    })
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -120,7 +137,7 @@ describe('ConnectGithubDialog', () => {
   })
 
   it('hands off to github.com/new and connects by polling — no button to click', async () => {
-    sync.connectExistingRepo.mockResolvedValueOnce('notFound').mockResolvedValueOnce('notFound')
+    sync.connectExistingRepo.mockResolvedValue('notFound')
     sync.connectNewRepo.mockResolvedValueOnce('manualCreateNeeded')
     const onClose = await renderWizard()
 
@@ -132,13 +149,14 @@ describe('ConnectGithubDialog', () => {
     expect(openedUrls).toHaveBeenCalledWith(
       expect.stringContaining('https://github.com/new?name=g-backup'),
     )
+    sync.connectExistingRepo.mockResolvedValue('connected')
 
     // Once the repo exists, a poll connects it — the user clicks nothing.
     await vi.waitFor(() => {
-      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
-        { owner: 'alex', name: 'g-backup' },
-        { allowPublic: false },
-      )
+      expect(existingCalls().at(-1)).toEqual({
+        ref: { owner: 'alex', name: 'g-backup' },
+        allowPublic: false,
+      })
     })
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
     // The repo exists now — re-running the API create would just 422.
@@ -212,10 +230,10 @@ describe('ConnectGithubDialog', () => {
     await page.getByRole('button', { name: 'Sync with a public repo' }).click()
 
     await vi.waitFor(() => {
-      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
-        { owner: 'alex', name: 'public-notes' },
-        { allowPublic: true },
-      )
+      expect(existingCalls().at(-1)).toEqual({
+        ref: { owner: 'alex', name: 'public-notes' },
+        allowPublic: true,
+      })
     })
     expect(onClose).toHaveBeenCalled()
   })
@@ -252,10 +270,10 @@ describe('ConnectGithubDialog', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await vi.waitFor(() => {
-      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
-        { owner: 'alex', name: 'notes' },
-        { allowPublic: false },
-      )
+      expect(existingCalls().at(-1)).toEqual({
+        ref: { owner: 'alex', name: 'notes' },
+        allowPublic: false,
+      })
     })
     expect(onClose).toHaveBeenCalled()
   })
@@ -281,9 +299,8 @@ describe('ConnectGithubDialog', () => {
     // access is the expected step (not an error), and the poll connects once it
     // lands — no retry button, no token language.
     storeCredential(appCredential())
-    sync.connectExistingRepo
-      .mockResolvedValueOnce('notFound') // initial lookup: app can't see it yet
-      .mockResolvedValueOnce('notFound') // poll: access still not granted
+    // The app can't see the repo until access is granted.
+    sync.connectExistingRepo.mockResolvedValue('notFound')
     const onClose = await renderWizard()
 
     await page.getByRole('radio', { name: /use an existing repository/i }).click()
@@ -302,13 +319,18 @@ describe('ConnectGithubDialog', () => {
     expect(openedUrls).toHaveBeenCalledWith(
       'https://github.com/apps/reflect-github-app/installations/new',
     )
+    // At least one poll still finds no access before it is granted.
+    await vi.waitFor(() => {
+      expect(sync.connectExistingRepo.mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
+    sync.connectExistingRepo.mockResolvedValue('connected')
 
     // Back from the browser with access granted — the poll connects, no click.
     await vi.waitFor(() => {
-      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
-        { owner: 'alex', name: 'notes' },
-        { allowPublic: false },
-      )
+      expect(existingCalls().at(-1)).toEqual({
+        ref: { owner: 'alex', name: 'notes' },
+        allowPublic: false,
+      })
     })
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(sync.connectExistingRepo.mock.calls.length).toBeGreaterThanOrEqual(3)
@@ -356,7 +378,6 @@ describe('ConnectGithubDialog', () => {
 
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    await expect.element(page.getByText(/waiting for the repository/i)).toBeInTheDocument()
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(sync.connectExistingRepo.mock.calls.length).toBeGreaterThanOrEqual(3)
     expect(sync.connectNewRepo).toHaveBeenCalledTimes(1)

@@ -152,11 +152,9 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
             />
           </div>
           <div className="space-y-1.5">
-            {/* The combobox input's real label is cmdk's hidden one (same
-                text); an htmlFor can't reach a cmdk input. */}
-            <div aria-hidden className={FIELD_LABEL_CLASS}>
+            <label htmlFor="add-meeting-attendees" className={FIELD_LABEL_CLASS}>
               Attendees
-            </div>
+            </label>
             {attendees.length > 0 && (
               <ul className="flex flex-wrap gap-1.5">
                 {attendees.map((attendee) => (
@@ -177,7 +175,11 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
                 ))}
               </ul>
             )}
-            <AttendeeCombobox attendees={attendees} onAdd={addAttendee} />
+            <AttendeeCombobox
+              id="add-meeting-attendees"
+              attendees={attendees}
+              onAdd={addAttendee}
+            />
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
             <Checkbox

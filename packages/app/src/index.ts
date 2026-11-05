@@ -60,6 +60,8 @@ export {
   type ConnectGithubWizardDeps,
   type ConnectGithubWizardOptions,
   type ConnectGithubWizardService,
+  type ConnectGithubWizardState,
+  type ConnectRepoChoice,
   type ConnectWizardStep,
 } from './sync/connect-github-wizard-service.ts'
 export {
@@ -145,6 +147,7 @@ export {
 export {
   type NavigateOptions,
   type NavigationService,
+  type NavigationState,
   type ScrollPosition,
 } from './navigation/navigation-service.ts'
 export {

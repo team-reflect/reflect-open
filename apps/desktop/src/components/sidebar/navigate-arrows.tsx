@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 const BACK_BINDING = keybindingFor('history.back')
 const FORWARD_BINDING = keybindingFor('history.forward')
@@ -19,7 +19,8 @@ const BUTTON_CLASS =
  * disabled at either end of it.
  */
 export function NavigateArrows(): ReactElement {
-  const { back, forward, canBack, canForward } = useRouter()
+  const { canBack, canForward } = useRouterState()
+  const { back, forward } = useRouterActions()
 
   return (
     // The arrows sit inside the overlaid macOS title-bar band, where the

@@ -7,10 +7,12 @@ import SafariServices
 /// sandbox. The reply is the extension's ack (`captureAckSchema` in
 /// `packages/core/src/capture/capture-envelope.ts`).
 final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
-    func beginRequest(with context: NSExtensionContext) {
-        let request = context.inputItems.first as? NSExtensionItem
-        let response = NSExtensionItem()
-        response.userInfo = [SFExtensionMessageKey: CaptureSpool.spool(request?.userInfo?[SFExtensionMessageKey])]
-        context.completeRequest(returningItems: [response], completionHandler: nil)
-    }
+  func beginRequest(with context: NSExtensionContext) {
+    let request = context.inputItems.first as? NSExtensionItem
+    let response = NSExtensionItem()
+    response.userInfo = [
+      SFExtensionMessageKey: CaptureSpool.spool(request?.userInfo?[SFExtensionMessageKey])
+    ]
+    context.completeRequest(returningItems: [response], completionHandler: nil)
+  }
 }

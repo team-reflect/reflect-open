@@ -41,6 +41,12 @@ Cascade layer order, low to high priority.
   );
 }
 
+/* Horizontal snap pager without a visible scrollbar. Each pager sets its own
+   `overflow-x`. */
+@utility pager-x {
+  @apply snap-x snap-mandatory scrollbar-none overflow-y-hidden overscroll-x-contain;
+}
+
 /* Controls that sit inside the overlaid macOS title-bar drag strip must share
    the strip's z-index so they win by tree order without jumping above overlays. */
 @utility window-drag-control {
@@ -55,6 +61,7 @@ Cascade layer order, low to high priority.
    `.dark` / `.reflect-space` runtime theming intact. */
 @theme inline {
   --color-surface: var(--surface);
+  --color-surface-canvas: var(--surface-canvas);
   --color-surface-sunken: var(--surface-sunken);
   --color-surface-app: var(--surface-app);
   --color-surface-hover: var(--surface-hover);
@@ -136,6 +143,14 @@ Cascade layer order, low to high priority.
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Motion tokens: easing curves and durations. */
+@theme {
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-sheet: 450ms;
+  --duration-stack: 350ms;
+  --duration-month-title: 500ms;
+}
+
 /* The DS shadow tokens share Tailwind's `--shadow-*` theme namespace, so a
    direct `--shadow-sm: var(--shadow-sm)` mapping would make Tailwind emit a
    self-referential (circular, thus invalid) variable into `@layer theme`.
@@ -186,6 +201,11 @@ Cascade layer order, low to high priority.
   --sidebar-accent-foreground: var(--text);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--focus-ring);
+}
+
+/* The light mobile canvas is off-white: a full-screen white page glares on a phone. */
+:root:not(.dark) .mobile-shell {
+  --surface-canvas: var(--surface-app);
 }
 
 html,
@@ -633,7 +653,11 @@ html:root {
    shadcn form controls carry their own focus-visible ring (border + ring
    utilities), so the global outline above would stack a second ring on top.
    Its rule is unlayered, so a Tailwind utility can't opt out, so do it here. */
-:where([data-slot='input'], [data-slot='textarea'], [cmdk-input]):focus-visible {
+:where(
+  [data-slot='input'],
+  [data-slot='textarea'],
+  [data-slot='input-group-control']
+):focus-visible {
   outline: none;
 }
 
@@ -675,7 +699,7 @@ html:root {
   width: 40%;
   flex-shrink: 0;
 }
-.reflect-palette-group [cmdk-group-heading] {
+.reflect-palette-group-label {
   padding: 0.375rem 0.625rem 0.125rem;
   font-size: 0.6875rem;
   font-weight: 600;
@@ -688,7 +712,7 @@ html:root {
   border-radius: 0.375rem;
   cursor: pointer;
 }
-.reflect-palette-item[data-selected='true'] {
+.reflect-palette-item[data-highlighted] {
   background: var(--accent-soft, rgb(99 102 241 / 12%));
 }
 .reflect-palette-empty {

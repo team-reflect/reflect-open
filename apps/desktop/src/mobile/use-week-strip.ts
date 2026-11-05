@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useEffectEvent,
   useLayoutEffect,
   useRef,
@@ -9,8 +8,7 @@ import {
 } from 'react'
 import type { WeekStartDay } from '@reflect/core'
 import { createWeekWindow, weekAtIndex, weekIndexOf, type WeekWindow } from '@reflect/app'
-import { nearestIndex, pageWidth, restOn } from '@/lib/scroll-pager.ts'
-import { watchScrollSettle } from '@/lib/scroll-settle.ts'
+import { attachSnapPager, type SnapPager } from '@/lib/snap-pager.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 
 /**
@@ -66,127 +64,49 @@ export interface WeekStrip {
  */
 export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStrip {
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const pagerRef = useRef<SnapPager | null>(null)
   const reducedMotion = usePrefersReducedMotion()
   const [weekWindow, setWeekWindow] = useState<WeekWindow>(() => {
     return createWeekWindow(date, weekStartDay)
   })
   const [displayedIndex, setDisplayedIndex] = useState(weekWindow.anchorIndex)
-  // The displayed week, for the scroller's listeners between renders.
-  const displayedIndexRef = useRef(weekWindow.anchorIndex)
   // The window start we last reconciled against — a change means a rebuild,
   // so the scroller must move onto the new slides at the anchor.
   const windowStartRef = useRef(weekWindow.start)
   // The `date` the strip last followed — browsing must not snap back to it.
   const followedDateRef = useRef(date)
-  // A user scroll has moved the strip and has not settled.
-  const userScrollingRef = useRef(false)
 
-  const display = useCallback((index: number): void => {
-    displayedIndexRef.current = index
-    setDisplayedIndex(index)
-  }, [])
-
-  // Shows week `index` in the header at once, then scrolls the strip to it.
-  const scrollToWeek = useCallback(
-    (index: number): void => {
-      display(index)
-      const scroller = scrollerRef.current
-      if (!scroller) {
-        return
-      }
-      userScrollingRef.current = false
-      scroller.scrollTo({
-        left: index * pageWidth(scroller),
-        behavior: reducedMotion ? 'instant' : 'smooth',
-      })
-    },
-    [display, reducedMotion],
-  )
-
-  // The header follows the week nearest a finger or wheel scroll. A scroll
-  // that no finger or wheel started already shows its target.
-  const handleScroll = useEffectEvent((scroller: HTMLElement, isUserScroll: boolean) => {
-    if (!isUserScroll) {
-      return
-    }
-    userScrollingRef.current = true
-    const nearest = nearestIndex(scroller, weekWindow.count)
-    if (nearest !== undefined && nearest !== displayedIndexRef.current) {
-      display(nearest)
-    }
-  })
+  const count = useEffectEvent(() => weekWindow.count)
+  const shownIndex = useEffectEvent(() => displayedIndex)
+  const prefersReducedMotion = useEffectEvent(() => reducedMotion)
 
   // Re-center the window when paging settles near an edge, keeping the
-  // browsed week on screen (it becomes the rebuilt window's anchor). A scroll
-  // that no finger or wheel started (a scroll to the selection, a page width
-  // change) settles on the displayed week.
-  const handleSettle = useEffectEvent((scroller: HTMLElement, isUserScroll: boolean) => {
-    userScrollingRef.current = false
-    if (!isUserScroll) {
-      restOn(scroller, displayedIndexRef.current)
-      return
-    }
-    const index = nearestIndex(scroller, weekWindow.count)
-    if (index === undefined) {
-      return
-    }
-    // WebKit can come to rest between snap points.
-    restOn(scroller, index)
-    display(index)
+  // browsed week on screen (it becomes the rebuilt window's anchor).
+  const handleUserSettle = useEffectEvent((index: number) => {
     if (shouldRecenterWeeks(weekWindow, index)) {
       setWeekWindow(createWeekWindow(weekAtIndex(weekWindow, index), weekStartDay))
     }
   })
 
-  // A focused day in another week (keyboard Tab) shows that week, so the
-  // settle of the focus scroll keeps it on screen.
-  const handleFocus = useEffectEvent((scroller: HTMLElement, target: EventTarget | null) => {
-    const index = [...scroller.children].findIndex(
-      (row) => target instanceof Node && row.contains(target),
-    )
-    if (index !== -1 && index !== displayedIndexRef.current) {
-      scrollToWeek(index)
-    }
-  })
-
-  useEffect(() => {
+  // Attaches the pager, which rests on the anchor week before the first paint.
+  useLayoutEffect(() => {
     const scroller = scrollerRef.current
     if (!scroller) {
       return
     }
     const controller = new AbortController()
-    const watch = watchScrollSettle({
+    pagerRef.current = attachSnapPager({
       element: scroller,
-      onSettle: () => handleSettle(scroller, watch.isUserScroll()),
+      index: shownIndex(),
+      count,
+      prefersReducedMotion,
+      onIndex: setDisplayedIndex,
+      onUserSettle: handleUserSettle,
       signal: controller.signal,
     })
-    // After the watch, whose own listener decides whether this scroll is the user's.
-    scroller.addEventListener('scroll', () => handleScroll(scroller, watch.isUserScroll()), {
-      passive: true,
-      signal: controller.signal,
-    })
-    scroller.addEventListener('focusin', (event) => handleFocus(scroller, event.target), {
-      signal: controller.signal,
-    })
-    // Rotation and split view change the page width: stay on the same week,
-    // unless a finger or its momentum owns the position (the settle aligns it).
-    const resize = new ResizeObserver(() => {
-      if (!watch.isTouching() && !userScrollingRef.current) {
-        restOn(scroller, displayedIndexRef.current)
-      }
-    })
-    resize.observe(scroller)
     return () => {
+      pagerRef.current = null
       controller.abort()
-      resize.disconnect()
-    }
-  }, [])
-
-  // Places the scroller on the anchor week before the first paint.
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current
-    if (scroller) {
-      restOn(scroller, displayedIndexRef.current)
     }
   }, [])
 
@@ -207,13 +127,7 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
       // Any rebuild centers the window on the week to show — land on it.
       windowStartRef.current = weekWindow.start
       followedDateRef.current = date
-      displayedIndexRef.current = weekWindow.anchorIndex
-      userScrollingRef.current = false
-      const scroller = scrollerRef.current
-      if (scroller) {
-        restOn(scroller, weekWindow.anchorIndex)
-      }
-      setDisplayedIndex(weekWindow.anchorIndex)
+      pagerRef.current?.restOn(weekWindow.anchorIndex)
       return
     }
     if (followedDateRef.current === date) {
@@ -229,8 +143,8 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
       setWeekWindow(createWeekWindow(date, weekStartDay))
       return
     }
-    scrollToWeek(index)
-  }, [date, weekWindow, weekStartDay, scrollToWeek])
+    pagerRef.current?.show(index)
+  }, [date, weekWindow, weekStartDay])
 
   const showWeekOf = useCallback(
     (target: string) => {
@@ -239,9 +153,9 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
         setWeekWindow(createWeekWindow(target, weekStartDay))
         return
       }
-      scrollToWeek(index)
+      pagerRef.current?.show(index)
     },
-    [weekWindow, weekStartDay, scrollToWeek],
+    [weekWindow, weekStartDay],
   )
 
   return {

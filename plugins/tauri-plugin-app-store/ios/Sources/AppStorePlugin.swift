@@ -34,9 +34,9 @@ class AppStorePlugin: Plugin {
     // A simulator has no App Store account and names its receipt `receipt`,
     // so it fails both checks; it is always a development install.
     #if targetEnvironment(simulator)
-      let isSandboxInstall = true
+    let isSandboxInstall = true
     #else
-      let isSandboxInstall = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    let isSandboxInstall = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
     #endif
     if isSandboxInstall {
       invoke.resolve(["environment": "Sandbox"])

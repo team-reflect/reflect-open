@@ -14,11 +14,12 @@ import {
   createTestSettingsService,
   type TestCoreServices,
 } from '@reflect/core/testing'
-import { toast } from '@/components/ui/toast.tsx'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useStore } from '@/lib/use-store.ts'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { createTestToastController } from '@/test-utils/toast.tsx'
+import { ToastControllerContext } from '@/lib/use-toasts.ts'
 import { AudioMemoProvider, useAudioMemo, useAudioMemoPhase } from './audio-memo-provider.tsx'
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 3 }
@@ -89,24 +90,27 @@ async function setup(provider: AiProviderConfig = OPENAI) {
     settings,
   })
   core.audioRecorder.setStopResult(RECORDING)
+  const toastController = createTestToastController()
 
   const hook = await renderHookInApp(() => ({ memo: useAudioMemoView(), sidebar: useSidebar() }), {
     core,
     graph: GRAPH,
     wrapper: (children: ReactNode) => (
-      <SidebarProvider>
-        <AudioMemoProvider graph={GRAPH}>
-          <PhaseProbe />
-          <ElapsedProbe />
-          {children}
-        </AudioMemoProvider>
-      </SidebarProvider>
+      <ToastControllerContext value={toastController}>
+        <SidebarProvider>
+          <AudioMemoProvider graph={GRAPH}>
+            <PhaseProbe />
+            <ElapsedProbe />
+            {children}
+          </AudioMemoProvider>
+        </SidebarProvider>
+      </ToastControllerContext>
     ),
   })
   const cancels = (): number => {
     return core.audioRecorder.calls().filter((call) => call.method === 'cancel').length
   }
-  return { ...hook, core, cancels }
+  return { ...hook, core, cancels, toastController }
 }
 
 describe('AudioMemoProvider', () => {
@@ -241,17 +245,15 @@ describe('AudioMemoProvider', () => {
   })
 
   it('shows the still-recording reminder as a toast, and stopping takes it down', async () => {
-    const add = vi.spyOn(toast, 'add').mockReturnValue('audio-memo-reminder')
-    const close = vi.spyOn(toast, 'close').mockReturnValue(undefined)
-    const { result, core } = await setup()
+    const { result, core, toastController } = await setup()
 
     await act(() => {
       result.current.memo.toggle()
     })
     core.audioRecorder.emitReminder(30 * 60_000)
-    expect(add).toHaveBeenCalledWith(
+    expect(toastController.open()).toEqual([
       expect.objectContaining({ id: 'audio-memo-reminder', title: 'Still recording' }),
-    )
+    ])
 
     await act(() => {
       result.current.memo.toggle()
@@ -259,7 +261,7 @@ describe('AudioMemoProvider', () => {
 
     // Left up, it would keep claiming a session is running, and its stop
     // control would land on whatever recording started next.
-    expect(close).toHaveBeenCalledWith('audio-memo-reminder')
+    expect(toastController.open()).toEqual([])
   })
 
   it('cancel discards the recording without saving', async () => {

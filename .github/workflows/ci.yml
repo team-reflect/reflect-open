@@ -175,6 +175,13 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets
 
+      - name: Swift format and lint
+        run: |
+          swift format --version
+          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
+          git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
+          git diff --exit-code '*.swift'
+
   test-rust:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
