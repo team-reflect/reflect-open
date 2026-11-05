@@ -1,4 +1,5 @@
 import type { ClockService, TimerHandle } from '@reflect/core'
+import { createDeferred } from '@reflect/utils'
 import type { AppLifecycleService } from '../app/lifecycle-service.ts'
 
 export interface PollUntilOptions {
@@ -55,7 +56,7 @@ function waitForNextCheck({
   signal,
 }: PollUntilOptions): Promise<void> {
   signal.throwIfAborted()
-  const { promise, resolve, reject } = Promise.withResolvers<void>()
+  const { promise, resolve, reject } = createDeferred<void>()
   const cleanup = new AbortController()
   let timer: TimerHandle | null = null
   const clearTimer = (): void => {
