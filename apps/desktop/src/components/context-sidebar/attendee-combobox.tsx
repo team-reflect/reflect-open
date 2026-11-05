@@ -154,8 +154,10 @@ export function AttendeeCombobox({ id, attendees, onAdd }: AttendeeComboboxProps
         onBlur={addTyped}
         onKeyDown={(keyEvent) => {
           if (getIsComposing()) {
-            // The Enter that commits a composition must not pick the highlighted entry.
+            // The Enter that commits a composition must not pick the highlighted entry
+            // or submit the dialog form.
             if (keyEvent.key === 'Enter') {
+              keyEvent.preventDefault()
               keyEvent.preventBaseUIHandler()
             }
             return

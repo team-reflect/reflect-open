@@ -336,6 +336,21 @@ describe('AiProvidersSection', () => {
     await expect.element(page.getByPlaceholder('Search or type a model name…')).toHaveValue('')
   })
 
+  it('does not take a partial search as a custom id after the pointer leaves the list', async () => {
+    stored = twoStoredModels()
+    await renderSection()
+
+    await page.getByRole('combobox', { name: 'Default model for OpenAI' }).click()
+    const search = page.getByPlaceholder('Search or type a model name…')
+    await search.fill('gpt')
+    await page.getByRole('option', { name: /GPT-5\.4 mini/ }).hover()
+    await search.hover()
+    await userEvent.keyboard('{Enter}')
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(saved()).toHaveLength(0)
+  })
+
   it('finds a model by its id as well as its label', async () => {
     stored = twoStoredModels()
     await renderSection()

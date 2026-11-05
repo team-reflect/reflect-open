@@ -156,6 +156,22 @@ describe('DailyEventsSection', () => {
     await expectLocatorToHaveCount(page.getByLabelText('Meeting name'), 0)
   })
 
+  it('the Enter that confirms an IME composition does not submit the form', async () => {
+    calendar.setEvents([eventAt(9, { title: 'Standup' })])
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
+
+    const attendee = page.getByLabelText('Attendees')
+    await attendee.fill('李雷')
+    // WebKit fires compositionend before the confirming Enter's keydown.
+    attendee.element().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+    await userEvent.keyboard('{Enter}')
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(addMeetingToDaily).not.toHaveBeenCalled()
+    await expect.element(page.getByLabelText('Meeting name')).toBeInTheDocument()
+  })
+
   it('passes invite emails and the contacts gate through to the action', async () => {
     stored = { calendarEnabled: true, calendarIds: ['cal-work'], contactsEnabled: true }
     await contacts.setStatus('authorized')

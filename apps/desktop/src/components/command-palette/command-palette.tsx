@@ -135,6 +135,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
               if (getIsComposing()) {
                 // The Enter that commits a composition must not pick the highlighted item.
                 if (event.key === 'Enter') {
+                  event.preventDefault()
                   event.preventBaseUIHandler()
                 }
                 return
