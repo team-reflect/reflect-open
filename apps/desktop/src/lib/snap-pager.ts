@@ -1,4 +1,4 @@
-import { nearestIndex, pageWidth, restOn } from '@/lib/scroll-pager.ts'
+import { nearestIndex, pageOf, pageWidth, restOn } from '@/lib/scroll-pager.ts'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 
 export interface SnapPagerOptions {
@@ -135,10 +135,11 @@ export function attachSnapPager({
         return
       }
       const target = event.target
-      const page = [...element.children].findIndex(
-        (child) => target instanceof Node && child.contains(target),
-      )
-      if (page !== -1 && page !== index) {
+      if (!(target instanceof Element)) {
+        return
+      }
+      const page = pageOf(element, target, count())
+      if (page !== undefined && page !== index) {
         show(page)
       }
     },
