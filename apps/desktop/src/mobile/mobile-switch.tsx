@@ -36,10 +36,8 @@ function NativeSwitch({
   return (
     <input
       type="checkbox"
-
       /* @ts-expect-error: WebKit's switch attribute (Safari 17.4+), which React's input types lack. */
       switch=""
-
       role="switch"
       checked={checked}
       onChange={(event) => onCheckedChange(event.currentTarget.checked)}
