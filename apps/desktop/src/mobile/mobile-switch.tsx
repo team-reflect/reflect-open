@@ -34,6 +34,10 @@ function NativeSwitch({
   onCheckedChange,
   'aria-describedby': describedBy,
 }: MobileSwitchProps): ReactElement {
+  // WebKit draws the switch in UIKit's 64x28 shape but keeps the old 31px
+  // height, so by default it is 71x31, larger than a native `UISwitch`.
+  // Setting both sides keeps WebKit's default size from applying. See
+  // https://github.com/WebKit/WebKit/blob/22d0ea35487a67870e232b0bf385fd30833d246a/Source/WebCore/rendering/cocoa/RenderThemeCocoa.mm#L416-L417
   return (
     <input
       type="checkbox"
@@ -43,7 +47,7 @@ function NativeSwitch({
       checked={checked}
       onChange={(event) => onCheckedChange(event.currentTarget.checked)}
       aria-describedby={describedBy}
-      className="shrink-0 accent-primary"
+      className="h-7 w-16 shrink-0 accent-primary"
     />
   )
 }
