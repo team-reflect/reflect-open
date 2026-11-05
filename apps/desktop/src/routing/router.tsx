@@ -9,7 +9,13 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import type { NavigateOptions, NavigationState, Route, ScrollPosition } from '@reflect/app'
+import type {
+  NavigateOptions,
+  NavigationService,
+  NavigationState,
+  Route,
+  ScrollPosition,
+} from '@reflect/app'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 export type RouterNavigate = (route: Route, options?: NavigateOptions) => void
@@ -72,24 +78,29 @@ export function RouterProvider({
   children,
 }: RouterProviderProps): ReactElement {
   const { navigation: appNavigation } = useAppServices()
-  const { noteMove } = useCoreServices()
   const [navigation] = useState(() => {
     appNavigation.reset(initialRoute)
     return appNavigation
   })
-  // React state rather than `useSyncExternalStore`: a store read through that
-  // hook always updates synchronously, which would drop the transition and
-  // flash the loading fallback of every lazily loaded screen.
-  const [state, setState] = useState(() => navigation.get())
+  return (
+    <RouterActionsProvider navigation={navigation}>
+      <RouterStateProvider navigation={navigation}>
+        <RouterHandlersProvider navigation={navigation}>{children}</RouterHandlersProvider>
+      </RouterStateProvider>
+    </RouterActionsProvider>
+  )
+}
 
-  useEffect(() => {
-    const sync = (): void => setState(navigation.get())
-    const unsubscribe = navigation.subscribe(sync)
-    // A descendant's effect may have navigated before this subscription.
-    startTransition(sync)
-    return unsubscribe
-  }, [navigation])
+interface NavigationProviderProps {
+  navigation: NavigationService
+  children: ReactNode
+}
 
+/**
+ * Provides the navigation callbacks. Each one runs the service call inside a
+ * transition, so the `setState` its subscriber fires is a transition update.
+ */
+function RouterActionsProvider({ navigation, children }: NavigationProviderProps): ReactElement {
   const navigate = useCallback(
     (route: Route, options?: NavigateOptions): void => {
       startTransition(() => navigation.navigate(route, options))
@@ -105,6 +116,32 @@ export function RouterProvider({
     startTransition(() => navigation.forward())
   }, [navigation])
 
+  const routerActions = useMemo<RouterActions>(
+    () => ({ navigate, back, forward }),
+    [navigate, back, forward],
+  )
+
+  return <RouterActionsContext value={routerActions}>{children}</RouterActionsContext>
+}
+
+/**
+ * Provides the service's state as rendered by React.
+ */
+function RouterStateProvider({ navigation, children }: NavigationProviderProps): ReactElement {
+  const { noteMove } = useCoreServices()
+  // React state rather than `useSyncExternalStore`: a store read through that
+  // hook always updates synchronously, which would drop the transition and
+  // flash the loading fallback of every lazily loaded screen.
+  const [state, setState] = useState(() => navigation.get())
+
+  useEffect(() => {
+    const sync = (): void => setState(navigation.get())
+    const unsubscribe = navigation.subscribe(sync)
+    // A descendant's effect may have navigated before this subscription.
+    startTransition(sync)
+    return unsubscribe
+  }, [navigation])
+
   // A note file move (Plan 17) rewrites every history entry that points at
   // the old path, so the current route (and back/forward) follow the file.
   useEffect(
@@ -112,11 +149,18 @@ export function RouterProvider({
     [navigation, noteMove],
   )
 
+  return <RouterStateContext value={state}>{children}</RouterStateContext>
+}
+
+/**
+ * Provides the scroll callbacks for the entry in the router state above it.
+ */
+function RouterHandlersProvider({ navigation, children }: NavigationProviderProps): ReactElement {
   // The scroll callbacks are bound to the entry this render shows. The
   // service's current entry runs ahead of the screen while a transition is
   // pending, and a render that suspends never commits, so neither can tell
   // which entry the views on screen belong to.
-  const { entryId, route } = state
+  const { entryId, route } = useRouterState()
   const position = useMemo(() => ({ entryId, route }), [entryId, route])
   const saveScrollState = useCallback(
     (scroll: ScrollPosition) => navigation.saveScrollState(scroll, position),
@@ -128,22 +172,11 @@ export function RouterProvider({
   )
   const savedScroll = useCallback(() => navigation.savedScroll(position), [navigation, position])
 
-  const routerActions = useMemo<RouterActions>(
-    () => ({ navigate, back, forward }),
-    [navigate, back, forward],
-  )
-
   const routerHandlers = useMemo<RouterHandlers>(() => {
     return { saveScrollState, clearScrollState, savedScroll }
   }, [saveScrollState, clearScrollState, savedScroll])
 
-  return (
-    <RouterActionsContext value={routerActions}>
-      <RouterStateContext value={state}>
-        <RouterHandlersContext value={routerHandlers}>{children}</RouterHandlersContext>
-      </RouterStateContext>
-    </RouterActionsContext>
-  )
+  return <RouterHandlersContext value={routerHandlers}>{children}</RouterHandlersContext>
 }
 
 /** Access the current route state. Use within a RouterProvider. */
