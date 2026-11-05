@@ -5,6 +5,7 @@ const WebSwitch = lazy(async () => {
   return { default: Switch }
 })
 
+// https://caniuse.com/mdn-html_elements_input_switch
 const supportsNativeSwitch = 'switch' in HTMLInputElement.prototype
 
 interface MobileSwitchProps {
