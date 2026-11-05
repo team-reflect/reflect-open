@@ -218,6 +218,25 @@ function shownMonth(view: BrowserView): string | null {
   )
 }
 
+/**
+ * Picks the `YYYY-MM` `month` from the month title: through the native month
+ * input where the browser has one, else through the picker sheet.
+ */
+async function pickMonthFromTitle(view: BrowserView, month: string): Promise<void> {
+  const trigger = view.getByLabelText('Change month')
+  if (trigger.element() instanceof HTMLInputElement) {
+    await userEvent.fill(trigger, month)
+    return
+  }
+  await userEvent.click(trigger)
+  const monthButton = view.getByRole('button', { name: formatMonthLabel(month) })
+  while (monthButton.query() === null) {
+    await userEvent.click(view.getByRole('button', { name: 'Next year' }))
+  }
+  await userEvent.click(monthButton)
+  await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+}
+
 /** A day in `date`'s week that isn't `date` itself (always present). */
 function otherDayInWeek(date: string): string {
   const week = weekOf(date, 'monday')
@@ -320,19 +339,15 @@ describe('MobileShell', () => {
     await expect.element(view.getByRole('button', { name: 'Today' })).toBeVisible()
   })
 
-  it('jumps to a picked month from the month title’s picker sheet', async () => {
-    const user = userEvent
+  it('jumps to a month picked from the month title', async () => {
     const today = getIsoToday()
     const view = await mount({ kind: 'today' })
 
-    await user.click(view.getByRole('button', { name: 'Change month' }))
-    await user.click(view.getByRole('button', { name: 'Next year' }))
     // January next year: always a different month, and (unlike a fixed
     // offset) always the same distance shape from today — date-agnostic.
     const pickedMonth = `${Number(getYearMonth(today).slice(0, 4)) + 1}-01`
-    await user.click(view.getByRole('button', { name: formatMonthLabel(pickedMonth) }))
+    await pickMonthFromTitle(view, pickedMonth)
 
-    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
     await waitFor(() => expect(shownMonth(view)).toBe(formatMonthLabel(pickedMonth)))
     const firstDay = `${pickedMonth}-01`
     expect(
@@ -344,15 +359,12 @@ describe('MobileShell', () => {
     await expect.element(view.getByRole('button', { name: 'Today' })).toBeVisible()
   })
 
-  it('keeps the selection when its own month is picked from the sheet', async () => {
-    const user = userEvent
+  it('keeps the selection when its own month is picked from the month title', async () => {
     const today = getIsoToday()
     const view = await mount({ kind: 'today' })
 
-    await user.click(view.getByRole('button', { name: 'Change month' }))
-    await user.click(view.getByRole('button', { name: formatMonthLabel(getYearMonth(today)) }))
+    await pickMonthFromTitle(view, getYearMonth(today))
 
-    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
     await waitFor(() => {
       expect(
         view
