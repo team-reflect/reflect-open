@@ -51,7 +51,7 @@ function NativeMonthPicker({ selected, onPick, children }: MonthPickerProps): Re
         onClick={(event) => event.currentTarget.showPicker()}
         onChange={(event) => {
           const picked = event.currentTarget.value
-          // The picker's Reset clears the value.
+          // Desktop Chrome's Clear button empties the value.
           if (picked !== '') {
             onPick(picked)
           }
