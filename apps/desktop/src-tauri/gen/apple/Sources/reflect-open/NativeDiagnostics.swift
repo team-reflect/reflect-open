@@ -21,9 +21,11 @@ private enum NativeDiagnostics {
     (Bundle.main.object(forInfoDictionaryKey: "ReflectSentryDSN") as? String ?? "")
     .trimmingCharacters(in: .whitespacesAndNewlines)
 
-  /// Forks build under their own bundle identifier and stay silent even if
-  /// they carry a DSN.
-  private static let officialBundleIdentifier = "app.reflect.ios"
+  /// The stable and beta apps. Forks build under their own bundle identifier
+  /// and stay silent even if they carry a DSN.
+  private static let officialBundleIdentifiers: Set<String> = [
+    "app.reflect.ios", "app.reflect.ios.beta",
+  ]
 
   private static let redacted = "[redacted]"
 
@@ -65,7 +67,9 @@ private enum NativeDiagnostics {
   ]
 
   static func start() {
-    guard !dsn.isEmpty, Bundle.main.bundleIdentifier == officialBundleIdentifier else {
+    guard !dsn.isEmpty, let identifier = Bundle.main.bundleIdentifier,
+      officialBundleIdentifiers.contains(identifier)
+    else {
       return
     }
 

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The beta flavor's entitlements (release configuration): the beta App Group,
+     matching the beta app target.
+     Hand-maintained, like the release file next to it: build-ios.ts selects
+     it through a TAURI_REFLECT_IOS_*_ENTITLEMENTS environment variable. -->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.app.reflect.beta</string>
+	</array>
+</dict>
+</plist>
