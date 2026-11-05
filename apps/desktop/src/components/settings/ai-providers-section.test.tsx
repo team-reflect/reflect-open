@@ -317,6 +317,55 @@ describe('AiProvidersSection', () => {
     expect(secrets.snapshot()['ai-api-key:b']).toBe('sk-openai-secret')
   })
 
+  it('takes a typed custom model id with Enter and reopens with an empty search', async () => {
+    stored = twoStoredModels()
+    await renderSection()
+
+    const trigger = page.getByRole('combobox', { name: 'Default model for OpenAI' })
+    await trigger.click()
+    await page.getByPlaceholder('Search or type a model name…').fill('gpt-local-test')
+    await expect.element(page.getByText('to use “gpt-local-test”')).toBeInTheDocument()
+    await userEvent.keyboard('{Enter}')
+
+    await vi.waitFor(() => {
+      expect(lastSavedDoc().aiProviders).toContainEqual(
+        entry({ id: 'b', provider: 'openai', model: 'gpt-local-test', keyHint: 'abcd2' }),
+      )
+    })
+    await trigger.click()
+    await expect.element(page.getByPlaceholder('Search or type a model name…')).toHaveValue('')
+  })
+
+  it('does not take a partial search as a custom id after the pointer leaves the list', async () => {
+    stored = twoStoredModels()
+    await renderSection()
+
+    await page.getByRole('combobox', { name: 'Default model for OpenAI' }).click()
+    const search = page.getByPlaceholder('Search or type a model name…')
+    await search.fill('gpt')
+    await page.getByRole('option', { name: /GPT-5\.4 mini/ }).hover()
+    await search.hover()
+    await userEvent.keyboard('{Enter}')
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    expect(saved()).toHaveLength(0)
+  })
+
+  it('finds a model by its id as well as its label', async () => {
+    stored = twoStoredModels()
+    await renderSection()
+
+    await page.getByRole('combobox', { name: 'Default model for OpenAI' }).click()
+    await page.getByPlaceholder('Search or type a model name…').fill('gpt-5.4-mini')
+    await userEvent.keyboard('{Enter}')
+
+    await vi.waitFor(() => {
+      expect(lastSavedDoc().aiProviders).toContainEqual(
+        entry({ id: 'b', provider: 'openai', model: 'gpt-5.4-mini', keyHint: 'abcd2' }),
+      )
+    })
+  })
+
   it('traps Tab inside the dialog', async () => {
     await renderSection()
     await expect.element(page.getByText(/No AI providers configured/)).toBeInTheDocument()
