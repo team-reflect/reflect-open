@@ -65,7 +65,9 @@ export function AppShell({
         </aside>
       ) : null}
 
-      <main className={cn('min-w-0 flex-1 overflow-hidden bg-surface', INSETS)}>{children}</main>
+      <main className={cn('min-w-0 flex-1 overflow-hidden bg-surface-canvas', INSETS)}>
+        {children}
+      </main>
 
       {context ? (
         <aside

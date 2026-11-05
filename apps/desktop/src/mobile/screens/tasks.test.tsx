@@ -421,6 +421,21 @@ describe('MobileTasks', () => {
     await view.unmount()
   })
 
+  it('schedules a date picked from the native date input', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const user = userEvent
+    const view = await renderScreen()
+
+    await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
+    const picker = view.getByLabelText('Pick date')
+    await expect.element(picker).toHaveValue('2026-06-14')
+    await user.fill(picker, '2026-06-20')
+    expect(asTextArea(view.getByRole('textbox', { name: 'Task text' }).element()).value).toBe(
+      'buy milk [[2026-06-20]]',
+    )
+    await view.unmount()
+  })
+
   it('fires light haptics for task sheet scheduling and actions', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
     const user = userEvent
@@ -429,17 +444,14 @@ describe('MobileTasks', () => {
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     haptics.reset()
 
-    await user.click(view.getByRole('button', { name: 'Pick date' }))
+    await user.click(view.getByRole('button', { name: 'Tomorrow' }))
     expect(haptics.impacts()).toBe(1)
 
-    await user.click(view.getByRole('button', { name: 'Tomorrow' }))
+    await user.click(view.getByRole('button', { name: 'Clear' }))
     expect(haptics.impacts()).toBe(2)
 
-    await user.click(view.getByRole('button', { name: 'Clear' }))
-    expect(haptics.impacts()).toBe(3)
-
     await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
-    expect(haptics.impacts()).toBe(4)
+    expect(haptics.impacts()).toBe(3)
     await waitFor(() => expect(writesOf('toBullet')).toHaveLength(1))
     await view.unmount()
   })

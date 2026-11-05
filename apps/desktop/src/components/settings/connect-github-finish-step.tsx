@@ -1,10 +1,11 @@
 import type { ReactElement, ReactNode } from 'react'
+import type { ConnectGithubWizardService, ConnectGithubWizardState } from '@reflect/app'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import type { ConnectGithubWizard } from '@/hooks/use-connect-github-wizard.ts'
 
 interface ConnectGithubFinishStepProps {
-  wizard: ConnectGithubWizard
+  state: Extract<ConnectGithubWizardState, { step: 'finish' }>
+  wizard: ConnectGithubWizardService
   /**
    * `row`: desktop dialog — small buttons side by side, escape hatches
    * leading. `stack`: mobile sheet — full-width buttons, primary action
@@ -15,18 +16,17 @@ interface ConnectGithubFinishStepProps {
 
 /**
  * The connect wizard's finish step, shared by the desktop dialog and the
- * mobile drawer so the view precedence and every user-facing string live
- * once. Renders whatever {@link ConnectGithubWizard.finishView} says —
- * the public-repo consent gate, the create/grant handoffs (whose polls the
- * hook owns), the in-flight state, or a failure's inline error with its
- * escape back to the repo step. Only button sizing/stacking varies by
- * `layout`.
+ * mobile drawer so every user-facing string lives once. Renders the finish
+ * view: the public-repo consent question, the create/grant handoffs, the
+ * in-flight state, or a failure with its escape back to the repo step. Only
+ * button sizing/stacking varies by `layout`.
  */
 export function ConnectGithubFinishStep({
+  state,
   wizard,
   layout,
 }: ConnectGithubFinishStepProps): ReactElement {
-  const view = wizard.finishView
+  const { view } = state
   const buttonSize = layout === 'row' ? ('sm' as const) : undefined
   const groupClass = layout === 'row' ? 'flex gap-2' : 'flex flex-col gap-2'
 
@@ -40,11 +40,9 @@ export function ConnectGithubFinishStep({
 
   return (
     <div className="flex flex-col gap-3">
-      {wizard.user !== null ? (
-        <p className="text-xs text-text-muted">
-          Signed in as <strong className="text-text">{wizard.user.login}</strong>
-        </p>
-      ) : null}
+      <p className="text-xs text-text-muted">
+        Signed in as <strong className="text-text">{state.user.login}</strong>
+      </p>
 
       {view.kind === 'publicConfirm' ? (
         <>
@@ -57,12 +55,7 @@ export function ConnectGithubFinishStep({
           </InlineAlert>
           <div className={groupClass}>
             {layout === 'row' ? changeRepository('Choose another repo') : null}
-            <Button
-              variant="destructive"
-              size={buttonSize}
-              disabled={wizard.pending || wizard.user === null}
-              onClick={wizard.confirmPublic}
-            >
+            <Button variant="destructive" size={buttonSize} onClick={wizard.confirmPublic}>
               Sync with a public repo
             </Button>
             {layout === 'stack' ? changeRepository('Choose another repo') : null}
@@ -75,7 +68,7 @@ export function ConnectGithubFinishStep({
           <p className="text-sm text-text">
             Create{' '}
             <strong>
-              {view.owner}/{view.name}
+              {view.repo.owner}/{view.repo.name}
             </strong>{' '}
             on GitHub. Reflect will connect it as soon as it exists.
           </p>
@@ -86,7 +79,7 @@ export function ConnectGithubFinishStep({
             {changeRepository()}
           </div>
           <p className="text-xs text-text-muted">Waiting for the repository…</p>
-          {wizard.authKind === 'app' ? (
+          {view.authKind === 'app' ? (
             <p className="text-xs text-text-muted">
               If it doesn’t connect,{' '}
               <button type="button" className="underline" onClick={wizard.openInstallPage}>
@@ -129,17 +122,14 @@ export function ConnectGithubFinishStep({
 
       {view.kind === 'connecting' ? <p className="text-sm text-text-muted">Connecting…</p> : null}
 
-      {!wizard.pending && wizard.error !== null ? (
+      {view.kind === 'failed' ? (
         <>
-          <InlineAlert tone="error">{wizard.error}</InlineAlert>
-          {view.kind === 'idle'
-            ? // A failed connect must never strand the user here — offer the
-              // way back to a different repository. (The parked handoffs render
-              // their own escapes.)
-              changeRepository()
-            : null}
+          <InlineAlert tone="error">{view.error}</InlineAlert>
+          {changeRepository()}
         </>
       ) : null}
+
+      {state.openError !== null ? <InlineAlert tone="error">{state.openError}</InlineAlert> : null}
     </div>
   )
 }

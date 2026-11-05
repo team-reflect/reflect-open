@@ -34,7 +34,12 @@ export {
 export { newRepoUrl, parseRepoInput } from './sync/github-repo-service.ts'
 export type { GithubRepoRef } from './sync/types.ts'
 export { type GitSyncService, type GitSyncState } from './sync/git-sync-service.ts'
-export { type ConnectExistingResult, type GithubConnector } from './sync/github-connector.ts'
+export {
+  type ConnectExistingRepoOptions,
+  type ConnectExistingResult,
+  type ConnectNewRepoOptions,
+  type GithubConnector,
+} from './sync/github-connector.ts'
 export {
   type ConnectGitHostInput,
   type GitHostConnector,

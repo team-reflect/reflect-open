@@ -32,7 +32,7 @@ export function TabletShell({ graph }: TabletShellProps): ReactElement {
     navigation.forgetScrollStates()
   }
   if (sizeClass === null) {
-    return <div aria-busy className="h-dvh w-screen bg-surface" />
+    return <div aria-busy className="h-dvh w-screen bg-surface-canvas" />
   }
   return sizeClass === 'regular' ? <TabletWorkspace graph={graph} /> : <MobileShell />
 }

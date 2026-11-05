@@ -71,7 +71,7 @@ export function AllNotesTable({
       <div
         className={cn(
           ALL_NOTES_GRID,
-          'sticky top-0 z-10 border-b border-border bg-surface py-3 text-[13px] font-medium leading-none text-text-secondary shadow-sm',
+          'sticky top-0 z-10 border-b border-border bg-surface-canvas py-3 text-[13px] font-medium leading-none text-text-secondary shadow-sm',
         )}
       >
         <span>Subject</span>
