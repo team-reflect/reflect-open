@@ -82,6 +82,7 @@ export function RouterProvider({
     appNavigation.reset(initialRoute)
     return appNavigation
   })
+
   return (
     <RouterActionsProvider navigation={navigation}>
       <RouterStateProvider navigation={navigation}>
