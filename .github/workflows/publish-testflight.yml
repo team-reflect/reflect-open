@@ -93,7 +93,7 @@ jobs:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          REFLECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          TAURI_REFLECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           FLAVOR: ${{ inputs.flavor }}
         run: pnpm build:ios --build-number="$BUILD_NUMBER" ${FLAVOR:+--flavor="$FLAVOR"}
 

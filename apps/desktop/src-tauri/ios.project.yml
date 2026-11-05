@@ -158,7 +158,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
         # Native Sentry DSN from the build environment; empty disables it.
-        ReflectSentryDSN: $(REFLECT_SENTRY_DSN)
+        ReflectSentryDSN: $(TAURI_REFLECT_SENTRY_DSN)
         # The flavor's App Group, read by the Rust capture relay.
         ReflectAppGroup: $(REFLECT_APP_GROUP)
         UILaunchStoryboardName: LaunchScreen
@@ -287,8 +287,8 @@ targets:
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
         # The flavor's App Group, read by CaptureInbox.swift.
         ReflectAppGroup: $(REFLECT_APP_GROUP)
-        CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
-        CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
+        CFBundleShortVersionString: $(TAURI_REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(TAURI_REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           # Storyboard-less principal class; `@objc(ShareViewController)`
@@ -365,8 +365,8 @@ targets:
       path: RecordingWidget/Info.plist
       properties:
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        CFBundleShortVersionString: $(REFLECT_MARKETING_VERSION:default=0.0.0)
-        CFBundleVersion: $(REFLECT_BUILD_NUMBER:default=1)
+        CFBundleShortVersionString: $(TAURI_REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(TAURI_REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     # The widget needs no capability of its own, but the release pipeline

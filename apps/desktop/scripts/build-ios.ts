@@ -154,9 +154,10 @@ async function main(): Promise<void> {
       CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
       // Tauri only versions the app's Info.plist. The app extensions read
       // these instead, so their versions match the app's (prerelease tag
-      // stripped, as Tauri does).
-      REFLECT_MARKETING_VERSION: packageJson.version.split('-')[0],
-      REFLECT_BUILD_NUMBER: buildNumber,
+      // stripped, as Tauri does). `tauri ios build` passes only `TAURI_*`
+      // variables on to Xcode.
+      TAURI_REFLECT_MARKETING_VERSION: packageJson.version.split('-')[0],
+      TAURI_REFLECT_BUILD_NUMBER: buildNumber,
       ...flavor.xcodeEnv,
     }
     if (noSign) {

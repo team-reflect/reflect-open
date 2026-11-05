@@ -13,7 +13,7 @@ import Sentry
 /// `docs/privacy.md`.
 private enum NativeDiagnostics {
   /// The production Reflect project, expanded into Info.plist from the
-  /// `REFLECT_SENTRY_DSN` build environment. Sentry DSNs authorize event
+  /// `TAURI_REFLECT_SENTRY_DSN` build environment. Sentry DSNs authorize event
   /// submission only; builds without one (local and fork builds) leave the
   /// reporter off.
   /// https://docs.sentry.io/concepts/key-terms/dsn-explainer/
