@@ -101,8 +101,9 @@ export interface CaptureServiceDeps {
  * On desktop every session first registers the native-messaging host (pointer
  * file + browser manifests, rewritten on every graph open so app moves
  * self-heal). On the mobile surface there is no native-messaging host to
- * register; instead every pass first relays the App Group inbox the iOS share
- * extension spools into, and the session re-runs on app resume.
+ * register, and the session re-runs on app resume. Every pass first relays
+ * the App Group inbox the sandboxed extensions spool into: the iOS share
+ * extension, and the Safari app extension on macOS.
  */
 export interface CaptureService {
   /**
@@ -237,21 +238,20 @@ class CaptureSessionImpl implements CaptureSession {
     const { captureInbox, drain, enrichment, linkRepair, commitXPost, notifyXPostsWritten } =
       this.#deps
     const generation = this.#generation
-    if (this.#mobile) {
-      let relayStop: ReconcileStop | null = null
-      try {
-        // Move envelopes the iOS share extension spooled into the App Group
-        // inbox into the graph's capture inbox, ahead of every drain.
-        await captureInbox.relaySharedInbox(generation)
-      } catch (cause) {
-        // Already-relayed envelopes must still drain, so a relay failure
-        // surfaces like a drain stop instead of aborting the pass.
-        relayStop = { reason: toAppError(cause).kind, message: errorMessage(cause) }
-      }
-      this.#surfaceStop('Saving shared capture', relayStop)
-      if (isStale()) {
-        return
-      }
+    let relayStop: ReconcileStop | null = null
+    try {
+      // Move what the sandboxed extensions spooled into the App Group inbox
+      // into the graph's capture inbox, ahead of every drain. Zero, and
+      // cheap, where there is no shared container.
+      await captureInbox.relaySharedInbox(generation)
+    } catch (cause) {
+      // Already-relayed envelopes must still drain, so a relay failure
+      // surfaces like a drain stop instead of aborting the pass.
+      relayStop = { reason: toAppError(cause).kind, message: errorMessage(cause) }
+    }
+    this.#surfaceStop('Saving shared capture', relayStop)
+    if (isStale()) {
+      return
     }
     const drained = await drain.drain({
       generation,

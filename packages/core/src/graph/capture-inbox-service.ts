@@ -39,9 +39,9 @@ export interface CaptureInboxService {
    */
   reject(name: string, generation: number): Promise<void>
   /**
-   * Move envelopes the iOS share extension spooled into the App Group inbox
-   * into the graph's inbox, resolving with how many moved. Zero where there
-   * is no shared container.
+   * Move envelopes the sandboxed extensions (iOS share, macOS Safari) spooled
+   * into the App Group inbox into the graph's inbox, resolving with how many
+   * moved. Zero where there is no shared container.
    */
   relaySharedInbox(generation: number): Promise<number>
   /**
