@@ -1,5 +1,10 @@
 import { queryOptions } from '@tanstack/react-query'
-import type { CoreServices, DailyNoteService, IndexQueryService } from '@reflect/core'
+import type {
+  CoreServices,
+  DailyNoteService,
+  IndexQueryService,
+  SuggestedBacklinkService,
+} from '@reflect/core'
 import { queryKeys } from '@/lib/query-client.ts'
 
 /** Templates shared by the settings list and insertion picker. */
@@ -23,6 +28,18 @@ export function createDailyDatesQueryOptions(
   return queryOptions({
     queryKey: queryKeys.index.dailyDates(root, start, end),
     queryFn: () => dailyNotes.dailyDatesInRange(start, end),
+  })
+}
+
+/** A note's suggested backlinks; see `useSuggestedBacklinks` for when it refetches. */
+export function createSuggestedBacklinksQueryOptions(
+  suggestedBacklinks: SuggestedBacklinkService,
+  root: string | undefined,
+  path: string,
+) {
+  return queryOptions({
+    queryKey: queryKeys.suggestedBacklinks.note(root, path),
+    queryFn: () => suggestedBacklinks.getSuggestedBacklinks(path),
   })
 }
 

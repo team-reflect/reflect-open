@@ -187,6 +187,7 @@ export {
   type WikiResolverService,
 } from './indexing/wiki-resolver-service.ts'
 export { type BacklinkService } from './indexing/backlink-service.ts'
+export { type SuggestedBacklinkService } from './indexing/suggested-backlink-service.ts'
 export { createSearchService, type SearchService } from './indexing/search-service.ts'
 export { createSuggestionService, type SuggestionService } from './indexing/suggestion-service.ts'
 export {
@@ -447,6 +448,8 @@ export {
   type BacklinkContext,
   type BacklinkContextPage,
   type BacklinkSourceCursor,
+  type NoteMention,
+  type SuggestedBacklink,
   type SnippetTask,
   type DuplicateIdGroup,
   type NoteRow,

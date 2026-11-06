@@ -81,11 +81,12 @@ const ATTACHMENT_EXTENSIONS = new Set([
 export type GraphPathKind = 'note' | 'attachment'
 
 /**
- * ASCII-only lowering, byte-for-byte the Rust side's `eq_ignore_ascii_case`.
- * Full-Unicode `toLowerCase` folds characters Rust does not (KELVIN SIGN → k),
- * and the two classifiers must never disagree on the same wire path.
+ * ASCII-only lowering, byte-for-byte the Rust side's `eq_ignore_ascii_case`
+ * and SQLite's built-in `lower`. Full-Unicode `toLowerCase` folds characters
+ * those don't (KELVIN SIGN → k), and the two sides of a comparison must never
+ * disagree on the same text.
  */
-function asciiLowerCase(value: string): string {
+export function asciiLowerCase(value: string): string {
   return value.replaceAll(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32))
 }
 
