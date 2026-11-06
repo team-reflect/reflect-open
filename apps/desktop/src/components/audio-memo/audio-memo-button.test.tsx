@@ -22,6 +22,7 @@ const state = new WritableStore(IDLE)
 const elapsedMs = new WritableStore(0)
 const actions = { toggle: vi.fn(), cancel: vi.fn(), retry: vi.fn(), discard: vi.fn() }
 const session = { get: state.get, subscribe: state.subscribe, elapsedMs }
+let presentation: 'popover' | 'sheet' = 'popover'
 
 function setMemo(patch: Partial<AudioMemoSessionState>): void {
   state.set({ ...state.get(), ...patch })
@@ -29,7 +30,7 @@ function setMemo(patch: Partial<AudioMemoSessionState>): void {
 
 function renderButton(): Promise<RenderResult> {
   return renderInApp(
-    <AudioMemoContext value={{ session, ...actions }}>
+    <AudioMemoContext value={{ session, ...actions, presentation }}>
       <AudioMemoButton />
     </AudioMemoContext>,
   )
@@ -39,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   state.set(IDLE)
   elapsedMs.set(0)
+  presentation = 'popover'
 })
 
 describe('AudioMemoButton', () => {
@@ -114,6 +116,59 @@ describe('AudioMemoButton', () => {
     expect(actions.retry).toHaveBeenCalled()
     await userEvent.click(view.getByRole('button', { name: 'Discard', exact: true }))
     expect(actions.discard).toHaveBeenCalled()
+  })
+
+  describe('with the iOS recording sheet', () => {
+    beforeEach(() => {
+      presentation = 'sheet'
+    })
+
+    it('starts from the mic without a popover of its own', async () => {
+      const view = await renderButton()
+
+      await userEvent.click(view.getByRole('button', { name: 'Record audio memo' }))
+      expect(actions.toggle).toHaveBeenCalledTimes(1)
+      await expect.element(view.getByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('stops from the mic, leaving the recording UI to the sheet', async () => {
+      setMemo({ phase: 'recording' })
+      const view = await renderButton()
+
+      await userEvent.click(view.getByRole('button', { name: 'Stop recording' }))
+      expect(actions.toggle).toHaveBeenCalledTimes(1)
+      await expect.element(view.getByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('stops a pending permission request from the same control', async () => {
+      setMemo({ phase: 'requesting' })
+      const view = await renderButton()
+
+      await userEvent.click(view.getByRole('button', { name: 'Stop recording' }))
+      expect(actions.toggle).toHaveBeenCalledTimes(1)
+      await expect
+        .element(view.getByRole('button', { name: 'Record audio memo' }))
+        .not.toBeInTheDocument()
+    })
+
+    it('keeps the plain mic while transcribing, leaving the progress to the sheet', async () => {
+      setMemo({ phase: 'transcribing' })
+      const view = await renderButton()
+
+      await userEvent.click(view.getByRole('button', { name: 'Record audio memo' }))
+      expect(actions.toggle).toHaveBeenCalledTimes(1)
+      await expect.element(view.getByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('offers to show a parked error, which the sheet presents', async () => {
+      setMemo({ phase: 'error', error: 'provider down' })
+      const view = await renderButton()
+
+      await userEvent.click(view.getByRole('button', { name: 'Show audio memo error' }))
+      expect(actions.toggle).toHaveBeenCalledTimes(1)
+      await expect.element(view.getByRole('dialog')).not.toBeInTheDocument()
+      await expect.element(view.getByText('provider down')).not.toBeInTheDocument()
+    })
   })
 
   it('a non-resumable failure hides Retry', async () => {
