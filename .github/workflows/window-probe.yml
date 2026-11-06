@@ -1,0 +1,80 @@
+name: Window probe (macOS arm64)
+
+# TEMPORARY: builds the unsigned "Reflect Probe" macOS arm64 app from the
+# probe-window-state-macos26 branch and keeps it as a workflow artifact, so
+# the macOS 26 window-collapse bug can be investigated on a machine that
+# reproduces it. Never merged; see apps/desktop/scripts/window-probe/README.md.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [probe-window-state-macos26]
+
+permissions:
+  contents: read
+
+jobs:
+  macos-probe:
+    name: Build macOS arm64 probe app (unsigned)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+
+      # ort-sys extracts prebuilt ONNX Runtime binaries outside target/; see
+      # the same step in ci.yml. dirs::cache_dir on macOS is ~/Library/Caches.
+      - name: Cache ONNX Runtime binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/ort.pyke.io
+          key: ort-bin-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ort-bin-${{ runner.os }}-
+
+      - name: Ensure ort cache dir exists
+        run: mkdir -p ~/Library/Caches/ort.pyke.io
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No signing secrets on purpose: the .app is unsigned (the linker's
+      # ad-hoc signature only); run.sh clears quarantine and re-signs ad-hoc
+      # on the test machine. The Tauri CLI JS entry point is invoked directly
+      # because pnpm mangles the --config argument (see release-windows.mjs).
+      - name: Build probe app
+        working-directory: apps/desktop
+        run: node node_modules/@tauri-apps/cli/tauri.js build --bundles app --config src-tauri/tauri.probe.conf.json
+
+      - name: Package artifact
+        run: |
+          mkdir -p "$RUNNER_TEMP/probe-artifact"
+          ditto -c -k --keepParent "target/release/bundle/macos/Reflect Probe.app" "$RUNNER_TEMP/probe-artifact/Reflect-Probe.app.zip"
+          cp apps/desktop/scripts/window-probe/run.sh "$RUNNER_TEMP/probe-artifact/"
+          cp apps/desktop/scripts/window-probe/README.md "$RUNNER_TEMP/probe-artifact/"
+
+      - name: Upload probe artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reflect-window-probe-macos-arm64
+          path: ${{ runner.temp }}/probe-artifact/*
+          if-no-files-found: error
+          retention-days: 90
