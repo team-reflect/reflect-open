@@ -36,8 +36,8 @@ jobs:
           - name: windows
             os: windows-2025
             command: pnpm build:windows
-          # The oldest Ubuntu that can link the prebuilt ONNX Runtime, which
-          # needs glibc 2.38 and the libstdc++ of GCC 14.
+          # Ubuntu 24.04 is the oldest release that can link the prebuilt ONNX
+          # Runtime, which needs glibc 2.38 and the libstdc++ of GCC 14.
           - name: linux-x64
             os: ubuntu-24.04
             command: pnpm build:linux
