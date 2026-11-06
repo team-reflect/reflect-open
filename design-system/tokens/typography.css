@@ -14,8 +14,8 @@
     'InterVariable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
-  /* The note editor / reading surface can swap to a serif */
-  --font-reading: 'InterVariable', Georgia, 'Times New Roman', serif;
+  /* Keep Inter for supported glyphs and use the system UI font for script fallbacks */
+  --font-reading: var(--font-sans);
   /* Keyboard-shortcut glyphs (⌘ ⌥ ⇧) — system-ui renders them cleanly */
   --font-shortcut: system-ui, ui-monospace, SFMono-Regular, Menlo, monospace;
 
