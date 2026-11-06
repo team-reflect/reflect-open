@@ -4,6 +4,7 @@
 //! the trash policy and how a change reaches the frontend.
 
 pub mod conflict;
+mod coordinate;
 mod graph;
 pub mod graph_gitignore;
 mod graph_lock;

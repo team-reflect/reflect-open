@@ -37,6 +37,17 @@ reflect-index-schema = { workspace = true }
 # dataless-materialization policy around note reads.
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 core-foundation = { workspace = true }
+# File coordination around the atomic rename of every graph write.
+objc2 = { workspace = true }
+block2 = { workspace = true }
+objc2-foundation = { workspace = true, features = [
+  "std",
+  "NSError",
+  "NSFileCoordinator",
+  "NSString",
+  "NSURL",
+  "block2",
+] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 xattr = { workspace = true }
