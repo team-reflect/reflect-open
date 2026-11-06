@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>snap probe</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; font: 14px -apple-system, system-ui, sans-serif; }
+      body { display: flex; flex-direction: column; background: #fff; color: #222; }
+      header { flex: 0 0 auto; padding: max(12px, env(safe-area-inset-top)) 12px 8px; border-bottom: 1px solid #ddd; }
+      header b { font-variant-numeric: tabular-nums; }
+      #pager {
+        flex: 1 1 auto; min-height: 0; display: flex;
+        overflow-x: auto; overflow-y: hidden;
+        scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+        scrollbar-width: none;
+      }
+      #pager::-webkit-scrollbar { display: none; }
+      #pager.proximity { scroll-snap-type: x proximity; }
+      #pager.nosnap { scroll-snap-type: none; }
+      .wrap { position: relative; display: flex; height: 100%; }
+      .cell { flex: 0 0 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+      .nostop .cell { scroll-snap-stop: normal; }
+      .plain .cell { border-left: 1px solid #eee; padding: 16px; }
+      .slide { position: absolute; top: 0; bottom: 0; width: 100%; }
+      .v { height: 100%; overflow-y: auto; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+      .v p { margin: 0 0 1em; }
+      [contenteditable] { min-height: 3em; border: 1px dashed #bbb; padding: 8px; }
+    </style>
+  </head>
+  <body>
+    <header>probe <b id="status"></b></header>
+    <div id="pager"></div>
+    <script>
+      // Minimal copy of the day carousel: N snap cells under one wrapper and
+      // absolutely positioned slides over the three around the shown page.
+      // Logs touches and every scroll event to the Vite terminal through
+      // `/__swipe-log`, prefixed `probe`. Query flags:
+      //   cells=181 start=90       the belt
+      //   stop=0                   drop `scroll-snap-stop: always`
+      //   type=proximity|none      change `scroll-snap-type`
+      //   abs=0                    no overlay slides (plain cells with text)
+      //   nested=0                 slides without a vertical scroller
+      //   ce=0                     slides without a contenteditable block
+      //   inert=0                  no `inert` on off-page slides
+      //   mutate=1                 mount/unmount slides as the page changes (like the app)
+      const q = new URLSearchParams(location.search)
+      const flag = (key, fallback) => (q.has(key) ? q.get(key) !== '0' : fallback)
+      const cells = Number(q.get('cells') ?? 181)
+      const start = Number(q.get('start') ?? 90)
+      const stop = flag('stop', true)
+      const type = q.get('type') ?? 'mandatory'
+      const abs = flag('abs', true)
+      const nested = flag('nested', true)
+      const ce = flag('ce', true)
+      const inert = flag('inert', true)
+      const mutate = flag('mutate', false)
+
+      const queue = []
+      let timer
+      const flush = () => {
+        timer = undefined
+        if (queue.length === 0) return
+        const body = queue.splice(0).join('\n')
+        fetch('/__swipe-log', { method: 'POST', body, keepalive: true }).catch(() => {})
+      }
+      const t0 = performance.now()
+      const log = (kind, data) => {
+        const fields = Object.entries(data)
+          .map(([k, v]) => `${k}=${typeof v === 'number' ? Math.round(v * 10) / 10 : v}`)
+          .join(' ')
+        queue.push(`${(performance.now() - t0).toFixed(1).padStart(9)} probe:${kind.padEnd(10)} ${fields}`)
+        timer ??= setTimeout(flush, 200)
+      }
+
+      const pager = document.getElementById('pager')
+      const status = document.getElementById('status')
+      pager.className = [type === 'proximity' ? 'proximity' : type === 'none' ? 'nosnap' : '', stop ? '' : 'nostop', abs ? '' : 'plain'].join(' ')
+      const wrap = document.createElement('div')
+      wrap.className = 'wrap'
+      for (let i = 0; i < cells; i++) {
+        const cell = document.createElement('div')
+        cell.className = 'cell'
+        if (!abs) cell.textContent = `cell ${i}`
+        wrap.append(cell)
+      }
+      pager.append(wrap)
+
+      const slides = new Map()
+      const slideFor = (i) => {
+        const slide = document.createElement('div')
+        slide.className = 'slide'
+        slide.style.left = `${i * 100}%`
+        slide.dataset.index = i
+        let inner = slide
+        if (nested) {
+          inner = document.createElement('div')
+          inner.className = 'v'
+          slide.append(inner)
+        }
+        const h = document.createElement('h2')
+        h.textContent = `page ${i}`
+        inner.append(h)
+        if (ce) {
+          const edit = document.createElement('div')
+          edit.contentEditable = 'true'
+          edit.textContent = 'editable'
+          inner.append(edit)
+        }
+        for (let p = 0; p < (nested ? 12 : 2); p++) {
+          const para = document.createElement('p')
+          para.textContent = `paragraph ${p} of page ${i}. `.repeat(6)
+          inner.append(para)
+        }
+        return slide
+      }
+      let shown = start
+      const mountAround = (center) => {
+        if (!abs) return
+        const want = new Set([center - 1, center, center + 1].filter((i) => i >= 0 && i < cells))
+        for (const [i, el] of slides) {
+          if (!want.has(i)) {
+            el.remove()
+            slides.delete(i)
+            log('dom', { remove: i })
+          }
+        }
+        for (const i of want) {
+          if (!slides.has(i)) {
+            const el = slideFor(i)
+            slides.set(i, el)
+            wrap.append(el)
+            log('dom', { add: i })
+          }
+        }
+        if (inert) {
+          for (const [i, el] of slides) el.toggleAttribute('inert', i !== center)
+        }
+      }
+
+      const width = () => pager.getBoundingClientRect().width
+      pager.scrollLeft = start * width()
+      mountAround(start)
+
+      let lastTouchAt = -Infinity
+      let fingers = 0
+      let prev = pager.scrollLeft
+      let prevAt = performance.now()
+      pager.addEventListener(
+        'scroll',
+        () => {
+          const sl = pager.scrollLeft
+          const now = performance.now()
+          const page = Math.round(sl / width())
+          log('scroll', { sl, d: sl - prev, dt: now - prevAt, page, fingers, sinceTouch: now - lastTouchAt })
+          prev = sl
+          prevAt = now
+          status.textContent = `page ${page} sl ${Math.round(sl)}`
+          if (page !== shown) {
+            log('page', { from: shown, to: page })
+            shown = page
+            if (mutate) mountAround(page)
+          }
+        },
+        { passive: true },
+      )
+      pager.addEventListener('scrollend', () => log('scrollend', { sl: pager.scrollLeft }))
+      const starts = new Map()
+      for (const typeName of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+        document.addEventListener(
+          typeName,
+          (event) => {
+            lastTouchAt = performance.now()
+            fingers = event.touches.length
+            const touch = event.changedTouches[0]
+            if (!touch) return
+            const s = starts.get(touch.identifier)
+            if (typeName === 'touchstart') starts.set(touch.identifier, { x: touch.clientX, y: touch.clientY })
+            else if (typeName !== 'touchmove') starts.delete(touch.identifier)
+            log(typeName, {
+              x: touch.clientX,
+              y: touch.clientY,
+              dx: s ? touch.clientX - s.x : 0,
+              dy: s ? touch.clientY - s.y : 0,
+              sl: pager.scrollLeft,
+              target: event.target.tagName + (event.target.className ? '.' + String(event.target.className).split(' ')[0] : ''),
+            })
+          },
+          { capture: true, passive: true },
+        )
+      }
+      window.visualViewport?.addEventListener('resize', () => {
+        log('vv', { h: visualViewport.height, innerH: innerHeight })
+      })
+      log('install', {
+        query: location.search || '(none)',
+        ua: navigator.userAgent,
+        innerW: innerWidth,
+        innerH: innerHeight,
+        width: width(),
+        cells,
+        start,
+        stop,
+        type,
+        abs,
+        nested,
+        ce,
+        inert,
+        mutate,
+        sl: pager.scrollLeft,
+      })
+    </script>
+  </body>
+</html>
