@@ -14,4 +14,4 @@ keyboard and `--keyboard-height` stays 0. Turn it off to test keyboard avoidance
 
 `tauri ios dev` rewrites files under `apps/desktop/src-tauri/gen/apple/` (`project.pbxproj`
 build settings, the merged `Info.plist`). Do not commit those changes. To change the project,
-edit `ios.project.yml` and `gen/apple/project.yml` and follow their header comment.
+edit `gen/apple/project.yml` and follow its header comment.

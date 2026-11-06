@@ -56,7 +56,7 @@ private enum FieldCap {
 enum CaptureInbox {
   /// The flavor's App Group: `ReflectAppGroup` in the Info.plist of the
   /// running bundle (the app or the share extension), which
-  /// `ios.project.yml` sets per flavor so dev, beta, and stable never drain
+  /// `project.yml` sets per flavor so dev, beta, and stable never drain
   /// each other's inbox. It matches the
   /// `com.apple.security.application-groups` entitlement, and the app's Rust
   /// relay reads the same key.

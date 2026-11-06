@@ -1,16 +1,13 @@
-# XcodeGen (https://github.com/yonaskolb/XcodeGen) project spec: the copy
-# XcodeGen actually consumes to generate reflect-open.xcodeproj in this
-# directory. To regenerate the Xcode project after a spec change
-# (`brew install xcodegen` once):
+# XcodeGen (https://github.com/yonaskolb/XcodeGen) project spec for
+# reflect-open.xcodeproj in this directory. It is the only copy: Tauri keeps an
+# existing gen/apple/project.yml, so no template is needed. To regenerate the
+# Xcode project after a spec change (`brew install xcodegen` once):
 #
 #   cd apps/desktop/src-tauri/gen/apple && xcodegen generate
 #
 # then inspect the project.pbxproj diff before committing (`tauri ios dev`
 # may additionally normalize the generated files; see
 # docs/contributing/mobile-simulator.md).
-#
-# Kept in sync by hand with ../../ios.project.yml: every change here must
-# also be applied there, and vice versa.
 name: reflect-open
 options:
   bundleIdPrefix: app.reflect

@@ -320,7 +320,7 @@ pub fn capture_inbox_reject(
 /// The Info.plist key naming an App Group, per flavor so dev, beta, and stable
 /// never drain each other's inbox. It matches the
 /// `com.apple.security.application-groups` entitlement. On iOS it sits in the
-/// app's Info.plist (`ios.project.yml`), and `CaptureInbox.swift` reads the
+/// app's Info.plist (`gen/apple/project.yml`), and `CaptureInbox.swift` reads the
 /// same key from the extension's. On macOS it sits in the Safari app
 /// extension's, set when `scripts/embed-safari-extension.ts` builds it.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
