@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.18.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.9...v0.18.0-beta.10) (2026-11-05)
+
+
+### Features
+
+* support all Mermaid diagram types ([#2016](https://github.com/team-reflect/reflect-open/issues/2016)) ([aeeb1e1](https://github.com/team-reflect/reflect-open/commit/aeeb1e14561deac20b81f72f93698183705485b6))
+
+## [0.18.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.8...v0.18.0-beta.9) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** keep the day carousel on its day when the editor focuses ([#2013](https://github.com/team-reflect/reflect-open/issues/2013)) ([7ed3e8c](https://github.com/team-reflect/reflect-open/commit/7ed3e8cdc39b86085798190adf2b0d7d341493df))
+* **mobile:** pass the native Sentry DSN ([#2010](https://github.com/team-reflect/reflect-open/issues/2010)) ([09ddd10](https://github.com/team-reflect/reflect-open/commit/09ddd108abb920d2a61c979fb5932ce65dfbd032))
+* **mobile:** sign the beta iOS app with its own entitlements ([#2011](https://github.com/team-reflect/reflect-open/issues/2011)) ([3985858](https://github.com/team-reflect/reflect-open/commit/39858585b748ef73edaba83d4505c14242802759))
+* **mobile:** upload the IPA to TestFlight before the dSYMs ([#2015](https://github.com/team-reflect/reflect-open/issues/2015)) ([3c3b13b](https://github.com/team-reflect/reflect-open/commit/3c3b13bab75561b2b2c805b5ef2ad63f9f1cdc75))
+
+## [0.18.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.7...v0.18.0-beta.8) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** fix `SceneEntryPoints.swift` syntax error ([#2005](https://github.com/team-reflect/reflect-open/issues/2005)) ([5d661d9](https://github.com/team-reflect/reflect-open/commit/5d661d9ae7eb7015a3c34971687d58ed67144682))
+
+## [0.18.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.6...v0.18.0-beta.7) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** make trackpad scrolling work on iPad in landscape ([#1756](https://github.com/team-reflect/reflect-open/issues/1756)) ([7c07ffc](https://github.com/team-reflect/reflect-open/commit/7c07ffc28b0b4e4edb3bc9a77b4f5d3bd1225a30))
+* **mobile:** open settings select menus at the trailing edge ([#2004](https://github.com/team-reflect/reflect-open/issues/2004)) ([e46f114](https://github.com/team-reflect/reflect-open/commit/e46f114b68ccff0abecf857dfdf3e4d0abacc9f8))
+* **mobile:** use the Base UI switch in settings again ([#2003](https://github.com/team-reflect/reflect-open/issues/2003)) ([c35d3c5](https://github.com/team-reflect/reflect-open/commit/c35d3c566f8614a767ca251ed6f5e26ccfb3b01e))
+
 ## [0.18.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.5...v0.18.0-beta.6) (2026-11-05)
 
 

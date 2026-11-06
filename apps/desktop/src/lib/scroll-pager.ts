@@ -19,3 +19,18 @@ export function restOn(scroller: HTMLElement, index: number): void {
     scroller.scrollTo({ left, behavior: 'instant' })
   }
 }
+
+/**
+ * The page that holds `target`, from its position in the scroll range: pages
+ * may sit under a wrapper, so the scroller's children do not name them.
+ * `undefined` before layout.
+ */
+export function pageOf(scroller: HTMLElement, target: Element, count: number): number | undefined {
+  const width = pageWidth(scroller)
+  if (width === 0) {
+    return undefined
+  }
+  const rect = target.getBoundingClientRect()
+  const center = rect.left + rect.width / 2 - scroller.getBoundingClientRect().left
+  return Math.min(count - 1, Math.max(0, Math.floor((scroller.scrollLeft + center) / width)))
+}

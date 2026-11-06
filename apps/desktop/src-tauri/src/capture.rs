@@ -313,18 +313,6 @@ pub fn capture_inbox_reject(
 
 // ---- iOS App Group shared inbox ---------------------------------------------
 
-/// The App Group the iOS share extension spools into. Must match the
-/// `com.apple.security.application-groups` entitlement on the app and the
-/// extension targets (`ios.project.yml`) and `groupId` in
-/// `CaptureInbox.swift`. Debug builds are the dev flavor and use their own
-/// group so a dev install never drains the production app's inbox; the Xcode
-/// debug configuration compiles the Rust dev profile, so `debug_assertions`
-/// tracks the flavor exactly.
-#[cfg(all(target_os = "ios", debug_assertions))]
-const SHARED_GROUP_ID: &str = "group.app.reflect.dev";
-#[cfg(all(target_os = "ios", not(debug_assertions)))]
-const SHARED_GROUP_ID: &str = "group.app.reflect";
-
 /// The envelope spool directory inside the App Group container. The extension
 /// creates it lazily; a missing directory relays as zero.
 #[cfg(any(target_os = "ios", test))]
@@ -396,14 +384,28 @@ fn relay_shared_spools(shared_inbox: &Path, root: &Path) -> AppResult<u32> {
     Ok(relayed)
 }
 
+/// The App Group the iOS share extension spools into: `ReflectAppGroup` in
+/// the app's Info.plist, which `ios.project.yml` sets per flavor so dev, beta,
+/// and stable never drain each other's inbox. It matches the
+/// `com.apple.security.application-groups` entitlement, and
+/// `CaptureInbox.swift` reads the same key from the extension's Info.plist.
+#[cfg(target_os = "ios")]
+fn shared_group_id() -> Option<String> {
+    use objc2_foundation::{NSBundle, NSString};
+    let key = NSString::from_str("ReflectAppGroup");
+    let value = NSBundle::mainBundle().objectForInfoDictionaryKey(&key)?;
+    let group = value.downcast::<NSString>().ok()?.to_string();
+    (!group.is_empty()).then_some(group)
+}
+
 /// The shared inbox the iOS share extension writes: `<App Group>/inbox`.
 /// `None` when the container is unavailable (non-iOS platforms; a build
-/// without the App Group entitlement).
+/// without the App Group entitlement or the `ReflectAppGroup` key).
 #[cfg(target_os = "ios")]
 fn shared_inbox_dir() -> Option<PathBuf> {
     use objc2_foundation::{NSFileManager, NSString};
     let manager = NSFileManager::defaultManager();
-    let group = NSString::from_str(SHARED_GROUP_ID);
+    let group = NSString::from_str(&shared_group_id()?);
     let container = manager.containerURLForSecurityApplicationGroupIdentifier(&group)?;
     let path = container.path()?.to_string();
     Some(PathBuf::from(path).join(SHARED_INBOX_DIR))

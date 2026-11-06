@@ -5,7 +5,7 @@ import UserNotifications
 import WebKit
 
 #if canImport(ActivityKit)
-  import ActivityKit
+import ActivityKit
 #endif
 
 /// The payload of the plugin's ~10 Hz `recordingLevel` event.
@@ -838,48 +838,48 @@ class RecordingPlugin: Plugin {
   /// disabled Live Activities — both degrade to "no activity", never an error.
   private func startLiveActivity() {
     #if canImport(ActivityKit)
-      if #available(iOS 16.2, *) {
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-        let content = ActivityContent(
-          state: RecordingActivityAttributes.ContentState(startedAt: Date()),
-          staleDate: nil
+    if #available(iOS 16.2, *) {
+      guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+      let content = ActivityContent(
+        state: RecordingActivityAttributes.ContentState(startedAt: Date()),
+        staleDate: nil
+      )
+      do {
+        liveActivity = try Activity.request(
+          attributes: RecordingActivityAttributes(),
+          content: content,
+          pushType: nil
         )
-        do {
-          liveActivity = try Activity.request(
-            attributes: RecordingActivityAttributes(),
-            content: content,
-            pushType: nil
-          )
-        } catch {
-          Logger.error("recording Live Activity failed to start: \(error)")
-        }
+      } catch {
+        Logger.error("recording Live Activity failed to start: \(error)")
       }
+    }
     #endif
   }
 
   private func endLiveActivity() {
     #if canImport(ActivityKit)
-      if #available(iOS 16.2, *) {
-        guard let activity = liveActivity as? Activity<RecordingActivityAttributes> else {
-          return
-        }
-        liveActivity = nil
-        Task {
-          await activity.end(nil, dismissalPolicy: .immediate)
-        }
+    if #available(iOS 16.2, *) {
+      guard let activity = liveActivity as? Activity<RecordingActivityAttributes> else {
+        return
       }
+      liveActivity = nil
+      Task {
+        await activity.end(nil, dismissalPolicy: .immediate)
+      }
+    }
     #endif
   }
 
   private func endStaleLiveActivities() {
     #if canImport(ActivityKit)
-      if #available(iOS 16.2, *) {
-        Task {
-          for activity in Activity<RecordingActivityAttributes>.activities {
-            await activity.end(nil, dismissalPolicy: .immediate)
-          }
+    if #available(iOS 16.2, *) {
+      Task {
+        for activity in Activity<RecordingActivityAttributes>.activities {
+          await activity.end(nil, dismissalPolicy: .immediate)
         }
       }
+    }
     #endif
   }
 

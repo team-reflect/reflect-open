@@ -50,11 +50,12 @@ private enum SceneEntryPoints {
     let selector = #selector(
       UIWindowSceneDelegate.windowScene(_:performActionFor:completionHandler:))
     guard class_getInstanceMethod(delegateClass, selector) == nil else { return }
-    let block: @convention(block) (
-      AnyObject, UIWindowScene, UIApplicationShortcutItem, @escaping (Bool) -> Void
-    ) -> Void = { _, _, item, completion in
-      completion(performQuickAction(item))
-    }
+    let block:
+      @convention(block) (
+        AnyObject, UIWindowScene, UIApplicationShortcutItem, @escaping (Bool) -> Void
+      ) -> Void = { _, _, item, completion in
+        completion(performQuickAction(item))
+      }
     class_addMethod(delegateClass, selector, imp_implementationWithBlock(block), "v@:@@@?")
   }
 
@@ -64,49 +65,50 @@ private enum SceneEntryPoints {
   private static func deliverConnectionOptions(of delegateClass: AnyClass) {
     let selector = #selector(UISceneDelegate.scene(_:willConnectTo:options:))
     guard let method = class_getInstanceMethod(delegateClass, selector) else { return }
-    typealias WillConnect = @convention(c) (
-      AnyObject, Selector, UIScene, UISceneSession, UIScene.ConnectionOptions
-    ) -> Void
+    typealias WillConnect =
+      @convention(c) (
+        AnyObject, Selector, UIScene, UISceneSession, UIScene.ConnectionOptions
+      ) -> Void
     let original = unsafeBitCast(method_getImplementation(method), to: WillConnect.self)
-    let block: @convention(block) (
-      AnyObject, UIScene, UISceneSession, UIScene.ConnectionOptions
-    ) -> Void = { delegate, scene, session, options in
-      original(delegate, selector, scene, session, options)
-// TODO(tao#1376): delete this URL replay when tao includes the fix.
-//
-// Problem: when a URL launches the app (for example the lock-screen
-// widget's `reflect://record-audio`), UIKit puts the URL only in the
-// connection options of `scene:willConnectToSession:options:`. UIKit
-// does not call `scene:openURLContexts:` for it. tao 0.37.1 handles
-// `scene:openURLContexts:` (a URL that arrives while the app runs), but
-// `connect_scene` ignores the connection options. So a cold-launch URL
-// never reaches `RunEvent::Opened`, and the app only opens.
-//
-// Upstream fix: https://github.com/tauri-apps/tao/pull/1376
-// `connect_scene` reads `URLContexts` and `userActivities` from the
-// connection options and emits `Event::Opened` for them.
-//
-// This fix probally will ship in tao 0.37.3.
-// 
-// After the upgrade:
-// - Delete this `if !options.urlContexts.isEmpty { ... }` block. If you
-//   keep it, a cold-launch URL is delivered twice (once by tao, once
-//   here) and `recordAudio` is queued twice.
-// - Keep the `shortcutItem` replay below. tao has no shortcut item
-//   support, and tao#1376 does not change that.
-// - Remove "URLs" and "`scene:openURLContexts:`" from the doc comments
-//   of `SceneEntryPoints` and `deliverConnectionOptions`. Their
-//   remaining job is the quick action.
-// - Verify on a device or simulator: with the app not running, open
-//   `reflect://record-audio`. The recording sheet must open once.
-    if !options.urlContexts.isEmpty {
-      if !options.urlContexts.isEmpty {
-        scene.delegate?.scene?(scene, openURLContexts: options.urlContexts)
+    let block:
+      @convention(block) (
+        AnyObject, UIScene, UISceneSession, UIScene.ConnectionOptions
+      ) -> Void = { delegate, scene, session, options in
+        original(delegate, selector, scene, session, options)
+        // TODO(tao#1376): delete this URL replay when tao includes the fix.
+        //
+        // Problem: when a URL launches the app (for example the lock-screen
+        // widget's `reflect://record-audio`), UIKit puts the URL only in the
+        // connection options of `scene:willConnectToSession:options:`. UIKit
+        // does not call `scene:openURLContexts:` for it. tao 0.37.1 handles
+        // `scene:openURLContexts:` (a URL that arrives while the app runs), but
+        // `connect_scene` ignores the connection options. So a cold-launch URL
+        // never reaches `RunEvent::Opened`, and the app only opens.
+        //
+        // Upstream fix: https://github.com/tauri-apps/tao/pull/1376
+        // `connect_scene` reads `URLContexts` and `userActivities` from the
+        // connection options and emits `Event::Opened` for them.
+        //
+        // This fix probally will ship in tao 0.37.3.
+        //
+        // After the upgrade:
+        // - Delete this `if !options.urlContexts.isEmpty { ... }` block. If you
+        //   keep it, a cold-launch URL is delivered twice (once by tao, once
+        //   here) and `recordAudio` is queued twice.
+        // - Keep the `shortcutItem` replay below. tao has no shortcut item
+        //   support, and tao#1376 does not change that.
+        // - Remove "URLs" and "`scene:openURLContexts:`" from the doc comments
+        //   of `SceneEntryPoints` and `deliverConnectionOptions`. Their
+        //   remaining job is the quick action.
+        // - Verify on a device or simulator: with the app not running, open
+        //   `reflect://record-audio`. The recording sheet must open once.
+        if !options.urlContexts.isEmpty {
+          scene.delegate?.scene?(scene, openURLContexts: options.urlContexts)
+        }
+        if let item = options.shortcutItem {
+          _ = performQuickAction(item)
+        }
       }
-      if let item = options.shortcutItem {
-        _ = performQuickAction(item)
-      }
-    }
     method_setImplementation(method, imp_implementationWithBlock(block))
   }
 
