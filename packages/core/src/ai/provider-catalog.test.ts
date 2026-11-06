@@ -14,6 +14,7 @@ describe('AI_PROVIDERS', () => {
         models: [
           'gpt-6-astra',
           'gpt-6.1-sol',
+          'gpt-6.1-terra',
           'gpt-6-luna',
           'gpt-5.6-sol',
           'gpt-5.6-terra',
@@ -46,6 +47,7 @@ describe('AI_PROVIDERS', () => {
           'gemini-flash-latest',
           'gemini-3.8-flash',
           'gemini-3.6-flash',
+          'gemini-flash-lite-latest',
           'gemini-3.5-flash-lite',
         ],
       },
