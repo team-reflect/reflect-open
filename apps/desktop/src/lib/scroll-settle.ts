@@ -50,10 +50,12 @@ export interface ScrollSettleWatch {
    */
   isTouching: () => boolean
   /**
-   * True when the current or last scroll began from a touch, a mouse drag, or
-   * a wheel. False for scrolls that code, focus, or the keyboard started.
+   * How many gestures (a touch that scrolled the element, a wheel event, a
+   * mouse drag) have started on the element. A tap counts as none. A caller
+   * that remembers the count at one rest can tell whether a later rest
+   * follows a gesture or a scroll that code, focus, or the engine started.
    */
-  isUserScroll: () => boolean
+  gestures: () => number
 }
 
 /**
@@ -65,7 +67,7 @@ export interface ScrollSettleWatch {
  * A mouse drag scrolls the element the way a finger does: snapping is off
  * from the first move until the release scroll stops, and on release the
  * element scrolls smoothly to the snap position the browser picks from there.
- * The drag and that scroll count as one user scroll.
+ * The drag and that scroll count as one gesture.
  */
 export function watchScrollSettle({
   element,
@@ -78,13 +80,9 @@ export function watchScrollSettle({
   const fingers = new Set<number>()
   // A mouse drag or its release scroll is running.
   let mouseDragging = false
-  // A finger is down, or lifted after it moved the element, and that scroll has not settled.
-  let fingerScroll = false
-  let scrolledSinceTouch = false
-  let touchLeft = 0
-  let touchTop = 0
-  let wheelAt = -Infinity
-  let userScroll = false
+  let gestures = 0
+  // The touch in progress has scrolled the element, so it counted as a gesture.
+  let touchScrolled = false
   let pending = false
   let timer: ReturnType<typeof setTimeout> | undefined
   // A scroll was reported early because the element was settled. A snap
@@ -113,7 +111,6 @@ export function watchScrollSettle({
       return
     }
     pending = false
-    fingerScroll = false
     onSettle()
   }
   const settleOrWait = (): void => {
@@ -131,6 +128,7 @@ export function watchScrollSettle({
     (event: TouchEvent) => {
       if (fingers.size === 0) {
         gesture = new AbortController()
+        touchScrolled = false
       }
       for (const touch of event.changedTouches) {
         fingers.add(touch.identifier)
@@ -141,10 +139,6 @@ export function watchScrollSettle({
       target?.addEventListener('touchend', release, { passive: true, signal: gesture.signal })
       target?.addEventListener('touchcancel', release, { passive: true, signal: gesture.signal })
       endSnapTail()
-      fingerScroll = true
-      scrolledSinceTouch = false
-      touchLeft = element.scrollLeft
-      touchTop = element.scrollTop
     },
     { passive: true, signal },
   )
@@ -158,13 +152,6 @@ export function watchScrollSettle({
     if (isTouching()) {
       return
     }
-    // A tap moved nothing. Without this, a focus scroll right after the tap
-    // would count as the finger's.
-    const moved =
-      scrolledSinceTouch || element.scrollLeft !== touchLeft || element.scrollTop !== touchTop
-    if (!moved) {
-      fingerScroll = false
-    }
     if (pending) {
       settleOrWait()
     }
@@ -172,7 +159,7 @@ export function watchScrollSettle({
   element.addEventListener(
     'wheel',
     () => {
-      wheelAt = performance.now()
+      gestures += 1
       endSnapTail()
     },
     { passive: true, signal },
@@ -180,20 +167,17 @@ export function watchScrollSettle({
   element.addEventListener(
     'scroll',
     () => {
+      if (fingers.size > 0 && !touchScrolled) {
+        touchScrolled = true
+        gestures += 1
+      }
       if (snapTail) {
         if (isSettled?.() ?? false) {
-          // No new report, and the reported scroll keeps its user flag.
+          // No new report.
           extendSnapTail()
           return
         }
         endSnapTail()
-      }
-      scrolledSinceTouch = true
-      if (fingerScroll || performance.now() - wheelAt < SETTLE_IDLE_MS) {
-        userScroll = true
-      } else if (!pending) {
-        // A new scroll that no finger or wheel started.
-        userScroll = false
       }
       pending = true
       if (isTouching()) {
@@ -267,10 +251,6 @@ export function watchScrollSettle({
     )
     const finish = (): void => {
       controller.abort()
-      if (!pending) {
-        // The drag moved nothing, for example at the end of the range.
-        fingerScroll = false
-      }
       flush()
     }
 
@@ -285,7 +265,7 @@ export function watchScrollSettle({
         if (!dragging) {
           dragging = true
           mouseDragging = true
-          fingerScroll = true
+          gestures += 1
           endSnapTail()
           element.style.scrollSnapType = 'none'
         }
@@ -337,7 +317,7 @@ export function watchScrollSettle({
 
   return {
     isTouching,
-    isUserScroll: () => userScroll,
+    gestures: () => gestures,
   }
 }
 

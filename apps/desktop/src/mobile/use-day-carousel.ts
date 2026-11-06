@@ -178,8 +178,9 @@ interface CarouselNavigationState {
  * turns into a daily-route navigation). The route flows back in as `date` and
  * moves the scroller to match — guarded by {@link reconcileCarousel} so the
  * swipe's own echo doesn't redundantly re-scroll. A `date` beyond the window
- * re-anchors it. The {@link attachSnapPager} pulls scrolls that no finger or
- * wheel started (a caret reveal, a focus) back to the selected day.
+ * re-anchors it. The {@link attachSnapPager} reports the day the scroller
+ * rests on, whoever moved it there, so the route follows the day the scroller
+ * settles on.
  */
 export function useDayCarousel(
   date: string,
@@ -230,8 +231,8 @@ export function useDayCarousel(
   // the settle, so dragging back and forth over the middle mounts nothing twice.
   // The strip update stays out of the mount's transition, so it does not wait
   // for the next day's editor to render.
-  const handleIndex = useEffectEvent((nearest: number, byUser: boolean) => {
-    if (!byUser) {
+  const handleIndex = useEffectEvent((nearest: number, byScroll: boolean) => {
+    if (!byScroll) {
       return
     }
     onTarget(dateAtIndex(dayWindow, nearest), navigationKey)
@@ -253,7 +254,7 @@ export function useDayCarousel(
   // edge also rebuilds the window around the current day; the report lands
   // in the same batch, so the follow effect sees the re-anchored window
   // together with the new `date` and moves the scroller onto the same day.
-  const handleUserSettle = useEffectEvent((index: number) => {
+  const handleSettle = useEffectEvent((index: number) => {
     const day = dateAtIndex(dayWindow, index)
     // An editor left focused on another day would scroll the carousel back to
     // reveal its caret.
@@ -286,7 +287,7 @@ export function useDayCarousel(
       prefersReducedMotion,
       dragHandle: null,
       onIndex: handleIndex,
-      onUserSettle: handleUserSettle,
+      onSettle: handleSettle,
       signal: controller.signal,
     })
     return () => {

@@ -290,16 +290,13 @@ describe('useDayCarousel', () => {
     expect(kept!.getBoundingClientRect().left).toBeCloseTo(scroller.getBoundingClientRect().left)
   })
 
-  it('pulls a scroll that no finger started back to the selected day', async () => {
+  it('reports the day a scroll that no finger started settles on', async () => {
     const { scroller, onSelect } = await mountCarousel()
 
-    await act(() => {
-      scroller.scrollLeft = (CENTER + 1) * WIDTH
-    })
+    await scrollElement({ element: scroller, left: (CENTER + 1) * WIDTH })
 
-    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(CENTER * WIDTH))
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    expect(onSelect).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith('2026-06-13'))
+    expect(scroller.scrollLeft).toBe((CENTER + 1) * WIDTH)
   })
 
   it('aligns a swipe that comes to rest between two days', async () => {

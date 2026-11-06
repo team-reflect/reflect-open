@@ -292,6 +292,9 @@ function attachScrollDrawer({
   scroller.scrollTop = openTop()
 
   // Acts once the sheet rests at the closed snap point, after the finger lifts.
+  // Only a gesture since the sheet last rested open may close it: a resize or
+  // a re-snap that moves the sheet there on its own scrolls it back open.
+  let gesturesAtOpen = 0
   const watch = watchScrollSettle({
     element: scroller,
     signal,
@@ -299,10 +302,10 @@ function attachScrollDrawer({
     dragHandle: handle,
     onSettle: () => {
       if (!isClosed()) {
+        gesturesAtOpen = watch.gestures()
         return
       }
-      if (!watch.isUserScroll()) {
-        // A focus reveal or a resize moved the sheet: never close for those.
+      if (watch.gestures() === gesturesAtOpen) {
         scrollOpen()
         return
       }

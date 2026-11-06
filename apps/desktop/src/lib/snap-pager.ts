@@ -18,14 +18,14 @@ export interface SnapPagerOptions {
    */
   dragHandle?: HTMLElement | null | undefined
   /**
-   * The shown page changed. A user scroll shows the nearest page
-   * (`byUser` is true), and `show` or `restOn` shows its target at once.
+   * The shown page changed. A scroll shows the nearest page (`byScroll` is
+   * true), and `show` or `restOn` shows its target at once.
    */
-  onIndex: (index: number, byUser: boolean) => void
+  onIndex: (index: number, byScroll: boolean) => void
   /**
-   * A user scroll came to rest on page `index`.
+   * A scroll came to rest on page `index`, other than the page `show` targets.
    */
-  onUserSettle: (index: number) => void
+  onSettle: (index: number) => void
   signal: AbortSignal
 }
 
@@ -45,11 +45,12 @@ export interface SnapPager {
 }
 
 /**
- * Owns the shown page of a snapping horizontal scroller. It pulls a scroll
- * that neither a user nor `show` started back to the shown page, stays on the
- * shown page after a resize, and reports the page a user scroll comes to rest
- * on. A scroll that comes to rest on the page `show` targets counts as
- * `show`'s, even when a finger or wheel moved the scroller on the way.
+ * Owns the shown page of a snapping horizontal scroller. The page the
+ * scroller rests on is the shown page, whoever moved it there: the pager
+ * follows every scroll, reports where it settles, stays on the shown page
+ * after a resize, and shows the page of an element that takes focus. A scroll
+ * that comes to rest on the page `show` targets counts as `show`'s, even when
+ * a finger or wheel moved the scroller on the way.
  */
 export function attachSnapPager({
   element,
@@ -58,25 +59,43 @@ export function attachSnapPager({
   prefersReducedMotion,
   dragHandle,
   onIndex,
-  onUserSettle,
+  onSettle,
   signal,
 }: SnapPagerOptions): SnapPager {
   let index = initialIndex
-  // A user scroll has moved the scroller and has not settled.
-  let userScrolling = false
+  // The scroller is off its page: a scroll moved it between pages and has not
+  // settled. A scroll that lands on the page at once (a `restOn`) leaves it
+  // false, so it never blocks the focus or resize handling below.
+  let scrolling = false
   // The page a running `show` scroll moves to.
   let expected: number | undefined
+  // The page width the scroller last rested at. A change means a rotation or
+  // split view moved the scroller off its page: stay on the page.
+  let width = pageWidth(element)
+  const realign = (): boolean => {
+    const current = pageWidth(element)
+    if (current === width) {
+      return false
+    }
+    width = current
+    // A finger or a running scroll owns the position: the settle adopts the
+    // page it rests on.
+    if (!watch.isTouching() && !scrolling) {
+      restOn(element, index)
+    }
+    return true
+  }
 
-  const setIndex = (next: number, byUser: boolean): void => {
+  const setIndex = (next: number, byScroll: boolean): void => {
     if (next !== index) {
       index = next
-      onIndex(next, byUser)
+      onIndex(next, byScroll)
     }
   }
 
   const show = (next: number): void => {
     setIndex(next, false)
-    userScrolling = false
+    scrolling = false
     const left = next * pageWidth(element)
     if (Math.abs(element.scrollLeft - left) < 1) {
       return
@@ -90,39 +109,41 @@ export function attachSnapPager({
     signal,
     dragHandle,
     onSettle: () => {
-      userScrolling = false
+      scrolling = false
+      // A width change since the last rest leaves the position stale, so the
+      // nearest page would be wrong: stay on the shown page instead.
+      if (realign()) {
+        return
+      }
       const nearest = nearestIndex(element, count())
       const target = expected
       expected = undefined
       if (nearest === undefined) {
         return
       }
-      if (nearest === target || !watch.isUserScroll()) {
+      if (nearest === target) {
         restOn(element, index)
         return
       }
       // WebKit can come to rest between snap points.
       restOn(element, nearest)
       setIndex(nearest, true)
-      onUserSettle(nearest)
+      onSettle(nearest)
     },
   })
 
-  // After the watch, whose own listener decides whether this scroll is the user's.
   element.addEventListener(
     'scroll',
     () => {
-      if (!watch.isUserScroll()) {
-        if (expected === undefined) {
-          restOn(element, index)
-        }
+      if (expected !== undefined || realign()) {
         return
       }
-      userScrolling = true
       const nearest = nearestIndex(element, count())
-      if (nearest !== undefined) {
-        setIndex(nearest, true)
+      if (nearest === undefined) {
+        return
       }
+      setIndex(nearest, true)
+      scrolling = Math.abs(element.scrollLeft - nearest * width) >= 1
     },
     { passive: true, signal },
   )
@@ -131,7 +152,7 @@ export function attachSnapPager({
   element.addEventListener(
     'focusin',
     (event) => {
-      if (userScrolling) {
+      if (scrolling) {
         return
       }
       const target = event.target
@@ -146,10 +167,10 @@ export function attachSnapPager({
     { signal },
   )
 
-  // A rotation or split view changes the page width. Stay on the same page,
-  // unless a finger or its momentum owns the position (the settle aligns it).
+  // The `scroll` the width change causes usually realigns first; this covers
+  // a width change that moves nothing, and a height-only resize.
   const resize = new ResizeObserver(() => {
-    if (!watch.isTouching() && !userScrolling) {
+    if (!realign() && !watch.isTouching() && !scrolling) {
       restOn(element, index)
     }
   })
@@ -163,7 +184,7 @@ export function attachSnapPager({
     show,
     restOn: (next) => {
       setIndex(next, false)
-      userScrolling = false
+      scrolling = false
       expected = undefined
       restOn(element, next)
     },
