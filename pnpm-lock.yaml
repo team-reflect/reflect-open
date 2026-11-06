@@ -193,6 +193,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-basic-ssl':
+        specifier: ^2.3.0
+        version: 2.3.0(vite@8.3.5)
       '@vitejs/plugin-react':
         specifier: ^6.2.1
         version: 6.2.1(oxc-transform-react@0.156.0)(vite@8.3.5)
@@ -2837,6 +2840,12 @@ packages:
   '@vercel/oidc@3.2.0':
     resolution: {integrity: sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug==}
     engines: {node: '>= 20'}
+
+  '@vitejs/plugin-basic-ssl@2.3.0':
+    resolution: {integrity: sha512-bdyo8rB3NnQbikdMpHaML9Z1OZPBu6fFOBo+OtxsBlvMJtysWskmBcnbIDhUqgC8tcxNv/a+BcV5U+2nQMm1OQ==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+    peerDependencies:
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
 
   '@vitejs/plugin-react@6.2.1':
     resolution: {integrity: sha512-9KyWCij3r0+qLG3Q62vBmv0VyevmYibAtxaCIVK9o0k6CXgaajZRIe8tpfchQcdZArJ5b/7OrIz4W3b2uxVRDA==}
@@ -8491,6 +8500,10 @@ snapshots:
       magic-string: 1.4.3
 
   '@vercel/oidc@3.2.0': {}
+
+  '@vitejs/plugin-basic-ssl@2.3.0(vite@8.3.5)':
+    dependencies:
+      vite: 8.3.5(@types/node@24.13.4)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1)
 
   '@vitejs/plugin-react@6.2.1(oxc-transform-react@0.156.0)(vite@8.3.5)':
     dependencies:

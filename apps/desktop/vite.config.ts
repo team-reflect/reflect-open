@@ -3,11 +3,15 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 // The single version source; tauri.conf.json's `version` also points here.
 import pkg from './package.json' with { type: 'json' }
 
 const host: string | undefined = process.env.TAURI_DEV_HOST
 const port = 1420
+// `REFLECT_DEV_HTTPS=1 pnpm dev` serves self-signed HTTPS on every interface, so a
+// phone on the LAN gets a secure context (`crypto.randomUUID`, `crypto.subtle`).
+const devHttps = process.env.REFLECT_DEV_HTTPS === '1'
 
 const platform: 'mobile' | 'desktop' | '' = (() => {
   const env = process.env.TAURI_ENV_PLATFORM
@@ -31,6 +35,7 @@ const platform: 'mobile' | 'desktop' | '' = (() => {
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
   plugins: [
+    ...(devHttps ? [basicSsl()] : []),
     react({
       compiler: {
         reportDiagnostics: true,
@@ -93,7 +98,7 @@ export default defineConfig(({ command }) => ({
   server: {
     port,
     strictPort: true,
-    host: host || false,
+    host: host || devHttps,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
