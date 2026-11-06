@@ -59,6 +59,9 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
+      - uses: ./.github/actions/setup-apt
+        if: runner.os == 'Linux'
+
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: build-${{ matrix.name }}

@@ -1,9 +1,9 @@
 name: Set up Rust
-description: Installs the Rust toolchain, the cargo build cache, and on Linux the Tauri system dependencies.
+description: Installs the Rust toolchain and the cargo build cache.
 
 inputs:
   cache:
-    description: Whether to restore and save the cargo build cache and the Tauri apt package cache.
+    description: Whether to restore and save the cargo build cache.
     required: false
     default: 'true'
   cache-key:
@@ -19,13 +19,6 @@ runs:
     - name: Disable HTTP/2 multiplexing in cargo
       shell: bash
       run: echo "CARGO_HTTP_MULTIPLEXING=false" >> "$GITHUB_ENV"
-
-    # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
-    - name: Set up Tauri
-      if: runner.os == 'Linux'
-      uses: ./.github/actions/setup-tauri
-      with:
-        cache: ${{ inputs.cache }}
 
     - name: Install Rust toolchain
       shell: bash

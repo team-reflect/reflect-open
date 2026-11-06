@@ -157,6 +157,8 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ./.github/actions/setup-apt
+
       - uses: ./.github/actions/setup-rust
 
       - name: Format check
@@ -196,6 +198,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - uses: ./.github/actions/setup-apt
 
       - uses: ./.github/actions/setup-rust
 

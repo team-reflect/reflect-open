@@ -58,6 +58,10 @@ jobs:
         with:
           cache: false
 
+      - uses: ./.github/actions/setup-apt
+        with:
+          cache: false
+
       - uses: ./.github/actions/setup-rust
         with:
           cache: false

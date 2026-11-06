@@ -1,5 +1,5 @@
-name: Set up Tauri
-description: Installs the Tauri system dependencies on Linux, with a cache of the downloaded packages.
+name: Set up apt packages
+description: Installs the system packages that the builds need on Linux, with a cache of the downloaded packages.
 
 inputs:
   cache:
@@ -15,8 +15,8 @@ runs:
       shell: bash
       # `ImageOS` and `ImageVersion` are runner environment variables.
       run: |
-        echo "key=apt-tauri-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
-        echo "dir=$RUNNER_TEMP/apt-tauri-archives" >> "$GITHUB_OUTPUT"
+        echo "key=apt-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+        echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
 
     - name: Restore the apt package cache
       id: apt-cache
@@ -26,12 +26,13 @@ runs:
         path: ${{ steps.apt.outputs.dir }}/*.deb
         key: ${{ steps.apt.outputs.key }}
 
-    - name: Install Tauri system dependencies
+    - name: Install apt packages
       shell: bash
       env:
         archives: ${{ steps.apt.outputs.dir }}
       run: |
-        # The Tauri docs list, minus `patchelf`, which the runner image already
+        # Tauri v2 build dependencies (the crate links the WebView + GTK stack):
+        # the Tauri docs list, minus `patchelf`, which the runner image already
         # has. `libayatana-appindicator3-dev` replaces the deprecated
         # `libappindicator3-dev`, as in the Tauri prerequisites page.
         # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
