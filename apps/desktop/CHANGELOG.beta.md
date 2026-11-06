@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.11...v0.18.0-beta.12) (2026-11-06)
+
+
+### Features
+
+* **desktop:** log uncaught errors to the log file ([#2034](https://github.com/team-reflect/reflect-open/issues/2034)) ([a363a14](https://github.com/team-reflect/reflect-open/commit/a363a1451c52a56295133ba96036f85ccd0a9967))
+
 ## [0.18.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.10...v0.18.0-beta.11) (2026-11-06)
 
 
