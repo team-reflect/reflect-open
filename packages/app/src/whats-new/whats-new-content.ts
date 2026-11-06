@@ -25,5 +25,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'Swipes, sheets, and image dragging respond faster and move more smoothly.',
       platforms: ['ios'],
     },
+    {
+      title: 'New AI models',
+      body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
+      platforms: ['desktop', 'ios'],
+    },
   ],
 }
