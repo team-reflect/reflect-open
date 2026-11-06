@@ -4,7 +4,7 @@ import {
   createTestWindowService,
   type TestWindowService,
 } from '@reflect/app/testing'
-import { buildIndexedNote, parseNote } from '@reflect/core'
+import { buildIndexedNote, parseNote, type RecentGraph } from '@reflect/core'
 import {
   createNodeTestDatabaseService,
   createTestCoreServices,
@@ -15,7 +15,7 @@ import {
   type TestEmbeddingRuntimeService,
 } from '@reflect/core/testing'
 import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } from '@reflect/app'
-import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
+import { APP_COMMANDS, keybindingFor, sortGraphsByName } from './app-commands.ts'
 import type { CommandContext } from './types.ts'
 
 const TODAY = '2026-06-09'
@@ -92,6 +92,35 @@ function fakeContext(overrides?: Partial<CommandContext>) {
   }
   return { context, appLayer, navigated, navigateOptions }
 }
+
+function recentGraph(root: string, openedMs: number, name: string = root): RecentGraph {
+  return { root, name, openedMs }
+}
+
+describe('sortGraphsByName', () => {
+  it('orders graphs alphabetically by name, ignoring the recents (most-recently-used) order', () => {
+    const banana = recentGraph('/graphs/2', 2, 'Banana')
+    const apple = recentGraph('/graphs/1', 1, 'Apple')
+
+    expect(sortGraphsByName([banana, apple])).toEqual([apple, banana])
+  })
+
+  it('sorts case-insensitively and breaks ties by root path', () => {
+    const lower = recentGraph('/graphs/z', 1, 'alpha')
+    const upper = recentGraph('/graphs/a', 2, 'Alpha')
+
+    expect(sortGraphsByName([lower, upper])).toEqual([upper, lower])
+  })
+
+  it('keeps a stable order for roots that collate as equal but differ in encoding', () => {
+    const composed = recentGraph('/graphs/\u{E9}', 1, 'Notes')
+    const decomposed = recentGraph('/graphs/e\u{301}', 2, 'Notes')
+
+    expect(composed.root.localeCompare(decomposed.root)).toBe(0)
+    expect(sortGraphsByName([composed, decomposed])).toEqual([decomposed, composed])
+    expect(sortGraphsByName([decomposed, composed])).toEqual([decomposed, composed])
+  })
+})
 
 describe('keybindingFor', () => {
   it('returns the binding UI hints derive from', () => {

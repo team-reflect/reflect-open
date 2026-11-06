@@ -144,8 +144,8 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     graph: GRAPH,
     graphState: {
       recents: [
-        { root: '/notes', name: 'Notes', openedMs: 2 },
-        { root: '/work', name: 'Work', openedMs: 1 },
+        { root: '/work', name: 'Work', openedMs: 2 },
+        { root: '/notes', name: 'Notes', openedMs: 1 },
       ],
     },
     settings: {
