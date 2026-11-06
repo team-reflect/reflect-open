@@ -1,7 +1,7 @@
 #!/bin/bash
 # Ad-hoc re-signing for skip-codesign archives, shared by the ShareExtension
 # and RecordingWidget targets. The rationale lives with the phase definitions
-# in ios.project.yml.
+# in gen/apple/project.yml.
 set -euo pipefail
 
 ENV_LOCAL="$(dirname "${BASH_SOURCE[0]}")/../.xcode.env.local"

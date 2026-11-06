@@ -3,7 +3,7 @@
 # Rust crate into Externals/<arch>/<config>/libapp.a through the tauri CLI,
 # which in dev builds also connects back to the running `tauri ios dev`
 # process for the dev-server options. The phase itself is defined in
-# ios.project.yml / gen/apple/project.yml.
+# gen/apple/project.yml.
 #
 # Xcode launched from the Dock runs script phases with the minimal launchd
 # PATH (no Homebrew, no cargo), so nothing here may rely on the caller's
