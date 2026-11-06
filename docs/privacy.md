@@ -93,13 +93,15 @@ from disk at call time. Tests cover it.
   host-process crashes, watchdog terminations, and Apple MetricKit diagnostics (including
   main-thread hangs): failures that never reach JavaScript and arrive in TestFlight with no
   usable stack.
-- **What:** an allow-listed report: the JavaScript exception class (or a fixed native failure
-  category), sanitized stack locations, the app version, and whether it was handled. Native
-  reports add non-identifying OS/device model, architecture, memory, storage, battery, and
-  thermal facts, which tell a resource termination from a code defect. A small set of vetted
-  JavaScript structural messages that cannot contain document data is kept. All other exception
-  text, and every native exception value, is redacted. Filenames and loaded-image names are cut
-  to basenames.
+- **What:** an allow-listed report: the exception class (or a fixed native failure category),
+  stack locations with function names and file basenames, the app version, the OS, and whether
+  it was handled. Native reports add non-identifying OS/device model, architecture, memory,
+  storage, battery, and thermal facts, which tell a resource termination from a code defect. A
+  JavaScript message is kept only when it matches a fixed pattern that has no room for document
+  data: the browser's `Script error.`, ProseMirror's structural failures, and engine messages
+  made of source text (`undefined is not an object (evaluating 'a.b')`). Every other message is
+  redacted; a 48-bit hash of the root message is kept so repeats can be counted. Every native
+  exception value is redacted.
 - **Never collected:** request data, note content or titles, graph paths, filesystem or native
   source paths, frame variables, source context lines, thread names, breadcrumbs, console or
   Rust tracing output, session replay, performance traces and profiles, screenshots, view

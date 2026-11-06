@@ -1,36 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { createTestLoggerService } from '@reflect/core/testing'
-import type { BrowserOptions, ErrorEvent } from '@sentry/react'
+import type { BrowserOptions, ErrorEvent, Exception } from '@sentry/react'
 import {
   createExceptionTelemetry,
   type ExceptionTelemetrySdk,
-  parseExceptionTelemetryDsn,
   scrubExceptionEvent,
 } from './exception-telemetry.ts'
 
-describe('parseExceptionTelemetryDsn', () => {
-  it('accepts only the production Reflect Sentry project', () => {
-    expect(
-      parseExceptionTelemetryDsn(
-        ' https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200 ',
-      ),
-    ).toBe('https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200')
-    expect(
-      parseExceptionTelemetryDsn(
-        'https://0123456789abcdef0123456789abcdef@evil.example/4511705649971200',
-      ),
-    ).toBeNull()
-    expect(
-      parseExceptionTelemetryDsn(
-        'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/123',
-      ),
-    ).toBeNull()
-    expect(parseExceptionTelemetryDsn(undefined)).toBeNull()
-  })
-})
+function exceptionEvent(values: Exception[]): ErrorEvent {
+  return { type: undefined, exception: { values } }
+}
+
+async function scrubValues(values: Exception[]): Promise<Array<Exception | undefined>> {
+  return await Promise.all(
+    values.map(async (value) => {
+      const scrubbed = await scrubExceptionEvent(exceptionEvent([value]), 'darwin')
+      return scrubbed?.exception?.values?.[0]
+    }),
+  )
+}
 
 describe('scrubExceptionEvent', () => {
-  it('rebuilds exceptions from an allow-list and removes user and request data', () => {
+  it('rebuilds exceptions from an allow-list and removes user and request data', async () => {
     const event: ErrorEvent = {
       type: undefined,
       event_id: '0123456789abcdef0123456789abcdef',
@@ -96,15 +87,17 @@ describe('scrubExceptionEvent', () => {
       },
     }
 
-    expect(scrubExceptionEvent(event)).toEqual({
-      type: undefined,
+    const scrubbed = await scrubExceptionEvent(event, 'darwin')
+
+    expect(scrubbed?.tags?.message_hash).toMatch(/^[0-9a-f]{12}$/)
+    expect(scrubbed).toEqual({
       event_id: '0123456789abcdef0123456789abcdef',
       timestamp: 1_725_000_000,
       release: 'reflect@0.4.0-beta.45',
       environment: 'production',
       level: 'error',
       platform: 'javascript',
-      tags: { runtime: 'tauri-webview' },
+      tags: { runtime: 'tauri-webview', os: 'darwin', message_hash: scrubbed?.tags?.message_hash },
       exception: {
         values: [
           {
@@ -115,6 +108,7 @@ describe('scrubExceptionEvent', () => {
               frames: [
                 {
                   filename: 'app:///main-ABC123.js',
+                  function: 'openDailyNote',
                   lineno: 42,
                   colno: 7,
                   in_app: true,
@@ -136,108 +130,124 @@ describe('scrubExceptionEvent', () => {
     })
   })
 
-  it('redacts untrusted types, function names, filenames, mechanisms, and release values', () => {
-    const event: ErrorEvent = {
-      type: undefined,
-      event_id: 'person@example.com',
-      release: 'reflect@0.4.0-/Users/alex',
-      environment: 'person@example.com',
-      exception: {
-        values: [
-          {
-            type: 'Customer Acme',
-            value: 'private note text',
-            mechanism: { type: 'custom-person@example.com' },
-            stacktrace: {
-              frames: [
-                {
-                  filename: '/Users/alex/Notes/Acme.md',
-                  function: 'Customer Acme',
-                },
-              ],
-            },
-          },
-        ],
+  it('redacts untrusted types, function names, and filenames', async () => {
+    const event = exceptionEvent([
+      {
+        type: 'Customer Acme',
+        value: 'private note text',
+        mechanism: { type: 'custom', handled: true },
+        stacktrace: {
+          frames: [{ filename: '/Users/alex/Notes/Acme.md', function: 'Customer Acme' }],
+        },
       },
-    }
+    ])
 
-    expect(scrubExceptionEvent(event)).toEqual({
-      type: undefined,
-      level: 'error',
-      platform: 'javascript',
-      tags: { runtime: 'tauri-webview' },
-      exception: {
-        values: [
-          {
-            type: 'Error',
-            value: '[redacted]',
-            mechanism: { type: 'generic' },
-            stacktrace: {
-              frames: [
-                {
-                  filename: 'app:///[redacted]',
-                },
-              ],
-            },
-          },
-        ],
+    await expect(scrubValues(event.exception?.values ?? [])).resolves.toEqual([
+      {
+        type: 'Error',
+        value: '[redacted]',
+        mechanism: { type: 'custom', handled: true },
+        stacktrace: { frames: [{ filename: 'app:///[redacted]' }] },
       },
-    })
+    ])
   })
 
-  it('keeps allow-listed ProseMirror transform diagnostics', () => {
-    const event: ErrorEvent = {
-      type: undefined,
-      exception: {
-        values: [
-          { type: 'TransformError', value: 'Inconsistent open depths' },
-          { type: 'TransformError', value: 'Cannot join paragraph onto bullet_list' },
-        ],
-      },
-    }
+  it('keeps identifier-like function names', async () => {
+    const names = [
+      'preMatch',
+      'HostElement.disconnectedCallback',
+      'new EditorView',
+      'async flush',
+      '<anonymous>',
+      '?',
+    ]
+    const values = await scrubValues([
+      { type: 'Error', stacktrace: { frames: names.map((name) => ({ function: name })) } },
+    ])
 
-    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
+    expect(values?.[0]?.stacktrace?.frames?.map((frame) => frame.function)).toEqual(names)
+  })
+
+  it('keeps engine messages that contain only source text', async () => {
+    const safe = [
+      { type: 'Error', value: 'Script error.' },
+      {
+        type: 'TypeError',
+        value: "undefined is not an object (evaluating 'curDesc.parent.children')",
+      },
+      { type: 'TypeError', value: "null is not an object (evaluating 'a[0].b')" },
+      {
+        type: 'TypeError',
+        value: "view.destroy is not a function. (In 'view.destroy()', 'view.destroy' is undefined)",
+      },
+      {
+        type: 'TypeError',
+        value: "a.b is not a function. (In 'a.b()', 'a.b' is an instance of Object)",
+      },
+      { type: 'TypeError', value: 'editor.use is not a function' },
+      { type: 'TypeError', value: 'Load failed' },
+      { type: 'ReferenceError', value: "Can't find variable: requestIdleCallback" },
+      { type: 'ReferenceError', value: 'requestIdleCallback is not defined' },
+      { type: 'RangeError', value: 'Maximum call stack size exceeded.' },
       { type: 'TransformError', value: 'Inconsistent open depths' },
       { type: 'TransformError', value: 'Cannot join paragraph onto bullet_list' },
-    ])
+      { type: 'React ErrorBoundary TransformError', value: 'Invalid content for node paragraph' },
+    ]
+
+    await expect(scrubValues(safe)).resolves.toEqual(
+      safe.map(({ type, value }) => ({
+        type: type.startsWith('React ErrorBoundary ') ? 'ReactErrorBoundary<TransformError>' : type,
+        value,
+      })),
+    )
   })
 
-  it('keeps allow-listed diagnostics for React ErrorBoundary TransformErrors', () => {
-    const event: ErrorEvent = {
-      type: undefined,
-      exception: {
-        values: [
-          {
-            type: 'React ErrorBoundary TransformError',
-            value: 'Invalid content for node paragraph',
-          },
-        ],
-      },
-    }
+  it('redacts messages that can echo input', async () => {
+    const unsafe = [
+      { type: 'TypeError', value: 'Script error.' },
+      { type: 'Error', value: 'Could not open /Users/alex/Notes/Acme.md' },
+      { type: 'AppError', value: 'The [[Acme]] backlink target could not be resolved.' },
+      { type: 'SyntaxError', value: 'JSON Parse error: Unexpected identifier "Acme"' },
+      { type: 'DOMException', value: "'#Acme' is not a valid selector." },
+      { type: 'TypeError', value: "Cannot read properties of undefined (reading 'Acme')" },
+      { type: 'TypeError', value: "Cannot set properties of undefined (setting 'Acme')" },
+      { type: 'TypeError', value: 'Acme Corp roadmap is not a function' },
+      { type: 'TypeError', value: `x is not a function. (In 'x()', 'x' is "Acme roadmap")` },
+      { type: 'TypeError', value: "undefined is not an object (evaluating 'a'); see /Users/alex" },
+      { type: 'TransformError', value: 'Private roadmap note content' },
+    ]
 
-    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
-      {
-        type: 'ReactErrorBoundary<TransformError>',
-        value: 'Invalid content for node paragraph',
-      },
-    ])
+    await expect(scrubValues(unsafe)).resolves.toEqual(
+      unsafe.map(({ type }) => ({ type, value: '[redacted]' })),
+    )
   })
 
-  it('redacts free-form values from otherwise trusted exception types', () => {
-    const event: ErrorEvent = {
-      type: undefined,
-      exception: {
-        values: [{ type: 'TransformError', value: 'Private roadmap note content' }],
-      },
-    }
+  it('tags a redacted root message with a stable hash', async () => {
+    const first = await scrubExceptionEvent(
+      exceptionEvent([
+        { type: 'Error', value: 'Cause' },
+        { type: 'Error', value: 'Acme' },
+      ]),
+      'ios',
+    )
+    const second = await scrubExceptionEvent(
+      exceptionEvent([{ type: 'Error', value: 'Acme' }]),
+      'ios',
+    )
+    const safe = await scrubExceptionEvent(
+      exceptionEvent([{ type: 'Error', value: 'Script error.' }]),
+      'ios',
+    )
 
-    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
-      { type: 'TransformError', value: '[redacted]' },
-    ])
+    expect(first?.tags?.message_hash).toBe('37036cd8f974')
+    expect(second?.tags?.message_hash).toBe('37036cd8f974')
+    expect(safe?.tags).toEqual({ runtime: 'tauri-webview', os: 'ios' })
   })
 
-  it('drops non-exception events', () => {
-    expect(scrubExceptionEvent({ type: undefined, message: 'note content' })).toBeNull()
+  it('drops non-exception events', async () => {
+    await expect(
+      scrubExceptionEvent({ type: undefined, message: 'note content' }, 'darwin'),
+    ).resolves.toBeNull()
   })
 })
 
@@ -277,11 +287,12 @@ function createFakeSdk(options?: { initError?: Error }): ExceptionTelemetrySdk &
 }
 
 describe('createExceptionTelemetry', () => {
-  it('initializes the SDK once with the release', () => {
+  it('initializes the SDK once with the release and scrubs through `beforeSend`', async () => {
     const sdk = createFakeSdk()
     const telemetry = createExceptionTelemetry({
       dsn: DSN,
       release: 'reflect@1.2.3',
+      os: 'darwin',
       sdk,
       logger: createTestLoggerService(),
     })
@@ -291,6 +302,15 @@ describe('createExceptionTelemetry', () => {
 
     expect(sdk.inits).toHaveLength(1)
     expect(sdk.inits[0]).toMatchObject({ dsn: DSN, release: 'reflect@1.2.3' })
+    const scrubbed = await sdk.inits[0]?.beforeSend?.(
+      exceptionEvent([{ type: 'Error', value: 'Acme' }]),
+      {},
+    )
+    expect(scrubbed?.tags).toEqual({
+      runtime: 'tauri-webview',
+      os: 'darwin',
+      message_hash: '37036cd8f974',
+    })
   })
 
   it('logs an SDK that fails to initialize', () => {
@@ -299,6 +319,7 @@ describe('createExceptionTelemetry', () => {
     createExceptionTelemetry({
       dsn: DSN,
       release: 'reflect@1.2.3',
+      os: 'darwin',
       sdk: createFakeSdk({ initError: failure }),
       logger,
     }).install()
@@ -313,6 +334,7 @@ describe('createExceptionTelemetry', () => {
     const options = createExceptionTelemetry({
       dsn: DSN,
       release: 'reflect@1.2.3',
+      os: 'darwin',
       sdk,
       logger: createTestLoggerService(),
     }).reactRootOptions()
@@ -332,6 +354,7 @@ describe('createExceptionTelemetry', () => {
     const telemetry = createExceptionTelemetry({
       dsn: null,
       release: 'reflect@1.2.3',
+      os: 'darwin',
       sdk,
       logger: createTestLoggerService(),
     })
