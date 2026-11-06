@@ -26,7 +26,6 @@ packages:
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     exactVersion: 9.31.0
-fileGroups: [../../src]
 configs:
   debug: debug
   release: release
