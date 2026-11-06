@@ -29,7 +29,7 @@ export async function pollUntil<T>(
   options: PollUntilOptions,
 ): Promise<T> {
   const { signal } = options
-  for (;;) {
+  while (true) {
     await waitForNextCheck(options)
     let value: T
     try {
