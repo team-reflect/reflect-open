@@ -164,7 +164,7 @@ describe('watchScrollSettle', () => {
     expect(onSettle).toHaveBeenCalledTimes(2)
   })
 
-  it('counts a touch, a wheel, and a mouse drag as gestures, and a program scroll as none', async () => {
+  it('counts a scrolling touch and a wheel as gestures, and a tap or a program scroll as none', async () => {
     const element = mountScroller()
     const watch = watchScrollSettle({
       element,
@@ -178,6 +178,9 @@ describe('watchScrollSettle', () => {
 
     await touch(element, 'start')
     await touch(element, 'end')
+    expect(watch.gestures()).toBe(0)
+
+    await scrollElement({ element, left: 80, touch: true })
     expect(watch.gestures()).toBe(1)
 
     await userEvent.wheel(element, { delta: { x: 10 } })
@@ -223,6 +226,7 @@ describe('watchScrollSettle', () => {
       expect(element.scrollLeft).toBe(50)
       expect(element.style.scrollSnapType).toBe('none')
       expect(watch.isTouching()).toBe(true)
+      expect(watch.gestures()).toBe(1)
       // Past half of the range.
       await mouseTo(element, 5)
       await mouse.up()

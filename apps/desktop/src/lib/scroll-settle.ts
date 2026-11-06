@@ -50,10 +50,10 @@ export interface ScrollSettleWatch {
    */
   isTouching: () => boolean
   /**
-   * How many gestures (a touch, a wheel event, a mouse drag) have started on
-   * the element. A caller that remembers the count at one rest can tell
-   * whether a later rest follows a gesture or a scroll that code, focus, or
-   * the engine started.
+   * How many gestures (a touch that scrolled the element, a wheel event, a
+   * mouse drag) have started on the element. A tap counts as none. A caller
+   * that remembers the count at one rest can tell whether a later rest
+   * follows a gesture or a scroll that code, focus, or the engine started.
    */
   gestures: () => number
 }
@@ -81,6 +81,8 @@ export function watchScrollSettle({
   // A mouse drag or its release scroll is running.
   let mouseDragging = false
   let gestures = 0
+  // The touch in progress has scrolled the element, so it counted as a gesture.
+  let touchScrolled = false
   let pending = false
   let timer: ReturnType<typeof setTimeout> | undefined
   // A scroll was reported early because the element was settled. A snap
@@ -126,7 +128,7 @@ export function watchScrollSettle({
     (event: TouchEvent) => {
       if (fingers.size === 0) {
         gesture = new AbortController()
-        gestures += 1
+        touchScrolled = false
       }
       for (const touch of event.changedTouches) {
         fingers.add(touch.identifier)
@@ -165,6 +167,10 @@ export function watchScrollSettle({
   element.addEventListener(
     'scroll',
     () => {
+      if (fingers.size > 0 && !touchScrolled) {
+        touchScrolled = true
+        gestures += 1
+      }
       if (snapTail) {
         if (isSettled?.() ?? false) {
           // No new report.
