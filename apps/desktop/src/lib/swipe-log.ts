@@ -170,6 +170,162 @@ export function warnIfPullbackDuringTouch(fingersDown: number): void {
 
 let installed = false
 
+// The call site that owns the next scroll write (`restOn`), so its `js:*`
+// entry names it instead of carrying a stack.
+let currentSite: string | undefined
+
+/**
+ * Runs `write` with its `js:*` log entries attributed to `site`.
+ */
+export function withSite<T>(site: string, write: () => T): T {
+  const previous = currentSite
+  currentSite = site
+  try {
+    return write()
+  } finally {
+    currentSite = previous
+  }
+}
+
+function stack(): string {
+  const lines = (new Error().stack ?? '').split('\n')
+  return lines
+    .slice(2, 8)
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^at /, '')
+        .replace(/https?:\/\/[^/]+/, ''),
+    )
+    .join(' | ')
+    .slice(0, 500)
+}
+
+function origin(): Record<string, unknown> {
+  return currentSite ? { site: currentSite } : { stack: stack() }
+}
+
+/**
+ * Logs every JS write to the scroller's horizontal position: the `scrollLeft`
+ * setter on the element, `scrollTo` / `scroll` / `scrollBy` on it, and
+ * `scrollIntoView` / `focus` on anything inside it (both can scroll ancestors).
+ */
+function watchScrollWrites(scroller: HTMLElement): void {
+  const left = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollLeft')
+  if (left?.get && left.set) {
+    const { get, set } = left
+    Object.defineProperty(scroller, 'scrollLeft', {
+      configurable: true,
+      get() {
+        return get.call(this) as number
+      },
+      set(value: number) {
+        swipeLog('js:scrollLeft=', { value, from: get.call(this), ...origin() })
+        set.call(this, value)
+      },
+    })
+  }
+  for (const name of ['scrollTo', 'scroll', 'scrollBy'] as const) {
+    const original = Element.prototype[name] as (...args: unknown[]) => void
+    Element.prototype[name] = function patched(this: Element, ...args: unknown[]) {
+      if (this === scroller) {
+        const [first, second] = args
+        const options =
+          typeof first === 'object' && first !== null
+            ? (first as ScrollToOptions)
+            : { left: first as number, top: second as number }
+        swipeLog(`js:${name}`, {
+          left: options.left,
+          top: options.top,
+          behavior: options.behavior,
+          from: scroller.scrollLeft,
+          ...origin(),
+        })
+      }
+      return original.apply(this, args)
+    } as typeof original
+  }
+  const scrollIntoView = Element.prototype.scrollIntoView
+  Element.prototype.scrollIntoView = function patched(this: Element, arg?: unknown) {
+    if (scroller.contains(this)) {
+      swipeLog('js:scrollIntoView', {
+        target: describeNode(this),
+        arg: typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
+        from: scroller.scrollLeft,
+        ...origin(),
+      })
+    }
+    return scrollIntoView.call(this, arg as boolean | ScrollIntoViewOptions | undefined)
+  }
+  const focus = HTMLElement.prototype.focus
+  HTMLElement.prototype.focus = function patched(this: HTMLElement, options?: FocusOptions) {
+    if (scroller.contains(this)) {
+      swipeLog('js:focus', {
+        target: describeNode(this),
+        preventScroll: options?.preventScroll ?? false,
+        from: scroller.scrollLeft,
+        ...origin(),
+      })
+    }
+    return focus.call(this, options)
+  }
+}
+
+/**
+ * Logs DOM changes near the top of the scroller (cells, slides, and their
+ * first levels), which can move a snapping scroller on iOS.
+ */
+function watchMutations(scroller: HTMLElement): void {
+  const depthOf = (node: Node): number => {
+    let depth = 0
+    for (
+      let current: Node | null = node;
+      current && current !== scroller;
+      current = current.parentNode
+    ) {
+      depth += 1
+    }
+    return depth
+  }
+  const observer = new MutationObserver((records) => {
+    const summary: string[] = []
+    let skipped = 0
+    for (const record of records) {
+      if (depthOf(record.target) > 4) {
+        skipped += 1
+        continue
+      }
+      if (record.type === 'childList') {
+        for (const node of record.addedNodes) {
+          summary.push(`+${describeNode(node)}`)
+        }
+        for (const node of record.removedNodes) {
+          summary.push(`-${describeNode(node)}`)
+        }
+      } else {
+        summary.push(
+          `${describeNode(record.target)}[${record.attributeName}]=${(record.target as Element).getAttribute(record.attributeName ?? '') ?? 'null'}`,
+        )
+      }
+    }
+    if (summary.length === 0) {
+      return
+    }
+    swipeLog('dom', {
+      sl: scroller.scrollLeft,
+      n: summary.length,
+      deep: skipped,
+      changes: summary.slice(0, 6).join(' '),
+    })
+  })
+  observer.observe(scroller, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'inert', 'hidden'],
+  })
+}
+
 /**
  * Document-level touch, focus, and viewport logging, installed once. These
  * listeners see touches that never reach the scroller, so a `doc:touchstart`
@@ -240,6 +396,8 @@ export function installSwipeLog(scroller: HTMLElement): void {
   document.addEventListener('visibilitychange', () => {
     swipeLog('doc:visibility', { state: document.visibilityState })
   })
+  watchScrollWrites(scroller)
+  watchMutations(scroller)
   swipeLog('install', {
     ua: navigator.userAgent,
     innerW: window.innerWidth,

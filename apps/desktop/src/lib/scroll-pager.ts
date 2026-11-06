@@ -1,4 +1,4 @@
-import { swipeLog } from '@/lib/swipe-log.ts'
+import { swipeLog, withSite } from '@/lib/swipe-log.ts'
 
 /** The scroller's page width, unrounded (`clientWidth` is a whole number). */
 export function pageWidth(scroller: HTMLElement): number {
@@ -22,7 +22,7 @@ export function restOn(scroller: HTMLElement, index: number, site = '?'): void {
   const write = Math.abs(from - left) >= 1
   swipeLog('restOn', { site, index, from, to: left, width, write })
   if (write) {
-    scroller.scrollTo({ left, behavior: 'instant' })
+    withSite(site, () => scroller.scrollTo({ left, behavior: 'instant' }))
     swipeLog('restOn:after', { site, sl: scroller.scrollLeft })
   }
 }

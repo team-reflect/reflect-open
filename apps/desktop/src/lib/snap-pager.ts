@@ -6,6 +6,7 @@ import {
   swipeLog,
   swipeLogState,
   warnIfPullbackDuringTouch,
+  withSite,
 } from '@/lib/swipe-log.ts'
 
 export interface SnapPagerOptions {
@@ -99,7 +100,9 @@ export function attachSnapPager({
       return
     }
     expected = next
-    element.scrollTo({ left, behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
+    withSite(`${tag}:show`, () =>
+      element.scrollTo({ left, behavior: prefersReducedMotion() ? 'instant' : 'smooth' }),
+    )
   }
 
   const watch = watchScrollSettle({
@@ -112,7 +115,16 @@ export function attachSnapPager({
       const target = expected
       expected = undefined
       const user = watch.isUserScroll()
-      log('settle', { nearest, target, index, user, sl: element.scrollLeft })
+      const style = getComputedStyle(element)
+      log('settle', {
+        nearest,
+        target,
+        index,
+        user,
+        sl: element.scrollLeft,
+        snap: style.scrollSnapType,
+        ox: style.overflowX,
+      })
       if (nearest === undefined) {
         return
       }
