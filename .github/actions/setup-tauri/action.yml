@@ -10,30 +10,33 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Compute the apt cache key
+    - name: Compute the apt cache key and directory
       id: apt
       shell: bash
       # `ImageOS` and `ImageVersion` are runner environment variables, which the
       # `env` context does not have.
-      run: echo "key=apt-tauri-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "key=apt-tauri-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+        echo "dir=$RUNNER_TEMP/apt-tauri-archives" >> "$GITHUB_OUTPUT"
 
     - name: Restore the apt package cache
       id: apt-cache
       if: inputs.cache == 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ runner.temp }}/apt-tauri-archives/*.deb
+        path: ${{ steps.apt.outputs.dir }}/*.deb
         key: ${{ steps.apt.outputs.key }}
 
     - name: Install Tauri system dependencies
       shell: bash
+      env:
+        archives: ${{ steps.apt.outputs.dir }}
       run: |
         # The Tauri docs list, minus `patchelf`, which the runner image already
         # has. `libayatana-appindicator3-dev` replaces the deprecated
         # `libappindicator3-dev`, as in the Tauri prerequisites page.
         # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
         packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
-        archives="$RUNNER_TEMP/apt-tauri-archives"
         opts="--yes --no-install-recommends -o Dir::Cache::Archives=$archives"
         mkdir -p "$archives"
 
@@ -57,5 +60,5 @@ runs:
       with:
         # The glob skips the `lock` file and `partial/` directory that apt
         # keeps next to the packages, which only root and `_apt` can read.
-        path: ${{ runner.temp }}/apt-tauri-archives/*.deb
+        path: ${{ steps.apt.outputs.dir }}/*.deb
         key: ${{ steps.apt.outputs.key }}
