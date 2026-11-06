@@ -409,7 +409,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
         if (seq !== this.#openSeq) {
           return false
         }
-        this.#deps.logger.warn('welcome seed failed:', err)
+        this.#deps.logger.warn('graph open failed:', err)
         this.#setState({ error: errorMessage(err), status: 'choosing' })
       }
       if (seq === this.#openSeq) {

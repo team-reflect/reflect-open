@@ -179,8 +179,8 @@ interface CarouselNavigationState {
  * moves the scroller to match — guarded by {@link reconcileCarousel} so the
  * swipe's own echo doesn't redundantly re-scroll. A `date` beyond the window
  * re-anchors it. The {@link attachSnapPager} reports the day the scroller
- * rests on, whoever moved it there, so the shown day and the route never
- * disagree; an element that takes focus on another day shows that day.
+ * rests on, whoever moved it there, so the route follows the day the scroller
+ * settles on.
  */
 export function useDayCarousel(
   date: string,
