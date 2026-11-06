@@ -142,18 +142,14 @@ describe('scrubExceptionEvent', () => {
       },
     ])
 
-    await expect(scrubExceptionEvent(event, 'darwin')).resolves.toMatchObject({
-      exception: {
-        values: [
-          {
-            type: 'Error',
-            value: '[redacted]',
-            mechanism: { type: 'custom', handled: true },
-            stacktrace: { frames: [{ filename: 'app:///[redacted]' }] },
-          },
-        ],
+    await expect(scrubValues(event.exception?.values ?? [])).resolves.toEqual([
+      {
+        type: 'Error',
+        value: '[redacted]',
+        mechanism: { type: 'custom', handled: true },
+        stacktrace: { frames: [{ filename: 'app:///[redacted]' }] },
       },
-    })
+    ])
   })
 
   it('keeps identifier-like function names', async () => {
@@ -184,7 +180,10 @@ describe('scrubExceptionEvent', () => {
         type: 'TypeError',
         value: "view.destroy is not a function. (In 'view.destroy()', 'view.destroy' is undefined)",
       },
-      { type: 'TypeError', value: "Cannot read properties of undefined (reading 'children')" },
+      {
+        type: 'TypeError',
+        value: "a.b is not a function. (In 'a.b()', 'a.b' is an instance of Object)",
+      },
       { type: 'TypeError', value: 'editor.use is not a function' },
       { type: 'TypeError', value: 'Load failed' },
       { type: 'ReferenceError', value: "Can't find variable: requestIdleCallback" },
@@ -210,7 +209,10 @@ describe('scrubExceptionEvent', () => {
       { type: 'AppError', value: 'The [[Acme]] backlink target could not be resolved.' },
       { type: 'SyntaxError', value: 'JSON Parse error: Unexpected identifier "Acme"' },
       { type: 'DOMException', value: "'#Acme' is not a valid selector." },
-      { type: 'TypeError', value: "Cannot read properties of undefined (reading 'Acme Corp')" },
+      { type: 'TypeError', value: "Cannot read properties of undefined (reading 'Acme')" },
+      { type: 'TypeError', value: "Cannot set properties of undefined (setting 'Acme')" },
+      { type: 'TypeError', value: 'Acme Corp roadmap is not a function' },
+      { type: 'TypeError', value: `x is not a function. (In 'x()', 'x' is "Acme roadmap")` },
       { type: 'TypeError', value: "undefined is not an object (evaluating 'a'); see /Users/alex" },
       { type: 'TransformError', value: 'Private roadmap note content' },
     ]
@@ -237,8 +239,8 @@ describe('scrubExceptionEvent', () => {
       'ios',
     )
 
-    expect(first?.tags?.message_hash).toMatch(/^[0-9a-f]{12}$/)
-    expect(first?.tags?.message_hash).toBe(second?.tags?.message_hash)
+    expect(first?.tags?.message_hash).toBe('37036cd8f974')
+    expect(second?.tags?.message_hash).toBe('37036cd8f974')
     expect(safe?.tags).toEqual({ runtime: 'tauri-webview', os: 'ios' })
   })
 
@@ -285,7 +287,7 @@ function createFakeSdk(options?: { initError?: Error }): ExceptionTelemetrySdk &
 }
 
 describe('createExceptionTelemetry', () => {
-  it('initializes the SDK once with the release', () => {
+  it('initializes the SDK once with the release and scrubs through `beforeSend`', async () => {
     const sdk = createFakeSdk()
     const telemetry = createExceptionTelemetry({
       dsn: DSN,
@@ -300,6 +302,15 @@ describe('createExceptionTelemetry', () => {
 
     expect(sdk.inits).toHaveLength(1)
     expect(sdk.inits[0]).toMatchObject({ dsn: DSN, release: 'reflect@1.2.3' })
+    const scrubbed = await sdk.inits[0]?.beforeSend?.(
+      exceptionEvent([{ type: 'Error', value: 'Acme' }]),
+      {},
+    )
+    expect(scrubbed?.tags).toEqual({
+      runtime: 'tauri-webview',
+      os: 'darwin',
+      message_hash: '37036cd8f974',
+    })
   })
 
   it('logs an SDK that fails to initialize', () => {

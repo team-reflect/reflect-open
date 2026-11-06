@@ -14,11 +14,16 @@ describe('withoutUndefined', () => {
     expect('b' in result).toBe(false)
   })
 
+  it('rejects undefined for a required property', () => {
+    // @ts-expect-error `a` is required
+    expect(withoutUndefined<{ a: number }>({ a: undefined })).toEqual({})
+  })
+
   it('does not mutate its input', () => {
     const input = { a: undefined, b: 2 }
 
     withoutUndefined<{ a?: number; b: number }>(input)
 
-    expect(input).toEqual({ a: undefined, b: 2 })
+    expect(input).toStrictEqual({ a: undefined, b: 2 })
   })
 })

@@ -100,7 +100,8 @@ from disk at call time. Tests cover it.
   JavaScript message is kept only when it matches a fixed pattern that has no room for document
   data: the browser's `Script error.`, ProseMirror's structural failures, and engine messages
   made of source text (`undefined is not an object (evaluating 'a.b')`). Every other message is
-  replaced by a 48-bit hash of itself. Every native exception value is redacted.
+  redacted; a 48-bit hash of the root message is kept so repeats can be counted. Every native
+  exception value is redacted.
 - **Never collected:** request data, note content or titles, graph paths, filesystem or native
   source paths, frame variables, source context lines, thread names, breadcrumbs, console or
   Rust tracing output, session replay, performance traces and profiles, screenshots, view

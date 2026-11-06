@@ -23,16 +23,19 @@ const SAFE_FUNCTION_NAME = /^(?:(?:async|new) )?[\w$.<>?[\]]{1,120}$/
 const SAFE_SCRIPT_BASENAME = /^[\w.-]+\.(?:js|jsx|mjs|ts|tsx)$/
 
 // A source expression as WebKit and V8 print it (identifiers, member access,
-// calls, literals copied from the source text, never a runtime value), and a
-// bare identifier.
-const EXPR = String.raw`[\w$.[\]()'"\s]{1,160}`
+// calls, literals copied from the source text, never a runtime value), a bare
+// identifier, and the fixed value words an engine prints for a non-callable.
+const EXPR = String.raw`[\w$.[\]'"()]{1,160}`
 const ID = String.raw`[\w$]{1,64}`
+const VALUE = String.raw`(?:undefined|null|true|false|NaN|-?Infinity|-?\d+(?:\.\d+)?|an instance of ${ID})`
 const exact = (source: string): RegExp => new RegExp(`^${source}$`)
 
 // Exception messages that cannot carry document data, by exception type. Every
-// pattern is anchored and admits only identifiers or source text. A message
-// outside this list is redacted, including every `SyntaxError` (`JSON.parse`
-// echoes its input), `DOMException` (Chromium echoes arguments) and `AppError`.
+// pattern is anchored and admits only identifiers, source text without spaces,
+// or fixed words. A message outside this list is redacted, including every
+// `SyntaxError` (`JSON.parse` echoes its input), `DOMException` (Chromium echoes
+// arguments), `AppError`, and V8's `Cannot read properties of undefined
+// (reading 'x')`, whose `x` is a runtime key.
 const SAFE_EXCEPTION_VALUES: Record<string, readonly RegExp[]> = {
   // The fixed string a browser substitutes for an error it will not disclose.
   Error: [/^Script error\.?$/],
@@ -62,18 +65,12 @@ const SAFE_EXCEPTION_VALUES: Record<string, readonly RegExp[]> = {
     // WebKit
     exact(String.raw`(?:undefined|null) is not an object \(evaluating '${EXPR}'\)`),
     exact(
-      String.raw`${EXPR} is not a (?:function|constructor)\. \(In '${EXPR}', '${EXPR}' is .{1,80}\)`,
+      String.raw`${EXPR} is not a (?:function|constructor)\. \(In '${EXPR}', '${EXPR}' is ${VALUE}\)`,
     ),
     exact(String.raw`${EXPR} is not a constructor \(evaluating '${EXPR}'\)`),
     /^Attempted to assign to readonly property\.$/,
     /^Load failed$/,
     // V8
-    exact(
-      String.raw`Cannot (?:read|set) properties of (?:undefined|null) \((?:reading|setting) '${ID}'\)`,
-    ),
-    exact(
-      String.raw`Cannot destructure property '${ID}' of '${EXPR}' as it is (?:undefined|null)\.`,
-    ),
     exact(`${EXPR} is not (?:a function|a constructor|iterable)`),
     /^Failed to fetch$/,
     // Both
@@ -277,8 +274,8 @@ export const sentryExceptionTelemetrySdk: ExceptionTelemetrySdk = { init, reactE
 
 /**
  * The production DSN baked into this build, or `null` for development builds.
- * The WebView CSP limits `connect-src` to Sentry ingest hosts, so a wrong DSN
- * cannot send events elsewhere.
+ * It is a build secret of the release workflows, and the WebView CSP limits
+ * `connect-src` to Sentry ingest hosts.
  */
 export function buildExceptionTelemetryDsn(): string | null {
   const dsn = import.meta.env.PROD ? import.meta.env.VITE_SENTRY_DSN?.trim() : undefined
