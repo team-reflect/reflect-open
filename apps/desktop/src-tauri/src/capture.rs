@@ -29,14 +29,20 @@ const HOST_NAME: &str = "app.reflect.capture";
 #[cfg(target_os = "macos")]
 const HOST_BINARY: &str = "reflect-capture-host";
 
-/// Extension IDs allowed to launch the host. The first is the dev/unpacked ID,
-/// pinned by the `key` field in `apps/extension/wxt.config.ts`; the second is
-/// the published Chrome Web Store listing.
+/// Chromium extension origins allowed to launch the host. The first is the
+/// dev/unpacked ID, pinned by the `key` field in `apps/extension/wxt.config.ts`;
+/// the second is the published Chrome Web Store listing.
 #[cfg(any(target_os = "macos", test))]
-const EXTENSION_ORIGINS: [&str; 2] = [
+const CHROMIUM_EXTENSION_ORIGINS: [&str; 2] = [
     "chrome-extension://dlbliojklpickgimjdmjjdnbjdiomjik/",
     "chrome-extension://ccabifmooehighoonjeiololjfofkhkd/",
 ];
+
+/// Firefox add-on IDs allowed to launch the host: the
+/// `browser_specific_settings.gecko.id` in `apps/extension/wxt.config.ts`,
+/// which is the same for temporary loads and signed builds.
+#[cfg(any(target_os = "macos", test))]
+const FIREFOX_EXTENSION_IDS: [&str; 1] = ["capture@reflect.app"];
 
 /// Graph-relative spool directory the host writes and the drain reads.
 const INBOX_DIR: &str = ".reflect/inbox";
@@ -86,17 +92,33 @@ fn atomic_write_bytes_to(path: &Path, contents: &[u8]) -> AppResult<()> {
 // manifests on macOS only — Windows registry keys and Linux paths land with
 // Plan 15 packaging.
 
+/// Browser families whose native-messaging manifests differ in shape: Chromium
+/// allowlists `allowed_origins`, Firefox allowlists `allowed_extensions`.
+#[cfg(any(target_os = "macos", test))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BrowserFamily {
+    Chromium,
+    Firefox,
+}
+
 /// The native-messaging manifest content for a host binary at `host_path`.
 #[cfg(any(target_os = "macos", test))]
-fn host_manifest_json(host_path: &Path) -> String {
-    serde_json::to_string_pretty(&serde_json::json!({
+fn host_manifest_json(host_path: &Path, family: BrowserFamily) -> String {
+    let mut manifest = serde_json::json!({
         "name": HOST_NAME,
         "description": "Reflect link capture",
         "path": host_path.to_string_lossy(),
         "type": "stdio",
-        "allowed_origins": EXTENSION_ORIGINS,
-    }))
-    .expect("static manifest serializes")
+    });
+    match family {
+        BrowserFamily::Chromium => {
+            manifest["allowed_origins"] = serde_json::json!(CHROMIUM_EXTENSION_ORIGINS);
+        }
+        BrowserFamily::Firefox => {
+            manifest["allowed_extensions"] = serde_json::json!(FIREFOX_EXTENSION_IDS);
+        }
+    }
+    serde_json::to_string_pretty(&manifest).expect("static manifest serializes")
 }
 
 /// Chromium-family browser data dirs under `~/Library/Application Support`
@@ -116,18 +138,35 @@ const MACOS_BROWSER_DIRS: [&str; 10] = [
     "Arc/User Data",
 ];
 
-/// `NativeMessagingHosts/` dirs for browsers actually present under
-/// `app_support` — manifests are only written for detected browsers (spraying
-/// them for uninstalled ones is the Claude-Desktop mistake the spike calls
-/// out). Pure given the base dir, so the detection rule is unit-testable.
+/// Firefox keeps profiles for every channel (release, Developer Edition,
+/// Nightly) under `Firefox/`, but reads per-user host manifests from the
+/// shared `Mozilla/NativeMessagingHosts/`.
 #[cfg(any(target_os = "macos", test))]
-fn detected_manifest_dirs(app_support: &Path) -> Vec<PathBuf> {
-    MACOS_BROWSER_DIRS
+const MACOS_FIREFOX_DATA_DIR: &str = "Firefox";
+
+#[cfg(any(target_os = "macos", test))]
+const MACOS_FIREFOX_HOSTS_DIR: &str = "Mozilla/NativeMessagingHosts";
+
+/// `NativeMessagingHosts/` dirs for browsers actually present under
+/// `app_support`, with the manifest shape each one reads. Manifests are only
+/// written for detected browsers (spraying them for uninstalled ones is the
+/// Claude-Desktop mistake the spike calls out). Pure given the base dir, so
+/// the detection rule is unit-testable.
+#[cfg(any(target_os = "macos", test))]
+fn detected_manifest_dirs(app_support: &Path) -> Vec<(PathBuf, BrowserFamily)> {
+    let mut dirs: Vec<(PathBuf, BrowserFamily)> = MACOS_BROWSER_DIRS
         .iter()
         .map(|dir| app_support.join(dir))
         .filter(|dir| dir.is_dir())
-        .map(|dir| dir.join("NativeMessagingHosts"))
-        .collect()
+        .map(|dir| (dir.join("NativeMessagingHosts"), BrowserFamily::Chromium))
+        .collect();
+    if app_support.join(MACOS_FIREFOX_DATA_DIR).is_dir() {
+        dirs.push((
+            app_support.join(MACOS_FIREFOX_HOSTS_DIR),
+            BrowserFamily::Firefox,
+        ));
+    }
+    dirs
 }
 
 /// Write (or rewrite) the host manifest for every detected browser. Runs on
@@ -135,11 +174,13 @@ fn detected_manifest_dirs(app_support: &Path) -> Vec<PathBuf> {
 /// app translocation, per the bridge spike.
 #[cfg(any(target_os = "macos", test))]
 fn register_manifests(app_support: &Path, host_path: &Path) -> AppResult<usize> {
-    let manifest = host_manifest_json(host_path);
     let mut written = 0;
-    for dir in detected_manifest_dirs(app_support) {
+    for (dir, family) in detected_manifest_dirs(app_support) {
         fs::create_dir_all(&dir)?;
-        atomic_write_to(&dir.join(format!("{HOST_NAME}.json")), &manifest)?;
+        atomic_write_to(
+            &dir.join(format!("{HOST_NAME}.json")),
+            &host_manifest_json(host_path, family),
+        )?;
         written += 1;
     }
     Ok(written)
@@ -736,10 +777,11 @@ mod tests {
     }
 
     #[test]
-    fn manifest_pins_name_path_and_origins() {
-        let manifest = host_manifest_json(Path::new(
-            "/Applications/Reflect.app/Contents/MacOS/reflect-capture-host",
-        ));
+    fn chromium_manifest_pins_name_path_and_origins() {
+        let manifest = host_manifest_json(
+            Path::new("/Applications/Reflect.app/Contents/MacOS/reflect-capture-host"),
+            BrowserFamily::Chromium,
+        );
         let parsed: serde_json::Value = serde_json::from_str(&manifest).unwrap();
         assert_eq!(parsed["name"], "app.reflect.capture");
         assert_eq!(parsed["type"], "stdio");
@@ -754,6 +796,27 @@ mod tests {
                 "chrome-extension://ccabifmooehighoonjeiololjfofkhkd/"
             ])
         );
+        assert!(parsed.get("allowed_extensions").is_none());
+    }
+
+    #[test]
+    fn firefox_manifest_allowlists_the_gecko_id() {
+        let manifest = host_manifest_json(
+            Path::new("/Applications/Reflect.app/Contents/MacOS/reflect-capture-host"),
+            BrowserFamily::Firefox,
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&manifest).unwrap();
+        assert_eq!(parsed["name"], "app.reflect.capture");
+        assert_eq!(parsed["type"], "stdio");
+        assert_eq!(
+            parsed["path"],
+            "/Applications/Reflect.app/Contents/MacOS/reflect-capture-host"
+        );
+        assert_eq!(
+            parsed["allowed_extensions"],
+            serde_json::json!(["capture@reflect.app"])
+        );
+        assert!(parsed.get("allowed_origins").is_none());
     }
 
     #[test]
@@ -761,14 +824,33 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("Google/Chrome")).unwrap();
         fs::create_dir_all(dir.path().join("Arc/User Data")).unwrap();
-        // Vivaldi absent.
+        // Vivaldi and Firefox absent.
         let dirs = detected_manifest_dirs(dir.path());
         assert_eq!(
             dirs,
             vec![
-                dir.path().join("Google/Chrome/NativeMessagingHosts"),
-                dir.path().join("Arc/User Data/NativeMessagingHosts"),
+                (
+                    dir.path().join("Google/Chrome/NativeMessagingHosts"),
+                    BrowserFamily::Chromium
+                ),
+                (
+                    dir.path().join("Arc/User Data/NativeMessagingHosts"),
+                    BrowserFamily::Chromium
+                ),
             ]
+        );
+    }
+
+    #[test]
+    fn detects_firefox_by_its_profile_dir_and_targets_the_mozilla_hosts_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("Firefox")).unwrap();
+        assert_eq!(
+            detected_manifest_dirs(dir.path()),
+            vec![(
+                dir.path().join("Mozilla/NativeMessagingHosts"),
+                BrowserFamily::Firefox
+            )]
         );
     }
 
@@ -776,13 +858,18 @@ mod tests {
     fn register_writes_a_manifest_per_detected_browser() {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("Google/Chrome")).unwrap();
+        fs::create_dir_all(dir.path().join("Firefox")).unwrap();
         let written =
             register_manifests(dir.path(), Path::new("/bundle/reflect-capture-host")).unwrap();
-        assert_eq!(written, 1);
-        let manifest = dir
-            .path()
-            .join("Google/Chrome/NativeMessagingHosts/app.reflect.capture.json");
-        assert!(manifest.is_file());
+        assert_eq!(written, 2);
+
+        let read = |relative: &str| -> serde_json::Value {
+            serde_json::from_str(&fs::read_to_string(dir.path().join(relative)).unwrap()).unwrap()
+        };
+        let chrome = read("Google/Chrome/NativeMessagingHosts/app.reflect.capture.json");
+        assert!(chrome.get("allowed_origins").is_some());
+        let firefox = read("Mozilla/NativeMessagingHosts/app.reflect.capture.json");
+        assert!(firefox.get("allowed_extensions").is_some());
     }
 
     #[test]

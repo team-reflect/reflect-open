@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
     "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
     "build:safari": "wxt build -b safari --mv3",
     "zip": "WXT_STORE_BUILD=true wxt zip",
     "zip:unpacked": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "typecheck": "wxt prepare && tsc -b",
     "test": "vitest run",
     "gen:wxt": "wxt prepare"
   },
