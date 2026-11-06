@@ -53,6 +53,11 @@
       //   ce=0                     slides without a contenteditable block
       //   inert=0                  no `inert` on off-page slides
       //   mutate=1                 mount/unmount slides as the page changes (like the app)
+      //   js=1                     fix candidate A: no CSS snap; `touchend` picks the
+      //                            page from the finger's displacement and smooth-scrolls to it
+      //   pin=1                    fix candidate B: keep CSS snap; the first time the
+      //                            momentum rests on a page, pin it with an instant write
+      //                            and turn snapping off until the next touch
       const q = new URLSearchParams(location.search)
       const flag = (key, fallback) => (q.has(key) ? q.get(key) !== '0' : fallback)
       const cells = Number(q.get('cells') ?? 181)
@@ -64,6 +69,8 @@
       const ce = flag('ce', true)
       const inert = flag('inert', true)
       const mutate = flag('mutate', false)
+      const js = flag('js', false)
+      const pin = flag('pin', false)
 
       const queue = []
       let timer
@@ -94,6 +101,8 @@
         ['7 no snap-stop', 'stop=0'],
         ['8 proximity', 'type=proximity'],
         ['9 mutate', 'mutate=1'],
+        ['10 fix A: js paging', 'js=1'],
+        ['11 fix B: pin on arrival', 'pin=1'],
       ]
       const nav = document.getElementById('nav')
       for (const [label, query] of variants) {
@@ -106,7 +115,7 @@
 
       const pager = document.getElementById('pager')
       const status = document.getElementById('status')
-      pager.className = [type === 'proximity' ? 'proximity' : type === 'none' ? 'nosnap' : '', stop ? '' : 'nostop', abs ? '' : 'plain'].join(' ')
+      pager.className = [type === 'proximity' ? 'proximity' : type === 'none' || js ? 'nosnap' : '', stop ? '' : 'nostop', abs ? '' : 'plain'].join(' ')
       const wrap = document.createElement('div')
       wrap.className = 'wrap'
       wrap.style.width = `${cells * 100}%`
@@ -177,6 +186,8 @@
 
       let lastTouchAt = -Infinity
       let fingers = 0
+      let pinned = false
+      let gestureStart = { x: 0, sl: 0, page: start }
       let prev = pager.scrollLeft
       let prevAt = performance.now()
       pager.addEventListener(
@@ -186,8 +197,17 @@
           const now = performance.now()
           const page = Math.round(sl / width())
           log('scroll', { sl, d: sl - prev, dt: now - prevAt, page, fingers, sinceTouch: now - lastTouchAt })
+          const delta = sl - prev
           prev = sl
           prevAt = now
+          if (pin && fingers === 0 && !pinned && Math.abs(sl - page * width()) < 1.5 && Math.abs(delta) <= 3) {
+            // The momentum rests on a page: freeze it there before the engine
+            // can start another snap animation.
+            pinned = true
+            pager.style.scrollSnapType = 'none'
+            pager.scrollTo({ left: page * width(), behavior: 'instant' })
+            log('pin', { page, sl: pager.scrollLeft })
+          }
           status.textContent = `page ${page} sl ${Math.round(sl)}`
           if (page !== shown) {
             log('page', { from: shown, to: page })
@@ -208,6 +228,20 @@
             const touch = event.changedTouches[0]
             if (!touch) return
             const s = starts.get(touch.identifier)
+            if (typeName === 'touchstart' && fingers === 1) {
+              gestureStart = { x: touch.clientX, sl: pager.scrollLeft, page: Math.round(pager.scrollLeft / width()) }
+              if (pin && pinned) {
+                pinned = false
+                pager.style.scrollSnapType = ''
+              }
+            }
+            if (js && typeName === 'touchend' && fingers === 0 && s) {
+              // One page per gesture, chosen from the finger's displacement.
+              const dx = touch.clientX - s.x
+              const target = Math.max(0, Math.min(cells - 1, gestureStart.page + (dx < -30 ? 1 : dx > 30 ? -1 : 0)))
+              log('jspage', { from: gestureStart.page, to: target, dx, sl: pager.scrollLeft })
+              pager.scrollTo({ left: target * width(), behavior: 'smooth' })
+            }
             if (typeName === 'touchstart') starts.set(touch.identifier, { x: touch.clientX, y: touch.clientY })
             else if (typeName !== 'touchmove') starts.delete(touch.identifier)
             log(typeName, {
@@ -240,6 +274,8 @@
         ce,
         inert,
         mutate,
+        js,
+        pin,
         sl: pager.scrollLeft,
       })
     </script>
