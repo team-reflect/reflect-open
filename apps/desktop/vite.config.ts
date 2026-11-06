@@ -1,5 +1,6 @@
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
+import { appendFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -33,12 +34,16 @@ const platform: 'mobile' | 'desktop' | '' = (() => {
 })()
 
 // Prints the swipe log lines the page POSTs to `/__swipe-log`, so the log
-// reaches this terminal without Web Inspector or the HMR websocket.
+// reaches this terminal without Web Inspector or the HMR websocket, and
+// appends them to `swipe-log.txt` next to this file (every dev server shares it).
 function swipeLogPlugin(): Plugin {
+  const file = fileURLToPath(new URL('./swipe-log.txt', import.meta.url))
   return {
     name: 'swipe-log',
     apply: 'serve',
     configureServer(server) {
+      appendFileSync(file, `==== server start ${new Date().toISOString()}\n`)
+      server.config.logger.info(`[swipe-log] appending to ${file}`)
       server.middlewares.use('/__swipe-log', (req, res) => {
         if (req.method !== 'POST') {
           res.statusCode = 405
@@ -54,6 +59,7 @@ function swipeLogPlugin(): Plugin {
           for (const line of body.split('\n')) {
             process.stdout.write(`[swipe] ${line}\n`)
           }
+          appendFileSync(file, `${body}\n`)
           res.statusCode = 204
           res.end()
         })
