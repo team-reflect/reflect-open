@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.10...v0.18.0-beta.11) (2026-11-06)
+
+
+### Features
+
+* support GPT-6.1 Terra and Gemini Flash Lite Latest ([#2021](https://github.com/team-reflect/reflect-open/issues/2021)) ([1dfe250](https://github.com/team-reflect/reflect-open/commit/1dfe250daf2d2dd6e86e73a4abe1b3e623cb6705))
+
+
+### Bug Fixes
+
+* **mobile:** drop the snap pager pullback ([#2025](https://github.com/team-reflect/reflect-open/issues/2025)) ([8564ff8](https://github.com/team-reflect/reflect-open/commit/8564ff8c2a0b5a095232d02aa91cf7ba1fe8344d))
+
 ## [0.18.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.9...v0.18.0-beta.10) (2026-11-05)
 
 
