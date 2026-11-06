@@ -137,6 +137,9 @@ describe('useWeekStrip', () => {
   it('shows the week of a day that keyboard focus moves to', async () => {
     const { scroller, strip } = await mountStrip()
 
+    // The focus may come inside the quiet time of a program scroll that
+    // landed on the page, such as the one that rests the strip on mount.
+    scroller.dispatchEvent(new Event('scroll'))
     await act(() => {
       scroller.children[ANCHOR + 2]?.querySelector('button')?.focus()
     })

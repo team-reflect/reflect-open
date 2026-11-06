@@ -63,7 +63,9 @@ export function attachSnapPager({
   signal,
 }: SnapPagerOptions): SnapPager {
   let index = initialIndex
-  // A scroll has moved the scroller and has not settled.
+  // The scroller is off its page: a scroll moved it between pages and has not
+  // settled. A scroll that lands on the page at once (a `restOn`) leaves it
+  // false, so it never blocks the focus or resize handling below.
   let scrolling = false
   // The page a running `show` scroll moves to.
   let expected: number | undefined
@@ -76,7 +78,9 @@ export function attachSnapPager({
       return false
     }
     width = current
-    if (!watch.isTouching()) {
+    // A finger or a running scroll owns the position: the settle adopts the
+    // page it rests on.
+    if (!watch.isTouching() && !scrolling) {
       restOn(element, index)
     }
     return true
@@ -134,11 +138,12 @@ export function attachSnapPager({
       if (expected !== undefined || realign()) {
         return
       }
-      scrolling = true
       const nearest = nearestIndex(element, count())
-      if (nearest !== undefined) {
-        setIndex(nearest, true)
+      if (nearest === undefined) {
+        return
       }
+      setIndex(nearest, true)
+      scrolling = Math.abs(element.scrollLeft - nearest * width) >= 1
     },
     { passive: true, signal },
   )
