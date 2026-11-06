@@ -1,6 +1,6 @@
 import type { ExceptionErrorHandler, ExceptionTelemetryService } from '@reflect/app'
 import type { BuildPlatform, LoggerService } from '@reflect/core'
-import { sha256Hex } from '@reflect/utils'
+import { sha256Hex, withoutUndefined } from '@reflect/utils'
 import {
   dedupeIntegration,
   globalHandlersIntegration,
@@ -155,10 +155,6 @@ function scrubDebugMeta(debugMeta: ErrorEvent['debug_meta']): ErrorEvent['debug_
       : []
   })
   return images?.length ? { images } : undefined
-}
-
-function withoutUndefined<T extends object>(value: { [K in keyof T]: T[K] | undefined }): T {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T
 }
 
 function scrubException(exception: Exception): Exception {
