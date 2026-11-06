@@ -22,7 +22,7 @@ runs:
 
     # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
     - name: Install Tauri system dependencies
-      if: runner.os == 'Linux'
+      if: false
       shell: bash
       run: |
         PACKAGES="\
