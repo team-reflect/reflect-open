@@ -107,6 +107,7 @@ export function createDesktopHost(
   const exceptionTelemetry = createExceptionTelemetry({
     dsn: buildExceptionTelemetryDsn(),
     release: `reflect@${facts.appVersion}`,
+    os: facts.buildPlatform ?? 'unknown',
     sdk: sentryExceptionTelemetrySdk,
     logger,
   })
