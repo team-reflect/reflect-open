@@ -84,17 +84,21 @@ export function useBackPager({
     const { signal } = controller
     let popped = false
 
+    // Only a gesture since the pager last rested on its page may pop it: a
+    // scroll that code or the engine started is pinned back.
+    let gesturesAtRest = 0
     const watch = watchScrollSettle({
       element: scroller,
       onSettle: () => {
         if (popped) {
           return
         }
-        if (!watch.isUserScroll()) {
-          pinToLastPage(scroller)
+        if (scroller.scrollLeft > REVEALED_PX) {
+          gesturesAtRest = watch.gestures()
           return
         }
-        if (scroller.scrollLeft > REVEALED_PX) {
+        if (watch.gestures() === gesturesAtRest) {
+          pinToLastPage(scroller)
           return
         }
         popped = true

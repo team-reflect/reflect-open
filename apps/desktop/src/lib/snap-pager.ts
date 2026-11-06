@@ -106,6 +106,11 @@ export function attachSnapPager({
     dragHandle,
     onSettle: () => {
       scrolling = false
+      // A width change since the last rest leaves the position stale, so the
+      // nearest page would be wrong: stay on the shown page instead.
+      if (realign()) {
+        return
+      }
       const nearest = nearestIndex(element, count())
       const target = expected
       expected = undefined
