@@ -7,7 +7,7 @@
     "dev": "turbo run dev",
     "dev:web": "pnpm --filter @reflect/desktop dev",
     "dev:web:https": "REFLECT_DEV_HTTPS=1 pnpm run dev:web",
-    "dev:web:probe": "pnpm --filter @reflect/desktop exec vite --host --port 1421",
+    "dev:web:probe": "REFLECT_DEV_HTTPS=1 pnpm --filter @reflect/desktop exec vite --host --port 1421",
     "build": "turbo run build",
     "build:ios": "pnpm --filter @reflect/desktop build:ios",
     "build:linux": "pnpm --filter @reflect/desktop build:linux",
