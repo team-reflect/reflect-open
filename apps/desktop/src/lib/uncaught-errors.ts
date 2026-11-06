@@ -1,13 +1,5 @@
 import type { LoggerService } from '@reflect/core'
 
-export interface UncaughtErrorLoggingDeps {
-  /**
-   * The window whose `error` and `unhandledrejection` events are logged.
-   */
-  readonly target: EventTarget
-  readonly logger: LoggerService
-}
-
 function renderError(error: Error): string {
   const header = `${error.name}: ${error.message}`
   const stack = error.stack
@@ -25,7 +17,7 @@ function renderError(error: Error): string {
  * The rendered text goes into the message, because `createTauriLogger` drops
  * the stack of an `Error` cause.
  */
-export function installUncaughtErrorLogging({ target, logger }: UncaughtErrorLoggingDeps): void {
+export function installUncaughtErrorLogging(target: EventTarget, logger: LoggerService): void {
   target.addEventListener('error', (event) => {
     const { error, message } = event as Event & { error: unknown; message: string }
     logger.error(`uncaught error: ${error instanceof Error ? renderError(error) : message}`)

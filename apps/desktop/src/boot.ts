@@ -63,6 +63,6 @@ export const appServices = createAppServices(coreServices, host)
 // Runs before every module imported after this one, so exception telemetry
 // exists while the rest of the app's modules evaluate.
 appServices.exceptionTelemetry.install()
-installUncaughtErrorLogging({ target: window, logger })
+installUncaughtErrorLogging(window, logger)
 installQueryInvalidation(coreServices, appServices)
 void coreServices.contacts.refresh()
