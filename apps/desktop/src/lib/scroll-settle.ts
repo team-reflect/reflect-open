@@ -3,7 +3,7 @@ import { anySignal } from '@/lib/any-signal.ts'
 /**
  * Quiet time (ms) after the last scroll event before a scroll counts as settled.
  */
-const SETTLE_IDLE_MS = 120
+const SETTLE_IDLE_MS = 250
 
 /**
  * Mouse travel (px) before a press becomes a drag, so a click stays a click.

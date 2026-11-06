@@ -185,7 +185,7 @@ describe('useDayCarousel', () => {
 
     await touch(scroller, 'start')
     await act(() => scroller.scrollTo({ left: (CENTER + 1) * WIDTH, behavior: 'instant' }))
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 400))
     expect(onSelect).not.toHaveBeenCalled()
 
     await touch(scroller, 'end')
@@ -252,7 +252,7 @@ describe('useDayCarousel', () => {
 
     expect(scroller.scrollLeft).toBe((CENTER + 8) * WIDTH)
     expect(slide('2026-06-20')).not.toBeNull()
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 400))
     expect(onSelect).not.toHaveBeenCalled()
   })
 
@@ -268,7 +268,7 @@ describe('useDayCarousel', () => {
     expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
     expect(slide('2026-06-14')).toBeNull()
     await touch(scroller, 'end')
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 400))
     expect(onSelect).not.toHaveBeenCalled()
   })
 

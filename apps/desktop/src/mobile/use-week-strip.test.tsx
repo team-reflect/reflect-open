@@ -106,7 +106,7 @@ describe('useWeekStrip', () => {
     await vi.waitFor(() => {
       return expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 2))
     })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 400))
     expect(strip().weekWindow).toEqual(initialWindow)
     expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
   })
@@ -143,7 +143,7 @@ describe('useWeekStrip', () => {
 
     expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 2))
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH))
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 400))
     expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
   })
 
@@ -154,7 +154,7 @@ describe('useWeekStrip', () => {
     // strip back to the (unchanged) date's week.
     await scrollElement({ element: scroller, left: (ANCHOR + 2) * WIDTH, touch: true })
     await update({ width: WIDTH })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 400))
     expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
 
     await update({ date: '2026-06-19' })
