@@ -10,6 +10,9 @@
       body { display: flex; flex-direction: column; background: #fff; color: #222; }
       header { flex: 0 0 auto; padding: max(12px, env(safe-area-inset-top)) 12px 8px; border-bottom: 1px solid #ddd; }
       header b { font-variant-numeric: tabular-nums; }
+      nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      nav a { font-size: 13px; padding: 6px 10px; border: 1px solid #bbb; border-radius: 8px; color: #222; text-decoration: none; }
+      nav a.on { background: #222; color: #fff; border-color: #222; }
       #pager {
         flex: 1 1 auto; min-height: 0; display: flex;
         overflow-x: auto; overflow-y: hidden;
@@ -30,7 +33,10 @@
     </style>
   </head>
   <body>
-    <header>probe <b id="status"></b></header>
+    <header>
+      <div>probe <b id="status"></b></div>
+      <nav id="nav"></nav>
+    </header>
     <div id="pager"></div>
     <script>
       // Minimal copy of the day carousel: N snap cells under one wrapper and
@@ -72,6 +78,28 @@
           .join(' ')
         queue.push(`${(performance.now() - t0).toFixed(1).padStart(9)} probe:${kind.padEnd(10)} ${fields}`)
         timer ??= setTimeout(flush, 200)
+      }
+
+      // One button per variant. Tapping one reloads with that query, so the
+      // terminal gets a fresh `probe:install` line naming it.
+      const variants = [
+        ['1 default', ''],
+        ['2 no slides', 'abs=0'],
+        ['3 no vertical scroller', 'nested=0'],
+        ['4 no editable', 'ce=0'],
+        ['5 no inert', 'inert=0'],
+        ['6 7 cells', 'cells=7&start=3'],
+        ['7 no snap-stop', 'stop=0'],
+        ['8 proximity', 'type=proximity'],
+        ['9 mutate', 'mutate=1'],
+      ]
+      const nav = document.getElementById('nav')
+      for (const [label, query] of variants) {
+        const a = document.createElement('a')
+        a.textContent = label
+        a.href = location.pathname + (query ? '?' + query : '')
+        if ((location.search.replace(/^\?/, '') || '') === query) a.className = 'on'
+        nav.append(a)
       }
 
       const pager = document.getElementById('pager')
