@@ -27,49 +27,49 @@ runs:
     # `libayatana-appindicator3-dev` replaces the deprecated
     # `libappindicator3-dev`, as in the Tauri prerequisites page.
     #
-    # The image's package index can name versions the archive has since
-    # removed, so update first. The cache key hashes the exact `.deb` files
-    # that the install would download.
-    - name: Resolve Tauri system dependencies
+    # The `.deb` files are cached per runner image. `ImageOS` and
+    # `ImageVersion` are runner environment variables, which the `env` context
+    # does not have.
+    - name: Compute the apt cache key
       id: apt
       if: runner.os == 'Linux'
       shell: bash
-      run: |
-        packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
-        echo "TAURI_APT_PACKAGES=$packages" >> "$GITHUB_ENV"
-        sudo timeout 120 apt-get update || sudo timeout 120 apt-get update
-        hash=$(sudo apt-get install --print-uris -qq --no-install-recommends $packages | awk '{print $2, $4}' | sha256sum | cut -c1-16)
-        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
+      run: echo "key=apt-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
 
     - name: Restore the apt package cache
       id: apt-cache
       if: runner.os == 'Linux' && inputs.cache == 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ runner.temp }}/apt-archives
+        path: ${{ runner.temp }}/apt-archives/*.deb
         key: ${{ steps.apt.outputs.key }}
 
+    # The image's package index can name versions the archive has since
+    # removed, so update first. Only the download runs under `timeout`, since
+    # killing `dpkg` mid-install would break the retry.
     - name: Install Tauri system dependencies
       if: runner.os == 'Linux'
       shell: bash
       run: |
+        packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
         archives="$RUNNER_TEMP/apt-archives"
-        sudo mkdir -p "$archives/partial"
         opts="--yes --no-install-recommends -o Dir::Cache::Archives=$archives"
-        if ! sudo timeout 180 apt-get install $opts --download-only $TAURI_APT_PACKAGES; then
+        mkdir -p "$archives"
+        if ! sudo timeout 120 apt-get update || ! sudo timeout 180 apt-get install $opts --download-only $packages; then
           # The Azure mirror can trickle at ~50 kB/s without tripping apt's failover: https://github.com/actions/runner-images/issues/14823
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-          sudo apt-get install $opts --download-only $TAURI_APT_PACKAGES
+          sudo timeout 120 apt-get update
+          sudo apt-get install $opts --download-only $packages
         fi
-        sudo apt-get install $opts $TAURI_APT_PACKAGES
-        # apt leaves a root-only lock file, which the cache cannot read.
-        sudo rm -rf "$archives/lock" "$archives/partial"
+        sudo apt-get install $opts $packages
 
+    # The glob skips the `lock` file and `partial/` directory that apt keeps
+    # there, which only root and `_apt` can read.
     - name: Save the apt package cache
       if: runner.os == 'Linux' && inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ${{ runner.temp }}/apt-archives
+        path: ${{ runner.temp }}/apt-archives/*.deb
         key: ${{ steps.apt.outputs.key }}
 
     - name: Install Rust toolchain
