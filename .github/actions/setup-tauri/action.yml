@@ -13,8 +13,7 @@ runs:
     - name: Compute the apt cache key and directory
       id: apt
       shell: bash
-      # `ImageOS` and `ImageVersion` are runner environment variables, which the
-      # `env` context does not have.
+      # `ImageOS` and `ImageVersion` are runner environment variables.
       run: |
         echo "key=apt-tauri-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
         echo "dir=$RUNNER_TEMP/apt-tauri-archives" >> "$GITHUB_OUTPUT"
