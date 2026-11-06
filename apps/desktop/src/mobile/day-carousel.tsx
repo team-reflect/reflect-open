@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactElement } from 'react'
+import { useLayoutEffect, useMemo, useState, type ReactElement } from 'react'
+import { swipeLog } from '@/lib/swipe-log.ts'
 import { dateAtIndex } from '@reflect/app'
 import { DaySlide } from '@/mobile/day-slide.tsx'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
@@ -61,6 +62,17 @@ export function DayCarousel({
   // holding it in state (read during render) rather than a ref is safe.
   const [scrollMemory] = useState(() => new Map<string, number>())
   const keyboardVisible = useKeyboardVisible()
+  useLayoutEffect(() => {
+    swipeLog('dc:keyboard', { visible: keyboardVisible, sl: scrollerRef.current?.scrollLeft })
+  }, [keyboardVisible, scrollerRef])
+  useLayoutEffect(() => {
+    swipeLog('dc:mounted', {
+      low: mountedRange.low,
+      high: mountedRange.high,
+      selected: selectedIndex,
+      sl: scrollerRef.current?.scrollLeft,
+    })
+  }, [mountedRange.low, mountedRange.high, selectedIndex, scrollerRef])
   const cells = useMemo(() => {
     return Array.from({ length: dayWindow.count }, (_, index) => (
       <div

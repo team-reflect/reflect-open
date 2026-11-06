@@ -1,4 +1,5 @@
 import { anySignal } from '@/lib/any-signal.ts'
+import { describeNode, swipeLog } from '@/lib/swipe-log.ts'
 
 /**
  * Quiet time (ms) after the last scroll event before a scroll counts as settled.
@@ -54,6 +55,10 @@ export interface ScrollSettleWatch {
    * a wheel. False for scrolls that code, focus, or the keyboard started.
    */
   isUserScroll: () => boolean
+  /**
+   * Every internal flag, for the swipe log.
+   */
+  flags: () => Record<string, unknown>
 }
 
 /**
@@ -98,6 +103,17 @@ export function watchScrollSettle({
   let gesture = new AbortController()
 
   const isTouching = (): boolean => fingers.size > 0 || mouseDragging
+  const flags = (): Record<string, unknown> => ({
+    fingers: fingers.size,
+    fingerScroll,
+    sinceTouch: scrolledSinceTouch,
+    userScroll,
+    pending,
+    snapTail,
+    mouse: mouseDragging,
+    wheelAgo: performance.now() - wheelAt,
+    timer: timer !== undefined,
+  })
   const endSnapTail = (): void => {
     snapTail = false
     clearTimeout(snapTailTimer)
@@ -107,9 +123,12 @@ export function watchScrollSettle({
     clearTimeout(snapTailTimer)
     snapTailTimer = setTimeout(endSnapTail, SETTLE_IDLE_MS)
   }
-  const flush = (): void => {
+  const flush = (why: string): void => {
     clearTimeout(timer)
-    if (!pending || isTouching()) {
+    timer = undefined
+    const settles = pending && !isTouching()
+    swipeLog('ts:flush', { why, settles, sl: element.scrollLeft, ...flags() })
+    if (!settles) {
       return
     }
     pending = false
@@ -118,12 +137,12 @@ export function watchScrollSettle({
   }
   const settleOrWait = (): void => {
     if (isSettled?.() ?? false) {
-      flush()
+      flush('settled')
       extendSnapTail()
       return
     }
     clearTimeout(timer)
-    timer = setTimeout(flush, SETTLE_IDLE_MS)
+    timer = setTimeout(() => flush('timer'), SETTLE_IDLE_MS)
   }
 
   element.addEventListener(
@@ -145,6 +164,13 @@ export function watchScrollSettle({
       scrolledSinceTouch = false
       touchLeft = element.scrollLeft
       touchTop = element.scrollTop
+      swipeLog('ts:touchstart', {
+        ids: Array.from(event.changedTouches, (touch) => touch.identifier).join(','),
+        target: describeNode(target),
+        sl: touchLeft,
+        st: touchTop,
+        ...flags(),
+      })
     },
     { passive: true, signal },
   )
@@ -156,12 +182,22 @@ export function watchScrollSettle({
       gesture.abort()
     }
     if (isTouching()) {
+      swipeLog(`ts:${event.type}`, { still: true, ...flags() })
       return
     }
     // A tap moved nothing. Without this, a focus scroll right after the tap
     // would count as the finger's.
     const moved =
       scrolledSinceTouch || element.scrollLeft !== touchLeft || element.scrollTop !== touchTop
+    swipeLog(`ts:${event.type}`, {
+      moved,
+      sl: element.scrollLeft,
+      touchLeft,
+      st: element.scrollTop,
+      touchTop,
+      target: describeNode(event.target),
+      ...flags(),
+    })
     if (!moved) {
       fingerScroll = false
     }
@@ -180,10 +216,12 @@ export function watchScrollSettle({
   element.addEventListener(
     'scroll',
     () => {
+      const before = flags()
       if (snapTail) {
         if (isSettled?.() ?? false) {
           // No new report, and the reported scroll keeps its user flag.
           extendSnapTail()
+          swipeLog('ts:scroll', { sl: element.scrollLeft, tail: true, ...before })
           return
         }
         endSnapTail()
@@ -196,16 +234,23 @@ export function watchScrollSettle({
         userScroll = false
       }
       pending = true
+      swipeLog('ts:scroll', {
+        sl: element.scrollLeft,
+        st: element.scrollTop,
+        ...before,
+        userScrollAfter: userScroll,
+      })
       if (isTouching()) {
         // The finger decides; `touchend` checks again.
         clearTimeout(timer)
+        timer = undefined
         return
       }
       settleOrWait()
     },
     { passive: true, signal },
   )
-  element.addEventListener('scrollend', flush, { signal })
+  element.addEventListener('scrollend', () => flush('scrollend'), { signal })
   dragHandle?.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
   signal.addEventListener(
     'abort',
@@ -271,7 +316,7 @@ export function watchScrollSettle({
         // The drag moved nothing, for example at the end of the range.
         fingerScroll = false
       }
-      flush()
+      flush('mouse')
     }
 
     // On the window, so the drag goes on when the mouse leaves the element.
@@ -338,6 +383,7 @@ export function watchScrollSettle({
   return {
     isTouching,
     isUserScroll: () => userScroll,
+    flags,
   }
 }
 

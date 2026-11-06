@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@reflect/app'
 import { attachSnapPager, type SnapPager } from '@/lib/snap-pager.ts'
+import { describeNode, swipeLog } from '@/lib/swipe-log.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 
 /**
@@ -231,6 +232,7 @@ export function useDayCarousel(
   // The strip update stays out of the mount's transition, so it does not wait
   // for the next day's editor to render.
   const handleIndex = useEffectEvent((nearest: number, byUser: boolean) => {
+    swipeLog('dc:index', { nearest, byUser, day: dateAtIndex(dayWindow, nearest) })
     if (!byUser) {
       return
     }
@@ -259,6 +261,13 @@ export function useDayCarousel(
     // reveal its caret.
     const active = document.activeElement
     const activeDay = active?.closest('[data-day]')?.getAttribute('data-day')
+    swipeLog('dc:userSettle', {
+      index,
+      day,
+      reported: reportedRef.current,
+      active: describeNode(active),
+      recenter: shouldRecenter(dayWindow, index),
+    })
     if (active instanceof HTMLElement && activeDay && activeDay !== day) {
       active.blur()
     }
@@ -333,6 +342,15 @@ export function useDayCarousel(
       date,
       reported: reportedRef.current,
       forceScroll,
+    })
+    swipeLog('dc:follow', {
+      date,
+      navigationKey,
+      reported: reportedRef.current,
+      forceScroll,
+      windowStart: dayWindow.start,
+      action: sync.action,
+      index: sync.action === 'none' ? undefined : sync.index,
     })
     if (sync.action === 'none') {
       return

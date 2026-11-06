@@ -1,5 +1,12 @@
 import { nearestIndex, pageOf, pageWidth, restOn } from '@/lib/scroll-pager.ts'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
+import {
+  describeNode,
+  installSwipeLog,
+  swipeLog,
+  swipeLogState,
+  warnIfPullbackDuringTouch,
+} from '@/lib/swipe-log.ts'
 
 export interface SnapPagerOptions {
   /**
@@ -61,6 +68,14 @@ export function attachSnapPager({
   onUserSettle,
   signal,
 }: SnapPagerOptions): SnapPager {
+  // The day carousel sits in `main`; the week strip sits in `header`.
+  const tag = element.closest('header') ? 'strip' : 'days'
+  if (tag === 'days') {
+    installSwipeLog(element)
+  }
+  const log = (kind: string, data: Record<string, unknown> = {}): void => {
+    swipeLog(`${tag}:${kind}`, data)
+  }
   let index = initialIndex
   // A user scroll has moved the scroller and has not settled.
   let userScrolling = false
@@ -69,6 +84,7 @@ export function attachSnapPager({
 
   const setIndex = (next: number, byUser: boolean): void => {
     if (next !== index) {
+      log('setIndex', { from: index, to: next, byUser })
       index = next
       onIndex(next, byUser)
     }
@@ -78,6 +94,7 @@ export function attachSnapPager({
     setIndex(next, false)
     userScrolling = false
     const left = next * pageWidth(element)
+    log('show', { next, left, sl: element.scrollLeft })
     if (Math.abs(element.scrollLeft - left) < 1) {
       return
     }
@@ -94,15 +111,17 @@ export function attachSnapPager({
       const nearest = nearestIndex(element, count())
       const target = expected
       expected = undefined
+      const user = watch.isUserScroll()
+      log('settle', { nearest, target, index, user, sl: element.scrollLeft })
       if (nearest === undefined) {
         return
       }
-      if (nearest === target || !watch.isUserScroll()) {
-        restOn(element, index)
+      if (nearest === target || !user) {
+        restOn(element, index, `${tag}:settle-keep`)
         return
       }
       // WebKit can come to rest between snap points.
-      restOn(element, nearest)
+      restOn(element, nearest, `${tag}:settle-user`)
       setIndex(nearest, true)
       onUserSettle(nearest)
     },
@@ -112,9 +131,25 @@ export function attachSnapPager({
   element.addEventListener(
     'scroll',
     () => {
+      const flags = watch.flags()
       if (!watch.isUserScroll()) {
         if (expected === undefined) {
-          restOn(element, index)
+          const off = element.scrollLeft - index * pageWidth(element)
+          log('PULLBACK', {
+            index,
+            sl: element.scrollLeft,
+            off,
+            skip: swipeLogState.noPullback,
+            ...flags,
+          })
+          if (Math.abs(off) >= 1) {
+            warnIfPullbackDuringTouch(flags.fingers as number)
+          }
+          if (!swipeLogState.noPullback) {
+            restOn(element, index, `${tag}:scroll-pullback`)
+          }
+        } else {
+          log('scroll-expected', { expected, sl: element.scrollLeft })
         }
         return
       }
@@ -131,14 +166,12 @@ export function attachSnapPager({
   element.addEventListener(
     'focusin',
     (event) => {
+      const target = event.target
+      const page = target instanceof Element ? pageOf(element, target, count()) : undefined
+      log('focusin', { target: describeNode(target), page, index, userScrolling })
       if (userScrolling) {
         return
       }
-      const target = event.target
-      if (!(target instanceof Element)) {
-        return
-      }
-      const page = pageOf(element, target, count())
       if (page !== undefined && page !== index) {
         show(page)
       }
@@ -149,23 +182,27 @@ export function attachSnapPager({
   // A rotation or split view changes the page width. Stay on the same page,
   // unless a finger or its momentum owns the position (the settle aligns it).
   const resize = new ResizeObserver(() => {
-    if (!watch.isTouching() && !userScrolling) {
-      restOn(element, index)
+    const acts = !watch.isTouching() && !userScrolling
+    log('resize', { width: pageWidth(element), acts, userScrolling, ...watch.flags() })
+    if (acts) {
+      restOn(element, index, `${tag}:resize`)
     }
   })
   resize.observe(element)
   signal.addEventListener('abort', () => resize.disconnect(), { once: true })
 
-  restOn(element, index)
+  log('attach', { index: initialIndex, count: count(), width: pageWidth(element) })
+  restOn(element, index, `${tag}:attach`)
 
   return {
     index: () => index,
     show,
     restOn: (next) => {
+      log('restOn-api', { next, index, expected, userScrolling })
       setIndex(next, false)
       userScrolling = false
       expected = undefined
-      restOn(element, next)
+      restOn(element, next, `${tag}:api`)
     },
   }
 }
