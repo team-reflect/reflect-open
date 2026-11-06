@@ -4517,9 +4517,9 @@ dependencies = [
 
 [[package]]
 name = "reconcile-text"
-version = "0.13.2"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7283802ea19d95f818b9065c12ed24d4192400182409f50450c9b22682225b2b"
+checksum = "15c4cb0739c1b7bd0d92d5cc257a1db61bfb14b09c27986a1e639ff7d8932bde"
 dependencies = [
  "thiserror 2.0.21",
 ]

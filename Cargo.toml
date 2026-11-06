@@ -92,7 +92,7 @@ objc2-ui-kit = { version = "0.3.2", default-features = false }
 percent-encoding = "2.3.2"
 proptest = "1.12.0"
 pulldown-cmark = "0.13.4"
-reconcile-text = "0.13.2"
+reconcile-text = "0.14.1"
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
