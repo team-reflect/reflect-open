@@ -117,6 +117,6 @@ to local-first:
 
 - The App Group + capture-inbox schema (layout, ingest semantics,
   `private: true` at the boundary) and when to provision the App Group and
-  extension targets in `ios.project.yml`: cheap early, annoying to
+  extension targets in `gen/apple/project.yml`: cheap early, annoying to
   retrofit, not needed for mobile v1.
 - Whether long recordings need chunked ingest for extension memory limits.

@@ -4,7 +4,7 @@ import UIKit
 /// OS entry points that the scene lifecycle hands to the scene instead of the
 /// app delegate.
 ///
-/// Reflect declares a scene manifest (`ios.project.yml`) so tao creates its
+/// Reflect declares a scene manifest (`project.yml`) so tao creates its
 /// window inside the scene. On the scene lifecycle the home-screen quick action
 /// reaches the scene delegate, and a cold launch's quick action or URL arrives
 /// only in the scene's connection options. tao's scene delegate reads neither,
@@ -15,7 +15,7 @@ import UIKit
 /// to the Rust shell. The names mirror the constants in
 /// `plugins/tauri-plugin-recording/ios/Sources/RecordingPlugin.swift`.
 private enum SceneEntryPoints {
-  /// The quick action's `UIApplicationShortcutItemType` (`ios.project.yml`).
+  /// The quick action's `UIApplicationShortcutItemType` (`project.yml`).
   static let recordShortcutType = "app.reflect.record-audio"
   static let startRecordingRequested = Notification.Name("app.reflect.recording.start-requested")
   /// tao registers its scene delegate class under this name before

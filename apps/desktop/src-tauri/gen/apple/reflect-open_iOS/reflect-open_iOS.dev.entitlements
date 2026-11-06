@@ -4,7 +4,7 @@
      entitlements minus the iCloud block, mirroring the desktop's
      Entitlements.dev.plist, with the dev App Group so the dev share
      extension never drains into the production graph. Hand-maintained,
-     like the release file next to it: ios.project.yml selects one per
+     like the release file next to it: project.yml selects one per
      configuration via CODE_SIGN_ENTITLEMENTS. -->
 <plist version="1.0">
 <dict>

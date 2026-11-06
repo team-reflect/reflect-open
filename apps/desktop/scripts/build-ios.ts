@@ -32,7 +32,7 @@ interface IosFlavor {
   /** `--config` arguments for `tauri ios build`, which writes `identifier` into the app target. */
   configArgs: string[]
   /**
-   * Overrides for the `release` configuration defaults in `ios.project.yml`.
+   * Overrides for the `release` configuration defaults in `gen/apple/project.yml`.
    * `tauri ios build` passes only `TAURI*` variables (and a few others) on to
    * xcodebuild, hence the prefix.
    */

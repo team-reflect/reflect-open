@@ -110,7 +110,7 @@ suffix.
 ### Requirements
 
 iPhone or iPad. The minimum iOS version is `deploymentTarget` in
-`apps/desktop/src-tauri/ios.project.yml`.
+`apps/desktop/src-tauri/gen/apple/project.yml`.
 
 ### Troubleshooting
 

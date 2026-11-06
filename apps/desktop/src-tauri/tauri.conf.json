@@ -48,8 +48,7 @@
     "shortDescription": "Local-first, Markdown-backed note-taking",
     "copyright": "Copyright © 2026 Reflect App, LLC",
     "iOS": {
-      "developmentTeam": "789ULN5MZB",
-      "template": "src-tauri/ios.project.yml"
+      "developmentTeam": "789ULN5MZB"
     },
     "icon": [
       "icons/32x32.png",
