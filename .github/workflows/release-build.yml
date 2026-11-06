@@ -54,13 +54,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ./.github/actions/setup-apt
+        if: runner.os == 'Linux'
+
       - uses: ./.github/actions/setup-xcode
         if: runner.os == 'macOS'
 
       - uses: ./.github/actions/setup-node
-
-      - uses: ./.github/actions/setup-apt
-        if: runner.os == 'Linux'
 
       - uses: ./.github/actions/setup-rust
         with:
