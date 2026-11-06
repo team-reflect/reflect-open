@@ -22,11 +22,13 @@
       #pager::-webkit-scrollbar { display: none; }
       #pager.proximity { scroll-snap-type: x proximity; }
       #pager.nosnap { scroll-snap-type: none; }
-      .wrap { position: relative; display: flex; height: 100%; }
-      .cell { flex: 0 0 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+      /* The wrapper is `cells * 100%` of the pager, set from JS, so the cells
+         and slides can size themselves as fractions of it. */
+      .wrap { position: relative; display: flex; height: 100%; flex: 0 0 auto; }
+      .cell { flex: 0 0 var(--cell); height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
       .nostop .cell { scroll-snap-stop: normal; }
       .plain .cell { border-left: 1px solid #eee; padding: 16px; }
-      .slide { position: absolute; top: 0; bottom: 0; width: 100%; }
+      .slide { position: absolute; top: 0; bottom: 0; width: var(--cell); }
       .v { height: 100%; overflow-y: auto; padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
       .v p { margin: 0 0 1em; }
       [contenteditable] { min-height: 3em; border: 1px dashed #bbb; padding: 8px; }
@@ -107,6 +109,8 @@
       pager.className = [type === 'proximity' ? 'proximity' : type === 'none' ? 'nosnap' : '', stop ? '' : 'nostop', abs ? '' : 'plain'].join(' ')
       const wrap = document.createElement('div')
       wrap.className = 'wrap'
+      wrap.style.width = `${cells * 100}%`
+      wrap.style.setProperty('--cell', `${100 / cells}%`)
       for (let i = 0; i < cells; i++) {
         const cell = document.createElement('div')
         cell.className = 'cell'
@@ -119,7 +123,7 @@
       const slideFor = (i) => {
         const slide = document.createElement('div')
         slide.className = 'slide'
-        slide.style.left = `${i * 100}%`
+        slide.style.left = `${(i * 100) / cells}%`
         slide.dataset.index = i
         let inner = slide
         if (nested) {
