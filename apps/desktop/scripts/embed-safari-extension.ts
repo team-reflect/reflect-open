@@ -4,7 +4,7 @@
 //
 //   pnpm --filter @reflect/desktop safari:embed --app=<path> [flags]
 //
-// Needs Xcode and XcodeGen (`brew install xcodegen`).
+// Needs Xcode.
 //
 //   --app=<path>        The built app, for example from `pnpm tauri:build:dev`
 //   --identity=<name>   Codesign identity. Default: $APPLE_SIGNING_IDENTITY.
@@ -145,7 +145,6 @@ async function buildAppex(
   group: string,
   tempDir: string,
 ): Promise<string> {
-  await exec('xcodegen', ['generate', '--spec', join(PROJECT_DIR, 'project.yml')], INHERIT)
   await exec(
     'xcodebuild',
     [
@@ -188,10 +187,6 @@ async function main(): Promise<void> {
   }
   const identifier = await readInfo(app, 'CFBundleIdentifier')
   const group = `${values.team}.${identifier}`
-  // Not part of Xcode or its command-line tools; fail before any build step.
-  if ((await exec('which', ['xcodegen'])).exitCode !== 0) {
-    throw new Error('safari:embed needs XcodeGen: brew install xcodegen')
-  }
 
   log('Building the Safari web extension')
   await exec('pnpm', ['--filter', '@reflect/extension', 'build:safari'], INHERIT)
