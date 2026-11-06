@@ -3,15 +3,20 @@
  * Diagnostic ring log for the day carousel swipe jitter. Throwaway: this file
  * and its call sites live only on the `ocavue/swipe-log` branch.
  *
+ * Under the Vite dev server every entry is POSTed to `/__swipe-log`, which the
+ * `swipe-log` plugin in `vite.config.ts` prints to the terminal (no Web
+ * Inspector needed, and no dependency on the HMR websocket).
+ *
  * In the Web Inspector console:
  *   __swipeLog.dump()            prints and returns the last 400 entries
  *   __swipeLog.dump(0)           every entry (up to 8000)
  *   __swipeLog.clear()
- *   __swipeLog.state.live = true logs every entry as it happens
+ *   __swipeLog.state.live = true logs every entry to the console as well
  *   __swipeLog.state.noPullback = true   turns the per-scroll pullback off
  * `localStorage.swipeLogLive = '1'` and `localStorage.swipeLogNoPullback = '1'`
- * set the flags at startup. A pullback write while a finger is down, or
- * within 1.5 s of the last touch event, prints a `!!!!` line with a dump.
+ * set the flags at startup; `?nopullback=1` in the page URL does the same for
+ * the pullback switch. A pullback write while a finger is down, or within
+ * 1.5 s of the last touch event, prints a `!!!!` line.
  */
 
 export interface SwipeLogEntry {
@@ -38,9 +43,46 @@ function readFlag(key: string): boolean {
   }
 }
 
+function readQueryFlag(key: string): boolean {
+  try {
+    return new URLSearchParams(location.search).get(key) === '1'
+  } catch {
+    return false
+  }
+}
+
 export const swipeLogState = {
   live: readFlag('swipeLogLive'),
-  noPullback: readFlag('swipeLogNoPullback'),
+  noPullback: readFlag('swipeLogNoPullback') || readQueryFlag('nopullback'),
+  // Stream entries to the Vite terminal.
+  remote: import.meta.env.DEV,
+}
+
+const REMOTE_FLUSH_MS = 200
+const REMOTE_ENDPOINT = '/__swipe-log'
+let remoteQueue: string[] = []
+let remoteTimer: ReturnType<typeof setTimeout> | undefined
+
+async function flushRemote(): Promise<void> {
+  remoteTimer = undefined
+  if (remoteQueue.length === 0) {
+    return
+  }
+  const body = remoteQueue.join('\n')
+  remoteQueue = []
+  try {
+    await fetch(REMOTE_ENDPOINT, { method: 'POST', body, keepalive: true })
+  } catch {
+    // The dev server is gone; keep the ring buffer.
+  }
+}
+
+function sendRemote(line: string): void {
+  if (!swipeLogState.remote) {
+    return
+  }
+  remoteQueue.push(line)
+  remoteTimer ??= setTimeout(() => void flushRemote(), REMOTE_FLUSH_MS)
 }
 
 function round(value: unknown): unknown {
@@ -66,8 +108,10 @@ export function swipeLog(kind: string, data: Record<string, unknown> = {}): void
   if (entries.length > MAX_ENTRIES) {
     entries.splice(0, entries.length - TRIM_TO)
   }
+  const line = formatEntry(entry)
+  sendRemote(line)
   if (swipeLogState.live) {
-    console.log('[swipe-log]', formatEntry(entry))
+    console.log('[swipe-log]', line)
   }
 }
 
@@ -116,10 +160,12 @@ export function warnIfPullbackDuringTouch(fingersDown: number): void {
     return
   }
   lastWarnAt = now
-  console.log(
-    `[swipe-log] !!!! pullback write while fingersDown=${fingersDown}, ${(now - lastTouchAt).toFixed(0)} ms after the last touch event. Last 300 entries follow; run __swipeLog.dump(0) for all.`,
-  )
-  dumpSwipeLog(300)
+  const line = `!!!! pullback write while fingersDown=${fingersDown}, ${(now - lastTouchAt).toFixed(0)} ms after the last touch event`
+  sendRemote(line)
+  console.log(`[swipe-log] ${line}`)
+  if (!swipeLogState.remote) {
+    dumpSwipeLog(300)
+  }
 }
 
 let installed = false

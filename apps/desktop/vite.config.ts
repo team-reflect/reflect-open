@@ -1,7 +1,7 @@
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 // The single version source; tauri.conf.json's `version` also points here.
@@ -32,10 +32,41 @@ const platform: 'mobile' | 'desktop' | '' = (() => {
   throw new Error(`Unknown environment variable TAURI_ENV_PLATFORM: ${env}`)
 })()
 
+// Prints the swipe log lines the page POSTs to `/__swipe-log`, so the log
+// reaches this terminal without Web Inspector or the HMR websocket.
+function swipeLogPlugin(): Plugin {
+  return {
+    name: 'swipe-log',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__swipe-log', (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end()
+          return
+        }
+        let body = ''
+        req.setEncoding('utf8')
+        req.on('data', (chunk: string) => {
+          body += chunk
+        })
+        req.on('end', () => {
+          for (const line of body.split('\n')) {
+            process.stdout.write(`[swipe] ${line}\n`)
+          }
+          res.statusCode = 204
+          res.end()
+        })
+      })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
   plugins: [
     ...(devHttps ? [basicSsl()] : []),
+    swipeLogPlugin(),
     react({
       compiler: {
         reportDiagnostics: true,
