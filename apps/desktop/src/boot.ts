@@ -1,4 +1,5 @@
 import { installQueryInvalidation } from '@/lib/query-invalidation.ts'
+import { installUncaughtErrorLogging } from '@/lib/uncaught-errors.ts'
 import { createDesktopAdapters, createDesktopHost } from '@/services/create-desktop-services.ts'
 import { createDeferredIpcTransport } from '@/services/deferred-ipc.ts'
 import { detectPlatformFacts } from '@/services/detect-platform.ts'
@@ -62,5 +63,6 @@ export const appServices = createAppServices(coreServices, host)
 // Runs before every module imported after this one, so exception telemetry
 // exists while the rest of the app's modules evaluate.
 appServices.exceptionTelemetry.install()
+installUncaughtErrorLogging(window, logger)
 installQueryInvalidation(coreServices, appServices)
 void coreServices.contacts.refresh()
