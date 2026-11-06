@@ -1,5 +1,6 @@
 import type { ExceptionErrorHandler, ExceptionTelemetryService } from '@reflect/app'
 import type { BuildPlatform, LoggerService } from '@reflect/core'
+import { sha256Hex } from '@reflect/utils'
 import {
   dedupeIntegration,
   globalHandlersIntegration,
@@ -186,22 +187,6 @@ function scrubException(exception: Exception): Exception {
 }
 
 /**
- * The first 12 hex digits of the SHA-256 of a redacted message. It tells
- * redacted messages apart without disclosing them, so a suspected message
- * can be confirmed by hashing it locally.
- */
-async function hashMessage(value: string): Promise<string | undefined> {
-  const subtle = globalThis.crypto?.subtle
-  if (!subtle) {
-    return undefined
-  }
-  const digest = await subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(digest, 0, 6), (byte) => {
-    return byte.toString(16).padStart(2, '0')
-  }).join('')
-}
-
-/**
  * Reduce a Sentry error event to the diagnostic allow-list. This deliberately
  * constructs a new event rather than deleting known-sensitive fields so new
  * SDK fields cannot begin leaving the device unnoticed after an upgrade.
@@ -217,8 +202,13 @@ export async function scrubExceptionEvent(
 
   // Sentry orders linked exceptions cause first; the last one is the error itself.
   const root = exceptions.at(-1)
+  // The first 12 hex digits of the SHA-256 of a redacted message tell redacted
+  // messages apart without disclosing them; a suspected message is confirmed
+  // by hashing it locally.
   const messageHash =
-    root?.value && !isSafeExceptionValue(root) ? await hashMessage(root.value) : undefined
+    root?.value && !isSafeExceptionValue(root)
+      ? (await sha256Hex(root.value)).slice(0, 12)
+      : undefined
   const debugMeta = scrubDebugMeta(event.debug_meta)
   return withoutUndefined<ErrorEvent>({
     type: undefined,
