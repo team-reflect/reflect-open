@@ -50,7 +50,7 @@ from disk at call time. Tests cover it.
 - GitHub sign-in uses the OAuth device flow against `github.com`. The token is in the OS
   keychain.
 
-## Browser capture (the Chrome extension)
+## Browser capture (the Chrome and Firefox extension)
 
 - **Where:** nowhere on the network. The **Reflect Capture** extension hands each capture to a
   local native-messaging host (`reflect-capture-host`) that the desktop app registers. The host
