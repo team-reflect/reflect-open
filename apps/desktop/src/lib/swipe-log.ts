@@ -403,6 +403,7 @@ export function installSwipeLog(scroller: HTMLElement): void {
   watchScrollWrites(scroller)
   watchMutations(scroller)
   swipeLog('install', {
+    query: location.search || '(none)',
     ua: navigator.userAgent,
     innerW: window.innerWidth,
     innerH: window.innerHeight,
