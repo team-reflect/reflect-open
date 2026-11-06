@@ -38,11 +38,16 @@ export interface TestNativeMenuHost extends NativeMenuHost {
    * The items of every context menu opened, in order.
    */
   popups(): readonly (readonly NativeContextMenuItem[])[]
+  /**
+   * Every command-availability change the installed menu was told about, in order.
+   */
+  availability(): readonly boolean[]
 }
 
 class TestNativeMenuHostImpl implements TestNativeMenuHost {
   readonly calls: TestNativeMenuHostCall[] = []
   readonly #popups: (readonly NativeContextMenuItem[])[] = []
+  readonly #availability: boolean[] = []
   #appMenu: readonly NativeSubmenu[] | null = null
 
   buildAppMenu(submenus: readonly NativeSubmenu[]): NativeAppMenu {
@@ -55,7 +60,14 @@ class TestNativeMenuHostImpl implements TestNativeMenuHost {
       assignNsAppRoles: () => {
         this.calls.push('assignNsAppRoles')
       },
+      setCommandsAvailable: (available) => {
+        this.#availability.push(available)
+      },
     }
+  }
+
+  availability(): readonly boolean[] {
+    return [...this.#availability]
   }
 
   popup(items: readonly NativeContextMenuItem[]): void {

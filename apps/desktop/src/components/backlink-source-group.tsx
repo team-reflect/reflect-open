@@ -77,7 +77,7 @@ export function BacklinkSourceGroup({
             aria-expanded={expanded}
             aria-label={`${expanded ? 'Collapse' : 'Expand'} references from ${label}`}
             onClick={() => setExpanded(!expanded)}
-            className="absolute inset-y-0 -left-5 flex items-center text-text-muted opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            className="absolute inset-y-0 -left-5 flex items-center text-text-muted opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 touch-app:-inset-y-1.5 touch-app:-left-8 touch-app:pr-2 touch-app:pl-3 touch-app:opacity-100"
           >
             <ChevronRight
               aria-hidden

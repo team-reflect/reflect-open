@@ -33,7 +33,7 @@ A capture-and-recall companion with one product identity:
 ### 2.2 What it is not
 
 - Not a viewer. Editing ships in v1, on desktop's document machinery (sessions, debounced atomic saves, title rename, round-trip protection).
-- Not a parity port. No copilot, semantic search, ⌘K palette, CLI sidecar, map, or publishing. The container can hold several graphs (the settings sheet switches), but only one is open at a time, with no desktop-style chooser.
+- Not a parity port. No copilot, semantic search, ⌘K palette, CLI sidecar, map, or publishing in the phone shell; a regular-width iPad window renders the desktop workspace instead ([TDR 0005](decisions/0005-ipad-desktop-class.md)). The container can hold several graphs (the settings sheet switches), but only one is open at a time, with no desktop-style chooser.
 - Not a separate codebase, schema, or design system.
 - Not a cloud client. The phone is a peer with its own copy. The app's only network egress is GitHub sync; iCloud sync happens OS-side.
 
@@ -179,9 +179,9 @@ Aligned with Plan 19's risks, by product impact:
 
 Desktop is keyboard-native; mobile translates that rather than importing it:
 
-- **Touch-native, capture-first.** Thumb-reachable core actions, search as a visible surface, and the keyboard never hides the caret. No ⌘K palette in v1; iPad hardware-keyboard users use visible affordances.
+- **Touch-native, capture-first.** Thumb-reachable core actions, search as a visible surface, and the keyboard never hides the caret. No ⌘K palette in the phone shell. A regular-width iPad window gets the palette, every shortcut and the iPadOS menu bar through the desktop workspace ([TDR 0005](decisions/0005-ipad-desktop-class.md)); a compact one keeps the phone shell's visible affordances.
 - **Minimal UI, doubly.** Six screens, a tab/stack shell, a sync-status pill. Settings: storage, switch graph, GitHub, version.
-- **Same visual language.** Design-system tokens, safe-area layout (`viewport-fit=cover`), 16px minimum input font (blocks iOS auto-zoom), dark mode. iPad is "a big phone" in v1.
+- **Same visual language.** Design-system tokens, safe-area layout (`viewport-fit=cover`), 16px minimum input font (blocks iOS auto-zoom), dark mode. iPad shipped as "a big phone" in v1; a regular-width iPad window now renders the desktop workspace ([TDR 0005](decisions/0005-ipad-desktop-class.md)).
 - **Plain-language sync.** "Backed up / Syncing / Offline", never commits, branches, or merges.
 
 ---
@@ -206,11 +206,11 @@ The codebase succeeds if audio memos, share-sheet capture, and the AI copilot ca
 1. **App Group + capture-inbox schema** for the audio/share waves: layout, ingest semantics, `private: true` at the boundary, and when to provision the App Group and extension targets (cheap early, annoying to retrofit, not needed for v1).
 2. **Semantic search graduation:** what battery/storage/latency evidence gates local embeddings on iOS? Does sqlite-vec/fastembed ever run there?
 3. **AI-assisted conflict resolution:** Plan 21 defers it; the ladder would hand AI the same base/local/remote triple. How does mobile apply resolutions that need BYOK calls?
-4. **iPad posture:** how long does "big phone" hold before a two-pane layout is worth it?
+4. ~~**iPad posture:** how long does "big phone" hold before a two-pane layout is worth it?~~ Settled by [TDR 0005](decisions/0005-ipad-desktop-class.md): the desktop workspace in regular-width windows, the phone shell in compact ones.
 5. **Deep links and the command registry:** when automation (shortcuts, widgets) arrives, does `reflect://` map onto desktop's typed command layer?
 6. **Graph size on iCloud:** full download plus O(all-notes) watch diffing is fine today. What size forces delta intake or selective download?
 
-Closed since the first draft: the daily append/append merge (Plan 21's append-union rung) and the webview-drawn toolbar (Plan 19 decision 8).
+Closed since the first draft: the daily append/append merge (Plan 21's append-union rung), the webview-drawn toolbar (Plan 19 decision 8), and the iPad posture (TDR 0005).
 
 ---
 

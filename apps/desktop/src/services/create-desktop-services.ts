@@ -31,6 +31,7 @@ import { createBrowserImageCodec } from '@/services/browser-image-codec.ts'
 import { createDomLifecycleAdapter } from '@/services/dom-lifecycle.ts'
 import { createTauriDeepLinkSource } from '@/services/tauri-deep-link.ts'
 import { createTauriDialogService } from '@/services/tauri-dialog.ts'
+import { createIpadNativeMenuHost } from '@/services/ipad-native-menu.ts'
 import { createTauriNativeMenuHost } from '@/services/native-menu.ts'
 import { createTauriHttpService } from '@/services/tauri-http.ts'
 import { createTauriOpenerTransport } from '@/services/tauri-opener.ts'
@@ -87,8 +88,8 @@ export function createDesktopAdapters(
 /**
  * The desktop app's host for the app layer: the window service, the lifecycle
  * service and the operations list over the page, the Tauri dialogs, updater
- * and native menus inside the native shell, and Sentry exception telemetry
- * everywhere.
+ * and native menus (the iPadOS menu bar on an iPad) inside the native shell,
+ * and Sentry exception telemetry everywhere.
  */
 export function createDesktopHost(
   facts: PlatformFacts,
@@ -117,7 +118,9 @@ export function createDesktopHost(
       opener: createTauriOpenerTransport(),
       exceptionTelemetry,
       updater: createTauriUpdaterAdapter(),
-      nativeMenu: createTauriNativeMenuHost(),
+      nativeMenu: facts.isTablet
+        ? createIpadNativeMenuHost({ ipc, logger })
+        : createTauriNativeMenuHost(),
     }
   }
   return {

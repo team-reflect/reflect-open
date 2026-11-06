@@ -38,6 +38,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
       event.stopPropagation()
       void nativeMenu
         .openContextMenu({
+          at: { x: event.clientX, y: event.clientY },
           items: [
             {
               text: 'Unpin Note',

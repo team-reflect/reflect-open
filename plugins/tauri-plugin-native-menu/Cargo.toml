@@ -1,0 +1,20 @@
+[package]
+name = "tauri-plugin-native-menu"
+version = "0.1.0"
+description = "The Reflect iPad's native menus: the desktop app menu's commands and key equivalents in the UIMainMenuSystem menu bar, and context menus."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+links = "tauri-plugin-native-menu"
+
+[dependencies]
+tauri = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

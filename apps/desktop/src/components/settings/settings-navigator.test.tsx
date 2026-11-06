@@ -4,19 +4,29 @@ import {
   createTestCoreServices,
   createTestContactsService,
   createTestPlatformService,
+  type TestPlatformOptions,
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
-import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { IPAD_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SETTINGS_SECTIONS, settingsSectionDomId } from './sections.ts'
 import { SettingsNavigator } from './settings-navigator.tsx'
+import type { SettingsSectionEntry } from './use-visible-settings-sections.ts'
 
-// The app here is not macOS desktop and has no Contacts framework, so the
-// platform-gated entries are hidden (Integrations needs the contacts answer;
-// Agents needs `isMacosDesktop`) — the navigator lists the sections every
-// platform shows.
-const VISIBLE_SECTIONS = SETTINGS_SECTIONS.filter(
-  (section) => section.id !== 'integrations' && section.id !== 'agents',
+// The app here is not macOS desktop, not the iOS app, and has no Contacts
+// framework, so the platform-gated entries are hidden (Integrations needs the
+// contacts answer; Agents needs `isMacosDesktop`; Graph and Subscription are
+// the iOS app's) — the navigator lists the sections every desktop shows.
+const HIDDEN_SECTION_IDS: ReadonlySet<string> = new Set([
+  'integrations',
+  'agents',
+  'graph',
+  'subscription',
+])
+const VISIBLE_SECTIONS = SETTINGS_SECTIONS.filter((section) => !HIDDEN_SECTION_IDS.has(section.id))
+/** What the iOS app shows instead: Graph and Subscription, but no Import or Danger zone. */
+const IPAD_SECTIONS = SETTINGS_SECTIONS.filter(
+  (section) => !['integrations', 'agents', 'import', 'destructive'].includes(section.id),
 )
 
 /**
@@ -34,10 +44,13 @@ function sectionTop(index: number): number {
   return PAGE_PADDING_PX + index * SECTION_STRIDE_PX
 }
 
-async function renderNavigatorPage(): Promise<HTMLElement> {
+async function renderNavigatorPage(
+  platform: TestPlatformOptions = { isMacosDesktop: false },
+  sections: readonly SettingsSectionEntry[] = VISIBLE_SECTIONS,
+): Promise<HTMLElement> {
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
-    platform: createTestPlatformService({ isMacosDesktop: false }),
+    platform: createTestPlatformService(platform),
     contacts: createTestContactsService({ status: 'unavailable' }),
   })
   const view = await renderInApp(
@@ -46,7 +59,7 @@ async function renderNavigatorPage(): Promise<HTMLElement> {
         <div style={{ position: 'absolute', top: 0, left: 0 }}>
           <SettingsNavigator />
         </div>
-        {VISIBLE_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <section
             key={section.id}
             id={settingsSectionDomId(section.id)}
@@ -78,6 +91,18 @@ describe('SettingsNavigator', () => {
     expect(labels).toEqual(VISIBLE_SECTIONS.map((section) => section.title))
   })
 
+  it('trades Import and the Danger zone for Graph and Subscription in the iOS app', async () => {
+    await renderNavigatorPage(IPAD_PLATFORM)
+    const labels = page
+      .getByRole('button')
+      .elements()
+      .map((button) => button.textContent)
+    expect(labels[0]).toBe('Graph')
+    expect(labels).toContain('Subscription')
+    expect(labels).not.toContain('Import')
+    expect(labels).not.toContain('Danger zone')
+  })
+
   it('marks the section under the reading line as the page scrolls', async () => {
     const scroller = await renderNavigatorPage()
     await expect.element(activeEntry()).toMatchTextContent('Appearance')
@@ -96,6 +121,12 @@ describe('SettingsNavigator', () => {
     // Danger zone's top never crosses the reading line, but the page can scroll no
     // further — the bottom override keeps the last entry reachable.
     await expect.element(activeEntry()).toMatchTextContent('Danger zone')
+  })
+
+  it('hands the iOS app’s last section the marker at the very bottom of the page', async () => {
+    const scroller = await renderNavigatorPage(IPAD_PLATFORM, IPAD_SECTIONS)
+    scrollPageTo(scroller, PAGE_PADDING_PX + IPAD_SECTIONS.length * SECTION_STRIDE_PX - VIEWPORT_PX)
+    await expect.element(activeEntry()).toMatchTextContent('About')
   })
 
   it('clicking an entry scrolls its section to the top of the page', async () => {

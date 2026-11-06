@@ -23,6 +23,15 @@ const LAYOUT: AppSubmenuLayout[] = [
   { text: 'Window', nsAppRole: 'windows', entries: [{ kind: 'predefined', item: 'Minimize' }] },
 ]
 
+const IPAD: TestPlatformOptions = {
+  appPlatform: 'ios',
+  buildPlatform: 'ios',
+  isMacosDesktop: false,
+  isTablet: true,
+  hasMacosTitleBarOverlay: false,
+  surface: { mobileApp: true, touchEditor: true },
+}
+
 function setup(options?: { label?: string; platform?: TestPlatformOptions; failPaste?: boolean }) {
   const logger = createTestLoggerService()
   const commands = createCommandService({
@@ -50,6 +59,13 @@ function setup(options?: { label?: string; platform?: TestPlatformOptions; failP
   return { menu, windows, ipc, logger }
 }
 
+/**
+ * Let the queued menu availability updates land.
+ */
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 describe('install', () => {
   it('builds each submenu from the layout and the command registry', async () => {
     const { menu } = setup()
@@ -65,6 +81,7 @@ describe('install', () => {
         id: 'sidebar.toggle',
         text: 'Toggle sidebar',
         accelerator: 'CmdOrCtrl+\\',
+        binding: 'Mod-\\',
         action: menu.dispatchCommand,
       },
       { kind: 'predefined', item: 'Separator' },
@@ -118,13 +135,64 @@ describe('install', () => {
     expect(menu.isInstalled()).toBe(false)
   })
 
-  it('installs nothing off the macOS desktop', async () => {
+  it('installs nothing on platforms other than the macOS desktop and the iPad', async () => {
     const { menu } = setup({ platform: { isMacosDesktop: false } })
 
     await menu.install(LAYOUT)
 
     expect(menu.host.calls).toEqual([])
     expect(menu.isInstalled()).toBe(false)
+  })
+
+  it('installs the iPad menu bar without the macOS-only roles and Paste and Match Style', async () => {
+    const { menu, ipc } = setup({ platform: IPAD })
+
+    await menu.install(LAYOUT)
+
+    expect(menu.host.calls).toEqual(['buildAppMenu', 'setAsAppMenu'])
+    expect(ipc.calls()).toEqual([])
+    expect(menu.isInstalled()).toBe(true)
+  })
+
+  it('offers the command items only while a workspace can run them', async () => {
+    const { menu } = setup({ platform: IPAD })
+
+    await menu.install(LAYOUT)
+    expect(menu.host.availability()).toEqual([false])
+
+    menu.setCommandDispatch(vi.fn())
+    await settle()
+    expect(menu.host.availability()).toEqual([false, true])
+    // A replaced dispatcher keeps the items; only a gap withdraws them.
+    menu.setCommandDispatch(vi.fn())
+    await settle()
+    expect(menu.host.availability()).toEqual([false, true])
+    menu.setCommandDispatch(null)
+    await settle()
+    expect(menu.host.availability()).toEqual([false, true, false])
+  })
+
+  it('publishes nothing when a workspace swaps its dispatcher within one tick', async () => {
+    const { menu } = setup({ platform: IPAD })
+    await menu.install(LAYOUT)
+    menu.setCommandDispatch(vi.fn())
+    await settle()
+
+    // An effect's cleanup, then its re-run.
+    menu.setCommandDispatch(null)
+    menu.setCommandDispatch(vi.fn())
+    await settle()
+
+    expect(menu.host.availability()).toEqual([false, true])
+  })
+
+  it('offers the command items at once when a workspace published its dispatcher first', async () => {
+    const { menu } = setup({ platform: IPAD })
+    menu.setCommandDispatch(vi.fn())
+
+    await menu.install(LAYOUT)
+
+    expect(menu.host.availability()).toEqual([true])
   })
 
   it('rejects a layout that references an unknown command', async () => {
@@ -197,6 +265,18 @@ describe('focused note menu dispatch', () => {
     expect(dispatch).toHaveBeenCalledTimes(2)
   })
 
+  it('runs Find menu actions in place on an iPad, which has no note windows', () => {
+    const { menu, windows } = setup({ platform: IPAD })
+    const dispatch = vi.fn()
+    menu.setCommandDispatch(dispatch)
+    const focusedWindowLabel = vi.spyOn(windows, 'focusedWindowLabel')
+
+    menu.dispatchCommand('note.find')
+
+    expect(dispatch).toHaveBeenCalledWith('note.find')
+    expect(focusedWindowLabel).not.toHaveBeenCalled()
+  })
+
   it('validates routed Find menu event payloads before dispatching them', () => {
     const { menu, windows } = setup()
     const dispatch = vi.fn()
@@ -232,5 +312,15 @@ describe('openContextMenu', () => {
     expect(menu.host.popups()).toEqual([[{ text: 'Unpin Note', action: onSelect }]])
     menu.host.popups()[0]?.[0]?.action()
     expect(onSelect).toHaveBeenCalled()
+  })
+
+  it('hands the host the point the menu belongs at', async () => {
+    const { menu } = setup({ platform: IPAD })
+    const popup = vi.spyOn(menu.host, 'popup')
+    const items = [{ text: 'Unpin Note', action: vi.fn() }]
+
+    await menu.openContextMenu({ items, at: { x: 120, y: 48 } })
+
+    expect(popup).toHaveBeenCalledWith(items, { x: 120, y: 48 })
   })
 })

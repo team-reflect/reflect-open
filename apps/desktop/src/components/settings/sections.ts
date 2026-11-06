@@ -4,6 +4,9 @@
  * navigator's labels and jump targets can never drift from the page itself.
  */
 export const SETTINGS_SECTIONS = [
+  // iOS only (the iPad's desktop settings) — the graph's storage and the
+  // switcher between the iCloud Drive and on-device graphs.
+  { id: 'graph', title: 'Graph' },
   { id: 'appearance', title: 'Appearance' },
   { id: 'editor', title: 'Editor' },
   { id: 'date-time', title: 'Date & time' },
@@ -20,8 +23,12 @@ export const SETTINGS_SECTIONS = [
   { id: 'integrations', title: 'Integrations' },
   { id: 'sync', title: 'Sync' },
   { id: 'accounts', title: 'Accounts' },
+  // Not on iOS: the V1 importer reads the export zip from a filesystem path.
   { id: 'import', title: 'Import' },
+  // iOS only — the plan and the App Store's restore, manage and redeem controls.
+  { id: 'subscription', title: 'Subscription' },
   { id: 'about', title: 'About' },
+  // Not on iOS, whose graphs live in fixed roots the Graph section switches between.
   { id: 'destructive', title: 'Danger zone' },
 ] as const
 

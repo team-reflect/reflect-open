@@ -82,6 +82,10 @@ class TestNavigationServiceImpl implements TestNavigationService {
     this.#inner.reset(initialRoute)
   }
 
+  forgetScrollStates(): void {
+    this.#inner.forgetScrollStates()
+  }
+
   navigations(): readonly TestNavigateCall[] {
     return [...this.#calls]
   }

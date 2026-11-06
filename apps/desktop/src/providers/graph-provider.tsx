@@ -66,6 +66,12 @@ function selectRecents(state: State): RecentGraph[] {
   return state.recents
 }
 
+/**
+ * The recents of a shell that offers none: one shared array, so it never
+ * changes identity.
+ */
+const NO_RECENTS: RecentGraph[] = []
+
 function selectSession(state: State): GraphSession | null {
   return state.session
 }
@@ -190,7 +196,12 @@ export function useGraphError(): string | null {
  * The recently opened graphs.
  */
 export function useGraphRecents(): RecentGraph[] {
-  return useGraphSelector(selectRecents)
+  const { platform } = useCoreServices()
+  const recents = useGraphSelector(selectRecents)
+  // The shell still records every open, but a mobile recent is a dead path
+  // after a restore or update; the iPad's desktop footer and ⌘1–9 must not
+  // offer them (graphs switch through the mobile graph list).
+  return platform.appPlatform === 'desktop' ? recents : NO_RECENTS
 }
 
 /**

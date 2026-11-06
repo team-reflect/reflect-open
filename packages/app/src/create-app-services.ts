@@ -64,6 +64,7 @@ import {
   type MobileOnboardingService,
 } from './graph/mobile-onboarding-service.ts'
 import { createGraphBootService, type GraphBootService } from './graph/graph-boot-service.ts'
+import { createSizeClassService, type SizeClassService } from './app/size-class-service.ts'
 import { createReviewService, type ReviewService } from './review/review-service.ts'
 import { WHATS_NEW } from './whats-new/whats-new-content.ts'
 import { createWhatsNewService, type WhatsNewService } from './whats-new/whats-new-service.ts'
@@ -185,6 +186,10 @@ export interface AppServices {
    * The software keyboard's overlap height, as the UI last measured it.
    */
   readonly keyboard: KeyboardService
+  /**
+   * The window's horizontal size class: on an iPad, desktop workspace or phone shell.
+   */
+  readonly sizeClass: SizeClassService
   /**
    * Shares a note through the OS share sheet.
    */
@@ -313,6 +318,12 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     }),
     operations: host.operations,
     keyboard: createKeyboardService(),
+    sizeClass: createSizeClassService({
+      ipc: core.ipc,
+      platform: core.platform,
+      logger: core.logger,
+      media: host.media,
+    }),
     share: createShareService({ openDocuments: core.openDocuments }),
     autocompleteSuggestions: createAutocompleteSuggestionService({
       suggestions: core.suggestions,
