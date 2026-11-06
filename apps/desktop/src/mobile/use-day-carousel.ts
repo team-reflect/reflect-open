@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@reflect/app'
 import { attachSnapPager, type SnapPager } from '@/lib/snap-pager.ts'
-import { describeNode, swipeLog } from '@/lib/swipe-log.ts'
+import { describeNode, swipeLog, swipeLogState } from '@/lib/swipe-log.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 
 /**
@@ -237,6 +237,9 @@ export function useDayCarousel(
       return
     }
     onTarget(dateAtIndex(dayWindow, nearest), navigationKey)
+    if (swipeLogState.lazyMount) {
+      return
+    }
     startTransition(() => {
       setSelection((current) => {
         return current.navigationKey === navigationKey

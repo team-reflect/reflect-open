@@ -54,6 +54,10 @@ function readQueryFlag(key: string): boolean {
 export const swipeLogState = {
   live: readFlag('swipeLogLive'),
   noPullback: readFlag('swipeLogNoPullback') || readQueryFlag('nopullback'),
+  // Experiments: `?nosnapstop=1` drops `snap-always` from the day cells;
+  // `?lazymount=1` mounts the next day only at the settle, not mid-gesture.
+  noSnapStop: readQueryFlag('nosnapstop'),
+  lazyMount: readQueryFlag('lazymount'),
   // Stream entries to the Vite terminal.
   remote: import.meta.env.DEV,
 }
@@ -406,6 +410,8 @@ export function installSwipeLog(scroller: HTMLElement): void {
     width: scroller.getBoundingClientRect().width,
     live: swipeLogState.live,
     noPullback: swipeLogState.noPullback,
+    noSnapStop: swipeLogState.noSnapStop,
+    lazyMount: swipeLogState.lazyMount,
   })
   console.info(
     '[swipe-log] installed. __swipeLog.dump() prints the last 400 entries; __swipeLog.state.live = true streams them; __swipeLog.state.noPullback = true disables the per-scroll pullback.',

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useState, type ReactElement } from 'react'
-import { swipeLog } from '@/lib/swipe-log.ts'
+import { swipeLog, swipeLogState } from '@/lib/swipe-log.ts'
 import { dateAtIndex } from '@reflect/app'
 import { DaySlide } from '@/mobile/day-slide.tsx'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
@@ -77,7 +77,10 @@ export function DayCarousel({
     return Array.from({ length: dayWindow.count }, (_, index) => (
       <div
         key={dateAtIndex(dayWindow, index)}
-        className="h-full w-full shrink-0 snap-start snap-always"
+        className={cn(
+          'h-full w-full shrink-0 snap-start',
+          !swipeLogState.noSnapStop && 'snap-always',
+        )}
       />
     ))
   }, [dayWindow])
