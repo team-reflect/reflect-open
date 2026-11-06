@@ -82,7 +82,7 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
 
   // Re-center the window when paging settles near an edge, keeping the
   // browsed week on screen (it becomes the rebuilt window's anchor).
-  const handleUserSettle = useEffectEvent((index: number) => {
+  const handleSettle = useEffectEvent((index: number) => {
     if (shouldRecenterWeeks(weekWindow, index)) {
       setWeekWindow(createWeekWindow(weekAtIndex(weekWindow, index), weekStartDay))
     }
@@ -101,7 +101,7 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
       count,
       prefersReducedMotion,
       onIndex: setDisplayedIndex,
-      onUserSettle: handleUserSettle,
+      onSettle: handleSettle,
       signal: controller.signal,
     })
     return () => {

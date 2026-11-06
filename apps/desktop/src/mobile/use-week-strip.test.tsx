@@ -123,15 +123,15 @@ describe('useWeekStrip', () => {
     await touch(scroller, 'end')
   })
 
-  it('pulls a scroll that no finger started back to the displayed week', async () => {
+  it('displays the week a scroll that no finger started settles on', async () => {
     const { scroller, strip } = await mountStrip()
 
-    await act(() => {
-      scroller.scrollLeft = (ANCHOR + 3) * WIDTH
-    })
+    await scrollElement({ element: scroller, left: (ANCHOR + 3) * WIDTH })
 
-    await vi.waitFor(() => expect(scroller.scrollLeft).toBe(ANCHOR * WIDTH))
-    expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR))
+    await vi.waitFor(() => {
+      return expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 3))
+    })
+    expect(scroller.scrollLeft).toBe((ANCHOR + 3) * WIDTH)
   })
 
   it('shows the week of a day that keyboard focus moves to', async () => {
