@@ -21,29 +21,56 @@ runs:
       run: echo "CARGO_HTTP_MULTIPLEXING=false" >> "$GITHUB_ENV"
 
     # Tauri v2 build dependencies (the crate links the WebView + GTK stack).
-    - name: Install Tauri system dependencies
-      if: false
+    # The list is the one in the Tauri docs, minus `patchelf`, which the runner
+    # image already has:
+    # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
+    # `libayatana-appindicator3-dev` replaces the deprecated
+    # `libappindicator3-dev`, as in the Tauri prerequisites page.
+    #
+    # The image's package index can name versions the archive has since
+    # removed, so update first. The cache key hashes the exact `.deb` files
+    # that the install would download.
+    - name: Resolve Tauri system dependencies
+      id: apt
+      if: runner.os == 'Linux'
       shell: bash
       run: |
-        PACKAGES="\
-          libwebkit2gtk-4.1-dev \
-          libayatana-appindicator3-dev \
-          librsvg2-dev \
-          libxdo-dev \
-          libssl-dev \
-          build-essential \
-          curl \
-          wget \
-          file \
-          patchelf"
-        echo "Installing Tauri system dependencies..."
-        if sudo apt-get install -y $PACKAGES; then
-          echo "Tauri system dependencies installed successfully without apt-get update."
-        else
-          echo "Initial installation failed. Running apt-get update and retrying..."
-          sudo apt-get update
-          sudo apt-get install -y $PACKAGES
+        packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
+        echo "TAURI_APT_PACKAGES=$packages" >> "$GITHUB_ENV"
+        sudo timeout 120 apt-get update || sudo timeout 120 apt-get update
+        hash=$(sudo apt-get install --print-uris -qq --no-install-recommends $packages | awk '{print $2, $4}' | sha256sum | cut -c1-16)
+        echo "key=apt-$ImageOS-$RUNNER_ARCH-$hash" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the apt package cache
+      id: apt-cache
+      if: runner.os == 'Linux' && inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/apt-archives
+        key: ${{ steps.apt.outputs.key }}
+
+    - name: Install Tauri system dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        archives="$RUNNER_TEMP/apt-archives"
+        sudo mkdir -p "$archives/partial"
+        opts="--yes --no-install-recommends -o Dir::Cache::Archives=$archives"
+        if ! sudo timeout 180 apt-get install $opts --download-only $TAURI_APT_PACKAGES; then
+          # The Azure mirror can trickle at ~50 kB/s without tripping apt's failover: https://github.com/actions/runner-images/issues/14823
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          sudo apt-get install $opts --download-only $TAURI_APT_PACKAGES
         fi
+        sudo apt-get install $opts $TAURI_APT_PACKAGES
+        # apt leaves a root-only lock file, which the cache cannot read.
+        sudo rm -rf "$archives/lock" "$archives/partial"
+
+    - name: Save the apt package cache
+      if: runner.os == 'Linux' && inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/apt-archives
+        key: ${{ steps.apt.outputs.key }}
 
     - name: Install Rust toolchain
       shell: bash
