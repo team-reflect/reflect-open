@@ -51,6 +51,14 @@ function readQueryFlag(key: string): boolean {
   }
 }
 
+function readQueryNumber(key: string): number {
+  try {
+    return Number(new URLSearchParams(location.search).get(key)) || 0
+  } catch {
+    return 0
+  }
+}
+
 export const swipeLogState = {
   live: readFlag('swipeLogLive'),
   noPullback: readFlag('swipeLogNoPullback') || readQueryFlag('nopullback'),
@@ -58,6 +66,10 @@ export const swipeLogState = {
   // `?lazymount=1` mounts the next day only at the settle, not mid-gesture.
   noSnapStop: readQueryFlag('nosnapstop'),
   lazyMount: readQueryFlag('lazymount'),
+  // `?userchain=850`: a scroll within that many ms of the last user-attributed
+  // scroll counts as the user's too, so the engine's follow-up snap animation
+  // is never pulled back. 0 turns the rule off.
+  userChainMs: readQueryNumber('userchain'),
   // Stream entries to the Vite terminal.
   remote: import.meta.env.DEV,
 }
@@ -413,6 +425,7 @@ export function installSwipeLog(scroller: HTMLElement): void {
     noPullback: swipeLogState.noPullback,
     noSnapStop: swipeLogState.noSnapStop,
     lazyMount: swipeLogState.lazyMount,
+    userChainMs: swipeLogState.userChainMs,
   })
   console.info(
     '[swipe-log] installed. __swipeLog.dump() prints the last 400 entries; __swipeLog.state.live = true streams them; __swipeLog.state.noPullback = true disables the per-scroll pullback.',

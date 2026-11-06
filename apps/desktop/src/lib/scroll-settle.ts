@@ -1,5 +1,5 @@
 import { anySignal } from '@/lib/any-signal.ts'
-import { describeNode, swipeLog } from '@/lib/swipe-log.ts'
+import { describeNode, swipeLog, swipeLogState } from '@/lib/swipe-log.ts'
 
 /**
  * Quiet time (ms) after the last scroll event before a scroll counts as settled.
@@ -90,6 +90,9 @@ export function watchScrollSettle({
   let touchTop = 0
   let wheelAt = -Infinity
   let userScroll = false
+  // When the last scroll event attributed to the user happened. A gesture
+  // that moved starts the chain; a tap breaks it.
+  let lastUserScrollAt = -Infinity
   let pending = false
   let timer: ReturnType<typeof setTimeout> | undefined
   // A scroll was reported early because the element was settled. A snap
@@ -200,6 +203,7 @@ export function watchScrollSettle({
     })
     if (!moved) {
       fingerScroll = false
+      lastUserScrollAt = -Infinity
     }
     if (pending) {
       settleOrWait()
@@ -227,17 +231,24 @@ export function watchScrollSettle({
         endSnapTail()
       }
       scrolledSinceTouch = true
-      if (fingerScroll || performance.now() - wheelAt < SETTLE_IDLE_MS) {
+      const now = performance.now()
+      const chained =
+        swipeLogState.userChainMs > 0 && now - lastUserScrollAt < swipeLogState.userChainMs
+      if (fingerScroll || now - wheelAt < SETTLE_IDLE_MS || chained) {
         userScroll = true
       } else if (!pending) {
         // A new scroll that no finger or wheel started.
         userScroll = false
+      }
+      if (userScroll) {
+        lastUserScrollAt = now
       }
       pending = true
       swipeLog('ts:scroll', {
         sl: element.scrollLeft,
         st: element.scrollTop,
         ...before,
+        chained,
         userScrollAfter: userScroll,
       })
       if (isTouching()) {
