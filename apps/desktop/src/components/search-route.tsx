@@ -1,7 +1,7 @@
 import { useEffect, type ReactElement } from 'react'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
 import { DailyStream } from '@/components/daily-stream.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 
 interface SearchRouteProps {
   /** The query carried by the `search/:query` route. */
@@ -14,7 +14,7 @@ interface SearchRouteProps {
  */
 export function SearchRoute({ query }: SearchRouteProps): ReactElement {
   const { openPalette } = usePalette()
-  const { arrivalSeq, entryId } = useRouter()
+  const { arrivalSeq, entryId } = useRouterState()
   // Keyed on the *arrival*, not just the value (the daily stream's lesson):
   // re-navigating to the same search route bumps arrivalSeq without a remount,
   // and back/forward changes entryId without bumping arrivalSeq — both are

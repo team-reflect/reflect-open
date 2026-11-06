@@ -1,5 +1,107 @@
 # Changelog
 
+## [0.18.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.9...v0.18.0-beta.10) (2026-11-05)
+
+
+### Features
+
+* support all Mermaid diagram types ([#2016](https://github.com/team-reflect/reflect-open/issues/2016)) ([aeeb1e1](https://github.com/team-reflect/reflect-open/commit/aeeb1e14561deac20b81f72f93698183705485b6))
+
+## [0.18.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.8...v0.18.0-beta.9) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** keep the day carousel on its day when the editor focuses ([#2013](https://github.com/team-reflect/reflect-open/issues/2013)) ([7ed3e8c](https://github.com/team-reflect/reflect-open/commit/7ed3e8cdc39b86085798190adf2b0d7d341493df))
+* **mobile:** pass the native Sentry DSN ([#2010](https://github.com/team-reflect/reflect-open/issues/2010)) ([09ddd10](https://github.com/team-reflect/reflect-open/commit/09ddd108abb920d2a61c979fb5932ce65dfbd032))
+* **mobile:** sign the beta iOS app with its own entitlements ([#2011](https://github.com/team-reflect/reflect-open/issues/2011)) ([3985858](https://github.com/team-reflect/reflect-open/commit/39858585b748ef73edaba83d4505c14242802759))
+* **mobile:** upload the IPA to TestFlight before the dSYMs ([#2015](https://github.com/team-reflect/reflect-open/issues/2015)) ([3c3b13b](https://github.com/team-reflect/reflect-open/commit/3c3b13bab75561b2b2c805b5ef2ad63f9f1cdc75))
+
+## [0.18.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.7...v0.18.0-beta.8) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** fix `SceneEntryPoints.swift` syntax error ([#2005](https://github.com/team-reflect/reflect-open/issues/2005)) ([5d661d9](https://github.com/team-reflect/reflect-open/commit/5d661d9ae7eb7015a3c34971687d58ed67144682))
+
+## [0.18.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.6...v0.18.0-beta.7) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** make trackpad scrolling work on iPad in landscape ([#1756](https://github.com/team-reflect/reflect-open/issues/1756)) ([7c07ffc](https://github.com/team-reflect/reflect-open/commit/7c07ffc28b0b4e4edb3bc9a77b4f5d3bd1225a30))
+* **mobile:** open settings select menus at the trailing edge ([#2004](https://github.com/team-reflect/reflect-open/issues/2004)) ([e46f114](https://github.com/team-reflect/reflect-open/commit/e46f114b68ccff0abecf857dfdf3e4d0abacc9f8))
+* **mobile:** use the Base UI switch in settings again ([#2003](https://github.com/team-reflect/reflect-open/issues/2003)) ([c35d3c5](https://github.com/team-reflect/reflect-open/commit/c35d3c566f8614a767ca251ed6f5e26ccfb3b01e))
+
+## [0.18.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.5...v0.18.0-beta.6) (2026-11-05)
+
+
+### Features
+
+* **design-system:** split the editor canvas from cards ([#2000](https://github.com/team-reflect/reflect-open/issues/2000)) ([65e3127](https://github.com/team-reflect/reflect-open/commit/65e3127b315659be917527a81fc1ea6b2ed1fc42))
+* **mobile:** native switches and grouped settings ([#2001](https://github.com/team-reflect/reflect-open/issues/2001)) ([450afe1](https://github.com/team-reflect/reflect-open/commit/450afe11fba04aa8ca73a9c43776e68e93b5bc86))
+* **mobile:** use native select menus in settings ([#1993](https://github.com/team-reflect/reflect-open/issues/1993)) ([76b3b9d](https://github.com/team-reflect/reflect-open/commit/76b3b9d93a7bbc57751820dc3d32ad3e6be1c43d))
+* **mobile:** use the native date picker in the task sheet ([#1996](https://github.com/team-reflect/reflect-open/issues/1996)) ([06a5b43](https://github.com/team-reflect/reflect-open/commit/06a5b4389fa7aff5f735b893e2ba55b8c6f4b1b6))
+* **mobile:** use the native month picker on the daily header ([#1994](https://github.com/team-reflect/reflect-open/issues/1994)) ([1eb267d](https://github.com/team-reflect/reflect-open/commit/1eb267d51072b088b9497c723af9026d426a650c))
+
+
+### Bug Fixes
+
+* **desktop:** stop saving scroll to a pending entry ([#1991](https://github.com/team-reflect/reflect-open/issues/1991)) ([158b9f2](https://github.com/team-reflect/reflect-open/commit/158b9f291d3213b861dd22e56d1de80fd0ee578b))
+
+## [0.18.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.4...v0.18.0-beta.5) (2026-11-05)
+
+
+### Bug Fixes
+
+* **mobile:** keep swipe-row actions under the row on iOS 26 ([#1984](https://github.com/team-reflect/reflect-open/issues/1984)) ([5304053](https://github.com/team-reflect/reflect-open/commit/53040533319f6cc445a3577b80c67a0e2cf7ae14))
+* **mobile:** keep Tasks group headers above rows ([#1980](https://github.com/team-reflect/reflect-open/issues/1980)) ([e071eab](https://github.com/team-reflect/reflect-open/commit/e071eabf0ab076c9b9bbeabfe21486f70847187f))
+* **mobile:** keep the scroll indicator above Tasks and All rows ([#1981](https://github.com/team-reflect/reflect-open/issues/1981)) ([9f9cd9b](https://github.com/team-reflect/reflect-open/commit/9f9cd9be548fcc640a17243160a87ef2ab451331))
+* **mobile:** make off-screen day slides inert ([#1972](https://github.com/team-reflect/reflect-open/issues/1972)) ([15a32e4](https://github.com/team-reflect/reflect-open/commit/15a32e47e92a6e4a63cc13309c18167aab531878))
+* **mobile:** paint swipe-row over-swipe color only while touched ([#1979](https://github.com/team-reflect/reflect-open/issues/1979)) ([fd993e9](https://github.com/team-reflect/reflect-open/commit/fd993e996a0eabb05d0e0a4a5339e50668d07098))
+* **mobile:** remove drawer depth effect ([#1982](https://github.com/team-reflect/reflect-open/issues/1982)) ([1c7b58c](https://github.com/team-reflect/reflect-open/commit/1c7b58c8e51a69fb44e409d950960ede42b78492))
+* **mobile:** settle after a finger lifts from a removed node ([#1969](https://github.com/team-reflect/reflect-open/issues/1969)) ([a6ca461](https://github.com/team-reflect/reflect-open/commit/a6ca461c0628b0ae48848b53ac501c7c8c8c2020))
+
+## [0.18.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.3...v0.18.0-beta.4) (2026-11-04)
+
+
+### Features
+
+* **desktop:** offer What's New in a toast after an update ([#1963](https://github.com/team-reflect/reflect-open/issues/1963)) ([982c4f1](https://github.com/team-reflect/reflect-open/commit/982c4f133d60c546c125b9f8a5d6de4e12884dcb))
+
+
+### Bug Fixes
+
+* **desktop:** keep What's New items during the close animation ([#1962](https://github.com/team-reflect/reflect-open/issues/1962)) ([cade3ef](https://github.com/team-reflect/reflect-open/commit/cade3efb0463ff8abdf7924794942c597e2d56ef))
+* **mobile:** make the week strip scroll smoothly ([#1957](https://github.com/team-reflect/reflect-open/issues/1957)) ([8e1baca](https://github.com/team-reflect/reflect-open/commit/8e1bacab1862004267b3f4720d01a5b2bc4e2d92))
+
+## [0.18.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.2...v0.18.0-beta.3) (2026-11-04)
+
+
+### Features
+
+* **mobile:** add drawer depth effect ([#1954](https://github.com/team-reflect/reflect-open/issues/1954)) ([6b18f5a](https://github.com/team-reflect/reflect-open/commit/6b18f5adfde72b51ff414b41575424f49abb3651))
+* **mobile:** invite users to send feedback ([#1947](https://github.com/team-reflect/reflect-open/issues/1947)) ([5912d17](https://github.com/team-reflect/reflect-open/commit/5912d1703f6ff066a9cda85d256b1c870cb784c2))
+
+
+### Bug Fixes
+
+* **mobile:** make swiping between days smoother ([#1939](https://github.com/team-reflect/reflect-open/issues/1939)) ([15aebea](https://github.com/team-reflect/reflect-open/commit/15aebea8e523661af563c978070cd6a1e735a22b))
+
+## [0.18.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.1...v0.18.0-beta.2) (2026-11-04)
+
+
+### Features
+
+* show What's New after an update ([#1944](https://github.com/team-reflect/reflect-open/issues/1944)) ([2f6759d](https://github.com/team-reflect/reflect-open/commit/2f6759dbe47ec313dc397dfb955bbd272f689452))
+
+
+### Bug Fixes
+
+* **core:** log a failed V1 import cancel ([#1951](https://github.com/team-reflect/reflect-open/issues/1951)) ([b69decb](https://github.com/team-reflect/reflect-open/commit/b69decb358d278fb166ed8d27da351fb897a6aed))
+* **core:** log failed background attachment listings ([#1948](https://github.com/team-reflect/reflect-open/issues/1948)) ([405a402](https://github.com/team-reflect/reflect-open/commit/405a40280751d3d7fc80e205efc157e83b2eae73))
+* **core:** log failed deletes of discarded audio memo segments ([#1950](https://github.com/team-reflect/reflect-open/issues/1950)) ([3ed8844](https://github.com/team-reflect/reflect-open/commit/3ed88445259bbf8f902fc8fba4c4c5430420c4fa))
+
 ## [0.18.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.17.0...v0.18.0-beta.1) (2026-11-04)
 
 

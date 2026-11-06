@@ -34,7 +34,12 @@ export {
 export { newRepoUrl, parseRepoInput } from './sync/github-repo-service.ts'
 export type { GithubRepoRef } from './sync/types.ts'
 export { type GitSyncService, type GitSyncState } from './sync/git-sync-service.ts'
-export { type ConnectExistingResult, type GithubConnector } from './sync/github-connector.ts'
+export {
+  type ConnectExistingRepoOptions,
+  type ConnectExistingResult,
+  type ConnectNewRepoOptions,
+  type GithubConnector,
+} from './sync/github-connector.ts'
 export {
   type ConnectGitHostInput,
   type GitHostConnector,
@@ -137,7 +142,7 @@ export { type OpenDocumentsService } from './documents/open-documents-service.ts
 export { type RenameCoordinator } from './documents/title-rename-service.ts'
 export { createDocumentBinding, type DocumentBinding } from './documents/document-binding.ts'
 export { type ResolvedArchivedPost } from './embeds/x-archive-service.ts'
-export { marketingVersion } from './ports/app-info-service.ts'
+export { marketingVersion } from './ports/app-version.ts'
 export { reachWebStorage, type StorageService } from './ports/storage-service.ts'
 export {
   type Operation,
@@ -401,7 +406,6 @@ export {
   createLinkPreviewService,
   type LinkPreviewResolver,
   type LinkPreviewService,
-  type LinkPreviewSession,
 } from './link-preview/link-preview-service.ts'
 export { parseLinkPreviewMeta } from './link-preview/metadata.ts'
 

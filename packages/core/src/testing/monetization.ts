@@ -253,7 +253,7 @@ class TestInstallClockServiceImpl implements TestInstallClockService {
 
   constructor(state?: Partial<InstallClockState>) {
     this.#state = new WritableStore<InstallClockState>(
-      { phase: 'hidden', firstLaunchAt: null, today: '1970-01-01', isLoading: false, ...state },
+      { phase: 'hidden', firstLaunchAt: null, dayIndex: 0, isLoading: false, ...state },
       isDeepEqual,
     )
     this.get = this.#state.get

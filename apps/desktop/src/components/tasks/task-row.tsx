@@ -159,11 +159,11 @@ export function TaskRow({
       data-task-key={getTaskKey(task)}
       onClick={selectFromRow}
       className={cn(
-        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface px-4 py-2 lg:px-12',
+        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface-canvas px-4 py-2 lg:px-12',
         !editing && 'cursor-pointer',
         selected
           ? 'bg-accent-soft ring-1 ring-inset ring-accent/20 dark:ring-accent/10'
-          : 'hover:bg-surface-hover dark:bg-surface dark:hover:bg-surface-hover',
+          : 'hover:bg-surface-hover dark:bg-surface-canvas dark:hover:bg-surface-hover',
       )}
     >
       <button

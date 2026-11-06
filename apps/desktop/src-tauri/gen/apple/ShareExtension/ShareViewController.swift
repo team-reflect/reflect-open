@@ -7,23 +7,23 @@ import UIKit
 /// sheet appears.
 @objc(ShareViewController)
 final class ShareViewController: UIViewController {
-    private let state = ShareState()
+  private let state = ShareState()
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        state.extensionContext = extensionContext
-        view.backgroundColor = .systemBackground
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    state.extensionContext = extensionContext
+    view.backgroundColor = .systemBackground
 
-        let hosting = UIHostingController(rootView: ShareView().environmentObject(state))
-        addChild(hosting)
-        hosting.view.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(hosting.view)
-        NSLayoutConstraint.activate([
-            hosting.view.topAnchor.constraint(equalTo: view.topAnchor),
-            hosting.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            hosting.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            hosting.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        ])
-        hosting.didMove(toParent: self)
-    }
+    let hosting = UIHostingController(rootView: ShareView().environmentObject(state))
+    addChild(hosting)
+    hosting.view.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(hosting.view)
+    NSLayoutConstraint.activate([
+      hosting.view.topAnchor.constraint(equalTo: view.topAnchor),
+      hosting.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      hosting.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      hosting.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+    ])
+    hosting.didMove(toParent: self)
+  }
 }

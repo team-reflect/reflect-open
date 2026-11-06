@@ -21,3 +21,9 @@ pub(crate) async fn sync<R: Runtime>(app: AppHandle<R>) -> Result<()> {
 pub(crate) async fn present_offer_code_redeem_sheet<R: Runtime>(app: AppHandle<R>) -> Result<()> {
     app.app_store().present_offer_code_redeem_sheet()
 }
+
+/// Ask StoreKit for its review prompt; see `AppStore::request_review`.
+#[command]
+pub(crate) async fn request_review<R: Runtime>(app: AppHandle<R>) -> Result<()> {
+    app.app_store().request_review()
+}

@@ -118,14 +118,10 @@ const architecturePlugin = {
 
 /** Mocked in any desktop test: pure UI children and heavy children. */
 const DESKTOP_VI_MOCK_ALLOW = [
-  // The Base UI toast manager needs its viewport; tests record the `toast.add` calls.
-  '@/components/ui/toast.tsx',
   // The ProseKit editor: a test of a screen around it uses a probe.
   '@/editor/note-editor.tsx',
   // The read-only Markdown renderer loads the same editor stack.
   '@/editor/markdown-preview.tsx',
-  // The carousel engine measures real layout; tests script its API.
-  'embla-carousel-react',
 ]
 
 /** Extra specifiers for one desktop test file, each with its reason. */

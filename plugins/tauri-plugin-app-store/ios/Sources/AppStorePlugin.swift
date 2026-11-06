@@ -34,9 +34,9 @@ class AppStorePlugin: Plugin {
     // A simulator has no App Store account and names its receipt `receipt`,
     // so it fails both checks; it is always a development install.
     #if targetEnvironment(simulator)
-      let isSandboxInstall = true
+    let isSandboxInstall = true
     #else
-      let isSandboxInstall = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    let isSandboxInstall = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
     #endif
     if isSandboxInstall {
       invoke.resolve(["environment": "Sandbox"])
@@ -82,6 +82,28 @@ class AppStorePlugin: Plugin {
     } catch {
       invoke.reject("presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")
     }
+  }
+
+  /// Asks StoreKit for its review prompt. The system decides whether it
+  /// shows (at most three times in 365 days on App Store installs, never in
+  /// TestFlight) and reports nothing back.
+  @MainActor
+  @objc public func requestReview(_ invoke: Invoke) async throws {
+    // The Swift package says iOS 16, but the TestFlight build compiles this
+    // file with a lower deployment target, so the check must stay.
+    guard #available(iOS 16.0, *) else {
+      invoke.reject("requestReview needs iOS 16")
+      return
+    }
+    guard
+      let scene = UIApplication.shared.connectedScenes
+        .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+    else {
+      invoke.reject("no active window scene")
+      return
+    }
+    AppStore.requestReview(in: scene)
+    invoke.resolve()
   }
 }
 

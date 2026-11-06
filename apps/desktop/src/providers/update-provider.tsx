@@ -1,6 +1,6 @@
 import { createContext, use, useEffect, useMemo, type ReactElement, type ReactNode } from 'react'
 import type { UpdateService, UpdateState } from '@reflect/app'
-import { attachUpdateToasts } from '@/components/update-toasts.ts'
+import { UpdateToasts } from '@/components/update-toasts.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -27,7 +27,7 @@ interface UpdateProviderProps {
  */
 export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): ReactElement {
   const { update } = useAppServices()
-  const { platform, logger } = useCoreServices()
+  const { platform } = useCoreServices()
   const supported = update.supported
   const resolvedAutoCheck = autoCheck ?? !platform.isDev
 
@@ -36,15 +36,13 @@ export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): Re
     if (!supported) {
       return
     }
-    const detachToasts = attachUpdateToasts(update, logger)
     if (resolvedAutoCheck) {
       update.start()
     }
     return () => {
-      detachToasts()
       update.dispose()
     }
-  }, [update, supported, resolvedAutoCheck, logger])
+  }, [update, supported, resolvedAutoCheck])
 
   const value = useMemo<UpdateContextValue>(
     () => ({
@@ -57,7 +55,12 @@ export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): Re
     [update],
   )
 
-  return <UpdateContext value={value}>{children}</UpdateContext>
+  return (
+    <UpdateContext value={value}>
+      {supported ? <UpdateToasts /> : null}
+      {children}
+    </UpdateContext>
+  )
 }
 
 /**

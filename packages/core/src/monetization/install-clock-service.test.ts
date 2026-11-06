@@ -1,4 +1,3 @@
-import { formatIsoDate } from '@reflect/utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppPlatform } from '../ports/platform-facts.ts'
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
@@ -86,7 +85,21 @@ describe('InstallClockService', () => {
     activity.emitVisible()
 
     await vi.waitFor(() => expect(installClock.get().phase).toBe('required'))
-    expect(installClock.get().today).toBe(formatIsoDate(new Date(requiredAt)))
+    expect(installClock.get().dayIndex).toBe(PAYWALL_HIDDEN_DAYS + PAYWALL_SKIPPABLE_DAYS)
+  })
+
+  it('counts days from the first launch, not from midnight', async () => {
+    const installClock = service()
+    await settled(installClock)
+
+    await clock.advance(DAY_MS - 1)
+    activity.emitVisible()
+    await vi.waitFor(() => expect(installClock.get().isLoading).toBe(false))
+    expect(installClock.get().dayIndex).toBe(0)
+
+    await clock.advance(1)
+    activity.emitVisible()
+    await vi.waitFor(() => expect(installClock.get().dayIndex).toBe(1))
   })
 
   it('never rewinds when the clock is set back', async () => {

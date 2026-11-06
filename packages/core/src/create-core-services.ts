@@ -211,7 +211,7 @@ import {
   type WikiResolverService,
 } from './indexing/wiki-resolver-service.ts'
 import { createIndexStoreService, type IndexStoreService } from './indexing/index-store-service.ts'
-import { createAppStoreService } from './ipc/app-store-service.ts'
+import { createAppStoreService, type AppStoreService } from './ipc/app-store-service.ts'
 import { createIapService } from './ipc/iap-service.ts'
 import type { IpcBridgeService } from './ipc/ipc-service.ts'
 import {
@@ -227,7 +227,6 @@ import {
 import { createPrivacyService, type PrivacyService } from './privacy/privacy-service.ts'
 import { createSettingsService, type SettingsService } from './settings/settings-service.ts'
 import { createAgentSkillService, type AgentSkillService } from './ai/agent-skill-service.ts'
-import { createAppInfoService, type AppInfoService } from './ports/app-info-service.ts'
 import { createBackgroundReconcilerFactory } from './reconcile/background-reconciler.ts'
 import type { ClockService } from './ports/clock-service.ts'
 import type { HttpService } from './ports/http-service.ts'
@@ -280,10 +279,6 @@ export interface CoreServices {
    * Host filesystem path building, in the host platform's path syntax.
    */
   readonly path: PathService
-  /**
-   * Facts about the running application build.
-   */
-  readonly appInfo: AppInfoService
   /**
    * Live reads of the OS calendar database.
    */
@@ -527,6 +522,10 @@ export interface MobileServices {
    */
   readonly appStoreEnvironment: AppStoreEnvironmentService
   /**
+   * StoreKit's App Store sheets and prompts.
+   */
+  readonly appStore: AppStoreService
+  /**
    * Time since this device's first launch, which schedules the paywall.
    */
   readonly installClock: InstallClockService
@@ -682,7 +681,6 @@ export const coreServiceFactories = {
   noteTools: createNoteToolsService,
   chatEngine: createChatEngineService,
   chatGraphContext: createChatGraphContextService,
-  appInfo: createAppInfoService,
   contactSuggestions: createContactSuggestionService,
   meetings: createMeetingService,
   agentSkill: createAgentSkillService,
@@ -916,6 +914,7 @@ export function composeCoreServices(
       haptics,
       subscription,
       appStoreEnvironment,
+      appStore,
       installClock,
       paywall: create.paywall({
         subscription,
@@ -1055,6 +1054,7 @@ export function composeCoreServices(
     clock,
     platform: fileSrc,
     graphSession,
+    logger,
   })
   const persistenceFlush = create.persistenceFlush({
     settings,
@@ -1171,7 +1171,6 @@ export function composeCoreServices(
     platform,
     storage,
     path,
-    appInfo: create.appInfo({ ipc }),
     calendar,
     contacts,
     contactSuggestions: create.contactSuggestions({

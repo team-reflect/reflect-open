@@ -1,7 +1,7 @@
 import { useEffect, type ReactElement } from 'react'
 import { App } from '@/app.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
-import { attachOperationToasts } from '@/components/operation-toasts.ts'
+import { OperationToasts } from '@/components/operation-toasts.ts'
 import { OutdatedWebEngineBanner } from '@/components/outdated-web-engine-banner.tsx'
 import { Toaster } from '@/components/ui/toast.tsx'
 import { WindowDragRegion } from '@/components/window-drag-region.tsx'
@@ -9,7 +9,7 @@ import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { SidebarWidthEffect } from '@/providers/sidebar-width.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
-import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
  * The desktop surface tree: auto-update checks, the titlebar drag region, and
@@ -17,7 +17,6 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
  */
 export function DesktopRoot(): ReactElement {
   const { noteMove, platform, logger, deepLinkIntake } = useCoreServices()
-  const { operations } = useAppServices()
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
   // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.
@@ -41,12 +40,6 @@ export function DesktopRoot(): ReactElement {
   // longer matches `from`, and re-routing an absent entry is a no-op).
   useEffect(() => noteMove.followNativeMoves(), [noteMove])
 
-  // Every desktop window mirrors its own operations store into toasts (the
-  // store is per-webview, matching the per-window mount this replaces). The
-  // effect only ties the subscription to the window's lifetime; the toast
-  // calls themselves run inside the store mutations that report the work.
-  useEffect(() => attachOperationToasts(operations, logger), [operations, logger])
-
   return (
     <AppErrorBoundary>
       <UpdateProvider>
@@ -56,6 +49,8 @@ export function DesktopRoot(): ReactElement {
             <WindowDragRegion />
             <App />
             <OutdatedWebEngineBanner />
+            {/* Per window: each webview has its own operations store. */}
+            <OperationToasts />
             <Toaster />
           </TooltipProvider>
         </GraphProvider>

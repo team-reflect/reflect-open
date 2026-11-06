@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(REFLECT_MARKETING_VERSION:default=0.0.0)</string>
+	<string>$(TAURI_REFLECT_MARKETING_VERSION:default=0.0.0)</string>
 	<key>CFBundleVersion</key>
-	<string>$(REFLECT_BUILD_NUMBER:default=1)</string>
+	<string>$(TAURI_REFLECT_BUILD_NUMBER:default=1)</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
@@ -43,5 +43,7 @@
 		<key>NSExtensionPrincipalClass</key>
 		<string>ShareViewController</string>
 	</dict>
+	<key>ReflectAppGroup</key>
+	<string>$(REFLECT_APP_GROUP)</string>
 </dict>
 </plist>

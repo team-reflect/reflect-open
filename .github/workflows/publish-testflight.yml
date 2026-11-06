@@ -7,6 +7,10 @@ on:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
+      flavor:
+        description: beta or stable
+        required: true
+        type: string
     secrets:
       APPLE_API_KEY:
         required: true
@@ -28,7 +32,7 @@ permissions:
 
 jobs:
   testflight:
-    name: Build iOS
+    name: TestFlight
     if: github.repository == 'team-reflect/reflect-open'
     environment: release_app
     runs-on: xcode-27
@@ -88,8 +92,9 @@ jobs:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          REFLECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: pnpm build:ios --build-number="$BUILD_NUMBER"
+          TAURI_REFLECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          FLAVOR: ${{ inputs.flavor }}
+        run: pnpm build:ios --build-number="$BUILD_NUMBER" --flavor="$FLAVOR"
 
       - name: Upload to TestFlight
         env:

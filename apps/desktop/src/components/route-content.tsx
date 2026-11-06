@@ -3,7 +3,7 @@ import { DailyStream } from '@/components/daily-stream.tsx'
 import { LoadingScreen } from '@/components/loading-screen.tsx'
 import { SearchRoute } from '@/components/search-route.tsx'
 import { SingleNoteView } from '@/components/single-note-view.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 
 const AllNotesScreen = lazy(async () => {
   const { AllNotesScreen } = await import('@/components/all-notes/all-notes-screen.tsx')
@@ -33,7 +33,7 @@ const TasksScreen = lazy(async () => {
  * same clock.
  */
 function RouteContentBody(): ReactElement {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   switch (route.kind) {
     case 'today':
       return <DailyStream target={{ kind: 'today' }} />

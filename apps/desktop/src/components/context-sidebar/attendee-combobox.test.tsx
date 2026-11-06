@@ -1,5 +1,6 @@
 import { page, userEvent, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactElement } from 'react'
 import type {
   ContactMatch,
   MeetingAttendee,
@@ -11,6 +12,7 @@ import {
   createTestContactsService,
   type TestContactsService,
 } from '@reflect/core/testing'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
@@ -30,6 +32,18 @@ function contact(fullName: string, email: string): ContactMatch {
 
 const onAdd = vi.fn<(attendee: MeetingAttendee) => void>()
 
+/** The combobox inside a real dialog, the way the add-meeting dialog hosts it. */
+function InDialog({ attendees }: { attendees: MeetingAttendee[] }): ReactElement {
+  return (
+    <Dialog defaultOpen>
+      <DialogContent>
+        <DialogTitle>Add meeting</DialogTitle>
+        <AttendeeCombobox id="attendees" attendees={attendees} onAdd={onAdd} />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locator> {
   const base = createTestCoreServices({ database: createWasmTestDatabaseService() })
   const core = createTestCoreServices({
@@ -41,7 +55,7 @@ async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locato
       contacts,
     }).meetings,
   })
-  await renderInApp(<AttendeeCombobox attendees={attendees} onAdd={onAdd} />, {
+  await renderInApp(<InDialog attendees={attendees} />, {
     core,
     graph: { root: '/g', name: 'g' },
     settings: { contactsEnabled: true },
@@ -49,13 +63,10 @@ async function renderCombobox(attendees: MeetingAttendee[] = []): Promise<Locato
   return page.getByPlaceholder('Add attendee')
 }
 
-/** cmdk highlights the first row in an effect — selection isn't synchronous. */
+/** Base UI highlights the first row in an effect — the highlight isn't synchronous. */
 async function findHighlighted(text: string): Promise<Locator> {
-  const row = page.getByText(text)
-  await expect.element(row).toBeInTheDocument()
-  await vi.waitFor(() => {
-    expect(row.element().closest('[cmdk-item]')?.getAttribute('aria-selected')).toBe('true')
-  })
+  const row = page.getByRole('option', { name: text })
+  await expect.element(row).toHaveAttribute('data-highlighted')
   return row
 }
 
@@ -168,5 +179,10 @@ describe('AttendeeCombobox', () => {
 
     await expect.element(page.getByText('Ada Lovelace')).not.toBeInTheDocument()
     await expect.element(input).toHaveValue('ada')
+    await expect.element(page.getByRole('dialog', { name: 'Add meeting' })).toBeInTheDocument()
+
+    // With the suggestions gone, the next Escape belongs to the dialog.
+    await userEvent.keyboard('{Escape}')
+    await expect.element(page.getByRole('dialog', { name: 'Add meeting' })).not.toBeInTheDocument()
   })
 })
