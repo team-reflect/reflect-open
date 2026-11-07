@@ -113,8 +113,9 @@ TypeScript frontend bundled by Vite, in a Rust native shell. The Rust crates for
 - `apps/desktop/`: the Tauri 2 app (`src/` React frontend, `src-tauri/` Rust crate
   `reflect-open`). Never hand-edit `src-tauri/gen/`.
 - `apps/cli/`: `reflect`, the Rust read/discovery CLI ([docs/cli.md](docs/cli.md)).
-- `apps/extension/`: the Chrome capture extension; `apps/native-host/`: its
-  native-messaging sidecar `reflect-capture-host` (Plan 11).
+- `apps/extension/`: the Chrome and Safari capture extension;
+  `apps/native-host/`: its Chrome native-messaging sidecar `reflect-capture-host`
+  (Plan 11).
 - `packages/core/`, `packages/app/`, `packages/db/`: see Services below and each
   package's README.
 - `crates/index-schema/`: the SQLite migrations shared by the desktop writer and the
