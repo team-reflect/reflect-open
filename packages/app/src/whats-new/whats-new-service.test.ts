@@ -84,8 +84,10 @@ interface SetupOptions {
   version?: string
   seen?: string
   appPlatform?: 'desktop' | 'ios'
+  isMacosDesktop?: boolean
   status?: GraphStatus
   offerFirst?: boolean
+  content?: Readonly<Record<string, readonly WhatsNewItem[]>>
 }
 
 function setup(options: SetupOptions = {}) {
@@ -102,11 +104,12 @@ function setup(options: SetupOptions = {}) {
       appPlatform: options.appPlatform ?? 'desktop',
       appVersion: options.version ?? '0.19.1',
       isDev: false,
+      isMacosDesktop: options.isMacosDesktop ?? true,
     }),
     window: createTestWindowService(),
     graphSession,
     blocked: new WritableStore(false),
-    content: CONTENT,
+    content: options.content ?? CONTENT,
     offerFirst: options.offerFirst ?? false,
   })
   const stop = whatsNew.start()
@@ -126,6 +129,13 @@ describe('createWhatsNewService', () => {
     whatsNew.dismiss()
     expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBe('0.19.1')
+  })
+
+  it('keeps a macOS-only item off other desktops', () => {
+    const macosItem: WhatsNewItem = { ...ITEM_2, title: 'Mac item', macosOnly: true }
+    const content = { '0.19.1': [ITEM_2, macosItem] }
+    expect(setup({ content }).whatsNew.items).toEqual([ITEM_2, macosItem])
+    expect(setup({ content, isMacosDesktop: false }).whatsNew.items).toEqual([ITEM_2])
   })
 
   it('shows every item of a beta so far, once per full version', () => {

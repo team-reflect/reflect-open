@@ -7,6 +7,10 @@ export interface WhatsNewItem {
   readonly title: string
   readonly body: string
   readonly platforms: readonly AppPlatform[]
+  /**
+   * Show only on macOS. `desktop` alone also covers Windows and Linux.
+   */
+  readonly macosOnly?: boolean
 }
 
 /**
@@ -32,8 +36,9 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     },
     {
       title: 'Save pages from Safari',
-      body: 'On a Mac, turn on Reflect Capture in Safari Settings to save pages to your daily note.',
+      body: 'Turn on Reflect Capture in Safari Settings to save pages to your daily note.',
       platforms: ['desktop'],
+      macosOnly: true,
     },
   ],
 }

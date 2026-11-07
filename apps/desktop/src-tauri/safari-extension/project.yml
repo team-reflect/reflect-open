@@ -50,6 +50,7 @@ targets:
         # An appex bundle id must be prefixed by its containing app's.
         PRODUCT_BUNDLE_IDENTIFIER: $(REFLECT_APP_IDENTIFIER).safari-extension
         SWIFT_VERSION: '5.0'
-        # Signed by the embed script, with the sandbox and App Group
-        # entitlements, once the web extension is in its Resources.
+        # Signed by the callers of `scripts/safari-extension.ts`, with the
+        # sandbox and App Group entitlements, once the web extension is in its
+        # Resources.
         CODE_SIGNING_ALLOWED: 'NO'
