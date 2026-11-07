@@ -325,7 +325,7 @@ async function assertProfileAuthorizesAppGroup(bundle: Bundle): Promise<void> {
     return
   }
   const { [APP_GROUPS_KEY]: claim } = await readProfileEntitlements(bundle.profile)
-  const authorized = z.array(z.string()).catch([]).parse(claim)
+  const authorized = z.array(z.string()).default([]).parse(claim)
   if (!authorized.includes(bundle.appGroup) && !authorized.includes(`${REFLECT_TEAM_ID}.*`)) {
     throw new Error(
       `${basename(bundle.profile)} does not authorize the App Group ${bundle.appGroup}: ` +

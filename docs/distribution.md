@@ -62,7 +62,8 @@ Each release attaches `Reflect_aarch64.dmg` and `Reflect_universal.dmg`. Beta us
 
 Tauri's bundler cannot build app extensions, so `build:macos` builds the capture extension for
 Safari and embeds it at `Contents/PlugIns/SafariExtension.appex`. It versions with the app, not
-with `extension-v*` tags. Users turn it on in Safari Settings → Extensions.
+with `extension-v*` tags. It needs macOS 13.5 or later. Users turn it on in Safari Settings →
+Extensions.
 
 The extension is sandboxed, so it saves captures to an App Group, and the app moves them into
 the graph. The group is `<team>.<app bundle id>`, one per flavor. The app must claim it, and the
