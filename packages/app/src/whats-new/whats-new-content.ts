@@ -30,5 +30,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
       platforms: ['desktop', 'ios'],
     },
+    {
+      title: 'Save pages from Safari',
+      body: 'On a Mac, turn on Reflect Capture in Safari Settings to save pages to your daily note.',
+      platforms: ['desktop'],
+    },
   ],
 }

@@ -58,12 +58,35 @@ Each release attaches `Reflect_aarch64.dmg` and `Reflect_universal.dmg`. Beta us
 - Reflect and Reflect Beta are separate apps, but they **share** settings, recent graphs, and
   keychain secrets.
 
+### Safari extension
+
+Tauri's bundler cannot build app extensions, so `build:macos` builds the capture extension for
+Safari and embeds it at `Contents/PlugIns/SafariExtension.appex`. It versions with the app, not
+with `extension-v*` tags. Users turn it on in Safari Settings → Extensions.
+
+The extension is sandboxed, so it saves captures to an App Group, and the app moves them into
+the graph. The group is `<team>.<app bundle id>`, one per flavor. The app must claim it, and the
+stable and beta Developer ID profiles must authorize that claim or the build stops. To set that
+up, enable App Groups on the `app.reflect.desktop` and `app.reflect.desktop.beta` App IDs, then
+regenerate and commit both profiles. Apple adds `TEAM_ID.*` to a Mac profile for an App ID with
+that capability, so no group needs registering.
+
+To try it without the team's credentials, build the dev flavor, which has no profile, and sign
+it with your own certificate. `--team` is that certificate's Team ID (its `OU`):
+
+```bash
+pnpm tauri:build:dev --bundles app
+pnpm --filter @reflect/desktop safari:embed --app="$PWD/target/release/bundle/macos/Reflect Dev.app" --identity="<identity>" --team=<team>
+```
+
 ### Requirements
 
 Apple Silicon, or Intel with the universal build.
 
 ### Troubleshooting
 
+- **`does not authorize the App Group`**: the profile predates the App Groups capability. See
+  [Safari extension](#safari-extension).
 - **`codesign` cannot find the identity**: the certificate is not in your *login* keychain, or
   it is the wrong type.
 - **Notarization `status: Invalid`**: read the notary log the script prints (often a binary
