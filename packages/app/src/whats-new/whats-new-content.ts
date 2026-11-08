@@ -30,5 +30,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
       platforms: ['desktop', 'ios'],
     },
+    {
+      title: 'Sidebar shortcuts',
+      body: 'Press ⌘6–⌘9 to open your first four pinned notes, and hold ⌘ to see the shortcut beside every sidebar item.',
+      platforms: ['desktop'],
+    },
   ],
 }
