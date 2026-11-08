@@ -113,5 +113,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'Turn on Reflect Capture in Safari Settings to save pages to your daily note.',
       platforms: ['darwin'],
     },
+    {
+      title: 'Sidebar shortcuts',
+      body: 'Press ⌘6–⌘9 to open your first four pinned notes, and hold ⌘ to see the shortcut beside every sidebar item.',
+      platforms: ['desktop'],
+    },
   ],
 }
