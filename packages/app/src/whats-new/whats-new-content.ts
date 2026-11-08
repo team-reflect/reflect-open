@@ -113,5 +113,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'Turn on Reflect Capture in Safari Settings to save pages to your daily note.',
       platforms: ['darwin'],
     },
+    {
+      title: 'Code block languages from the keyboard',
+      body: 'With the caret in a code block, press ⌘P to pick its language, then carry on typing where you were.',
+      platforms: ['desktop'],
+    },
   ],
 }
