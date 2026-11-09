@@ -197,6 +197,9 @@ class DevBridgeImpl implements IpcBridge {
       case 'capture_shared_inbox_relay':
         // No share-extension App Group inbox in a browser; nothing to relay.
         return 0
+      case 'capture_quick_note_defaults_write':
+        // No App Group container in a browser; nothing to mirror.
+        return null
 
       case 'note_read': {
         const { path } = pathArgsSchema.parse(args)

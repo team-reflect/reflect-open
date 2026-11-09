@@ -38,6 +38,12 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       platforms: ALL_PLATFORMS,
     },
     {
+      id: 'quick-note-parent',
+      title: 'Choose where quick notes go',
+      body: 'Notes from Siri, Shortcuts, and the Action button can now go under a bullet of your choice in today’s note. Set it in Settings under Quick notes.',
+      platforms: ['ios'],
+    },
+    {
       id: 'node-menus-macos',
       title: MENUS_TITLE,
       body: `${MENUS_BODY} Press ⌘/ to open it.`,

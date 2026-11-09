@@ -1,5 +1,7 @@
 import { useId, useState, type ReactElement } from 'react'
+import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button.tsx'
+import { Input } from '@/components/ui/input.tsx'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { Textarea } from '@/components/ui/textarea.tsx'
 
@@ -11,6 +13,7 @@ interface TextSettingDrawerProps {
   placeholder: string
   /** Characters kept on save; longer drafts show a warning and are truncated. */
   maxLength: number
+  /** Textarea rows; `1` renders a single-line field where Return saves. */
   rows: number
   /** Canonicalize a draft before it is saved or compared with the default. */
   normalize: (value: string) => string
@@ -55,26 +58,43 @@ function TextSettingSheet({
   const warningId = useId()
   const currentDraft = dirty ? draft : value
   const overBy = currentDraft.trim().length - maxLength
+  const field = {
+    'aria-label': ariaLabel,
+    'aria-invalid': overBy > 0 || undefined,
+    'aria-describedby': overBy > 0 ? warningId : undefined,
+    value: currentDraft,
+    onChange: (event: { target: { value: string } }) => {
+      setDirty(true)
+      setDraft(event.target.value)
+    },
+    autoFocus: true,
+    placeholder,
+  }
+
+  function save(): void {
+    onSave(normalize(currentDraft))
+    onClose()
+  }
 
   return (
     <>
       <DrawerTitle>{title}</DrawerTitle>
       <DrawerBody>
         <p className="text-sm text-text-muted">{description}</p>
-        <Textarea
-          aria-label={ariaLabel}
-          aria-invalid={overBy > 0 || undefined}
-          aria-describedby={overBy > 0 ? warningId : undefined}
-          value={currentDraft}
-          onChange={(event) => {
-            setDirty(true)
-            setDraft(event.target.value)
-          }}
-          rows={rows}
-          autoFocus
-          placeholder={placeholder}
-          className="min-h-36 resize-y text-sm"
-        />
+        {rows === 1 ? (
+          <Input
+            {...field}
+            enterKeyHint="done"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !getIsComposing()) {
+                save()
+              }
+            }}
+            className="h-10"
+          />
+        ) : (
+          <Textarea {...field} rows={rows} className="min-h-36 resize-y text-sm" />
+        )}
         {overBy > 0 ? (
           <p id={warningId} role="alert" className="text-xs text-destructive">
             {overBy.toLocaleString()} characters over the {maxLength.toLocaleString()}-character
@@ -93,13 +113,7 @@ function TextSettingSheet({
           >
             Clear
           </Button>
-          <Button
-            type="button"
-            onClick={() => {
-              onSave(normalize(currentDraft))
-              onClose()
-            }}
-          >
+          <Button type="button" onClick={save}>
             Save
           </Button>
         </div>

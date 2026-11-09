@@ -259,6 +259,7 @@ export {
   clampSidebarWidth,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeTranscriptionPrompt,
+  normalizeQuickNoteParent,
   timeFormatSchema,
   DATE_FORMATS,
   dateFormatSchema,
@@ -399,6 +400,7 @@ export {
   captureWireMessageSchema,
   type CaptureWireMessage,
 } from './capture/capture-envelope.ts'
+export { TEXT_CAPTURE_PARENT_MAX_LENGTH } from './capture/text-capture-limits.ts'
 export { canReadCalendars } from './calendar/commands.ts'
 export { dayRange, displayEvents, defaultAttendees } from './calendar/events.ts'
 export { type MeetingAttendee } from './contacts/meeting-service.ts'
