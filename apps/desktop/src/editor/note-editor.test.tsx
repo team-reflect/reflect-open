@@ -5,6 +5,7 @@ import { page, userEvent } from 'vitest/browser'
 import type { TestPlatformOptions } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { pasteFiles } from '@/test-utils/file-events.ts'
+import { getSvgImageUrl } from '@/test-utils/image.ts'
 import '@/test-utils/locator.ts'
 import { hover, unhover } from '@/test-utils/mouse.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -12,8 +13,7 @@ import type { XPost } from '@post-embed/types'
 import { NoteEditor, type NoteEditorHandle } from './note-editor.tsx'
 
 // Media that loads without the network: the card hides a photo that fails.
-const X_PHOTO_URL =
-  "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='100'%20height='100'/%3E"
+const X_PHOTO_URL = getSvgImageUrl(100, 100)
 const X_VIDEO_URL = 'data:video/mp4;base64,'
 
 // The real resolver only lets `reflect-asset:` media through, which no test
@@ -82,6 +82,12 @@ const YOUTUBE_NOTE = `![](https://www.youtube.com/watch?v=aqz-KE-bpKQ)<!-- ${JSO
 
 const IMAGE_NOTE = 'A photo\n\n![Cat](assets/cat.png)'
 
+/**
+ * Big enough that a click at its center misses meowdown's embed menu button
+ * in the top-right corner, small enough to keep the note short.
+ */
+const CAT_URL = getSvgImageUrl(80, 60)
+
 function renderEditor(
   openAsset: (path: string) => MaybePromise<void> = vi.fn(async () => {}),
   platform?: TestPlatformOptions,
@@ -89,7 +95,7 @@ function renderEditor(
   return render(
     <NoteEditor
       initialContent={IMAGE_NOTE}
-      resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+      resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
       resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       openAsset={openAsset}
     />,
@@ -311,7 +317,7 @@ describe('NoteEditor image lightbox', () => {
     const dialog = page.getByRole('dialog', { name: 'Image preview' })
     await expect.element(dialog).toBeVisible()
     const preview = dialog.locate('img')
-    expect(preview.element()).toHaveProperty('src', 'asset://cat.png')
+    expect(preview.element()).toHaveProperty('src', CAT_URL)
 
     await userEvent.keyboard('{Escape}')
     await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
@@ -432,7 +438,7 @@ describe('NoteEditor image lightbox', () => {
     await screen.rerender(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
         openAsset={secondOpenImage}
       />,
@@ -449,7 +455,7 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       />,
     )
@@ -463,7 +469,7 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={'![Cat](assets/cat.png)\n\n![X](https://blocked.example/x.png)'}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
       />,
     )
 

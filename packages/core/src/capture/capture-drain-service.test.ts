@@ -605,6 +605,15 @@ describe('CaptureDrainService (text captures)', () => {
     expect(kit.noteFile.files().get(DAILY)).toBe('- call the bank\n')
   })
 
+  it('nests a text capture under its parent bullet', async () => {
+    kit.noteFile.set(DAILY, '- Inbox\n  - first\n- later\n')
+    addTextSpool(textEnvelope({ source: 'ios-intent', parent: 'Inbox' }))
+
+    await kit.drain()
+
+    expect(kit.noteFile.files().get(DAILY)).toBe('- Inbox\n  - first\n  - call the bank\n- later\n')
+  })
+
   it('a checkbox never joins a task list — the + marker stays a task', async () => {
     kit.noteFile.set(DAILY, '+ [ ] buy milk\n')
     addTextSpool(textEnvelope({ kind: 'checkbox', text: 'pack a bag' }))

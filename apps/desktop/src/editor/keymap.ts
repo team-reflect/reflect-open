@@ -16,14 +16,16 @@ import { EDITOR_KEY_BINDINGS } from '@meowdown/core'
  * editor-scope so no app binding can shadow them, and lists them in the
  * Keyboard settings section.
  *
- * `Mod-k` is the deliberate exception: it is shared, not reserved editor-scope.
- * meowdown consumes it inside the editor only when there is a selection or a link
- * at the caret (to insert or edit a link); otherwise it lets the keydown fall
- * through to the app command palette, which claims `Mod-k` app-scope. The editor
- * wins at run time by preventDefault-ing the keydown it handles, which
- * `useAppShortcuts` checks before acting.
+ * `Mod-k` and `Mod-/` are the deliberate exceptions: they are shared, not
+ * reserved editor-scope. meowdown consumes `Mod-k` inside the editor only when
+ * there is a selection or a link at the caret (to insert or edit a link), and
+ * `Mod-/` only when the caret is in a code block or an image or embed is
+ * selected (to open its menu). Otherwise the keydown falls through to the app,
+ * which claims `Mod-k` (command palette) and `Mod-/` (keyboard shortcuts)
+ * app-scope. The editor wins at run time by preventDefault-ing the keydown it
+ * handles, which `useAppShortcuts` checks before acting.
  */
-const SHARED_WITH_APP: ReadonlySet<string> = new Set(['Mod-k'])
+const SHARED_WITH_APP: ReadonlySet<string> = new Set(['Mod-k', 'Mod-/'])
 
 const EDITOR_BINDINGS = Object.fromEntries(
   Object.entries(EDITOR_KEY_BINDINGS).filter(([key]) => !SHARED_WITH_APP.has(key)),

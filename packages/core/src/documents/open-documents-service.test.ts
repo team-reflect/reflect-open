@@ -71,6 +71,26 @@ describe('open documents', () => {
     }
   })
 
+  it('settleAll flushes every document and settles each one after its flush', async () => {
+    const log: string[] = []
+    const unregisterA = openDocuments.register({
+      session: fakeSession('notes/a.md', log),
+      settle: () => {
+        log.push('settle:notes/a.md')
+      },
+    })
+    const unregisterB = openDocuments.register({ session: fakeSession('notes/b.md', log) })
+    try {
+      openDocuments.settleAll()
+      expect(log).toEqual(['flush:notes/a.md', 'flush:notes/b.md'])
+      await Promise.resolve()
+      expect(log).toEqual(['flush:notes/a.md', 'flush:notes/b.md', 'settle:notes/a.md'])
+    } finally {
+      unregisterA()
+      unregisterB()
+    }
+  })
+
   it('reloadAll asks every open session to reconcile against disk', () => {
     const log: string[] = []
     const unregisterA = openDocuments.register({ session: fakeSession('notes/a.md', log) })
@@ -202,7 +222,7 @@ describe('reloadAll with live sessions', () => {
     snapshots: NoteSessionSnapshot[],
     options?: { readOnly?: boolean },
   ): NoteSession {
-    return createNoteSessionService({
+    const session = createNoteSessionService({
       noteFile,
       clock: createTestClockService(),
       logger: createTestLoggerService(),
@@ -216,10 +236,14 @@ describe('reloadAll with live sessions', () => {
       onSnapshot: (snapshot) => {
         snapshots.push(snapshot)
       },
-      applyContent: (markdown) => {
+    })
+    session.attachEditor({
+      getMarkdown: () => '',
+      setMarkdown: (markdown) => {
         applied.push(markdown)
       },
     })
+    return session
   }
 
   it('a clean open note adopts the new disk content silently', async () => {

@@ -68,8 +68,10 @@ What's New is the in-app list of changes shown after an update. When a PR adds a
 feature or a change users will notice, add an item to `WHATS_NEW` in
 `packages/app/src/whats-new/whats-new-content.ts` in the same PR. Key it by the next
 marketing version (the version in `apps/desktop/package.json` without the prerelease
-suffix). Write a short title and a one-sentence body for users, and set `platforms`
-to where the change shows. Prefer to extend or merge an existing item over adding a
+suffix). Give it an `id` that no other item, in any version, uses. Write a short
+title and a one-sentence body for users, and set `platforms` to where the change
+shows. Each update shows only the items the user has not seen, so change the `id`
+of an extended item to show it again. Prefer to extend or merge an existing item over adding a
 near-duplicate. Skip internal changes, refactors, and small fixes.
 
 ### Running tests
