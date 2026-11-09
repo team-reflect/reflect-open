@@ -35,7 +35,7 @@ const INPUTS: WhatsNewInputs = {
   seen: false,
   override: false,
   blocked: false,
-  launch: 'opened',
+  graphOpened: true,
   offerFirst: false,
   accepted: false,
 }
@@ -52,7 +52,7 @@ describe('decideWhatsNew', () => {
   it('waits outside the main window, until a graph opens, and while blocked, even with the override', () => {
     const cases: Partial<WhatsNewInputs>[] = [
       { isMainWindow: false },
-      { launch: 'opening' },
+      { graphOpened: false },
       { blocked: true },
     ]
     for (const inputs of cases) {
@@ -66,14 +66,8 @@ describe('decideWhatsNew', () => {
     expect(decide({ seen: true })).toBe('wait')
   })
 
-  it('skips the version of a new install', () => {
-    expect(decide({ launch: 'openedAfterSetup' })).toBe('skip')
-  })
-
-  it('shows with the override despite a development build, a seen version, or a new install', () => {
-    expect(decide({ override: true, isDev: true, seen: true, launch: 'openedAfterSetup' })).toBe(
-      'show',
-    )
+  it('shows with the override despite a development build or a seen version', () => {
+    expect(decide({ override: true, isDev: true, seen: true })).toBe('show')
     expect(decide({ override: true, items: [] })).toBe('wait')
   })
 
