@@ -14,7 +14,7 @@ import type { WindowService } from '../app/window-service.ts'
 import type { WhatsNewItem } from './whats-new-content.ts'
 
 /**
- * The comma-separated ids of the current version's items the user saw or skipped.
+ * A JSON array of the ids of the current version's items the user saw or skipped.
  */
 export const WHATS_NEW_SEEN_STORAGE_KEY = 'reflect.whats-new.seen'
 
@@ -110,8 +110,16 @@ function selectIsOverride(value: string | null): boolean {
   return value === 'true'
 }
 
-function parseSeenIds(value: string | null): Set<string> {
-  return new Set(value?.split(','))
+/**
+ * The seen ids in the stored value. A value that is not a JSON array holds none.
+ */
+function parseSeenIds(value: string | null): ReadonlySet<unknown> {
+  try {
+    const ids: unknown = JSON.parse(value ?? '[]')
+    return new Set(Array.isArray(ids) ? ids : [])
+  } catch {
+    return new Set()
+  }
 }
 
 /**
@@ -242,7 +250,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
   }
 
   #markSeen(): void {
-    this.#deps.storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, this.#versionIds.join(','))
+    this.#deps.storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, JSON.stringify(this.#versionIds))
   }
 
   start(): Unlisten {

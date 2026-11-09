@@ -123,7 +123,7 @@ function setup(options: SetupOptions = {}) {
 
 describe('createWhatsNewService', () => {
   it('shows the items for the platform once the graph opens, and hides once dismissed', () => {
-    const { whatsNew, setStatus, seen } = setup({ seen: 'old-item', status: 'loading' })
+    const { whatsNew, setStatus, seen } = setup({ seen: '["old-item"]', status: 'loading' })
     expect(whatsNew.phase.get()).toBe('hidden')
     setStatus('ready')
     expect(whatsNew.phase.get()).toBe('shown')
@@ -131,17 +131,25 @@ describe('createWhatsNewService', () => {
 
     whatsNew.dismiss()
     expect(whatsNew.phase.get()).toBe('hidden')
-    expect(seen()).toBe('item-1,item-2,item-3')
+    expect(seen()).toBe('["item-1","item-2","item-3"]')
   })
 
   it('shows only the items not seen yet', () => {
-    const { whatsNew } = setup({ version: '0.19.1-beta.2', seen: 'item-2' })
+    const { whatsNew } = setup({ version: '0.19.1-beta.2', seen: '["item-2"]' })
     expect(whatsNew.phase.get()).toBe('shown')
     expect(whatsNew.items).toEqual([ITEM_3])
   })
 
+  it('shows every item when the stored value is not a JSON array', () => {
+    for (const seen of ['0.19.1-beta.1', '{}']) {
+      const { whatsNew } = setup({ seen })
+      expect(whatsNew.phase.get()).toBe('shown')
+      expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])
+    }
+  })
+
   it('stays hidden when every item was seen', () => {
-    const { whatsNew } = setup({ seen: 'item-2,item-3' })
+    const { whatsNew } = setup({ seen: '["item-2","item-3"]' })
     expect(whatsNew.phase.get()).toBe('hidden')
     expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])
   })
@@ -151,7 +159,7 @@ describe('createWhatsNewService', () => {
     setStatus('choosing')
     setStatus('ready')
     expect(whatsNew.phase.get()).toBe('hidden')
-    expect(seen()).toBe('item-1,item-2,item-3')
+    expect(seen()).toBe('["item-1","item-2","item-3"]')
   })
 
   it('ignores a graph switch after the first open', () => {
@@ -167,7 +175,7 @@ describe('createWhatsNewService', () => {
   })
 
   it('shows seen items with the override, which dismiss turns off', () => {
-    const { whatsNew } = setup({ seen: 'item-2,item-3' })
+    const { whatsNew } = setup({ seen: '["item-2","item-3"]' })
     expect(whatsNew.phase.get()).toBe('hidden')
 
     whatsNew.setOverride(true)
@@ -192,7 +200,7 @@ describe('createWhatsNewService', () => {
     const { whatsNew, seen } = setup({ offerFirst: true })
     whatsNew.decline()
     expect(whatsNew.phase.get()).toBe('hidden')
-    expect(seen()).toBe('item-1,item-2,item-3')
+    expect(seen()).toBe('["item-1","item-2","item-3"]')
   })
 
   it('stops following the launch', () => {
