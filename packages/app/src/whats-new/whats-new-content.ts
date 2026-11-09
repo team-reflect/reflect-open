@@ -41,6 +41,6 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     menusItem('Press ⌘/ to open it.', ['darwin']),
     menusItem('Press Ctrl+/ to open it.', ['windows', 'linux']),
     menusItem('With a keyboard, press ⌘/ to open it.', ['ios']),
-    menusItem('With a keyboard, press Ctrl+/ to open it.', ['android']),
+    menusItem('With a keyboard, press Ctrl+/ to open it.', ['android']), // FIXME： delete this
   ],
 }
