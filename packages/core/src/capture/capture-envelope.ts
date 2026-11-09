@@ -100,6 +100,11 @@ export type ExtensionCaptureWire = z.infer<typeof extensionCaptureWireSchema>
 export const TEXT_CAPTURE_MAX_LENGTH = 10_000
 
 /**
+ * Cap on a text capture's parent bullet: one short label.
+ */
+export const TEXT_CAPTURE_PARENT_MAX_LENGTH = 200
+
+/**
  * What a text capture materializes as on the capture-day daily note. One
  * vocabulary end-to-end: the `reflect://append`/`reflect://checkbox`/
  * `reflect://task` URL verb IS the envelope kind IS the drain behavior
@@ -143,6 +148,18 @@ export const textCaptureEnvelopeSchema = z.object({
     .min(1)
     .max(TEXT_CAPTURE_MAX_LENGTH)
     .regex(/^[^\r\n]+$/, 'must be a single line'),
+  /**
+   * The top-level bullet the entry nests under, as the user typed it
+   * (`Inbox` or `[[Inbox]]`). Absent means the end of the note. Ignored for
+   * `task`, which always files into the Tasks section.
+   */
+  parent: z
+    .string()
+    .trim()
+    .min(1)
+    .max(TEXT_CAPTURE_PARENT_MAX_LENGTH)
+    .regex(/^[^\r\n]+$/, 'must be a single line')
+    .optional(),
   /** When the link fired, ISO-8601 — decides the daily note it lands on. */
   capturedAt: z.iso.datetime({ offset: true }),
   /** Where the capture came from. */

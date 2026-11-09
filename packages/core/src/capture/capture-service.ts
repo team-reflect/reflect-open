@@ -26,6 +26,7 @@ import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { PrivacyService } from '../privacy/privacy-service.ts'
+import type { SettingsService } from '../settings/settings-service.ts'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
 import type { BacklinkTargetService } from './backlink-target-service.ts'
 import { createCaptureDrainService, type CaptureDrainService } from './capture-drain-service.ts'
@@ -89,6 +90,7 @@ export interface CaptureServiceDeps {
   readonly fileChanges: FileChangeService
   readonly progress: ProgressPort
   readonly platform: PlatformFacts
+  readonly settings: SettingsService
   readonly logger: LoggerService
 }
 
@@ -126,6 +128,7 @@ interface CaptureSessionDeps {
   readonly fileChanges: FileChangeService
   readonly progress: ProgressPort
   readonly platform: PlatformFacts
+  readonly settings: SettingsService
   readonly logger: LoggerService
   readonly commitXPost: (
     envelope: XPostEnvelope,
@@ -195,6 +198,7 @@ class CaptureSessionImpl implements CaptureSession {
     loop.schedule() // the launch pass: captures spooled while the app was closed
     loop.retryOnWake() // the network's natural retry signals (enrichment)
     if (this.#mobile) {
+      this.#mirrorQuickNoteParent()
       // Mobile resume: `focus` alone is unreliable in the iOS webview (the
       // iCloud refresh hook listens to both for the same reason).
       loop.onDispose(
@@ -213,6 +217,41 @@ class CaptureSessionImpl implements CaptureSession {
         }
       }),
     )
+  }
+
+  /**
+   * Keep the App Group copy of the quick note parent equal to the setting, so
+   * the App Intent reads it while the app is closed. Waits for the settings
+   * load: before it, the value is the default and would clear the copy.
+   */
+  #mirrorQuickNoteParent(): void {
+    const { settings, captureInbox, logger } = this.#deps
+    const loop = this.#loop
+    let written: string | undefined
+    const write = async (): Promise<void> => {
+      const parent = settings.get().quickNoteParent
+      if (parent === written) {
+        return
+      }
+      written = parent
+      try {
+        await captureInbox.writeQuickNoteDefaults(parent)
+      } catch (cause) {
+        written = undefined
+        logger.error('quick note defaults mirror failed:', errorMessage(cause))
+      }
+    }
+    void (async () => {
+      if ((await settings.whenLoaded()) === 'failed' || loop.isStale()) {
+        return
+      }
+      void write()
+      loop.onDispose(
+        settings.subscribe(() => {
+          void write()
+        }),
+      )
+    })()
   }
 
   #surfaceStop(label: string, stopped: ReconcileStop | null): void {
@@ -315,8 +354,16 @@ class CaptureServiceImpl implements CaptureService {
   }
 
   openSession(options: CaptureSessionOptions): CaptureSession {
-    const { captureInbox, reconcilers, activity, fileChanges, progress, platform, logger } =
-      this.#deps
+    const {
+      captureInbox,
+      reconcilers,
+      activity,
+      fileChanges,
+      progress,
+      platform,
+      settings,
+      logger,
+    } = this.#deps
     return new CaptureSessionImpl(
       {
         captureInbox,
@@ -328,6 +375,7 @@ class CaptureServiceImpl implements CaptureService {
         fileChanges,
         progress,
         platform,
+        settings,
         logger,
         commitXPost: (envelope, path, generation) => this.#commitXPost(envelope, path, generation),
         notifyXPostsWritten: () => {

@@ -259,6 +259,7 @@ export {
   clampSidebarWidth,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeTranscriptionPrompt,
+  normalizeQuickNoteParent,
   timeFormatSchema,
   DATE_FORMATS,
   dateFormatSchema,
@@ -397,6 +398,7 @@ export {
 export {
   captureAckSchema,
   captureWireMessageSchema,
+  TEXT_CAPTURE_PARENT_MAX_LENGTH,
   type CaptureWireMessage,
 } from './capture/capture-envelope.ts'
 export { canReadCalendars } from './calendar/commands.ts'

@@ -42,8 +42,10 @@ import {
   errorMessage,
   marketingVersion,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
+  TEXT_CAPTURE_PARENT_MAX_LENGTH,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeChatSystemPrompt,
+  normalizeQuickNoteParent,
   normalizeTranscriptionPrompt,
   type AiPrompt,
   type AiProviderConfig,
@@ -63,6 +65,7 @@ import {
   useEditorDefaultBullet,
   useEditorSmoothCaretAnimation,
   useEditorTextSize,
+  useQuickNoteParent,
   useSettingsService,
   useThemeSetting,
   useTimeFormat,
@@ -203,6 +206,7 @@ export function MobileSettings(): ReactElement {
   const chatSystemPrompt = useChatSystemPrompt()
   const transcriptionFormat = useTranscriptionFormat()
   const transcriptionPrompt = useTranscriptionPrompt()
+  const quickNoteParent = useQuickNoteParent()
   const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
@@ -231,6 +235,7 @@ export function MobileSettings(): ReactElement {
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [systemPromptOpen, setSystemPromptOpen] = useState(false)
   const [transcriptionPromptOpen, setTranscriptionPromptOpen] = useState(false)
+  const [quickNoteParentOpen, setQuickNoteParentOpen] = useState(false)
   const { prompts, addPrompt, updatePrompt, removePrompt } = useAiPrompts()
   // The edited prompt sticks around after close so the exit animation has
   // content; `promptOpen` alone drives visibility (the edit-sheet pattern).
@@ -387,6 +392,19 @@ export function MobileSettings(): ReactElement {
               }}
             />
           </SettingsGroup>
+
+          {isIos ? (
+            <SettingsGroup
+              header="Quick notes"
+              footer="Notes from Siri, Shortcuts, and the Action button go under this bullet in today’s note."
+            >
+              <SettingsNavRow
+                label="Add under"
+                value={quickNoteParent === '' ? 'End of note' : quickNoteParent}
+                onPress={() => setQuickNoteParentOpen(true)}
+              />
+            </SettingsGroup>
+          ) : null}
 
           <SettingsGroup
             header="AI"
@@ -686,6 +704,19 @@ export function MobileSettings(): ReactElement {
         open={transcriptionPromptOpen}
         onOpenChange={setTranscriptionPromptOpen}
         onSave={(transcriptionPrompt) => settingsService.update({ transcriptionPrompt })}
+      />
+      <TextSettingDrawer
+        title="Add quick notes under"
+        description="The name of a bullet in your daily note, such as Inbox or [[Inbox]]. Quick notes become its last children, and Reflect adds the bullet at the end of the note when it is missing. Leave empty to add quick notes at the end of the note."
+        ariaLabel="Parent bullet for quick notes"
+        placeholder="Inbox"
+        maxLength={TEXT_CAPTURE_PARENT_MAX_LENGTH}
+        rows={1}
+        normalize={normalizeQuickNoteParent}
+        value={quickNoteParent}
+        open={quickNoteParentOpen}
+        onOpenChange={setQuickNoteParentOpen}
+        onSave={(quickNoteParent) => settingsService.update({ quickNoteParent })}
       />
       <AiPromptDrawer
         prompt={editingPrompt}
