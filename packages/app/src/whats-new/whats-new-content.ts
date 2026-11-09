@@ -38,7 +38,7 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       title: 'Open menus from the keyboard',
       body: 'Press ⌘/ (Ctrl+/ on Windows) to open the menu of the selected image, embed, or code block.',
-      platforms: ['desktop'],
+      platforms: ['desktop'], // FIXME: show different keyboard shortcut based on the BuildPlatform
     },
   ],
 }
