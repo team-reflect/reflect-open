@@ -307,7 +307,7 @@ describe('NoteEditor image lightbox', () => {
   it('opens a lightbox from an inline image and closes on Escape', async () => {
     await renderEditor()
 
-    await pmRoot.getByAltText('Cat').click()
+    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
     const dialog = page.getByRole('dialog', { name: 'Image preview' })
     await expect.element(dialog).toBeVisible()
     const preview = dialog.locate('img')
@@ -321,7 +321,7 @@ describe('NoteEditor image lightbox', () => {
     const openImage = vi.fn(async () => {})
     await renderEditor(openImage)
 
-    await pmRoot.getByAltText('Cat').click()
+    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
     await page.getByRole('button', { name: 'Open' }).click()
     await vi.waitFor(() => {
       expect(openImage).toHaveBeenCalledWith('assets/cat.png')
@@ -331,7 +331,7 @@ describe('NoteEditor image lightbox', () => {
   it('keeps the image opener inside iOS safe-area bounds', async () => {
     await renderEditor()
 
-    await pmRoot.getByAltText('Cat').click()
+    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
     const opener = page.getByRole('button', { name: 'Open' })
     await expect.element(opener).toBeVisible()
     expect(opener.element().parentElement?.className).toContain('top-safe-or-4')
@@ -341,7 +341,7 @@ describe('NoteEditor image lightbox', () => {
   it('shows mobile close chrome inside iOS safe-area bounds', async () => {
     await renderEditor(undefined, MOBILE_APP)
 
-    await pmRoot.getByAltText('Cat').click()
+    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
     const close = page.getByRole('button', { name: 'Close', exact: true })
     await expect.element(close).toBeVisible()
     expect(close.element().parentElement?.className).toContain('top-safe-or-4')
@@ -354,7 +354,7 @@ describe('NoteEditor image lightbox', () => {
   it('dismisses the mobile image lightbox with a downward drag', async () => {
     await renderEditor(undefined, MOBILE_APP)
 
-    await pmRoot.getByAltText('Cat').click()
+    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
     const preview = page.getByRole('button', { name: 'Close image preview' })
     await expect.element(preview).toBeVisible()
     const image = preview.locate('img').element()
@@ -424,7 +424,7 @@ describe('NoteEditor image lightbox', () => {
     const secondOpenImage = vi.fn(async () => {})
     const screen = await renderEditor(firstOpenImage)
 
-    await pmRoot.getByAltText('Cat').click()
+    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
     await expect.element(page.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
     // The rerender is a synchronous update too.
     await settleViewTransition()
@@ -454,7 +454,7 @@ describe('NoteEditor image lightbox', () => {
       />,
     )
 
-    await pmRoot.getByAltText('Cat').click()
+    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
     await expect.element(page.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
     await expectLocatorToHaveCount(page.getByRole('button', { name: 'Open' }), 0)
   })
