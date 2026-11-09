@@ -38,9 +38,21 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       platforms: ALL_PLATFORMS,
     },
     {
+      id: 'mermaid-all-types',
+      title: 'Every Mermaid diagram type',
+      body: 'Mind maps, pie charts, Gantt charts, timelines, Sankey diagrams, and all other Mermaid diagram types now render in your notes.',
+      platforms: ALL_PLATFORMS,
+    },
+    {
       id: 'quick-note-parent',
       title: 'Choose where quick notes go',
       body: 'Notes from Siri, Shortcuts, and the Action button can now go under a bullet of your choice in today’s note. Set it in Settings under Quick notes.',
+      platforms: ['ios'],
+    },
+    {
+      id: 'ipad-trackpad-scroll',
+      title: 'Trackpad scrolling on iPad',
+      body: 'On an iPad in landscape, two-finger trackpad scrolling now moves notes in the right direction.',
       platforms: ['ios'],
     },
     {
