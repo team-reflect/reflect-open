@@ -9,7 +9,7 @@ export interface WhatsNewItem {
   readonly platforms: readonly BuildPlatform[]
 }
 
-const DESKTOP_AND_IOS: readonly BuildPlatform[] = ['darwin', 'windows', 'linux', 'ios']
+const ALL_PLATFORMS: readonly BuildPlatform[] = ['darwin', 'windows', 'linux', 'ios', 'android']
 
 /**
  * The menus item, with the shortcut hint that fits each platform.
@@ -36,10 +36,11 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       title: 'New AI models',
       body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
-      platforms: DESKTOP_AND_IOS,
+      platforms: ALL_PLATFORMS,
     },
     menusItem('Press ⌘/ to open it.', ['darwin']),
     menusItem('Press Ctrl+/ to open it.', ['windows', 'linux']),
     menusItem('With a keyboard, press ⌘/ to open it.', ['ios']),
+    menusItem('With a keyboard, press Ctrl+/ to open it.', ['android']),
   ],
 }
