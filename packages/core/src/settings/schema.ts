@@ -1,5 +1,6 @@
 import { getWeekStart, type Weekday } from '@reflect/utils'
 import { z } from 'zod'
+import { TEXT_CAPTURE_PARENT_MAX_LENGTH } from '../capture/text-capture-limits.ts'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 
 /**
@@ -250,6 +251,19 @@ export const transcriptionPromptSchema = z
   .string()
   .catch('')
   .transform(normalizeTranscriptionPrompt)
+
+/** Fold the quick note parent to one capped line before storing or mirroring it. */
+export function normalizeQuickNoteParent(value: string): string {
+  return value.replaceAll(/\s+/g, ' ').trim().slice(0, TEXT_CAPTURE_PARENT_MAX_LENGTH)
+}
+
+/**
+ * The top-level daily-note bullet that quick notes from Siri, Shortcuts, and
+ * the Action button nest under, as the user typed it (`Inbox` or
+ * `[[Inbox]]`). Empty (the default) appends them at the end of the note.
+ * Mobile-only; desktop never reads it.
+ */
+export const quickNoteParentSchema = z.string().catch('').transform(normalizeQuickNoteParent)
 
 /**
  * Whether the user has finished the mobile onboarding choice (Plan 19, step
@@ -544,6 +558,7 @@ export const settingsSchema = z.looseObject({
   describeAssets: describeAssetsSchema,
   transcriptionFormat: transcriptionFormatSchema,
   transcriptionPrompt: transcriptionPromptSchema,
+  quickNoteParent: quickNoteParentSchema,
   contactsEnabled: contactsEnabledSchema,
   mobileOnboarded: mobileOnboardedSchema,
   mobileStorage: mobileStorageKindSchema,
