@@ -115,7 +115,6 @@ export interface DocumentBinding<Coordinator extends DocumentCoordinator = Docum
    * The live session with its snapshot and epoch, as one value.
    */
   readonly view: Store<DocumentView>
-  coordinator(): Coordinator | null
 }
 
 export interface DocumentBindingDeps {
@@ -207,10 +206,6 @@ class DocumentBindingImpl<
       return
     }
     this.#teardown(target, owner)
-  }
-
-  coordinator(): Coordinator | null {
-    return this.#coordinator
   }
 
   #teardown(target: NoteSession, owner: Coordinator | null): void {

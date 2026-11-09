@@ -126,32 +126,6 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
     missingSeed,
   ])
 
-  // Flush pending edits when the window loses focus, and register with the
-  // app-global registry so quit-time teardown (window close, ⌘Q — paths where
-  // unmount effects never run) can flush this buffer too. The session's flush
-  // resolves once the write has landed, which is what makes quit wait.
-  useEffect(() => {
-    if (!path) {
-      return
-    }
-    const flush = (): void => {
-      // Capture the pair at event time: reading the binding again after the
-      // flush promise resolves could observe a *different* note's session/
-      // coordinator if navigation switched panes mid-flush — settling that
-      // one early would fire its renames without quiet period or blur.
-      const { session } = binding.view.get()
-      const coordinator = binding.coordinator()
-      // Blur is a settle point for title renames — but only after the flushed
-      // save lands, so the tracker has seen the final title. (Quit-time flush
-      // + settle is the open-documents service's job, not this listener's.)
-      void session?.flush().then(() => coordinator?.settle())
-    }
-    window.addEventListener('blur', flush)
-    return () => {
-      window.removeEventListener('blur', flush)
-    }
-  }, [binding, path])
-
   // Render reads the binding only through its store: a method call here would
   // be memoized on the binding and freeze at its first value.
   const view = useStore(binding.view)
