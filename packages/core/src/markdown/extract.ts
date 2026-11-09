@@ -1,4 +1,5 @@
 import { parseXPostId } from '@post-embed/schema'
+import type { LezerNodeName, Tree } from '@meowdown/markdown'
 import { dateFromDailyPath, isAttachmentPath, isDaily } from '../graph/paths.ts'
 import { parseFrontmatter, splitFrontmatter } from './frontmatter.ts'
 import { parseBody } from './grammar.ts'
@@ -332,6 +333,46 @@ function deriveTitle(frontmatter: Frontmatter, headings: Heading[], path: string
   return basename(path)
 }
 
+/**
+ * Record the plain-text spans of one node: syntax to cut and literal regions.
+ * The one rule set behind a note's `displayText` and {@link plainTextSpans}.
+ */
+function collectPlainTextSpans(
+  name: string,
+  span: Span,
+  cuts: Span[],
+  literalRanges: Span[],
+): void {
+  if (isSyntaxNode(name)) {
+    cuts.push(span)
+  }
+  if (isLiteralPlainTextNode(name)) {
+    literalRanges.push(span)
+  }
+}
+
+/**
+ * The spans {@link plainTextOfRange} needs to render any range of an already
+ * parsed body as plain text, by the same rules as a note's `displayText`
+ * (wiki links are left whole for `plainTextOfRange` to flatten), plus table
+ * cell delimiters: a single table row is read as one line of text.
+ */
+export function plainTextSpans(tree: Tree): { cuts: Span[]; literalRanges: Span[] } {
+  const cuts: Span[] = []
+  const literalRanges: Span[] = []
+  tree.iterate({
+    enter: (node) => {
+      const { name, from, to } = node
+      collectPlainTextSpans(name, { from, to }, cuts, literalRanges)
+      if (name === ('TableDelimiter' satisfies LezerNodeName)) {
+        cuts.push({ from, to })
+      }
+      return !isWikiNodeName(name)
+    },
+  })
+  return { cuts, literalRanges }
+}
+
 /** Parse one note's full source into the stable {@link ParsedNote} contract. */
 export function parseNote(input: { path: string; source: string }): ParsedNote {
   const { path, source } = input
@@ -351,14 +392,9 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
     enter: (node) => {
       const { name, from, to } = node
 
-      if (isSyntaxNode(name)) {
-        cuts.push({ from, to })
-      }
+      collectPlainTextSpans(name, { from, to }, cuts, literalPlainText)
       if (isTagExcludedNode(name)) {
         tagExcluded.push({ from, to })
-      }
-      if (isLiteralPlainTextNode(name)) {
-        literalPlainText.push({ from, to })
       }
 
       if (isWikiNodeName(name)) {

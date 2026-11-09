@@ -195,6 +195,10 @@ import {
 } from './embeddings/semantic-search-service.ts'
 import { createDatabaseService, type DatabaseService } from './indexing/database-service.ts'
 import { createBacklinkService, type BacklinkService } from './indexing/backlink-service.ts'
+import {
+  createSuggestedBacklinkService,
+  type SuggestedBacklinkService,
+} from './indexing/suggested-backlink-service.ts'
 import { createFileChangeService, type FileChangeService } from './indexing/file-change-service.ts'
 import { createGraphStatsService, type GraphStatsService } from './indexing/graph-stats-service.ts'
 import {
@@ -432,6 +436,10 @@ export interface CoreServices {
    */
   readonly backlinks: BacklinkService
   /**
+   * Notes that name a note without linking to it, and the rewrite that links them.
+   */
+  readonly suggestedBacklinks: SuggestedBacklinkService
+  /**
    * The palette's full-text search with filters.
    */
   readonly search: SearchService
@@ -627,6 +635,7 @@ export const coreServiceFactories = {
   indexQuery: createIndexQueryService,
   wikiResolver: createWikiResolverService,
   backlinks: createBacklinkService,
+  suggestedBacklinks: createSuggestedBacklinkService,
   search: createSearchService,
   suggestions: createSuggestionService,
   noteList: createNoteListService,
@@ -1263,6 +1272,12 @@ export function composeCoreServices(
       graphSession,
     }),
     noteDocuments,
+    suggestedBacklinks: create.suggestedBacklinks({
+      database,
+      noteDocuments,
+      progress,
+      graphSession,
+    }),
     notePreview: create.notePreview({
       noteLinkResolver,
       noteDocuments,

@@ -22,6 +22,16 @@ export interface WikiLinkSuggestionResult {
 }
 
 /**
+ * The recency key of a source note, newest first in both the backlinks and
+ * the suggested-backlinks queries: a daily note by its day, any other note by
+ * its last update. One definition, so the two can't order sources apart.
+ */
+export const sourceRecency = sql<number>`coalesce(
+  strftime('%s', "notes"."daily_date") * 1000,
+  "notes"."updated_at"
+)`
+
+/**
  * The recall-feed ordering, shared by the filtered search and the All Notes
  * list so the two "V1 list order" implementations can't drift: optionally
  * pinned-first (explicit pin order, then unordered pins), then recency, then
@@ -55,6 +65,63 @@ interface WikiAddressWinner {
 
 function winnerAddressesPath(path: string, winner: WikiAddressWinner | undefined): boolean {
   return winner?.path === path && winner.claimCount === 1
+}
+
+/**
+ * The winning note of each folded key in `note_keys`, with its claim count:
+ * the one "which note does `[[key]]` open" lookup, shared by the `[[` menu and
+ * the suggested backlinks so they can't disagree on what a spelling opens.
+ */
+async function fetchKeyWinners(
+  db: Kysely<Database>,
+  keys: Iterable<string>,
+): Promise<Map<string, WikiAddressWinner>> {
+  const winners = new Map<string, WikiAddressWinner>()
+  for (const chunk of inClauseChunks([...keys])) {
+    const rows = await db
+      .selectFrom('noteKeys')
+      .innerJoin('notes', 'notes.path', 'noteKeys.notePath')
+      .where('key', 'in', chunk)
+      .select(['key', 'notePath', 'notes.dailyDate', 'noteKeys.claimCount'])
+      .execute()
+    for (const row of rows) {
+      if (row.key !== null && row.notePath !== null) {
+        winners.set(row.key, {
+          path: row.notePath,
+          dailyDate: row.dailyDate,
+          claimCount: Number(row.claimCount),
+        })
+      }
+    }
+  }
+  return winners
+}
+
+/**
+ * Every folded key that resolves to the note at `path` (the keys it wins in
+ * `note_keys`: daily date, title, aliases, filename) — what a backlink row
+ * joins on to reach it.
+ */
+export async function keysResolvingTo(db: Kysely<Database>, path: string): Promise<Set<string>> {
+  const rows = await db.selectFrom('noteKeys').where('notePath', '=', path).select('key').execute()
+  return new Set(rows.map((row) => row.key).filter((key) => key !== null))
+}
+
+/**
+ * Which of `keys` (folded wiki-link keys) open `path` and only `path`: the
+ * note wins the key in `note_keys`, and nothing else claims it in that tier.
+ * The same rule the `[[` menu applies before it inserts a spelling.
+ */
+export async function keysAddressingPath(
+  db: Kysely<Database>,
+  keys: readonly string[],
+  path: string,
+): Promise<Set<string>> {
+  const winners = await fetchKeyWinners(
+    db,
+    keys.filter((key) => key !== ''),
+  )
+  return new Set(keys.filter((key) => winnerAddressesPath(path, winners.get(key))))
 }
 
 /**
@@ -176,24 +243,7 @@ export async function verifyWikiSuggestionAddresses(
   }
   keys.delete('')
 
-  const winners = new Map<string, WikiAddressWinner>()
-  for (const chunk of inClauseChunks([...keys])) {
-    const rows = await db
-      .selectFrom('noteKeys')
-      .innerJoin('notes', 'notes.path', 'noteKeys.notePath')
-      .where('key', 'in', chunk)
-      .select(['key', 'notePath', 'notes.dailyDate', 'noteKeys.claimCount'])
-      .execute()
-    for (const row of rows) {
-      if (row.key !== null && row.notePath !== null) {
-        winners.set(row.key, {
-          path: row.notePath,
-          dailyDate: row.dailyDate,
-          claimCount: Number(row.claimCount),
-        })
-      }
-    }
-  }
+  const winners = await fetchKeyWinners(db, keys)
 
   const unaddressedPaths = new Set<string>()
   for (const candidate of candidates) {

@@ -8,6 +8,7 @@ import {
   type BlockContextSource,
 } from './block-context.ts'
 import type { DatabaseService } from './database-service.ts'
+import { keysResolvingTo, sourceRecency } from './queries-shared.ts'
 import {
   createSourceTaskLocator,
   extractSnippetTasks,
@@ -85,11 +86,6 @@ export interface BacklinkContextPage {
    */
   readonly indexedLinkCount: number
 }
-
-const sourceRecency = sql<number>`coalesce(
-  strftime('%s', "notes"."daily_date") * 1000,
-  "notes"."updated_at"
-)`
 
 function afterSource(cursor: BacklinkSourceCursor) {
   return sql<boolean>`(
@@ -246,11 +242,7 @@ class BacklinkServiceImpl implements BacklinkService {
     // Every spelling that resolves to the target (title, aliases, daily date),
     // so sibling branches co-group under any of them — old Reflect compared
     // resolved note ids, not link text.
-    const targetKeys = new Set(
-      (await db.selectFrom('noteKeys').where('notePath', '=', path).select('key').execute())
-        .map((row) => row.key)
-        .filter((key): key is string => typeof key === 'string'),
-    )
+    const targetKeys = await keysResolvingTo(db, path)
 
     // One read *and one parse* per distinct source: a well-linked source
     // contributes many rows, and context extraction walks the parsed body.

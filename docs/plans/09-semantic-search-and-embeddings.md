@@ -39,6 +39,14 @@ native risk is reviewable in isolation:
   deferral lands here) under the backlinks panel, seeded by the note's own
   content, self-excluded, hidden when unavailable.
 
+  > **Update (2026-10-30):** related notes did not replace suggested backlinks;
+  > they answer a different question. Related notes (shipped as the sidebar's
+  > Similar notes) find notes about similar things, need the optional model,
+  > and offer no action. V1's suggested backlinks find notes that *name* this
+  > one without linking it and turn the mention into a link in one click. They
+  > now ship separately as a lexical, model-free sidebar section
+  > (`indexing/suggested-backlink-service.ts`), with no index schema change.
+
 **Recorded consequences:** `fastembed` pulls ONNX Runtime — its dylib must be
 code-signed at notarization time (Plan 15), and model-dependent Rust tests are
 gated behind an ignored integration flag (unit tests use a fake embedder).

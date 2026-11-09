@@ -18,8 +18,8 @@ popover for the suggestion menu. See [Libraries](libraries.md).
 rename + link rewrite + alias preservation, alias frontmatter, case-insensitive
 resolution.
 **Out:** typed entities/people/companies (deferred — backlinks stay plain `[[Alice]]`),
-graph-map view (deferred), suggested backlinks (nice-to-have; can follow once retrieval
-exists in Plan 09).
+graph-map view (deferred), suggested backlinks (nice-to-have; Plan 09 first folded them
+into related notes — they have since shipped on their own, see the Plan 09 update).
 
 **Carried in from Plan 06 review:** clicking a wiki link that fails to resolve currently
 logs to the console only — surface it to the user (toast/inline) as part of this plan's
