@@ -1,16 +1,22 @@
-# XcodeGen (https://github.com/yonaskolb/XcodeGen) project spec: the copy
-# XcodeGen actually consumes to generate reflect-open.xcodeproj in this
-# directory. To regenerate the Xcode project after a spec change
+# XcodeGen (https://github.com/yonaskolb/XcodeGen) project spec for
+# reflect-open.xcodeproj in this directory. It is the only copy: Tauri keeps an
+# existing gen/apple/project.yml, so no template is needed.
+#
+# Source folders are synced folders (Xcode 16 buildable folders): adding,
+# removing, or renaming a file inside one needs no regeneration. A file that
+# more than one target compiles goes in a Shared/ folder synced to each of
+# those targets; listing it by path inside another target's synced folder
+# makes XcodeGen output nondeterministic.
+#
+# To regenerate the Xcode project after a spec change, run XcodeGen 2.46.0
 # (`brew install xcodegen` once):
 #
-#   cd apps/desktop/src-tauri/gen/apple && xcodegen generate
+#   cd apps/desktop/src-tauri/gen/apple && mkdir -p assets && xcodegen generate
 #
 # then inspect the project.pbxproj diff before committing (`tauri ios dev`
 # may additionally normalize the generated files; see
-# docs/contributing/mobile-simulator.md).
-#
-# Kept in sync by hand with ../../ios.project.yml: every change here must
-# also be applied there, and vice versa.
+# docs/contributing/mobile-simulator.md). Do not edit the generated files by
+# hand, and do not accept Xcode's "Update to recommended settings".
 name: reflect-open
 options:
   bundleIdPrefix: app.reflect
@@ -23,17 +29,24 @@ packages:
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     exactVersion: 9.31.0
-fileGroups: [../../src]
 configs:
   debug: debug
   release: release
 settingGroups:
-  # The dev flavor (mirrors the desktop's tauri.dev.conf.json flavor): debug
-  # builds get their own bundle id, home-screen name, icon, and App Group so
-  # a `tauri ios dev` install coexists with the TestFlight/App Store app.
-  # `tauri ios dev` always builds the debug configuration and the TestFlight
-  # pipeline always builds release, so the configuration is the flavor axis.
-  # REFLECT_DISPLAY_NAME feeds CFBundleDisplayName via Info.plist expansion.
+  # Three flavors, mirroring the desktop's tauri.conf.json overlays. Debug
+  # builds are the dev flavor: `tauri ios dev` always builds the debug
+  # configuration, so its values are literals. Release builds are stable by
+  # default; for a beta, build-ios.ts overrides the release defaults through
+  # TAURI_REFLECT_IOS_* environment variables, which xcodebuild exposes to
+  # settings the project does not define. The TAURI prefix is required:
+  # `tauri ios build` passes only TAURI*, WRY*, CARGO_*, and RUST_* variables
+  # on to xcodebuild
+  # (https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.12.4/crates/tauri-cli/src/mobile/mod.rs#L311-L329).
+  # `tauri ios build` also rewrites the app target's PRODUCT_BUNDLE_IDENTIFIER
+  # to the Tauri config's identifier (tauri.ios.beta.conf.json for a beta),
+  # so that setting stays a literal. REFLECT_DISPLAY_NAME feeds
+  # CFBundleDisplayName and REFLECT_APP_GROUP feeds ReflectAppGroup via
+  # Info.plist expansion.
   app:
     base:
       PRODUCT_NAME: Reflect
@@ -47,11 +60,13 @@ settingGroups:
         # The dev App Group, no iCloud; see the entitlements comment on the
         # reflect-open_iOS target.
         CODE_SIGN_ENTITLEMENTS: reflect-open_iOS/reflect-open_iOS.dev.entitlements
+        REFLECT_APP_GROUP: group.app.reflect.dev
       release:
         PRODUCT_BUNDLE_IDENTIFIER: app.reflect.ios
-        REFLECT_DISPLAY_NAME: Reflect
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: reflect-open_iOS/reflect-open_iOS.entitlements
+        REFLECT_DISPLAY_NAME: $(TAURI_REFLECT_IOS_DISPLAY_NAME:default=Reflect)
+        ASSETCATALOG_COMPILER_APPICON_NAME: $(TAURI_REFLECT_IOS_APP_ICON:default=AppIcon)
+        CODE_SIGN_ENTITLEMENTS: $(TAURI_REFLECT_IOS_APP_ENTITLEMENTS:default=reflect-open_iOS/reflect-open_iOS.entitlements)
+        REFLECT_APP_GROUP: $(TAURI_REFLECT_IOS_APP_GROUP:default=group.app.reflect)
 targetTemplates:
   app:
     type: application
@@ -69,25 +84,25 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+        type: syncedFolder
       - path: Assets.xcassets
       # Icon Composer documents; ASSETCATALOG_COMPILER_APPICON_NAME picks one.
       - path: ../../icons/AppIcon.icon
       - path: ../../icons-dev/AppIcon-Dev.icon
-      # Build artifacts (libapp.a) land here; without an explicit `none`,
-      # regenerating after a build sweeps them into Copy Bundle Resources,
-      # shipping the Rust static archive inside the app bundle.
-      - path: Externals
-        buildPhase: none
+      - path: ../../icons-beta/AppIcon-Beta.icon
       - path: reflect-open_iOS
       - path: assets
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
-      # The capture-inbox producer, shared by path with the share extension
-      # (the same pattern the widget uses for the Live Activity sources): the
+      # The capture-inbox producer, shared with the share extension: the
       # quick-note intent (Plan 24) spools envelopes from the app process
       # through the same atomic App Group writer the share sheet uses.
-      - path: ShareExtension/CaptureInbox.swift
+      - path: Shared/Capture
+        type: syncedFolder
+      # The stop LiveActivityIntent, shared with the widget; it executes here.
+      - path: Shared/Recording
+        type: syncedFolder
     info:
       path: reflect-open_iOS/Info.plist
       properties:
@@ -128,15 +143,25 @@ targets:
             CFBundleURLSchemes: [reflect]
         # The recording Live Activity (audio-memos wave 3).
         NSSupportsLiveActivities: true
-        # Home-screen quick action (audio-memos wave 3); handled by the
-        # recording plugin via the shortcut-item delegate hook.
+        # Home-screen quick action (audio-memos wave 3); the scene delegate
+        # receives it, and SceneEntryPoints.swift hands it to the recording
+        # plugin.
         UIApplicationShortcutItems:
           - UIApplicationShortcutItemType: app.reflect.record-audio
             UIApplicationShortcutItemTitle: Record audio
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAudio
+        # The system runs the app on the scene lifecycle either way; declaring
+        # it makes tao create its UIWindow inside the connected scene. A window
+        # created before the scene connects never gets an interface
+        # orientation, and UIKit then delivers trackpad scrolls unrotated: in
+        # landscape a vertical scroll reaches the webview as a horizontal one.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
         # Native Sentry DSN from the build environment; empty disables it.
-        ReflectSentryDSN: $(REFLECT_SENTRY_DSN)
+        ReflectSentryDSN: $(TAURI_REFLECT_SENTRY_DSN)
+        # The flavor's App Group, read by the Rust capture relay.
+        ReflectAppGroup: $(REFLECT_APP_GROUP)
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -247,21 +272,22 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - path: ShareExtension/ShareViewController.swift
-      - path: ShareExtension/ShareState.swift
-      - path: ShareExtension/ShareView.swift
-      - path: ShareExtension/CaptureInbox.swift
-      # The Safari preprocessor (title/URL/selection/meta description); a
-      # bundle resource the NSExtension attributes reference by base name.
-      - path: ShareExtension/ExtensionClass.js
-        buildPhase: resources
+      # Includes ExtensionClass.js, the Safari preprocessor (title/URL/
+      # selection/meta description): a bundle resource the NSExtension
+      # attributes reference by base name.
+      - path: ShareExtension
+        type: syncedFolder
+      - path: Shared/Capture
+        type: syncedFolder
     info:
       path: ShareExtension/Info.plist
       properties:
         # The share sheet's row label (the icon comes from the host app).
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        CFBundleShortVersionString: 0.6.0
-        CFBundleVersion: 0.6.0.8
+        # The flavor's App Group, read by CaptureInbox.swift.
+        ReflectAppGroup: $(REFLECT_APP_GROUP)
+        CFBundleShortVersionString: $(TAURI_REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(TAURI_REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           # Storyboard-less principal class; `@objc(ShareViewController)`
@@ -286,6 +312,9 @@ targets:
       base:
         PRODUCT_NAME: ShareExtension
         CODE_SIGN_STYLE: Automatic
+        # preserve-entitlements.sh reads REFLECT_CODE_SIGN_ENTITLEMENTS:
+        # skip-codesign builds blank CODE_SIGN_ENTITLEMENTS.
+        CODE_SIGN_ENTITLEMENTS: $(REFLECT_CODE_SIGN_ENTITLEMENTS)
         DEVELOPMENT_TEAM: 789ULN5MZB
         SWIFT_VERSION: '5.0'
         TARGETED_DEVICE_FAMILY: 1,2
@@ -295,11 +324,13 @@ targets:
         debug:
           PRODUCT_BUNDLE_IDENTIFIER: app.reflect.ios.dev.share
           REFLECT_DISPLAY_NAME: Reflect Dev
-          CODE_SIGN_ENTITLEMENTS: ShareExtension/ShareExtension.dev.entitlements
+          REFLECT_CODE_SIGN_ENTITLEMENTS: ShareExtension/ShareExtension.dev.entitlements
+          REFLECT_APP_GROUP: group.app.reflect.dev
         release:
-          PRODUCT_BUNDLE_IDENTIFIER: app.reflect.ios.share
-          REFLECT_DISPLAY_NAME: Reflect
-          CODE_SIGN_ENTITLEMENTS: ShareExtension/ShareExtension.entitlements
+          PRODUCT_BUNDLE_IDENTIFIER: $(TAURI_REFLECT_IOS_SHARE_BUNDLE_ID:default=app.reflect.ios.share)
+          REFLECT_DISPLAY_NAME: $(TAURI_REFLECT_IOS_DISPLAY_NAME:default=Reflect)
+          REFLECT_CODE_SIGN_ENTITLEMENTS: $(TAURI_REFLECT_IOS_SHARE_ENTITLEMENTS:default=ShareExtension/ShareExtension.entitlements)
+          REFLECT_APP_GROUP: $(TAURI_REFLECT_IOS_APP_GROUP:default=group.app.reflect)
     postBuildScripts:
       # Tauri's App Store Connect API-key flow (CI TestFlight builds) archives
       # with code signing disabled, then dummy-signs only the app binary before
@@ -315,26 +346,26 @@ targets:
 
   # The audio-memo widget extension (wave 3): the lock-screen / home-screen
   # "record" widget plus the recording Live Activity. Swift only — no Rust,
-  # no webview. Two sources are shared by path: the Live Activity attributes
+  # no webview. Two sources are shared: the Live Activity attributes, by path
   # (also compiled into the recording plugin — ActivityKit matches app and
-  # widget by type name) and the stop LiveActivityIntent (also compiled into
-  # the app target, where it executes).
+  # widget by type name), and the stop LiveActivityIntent in Shared/Recording
+  # (also compiled into the app target, where it executes).
   RecordingWidget:
     type: app-extension
     platform: iOS
     deploymentTarget: '16.2'
     sources:
-      - path: RecordingWidget/RecordingWidgetBundle.swift
-      - path: RecordingWidget/RecordAudioWidget.swift
-      - path: RecordingWidget/RecordingActivityWidget.swift
-      - path: Sources/reflect-open/StopRecordingLiveActivityIntent.swift
+      - path: RecordingWidget
+        type: syncedFolder
+      - path: Shared/Recording
+        type: syncedFolder
       - path: ../../../../../plugins/tauri-plugin-recording/ios/Sources/RecordingActivityAttributes.swift
     info:
       path: RecordingWidget/Info.plist
       properties:
         CFBundleDisplayName: $(REFLECT_DISPLAY_NAME)
-        CFBundleShortVersionString: 0.6.0
-        CFBundleVersion: 0.6.0.8
+        CFBundleShortVersionString: $(TAURI_REFLECT_MARKETING_VERSION:default=0.0.0)
+        CFBundleVersion: $(TAURI_REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     # The widget needs no capability of its own, but the release pipeline
@@ -346,6 +377,8 @@ targets:
       base:
         PRODUCT_NAME: RecordingWidget
         CODE_SIGN_STYLE: Automatic
+        # See ShareExtension.
+        CODE_SIGN_ENTITLEMENTS: $(REFLECT_CODE_SIGN_ENTITLEMENTS)
         DEVELOPMENT_TEAM: 789ULN5MZB
         SWIFT_VERSION: '5.0'
         TARGETED_DEVICE_FAMILY: 1,2
@@ -353,11 +386,11 @@ targets:
         debug:
           PRODUCT_BUNDLE_IDENTIFIER: app.reflect.ios.dev.widgets
           REFLECT_DISPLAY_NAME: Reflect Dev
-          CODE_SIGN_ENTITLEMENTS: RecordingWidget/RecordingWidget.dev.entitlements
+          REFLECT_CODE_SIGN_ENTITLEMENTS: RecordingWidget/RecordingWidget.dev.entitlements
         release:
-          PRODUCT_BUNDLE_IDENTIFIER: app.reflect.ios.widgets
-          REFLECT_DISPLAY_NAME: Reflect
-          CODE_SIGN_ENTITLEMENTS: RecordingWidget/RecordingWidget.entitlements
+          PRODUCT_BUNDLE_IDENTIFIER: $(TAURI_REFLECT_IOS_WIDGETS_BUNDLE_ID:default=app.reflect.ios.widgets)
+          REFLECT_DISPLAY_NAME: $(TAURI_REFLECT_IOS_DISPLAY_NAME:default=Reflect)
+          REFLECT_CODE_SIGN_ENTITLEMENTS: $(TAURI_REFLECT_IOS_WIDGETS_ENTITLEMENTS:default=RecordingWidget/RecordingWidget.entitlements)
     postBuildScripts:
       # Same skip-codesign entitlement preservation as ShareExtension: CI
       # TestFlight builds archive unsigned, and export re-signing only keeps

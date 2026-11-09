@@ -39,6 +39,10 @@ export interface TestCaptureInboxService extends CaptureInboxService {
   removed(): readonly string[]
   rejected(): readonly string[]
   hostRegistrations(): number
+  /**
+   * Every value passed to {@link CaptureInboxService.writeQuickNoteDefaults}, in order.
+   */
+  quickNoteDefaults(): readonly string[]
 }
 
 /**
@@ -51,6 +55,7 @@ class TestCaptureInboxServiceImpl implements TestCaptureInboxService {
   readonly #shared = new Map<string, string>()
   readonly #spoolLog: { name: string; json: string; generation: number }[] = []
   readonly #removeLog: string[] = []
+  readonly #quickNoteDefaults: string[] = []
   readonly #rejectLog: string[] = []
   #registrations = 0
 
@@ -106,6 +111,15 @@ class TestCaptureInboxServiceImpl implements TestCaptureInboxService {
     this.#rejectLog.push(name)
     this.#inbox.delete(name)
     return Promise.resolve()
+  }
+
+  writeQuickNoteDefaults(parent: string): Promise<void> {
+    this.#quickNoteDefaults.push(parent)
+    return Promise.resolve()
+  }
+
+  quickNoteDefaults(): readonly string[] {
+    return this.#quickNoteDefaults
   }
 
   relaySharedInbox(): Promise<number> {

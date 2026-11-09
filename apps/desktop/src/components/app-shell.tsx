@@ -52,7 +52,7 @@ export function AppShell({
         </aside>
       ) : null}
 
-      <main className="min-w-0 flex-1 overflow-hidden bg-surface">{children}</main>
+      <main className="min-w-0 flex-1 overflow-hidden bg-surface-canvas">{children}</main>
 
       {context ? (
         <aside

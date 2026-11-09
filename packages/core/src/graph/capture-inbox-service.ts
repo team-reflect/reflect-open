@@ -39,11 +39,16 @@ export interface CaptureInboxService {
    */
   reject(name: string, generation: number): Promise<void>
   /**
-   * Move envelopes the iOS share extension spooled into the App Group inbox
-   * into the graph's inbox, resolving with how many moved. Zero where there
-   * is no shared container.
+   * Move envelopes the sandboxed extensions (iOS share, macOS Safari) spooled
+   * into the App Group inbox into the graph's inbox, resolving with how many
+   * moved. Zero where there is no shared container.
    */
   relaySharedInbox(generation: number): Promise<number>
+  /**
+   * Mirror the quick note parent into the App Group container for the iOS
+   * App Intent; an empty string clears it. A no-op without that container.
+   */
+  writeQuickNoteDefaults(parent: string): Promise<void>
   /**
    * Copy a spooled screenshot into the graph as a downscaled JPEG asset. The
    * spool file stays until it is removed.
@@ -93,6 +98,10 @@ class CaptureInboxServiceImpl implements CaptureInboxService {
 
   async relaySharedInbox(generation: number): Promise<number> {
     return await this.#deps.ipc.call('capture_shared_inbox_relay', { generation }, z.number())
+  }
+
+  async writeQuickNoteDefaults(parent: string): Promise<void> {
+    await this.#deps.ipc.call('capture_quick_note_defaults_write', { parent }, voidSchema)
   }
 
   async promoteScreenshot(

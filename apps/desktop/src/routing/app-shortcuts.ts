@@ -1,21 +1,22 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
-import { getIsoToday } from '@reflect/utils'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
-import { useMaybeChatSession } from '@/providers/chat-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo, useGraphRecents } from '@/providers/graph-provider.tsx'
 import { useNoteFindActions } from '@/providers/note-find-provider.tsx'
 import { useNoteTemplates } from '@/providers/note-templates-provider.tsx'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useSettingsService } from '@/providers/settings-provider.tsx'
 import { useShortcuts } from '@/providers/shortcuts-provider.tsx'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
-import { useTheme } from '@/providers/theme-provider.tsx'
-import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import {
+  useAppServices,
+  useCoreServices,
+  useMaybeGraphServices,
+} from '@/services/services-provider.tsx'
 import { focusedNotePathForRoute } from '@reflect/app'
-import { useRouter } from './router.tsx'
+import { useRouterActions, useRouterState, useRouterHandlers } from './router.tsx'
 
 /**
  * App-scope keyboard shortcuts, driven by the command registry (Plan 08): a
@@ -44,18 +45,18 @@ const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
  * the native menu's command items dispatch into the same guard path while
  * mounted (`setMenuCommandDispatch`).
  */
-
-function doNothing(): void {}
-
 export function useAppShortcuts(): CommandContext {
   const services = useCoreServices()
   const appServices = useAppServices()
-  const { route, navigate, back, forward, clearScrollState } = useRouter()
+  const { route } = useRouterState()
+  const { clearScrollState } = useRouterHandlers()
+  const { navigate, back, forward } = useRouterActions()
   const { platform, semanticSearch } = services
   const { commands, nativeMenu } = appServices
   const focusedDailyDate = useFocusedDailyDate()
-  const { resolvedTheme, setTheme } = useTheme()
-  const { graph, recents, openRecent } = useGraph()
+  const graph = useGraphInfo()
+  const recents = useGraphRecents()
+  const { openRecent } = useGraphActions()
   const { openPalette, open: paletteOpen } = usePalette()
   const { openShortcuts, closeShortcuts, open: shortcutsOpen } = useShortcuts()
   const {
@@ -67,8 +68,11 @@ export function useAppShortcuts(): CommandContext {
   const { toggleSidebar } = useSidebar()
   const { toggle: toggleAudioMemo } = useAudioMemo()
   // The hook can outlive the open graph, and its chat session with it.
-  const newChat = useMaybeChatSession()?.newChat ?? doNothing
-  const { updateSettings } = useSettings()
+  const chat = useMaybeGraphServices()?.chat
+  const newChat = useCallback(() => {
+    chat?.newChat()
+  }, [chat])
+  const settingsService = useSettingsService()
   const {
     openForPath: openNoteFindForPath,
     next: findNextInNote,
@@ -114,12 +118,16 @@ export function useAppShortcuts(): CommandContext {
       // the same day the context sidebar shows (see `effectiveDailyDate`); off
       // the daily views it falls back to the routed note.
       notePath: () => {
-        return focusedNotePathForRoute(routeRef.current, getIsoToday(), focusedDailyDateRef.current)
+        return focusedNotePathForRoute(
+          routeRef.current,
+          services.today.get(),
+          focusedDailyDateRef.current,
+        )
       },
       togglePin: async () => {
         const path = focusedNotePathForRoute(
           routeRef.current,
-          getIsoToday(),
+          services.today.get(),
           focusedDailyDateRef.current,
         )
         if (path !== null) {
@@ -129,7 +137,7 @@ export function useAppShortcuts(): CommandContext {
       togglePrivate: async () => {
         const path = focusedNotePathForRoute(
           routeRef.current,
-          getIsoToday(),
+          services.today.get(),
           focusedDailyDateRef.current,
         )
         if (path !== null) {
@@ -139,12 +147,16 @@ export function useAppShortcuts(): CommandContext {
       back,
       forward,
       clearScrollState,
-      toggleTheme: () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'),
+      toggleTheme: appServices.theme.toggleTheme,
       toggleSidebar,
       newChat,
       openNoteFind: () => {
         openNoteFindForPath(
-          focusedNotePathForRoute(routeRef.current, getIsoToday(), focusedDailyDateRef.current),
+          focusedNotePathForRoute(
+            routeRef.current,
+            services.today.get(),
+            focusedDailyDateRef.current,
+          ),
         )
       },
       findNextInNote,
@@ -162,7 +174,7 @@ export function useAppShortcuts(): CommandContext {
       openTemplatePicker,
       openTemplateCreate,
       enableSemanticSearch: () => {
-        updateSettings({ semanticSearchEnabled: true })
+        settingsService.update({ semanticSearchEnabled: true })
         // EmbeddingsSync loads an untouched runtime; a `failed` one only
         // retries on an explicit action like this command.
         void semanticSearch.retryFailedModel()
@@ -175,8 +187,6 @@ export function useAppShortcuts(): CommandContext {
       back,
       forward,
       clearScrollState,
-      resolvedTheme,
-      setTheme,
       openPalette,
       openShortcuts,
       openTemplatePicker,
@@ -187,7 +197,7 @@ export function useAppShortcuts(): CommandContext {
       findNextInNote,
       findPreviousInNote,
       toggleAudioMemo,
-      updateSettings,
+      settingsService,
       semanticSearch,
     ],
   )

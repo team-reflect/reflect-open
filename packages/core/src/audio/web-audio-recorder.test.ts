@@ -114,8 +114,8 @@ describe('createWebAudioRecorder', () => {
     const recorder = createRecorder()
     const states: AudioRecorderState[] = []
     const elapsed: number[] = []
-    recorder.subscribeState((state) => {
-      states.push(state)
+    recorder.state.subscribe(() => {
+      states.push(recorder.state.get())
     })
     recorder.subscribeLevel((event) => {
       elapsed.push(event.elapsedMs)
@@ -124,7 +124,7 @@ describe('createWebAudioRecorder', () => {
     await expect(recorder.start(START_OPTIONS)).resolves.toEqual({
       sessionStartedMs: 1_700_000_000_000,
     })
-    expect(recorder.state()).toBe('recording')
+    expect(recorder.state.get()).toBe('recording')
     expect(recorder.stream()).not.toBeNull()
     // WKWebView profile: webm unsupported, mp4 picked.
     expect(FakeMediaRecorder.instances[0]!.mimeType).toBe('audio/mp4')
@@ -162,7 +162,7 @@ describe('createWebAudioRecorder', () => {
     await clock.advance(200)
 
     await expect(recorder.stop()).resolves.toBeNull()
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
   })
 
   it('cancel stops the tracks and discards without a result', async () => {
@@ -173,7 +173,7 @@ describe('createWebAudioRecorder', () => {
 
     await recorder.cancel()
 
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
     expect(recorder.stream()).toBeNull()
     expect(track.stopped).toBe(true)
   })
@@ -186,13 +186,13 @@ describe('createWebAudioRecorder', () => {
 
     await expect(recorder.start(START_OPTIONS)).rejects.toThrow('NotSupportedError')
     expect(track.stopped).toBe(true)
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
 
     // The failure must not wedge the recorder: a later start records normally.
     FakeMediaRecorder.failConstruction = false
     mediaDevices.answer = () => Promise.resolve(fakeStream([fakeTrack()]))
     await recorder.start(START_OPTIONS)
-    expect(recorder.state()).toBe('recording')
+    expect(recorder.state.get()).toBe('recording')
   })
 
   it('rethrows a permission denial and returns to idle', async () => {
@@ -200,7 +200,7 @@ describe('createWebAudioRecorder', () => {
     const recorder = createRecorder()
 
     await expect(recorder.start(START_OPTIONS)).rejects.toThrow('Permission denied')
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
   })
 
   it('overlapping starts acquire a single stream', async () => {
@@ -215,7 +215,7 @@ describe('createWebAudioRecorder', () => {
 
     expect(mediaDevices.requests).toBe(1)
     expect(FakeMediaRecorder.instances).toHaveLength(1)
-    expect(recorder.state()).toBe('recording')
+    expect(recorder.state.get()).toBe('recording')
   })
 
   it('a cancel during the permission prompt releases the stream it resolves into', async () => {
@@ -225,13 +225,13 @@ describe('createWebAudioRecorder', () => {
     const recorder = createRecorder()
 
     const pending = recorder.start(START_OPTIONS)
-    expect(recorder.state()).toBe('requesting')
+    expect(recorder.state.get()).toBe('requesting')
     await recorder.cancel()
     pendingStream.resolve(fakeStream([track]))
 
     await expect(pending).resolves.toBeNull()
     expect(track.stopped).toBe(true)
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
     expect(FakeMediaRecorder.instances).toHaveLength(0)
   })
 
@@ -255,7 +255,7 @@ describe('createWebAudioRecorder', () => {
 
     await expect(recorder.stop()).resolves.toBeNull()
     expect(FakeMediaRecorder.instances[0]!.stopCalls).toBe(0)
-    expect(recorder.state()).toBe('idle')
+    expect(recorder.state.get()).toBe('idle')
   })
 
   it('rotates segments on the segment boundary and numbers the final one after them', async () => {

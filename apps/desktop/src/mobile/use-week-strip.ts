@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import useEmblaCarousel from 'embla-carousel-react'
+import {
+  useCallback,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react'
 import type { WeekStartDay } from '@reflect/core'
 import { createWeekWindow, weekAtIndex, weekIndexOf, type WeekWindow } from '@reflect/app'
+import { attachSnapPager, type SnapPager } from '@/lib/snap-pager.ts'
+import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 
 /**
  * How close (in weeks) a settled page may get to a window edge before the
@@ -23,8 +31,8 @@ export function shouldRecenterWeeks(
 }
 
 export interface WeekStrip {
-  /** Attach to the strip's Embla viewport element. */
-  emblaRef: ReturnType<typeof useEmblaCarousel>[0]
+  /** Attach to the strip's horizontal scroller. */
+  scrollerRef: RefObject<HTMLDivElement | null>
   /** The current window of week slides. */
   weekWindow: WeekWindow
   /** Week-start of the visible (possibly browsed-to) week — the month header. */
@@ -38,56 +46,69 @@ export interface WeekStrip {
 }
 
 /**
- * Drives the calendar strip's week paging (V1 parity): an Embla carousel of
- * week slides over a re-centering {@link WeekWindow}. Paging **browses** —
- * it moves the visible week (and the month header) without changing the
- * selection; tapping a day navigates, and the strip follows the selected
- * `date` back whenever it changes (a carousel swipe, a date link, Today).
+ * Drives the calendar strip's week paging (V1 parity): a native horizontal
+ * scroller that snaps to one week slide at a time, over a re-centering
+ * {@link WeekWindow}. Paging **browses** — it moves the visible week (and the
+ * month header) without changing the selection; tapping a day navigates, and
+ * the strip scrolls back to the selected `date` whenever it changes (a carousel
+ * swipe, a date link, Today).
+ *
+ * The browser moves the strip with the finger and snaps it, so the gesture
+ * never waits for the main thread. The month header follows the week nearest
+ * a user scroll; a scroll to the selection shows its target week at once.
  *
  * Window rebuilds — a far `date` jump, a week-start setting change, or paging
  * near an edge — always land the rebuilt window's **anchor** week on screen:
  * every rebuild centers the window on the week it needs to show, so the
- * follow effect reinitializes Embla onto the anchor index uniformly.
+ * follow effect moves the scroller onto the anchor index uniformly.
  */
 export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStrip {
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const pagerRef = useRef<SnapPager | null>(null)
+  const reducedMotion = usePrefersReducedMotion()
   const [weekWindow, setWeekWindow] = useState<WeekWindow>(() => {
     return createWeekWindow(date, weekStartDay)
   })
-  const [emblaRef, emblaApi] = useEmblaCarousel({ startIndex: weekWindow.anchorIndex })
   const [displayedIndex, setDisplayedIndex] = useState(weekWindow.anchorIndex)
   // The window start we last reconciled against — a change means a rebuild,
-  // so Embla must reinitialize onto the new slides at the anchor.
+  // so the scroller must move onto the new slides at the anchor.
   const windowStartRef = useRef(weekWindow.start)
   // The `date` the strip last followed — browsing must not snap back to it.
   const followedDateRef = useRef(date)
 
-  const onEmblaSelect = useCallback((api: NonNullable<typeof emblaApi>) => {
-    setDisplayedIndex(api.selectedScrollSnap())
-  }, [])
+  const count = useEffectEvent(() => weekWindow.count)
+  const shownIndex = useEffectEvent(() => displayedIndex)
+  const prefersReducedMotion = useEffectEvent(() => reducedMotion)
 
   // Re-center the window when paging settles near an edge, keeping the
   // browsed week on screen (it becomes the rebuilt window's anchor).
-  const onEmblaSettle = useCallback(
-    (api: NonNullable<typeof emblaApi>) => {
-      const index = api.selectedScrollSnap()
-      if (shouldRecenterWeeks(weekWindow, index)) {
-        setWeekWindow(createWeekWindow(weekAtIndex(weekWindow, index), weekStartDay))
-      }
-    },
-    [weekWindow, weekStartDay],
-  )
+  const handleSettle = useEffectEvent((index: number) => {
+    if (shouldRecenterWeeks(weekWindow, index)) {
+      setWeekWindow(createWeekWindow(weekAtIndex(weekWindow, index), weekStartDay))
+    }
+  })
 
-  useEffect(() => {
-    if (!emblaApi) {
+  // Attaches the pager, which rests on the anchor week before the first paint.
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current
+    if (!scroller) {
       return
     }
-    emblaApi.on('select', onEmblaSelect)
-    emblaApi.on('settle', onEmblaSettle)
+    const controller = new AbortController()
+    pagerRef.current = attachSnapPager({
+      element: scroller,
+      index: shownIndex(),
+      count,
+      prefersReducedMotion,
+      onIndex: setDisplayedIndex,
+      onSettle: handleSettle,
+      signal: controller.signal,
+    })
     return () => {
-      emblaApi.off('select', onEmblaSelect)
-      emblaApi.off('settle', onEmblaSettle)
+      pagerRef.current = null
+      controller.abort()
     }
-  }, [emblaApi, onEmblaSelect, onEmblaSettle])
+  }, [])
 
   // A week-start change re-aligns every week: rebuild around the selection.
   const weekStartDayRef = useRef(weekStartDay)
@@ -102,15 +123,11 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
   // Follow the selection and finish rebuilds. Layout effect so the strip's
   // position lands in the same frame as the day carousel's (no visible lag).
   useLayoutEffect(() => {
-    if (!emblaApi) {
-      return
-    }
     if (weekWindow.start !== windowStartRef.current) {
       // Any rebuild centers the window on the week to show — land on it.
       windowStartRef.current = weekWindow.start
       followedDateRef.current = date
-      emblaApi.reInit({ startIndex: weekWindow.anchorIndex })
-      setDisplayedIndex(weekWindow.anchorIndex)
+      pagerRef.current?.restOn(weekWindow.anchorIndex)
       return
     }
     if (followedDateRef.current === date) {
@@ -126,9 +143,8 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
       setWeekWindow(createWeekWindow(date, weekStartDay))
       return
     }
-    emblaApi.scrollTo(index)
-    setDisplayedIndex(index)
-  }, [emblaApi, date, weekWindow, weekStartDay])
+    pagerRef.current?.show(index)
+  }, [date, weekWindow, weekStartDay])
 
   const showWeekOf = useCallback(
     (target: string) => {
@@ -137,14 +153,13 @@ export function useWeekStrip(date: string, weekStartDay: WeekStartDay): WeekStri
         setWeekWindow(createWeekWindow(target, weekStartDay))
         return
       }
-      emblaApi?.scrollTo(index)
-      setDisplayedIndex(index)
+      pagerRef.current?.show(index)
     },
-    [emblaApi, weekWindow, weekStartDay],
+    [weekWindow, weekStartDay],
   )
 
   return {
-    emblaRef,
+    scrollerRef,
     weekWindow,
     displayedWeekStart: weekAtIndex(weekWindow, displayedIndex),
     showWeekOf,

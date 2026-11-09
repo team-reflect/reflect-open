@@ -13,6 +13,7 @@ import {
   createTestSettingsService,
   createTestStorageService,
 } from '../testing/index.ts'
+import { WritableStore } from '../store.ts'
 import type { EmbeddingBackfillResult } from './embedding-index-service.ts'
 import type { EmbedStatus } from './embedding-runtime-service.ts'
 import type { RetrievalHit } from './retrieval-service.ts'
@@ -49,7 +50,7 @@ async function setup(options?: {
   const indexLifecycle = createTestIndexLifecycleService({
     logger,
     progress,
-    graphSession: { getState: () => ({ session }), subscribe: () => () => {} },
+    graphSession: new WritableStore({ session }),
     indexStore: createTestIndexStoreService({
       fail: (call) => {
         return options?.failClear === true && call.method === 'clear'
@@ -207,7 +208,7 @@ describe('start', () => {
     })
 
     const stop = semanticSearch.start()
-    await vi.waitFor(() => expect(runtime.lastStatus().status).toBe('failed'))
+    await vi.waitFor(() => expect(runtime.get().status).toBe('failed'))
     await flush()
 
     // The one load an untouched runtime gets; `failed` starts no second one.
@@ -220,7 +221,7 @@ describe('start', () => {
     const { semanticSearch, runtime, embeddingIndex } = await setup({ role: 'note-window' })
 
     const stop = semanticSearch.start()
-    await vi.waitFor(() => expect(runtime.lastStatus()).toEqual(READY))
+    await vi.waitFor(() => expect(runtime.get()).toEqual(READY))
     await flush()
 
     expect(runtime.ensureCalls()).toBe(0)
@@ -251,7 +252,7 @@ describe('start', () => {
     graphSession.setState({ indexGeneration: null })
 
     const stop = semanticSearch.start()
-    await vi.waitFor(() => expect(runtime.lastStatus()).toEqual(READY))
+    await vi.waitFor(() => expect(runtime.get()).toEqual(READY))
     await flush()
 
     expect(embeddingIndex.follows()).toEqual([])

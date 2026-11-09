@@ -2,28 +2,10 @@ import { Profiler } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import type { LightboxController } from '@meowdown/react'
+import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MediaLightbox } from './media-lightbox.tsx'
-
-// The Playwright context pins prefers-reduced-motion to reduce, so the
-// reduced-motion query stays stubbed to exercise both settings.
-function installMatchMedia(reducedMotion: boolean): void {
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: vi.fn((query: string): MediaQueryList => ({
-      matches: reducedMotion && query === '(prefers-reduced-motion: reduce)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  })
-}
 
 function makeLightbox(close: () => void): LightboxController {
   return {
@@ -47,7 +29,9 @@ interface RenderedLightbox {
   rerender: () => Promise<void>
 }
 
-async function renderMobileLightbox(): Promise<RenderedLightbox> {
+async function renderMobileLightbox(options?: {
+  reducedMotion?: boolean
+}): Promise<RenderedLightbox> {
   const onClose = vi.fn()
   const lightbox = makeLightbox(onClose)
   let commitCount = 0
@@ -61,7 +45,13 @@ async function renderMobileLightbox(): Promise<RenderedLightbox> {
       <MediaLightbox lightbox={lightbox} onOpenImage={vi.fn()} />
     </Profiler>
   )
-  const screen = await renderInApp(renderLightbox(), { platform: MOBILE_PLATFORM })
+  const systemPreferences = createTestSystemPreferencesService({
+    reducedMotion: options?.reducedMotion ?? false,
+  })
+  const screen = await renderInApp(renderLightbox(), {
+    platform: MOBILE_PLATFORM,
+    appServices: { systemPreferences },
+  })
 
   const dialog = page.getByRole('dialog', { name: 'Image preview' })
   await expect.element(dialog).toBeInTheDocument()
@@ -130,7 +120,6 @@ function swallowTransitionEnd(event: Event): void {
 }
 
 beforeEach(() => {
-  installMatchMedia(false)
   document.addEventListener('transitionend', swallowTransitionEnd, { capture: true })
 })
 
@@ -362,8 +351,9 @@ describe('MediaLightbox mobile drag-to-dismiss', () => {
   })
 
   it('skips the settle animation under reduced motion and clears suppression', async () => {
-    installMatchMedia(true)
-    const { preview, image, backdrop, closeChrome, onClose } = await renderMobileLightbox()
+    const { preview, image, backdrop, closeChrome, onClose } = await renderMobileLightbox({
+      reducedMotion: true,
+    })
 
     touchDown(preview, 100, 100)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 102, clientY: 130 })

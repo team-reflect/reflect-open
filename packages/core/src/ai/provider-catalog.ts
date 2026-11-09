@@ -55,6 +55,7 @@ type OpenAIModelId = KnownId<Parameters<OpenAIProvider>[0]>
 const OPENAI_MODELS: NonEmptyArray<AiModelOption<OpenAIModelId>> = [
   { id: 'gpt-6-astra', label: 'GPT-6 Astra', contextWindow: 1_000_000 },
   { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', contextWindow: 1_000_000 },
+  { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', contextWindow: 1_000_000 },
   { id: 'gpt-6-luna', label: 'GPT-6 Luna', contextWindow: 1_000_000 },
   { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', contextWindow: 1_000_000 },
   { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', contextWindow: 1_000_000 },
@@ -86,6 +87,7 @@ const GOOGLE_MODELS: NonEmptyArray<AiModelOption<GoogleModelId>> = [
   { id: 'gemini-flash-latest', label: 'Gemini Flash Latest', contextWindow: 1_000_000 },
   { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', contextWindow: 1_000_000 },
   { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', contextWindow: 1_000_000 },
+  { id: 'gemini-flash-lite-latest', label: 'Gemini Flash Lite Latest', contextWindow: 1_000_000 },
   { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', contextWindow: 1_000_000 },
 ]
 

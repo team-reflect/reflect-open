@@ -56,13 +56,47 @@ describe('createWebStorageService', () => {
     })
     const listener = vi.fn()
     const other = vi.fn()
-    const unsubscribe = storage.local.subscribe('key', listener)
-    storage.local.subscribe('other', other)
+    const unsubscribe = storage.local.store('key').subscribe(listener)
+    storage.local.store('other').subscribe(other)
 
     storage.local.set('key', 'written')
     storage.local.set('key', 'written')
     expect(listener).toHaveBeenCalledOnce()
     expect(other).not.toHaveBeenCalled()
+
+    unsubscribe()
+    storage.local.set('key', null)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('does not notify when a write matches the stored value', () => {
+    const storage = createWebStorageService({
+      logger: createTestLoggerService(),
+      localStorage: createStorage({ key: 'stored' }),
+      sessionStorage: null,
+    })
+    const listener = vi.fn()
+    storage.local.store('key').subscribe(listener)
+
+    storage.local.set('key', 'stored')
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('returns one store per key that follows writes', () => {
+    const storage = createWebStorageService({
+      logger: createTestLoggerService(),
+      localStorage: createStorage({ key: 'stored' }),
+      sessionStorage: null,
+    })
+    const store = storage.local.store('key')
+    expect(storage.local.store('key')).toBe(store)
+    expect(store.get()).toBe('stored')
+
+    const listener = vi.fn()
+    const unsubscribe = store.subscribe(listener)
+    storage.local.set('key', 'written')
+    expect(store.get()).toBe('written')
+    expect(listener).toHaveBeenCalledOnce()
 
     unsubscribe()
     storage.local.set('key', null)

@@ -7,6 +7,7 @@ import {
   createTestAttachmentService,
   createTestClockService,
   createTestFileChangeService,
+  createTestLoggerService,
   createTestNoteFileService,
   createTestProgressPort,
   createTestPlatformService,
@@ -20,7 +21,7 @@ import { useAssetPersistence, type AssetPersistence } from './use-asset-persiste
 let persistence: AssetPersistence | null = null
 // The app of the latest `renderPersistence`; the attachment services read its graph.
 let core: ReturnType<typeof createTestCoreServices<{ attachments: AttachmentService }>>
-const graphSession = { getState: () => core.graphSession.getState() }
+const graphSession = { get: () => core.graphSession.get() }
 // The attachment service of the next `renderPersistence`.
 let attachmentService: AttachmentService = createTestAttachmentService({ graphSession })
 
@@ -151,6 +152,7 @@ describe('useAssetPersistence', () => {
       clock,
       platform: createTestPlatformService(),
       graphSession,
+      logger: createTestLoggerService(),
     })
     const view = await renderPersistence({ generation: 3, path: 'notes/a.md' })
 

@@ -1,4 +1,10 @@
-import type { CoreServices } from '@reflect/core'
+import {
+  combineStores,
+  isMobilePlatform,
+  WritableStore,
+  type CoreServices,
+  type Store,
+} from '@reflect/core'
 import type { ClipboardService } from './app/clipboard-service.ts'
 import {
   createOpenerService,
@@ -49,15 +55,18 @@ import { createQuitPolicyService, type QuitPolicyService } from './app/quit-poli
 import type { WindowService } from './app/window-service.ts'
 import type { DialogService } from './app/dialog-service.ts'
 import {
-  createPlatformService,
+  createSystemPreferencesService,
   type PlatformMedia,
-  type PlatformService,
-} from './app/platform-service.ts'
+  type SystemPreferencesService,
+} from './app/system-preferences-service.ts'
 import {
   createMobileOnboardingService,
   type MobileOnboardingService,
 } from './graph/mobile-onboarding-service.ts'
 import { createGraphBootService, type GraphBootService } from './graph/graph-boot-service.ts'
+import { createReviewService, type ReviewService } from './review/review-service.ts'
+import { WHATS_NEW } from './whats-new/whats-new-content.ts'
+import { createWhatsNewService, type WhatsNewService } from './whats-new/whats-new-service.ts'
 
 /**
  * What the host supplies to the app layer: the window, lifecycle, storage,
@@ -120,9 +129,9 @@ export interface AppServices {
    */
   readonly dialog: DialogService
   /**
-   * The platform facts plus the webview's reduced-motion and color-scheme signals.
+   * The webview's reduced-motion and color-scheme preferences.
    */
-  readonly platform: PlatformService
+  readonly systemPreferences: SystemPreferencesService
   /**
    * The window-aware graph flows: the boot path, the folder picker, and the
    * opens and closes that end the session note windows adopted.
@@ -208,13 +217,21 @@ export interface AppServices {
    * When the app lands its dirty state: on quit and window close, or on moving to the background.
    */
   readonly quitPolicy: QuitPolicyService
+  /**
+   * The What's New page shown once per app version after an update.
+   */
+  readonly whatsNew: WhatsNewService
+  /**
+   * The App Store review request on iOS, and the rate and feedback links.
+   */
+  readonly review: ReviewService
 }
 
 /**
  * Build the app layer once per webview.
  */
 export function createAppServices(core: CoreServices, host: AppHost): AppServices {
-  const platform = createPlatformService({ facts: core.platform, media: host.media })
+  const systemPreferences = createSystemPreferencesService({ media: host.media })
   const commands = createCommandService({ platform: core.platform, logger: core.logger })
   const keymap = createKeymapService({ platform: core.platform })
   const nativeMenu = createNativeMenuService({
@@ -256,7 +273,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
   return {
     window: host.window,
     dialog: host.dialog,
-    platform,
+    systemPreferences,
     graphBoot: createGraphBootService({
       graphSession: core.graphSession,
       window: host.window,
@@ -285,7 +302,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     theme: createThemeService({
       settings: core.settings,
       storage: core.storage,
-      platform,
+      systemPreferences,
     }),
     update: createUpdateService({
       updater: host.updater,
@@ -303,7 +320,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       contacts: core.contacts,
       personNotes: core.personNotes,
       settings: core.settings,
-      clock: core.clock,
+      today: core.today,
       operations: host.operations,
       logger: core.logger,
       graphSession: core.graphSession,
@@ -325,5 +342,39 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
       platform: core.platform,
       persistenceFlush: core.persistenceFlush,
     }),
+    whatsNew: createWhatsNewService({
+      storage: core.storage,
+      platform: core.platform,
+      window: host.window,
+      graphSession: core.graphSession,
+      blocked: whatsNewBlocked(core),
+      content: WHATS_NEW,
+      offerFirst: !isMobilePlatform(core.platform.appPlatform),
+    }),
+    review: createReviewService({
+      storage: core.storage,
+      clock: core.clock,
+      platform: core.platform,
+      logger: core.logger,
+      opener,
+      classicAccess: core.classicAccess,
+      mobile: core.mobile,
+    }),
   }
+}
+
+/**
+ * Whether the paywall shows, or may still show because a check behind it is loading.
+ */
+function whatsNewBlocked(core: CoreServices): Store<boolean> {
+  const { mobile } = core
+  if (mobile === null) {
+    return new WritableStore(false)
+  }
+  return combineStores(
+    [mobile.paywall.gate, mobile.subscription, core.classicAccess, mobile.installClock],
+    (phase, active, classic, clock) => {
+      return phase !== 'hidden' || active.isLoading || classic.isLoading || clock.isLoading
+    },
+  )
 }

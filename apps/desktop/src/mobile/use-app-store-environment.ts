@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { AppStoreEnvironment } from '@reflect/core'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useServiceState } from '@/services/use-service-state.ts'
+import { useStore } from '@/lib/use-store.ts'
 
 /**
  * The live or startup-seeded App Store install channel, verified on mount.
@@ -13,7 +13,7 @@ export function useAppStoreEnvironment(): {
   invalidate: VoidFunction
 } {
   const { appStoreEnvironment: environment } = useMobileServices()
-  const state = useServiceState(environment, environment.getState)
+  const state = useStore(environment)
 
   useEffect(() => {
     void environment.environment()

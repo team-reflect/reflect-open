@@ -10,19 +10,19 @@ import {
 import { PaletteProvider } from '@/components/command-palette/palette-provider.tsx'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import { queryClient } from '@/lib/query-client.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import '@/test-utils/locator.ts'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { RouteContent } from './route-content.tsx'
 
-type Router = ReturnType<typeof useRouter>
+type Router = ReturnType<typeof useRouterActions>
 
 /**
  * Publishes the router so the test can navigate.
  */
 function RouterProbe({ routerRef }: { routerRef: RefObject<Router | null> }): null {
-  const router = useRouter()
+  const router = useRouterActions()
   useLayoutEffect(() => {
     routerRef.current = router
   })

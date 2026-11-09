@@ -64,6 +64,16 @@ release-please owns the app version in `apps/desktop/package.json`. Never hand-e
 that version, the changelogs (`apps/desktop/CHANGELOG.md`,
 `apps/desktop/CHANGELOG.beta.md`), or the manifests under `.github/release-please/`.
 
+What's New is the in-app list of changes shown after an update. When a PR adds a
+feature or a change users will notice, add an item to `WHATS_NEW` in
+`packages/app/src/whats-new/whats-new-content.ts` in the same PR. Key it by the next
+marketing version (the version in `apps/desktop/package.json` without the prerelease
+suffix). Give it an `id` that no other item, in any version, uses. Write a short
+title and a one-sentence body for users, and set `platforms` to where the change
+shows. Each update shows only the items the user has not seen, so change the `id`
+of an extended item to show it again. Prefer to extend or merge an existing item over adding a
+near-duplicate. Skip internal changes, refactors, and small fixes.
+
 ### Running tests
 
 There are too many tests to run them all. Run only the ones for the logic you wrote:
@@ -153,6 +163,9 @@ The short version:
   and the platform roots.
 - React reads `useCoreServices()` and `useAppServices()`; commands read
   `CommandContext.services` and `.app`.
+- Service state is a `Store`. Read the module comment of
+  [packages/core/src/store.ts](packages/core/src/store.ts) before you add or change
+  service state or a React read of it.
 - Rust-boundary wrappers (`NoteFileService`) take an explicit `generation`. User-facing
   services read the `GraphSession` once at method entry and pass its generations down.
 - Tests build services over `@reflect/core/testing` and `@reflect/app/testing`;

@@ -23,7 +23,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { imageFilesFrom } from '@/lib/chat-attachments.ts'
 import { groupModelOptions } from '@/lib/chat-model-groups.ts'
 import { keybindingFor } from '@/lib/commands/app-commands.ts'
-import { useChatSession } from '@/providers/chat-provider.tsx'
+import {
+  useChatActions,
+  useChatAttachments,
+  useChatDraft,
+  useChatModels,
+  useChatStatus,
+  useHasChatTurns,
+} from '@/providers/chat-provider.tsx'
 import { ChatHistoryMenu } from './chat-history-menu.tsx'
 
 const NEW_CHAT_BINDING = keybindingFor('chat.new')
@@ -38,22 +45,13 @@ const NEW_CHAT_BINDING = keybindingFor('chat.new')
  * conversations; "New chat" appears once there's a conversation to leave.
  */
 export function ChatInput(): ReactElement {
-  const {
-    turns,
-    status,
-    providers,
-    modelOptions,
-    activeModel,
-    selectModel,
-    draft,
-    setDraft,
-    attachments,
-    attachImages,
-    removeAttachment,
-    send,
-    stop,
-    newChat,
-  } = useChatSession()
+  const hasTurns = useHasChatTurns()
+  const status = useChatStatus()
+  const { providers, modelOptions, activeModel } = useChatModels()
+  const draft = useChatDraft()
+  const attachments = useChatAttachments()
+  const { selectModel, setDraft, attachImages, removeAttachment, send, stop, newChat } =
+    useChatActions()
   const streaming = status === 'streaming'
   const empty = draft.trim() === '' && attachments.length === 0
 
@@ -176,7 +174,7 @@ export function ChatInput(): ReactElement {
           </Select>
           <div className="flex-1" />
           <ChatHistoryMenu />
-          {turns.length > 0 && !streaming ? (
+          {hasTurns && !streaming ? (
             <Tooltip>
               <TooltipTrigger
                 render={

@@ -51,7 +51,7 @@ describe('IntegrationsSection', () => {
   })
 
   it('disabling persists without touching the permission', async () => {
-    contacts.setStatus('authorized')
+    await contacts.setStatus('authorized')
     await renderSection({ contactsEnabled: true })
     await page.getByRole('switch', { name: 'Contacts' }).click()
 
@@ -67,7 +67,7 @@ describe('IntegrationsSection', () => {
   })
 
   it('points a denied permission at System Settings', async () => {
-    contacts.setStatus('denied')
+    await contacts.setStatus('denied')
     await renderSection({ contactsEnabled: true })
 
     await page.getByRole('button', { name: 'Open System Settings' }).click()
@@ -79,7 +79,7 @@ describe('IntegrationsSection', () => {
   })
 
   it('renders nothing where the Contacts framework does not exist', async () => {
-    contacts.setStatus('unavailable')
+    await contacts.setStatus('unavailable')
     await renderSection()
     await vi.waitFor(() => expect(page.getByRole('switch').query()).toBeNull())
     expect(page.getByText('Integrations').query()).toBeNull()
@@ -89,7 +89,7 @@ describe('IntegrationsSection', () => {
 describe('IntegrationsSection on macOS', () => {
   it('keeps calendar visible on macOS when contacts are unavailable', async () => {
     platform = {}
-    contacts.setStatus('unavailable')
+    await contacts.setStatus('unavailable')
     await renderSection()
 
     await expect.element(page.getByText('Calendar events')).toBeInTheDocument()

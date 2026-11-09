@@ -5,7 +5,7 @@ import { DailyCaptureMenu } from '@/mobile/daily-capture-menu.tsx'
 import { DayCarousel } from '@/mobile/day-carousel.tsx'
 import { useDailyArrivals } from '@/mobile/use-daily-arrivals.ts'
 import { useSwipeTarget } from '@/mobile/use-swipe-target.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /**
  * The mobile spine (Plan 19, V1 parity): a month header + week calendar strip
@@ -13,13 +13,14 @@ import { useRouter } from '@/routing/router.tsx'
  * stay in lockstep through `date` — tapping a strip day or swiping the
  * carousel both navigate a daily route, which flows back as `date` (though
  * mid-swipe the strip briefly leads, following the gesture's target day). A
- * floating `+` expands into new-note and audio-memo capture actions.
+ * floating `+` expands into new-note, new-task, and audio-memo capture actions.
  *
  * Mounted once for the daily surface (a stable key in `MobileScreen`), so a
  * day change scrolls the carousel rather than remounting it.
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
-  const { navigate, entryId, arrivalSeq, arrivalFocusEditor } = useRouter()
+  const { entryId, arrivalSeq, arrivalFocusEditor } = useRouterState()
+  const { navigate } = useRouterActions()
   // One live `today` for the whole surface: the strip marks today's cell and
   // the `select` below decide "is this today?" from the *same* value, so they
   // can't disagree across the midnight rollover (which would otherwise route a
@@ -31,9 +32,9 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // a date-preserving Today tap — mints a new key, which supersedes the swipe
   // state scoped to the old one.
   const navigationKey = `${entryId}:${arrivalSeq}:${date}`
-  // The day a swipe is heading toward, announced at pointer-up — the strip
-  // (and its rolling month title) follows it while the carousel's snap
-  // animation plays, instead of waiting for the settle-time route change.
+  // The day a swipe is heading toward, announced mid-swipe — the strip (and
+  // its rolling month title) follows it while the carousel still moves,
+  // instead of waiting for the settle-time route change.
   const { targetDate, followSwipeTarget } = useSwipeTarget(navigationKey)
   const select = useCallback(
     (day: string): void => {

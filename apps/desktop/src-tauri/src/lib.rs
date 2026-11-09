@@ -56,15 +56,6 @@ mod watcher;
 
 use tauri::{Emitter, Manager};
 
-/// Returns the application version from Tauri's resolved package metadata.
-///
-/// The canonical round-trip example for the IPC boundary: the frontend reaches
-/// it only through `@reflect/core`'s typed, zod-validated `getAppVersion`.
-#[tauri::command]
-fn app_version<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> String {
-    app.package_info().version.to_string()
-}
-
 /// Builds the HTTP User-Agent from the same resolved version shown in the UI.
 pub(crate) fn app_user_agent<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> String {
     format!("Reflect/{}", app.package_info().version)
@@ -72,7 +63,7 @@ pub(crate) fn app_user_agent<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> St
 
 #[cfg(test)]
 mod app_metadata_tests {
-    use super::{app_user_agent, app_version};
+    use super::app_user_agent;
 
     #[test]
     fn app_metadata_uses_tauri_package_info() {
@@ -82,7 +73,6 @@ mod app_metadata_tests {
             .build(context)
             .expect("mock app");
 
-        assert_eq!(app_version(app.handle().clone()), "7.8.9-beta.4");
         assert_eq!(app_user_agent(app.handle()), "Reflect/7.8.9-beta.4");
     }
 }
@@ -271,7 +261,6 @@ pub fn run() {
             fs::x_archive::x_archive_resolve,
             fs::x_archive::x_archive_owners,
             fs::x_syndication::x_syndication_fetch,
-            app_version,
             background_task::background_task_begin,
             background_task::background_task_end,
             icloud::storage::mobile_storage,
@@ -360,6 +349,7 @@ pub fn run() {
             capture::capture_inbox_remove,
             capture::capture_inbox_reject,
             capture::capture_shared_inbox_relay,
+            capture::capture_quick_note_defaults_write,
             capture::capture_screenshot_promote,
             capture::capture_link_preview,
             capture::capture_meta_fetch,

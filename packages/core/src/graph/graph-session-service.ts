@@ -13,6 +13,7 @@ import type { IndexStoreService } from '../indexing/index-store-service.ts'
 import type { ICloudNativeService } from '../ipc/icloud-native-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { WritableStore, type Store } from '../store.ts'
 import type { MobileStorageService } from '../ipc/mobile-storage-service.ts'
 import type { NoteFileService } from './note-file-service.ts'
 import { ensureWelcomeNote } from './onboarding.ts'
@@ -45,10 +46,6 @@ export interface GraphSessionState<Services = unknown> {
    * independent in Rust. Null when the index failed to open.
    */
   readonly indexGeneration: number | null
-  /**
-   * True while the background index reconcile is running (Plan 06b).
-   */
-  readonly indexing: boolean
   readonly error: string | null
   readonly recents: RecentGraph[]
   /**
@@ -67,13 +64,13 @@ export interface GraphSessionState<Services = unknown> {
  * the open, create, close, forget and delete flows, and the recents list.
  * Members are function properties so surfaces can pass them around unbound.
  */
-export interface GraphSessionService<Services = unknown> {
-  getState: () => GraphSessionState<Services>
-  subscribe: (listener: () => void) => Unlisten
+export interface GraphSessionService<Services = unknown> extends Store<
+  GraphSessionState<Services>
+> {
   /**
-   * Follow the index lifecycle: the indexing flag, reconcile demands, the
-   * reloads, moves and downloads that its passes call for, and the app
-   * activity that suspends it. The returned function stops the following.
+   * Follow the index lifecycle: reconcile demands, the reloads, moves and
+   * downloads that its passes call for, and the app activity that suspends
+   * it. The returned function stops the following.
    */
   attach(): Unlisten
   /**
@@ -166,21 +163,41 @@ export interface GraphSessionServiceDeps<Services = unknown> {
  */
 const voidSchema = z.null()
 
+/**
+ * Field-by-field equality of two {@link GraphSessionState}s. `recents` is
+ * compared by content because every `loadRecents` reads a new list.
+ */
+function isGraphSessionStateEqual<Services>(
+  a: GraphSessionState<Services>,
+  b: GraphSessionState<Services>,
+): boolean {
+  return (
+    a.status === b.status &&
+    a.graph === b.graph &&
+    a.indexGeneration === b.indexGeneration &&
+    a.error === b.error &&
+    isDeepEqual(a.recents, b.recents) &&
+    a.session === b.session &&
+    a.services === b.services
+  )
+}
+
 class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService<Services> {
   readonly #deps: GraphSessionServiceDeps<Services>
-  readonly #listeners = new Set<() => void>()
   readonly #releasedListeners = new Set<(reason: GraphReleaseReason) => void>()
   readonly #deletedListeners = new Set<(root: string) => void>()
-  #state: GraphSessionState<Services> = {
-    status: 'loading',
-    graph: null,
-    indexGeneration: null,
-    indexing: false,
-    error: null,
-    recents: [],
-    session: null,
-    services: null,
-  }
+  readonly #state = new WritableStore<GraphSessionState<Services>>(
+    {
+      status: 'loading',
+      graph: null,
+      indexGeneration: null,
+      error: null,
+      recents: [],
+      session: null,
+      services: null,
+    },
+    isGraphSessionStateEqual,
+  )
   // Monotonic open token: only the most recent open may commit `graph`/`status`,
   // so overlapping opens (double-click, StrictMode remount) can't finish out of
   // order and leave us on a graph the user didn't pick last.
@@ -194,9 +211,9 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     this.#deps = deps
   }
 
-  readonly getState = (): GraphSessionState<Services> => this.#state
+  readonly get = this.#state.get
 
-  readonly subscribe = (listener: () => void): Unlisten => this.#attach(this.#listeners, listener)
+  readonly subscribe = this.#state.subscribe
 
   onGraphReleased(listener: (reason: GraphReleaseReason) => void): Unlisten {
     return this.#attach(this.#releasedListeners, listener)
@@ -222,14 +239,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
   }
 
   #setState(patch: Partial<GraphSessionState<Services>>): void {
-    const next = { ...this.#state, ...patch }
-    if (isDeepEqual(next, this.#state)) {
-      return
-    }
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set({ ...this.#state.get(), ...patch })
   }
 
   /**
@@ -399,6 +409,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
         if (seq !== this.#openSeq) {
           return false
         }
+        this.#deps.logger.warn('graph open failed:', err)
         this.#setState({ error: errorMessage(err), status: 'choosing' })
       }
       if (seq === this.#openSeq) {
@@ -439,7 +450,6 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     this.#setState({
       graph: null,
       indexGeneration: null,
-      indexing: false,
       error: null,
       status: 'choosing',
       session: null,
@@ -448,7 +458,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
   }
 
   async forgetRecent(root: string): Promise<void> {
-    const { graph } = this.#state
+    const { graph } = this.#state.get()
     try {
       await this.#deps.ipc.call('forget_recent', { root }, voidSchema)
       await this.loadRecents()
@@ -464,7 +474,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     if (this.#deps.role !== 'main') {
       throw new Error('Deleting a graph is only available from the main window.')
     }
-    const { graph } = this.#state
+    const { graph } = this.#state.get()
     if (graph === null) {
       return
     }
@@ -497,7 +507,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
   }
 
   refreshIndex(): void {
-    const { session } = this.#state
+    const { session } = this.#state.get()
     // Off-main, a refresh would start a second concurrent index writer.
     if (session === null || session.indexGeneration === null || this.#deps.role !== 'main') {
       return
@@ -521,9 +531,6 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
 
   attach(): Unlisten {
     const unlisteners = [
-      this.#deps.indexLifecycle.onProgress((progress) => {
-        this.#setState({ indexing: progress === 'reconciling' })
-      }),
       // A structural vault change (folder created, renamed, or removed) cannot
       // be expressed as per-file events; the watcher asks for one full
       // reconcile instead, and `refresh` coalesces bursts into a single queued

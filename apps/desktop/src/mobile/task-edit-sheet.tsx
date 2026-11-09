@@ -3,7 +3,7 @@ import { ArrowRight, CalendarDays, Check, CircleCheck, List, Trash2, Undo2, X } 
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
 import { Button } from '@/components/ui/button.tsx'
-import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { markModeFromSyntax } from '@/editor/mark-mode.ts'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
@@ -16,9 +16,14 @@ import type { TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { TaskScheduleGrid } from '@/mobile/task-schedule-grid.tsx'
 import { useTaskSheetFinalizer } from '@/mobile/use-task-sheet-finalizer.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  useDateFormat,
+  useEditorMarkdownSyntax,
+  useEditorSmoothCaretAnimation,
+  useEditorSpellCheck,
+  useTimeFormat,
+} from '@/providers/settings-provider.tsx'
 
 interface MobileTaskEditSheetProps {
   /** The task being edited. Remount (key by task) to reseed the draft. */
@@ -26,7 +31,7 @@ interface MobileTaskEditSheetProps {
   open: boolean
   /** Close the sheet. A user dismissal commits the draft first (V1 mobile). */
   onOpenChange: (open: boolean) => void
-  /** Today's live ISO date, for the schedule shortcuts and the month grid. */
+  /** Today's live ISO date, for the schedule shortcuts. */
   today: string
   /** The screen's shared task actions — one optimistic-cache path for every write. */
   actions: TaskActions
@@ -63,12 +68,15 @@ export function MobileTaskEditSheet({
   autoFocusEditor = false,
 }: MobileTaskEditSheetProps): ReactElement {
   const { haptics } = useMobileServices()
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
+  const timeFormat = useTimeFormat()
+  const editorMarkdownSyntax = useEditorMarkdownSyntax()
+  const editorSpellCheck = useEditorSpellCheck()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
   const navigateWikiLink = useWikiLinkNavigation()
   const onLinkClick = useMarkdownLinkClick(null)
   const navigateTag = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
-  const [showCalendar, setShowCalendar] = useState(false)
   // The editor is uncontrolled; a reopen reseeds the draft (the row may have
   // been rewritten by an action), so remount it via this seed to re-read it.
   const [editorSeed, setEditorSeed] = useState(0)
@@ -96,10 +104,7 @@ export function MobileTaskEditSheet({
       onOpenChange,
       actions,
       readDraft: readLiveDraft,
-      onReseed: () => {
-        setShowCalendar(false)
-        setEditorSeed((seed) => seed + 1)
-      },
+      onReseed: () => setEditorSeed((seed) => seed + 1),
     })
   const dueDate = getTaskDueDate(draft)
 
@@ -191,12 +196,6 @@ export function MobileTaskEditSheet({
     liveDraftRef.current = { seed: editorSeed, markdown: next }
     setDraft(next)
     editorRef.current?.setMarkdown(next)
-    setShowCalendar(false)
-  }
-
-  const toggleCalendar = (): void => {
-    hapticImpactLight(haptics)
-    setShowCalendar((showing) => !showing)
   }
 
   return (
@@ -205,29 +204,27 @@ export function MobileTaskEditSheet({
         aria-label="Edit task"
         // On the "+"-add path the editor takes focus instead of the sheet
         // container, so typing can start immediately.
-        initialFocus={() => {
-          if (!autoFocusEditor) {
-            return true
-          }
-          editorRef.current?.focus()
-          return false
-        }}
+        initialFocus={
+          autoFocusEditor
+            ? () => {
+                editorRef.current?.focus()
+                return false
+              }
+            : undefined
+        }
       >
         <DrawerTitle className="sr-only">Edit task</DrawerTitle>
         <div className="flex flex-col gap-3 p-4">
-          <div
-            data-base-ui-swipe-ignore
-            className="rounded-md border border-border bg-surface px-3 py-2 focus-within:ring-1 focus-within:ring-accent"
-          >
+          <div className="rounded-md border border-border bg-surface px-3 py-2 focus-within:ring-1 focus-within:ring-accent">
             <NoteEditor
               key={editorSeed}
               initialContent={draft}
               singleParagraph
               onChange={handleChange}
-              markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
-              spellCheck={settings.editorSpellCheck}
-              smoothCaretAnimation={settings.editorSmoothCaretAnimation}
-              timeFormat={settings.timeFormat}
+              markMode={markModeFromSyntax(editorMarkdownSyntax)}
+              spellCheck={editorSpellCheck}
+              smoothCaretAnimation={editorSmoothCaretAnimation}
+              timeFormat={timeFormat}
               // A one-line editor has nothing to reorder, so keep the gutter grip off.
               blockHandle={false}
               onWikiLinkClick={openWikiLink}
@@ -257,11 +254,10 @@ export function MobileTaskEditSheet({
               active={dueDate === addDaysToIsoDate(today, 7)}
               onClick={() => schedule(addDaysToIsoDate(today, 7))}
             />
-            <ScheduleChip
-              label={dueDate !== null ? formatDayLabel(dueDate, settings.dateFormat) : 'Pick date'}
-              icon={<CalendarDays aria-hidden className="size-3.5" />}
-              active={showCalendar}
-              onClick={toggleCalendar}
+            <PickDateChip
+              label={dueDate !== null ? formatDayLabel(dueDate, dateFormat) : 'Pick date'}
+              value={dueDate ?? today}
+              onPick={schedule}
             />
             {dueDate !== null ? (
               <ScheduleChip
@@ -272,9 +268,6 @@ export function MobileTaskEditSheet({
               />
             ) : null}
           </div>
-          {showCalendar ? (
-            <TaskScheduleGrid today={today} selected={dueDate} onPick={schedule} />
-          ) : null}
           <div className="flex flex-col gap-1 border-t border-border pt-2">
             <Button
               variant="ghost"
@@ -359,13 +352,55 @@ function ScheduleChip({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={cn(
-        'flex h-8 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-xs font-medium',
-        active ? 'border-accent/40 bg-accent-soft text-text' : 'border-border text-text-muted',
-      )}
+      className={getScheduleChipClassName(active)}
     >
       {active && icon === undefined ? <Check aria-hidden className="size-3.5" /> : icon}
       {label}
     </button>
+  )
+}
+
+/**
+ * A schedule chip covered by a transparent native date input, so a tap opens
+ * the system date picker (`UIDatePicker` on iOS).
+ */
+function PickDateChip({
+  label,
+  value,
+  onPick,
+}: {
+  label: string
+  /** The input's ISO date: the due date, else today. */
+  value: string
+  onPick: (isoDate: string) => void
+}): ReactElement {
+  return (
+    <label className={cn(getScheduleChipClassName(false), 'relative')}>
+      <CalendarDays aria-hidden className="size-3.5" />
+      {label}
+      <input
+        type="date"
+        aria-label="Pick date"
+        // iOS fills an empty date input with today on open and fires change.
+        value={value}
+        // iOS opens the picker on focus; desktop Chrome only from its icon.
+        onClick={(event) => event.currentTarget.showPicker()}
+        onChange={(event) => {
+          const picked = event.currentTarget.value
+          // Desktop Chrome's Clear button empties the value.
+          if (picked !== '') {
+            onPick(picked)
+          }
+        }}
+        className="absolute inset-0 appearance-none text-base opacity-0"
+      />
+    </label>
+  )
+}
+
+function getScheduleChipClassName(active: boolean): string {
+  return cn(
+    'flex h-8 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-xs font-medium',
+    active ? 'border-accent/40 bg-accent-soft text-text' : 'border-border text-text-muted',
   )
 }

@@ -1,0 +1,64 @@
+name: Set up apt packages
+description: Installs the system packages that the builds need on Linux, with a cache of the downloaded packages.
+
+inputs:
+  cache:
+    description: Whether to restore and save the apt package cache.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Compute the apt cache key and directory
+      id: apt
+      shell: bash
+      # `ImageOS` and `ImageVersion` are runner environment variables.
+      run: |
+        echo "key=apt-$ImageOS-$ImageVersion-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+        echo "dir=$RUNNER_TEMP/apt-archives" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the apt package cache
+      id: apt-cache
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.apt.outputs.dir }}/*.deb
+        key: ${{ steps.apt.outputs.key }}
+
+    - name: Install apt packages
+      shell: bash
+      env:
+        archives: ${{ steps.apt.outputs.dir }}
+      run: |
+        # Tauri v2 build dependencies (the crate links the WebView + GTK stack):
+        # the Tauri docs list, minus `patchelf`, which the runner image already
+        # has. `libayatana-appindicator3-dev` replaces the deprecated
+        # `libappindicator3-dev`, as in the Tauri prerequisites page.
+        # https://github.com/tauri-apps/tauri-docs/blob/5e49cc6e48597060f1618e0b62cb91b071b1b4a9/src/content/docs/distribute/Pipelines/github.mdx?plain=1#L105
+        packages="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils"
+        opts="--yes --no-install-recommends -o Dir::Cache::Archives=$archives"
+        mkdir -p "$archives"
+
+        # Update first: the image's package index can name versions the archive
+        # has since removed. Only the download runs under `timeout`, since
+        # killing `dpkg` mid-install would break the retry.
+        download() {
+          sudo timeout 120 apt-get update &&
+            sudo timeout 180 apt-get install $opts --download-only $packages
+        }
+        if ! download; then
+          # The Azure mirror can trickle at ~50 kB/s without tripping apt's failover: https://github.com/actions/runner-images/issues/14823
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          download
+        fi
+        sudo apt-get install $opts $packages
+
+    - name: Save the apt package cache
+      if: inputs.cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        # The glob skips the `lock` file and `partial/` directory that apt
+        # keeps next to the packages, which only root and `_apt` can read.
+        path: ${{ steps.apt.outputs.dir }}/*.deb
+        key: ${{ steps.apt.outputs.key }}

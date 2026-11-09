@@ -14,16 +14,6 @@ function createTestDailyNoteService(
   })
 }
 
-describe('today', () => {
-  it('follows the clock', () => {
-    const clock = createTestClockService({ today: '2026-06-12' })
-    const dailyNotes = createTestDailyNoteService({ clock })
-    expect(dailyNotes.today()).toBe('2026-06-12')
-    clock.setToday('2026-06-13')
-    expect(dailyNotes.today()).toBe('2026-06-13')
-  })
-})
-
 describe('dailyDatesInRange', () => {
   it('lists the dates with content within inclusive bounds', async () => {
     const database = createNodeTestDatabaseService()
@@ -138,20 +128,6 @@ describe('subscribeWakeOnNewDay', () => {
     activity.emitHidden()
     clock.setNow(new Date(2026, 5, 13, 8, 0, 0).getTime())
     activity.emitVisible()
-    activity.emitVisible()
-    expect(days).toEqual(['2026-06-13'])
-  })
-
-  it('reads the wall clock, so a stale cached `today()` cannot hide the new day', () => {
-    const clock = createTestClockService({ now: evening, today: '2026-06-12' })
-    const activity = createTestActivityPort()
-    const dailyNotes = createTestDailyNoteService({ clock, activity })
-    const days: string[] = []
-    dailyNotes.subscribeWakeOnNewDay((today) => {
-      days.push(today)
-    })
-    activity.emitHidden()
-    clock.setNow(new Date(2026, 5, 13, 8, 0, 0).getTime())
     activity.emitVisible()
     expect(days).toEqual(['2026-06-13'])
   })

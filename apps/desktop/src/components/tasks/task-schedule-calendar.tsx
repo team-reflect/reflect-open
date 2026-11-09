@@ -5,7 +5,7 @@ import { addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
 import { formatDayLabel } from '@reflect/core'
 import { buildMonthGrid, formatMonthLabel, getWeekdayLabels } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useDateFormat, useWeekStartDay } from '@/providers/settings-provider.tsx'
 
 interface TaskScheduleCalendarProps {
   /** Controlled open state (the ⌘⇧S shortcut toggles it). */
@@ -34,7 +34,8 @@ export function TaskScheduleCalendar({
   onSchedule,
   children,
 }: TaskScheduleCalendarProps): ReactElement {
-  const { settings } = useSettings()
+  const dateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
   const [month, setMonth] = useState(() => getYearMonth(today))
   // Re-anchor to today's month each time the popover opens, without an effect.
   const [wasOpen, setWasOpen] = useState(open)
@@ -45,7 +46,7 @@ export function TaskScheduleCalendar({
     }
   }
 
-  const grid = buildMonthGrid(month, settings.weekStartDay)
+  const grid = buildMonthGrid(month, weekStartDay)
   const pick = (isoDate: string | null): void => {
     onSchedule(isoDate)
     onOpenChange(false)
@@ -78,7 +79,7 @@ export function TaskScheduleCalendar({
         </header>
 
         <div className="grid grid-cols-7 px-3 text-center">
-          {getWeekdayLabels(settings.weekStartDay).map((weekday) => (
+          {getWeekdayLabels(weekStartDay).map((weekday) => (
             <div key={weekday} className="py-1 text-xs font-medium text-text-muted">
               {weekday}
             </div>
@@ -93,7 +94,7 @@ export function TaskScheduleCalendar({
                   <button
                     key={cell.date}
                     type="button"
-                    aria-label={formatDayLabel(cell.date, settings.dateFormat)}
+                    aria-label={formatDayLabel(cell.date, dateFormat)}
                     aria-current={isToday ? 'date' : undefined}
                     onClick={() => pick(cell.date)}
                     className={cn(

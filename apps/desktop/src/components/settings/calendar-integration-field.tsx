@@ -20,7 +20,7 @@ import {
   useCalendarChangeInvalidation,
   useCalendars,
 } from '@/lib/use-calendar.ts'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import { useCalendarEnabled, useCalendarIds } from '@/providers/settings-provider.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 import { SettingsSwitchField } from './switch-field.tsx'
 
@@ -37,13 +37,14 @@ const ACTION_BUTTON_CLASS =
  * elsewhere.
  */
 export function CalendarIntegrationField(): ReactElement | null {
-  const { settings } = useSettings()
+  const calendarEnabled = useCalendarEnabled()
+  const calendarIds = useCalendarIds()
   const queryClient = useQueryClient()
   const { opener, calendarEvents } = useAppServices()
-  const status = useCalendarAuthorization(settings.calendarEnabled)
+  const status = useCalendarAuthorization(calendarEnabled)
   const canRead = status !== undefined && canReadCalendars(status)
-  const { calendars, isLoaded } = useCalendars(settings.calendarEnabled && canRead)
-  useCalendarChangeInvalidation(settings.calendarEnabled)
+  const { calendars, isLoaded } = useCalendars(calendarEnabled && canRead)
+  useCalendarChangeInvalidation(calendarEnabled)
 
   const groups = useMemo(() => groupCalendarsBySource(calendars), [calendars])
 
@@ -70,7 +71,7 @@ export function CalendarIntegrationField(): ReactElement | null {
   }
 
   let detail: ReactNode = null
-  if (settings.calendarEnabled && status !== undefined && !canRead) {
+  if (calendarEnabled && status !== undefined && !canRead) {
     detail = (
       <div>
         <InlineAlert tone="error">
@@ -97,8 +98,8 @@ export function CalendarIntegrationField(): ReactElement | null {
         </div>
       </div>
     )
-  } else if (settings.calendarEnabled && canRead && isLoaded) {
-    const enabledCount = countSelectedCalendars(calendars, settings.calendarIds)
+  } else if (calendarEnabled && canRead && isLoaded) {
+    const enabledCount = countSelectedCalendars(calendars, calendarIds)
     detail =
       groups.length === 0 ? (
         <p className="text-xs text-text-muted">
@@ -134,7 +135,7 @@ export function CalendarIntegrationField(): ReactElement | null {
                           <li key={calendar.id}>
                             <label className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
                               <Checkbox
-                                checked={settings.calendarIds.includes(calendar.id)}
+                                checked={calendarIds.includes(calendar.id)}
                                 onCheckedChange={(checked) => {
                                   calendarEvents.toggleCalendar(calendar.id, checked === true)
                                 }}
@@ -168,7 +169,7 @@ export function CalendarIntegrationField(): ReactElement | null {
       <SettingsSwitchField
         legend="Calendar events"
         description="Show the day's meetings from Apple Calendar beside the daily note."
-        checked={settings.calendarEnabled}
+        checked={calendarEnabled}
         onCheckedChange={handleToggle}
       />
       {detail !== null && <div className="px-4 pb-3.5">{detail}</div>}

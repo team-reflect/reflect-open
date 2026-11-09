@@ -61,8 +61,15 @@
 			<string>Any</string>
 		</dict>
 	</dict>
+	<key>ReflectAppGroup</key>
+	<string>$(REFLECT_APP_GROUP)</string>
 	<key>ReflectSentryDSN</key>
-	<string>$(REFLECT_SENTRY_DSN)</string>
+	<string>$(TAURI_REFLECT_SENTRY_DSN)</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

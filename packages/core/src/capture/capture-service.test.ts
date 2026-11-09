@@ -12,6 +12,7 @@ import { createAiProviderConfigService } from '../ai/ai-provider-config-service.
 import { createOpenDocumentsService } from '../documents/open-documents-service.ts'
 import { dailyPath } from '../graph/paths.ts'
 import { createPrivacyService } from '../privacy/privacy-service.ts'
+import type { Settings } from '../settings/schema.ts'
 import {
   createTestAiKeyValidationService,
   createTestAssetStoreService,
@@ -58,7 +59,8 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-function setup(options: { mobile?: boolean } = {}) {
+function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {}) {
+  const settings = createTestSettingsService(options.settings)
   const noteFile = createTestNoteFileService()
   const captureInbox = createTestCaptureInboxService()
   const openDocuments = createOpenDocumentsService({ fileChanges: createTestFileChangeService() })
@@ -92,10 +94,12 @@ function setup(options: { mobile?: boolean } = {}) {
     fileChanges,
     progress,
     platform: createTestPlatformService({ surface: { mobileApp: options.mobile ?? false } }),
+    settings,
     logger,
   })
   return {
     capture,
+    settings,
     noteFile,
     captureInbox,
     openDocuments,
@@ -182,6 +186,59 @@ describe('CaptureService (host registration)', () => {
   })
 })
 
+describe('CaptureService (quick note defaults mirror)', () => {
+  it('on mobile, mirrors the quick note parent at start and on every change', async () => {
+    const kit = setup({ mobile: true, settings: { quickNoteParent: 'Inbox' } })
+
+    const session = kit.capture.openSession({ generation: 3 })
+    session.start()
+    await flush()
+    kit.settings.update({ quickNoteParent: '[[Ideas]]' })
+    kit.settings.update({ editorSpellCheck: false })
+    await flush()
+
+    expect(kit.captureInbox.quickNoteDefaults()).toEqual(['Inbox', '[[Ideas]]'])
+    session.dispose()
+    kit.settings.update({ quickNoteParent: '' })
+    await flush()
+    expect(kit.captureInbox.quickNoteDefaults()).toEqual(['Inbox', '[[Ideas]]'])
+  })
+
+  it('writes the mirror one at a time, ending on the latest value', async () => {
+    const kit = setup({ mobile: true, settings: { quickNoteParent: 'Inbox' } })
+    const firstWrite = Promise.withResolvers<void>()
+    const started: string[] = []
+    vi.spyOn(kit.captureInbox, 'writeQuickNoteDefaults').mockImplementation((parent) => {
+      started.push(parent)
+      return started.length === 1 ? firstWrite.promise : Promise.resolve()
+    })
+
+    const session = kit.capture.openSession({ generation: 3 })
+    session.start()
+    await flush()
+    kit.settings.update({ quickNoteParent: 'Ideas' })
+    kit.settings.update({ quickNoteParent: 'Later' })
+    await flush()
+    expect(started).toEqual(['Inbox'])
+
+    firstWrite.resolve()
+    await flush()
+    expect(started.at(-1)).toBe('Later')
+    session.dispose()
+  })
+
+  it('on desktop, never mirrors the quick note parent', async () => {
+    const kit = setup({ settings: { quickNoteParent: 'Inbox' } })
+
+    const session = kit.capture.openSession({ generation: 3 })
+    session.start()
+    await flush()
+
+    expect(kit.captureInbox.quickNoteDefaults()).toEqual([])
+    session.dispose()
+  })
+})
+
 describe('CaptureService (shared-inbox relay)', () => {
   it('relays the shared inbox BEFORE the drain, every pass', async () => {
     const kit = setup({ mobile: true })
@@ -229,21 +286,30 @@ describe('CaptureService (shared-inbox relay)', () => {
     session.schedule()
     await flush()
     expect(kit.drains).toHaveBeenCalledTimes(2)
-    expect(kit.progress.getAll()).toHaveLength(1)
+    expect(kit.progress.get()).toHaveLength(1)
     session.dispose()
   })
 
-  it('on desktop, passes run drain-then-enrich only', async () => {
+  it('on desktop, relays the shared inbox (Safari) before the drain too', async () => {
     const kit = setup()
+    const order: string[] = []
+    kit.relays.mockImplementation(() => {
+      order.push('relay')
+      return Promise.resolve(0)
+    })
+    kit.drains.mockImplementation(() => {
+      order.push('drain')
+      return Promise.resolve([])
+    })
 
     const session = kit.capture.openSession({ generation: 3 })
     session.start()
     await flush()
 
-    expect(kit.relays).not.toHaveBeenCalled()
-    expect(kit.drains).toHaveBeenCalledTimes(1)
+    expect(order).toEqual(['relay', 'drain'])
+    expect(kit.relays).toHaveBeenCalledWith(3)
     expect(kit.enrichments).toHaveBeenCalledTimes(2)
-    expect(kit.progress.getAll()).toEqual([])
+    expect(kit.progress.get()).toEqual([])
     session.dispose()
   })
 

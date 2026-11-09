@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RetrievalService } from '@reflect/core'
 import { createTestCoreServices, createTestRetrievalService } from '@reflect/core/testing'
 import type { ReactNode } from 'react'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteContextSidebar } from './note-context-sidebar.tsx'
@@ -11,7 +11,7 @@ import { NoteContextSidebar } from './note-context-sidebar.tsx'
 const relatedNotes = vi.fn<RetrievalService['relatedNotes']>()
 
 function RouteProbe(): ReactNode {
-  const { route } = useRouter()
+  const { route } = useRouterState()
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 

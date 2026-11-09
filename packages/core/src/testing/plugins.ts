@@ -1,4 +1,3 @@
-import { AppError } from '../errors.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
 import type { IapProduct, IapService } from '../ipc/iap-service.ts'
@@ -14,18 +13,10 @@ export interface TestHapticsService extends HapticsService {
 }
 
 class TestHapticsServiceImpl implements TestHapticsService {
-  readonly #fail: boolean
   #count = 0
-
-  constructor(options?: { fail?: boolean }) {
-    this.#fail = options?.fail ?? false
-  }
 
   impactLight(): Promise<void> {
     this.#count += 1
-    if (this.#fail) {
-      return Promise.reject(new AppError('io', 'test haptics: no haptic engine'))
-    }
     return Promise.resolve()
   }
 
@@ -39,11 +30,10 @@ class TestHapticsServiceImpl implements TestHapticsService {
 }
 
 /**
- * A {@link HapticsService} that counts impacts. With `fail`, every call is
- * still counted but rejects, like an engine that is not there.
+ * A {@link HapticsService} that counts impacts.
  */
-export function createTestHapticsService(options?: { fail?: boolean }): TestHapticsService {
-  return new TestHapticsServiceImpl(options)
+export function createTestHapticsService(): TestHapticsService {
+  return new TestHapticsServiceImpl()
 }
 
 export interface TestIapService extends IapService {
@@ -118,7 +108,7 @@ export function createTestIapService(options?: {
   return new TestIapServiceImpl(options)
 }
 
-export type AppStoreCall = 'environment' | 'sync' | 'presentOfferCodeRedeemSheet'
+export type AppStoreCall = 'environment' | 'sync' | 'presentOfferCodeRedeemSheet' | 'requestReview'
 
 export interface TestAppStoreService extends AppStoreService {
   /**
@@ -147,6 +137,11 @@ class TestAppStoreServiceImpl implements TestAppStoreService {
 
   presentOfferCodeRedeemSheet(): void {
     this.#log.push('presentOfferCodeRedeemSheet')
+    return
+  }
+
+  requestReview(): void {
+    this.#log.push('requestReview')
     return
   }
 

@@ -7,7 +7,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { toast } from '@/components/ui/toast.tsx'
+import { useToastController } from '@/lib/use-toasts.ts'
 import type {
   PendingReplacementResolveHandler,
   SelectionMenuContext,
@@ -26,7 +26,7 @@ import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useNoteRow } from '@/hooks/use-note-row.ts'
-import { useRouter } from '@/routing/router.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 /**
@@ -72,11 +72,27 @@ interface ActiveRun {
   context: SelectionMenuContext
 }
 
+/**
+ * Runs `callback` for each value of `iterable` and stops when it returns
+ * `false`. React Compiler cannot compile a `for await` loop and skips any
+ * component or hook that contains one, so the loop lives in this module-level
+ * function, which the compiler does not touch.
+ */
+async function forEachAsync<T>(
+  iterable: AsyncIterable<T>,
+  callback: (value: T) => boolean | void,
+): Promise<void> {
+  for await (const value of iterable) {
+    if (callback(value) === false) return
+  }
+}
+
 export function useEditorAiMenu({
   path,
   sessionEpoch,
   editorRef,
 }: EditorAiMenuOptions): EditorAiMenuValue {
+  const toastController = useToastController()
   const noteRow = useNoteRow(path)
   // The last privacy flag this session resolved, adjusted during render (the
   // note-pane seed pattern). A title-driven rename retargets the same note
@@ -104,7 +120,7 @@ export function useEditorAiMenu({
   const { providers } = useAiProviders()
   const { selectionTransform } = useCoreServices()
   const { prompts } = useAiPrompts()
-  const { navigate } = useRouter()
+  const { navigate } = useRouterActions()
 
   const runRef = useRef<ActiveRun | null>(null)
   // The staged placement of the current run — state (not just the ref) so the
@@ -145,7 +161,7 @@ export function useEditorAiMenu({
           setRunMode(null)
         }
         editorRef.current?.discardPendingReplacement()
-        toast.add({ type: 'error', title: message })
+        toastController.add({ type: 'error', title: message })
       }
 
       // The service picks the provider, gates the selection against the
@@ -158,19 +174,19 @@ export function useEditorAiMenu({
         model: modelOverride,
         signal: run.controller.signal,
       })
-      for await (const event of events) {
-        if (runRef.current !== run) return
+      await forEachAsync(events, (event) => {
+        if (runRef.current !== run) return false
         if (event.type === 'text-delta') {
           editorRef.current?.appendPendingReplacementText(event.text)
         } else if (event.type === 'error') {
           fail(event.message)
-          return
+          return false
         }
         // 'complete' and 'aborted' need no action: the preview holds the text
         // and the user decides with Accept/Discard.
-      }
+      })
     },
-    [selectionTransform, path, isPrivate, editorRef],
+    [selectionTransform, path, isPrivate, editorRef, toastController],
   )
 
   const runPrompt = useCallback(

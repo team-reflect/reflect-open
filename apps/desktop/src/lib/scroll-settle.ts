@@ -1,3 +1,5 @@
+import { anySignal } from '@/lib/any-signal.ts'
+
 /**
  * Quiet time (ms) after the last scroll event before a scroll counts as settled.
  */
@@ -35,9 +37,10 @@ export interface ScrollSettleOptions {
    */
   isSettled?: (() => boolean) | undefined
   /**
-   * Where a mouse drag may start. Defaults to `element`.
+   * Where a mouse drag may start. Defaults to `element`. `null` starts no
+   * mouse drag.
    */
-  dragHandle?: HTMLElement | undefined
+  dragHandle?: HTMLElement | null | undefined
 }
 
 export interface ScrollSettleWatch {
@@ -47,10 +50,12 @@ export interface ScrollSettleWatch {
    */
   isTouching: () => boolean
   /**
-   * True when the current or last scroll began from a touch, a mouse drag, or
-   * a wheel. False for scrolls that code, focus, or the keyboard started.
+   * How many gestures (a touch that scrolled the element, a wheel event, a
+   * mouse drag) have started on the element. A tap counts as none. A caller
+   * that remembers the count at one rest can tell whether a later rest
+   * follows a gesture or a scroll that code, focus, or the engine started.
    */
-  isUserScroll: () => boolean
+  gestures: () => number
 }
 
 /**
@@ -61,8 +66,8 @@ export interface ScrollSettleWatch {
  *
  * A mouse drag scrolls the element the way a finger does: snapping is off
  * from the first move until the release scroll stops, and on release the
- * element scrolls smoothly to the nearer end of its range. The drag and that
- * scroll count as one user scroll.
+ * element scrolls smoothly to the snap position the browser picks from there.
+ * The drag and that scroll count as one gesture.
  */
 export function watchScrollSettle({
   element,
@@ -75,13 +80,9 @@ export function watchScrollSettle({
   const fingers = new Set<number>()
   // A mouse drag or its release scroll is running.
   let mouseDragging = false
-  // A finger is down, or lifted after it moved the element, and that scroll has not settled.
-  let fingerScroll = false
-  let scrolledSinceTouch = false
-  let touchLeft = 0
-  let touchTop = 0
-  let wheelAt = -Infinity
-  let userScroll = false
+  let gestures = 0
+  // The touch in progress has scrolled the element, so it counted as a gesture.
+  let touchScrolled = false
   let pending = false
   let timer: ReturnType<typeof setTimeout> | undefined
   // A scroll was reported early because the element was settled. A snap
@@ -91,6 +92,8 @@ export function watchScrollSettle({
   let snapTailTimer: ReturnType<typeof setTimeout> | undefined
   // The current mouse press, from `pointerdown` until its release scroll stops.
   let press: AbortController | undefined
+  // The current touch gesture, from the first finger down until the last lifts.
+  let gesture = new AbortController()
 
   const isTouching = (): boolean => fingers.size > 0 || mouseDragging
   const endSnapTail = (): void => {
@@ -108,7 +111,6 @@ export function watchScrollSettle({
       return
     }
     pending = false
-    fingerScroll = false
     onSettle()
   }
   const settleOrWait = (): void => {
@@ -124,14 +126,19 @@ export function watchScrollSettle({
   element.addEventListener(
     'touchstart',
     (event: TouchEvent) => {
+      if (fingers.size === 0) {
+        gesture = new AbortController()
+        touchScrolled = false
+      }
       for (const touch of event.changedTouches) {
         fingers.add(touch.identifier)
       }
+      // `touchend` fires on the node the finger landed on, and does not bubble
+      // to `element` once that node is removed, so the listeners go on the node.
+      const target = event.target as HTMLElement | null
+      target?.addEventListener('touchend', release, { passive: true, signal: gesture.signal })
+      target?.addEventListener('touchcancel', release, { passive: true, signal: gesture.signal })
       endSnapTail()
-      fingerScroll = true
-      scrolledSinceTouch = false
-      touchLeft = element.scrollLeft
-      touchTop = element.scrollTop
     },
     { passive: true, signal },
   )
@@ -139,26 +146,20 @@ export function watchScrollSettle({
     for (const touch of event.changedTouches) {
       fingers.delete(touch.identifier)
     }
+    if (fingers.size === 0) {
+      gesture.abort()
+    }
     if (isTouching()) {
       return
-    }
-    // A tap moved nothing. Without this, a focus scroll right after the tap
-    // would count as the finger's.
-    const moved =
-      scrolledSinceTouch || element.scrollLeft !== touchLeft || element.scrollTop !== touchTop
-    if (!moved) {
-      fingerScroll = false
     }
     if (pending) {
       settleOrWait()
     }
   }
-  element.addEventListener('touchend', release, { passive: true, signal })
-  element.addEventListener('touchcancel', release, { passive: true, signal })
   element.addEventListener(
     'wheel',
     () => {
-      wheelAt = performance.now()
+      gestures += 1
       endSnapTail()
     },
     { passive: true, signal },
@@ -166,20 +167,17 @@ export function watchScrollSettle({
   element.addEventListener(
     'scroll',
     () => {
+      if (fingers.size > 0 && !touchScrolled) {
+        touchScrolled = true
+        gestures += 1
+      }
       if (snapTail) {
         if (isSettled?.() ?? false) {
-          // No new report, and the reported scroll keeps its user flag.
+          // No new report.
           extendSnapTail()
           return
         }
         endSnapTail()
-      }
-      scrolledSinceTouch = true
-      if (fingerScroll || performance.now() - wheelAt < SETTLE_IDLE_MS) {
-        userScroll = true
-      } else if (!pending) {
-        // A new scroll that no finger or wheel started.
-        userScroll = false
       }
       pending = true
       if (isTouching()) {
@@ -192,12 +190,13 @@ export function watchScrollSettle({
     { passive: true, signal },
   )
   element.addEventListener('scrollend', flush, { signal })
-  dragHandle.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
+  dragHandle?.addEventListener('pointerdown', (down) => dragWithMouse(down), { signal })
   signal.addEventListener(
     'abort',
     () => {
       clearTimeout(timer)
       clearTimeout(snapTailTimer)
+      gesture.abort()
     },
     { once: true },
   )
@@ -228,7 +227,7 @@ export function watchScrollSettle({
     let quiet: ReturnType<typeof setTimeout> | undefined
     const controller = new AbortController()
     press = controller
-    const pressSignal = AbortSignal.any([signal, controller.signal])
+    const pressSignal = anySignal([signal, controller.signal])
     // Stops text selection and native drag and drop, and leaves the press
     // itself to the control under it: a `preventDefault` on `pointerdown`
     // would cancel its `mousedown`.
@@ -240,7 +239,7 @@ export function watchScrollSettle({
     }
     // The button is down: from `pointerdown` until `pointerup` or `pointercancel`.
     const released = new AbortController()
-    const held = AbortSignal.any([pressSignal, released.signal])
+    const held = anySignal([pressSignal, released.signal])
     pressSignal.addEventListener(
       'abort',
       () => {
@@ -252,10 +251,6 @@ export function watchScrollSettle({
     )
     const finish = (): void => {
       controller.abort()
-      if (!pending) {
-        // The drag moved nothing, for example at the end of the range.
-        fingerScroll = false
-      }
       flush()
     }
 
@@ -270,7 +265,7 @@ export function watchScrollSettle({
         if (!dragging) {
           dragging = true
           mouseDragging = true
-          fingerScroll = true
+          gestures += 1
           endSnapTail()
           element.style.scrollSnapType = 'none'
         }
@@ -286,13 +281,16 @@ export function watchScrollSettle({
         controller.abort()
         return
       }
-      // Snap stays off until the release scroll stops. Turned back on here, it
-      // would re-snap to the target the drag started from.
       suppressNextClick()
-      const range = x
-        ? element.scrollWidth - element.clientWidth
-        : element.scrollHeight - element.clientHeight
-      const end = position() < range / 2 ? 0 : range
+      // Snap turned back on moves the element to its snap position at the next
+      // layout, which the read forces. Safari makes that move a jump
+      // (docs/mobile-motion.md), so snap goes off again within the same task,
+      // before a frame paints, and stays off until the smooth scroll there stops.
+      const from = position()
+      element.style.scrollSnapType = ''
+      const end = position()
+      element.style.scrollSnapType = 'none'
+      element.scrollTo({ [x ? 'left' : 'top']: from, behavior: 'instant' })
       // The press lasts until the release scroll stops: on `scrollend` at
       // `end`, or after the quiet time. A late `scrollend` from the drag
       // itself does not end it, and an interrupted scroll cannot hold it.
@@ -319,7 +317,7 @@ export function watchScrollSettle({
 
   return {
     isTouching,
-    isUserScroll: () => userScroll,
+    gestures: () => gestures,
   }
 }
 

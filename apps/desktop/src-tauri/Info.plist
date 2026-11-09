@@ -21,7 +21,7 @@
 	<string>Reflect reads your contacts to suggest details for person notes. Nothing is stored or sent anywhere.</string>
 	<!-- iCloud Drive document storage (Plan 21): declares the container so it
 	     shows up as a "Reflect" location in Finder's iCloud Drive. Must match
-	     the iOS declaration (ios.project.yml / gen/apple) key for key — the
+	     the iOS declaration (gen/apple/project.yml) key for key — the
 	     container is the shared folder both apps sync through. -->
 	<key>NSUbiquitousContainers</key>
 	<dict>

@@ -1,5 +1,6 @@
 import {
   createGraphServices,
+  deriveStore,
   isICloudRoot,
   isMobilePlatform,
   openGraphLifecycle,
@@ -7,10 +8,12 @@ import {
   type GraphServicesDeps,
   type GraphSession,
   type PlatformFacts,
+  type Settings,
   type SettingsService,
+  type Store,
   type Unlisten,
 } from '@reflect/core'
-import type { MobileOnboardingService } from './mobile-onboarding-service.ts'
+import type { MobileOnboardingService, MobileOnboardingState } from './mobile-onboarding-service.ts'
 
 /**
  * What {@link createAppGraphServices} decides the lifecycles of a session from.
@@ -27,17 +30,21 @@ export interface AppGraphServicesDeps {
   readonly mobileOnboarding: MobileOnboardingService
 }
 
+function selectDescribeAssets(settings: Settings): boolean {
+  return settings.describeAssets
+}
+
+function selectIsIcloud(state: MobileOnboardingState): boolean {
+  return state.kind === 'icloud'
+}
+
 /**
- * Run `open` while `active()` holds, re-checked on every `subscribe` notification.
+ * Run `open` while `active` holds, re-checked on every notification.
  */
-export function whileActive(
-  active: () => boolean,
-  subscribe: (listener: () => void) => Unlisten,
-  open: () => () => void,
-): Unlisten {
+export function whileActive(active: Store<boolean>, open: () => () => void): Unlisten {
   let close: (() => void) | null = null
   const follow = (): void => {
-    if (active() === (close !== null)) {
+    if (active.get() === (close !== null)) {
       return
     }
     if (close === null) {
@@ -47,7 +54,7 @@ export function whileActive(
       close = null
     }
   }
-  const unlisten = subscribe(follow)
+  const unlisten = active.subscribe(follow)
   follow()
   return () => {
     unlisten()
@@ -81,19 +88,15 @@ export function createAppGraphServices(
   const disposers: Unlisten[] = []
   if (main && !mobile) {
     disposers.push(
-      whileActive(
-        () => settings.get().describeAssets,
-        settings.subscribe,
-        () => openGraphLifecycle(session, deps, 'assetDescription'),
-      ),
+      whileActive(deriveStore(settings, selectDescribeAssets), () => {
+        return openGraphLifecycle(session, deps, 'assetDescription')
+      }),
     )
   }
   disposers.push(
-    whileActive(
-      () => mobileOnboarding.getState().kind === 'icloud',
-      mobileOnboarding.subscribe,
-      () => openGraphLifecycle(session, deps, 'icloudDownload'),
-    ),
+    whileActive(deriveStore(mobileOnboarding, selectIsIcloud), () => {
+      return openGraphLifecycle(session, deps, 'icloudDownload')
+    }),
   )
   const dispose = (): void => {
     for (const teardown of disposers.splice(0).reverse()) {

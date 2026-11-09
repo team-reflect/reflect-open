@@ -713,7 +713,7 @@ describe('canLookupContacts', () => {
     async ({ enabled, status, expected }) => {
       const settings = createTestSettingsService({ contactsEnabled: enabled })
       await settings.whenLoaded()
-      contacts.setStatus(status)
+      await contacts.setStatus(status)
 
       expect(meetingService({ settings }).canLookupContacts()).toBe(expected)
     },

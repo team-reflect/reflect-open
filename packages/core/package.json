@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@meowdown/markdown": "^0.78.0",
-    "@ocavue/utils": "^1.9.0",
+    "@ocavue/utils": "^1.11.0",
     "@post-embed/exporter": "^0.5.0",
     "@post-embed/schema": "^0.5.2",
     "@post-embed/types": "^0.5.0",
@@ -25,16 +25,17 @@
     "kysely": "^0.28.18",
     "pkce-challenge": "^6.0.0",
     "ulid": "^3.0.2",
+    "uuid": "^14.0.3",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^4.0.34",
+    "@ai-sdk/provider": "^4.0.36",
     "@ocavue/tsconfig": "^0.7.1",
-    "jsdom": "^30.1.3",
+    "jsdom": "^31.0.0",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.0",
     "vitest-fail-on-console": "^0.10.1"
   }
 }

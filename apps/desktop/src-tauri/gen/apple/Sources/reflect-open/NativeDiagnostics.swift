@@ -13,16 +13,19 @@ import Sentry
 /// `docs/privacy.md`.
 private enum NativeDiagnostics {
   /// The production Reflect project, expanded into Info.plist from the
-  /// `REFLECT_SENTRY_DSN` build environment. Sentry DSNs authorize event
+  /// `TAURI_REFLECT_SENTRY_DSN` build environment. Sentry DSNs authorize event
   /// submission only; builds without one (local and fork builds) leave the
   /// reporter off.
   /// https://docs.sentry.io/concepts/key-terms/dsn-explainer/
-  private static let dsn = (Bundle.main.object(forInfoDictionaryKey: "ReflectSentryDSN") as? String ?? "")
+  private static let dsn =
+    (Bundle.main.object(forInfoDictionaryKey: "ReflectSentryDSN") as? String ?? "")
     .trimmingCharacters(in: .whitespacesAndNewlines)
 
-  /// Forks build under their own bundle identifier and stay silent even if
-  /// they carry a DSN.
-  private static let officialBundleIdentifier = "app.reflect.ios"
+  /// The stable and beta apps. Forks build under their own bundle identifier
+  /// and stay silent even if they carry a DSN.
+  private static let officialBundleIdentifiers: Set<String> = [
+    "app.reflect.ios", "app.reflect.ios.beta",
+  ]
 
   private static let redacted = "[redacted]"
 
@@ -64,7 +67,9 @@ private enum NativeDiagnostics {
   ]
 
   static func start() {
-    guard !dsn.isEmpty, Bundle.main.bundleIdentifier == officialBundleIdentifier else {
+    guard !dsn.isEmpty, let identifier = Bundle.main.bundleIdentifier,
+      officialBundleIdentifiers.contains(identifier)
+    else {
       return
     }
 
@@ -124,7 +129,8 @@ private enum NativeDiagnostics {
   /// address, a symbol, or allow-listed device metadata.
   private static func scrub(event: Event) -> Event? {
     let hasDiagnosticStack =
-      event.stacktrace != nil || event.exceptions?.isEmpty == false || event.threads?.isEmpty == false
+      event.stacktrace != nil || event.exceptions?.isEmpty == false
+      || event.threads?.isEmpty == false
     guard hasDiagnosticStack else {
       return nil
     }
@@ -144,11 +150,11 @@ private enum NativeDiagnostics {
     event.context = scrub(context: event.context)
     // Debug images keep their UUID and address range — that is what Sentry
     // matches the uploaded dSYMs against — but not their build-machine paths.
-    event.debugMeta?.forEach { image in
+    for image in event.debugMeta ?? [] {
       image.codeFile = image.codeFile.map(basename)
     }
 
-    event.exceptions?.forEach { exception in
+    for exception in event.exceptions ?? [] {
       exception.value = redacted
       exception.type = "NativeCrash"
       exception.module = nil
@@ -158,7 +164,7 @@ private enum NativeDiagnostics {
       exception.mechanism?.helpLink = nil
       scrub(stacktrace: exception.stacktrace)
     }
-    event.threads?.forEach { thread in
+    for thread in event.threads ?? [] {
       thread.name = nil
       scrub(stacktrace: thread.stacktrace)
     }
@@ -184,7 +190,7 @@ private enum NativeDiagnostics {
   }
 
   private static func scrub(stacktrace: SentryStacktrace?) {
-    stacktrace?.frames.forEach { frame in
+    for frame in stacktrace?.frames ?? [] {
       frame.fileName = nil
       frame.contextLine = nil
       frame.preContext = nil
@@ -206,6 +212,6 @@ private enum NativeDiagnostics {
 @_cdecl("reflect_start_native_diagnostics")
 public func reflectStartNativeDiagnostics() {
   #if !DEBUG
-    NativeDiagnostics.start()
+  NativeDiagnostics.start()
   #endif
 }

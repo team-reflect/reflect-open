@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- The dev flavor's entitlements (debug configuration): the dev App Group,
      matching the dev app target. Hand-maintained, like the release file
-     next to it: ios.project.yml selects one per configuration via
+     next to it: project.yml selects one per configuration via
      CODE_SIGN_ENTITLEMENTS. -->
 <plist version="1.0">
 <dict>

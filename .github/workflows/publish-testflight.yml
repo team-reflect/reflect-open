@@ -7,6 +7,10 @@ on:
         description: Immutable commit targeted by the release tag.
         required: true
         type: string
+      flavor:
+        description: beta or stable
+        required: true
+        type: string
     secrets:
       APPLE_API_KEY:
         required: true
@@ -28,7 +32,7 @@ permissions:
 
 jobs:
   testflight:
-    name: Build iOS
+    name: TestFlight
     if: github.repository == 'team-reflect/reflect-open'
     environment: release_app
     runs-on: xcode-27
@@ -40,6 +44,10 @@ jobs:
           # release snapshot. Always build the verified immutable tag commit.
           ref: ${{ inputs.commit }}
           persist-credentials: false
+          # The build number counts commits. A blobless clone fetches the
+          # whole history without the file contents of older commits.
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Verify TestFlight secrets are configured
         env:
@@ -72,7 +80,7 @@ jobs:
       - name: Resolve build number
         id: build_number
         run: |
-          build_number="$(date -u +%Y%m%d%H%M)"
+          build_number="$(git rev-list --count HEAD)"
           echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
           echo "value=$build_number" >> "$GITHUB_OUTPUT"
           echo "Using TestFlight CFBundleVersion $build_number"
@@ -84,8 +92,9 @@ jobs:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          REFLECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: pnpm build:ios --build-number="$BUILD_NUMBER"
+          TAURI_REFLECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          FLAVOR: ${{ inputs.flavor }}
+        run: pnpm build:ios --build-number="$BUILD_NUMBER" --flavor="$FLAVOR"
 
       - name: Upload to TestFlight
         env:

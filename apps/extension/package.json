@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wxt",
     "build": "wxt build",
+    "build:safari": "wxt build -b safari --mv3",
     "zip": "WXT_STORE_BUILD=true wxt zip",
     "zip:unpacked": "wxt zip",
     "typecheck": "wxt prepare && tsc -b",
@@ -31,7 +32,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "vite": "^8.3.5",
-    "vitest": "^5.0.5",
+    "vitest": "^5.1.0",
     "vitest-fail-on-console": "^0.10.1",
     "wxt": "^0.21.4"
   }

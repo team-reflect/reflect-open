@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useSessionStorageExternalStore } from '@/hooks/use-session-storage-external-store.ts'
+import { useSessionStorageValue } from '@/hooks/use-session-storage-value.ts'
 
 /**
  * A boolean flag persisted in sessionStorage and shared live across every
@@ -12,7 +12,7 @@ export function useSessionFlag(
   key: string,
   defaultValue: boolean,
 ): [boolean, (next: boolean) => void] {
-  const [stored, setStored] = useSessionStorageExternalStore(key)
+  const [stored, setStored] = useSessionStorageValue(key)
 
   const setValue = useCallback(
     (next: boolean) => {

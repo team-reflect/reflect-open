@@ -7,7 +7,7 @@ import { scrollElement, touch } from '@/test-utils/scroll.ts'
 /**
  * Settle reports for a native scroller: one report per scroll, never while a
  * finger is down, at once where the caller can tell the scroll is over, and a
- * record of whether a finger or a wheel started the scroll.
+ * count of the gestures that started on the element.
  */
 
 const listeners = { controller: new AbortController() }
@@ -30,15 +30,14 @@ describe('watchScrollSettle', () => {
   it('reports once after a scroll that no finger started', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
-    const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+    watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
 
     element.scrollLeft = 50
 
     await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
-    expect(watch.isUserScroll()).toBe(false)
   })
 
-  it('waits for the finger to lift, then reports a user scroll', async () => {
+  it('waits for the finger to lift, then reports', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
     const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
@@ -51,7 +50,22 @@ describe('watchScrollSettle', () => {
     await touch(element, 'end')
 
     await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
-    expect(watch.isUserScroll()).toBe(true)
+  })
+
+  it('stops touching when a finger lifts from a removed node', async () => {
+    const element = mountScroller()
+    const watch = watchScrollSettle({
+      element,
+      onSettle: vi.fn(),
+      signal: listeners.controller.signal,
+    })
+    const child = element.firstElementChild!
+
+    await touch(child, 'start')
+    child.remove()
+    await touch(child, 'end')
+
+    expect(watch.isTouching()).toBe(false)
   })
 
   it('reports on touchend with no scroll after it once the element is settled', async () => {
@@ -94,7 +108,7 @@ describe('watchScrollSettle', () => {
   it('does not report again when a settled snap moves on inside the settled range', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
-    const watch = watchScrollSettle({
+    watchScrollSettle({
       element,
       onSettle,
       signal: listeners.controller.signal,
@@ -110,13 +124,12 @@ describe('watchScrollSettle', () => {
     await scrollElement({ element, left: 0 })
 
     expect(onSettle).toHaveBeenCalledOnce()
-    expect(watch.isUserScroll()).toBe(true)
   })
 
   it('reports a wheel scroll that comes right after an early report', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
-    const watch = watchScrollSettle({
+    watchScrollSettle({
       element,
       onSettle,
       signal: listeners.controller.signal,
@@ -131,13 +144,12 @@ describe('watchScrollSettle', () => {
 
     await vi.waitFor(() => expect(onSettle).toHaveBeenCalledTimes(3))
     expect(element.scrollLeft).toBe(0)
-    expect(watch.isUserScroll()).toBe(true)
   })
 
   it('reports a scroll inside the settled range once the quiet time has passed', async () => {
     const element = mountScroller()
     const onSettle = vi.fn()
-    const watch = watchScrollSettle({
+    watchScrollSettle({
       element,
       onSettle,
       signal: listeners.controller.signal,
@@ -150,52 +162,29 @@ describe('watchScrollSettle', () => {
     await scrollElement({ element, left: 0 })
 
     expect(onSettle).toHaveBeenCalledTimes(2)
-    expect(watch.isUserScroll()).toBe(false)
   })
 
-  it('does not count a scroll right after a tap as the finger’s', async () => {
+  it('counts a scrolling touch and a wheel as gestures, and a tap or a program scroll as none', async () => {
     const element = mountScroller()
-    const onSettle = vi.fn()
-    const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+    const watch = watchScrollSettle({
+      element,
+      onSettle: vi.fn(),
+      signal: listeners.controller.signal,
+    })
+    expect(watch.gestures()).toBe(0)
 
-    // A tap that focuses a field, then the focus scroll.
+    await scrollElement({ element, left: 50 })
+    expect(watch.gestures()).toBe(0)
+
     await touch(element, 'start')
     await touch(element, 'end')
-    await scrollElement({ element, left: 50 })
+    expect(watch.gestures()).toBe(0)
 
-    await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
-    expect(watch.isUserScroll()).toBe(false)
-  })
+    await scrollElement({ element, left: 80, touch: true })
+    expect(watch.gestures()).toBe(1)
 
-  it('counts a wheel scroll as a user scroll', async () => {
-    const element = mountScroller()
-    const onSettle = vi.fn()
-    const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
-
-    await userEvent.wheel(element, { delta: { x: 50 } })
-
-    await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
-    expect(element.scrollLeft).toBe(50)
-    expect(watch.isUserScroll()).toBe(true)
-  })
-
-  it('does not count a keyboard scroll as a user scroll', async () => {
-    // Vertical, because WebKit has no keyboard scroll on the x axis.
-    const element = mountScroller()
-    element.style.cssText = 'width: 100px; height: 100px; overflow-y: auto'
-    element.innerHTML = '<div style="height: 1000px"></div>'
-    element.tabIndex = 0
-    const onSettle = vi.fn()
-    const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
-
-    element.focus()
-    await userEvent.keyboard('{PageDown}')
-
-    // WebKit reports a `scrollend` after each step of a keyboard scroll, so
-    // there can be more than one report.
-    await vi.waitFor(() => expect(onSettle).toHaveBeenCalled())
-    expect(element.scrollTop).toBeGreaterThan(0)
-    expect(watch.isUserScroll()).toBe(false)
+    await userEvent.wheel(element, { delta: { x: 10 } })
+    await vi.waitFor(() => expect(watch.gestures()).toBeGreaterThan(1))
   })
 
   describe('mouse drag', () => {
@@ -224,7 +213,7 @@ describe('watchScrollSettle', () => {
       await mouse.move(box.left + x, box.top + 5, { steps: 5 })
     }
 
-    it('scrolls with the mouse, then settles at the nearer end as a user scroll', async () => {
+    it('scrolls with the mouse, then settles at the nearer end', async () => {
       const element = mountSnapScroller()
       const onSettle = vi.fn()
       const onClick = vi.fn()
@@ -237,6 +226,7 @@ describe('watchScrollSettle', () => {
       expect(element.scrollLeft).toBe(50)
       expect(element.style.scrollSnapType).toBe('none')
       expect(watch.isTouching()).toBe(true)
+      expect(watch.gestures()).toBe(1)
       // Past half of the range.
       await mouseTo(element, 5)
       await mouse.up()
@@ -244,9 +234,27 @@ describe('watchScrollSettle', () => {
       await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
       expect(element.style.scrollSnapType).toBe('')
       expect(element.scrollLeft).toBe(150)
-      expect(watch.isUserScroll()).toBe(true)
       expect(watch.isTouching()).toBe(false)
       expect(onClick).not.toHaveBeenCalled()
+    })
+
+    it('settles at the snap target nearest the release, not only at an end', async () => {
+      const element = mountSnapScroller()
+      element.firstElementChild?.insertAdjacentHTML(
+        'beforeend',
+        '<i style="position: absolute; left: 60px; width: 1px; scroll-snap-align: start"></i>',
+      )
+      const onSettle = vi.fn()
+      watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, 45)
+      expect(element.scrollLeft).toBe(50)
+      await mouse.up()
+
+      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
+      expect(element.scrollLeft).toBe(60)
     })
 
     it('leaves a click under the drag distance alone', async () => {
@@ -265,23 +273,6 @@ describe('watchScrollSettle', () => {
       expect(onClick).toHaveReturnedWith(false)
       await new Promise((resolve) => setTimeout(resolve, 200))
       expect(onSettle).not.toHaveBeenCalled()
-    })
-
-    it('does not count a later scroll as the user’s after a drag that moved nothing', async () => {
-      const element = mountSnapScroller()
-      const onSettle = vi.fn()
-      const watch = watchScrollSettle({ element, onSettle, signal: listeners.controller.signal })
-
-      // Already at the start: dragging right cannot scroll.
-      await mouseTo(element, 10)
-      await mouse.down()
-      await mouseTo(element, 60)
-      await mouse.up()
-      await vi.waitFor(() => expect(watch.isTouching()).toBe(false))
-      await scrollElement({ element, left: 150 })
-
-      await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
-      expect(watch.isUserScroll()).toBe(false)
     })
 
     it('stops following the mouse when the watch aborts mid-drag', async () => {
@@ -318,7 +309,6 @@ describe('watchScrollSettle', () => {
       expect(onSettle).not.toHaveBeenCalled()
       await mouse.up()
       await vi.waitFor(() => expect(onSettle).toHaveBeenCalledOnce())
-      expect(watch.isUserScroll()).toBe(true)
     })
 
     it('ends a drag on `pointercancel`', async () => {
@@ -400,6 +390,23 @@ describe('watchScrollSettle', () => {
       field.style.cssText = 'width: 100px; height: 10px; padding: 0; border: 0'
       element.firstElementChild!.append(field)
       watchScrollSettle({ element, onSettle: vi.fn(), signal: listeners.controller.signal })
+
+      await mouseTo(element, 95)
+      await mouse.down()
+      await mouseTo(element, 45)
+      await mouse.up()
+
+      expect(element.scrollLeft).toBe(0)
+    })
+
+    it('starts no drag with a `null` drag handle', async () => {
+      const element = mountSnapScroller()
+      watchScrollSettle({
+        element,
+        onSettle: vi.fn(),
+        signal: listeners.controller.signal,
+        dragHandle: null,
+      })
 
       await mouseTo(element, 95)
       await mouse.down()

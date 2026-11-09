@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createDeferred } from '@reflect/utils'
 import { AppError } from '../errors.ts'
 import { createTestHttpService } from '../testing/http.ts'
 import { createTestGitSyncService, createTestGithubAuthService } from '../testing/sync.ts'
@@ -111,6 +112,54 @@ describe('GithubConnector', () => {
         branch: 'master',
       },
     ])
+  })
+
+  it('connectExistingRepo aborted during the lookup never changes the remote', async () => {
+    const { http, gitSync, connector } = setup()
+    const lookup = createDeferred<Response>()
+    http.on('GET', 'https://api.github.com/repos/alex/notes', () => lookup.promise)
+    const controller = new AbortController()
+
+    const result = connector.connectExistingRepo(
+      { owner: 'alex', name: 'notes' },
+      { signal: controller.signal },
+    )
+    controller.abort()
+    lookup.resolve(
+      jsonResponse({
+        full_name: 'alex/notes',
+        private: true,
+        default_branch: 'main',
+        html_url: 'https://github.com/alex/notes',
+      }),
+    )
+
+    await expect(result).rejects.toBe(controller.signal.reason)
+    expect(gitSync.calls()).toEqual([])
+  })
+
+  it('connectNewRepo aborted during the create never changes the remote', async () => {
+    const { http, gitSync, connector } = setup()
+    const create = createDeferred<Response>()
+    http.on('POST', 'https://api.github.com/user/repos', () => create.promise)
+    const controller = new AbortController()
+
+    const result = connector.connectNewRepo('g-backup', { signal: controller.signal })
+    controller.abort()
+    create.resolve(
+      jsonResponse(
+        {
+          full_name: 'alex/g-backup',
+          private: true,
+          default_branch: 'main',
+          html_url: 'https://github.com/alex/g-backup',
+        },
+        201,
+      ),
+    )
+
+    await expect(result).rejects.toBe(controller.signal.reason)
+    expect(gitSync.calls()).toEqual([])
   })
 
   it('refuses to connect while signed out', async () => {

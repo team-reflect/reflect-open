@@ -40,6 +40,9 @@ message and, for `feat`/`fix`, the user-facing changelog entry.
 - The changelog is scoped to `apps/desktop/`: a change that should appear in it
   must touch that directory. A pure `packages/core` fix still ships in the next
   release, but gets no changelog line.
+- A change users will notice also adds an item to the in-app What's New list
+  (`packages/app/src/whats-new/whats-new-content.ts`). See
+  [AGENTS.md](AGENTS.md#development-workflow).
 - GitHub's Revert button writes `Revert "…"`; retitle it to `revert: …`.
 
 ## Where code goes

@@ -157,6 +157,8 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: ./.github/actions/setup-apt
+
       - uses: ./.github/actions/setup-rust
 
       - name: Format check
@@ -175,6 +177,13 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets
 
+      - name: Swift format and lint
+        run: |
+          swift format --version
+          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
+          git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
+          git diff --exit-code '*.swift'
+
   test-rust:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
@@ -189,6 +198,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - uses: ./.github/actions/setup-apt
 
       - uses: ./.github/actions/setup-rust
 
@@ -205,14 +216,11 @@ jobs:
     needs: [classify, lint-node, test-node, test-chromium, lint-rust, test-rust]
 
     steps:
-      - name: Fail because this PR is in the middle of a stack
-        if: needs.classify.outputs.stack-middle == 'true'
-        run: |
-          echo '::error title=Expected failure::This PR is in the middle of a stack, so some jobs were skipped. This failure is expected. They run when the PR becomes the lowest unmerged PR or the top PR of the stack.'
-          exit 1
-
+      # A PR in the middle of a stack skips its jobs on purpose: the top PR of
+      # the stack runs them on the same code. Passing here lets the whole
+      # stack merge at once.
       - name: Verify that all jobs succeeded
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || (needs.classify.outputs.stack-middle != 'true' && contains(needs.*.result, 'skipped')) }}
         run: |
           echo 'Some jobs did not succeed: ${{ toJSON(needs) }}'
           exit 1

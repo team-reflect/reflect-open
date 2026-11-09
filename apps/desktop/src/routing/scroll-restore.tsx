@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactElement, type ReactNode } from 'react'
 import { cn } from '@/lib/utils.ts'
-import { useRouter } from './router.tsx'
+import { useRouterState, useRouterHandlers } from './router.tsx'
 
 interface ScrollRestoredProps {
   className?: string
@@ -19,7 +19,8 @@ interface ScrollRestoredProps {
  * static offsets, overflowing the frame into a second scrollbar.
  */
 export function ScrollRestored({ className, children }: ScrollRestoredProps): ReactElement {
-  const { entryId, saveScrollState, savedScroll } = useRouter()
+  const { entryId } = useRouterState()
+  const { saveScrollState, savedScroll } = useRouterHandlers()
   const ref = useRef<HTMLDivElement | null>(null)
 
   // Re-run whenever the history entry changes (back/forward, or note→note in
@@ -27,7 +28,8 @@ export function ScrollRestored({ className, children }: ScrollRestoredProps): Re
   // top for an entry that has none — never carry the previous view's position.
   useEffect(() => {
     if (ref.current) {
-      ref.current.scrollTop = savedScroll() ?? 0
+      const saved = savedScroll()
+      ref.current.scrollTop = typeof saved === 'number' ? saved : 0
     }
   }, [entryId, savedScroll])
 

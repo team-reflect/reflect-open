@@ -1,5 +1,6 @@
 import type { MaybePromise } from '@reflect/utils'
 import { AppError } from '../errors.ts'
+import { WritableStore } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type {
   ICloudNativeService,
@@ -10,8 +11,13 @@ import type {
 } from '../ipc/icloud-native-service.ts'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
-import type { GitSyncService, GitSyncState } from '../sync/git-sync-service.ts'
-import type { ConnectExistingResult, GithubConnector } from '../sync/github-connector.ts'
+import { sameState, type GitSyncService, type GitSyncState } from '../sync/git-sync-service.ts'
+import type {
+  ConnectExistingRepoOptions,
+  ConnectExistingResult,
+  ConnectNewRepoOptions,
+  GithubConnector,
+} from '../sync/github-connector.ts'
 import type {
   ConnectGitHostInput,
   GitHostConnector,
@@ -416,7 +422,7 @@ class TestGithubAuthServiceImpl implements TestGithubAuthService {
     })
   }
 
-  readonly getState = (): GithubAuthState => this.#inner.getState()
+  readonly get = (): GithubAuthState => this.#inner.get()
 
   load(): Promise<GithubAuth | null> {
     return this.#inner.load()
@@ -491,30 +497,20 @@ export interface TestGitSyncService extends GitSyncService {
  * only through `setState`; every action is recorded.
  */
 class TestGitSyncServiceImpl implements TestGitSyncService {
-  #state: GitSyncState
-  readonly #listeners = new Set<() => void>()
+  readonly #state: WritableStore<GitSyncState>
   readonly #log: GitSyncCall[] = []
 
   constructor(options?: { state?: GitSyncState }) {
-    this.#state = options?.state ?? { phase: 'loading' }
+    this.#state = new WritableStore<GitSyncState>(options?.state ?? { phase: 'loading' }, sameState)
   }
 
   start(): void {
     this.#log.push({ method: 'start' })
   }
 
-  readonly getState = (): GitSyncState => this.#state
+  readonly get = (): GitSyncState => this.#state.get()
 
-  readonly subscribe = (listener: () => void): Unlisten => {
-    // Wrapped for identity, so one function added twice detaches independently.
-    const deliver = (): void => {
-      listener()
-    }
-    this.#listeners.add(deliver)
-    return () => {
-      this.#listeners.delete(deliver)
-    }
-  }
+  readonly subscribe = (listener: () => void): Unlisten => this.#state.subscribe(listener)
 
   connectRemote(remoteUrl: string, branch: string | null): Promise<void> {
     this.#log.push({ method: 'connectRemote', remoteUrl, branch })
@@ -534,10 +530,7 @@ class TestGitSyncServiceImpl implements TestGitSyncService {
   }
 
   setState(next: GitSyncState): void {
-    this.#state = next
-    for (const listener of this.#listeners) {
-      listener()
-    }
+    this.#state.set(next)
   }
 
   calls(): readonly GitSyncCall[] {
@@ -585,14 +578,17 @@ class TestGithubConnectorImpl implements TestGithubConnector {
     return Promise.resolve('connected')
   }
 
-  async connectNewRepo(name: string): Promise<'connected' | 'manualCreateNeeded'> {
+  async connectNewRepo(
+    name: string,
+    options?: ConnectNewRepoOptions,
+  ): Promise<'connected' | 'manualCreateNeeded'> {
     this.#log.push({ method: 'connectNewRepo', name })
-    return await this.#connectNew(name)
+    return await this.#connectNew(name, options)
   }
 
   async connectExistingRepo(
     ref: GithubRepoRef,
-    connectOptions?: { allowPublic?: boolean | undefined },
+    connectOptions?: ConnectExistingRepoOptions,
   ): Promise<ConnectExistingResult> {
     this.#log.push({
       method: 'connectExistingRepo',

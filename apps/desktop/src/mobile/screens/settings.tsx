@@ -1,9 +1,9 @@
 import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import appIcon from '@/assets/app-icon.png'
 import { useQuery } from '@tanstack/react-query'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
-import { useAppVersion } from '@/hooks/use-app-version.ts'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
 import { queryKeys } from '@/lib/query-client.ts'
@@ -20,17 +20,21 @@ import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
 import {
   SettingsActionRow,
   SettingsGroup,
+  SettingsHeroRow,
   SettingsNavRow,
-  SettingsSegmentedRow,
+  SettingsMenuRow,
   SettingsSelectRow,
   SettingsSwitchRow,
   SettingsValueRow,
-  type SegmentedOption,
+  type SettingsMenuOption,
 } from '@/mobile/settings-list.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
 import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
-import { useGraph } from '@/providers/graph-provider.tsx'
+import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import {
   aiProvider,
@@ -38,12 +42,15 @@ import {
   errorMessage,
   marketingVersion,
   CHAT_SYSTEM_PROMPT_MAX_LENGTH,
+  TEXT_CAPTURE_PARENT_MAX_LENGTH,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeChatSystemPrompt,
+  normalizeQuickNoteParent,
   normalizeTranscriptionPrompt,
   type AiPrompt,
   type AiProviderConfig,
   type EditorTextSize,
+  type PaywallPhase,
   type ThemePreference,
   type TimeFormat,
   type WeekStartDay,
@@ -51,12 +58,80 @@ import {
   formatFullDate,
 } from '@reflect/core'
 import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
-import { useSettings } from '@/providers/settings-provider.tsx'
+import {
+  useChatSystemPrompt,
+  useDateFormat,
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorSmoothCaretAnimation,
+  useEditorTextSize,
+  useQuickNoteParent,
+  useSettingsService,
+  useThemeSetting,
+  useTimeFormat,
+  useTranscriptionFormat,
+  useTranscriptionPrompt,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
 import { CountdownText } from '@/components/countdown-text.tsx'
-import { useGitSyncContext } from '@/providers/sync-provider.tsx'
-import { useRouter } from '@/routing/router.tsx'
+import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
-const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
+const PAYWALL_PHASE_OPTIONS: readonly SettingsMenuOption<PaywallPhase | 'off'>[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'skippable', label: 'Skippable' },
+  { value: 'required', label: 'Required' },
+]
+
+/**
+ * Shows What's New again in this session.
+ */
+function WhatsNewRow(): ReactElement {
+  const { whatsNew } = useAppServices()
+  const override = useStore(whatsNew.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate What’s New"
+      checked={override}
+      onCheckedChange={whatsNew.setOverride}
+    />
+  )
+}
+
+/**
+ * Shows the review page after What's New in this session.
+ */
+function ReviewRow(): ReactElement {
+  const { review } = useAppServices()
+  const override = useStore(review.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate review page"
+      checked={override}
+      onCheckedChange={review.setOverride}
+    />
+  )
+}
+
+/**
+ * Simulates a paywall phase for this session, so a TestFlight build can walk
+ * through every phase.
+ */
+function PaywallPhaseRow(): ReactElement {
+  const { paywall } = useMobileServices()
+  const override = useStore(paywall.phaseOverride)
+  return (
+    <SettingsMenuRow
+      label="Paywall"
+      value={override ?? 'off'}
+      options={PAYWALL_PHASE_OPTIONS}
+      onChange={(next) => paywall.setPhaseOverride(next === 'off' ? null : next)}
+    />
+  )
+}
+
+const THEME_OPTIONS: readonly SettingsMenuOption<ThemePreference>[] = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -70,19 +145,19 @@ function aiProviderValue(provider: AiProviderConfig, defaultProviderId: string |
   return provider.id === defaultProviderId ? `${credential} · Default` : credential
 }
 
-const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
+const TEXT_SIZE_OPTIONS: readonly SettingsMenuOption<EditorTextSize>[] = [
   { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
   { value: 'large', label: 'Large' },
 ]
 
-const WEEK_START_OPTIONS: readonly SegmentedOption<WeekStartDay>[] = [
+const WEEK_START_OPTIONS: readonly SettingsMenuOption<WeekStartDay>[] = [
   { value: 'sunday', label: 'Sunday' },
   { value: 'monday', label: 'Monday' },
   { value: 'saturday', label: 'Saturday' },
 ]
 
-const TIME_FORMAT_OPTIONS: readonly SegmentedOption<TimeFormat>[] = [
+const TIME_FORMAT_OPTIONS: readonly SettingsMenuOption<TimeFormat>[] = [
   { value: '12h', label: '12-hour' },
   { value: '24h', label: '24-hour' },
 ]
@@ -111,15 +186,29 @@ function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
  * device's GitHub sign-in, independent of the graph.
  */
 export function MobileSettings(): ReactElement {
-  const { back, canBack, navigate } = useRouter()
-  const { graph, mobileStorageKind, platform } = useGraph()
+  const { canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
+  const graph = useGraphInfo()
+  const { platform } = useGraphActions()
+  const mobileStorageKind = useMobileStorageKind()
   const isIos = platform === 'ios'
   const subscriptionControls = useSubscriptionControls()
-  const { opener } = useAppServices()
+  const { opener, review } = useAppServices()
   const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
-  const { settings, updateSettings } = useSettings()
+  const theme = useThemeSetting()
+  const editorTextSize = useEditorTextSize()
+  const selectedDateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
+  const chatSystemPrompt = useChatSystemPrompt()
+  const transcriptionFormat = useTranscriptionFormat()
+  const transcriptionPrompt = useTranscriptionPrompt()
+  const quickNoteParent = useQuickNoteParent()
+  const settingsService = useSettingsService()
   const [today] = useState(() => new Date())
-  const version = useAppVersion()
   const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
   const crashTest = useCrashTest()
   const perfHudEnabled = usePerfHudEnabled()
@@ -127,8 +216,11 @@ export function MobileSettings(): ReactElement {
   // Development and TestFlight installs show the prerelease tag; anything else hides it.
   const showPrerelease =
     platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
-  const versionLabel = version === null ? '…' : showPrerelease ? version : marketingVersion(version)
-  const sync = useGitSyncContext()
+  const versionLabel = showPrerelease
+    ? platformService.appVersion
+    : marketingVersion(platformService.appVersion)
+  const gitSync = useGitSyncState()
+  const { disconnectGraph } = useGitSyncActions()
   const githubConnected = useGithubConnected()
   const disconnectAction = useAsyncAction()
   const signOutAction = useAsyncAction()
@@ -143,6 +235,7 @@ export function MobileSettings(): ReactElement {
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [systemPromptOpen, setSystemPromptOpen] = useState(false)
   const [transcriptionPromptOpen, setTranscriptionPromptOpen] = useState(false)
+  const [quickNoteParentOpen, setQuickNoteParentOpen] = useState(false)
   const { prompts, addPrompt, updatePrompt, removePrompt } = useAiPrompts()
   // The edited prompt sticks around after close so the exit animation has
   // content; `promptOpen` alone drives visibility (the edit-sheet pattern).
@@ -160,13 +253,10 @@ export function MobileSettings(): ReactElement {
     enabled: graph !== null,
   })
 
-  const gitSync = sync?.state ?? null
   const status = getMobileSyncStatus(gitSync)
   // A graph with a remote, connected or waiting for its sign-in.
   const remote =
-    gitSync !== null && (gitSync.phase === 'connected' || gitSync.phase === 'needsCredential')
-      ? gitSync
-      : null
+    gitSync.phase === 'connected' || gitSync.phase === 'needsCredential' ? gitSync : null
   // A host remote that waits for its sign-in can get one here. Plain HTTP
   // cannot: the resolver never sends a sign-in in the clear.
   const canAddSignIn =
@@ -183,17 +273,14 @@ export function MobileSettings(): ReactElement {
   // are mutually exclusive per graph, Plan 21) and wait out the controller's
   // `loading` phase so the rows never flash on a graph that turns out to be
   // connected.
-  const canConnect = mobileStorageKind === 'local' && gitSync?.phase === 'disconnected'
+  const canConnect = mobileStorageKind === 'local' && gitSync.phase === 'disconnected'
 
   // Stop syncing this graph: drop its remote. The local clone and every
   // sign-in stay; the controller restarts into its disconnected state.
   async function disconnect(): Promise<void> {
-    if (sync === null) {
-      return
-    }
     await disconnectAction.run(async () => {
       try {
-        await sync.disconnectGraph()
+        await disconnectGraph()
       } catch (err) {
         logger.error('stop syncing failed:', errorMessage(err))
       }
@@ -216,9 +303,9 @@ export function MobileSettings(): ReactElement {
 
   const storageLabel =
     mobileStorageKind === 'icloud'
-      ? 'iCloud Drive'
+      ? 'Stored in iCloud Drive'
       : mobileStorageKind === 'local'
-        ? 'This device'
+        ? 'Stored on this device'
         : undefined
 
   return (
@@ -227,28 +314,29 @@ export function MobileSettings(): ReactElement {
         title="Settings"
         onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
       />
-      <main className="min-h-0 flex-1 overflow-y-auto px-safe pb-safe">
-        <div className="flex flex-col gap-6 px-4 py-4">
-          <SettingsGroup header="Graph">
-            <SettingsNavRow
-              label={graph?.name ?? '—'}
-              value={storageLabel}
+      <main className="min-h-0 flex-1 overflow-y-auto bg-surface-app px-safe pb-safe">
+        <div className="flex flex-col gap-8 px-4 py-5">
+          <SettingsGroup>
+            <SettingsHeroRow
+              title={graph?.name ?? '—'}
+              subtitle={storageLabel}
+              media={<img src={appIcon} alt="" className="size-full object-cover" />}
               onPress={() => navigate({ kind: 'graphs' })}
             />
           </SettingsGroup>
 
           <SettingsGroup header="Appearance">
-            <SettingsSegmentedRow
+            <SettingsMenuRow
               label="Theme"
-              value={settings.theme}
+              value={theme}
               options={THEME_OPTIONS}
-              onChange={(theme) => updateSettings({ theme })}
+              onChange={(theme) => settingsService.update({ theme })}
             />
-            <SettingsSegmentedRow
+            <SettingsMenuRow
               label="Text size"
-              value={settings.editorTextSize}
+              value={editorTextSize}
               options={TEXT_SIZE_OPTIONS}
-              onChange={(editorTextSize) => updateSettings({ editorTextSize })}
+              onChange={(editorTextSize) => settingsService.update({ editorTextSize })}
             />
           </SettingsGroup>
 
@@ -260,48 +348,63 @@ export function MobileSettings(): ReactElement {
               <SettingsSelectRow
                 key={dateFormat}
                 label={formatFullDate(today, dateFormat)}
-                selected={settings.dateFormat === dateFormat}
-                onPress={() => updateSettings({ dateFormat })}
+                selected={selectedDateFormat === dateFormat}
+                onPress={() => settingsService.update({ dateFormat })}
               />
             ))}
           </SettingsGroup>
 
           <SettingsGroup header="Week and time">
-            <SettingsSegmentedRow
+            <SettingsMenuRow
               label="Week start"
-              value={settings.weekStartDay}
+              value={weekStartDay}
               options={WEEK_START_OPTIONS}
-              onChange={(weekStartDay) => updateSettings({ weekStartDay })}
+              onChange={(weekStartDay) => settingsService.update({ weekStartDay })}
             />
-            <SettingsSegmentedRow
+            <SettingsMenuRow
               label="Time format"
-              value={settings.timeFormat}
+              value={timeFormat}
               options={TIME_FORMAT_OPTIONS}
-              onChange={(timeFormat) => updateSettings({ timeFormat })}
+              onChange={(timeFormat) => settingsService.update({ timeFormat })}
             />
           </SettingsGroup>
 
           <SettingsGroup header="Editor">
             <SettingsSwitchRow
               label="Smooth caret animation"
-              checked={settings.editorSmoothCaretAnimation}
+              checked={editorSmoothCaretAnimation}
               onCheckedChange={(editorSmoothCaretAnimation) => {
-                updateSettings({ editorSmoothCaretAnimation })
+                settingsService.update({ editorSmoothCaretAnimation })
               }}
             />
             <SettingsSwitchRow
               label="Start with a bullet"
-              checked={settings.editorDefaultBullet}
-              onCheckedChange={(editorDefaultBullet) => updateSettings({ editorDefaultBullet })}
+              checked={editorDefaultBullet}
+              onCheckedChange={(editorDefaultBullet) => {
+                return settingsService.update({ editorDefaultBullet })
+              }}
             />
             <SettingsSwitchRow
               label="Bullet after a heading"
-              checked={settings.editorBulletAfterHeading}
+              checked={editorBulletAfterHeading}
               onCheckedChange={(editorBulletAfterHeading) => {
-                updateSettings({ editorBulletAfterHeading })
+                settingsService.update({ editorBulletAfterHeading })
               }}
             />
           </SettingsGroup>
+
+          {isIos ? (
+            <SettingsGroup
+              header="Quick notes"
+              footer="Where Siri and Shortcuts notes go in today’s note."
+            >
+              <SettingsNavRow
+                label="Add under"
+                value={quickNoteParent === '' ? 'End of note' : quickNoteParent}
+                onPress={() => setQuickNoteParentOpen(true)}
+              />
+            </SettingsGroup>
+          ) : null}
 
           <SettingsGroup
             header="AI"
@@ -321,9 +424,7 @@ export function MobileSettings(): ReactElement {
             <SettingsActionRow label="Add AI provider" onPress={() => setAddProviderOpen(true)} />
             <SettingsNavRow
               label="System prompt"
-              value={
-                normalizeChatSystemPrompt(settings.chatSystemPrompt) === '' ? 'Default' : 'Custom'
-              }
+              value={normalizeChatSystemPrompt(chatSystemPrompt) === '' ? 'Default' : 'Custom'}
               onPress={() => setSystemPromptOpen(true)}
             />
           </SettingsGroup>
@@ -358,17 +459,15 @@ export function MobileSettings(): ReactElement {
           >
             <SettingsSwitchRow
               label="Transcription auto-format"
-              checked={settings.transcriptionFormat}
+              checked={transcriptionFormat}
               descriptionId={audioMemoDescriptionId}
-              onCheckedChange={(transcriptionFormat) => updateSettings({ transcriptionFormat })}
+              onCheckedChange={(transcriptionFormat) => {
+                return settingsService.update({ transcriptionFormat })
+              }}
             />
             <SettingsNavRow
               label="Helper text"
-              value={
-                normalizeTranscriptionPrompt(settings.transcriptionPrompt) === ''
-                  ? 'None'
-                  : 'Custom'
-              }
+              value={normalizeTranscriptionPrompt(transcriptionPrompt) === '' ? 'None' : 'Custom'}
               onPress={() => setTranscriptionPromptOpen(true)}
             />
           </SettingsGroup>
@@ -478,12 +577,25 @@ export function MobileSettings(): ReactElement {
             </SettingsGroup>
           ) : null}
 
+          <SettingsGroup header="Feedback">
+            {isIos ? <SettingsActionRow label="Rate Reflect" onPress={review.writeReview} /> : null}
+            <SettingsActionRow
+              label="Join the Discord community"
+              onPress={() => review.sendFeedback('discord')}
+            />
+            <SettingsActionRow
+              label="Report a bug on GitHub"
+              onPress={() => review.sendFeedback('github')}
+            />
+            <SettingsActionRow label="Email support" onPress={() => review.sendFeedback('email')} />
+          </SettingsGroup>
+
           <SettingsGroup header="About">
+            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsValueRow
               label="Notes"
               value={notes === undefined ? '…' : String(notes.length)}
             />
-            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
             <SettingsNavRow
               label="Open Source Licenses"
               onPress={() => navigate({ kind: 'licenses' })}
@@ -507,6 +619,11 @@ export function MobileSettings(): ReactElement {
                   value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
                 />
               ) : null}
+              {isIos && (environment.value === 'Sandbox' || environment.value === 'Xcode') ? (
+                <PaywallPhaseRow />
+              ) : null}
+              <WhatsNewRow />
+              <ReviewRow />
               <SettingsSwitchRow
                 label="Performance HUD"
                 checked={perfHudEnabled}
@@ -570,10 +687,10 @@ export function MobileSettings(): ReactElement {
         maxLength={CHAT_SYSTEM_PROMPT_MAX_LENGTH}
         rows={8}
         normalize={normalizeChatSystemPrompt}
-        value={settings.chatSystemPrompt}
+        value={chatSystemPrompt}
         open={systemPromptOpen}
         onOpenChange={setSystemPromptOpen}
-        onSave={(chatSystemPrompt) => updateSettings({ chatSystemPrompt })}
+        onSave={(chatSystemPrompt) => settingsService.update({ chatSystemPrompt })}
       />
       <TextSettingDrawer
         title="Transcription helper text"
@@ -583,10 +700,23 @@ export function MobileSettings(): ReactElement {
         maxLength={TRANSCRIPTION_PROMPT_MAX_LENGTH}
         rows={3}
         normalize={normalizeTranscriptionPrompt}
-        value={settings.transcriptionPrompt}
+        value={transcriptionPrompt}
         open={transcriptionPromptOpen}
         onOpenChange={setTranscriptionPromptOpen}
-        onSave={(transcriptionPrompt) => updateSettings({ transcriptionPrompt })}
+        onSave={(transcriptionPrompt) => settingsService.update({ transcriptionPrompt })}
+      />
+      <TextSettingDrawer
+        title="Add quick notes under"
+        description="Quick notes go under this bullet. Leave empty to add them at the end."
+        ariaLabel="Parent bullet for quick notes"
+        placeholder="Inbox"
+        maxLength={TEXT_CAPTURE_PARENT_MAX_LENGTH}
+        rows={1}
+        normalize={normalizeQuickNoteParent}
+        value={quickNoteParent}
+        open={quickNoteParentOpen}
+        onOpenChange={setQuickNoteParentOpen}
+        onSave={(quickNoteParent) => settingsService.update({ quickNoteParent })}
       />
       <AiPromptDrawer
         prompt={editingPrompt}

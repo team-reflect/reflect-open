@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @reflect/desktop dev",
     "build": "turbo run build",
     "build:ios": "pnpm --filter @reflect/desktop build:ios",
     "build:linux": "pnpm --filter @reflect/desktop build:linux",
@@ -35,18 +36,18 @@
     "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
-    "@ocavue/eslint-config": "^4.22.0",
+    "@ocavue/eslint-config": "^4.23.0",
     "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
-    "eslint": "^10.13.0",
-    "knip": "^6.43.0",
+    "eslint": "^10.14.0",
+    "knip": "^6.44.1",
     "nano-staged": "^1.0.2",
-    "oxfmt": "^0.74.0",
-    "oxlint": "^1.88.0",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.91.0",
     "simple-git-hooks": "^2.14.0",
     "turbo": "^2.11.9",
     "typescript": "~6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "simple-git-hooks": {
     "pre-commit": "./node_modules/.bin/nano-staged --allow-empty"
