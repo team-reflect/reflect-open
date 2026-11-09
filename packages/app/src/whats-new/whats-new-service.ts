@@ -166,7 +166,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
     const { storage, platform, window, blocked, content, offerFirst } = deps
     const isMainWindow = window.isMainWindow()
     const items = (content[marketingVersion(platform.appVersion)] ?? []).filter((item) => {
-      return item.platforms.includes(platform.appPlatform)
+      return item.platforms.includes(platform.appPlatform) // FIXME: use BuildPlatform instead of AppPlatform
     })
     this.items = items
     this.override = deriveStore(
