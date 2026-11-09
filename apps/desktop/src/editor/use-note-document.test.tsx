@@ -232,10 +232,10 @@ describe('useNoteDocument', () => {
     await act(() => hook.result.current.onEditorChange('# New Title\n'))
     await act(() => clock.advance(1000)) // the rename save lands
 
-    // Blur is a settle point: the rewrite fires without waiting out the
+    // A settle point (window blur): the rewrite fires without waiting out the
     // quiet period, then the alias lands through the normal save pipeline.
     await act(() => {
-      window.dispatchEvent(new Event('blur'))
+      core.openDocuments.settleAll()
     })
     await act(() => runAllTimers())
 

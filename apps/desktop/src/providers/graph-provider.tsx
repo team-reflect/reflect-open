@@ -96,7 +96,7 @@ export function GraphProvider({
   children: ReactNode
   platform?: AppPlatform
 }) {
-  const { graphSession: session } = useCoreServices()
+  const { graphSession: session, openDocuments } = useCoreServices()
   const { graphBoot, mobileOnboarding, whatsNew } = useAppServices()
   const services = useSelector(session, selectServices)
 
@@ -112,6 +112,16 @@ export function GraphProvider({
   // The mobile bootstrap + onboarding (Plans 19/21) lives in its own
   // service; it opens and parks through the session. Inert on desktop.
   useEffect(() => mobileOnboarding.boot(), [mobileOnboarding])
+
+  // Losing window focus is a settle point: every open note flushes, then its
+  // pending title rename fires.
+  useEffect(() => {
+    const controller = new AbortController()
+    window.addEventListener('blur', () => openDocuments.settleAll(), {
+      signal: controller.signal,
+    })
+    return () => controller.abort()
+  }, [openDocuments])
 
   const value = useMemo<GraphContextValue>(
     () => ({
