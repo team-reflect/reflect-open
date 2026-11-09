@@ -140,8 +140,8 @@ describe('createWhatsNewService', () => {
     expect(whatsNew.items).toEqual([ITEM_3])
   })
 
-  it('shows every item when the stored value is not a JSON array', () => {
-    for (const seen of ['0.19.1-beta.1', '{}']) {
+  it('shows every item when the stored value is not a JSON array of strings', () => {
+    for (const seen of ['0.19.1-beta.1', '{}', '[1]']) {
       const { whatsNew } = setup({ seen })
       expect(whatsNew.phase.get()).toBe('shown')
       expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])

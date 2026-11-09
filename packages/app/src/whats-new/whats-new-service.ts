@@ -10,6 +10,7 @@ import {
   type Store,
   type Unlisten,
 } from '@reflect/core'
+import { z } from 'zod'
 import type { WindowService } from '../app/window-service.ts'
 import type { WhatsNewItem } from './whats-new-content.ts'
 
@@ -110,13 +111,14 @@ function selectIsOverride(value: string | null): boolean {
   return value === 'true'
 }
 
+const seenIdsSchema = z.array(z.string())
+
 /**
- * The seen ids in the stored value. A value that is not a JSON array holds none.
+ * The seen ids in the stored value. A value that is not a JSON array of strings holds none.
  */
-function parseSeenIds(value: string | null): ReadonlySet<unknown> {
+function parseSeenIds(value: string | null): ReadonlySet<string> {
   try {
-    const ids: unknown = JSON.parse(value ?? '[]')
-    return new Set(Array.isArray(ids) ? ids : [])
+    return new Set(seenIdsSchema.parse(JSON.parse(value ?? '[]')))
   } catch {
     return new Set()
   }
