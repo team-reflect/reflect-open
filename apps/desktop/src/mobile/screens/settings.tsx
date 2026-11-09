@@ -396,7 +396,7 @@ export function MobileSettings(): ReactElement {
           {isIos ? (
             <SettingsGroup
               header="Quick notes"
-              footer="Notes from Siri, Shortcuts, and the Action button go under this bullet in today’s note."
+              footer="Where Siri and Shortcuts notes go in today’s note."
             >
               <SettingsNavRow
                 label="Add under"
@@ -707,7 +707,7 @@ export function MobileSettings(): ReactElement {
       />
       <TextSettingDrawer
         title="Add quick notes under"
-        description="The name of a bullet in your daily note, such as Inbox or [[Inbox]]. Quick notes become its last children, and Reflect adds the bullet at the end of the note when it is missing. Leave empty to add quick notes at the end of the note."
+        description="Quick notes go under this bullet. Leave empty to add them at the end."
         ariaLabel="Parent bullet for quick notes"
         placeholder="Inbox"
         maxLength={TEXT_CAPTURE_PARENT_MAX_LENGTH}

@@ -305,6 +305,17 @@ describe('MobileSettings', () => {
       .toBeInTheDocument()
   })
 
+  it('saves the quick note parent on Return', async () => {
+    const user = userEvent
+    const view = await mount({ ios: true })
+
+    await user.click(page.getByRole('button', { name: /Add under.*End of note/ }))
+    await user.fill(page.getByRole('textbox', { name: 'Parent bullet for quick notes' }), 'Inbox')
+    await user.keyboard('{Enter}')
+
+    await expectSettings(view, { quickNoteParent: 'Inbox' })
+  })
+
   it('clears the quick note parent', async () => {
     const user = userEvent
     const view = await mount({ ios: true, settings: { quickNoteParent: 'Inbox' } })
