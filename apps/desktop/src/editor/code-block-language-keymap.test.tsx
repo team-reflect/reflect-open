@@ -35,7 +35,7 @@ describe('CodeBlockLanguageKeymap', () => {
     await userEvent.keyboard(PRESS_MOD_P)
     await expect.element(search).toHaveFocus()
 
-    await userEvent.keyboard('pyth{ArrowDown}{Enter}')
+    await userEvent.keyboard('python{Enter}')
     await vi.waitFor(() => {
       expect(fence(handle.getMarkdown())?.language).toBe('python')
     })

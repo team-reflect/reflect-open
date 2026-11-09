@@ -74,9 +74,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       platforms: ['ios'],
     },
     {
+      id: 'code-block-language-shortcut',
       title: 'Code block languages from the keyboard',
       body: 'With the caret in a code block, press ⌘P to pick its language, then carry on typing where you were.',
-      platforms: ['desktop'],
+      platforms: ['darwin', 'windows', 'linux'],
     },
   ],
 }
