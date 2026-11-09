@@ -202,7 +202,7 @@ describe('reloadAll with live sessions', () => {
     snapshots: NoteSessionSnapshot[],
     options?: { readOnly?: boolean },
   ): NoteSession {
-    return createNoteSessionService({
+    const session = createNoteSessionService({
       noteFile,
       clock: createTestClockService(),
       logger: createTestLoggerService(),
@@ -216,10 +216,14 @@ describe('reloadAll with live sessions', () => {
       onSnapshot: (snapshot) => {
         snapshots.push(snapshot)
       },
-      applyContent: (markdown) => {
+    })
+    session.attachEditor({
+      getMarkdown: () => '',
+      setMarkdown: (markdown) => {
         applied.push(markdown)
       },
     })
+    return session
   }
 
   it('a clean open note adopts the new disk content silently', async () => {

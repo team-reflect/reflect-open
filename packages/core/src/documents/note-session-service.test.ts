@@ -87,9 +87,12 @@ function harness(options?: {
   disk?: string | null
   createIfMissing?: boolean
   missingSeed?: string
+  /**
+   * The attached editor's `getMarkdown`: how it reports pending native input.
+   */
   reconcilePendingEditorInput?: () => void
   /**
-   * Runs inside `applyContent`, the way an editor reports its serialization while it loads content.
+   * Runs inside the attached editor's `setMarkdown`, the way an editor reports its serialization while it loads content.
    */
   onApply?: (markdown: string) => void
 }): Harness {
@@ -133,17 +136,22 @@ function harness(options?: {
     onSnapshot: (snapshot) => {
       snapshots.push(snapshot)
     },
-    applyContent: (markdown) => {
-      applied.push(markdown)
-      options?.onApply?.(markdown)
-    },
-    reconcilePendingEditorInput: options?.reconcilePendingEditorInput,
     onContent: (content, origin) => {
       contents.push({ content, origin })
     },
     createIfMissing: options?.createIfMissing,
     missingSeed: options?.missingSeed,
     saveDebounceMs: 10,
+  })
+  session.attachEditor({
+    getMarkdown: () => {
+      options?.reconcilePendingEditorInput?.()
+      return ''
+    },
+    setMarkdown: (markdown) => {
+      applied.push(markdown)
+      options?.onApply?.(markdown)
+    },
   })
   return {
     snapshots,
@@ -586,7 +594,7 @@ describe('external changes and saves', () => {
   it('an external reload never dirties the buffer, even when the editor reports a normalized serialization', async () => {
     let target: NoteSession | null = null
     const h = harness({
-      // The editor's change handler fires synchronously inside applyContent
+      // The editor’s change handler fires synchronously inside setMarkdown
       // and reports a normalized serialization (an extra trailing newline).
       onApply: (markdown) => target?.editorChanged(`${markdown}\n`),
     })
@@ -1213,7 +1221,7 @@ describe('commitSourceEdit', () => {
     expect(h.writes.at(-1)?.contents).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     expect(h.applied.at(-1)).toBe('# Todo\n\n+ [ ] buy oat milk\n')
     // The pane mounts its editor from `initialContent` only after the ready
-    // snapshot renders, so `applyContent` above reached no editor yet: the seed
+    // snapshot renders, so `setMarkdown` above reached no editor yet: the seed
     // must already carry the edit or the editor opens on the pre-edit body.
     expect(h.snapshots.at(-1)?.initialContent).toBe('# Todo\n\n+ [ ] buy oat milk\n')
   })
