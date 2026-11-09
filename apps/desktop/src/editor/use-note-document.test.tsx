@@ -293,6 +293,7 @@ describe('useNoteDocument', () => {
     expect(locked).toEqual({ status: 'done', isPrivate: true })
     expect(file('notes/new-title.md')).toContain('private: true')
     expect(hook.result.current.snapshot.path).toBe('notes/new-title.md')
+    expect(hook.result.current.snapshot.isPrivate).toBe(true)
     await hook.unmount()
   })
 

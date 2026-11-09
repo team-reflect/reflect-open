@@ -175,6 +175,7 @@ export function NotePaneComponent({
         path={snapshot.path}
         session={session}
         initialContent={snapshot.initialContent}
+        isPrivate={snapshot.isPrivate}
         saveError={snapshot.error}
         dailyNote={dailyNote}
         autoFocus={autoFocus}

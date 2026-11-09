@@ -43,6 +43,8 @@ interface SessionEditorViewProps {
   session: NoteSession
   /** The body the editor opens on. */
   initialContent: string
+  /** The note's `private: true` flag, as its session holds it. */
+  isPrivate: boolean
   /** The session's save error, if its last write failed. */
   saveError: string | null
   dailyNote: boolean
@@ -67,6 +69,7 @@ export function SessionEditorView({
   path,
   session,
   initialContent,
+  isPrivate,
   saveError,
   dailyNote,
   autoFocus,
@@ -125,7 +128,7 @@ export function SessionEditorView({
   // (a late resolve after the unmount must insert nowhere rather than
   // somewhere stale).
   const onSlashMenuSearch = useTemplateSlashItems(useCallback(() => editorRef.current, []))
-  const aiMenu = useEditorAiMenu({ path, editorRef })
+  const aiMenu = useEditorAiMenu({ path, isPrivate, editorRef })
 
   const handleRef = useCallback(
     (handle: NoteEditorHandle) => {

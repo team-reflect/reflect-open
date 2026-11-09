@@ -25,7 +25,6 @@ import { AiPreviewActions } from '@/editor/ai-menu/ai-preview-actions.tsx'
 import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
 import { useAiProviders } from '@/hooks/use-ai-providers.ts'
-import { useNoteRow } from '@/hooks/use-note-row.ts'
 import { useRouterActions } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
@@ -40,6 +39,8 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 interface EditorAiMenuOptions {
   /** Graph-relative path of the note being edited (the privacy subject). */
   path: string
+  /** The note's `private: true` flag, as its session holds it. */
+  isPrivate: boolean
   /** The mounted editor's handle (staging, streaming, and accept live there). */
   editorRef: RefObject<NoteEditorHandle | null>
 }
@@ -81,24 +82,12 @@ async function forEachAsync<T>(
   }
 }
 
-export function useEditorAiMenu({ path, editorRef }: EditorAiMenuOptions): EditorAiMenuValue {
+export function useEditorAiMenu({
+  path,
+  isPrivate,
+  editorRef,
+}: EditorAiMenuOptions): EditorAiMenuValue {
   const toastController = useToastController()
-  const noteRow = useNoteRow(path)
-  // The last privacy flag this editor resolved, adjusted during render (the
-  // note-pane seed pattern). A title-driven rename retargets the same note
-  // under a new path (Plan 17), and the new path's row query starts empty —
-  // the previous flag stays authoritative for that beat, so a Retry mid-
-  // rename doesn't misreport a public note as private.
-  const [resolvedPrivacy, setResolvedPrivacy] = useState<boolean | null>(null)
-  if (noteRow !== null && resolvedPrivacy !== noteRow.isPrivate) {
-    setResolvedPrivacy(noteRow.isPrivate)
-  }
-  // Fail closed: with no row resolved for this editor yet, the note counts as
-  // private, so the menu (and the CloudSafe mint below) never treats a
-  // not-yet-loaded note as sendable. The row is overlay-backed, so an in-app
-  // "Mark as private" flips this immediately; only an external edit waits on
-  // the watcher's re-index.
-  const isPrivate = noteRow?.isPrivate ?? resolvedPrivacy ?? true
   const { providers } = useAiProviders()
   const { selectionTransform } = useCoreServices()
   const { prompts } = useAiPrompts()

@@ -27,6 +27,13 @@ export interface NoteSessionSnapshot {
   /** True while the buffer has changes not yet written to disk. */
   dirty: boolean
   /**
+   * The document's `private: true` frontmatter flag, as the session holds it:
+   * the loaded header, followed by frontmatter commits and external reloads.
+   * True while loading, so nothing leaves the device before the header is
+   * known.
+   */
+  isPrivate: boolean
+  /**
    * True when the initial load found no file (the lazy-create contract): the
    * note exists only as this buffer until the first save lands.
    */
@@ -41,6 +48,7 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
   initialContent: '',
   protected: false,
   dirty: false,
+  isPrivate: true,
   missing: false,
   error: null,
 }
