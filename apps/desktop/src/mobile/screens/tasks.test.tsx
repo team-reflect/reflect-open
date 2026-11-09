@@ -52,11 +52,13 @@ vi.mock('@/editor/note-editor.tsx', async () => {
       initialContent: string
       onChange?: (markdown: string) => void
       onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
-      handleRef?: (handle: import('@/editor/note-editor.tsx').NoteEditorHandle | null) => void
+      handleRef?: (
+        handle: import('@/editor/note-editor.tsx').NoteEditorHandle | null,
+      ) => void | (() => void)
     }) => {
       const areaRef = useRef<HTMLTextAreaElement | null>(null)
       useEffect(() => {
-        handleRef?.({
+        const cleanup = handleRef?.({
           getMarkdown: () => areaRef.current?.value ?? '',
           setMarkdown: (markdown) => {
             if (areaRef.current !== null) {
@@ -77,7 +79,13 @@ vi.mock('@/editor/note-editor.tsx', async () => {
           findNext: () => {},
           findPrevious: () => {},
         })
-        return () => handleRef?.(null)
+        return () => {
+          if (typeof cleanup === 'function') {
+            cleanup()
+          } else {
+            handleRef?.(null)
+          }
+        }
       }, [handleRef])
       return (
         <>

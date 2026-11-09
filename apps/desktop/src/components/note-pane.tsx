@@ -1,42 +1,14 @@
-import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
-import type { ExitBoundaryHandler, SearchStatus } from '@meowdown/core'
+import { memo, useState, type ReactElement } from 'react'
 import { deferredCreationPolicy, isDaily } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel.tsx'
 import { NoteLoading } from '@/components/note-loading.tsx'
 import { NoteOpenError } from '@/components/note-open-error.tsx'
-import { NoteSaveAlerts } from '@/components/note-save-alerts.tsx'
 import { ProtectedNoteView } from '@/components/protected-note-view.tsx'
-import { SuggestedContactCard } from '@/components/suggested-contact-card.tsx'
-import { EditorAiKeymap } from '@/editor/ai-menu/editor-ai-keymap.tsx'
-import { useEditorAiMenu } from '@/editor/ai-menu/use-editor-ai-menu.tsx'
-import { editorBodyWithDefaultBullet } from '@/editor/default-bullet.ts'
-import {
-  registerNoteEditorHandle,
-  unregisterNoteEditorHandle,
-} from '@/editor/editor-handle-registry.ts'
-import { markModeFromSyntax } from '@/editor/mark-mode.ts'
-import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor.tsx'
-import { useAssetPersistence } from '@/editor/use-asset-persistence.ts'
-import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete.ts'
+import { SessionEditorView } from '@/components/session-editor-view.tsx'
+import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { useNoteDocument } from '@/editor/use-note-document.ts'
-import { useTagNavigation } from '@/editor/use-tag-navigation.ts'
-import { useTemplateSlashItems } from '@/editor/use-template-slash-items.ts'
-import { useMarkdownLinkClick } from '@/editor/use-markdown-link-click.ts'
-import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation.ts'
-import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview.tsx'
 import { useXPostPreload } from '@/editor/use-x-post-preload.ts'
 import { cn } from '@/lib/utils.ts'
-import { useGraphInfo } from '@/providers/graph-provider.tsx'
-import { useNoteSearchQuery, useNoteSearchReport } from '@/providers/note-find-provider.tsx'
-import {
-  useDateFormat,
-  useEditorBulletAfterHeading,
-  useEditorDefaultBullet,
-  useEditorMarkdownSyntax,
-  useEditorSmoothCaretAnimation,
-  useEditorSpellCheck,
-  useTimeFormat,
-} from '@/providers/settings-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
 interface NotePaneProps {
@@ -115,8 +87,8 @@ interface NotePaneProps {
  * these per day in the daily stream.
  *
  * The pane is composition only: document semantics live in
- * `useNoteDocument`/`note-session.ts`, link-click behavior in
- * `useWikiLinkNavigation`, and the banners are shared components.
+ * `useNoteDocument`/`note-session.ts`, and the editor of one session, with
+ * everything addressed by its path, is `SessionEditorView`.
  */
 export function NotePaneComponent({
   path,
@@ -132,15 +104,7 @@ export function NotePaneComponent({
   registerHandle,
   onExitBoundary,
 }: NotePaneProps): ReactElement {
-  const graph = useGraphInfo()
-  const dateFormat = useDateFormat()
-  const timeFormat = useTimeFormat()
-  const editorMarkdownSyntax = useEditorMarkdownSyntax()
-  const editorSpellCheck = useEditorSpellCheck()
-  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
-  const editorDefaultBullet = useEditorDefaultBullet()
-  const editorBulletAfterHeading = useEditorBulletAfterHeading()
-  const { noteCreation, platform, linkPreview } = useCoreServices()
+  const { noteCreation } = useCoreServices()
   const dailyNote = isDaily(path)
   const policy = deferredCreationPolicy(path)
   const lazyCreate = lazy && policy.lazyCreatable
@@ -167,196 +131,61 @@ export function NotePaneComponent({
     // notes stay unseeded — the date is their identity.
     missingSeed: needsSeed ? seed.seed : undefined,
   })
-  const {
-    resolveImageUrl,
-    resolveWikiEmbed,
-    resolveAssetOpenPath,
-    resolveFileLink,
-    openAsset,
-    saveFile,
-    resolveFileInfo,
-    saveError,
-  } = useAssetPersistence(path)
-  const renderWikilinkHoverCard = useWikiLinkHoverPreview({
-    dateFormat,
-  })
-  const onWikiLinkClick = useWikiLinkNavigation()
-  const onLinkClick = useMarkdownLinkClick(path)
-  const onTagClick = useTagNavigation()
-  const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
-  // Outbound features gate on the note the editor shows, which can briefly
-  // differ from the route's note during a switch.
-  const editorPath = document.editorPath ?? path
-  const hasGraph = graph !== null
-  const resolveLinkPreview = useMemo(
-    () => (hasGraph ? linkPreview.createResolver(editorPath) : undefined),
-    [hasGraph, linkPreview, editorPath],
-  )
-
-  const bindEditor = document.bindEditor
-  const aiEditorRef = useRef<NoteEditorHandle | null>(null)
-  // Find is one session per window: only the targeted note gets a query, and
-  // only its status reaches the Find bar.
-  const searchQuery = useNoteSearchQuery(path)
-  const reportSearchStatus = useNoteSearchReport()
-  const handleSearchChange = useCallback(
-    (status: SearchStatus) => reportSearchStatus(path, status),
-    [path, reportSearchStatus],
-  )
-  // The registry entry this pane made, so unmount removes exactly it (a
-  // remount of the same path may already have re-registered).
-  const registeredHandleRef = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
-  // The `/` menu's template rows insert into this pane's own editor, read
-  // through the registry ref at select time (a late resolve after the pane
-  // unmounted must insert nowhere rather than somewhere stale).
-  const onSlashMenuSearch = useTemplateSlashItems(
-    useCallback(() => registeredHandleRef.current?.handle ?? null, []),
-  )
-  const handleRef = useCallback(
-    (handle: NoteEditorHandle | null) => {
-      bindEditor(handle)
-      aiEditorRef.current = handle
-      if (handle === null) {
-        if (registeredHandleRef.current !== null) {
-          unregisterNoteEditorHandle(
-            registeredHandleRef.current.path,
-            registeredHandleRef.current.handle,
-          )
-          registeredHandleRef.current = null
-        }
-      } else {
-        registerNoteEditorHandle(path, handle)
-        registeredHandleRef.current = { path, handle }
-      }
-      if (dailyDate !== undefined) {
-        registerHandle?.(dailyDate, handle)
-      }
-      if (handle && autoFocus) {
-        // By default the caret lands at the document start — for a seeded
-        // new note that is the empty H1, so typing names the note. An `end`
-        // selection moves it (and the scroll) to the note's content end.
-        handle.focus()
-        if (autoFocusSelection === 'end') {
-          handle.setSelection('end')
-        }
-        onAutoFocused?.()
-      }
-    },
-    [bindEditor, path, dailyDate, registerHandle, autoFocus, autoFocusSelection, onAutoFocused],
-  )
-
-  const aiMenu = useEditorAiMenu({
-    path: editorPath,
-    sessionEpoch: document.sessionEpoch,
-    editorRef: aiEditorRef,
-  })
-
-  const handleExitBoundary: ExitBoundaryHandler | undefined = useMemo(() => {
-    if (!dailyDate || !onExitBoundary) {
-      return
-    }
-    return ({ direction }) => {
-      return onExitBoundary(dailyDate, direction)
-    }
-  }, [dailyDate, onExitBoundary])
+  const { snapshot, session, epoch } = document
 
   const editorContent =
-    document.status === 'ready' && !document.protected ? document.initialContent : null
+    snapshot.status === 'ready' && !snapshot.protected ? snapshot.initialContent : null
   const xPostsReady = useXPostPreload(editorContent)
 
-  if (document.status === 'loading' || (editorContent !== null && !xPostsReady)) {
+  if (
+    session === null ||
+    snapshot.path === null ||
+    snapshot.status === 'loading' ||
+    (editorContent !== null && !xPostsReady)
+  ) {
     return <NoteLoading className={cn(gutterClassName, editorClassName, className)} />
   }
 
-  if (document.status === 'error') {
+  if (snapshot.status === 'error') {
     return (
       <NoteOpenError
         path={path}
-        message={document.error}
+        message={snapshot.error}
         className={cn(gutterClassName, editorClassName, className)}
       />
     )
   }
 
-  if (document.protected) {
+  if (snapshot.protected) {
     return (
       <div className={cn(gutterClassName, className)}>
-        <ProtectedNoteView content={document.initialContent} />
+        <ProtectedNoteView content={snapshot.initialContent} />
         {showBacklinks ? <BacklinksPanel path={path} /> : null}
       </div>
     )
   }
 
-  // A note that opens with an empty body starts on an empty bullet when the
-  // setting is on (old Reflect's every-note default). The seed only changes what
-  // the editor shows; persistence is untouched, so a not-yet-created daily
-  // placeholder stays uncreated until the user types — see `default-bullet.ts`.
-  const editorSeed = editorBodyWithDefaultBullet(document.initialContent, editorDefaultBullet)
-
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
-      <div className={gutterClassName}>
-        <NoteSaveAlerts document={document} assetSaveError={saveError} />
-
-        {/* Daily notes are date-titled, so a contact can never match one —
-            the hook gates on it, and skipping the mount keeps the stream lean.
-            Keyed by path: a note switch must not carry one card's busy/error
-            state into the next note's card. */}
-        {!dailyNote ? <SuggestedContactCard key={path} path={path} /> : null}
-      </div>
-
-      <NoteEditor
+      <SessionEditorView
         // Keyed on the session, not the path: a rename retargets the live
         // session under a new filename (Plan 17), and remounting the editor
         // for that would throw away the cursor mid-thought.
-        key={document.sessionEpoch}
-        initialContent={editorSeed}
-        onChange={document.onEditorChange}
-        markMode={markModeFromSyntax(editorMarkdownSyntax)}
-        spellCheck={editorSpellCheck}
-        searchQuery={searchQuery}
-        onSearchChange={handleSearchChange}
-        smoothCaretAnimation={editorSmoothCaretAnimation}
-        timeFormat={timeFormat}
-        bulletAfterHeading={editorBulletAfterHeading}
-        backspaceDeletesEmptyFirstBlock={dailyNote}
-        // The grip drag-reorders blocks and the "+" inserts a paragraph below.
-        blockHandle={true}
-        resolveImageUrl={resolveImageUrl}
-        resolveWikiEmbed={resolveWikiEmbed}
-        resolveAssetOpenPath={resolveAssetOpenPath}
-        openAsset={openAsset}
-        saveFile={saveFile}
-        // Claims links to local attachments (what saveFile inserts for a
-        // dropped non-image file, or a vault's own attachment links) so they
-        // render as file pills, sized by resolveFileInfo.
-        resolveFileLink={resolveFileLink}
-        resolveFileInfo={resolveFileInfo}
-        onWikiLinkClick={onWikiLinkClick}
-        onLinkClick={onLinkClick}
-        resolveLinkPreview={resolveLinkPreview}
-        renderWikilinkHoverCard={
-          graph !== null && !platform.surface.touchEditor ? renderWikilinkHoverCard : undefined
-        }
-        onTagClick={onTagClick}
-        onWikilinkSearch={onWikilinkSearch}
-        onTagSearch={onTagSearch}
-        onSelectionMenuSearch={aiMenu.onSelectionMenuSearch}
-        pendingReplacementActions={aiMenu.pendingReplacementActions}
-        onPendingReplacementResolve={aiMenu.onPendingReplacementResolve}
-        onSlashMenuSearch={onSlashMenuSearch}
-        // Daily notes carry no title semantics (the date is their subject),
-        // so an empty leading H1 there is just an empty heading.
-        {...(dailyNote ? {} : { titlePlaceholder: 'Untitled' })}
-        // `reflect-note-surface` opts this primary editor into the reading
-        // text size (Settings → Editor); compact MarkdownView previews that
-        // also carry `reflect-editor` keep their own context size.
-        className={cn('reflect-note-surface', gutterClassName, editorClassName)}
-        handleRef={handleRef}
-        onExitBoundary={handleExitBoundary}
-      >
-        <EditorAiKeymap onTrigger={aiMenu.openMenu} />
-      </NoteEditor>
+        key={epoch}
+        path={snapshot.path}
+        session={session}
+        initialContent={snapshot.initialContent}
+        saveError={snapshot.error}
+        dailyNote={dailyNote}
+        autoFocus={autoFocus}
+        autoFocusSelection={autoFocusSelection}
+        onAutoFocused={onAutoFocused}
+        gutterClassName={gutterClassName}
+        editorClassName={editorClassName}
+        dailyDate={dailyDate}
+        registerHandle={registerHandle}
+        onExitBoundary={onExitBoundary}
+      />
 
       {showBacklinks ? (
         <div className={gutterClassName}>
