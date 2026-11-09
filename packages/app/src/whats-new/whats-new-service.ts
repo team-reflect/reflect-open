@@ -4,16 +4,18 @@ import {
   marketingVersion,
   WritableStore,
   type GraphSessionService,
+  type BuildPlatform,
   type PlatformFacts,
   type StorageService,
   type Store,
   type Unlisten,
 } from '@reflect/core'
+import { z } from 'zod'
 import type { WindowService } from '../app/window-service.ts'
 import type { WhatsNewItem } from './whats-new-content.ts'
 
 /**
- * The full version, prerelease tag included, whose What's New the user last saw or skipped.
+ * A JSON array of the ids of the current version's items the user saw or skipped.
  */
 export const WHATS_NEW_SEEN_STORAGE_KEY = 'reflect.whats-new.seen'
 
@@ -23,23 +25,17 @@ export const WHATS_NEW_SEEN_STORAGE_KEY = 'reflect.whats-new.seen'
 export const WHATS_NEW_OVERRIDE_STORAGE_KEY = 'reflect.whats-new.override'
 
 /**
- * How far this launch got: no graph open yet, a graph opened, or a graph
- * opened after the graph chooser or the onboarding (a new install).
- */
-export type WhatsNewLaunch = 'opening' | 'opened' | 'openedAfterSetup'
-
-/**
  * Everything {@link decideWhatsNew} reads.
  */
 export interface WhatsNewInputs {
   readonly isMainWindow: boolean
   readonly isDev: boolean
   /**
-   * The current version's items for this platform.
+   * The items to show.
    */
   readonly items: readonly WhatsNewItem[]
   /**
-   * The user already saw or skipped the current version.
+   * The user already saw or skipped every item of the current version.
    */
   readonly seen: boolean
   readonly override: boolean
@@ -47,7 +43,10 @@ export interface WhatsNewInputs {
    * Something with priority, like the paywall, shows or may show.
    */
   readonly blocked: boolean
-  readonly launch: WhatsNewLaunch
+  /**
+   * The first graph of this launch opened.
+   */
+  readonly graphOpened: boolean
   /**
    * Offer What's New first, and show it only once the user accepts.
    */
@@ -59,10 +58,19 @@ export interface WhatsNewInputs {
 }
 
 /**
- * `wait` shows nothing for now; `skip` shows nothing and marks the version
- * seen; `offer` asks the user first; `show` shows the items.
+ * The build target whose items to show. Browser dev has no Tauri build target,
+ * so it stands in the closest one.
  */
-export type WhatsNewDecision = 'wait' | 'skip' | 'offer' | 'show'
+export function whatsNewPlatform(platform: PlatformFacts): BuildPlatform {
+  if (platform.buildPlatform) return platform.buildPlatform
+  if (platform.appPlatform !== 'desktop') return platform.appPlatform
+  return platform.isApplePlatform ? 'darwin' : 'windows'
+}
+
+/**
+ * `wait` shows nothing for now; `offer` asks the user first; `show` shows the items.
+ */
+export type WhatsNewDecision = 'wait' | 'offer' | 'show'
 
 /**
  * Whether What's New is hidden, offered, or shown.
@@ -71,7 +79,6 @@ export type WhatsNewPhase = 'hidden' | 'offered' | 'shown'
 
 const PHASES: Record<WhatsNewDecision, WhatsNewPhase> = {
   wait: 'hidden',
-  skip: 'hidden',
   offer: 'offered',
   show: 'shown',
 }
@@ -80,7 +87,7 @@ const PHASES: Record<WhatsNewDecision, WhatsNewPhase> = {
  * What to do with What's New for the given inputs.
  */
 export function decideWhatsNew(inputs: WhatsNewInputs): WhatsNewDecision {
-  if (!inputs.isMainWindow || inputs.launch === 'opening' || inputs.blocked) {
+  if (!inputs.isMainWindow || !inputs.graphOpened || inputs.blocked) {
     return 'wait'
   }
   if (inputs.override) {
@@ -89,9 +96,6 @@ export function decideWhatsNew(inputs: WhatsNewInputs): WhatsNewDecision {
   if (inputs.isDev || inputs.seen) {
     return 'wait'
   }
-  if (inputs.launch === 'openedAfterSetup' || inputs.items.length === 0) {
-    return 'skip'
-  }
   return inputs.offerFirst && !inputs.accepted ? 'offer' : 'show'
 }
 
@@ -99,12 +103,27 @@ function selectIsOverride(value: string | null): boolean {
   return value === 'true'
 }
 
+const seenIdsSchema = z.array(z.string())
+
 /**
- * The What's New page shown once per app version after an update.
+ * The seen ids in the stored value. A value that is not a JSON array of strings holds none.
+ */
+function parseSeenIds(value: string | null): ReadonlySet<string> {
+  try {
+    return new Set(seenIdsSchema.parse(JSON.parse(value ?? '[]')))
+  } catch {
+    return new Set()
+  }
+}
+
+/**
+ * The What's New page shown after an update that brings items the user has
+ * not seen.
  */
 export interface WhatsNewService {
   /**
-   * The current version's items for this platform.
+   * The current version's items for this platform that the user had not seen
+   * at launch, or all of them when the user had seen every one.
    */
   readonly items: readonly WhatsNewItem[]
   /**
@@ -121,16 +140,17 @@ export interface WhatsNewService {
    */
   accept: () => void
   /**
-   * Marks the current version as seen while it is still only offered.
+   * Marks the current version's items as seen while they are still only offered.
    */
   decline: () => void
   /**
-   * Marks the current version as seen and turns the override off.
+   * Marks the current version's items as seen and turns the override off.
    */
   dismiss: () => void
   /**
-   * Follows how this launch opens its graph, and marks a version seen when it
-   * should never show. Call it before the graph boot. Returns the function
+   * Follows how this launch opens its first graph, and marks the items seen
+   * when it opens after the graph chooser or the onboarding (a new install).
+   * Call it before the graph boot. Returns the function
    * that stops it.
    */
   start(): Unlisten
@@ -154,9 +174,11 @@ export interface WhatsNewServiceDeps {
 
 class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
-  readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
+  readonly #graphOpened = new WritableStore(false)
   readonly #accepted = new WritableStore(false)
+  readonly #seen: WritableStore<boolean>
   readonly #decision: Store<WhatsNewDecision>
+  readonly #versionIds: readonly string[]
   readonly items: readonly WhatsNewItem[]
   readonly phase: Store<WhatsNewPhase>
   readonly override: Store<boolean>
@@ -165,31 +187,32 @@ class WhatsNewServiceImpl implements WhatsNewService {
     this.#deps = deps
     const { storage, platform, window, blocked, content, offerFirst } = deps
     const isMainWindow = window.isMainWindow()
-    const items = (content[marketingVersion(platform.appVersion)] ?? []).filter((item) => {
-      return item.platforms.includes(platform.appPlatform)
+    const versionItems = content[marketingVersion(platform.appVersion)] ?? []
+    this.#versionIds = versionItems.map((item) => item.id)
+    const platformItems = versionItems.filter((item) => {
+      return item.platforms.includes(whatsNewPlatform(platform))
     })
+    const seenIds = parseSeenIds(storage.local.get(WHATS_NEW_SEEN_STORAGE_KEY))
+    const unseenItems = platformItems.filter((item) => !seenIds.has(item.id))
+    // Opening What's New again after seeing every item shows them all.
+    const items = unseenItems.length > 0 ? unseenItems : platformItems
     this.items = items
+    this.#seen = new WritableStore(unseenItems.length === 0)
     this.override = deriveStore(
       storage.session.store(WHATS_NEW_OVERRIDE_STORAGE_KEY),
       selectIsOverride,
     )
     this.#decision = combineStores(
-      [
-        storage.local.store(WHATS_NEW_SEEN_STORAGE_KEY),
-        this.override,
-        blocked,
-        this.#launch,
-        this.#accepted,
-      ],
-      (seen, override, blockedValue, launch, accepted) => {
+      [this.#seen, this.override, blocked, this.#graphOpened, this.#accepted],
+      (seen, override, blockedValue, graphOpened, accepted) => {
         return decideWhatsNew({
           isMainWindow,
           isDev: platform.isDev,
           items,
-          seen: seen === platform.appVersion,
+          seen,
           override,
           blocked: blockedValue,
-          launch,
+          graphOpened,
           offerFirst,
           accepted,
         })
@@ -218,7 +241,8 @@ class WhatsNewServiceImpl implements WhatsNewService {
   }
 
   #markSeen(): void {
-    this.#deps.storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, this.#deps.platform.appVersion)
+    this.#deps.storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, JSON.stringify(this.#versionIds))
+    this.#seen.set(true)
   }
 
   start(): Unlisten {
@@ -231,25 +255,17 @@ class WhatsNewServiceImpl implements WhatsNewService {
       if (status === 'choosing') {
         setupSeen = true
       } else if (status === 'ready') {
-        this.#launch.set(setupSeen ? 'openedAfterSetup' : 'opened')
+        if (setupSeen) {
+          this.#markSeen()
+        }
+        this.#graphOpened.set(true)
         stopLaunch()
       }
     }
     const stopLaunch = graphSession.subscribe(followLaunch)
     followLaunch()
 
-    const markSkipped = (): void => {
-      if (this.#decision.get() === 'skip') {
-        this.#markSeen()
-      }
-    }
-    const stopDecision = this.#decision.subscribe(markSkipped)
-    markSkipped()
-
-    return () => {
-      stopLaunch()
-      stopDecision()
-    }
+    return stopLaunch
   }
 }
 

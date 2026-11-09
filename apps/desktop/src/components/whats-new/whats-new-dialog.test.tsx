@@ -24,7 +24,12 @@ function createFakeWhatsNew(initial: WhatsNewPhase = 'shown') {
   let dismissed = 0
   const whatsNew: WhatsNewService = {
     items: [
-      { title: 'Chat in the All tab', body: 'Ask your notes anywhere.', platforms: ['desktop'] },
+      {
+        id: 'chat',
+        title: 'Chat in the All tab',
+        body: 'Ask your notes anywhere.',
+        platforms: ['darwin'],
+      },
     ],
     phase,
     override: new WritableStore(false),

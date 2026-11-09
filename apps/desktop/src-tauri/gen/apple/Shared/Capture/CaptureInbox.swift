@@ -28,6 +28,8 @@ struct TextCaptureEnvelope: Encodable {
   var id: String
   var kind = "append"
   var text: String
+  /// The top-level bullet the entry nests under; nil appends at the end.
+  var parent: String?
   var capturedAt: String
   var source: String
 }
@@ -51,6 +53,8 @@ private enum FieldCap {
   static let selection = 10_000
   static let description = 2_000
   static let textMax = 10_000
+  /// Mirrors `TEXT_CAPTURE_PARENT_MAX_LENGTH`.
+  static let parent = 200
 }
 
 enum CaptureInbox {
@@ -109,17 +113,18 @@ enum CaptureInbox {
     try spool(data, id: id)
   }
 
-  /// Spool text as an append capture — the daily note gets a bullet.
-  /// Returns false (spooling nothing) when the text folds to empty.
-  /// `source` is the envelope's provenance tag; deliberately no default,
-  /// so the compiler names every producer.
-  static func spoolText(_ text: String, source: String) throws -> Bool {
+  /// Spool text as an append capture — the daily note gets a bullet, under
+  /// `parent` when it is set. Returns false (spooling nothing) when the text
+  /// folds to empty. `source` and `parent` deliberately have no default, so
+  /// the compiler names every producer.
+  static func spoolText(_ text: String, source: String, parent: String?) throws -> Bool {
     guard let line = foldedLine(text) else {
       return false
     }
     let id = envelopeId()
     let envelope = TextCaptureEnvelope(
-      id: id, text: line, capturedAt: capturedAt(), source: source)
+      id: id, text: line, parent: parent.flatMap(foldedParent), capturedAt: capturedAt(),
+      source: source)
     try spool(try JSONEncoder().encode(envelope), id: id)
     return true
   }
@@ -133,12 +138,20 @@ enum CaptureInbox {
   /// the schema's single-line limit — the same normalization the desktop's
   /// deep-link parser applies. Nil when nothing printable remains.
   static func foldedLine(_ text: String) -> String? {
-    let folded =
-      text
+    nonEmpty(capped(folded(text), at: FieldCap.textMax))
+  }
+
+  /// A parent bullet label folded to one line and capped to the drain
+  /// schema's limit. Nil when nothing printable remains.
+  static func foldedParent(_ text: String) -> String? {
+    nonEmpty(capped(folded(text), at: FieldCap.parent))
+  }
+
+  private static func folded(_ text: String) -> String {
+    text
       .components(separatedBy: .whitespacesAndNewlines)
       .filter { !$0.isEmpty }
       .joined(separator: " ")
-    return nonEmpty(capped(folded, at: FieldCap.textMax))
   }
 
   // MARK: - spooling
@@ -156,14 +169,18 @@ enum CaptureInbox {
   }
 
   private static func inboxUrl() throws -> URL {
-    guard
-      !groupId.isEmpty,
-      let container = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: groupId)
-    else {
+    guard let container = containerUrl() else {
       throw CaptureInboxError.containerUnavailable
     }
     return container.appendingPathComponent(inboxDir, isDirectory: true)
+  }
+
+  /// The flavor's App Group container, or nil when it is unavailable.
+  static func containerUrl() -> URL? {
+    guard !groupId.isEmpty else {
+      return nil
+    }
+    return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupId)
   }
 
   // MARK: - field shaping

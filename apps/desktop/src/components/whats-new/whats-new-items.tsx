@@ -32,11 +32,7 @@ export function WhatsNewItems({ items, riseFrom, className }: WhatsNewItemsProps
       {items.map((item, index) => {
         const rise = riseFrom === undefined ? undefined : riseIn(riseFrom + index)
         return (
-          <li
-            key={item.title}
-            className={cn('flex gap-3 py-3', rise?.className)}
-            style={rise?.style}
-          >
+          <li key={item.id} className={cn('flex gap-3 py-3', rise?.className)} style={rise?.style}>
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-accent/10 text-accent dark:bg-accent/20 dark:text-accent-hover">
               <Check className="size-3.5" strokeWidth={2.75} />
             </span>

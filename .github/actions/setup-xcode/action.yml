@@ -17,7 +17,7 @@ runs:
           echo "Xcode path: $app"
           echo "Xcode real path: $(realpath "$app")"
           echo "Xcode version: $(plutil -extract CFBundleShortVersionString raw "$app/Contents/version.plist")"
-          echo "Xcode build number: $(plutil -extract ProductBuildVersion raw "$app/Contents/version.plist")"
+          echo "Xcode build version: $(plutil -extract ProductBuildVersion raw "$app/Contents/version.plist")"
         done
 
     - name: Print the Xcode version before

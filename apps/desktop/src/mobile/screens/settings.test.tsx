@@ -290,6 +290,48 @@ describe('MobileSettings', () => {
     await expectSettings(view, { transcriptionPrompt: 'x'.repeat(500) })
   })
 
+  it('edits the quick note parent on iOS', async () => {
+    const user = userEvent
+    const view = await mount({ ios: true })
+
+    await user.click(page.getByRole('button', { name: /Add under.*End of note/ }))
+    const textarea = page.getByRole('textbox', { name: 'Parent bullet for quick notes' })
+    await user.fill(textarea, ' [[Inbox]] ')
+    await user.click(page.getByRole('button', { name: 'Save' }))
+
+    await expectSettings(view, { quickNoteParent: '[[Inbox]]' })
+    await expect
+      .element(page.getByRole('button', { name: /Add under.*\[\[Inbox\]\]/ }))
+      .toBeInTheDocument()
+  })
+
+  it('saves the quick note parent on Return', async () => {
+    const user = userEvent
+    const view = await mount({ ios: true })
+
+    await user.click(page.getByRole('button', { name: /Add under.*End of note/ }))
+    await user.fill(page.getByRole('textbox', { name: 'Parent bullet for quick notes' }), 'Inbox')
+    await user.keyboard('{Enter}')
+
+    await expectSettings(view, { quickNoteParent: 'Inbox' })
+  })
+
+  it('clears the quick note parent', async () => {
+    const user = userEvent
+    const view = await mount({ ios: true, settings: { quickNoteParent: 'Inbox' } })
+
+    await user.click(page.getByRole('button', { name: /Add under.*Inbox/ }))
+    await user.click(page.getByRole('button', { name: 'Clear' }))
+
+    await expectSettings(view, { quickNoteParent: '' })
+  })
+
+  it('hides the quick notes group outside iOS', async () => {
+    await mount()
+
+    await expect.element(page.getByText('Quick notes')).not.toBeInTheDocument()
+  })
+
   it('tracks a prompt that hydrates while its editor is open', async () => {
     const user = userEvent
     const view = await mount()
