@@ -6,6 +6,7 @@ import type { NoteFileService, NoteWriteResult } from '../graph/note-file-servic
 import { appendBlock } from '../markdown/append-section.ts'
 import { hasAuthoredTitle, parseNote } from '../markdown/extract.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
+import { notePrivate } from '../privacy/privacy-service.ts'
 import { splitDoc } from './note-session-doc.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type {
@@ -211,6 +212,7 @@ class NoteSessionImpl implements NoteSession {
       initialContent: this.#initialContent,
       protected: this.#isProtected,
       dirty: this.#dirty,
+      isPrivate: this.#status === 'ready' ? notePrivate(this.#header) : true,
       missing: this.#missing,
       error: this.#error,
     }
@@ -221,6 +223,7 @@ class NoteSessionImpl implements NoteSession {
       this.#lastEmitted.initialContent === next.initialContent &&
       this.#lastEmitted.protected === next.protected &&
       this.#lastEmitted.dirty === next.dirty &&
+      this.#lastEmitted.isPrivate === next.isPrivate &&
       this.#lastEmitted.missing === next.missing &&
       this.#lastEmitted.error === next.error
     ) {

@@ -211,6 +211,23 @@ describe('createNoteSession', () => {
     expect(snapshots.length).toBe(emittedBeforeDispose)
   })
 
+  it('reports the private flag from the loaded header, then follows every header change', async () => {
+    const h = harness({ disk: '---\nprivate: true\n---\n# Secret\n' })
+    expect(h.snapshots.at(-1)?.isPrivate ?? true).toBe(true) // fail closed while loading
+    h.session.load()
+    await settled()
+    expect(h.snapshots.at(-1)?.isPrivate).toBe(true)
+
+    expect(await h.session.commitFrontmatter({ private: false })).toBe(true)
+    await settled()
+    expect(h.snapshots.at(-1)?.isPrivate).toBe(false)
+
+    h.setDisk('---\nprivate: true\n---\n# Secret\n')
+    h.session.externalChanged()
+    await settled()
+    expect(h.snapshots.at(-1)?.isPrivate).toBe(true)
+  })
+
   it('reconciles pending editor input before a flush snapshots the buffer', async () => {
     let target: NoteSession | null = null
     const reconcilePendingEditorInput = vi.fn(() => {
