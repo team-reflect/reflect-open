@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.12...v0.18.0-beta.13) (2026-11-09)
+
+
+### Bug Fixes
+
+* **desktop:** stop note switches overwriting notes and exposing private notes ([#1800](https://github.com/team-reflect/reflect-open/issues/1800)) ([8266c5d](https://github.com/team-reflect/reflect-open/commit/8266c5d3cdec6361ffa495996a70a57b9a31d050))
+
 ## [0.18.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.11...v0.18.0-beta.12) (2026-11-09)
 
 
