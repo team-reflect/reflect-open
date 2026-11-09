@@ -8,12 +8,14 @@ import {
   seedNotes,
   type TestNote,
 } from '../testing/index.ts'
+import { HIGHLIGHT_END, HIGHLIGHT_START } from '../indexing/search.ts'
 import { createSearchService } from '../indexing/search-service.ts'
 import { createWikiResolverService } from '../indexing/wiki-resolver-service.ts'
 import type { EmbedStatus } from './embedding-runtime-service.ts'
 import {
   bestChunkPerNote,
   createRetrievalService,
+  type FindAllOptions,
   fuseRanked,
   mergeNearestFirst,
   type ChunkHitRow,
@@ -61,13 +63,19 @@ const NOTES: readonly TestNote[] = [
 ]
 
 /**
- * A retrieval service over a graph of {@link NOTES}, embedded through the real pipeline.
+ * A retrieval service over a graph of `notes` (default {@link NOTES}),
+ * embedded through the real pipeline.
  */
-async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
+async function setup(options?: {
+  status?: EmbedStatus
+  embedded?: boolean
+  notes?: readonly TestNote[]
+}) {
+  const notes = options?.notes ?? NOTES
   const database = createNodeTestDatabaseService()
-  seedNotes(database, NOTES)
+  seedNotes(database, notes)
   const noteFile = createTestNoteFileService({
-    files: Object.fromEntries(NOTES.map((note) => [note.path, note.markdown])),
+    files: Object.fromEntries(notes.map((note) => [note.path, note.markdown])),
   })
   const logger = createTestLoggerService()
   if (options?.embedded !== false) {
@@ -85,12 +93,11 @@ async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
     vectors: embed,
     ...(options?.status === undefined ? {} : { status: options.status }),
   })
+  const wikiResolver = createWikiResolverService({ database })
   const retrieval = createRetrievalService({
     database,
-    search: createSearchService({
-      database,
-      wikiResolver: createWikiResolverService({ database }),
-    }),
+    search: createSearchService({ database, wikiResolver }),
+    wikiResolver,
     embeddingRuntime: runtime,
     logger,
   })
@@ -188,6 +195,179 @@ describe('retrieve', () => {
 
     await expect(retrieval.retrieve('rust', { mode: 'semantic' })).rejects.toThrow(
       'embedding model is uninitialized',
+    )
+  })
+})
+
+/** Epoch ms of noon local time on `date`, a mid-day `mtime`. */
+function localNoon(date: string): number {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year!, month! - 1, day, 12).getTime()
+}
+
+const BEETS_GRAPH: readonly TestNote[] = [
+  { path: 'daily/2026-05-20.md', markdown: '- Coffee with Andy and Bob\n', mtime: 1 },
+  {
+    path: 'daily/2026-07-14.md',
+    markdown: '- Beets call with [[Andy]] and Bob\n  - battlestar galactica, bear-proof sheds\n',
+    mtime: 2,
+  },
+  { path: 'daily/2026-09-02.md', markdown: '- Lunch with Andy only\n', mtime: 3 },
+  { path: 'daily/2026-10-01.md', markdown: '- Andy and Bob: bears near the hives\n', mtime: 4 },
+  {
+    path: 'daily/2026-10-02.md',
+    markdown: '---\nprivate: true\n---\n- Andy and Bob, privately\n',
+    mtime: 5,
+  },
+  // A regular note last edited in August sorts among the dailies by that date.
+  { path: 'notes/andy.md', markdown: '# Andy\n\nKnows Bob.\n', mtime: localNoon('2026-08-01') },
+  { path: 'notes/bob.md', markdown: '# Bob\n\nGrows beets.\n', mtime: 7 },
+  { path: 'templates/meeting.md', markdown: '# Meeting\n\nAndy and Bob.\n', mtime: 8 },
+]
+
+/** The paths `findAll` returns, or the refusal reason. */
+async function foundPaths(
+  groups: readonly (readonly string[])[],
+  options: Partial<FindAllOptions> = {},
+  notes: readonly TestNote[] = BEETS_GRAPH,
+): Promise<string[] | string> {
+  const { retrieval } = await setup({ notes, embedded: false })
+  const result = await retrieval.findAll(groups, { limit: 30, ...options })
+  return result.ok ? result.hits.map((hit) => hit.path) : result.reason
+}
+
+describe('findAll', () => {
+  it('matches every group: any alternative within one, all groups together', async () => {
+    // grep's (Andy|Bob) then (battle|bears): "battle" is a stem of "battlestar".
+    await expect(
+      foundPaths([
+        ['Andy', 'Bob'],
+        ['battle', 'bears'],
+      ]),
+    ).resolves.toEqual(['daily/2026-10-01.md', 'daily/2026-07-14.md'])
+  })
+
+  it('lists the most recent first, daily notes by date and others by last edit, never templates', async () => {
+    await expect(foundPaths([['Andy'], ['Bob']])).resolves.toEqual([
+      'daily/2026-10-01.md',
+      'notes/andy.md',
+      'daily/2026-07-14.md',
+      'daily/2026-05-20.md',
+    ])
+  })
+
+  it('returns the snippet around the matches, marked like search snippets', async () => {
+    const { retrieval } = await setup({ notes: BEETS_GRAPH, embedded: false })
+
+    const result = await retrieval.findAll([['bear-proof']], { limit: 30 })
+
+    expect(result).toMatchObject({
+      ok: true,
+      hits: [{ path: 'daily/2026-07-14.md', heading: null, isPrivate: false }],
+    })
+    const snippet = result.ok ? result.hits[0]!.snippet : ''
+    expect(snippet).toContain(`${HIGHLIGHT_START}bear-proof${HIGHLIGHT_END}`)
+    expect(snippet).toContain('battlestar galactica,')
+  })
+
+  it('limits to daily notes dated within the inclusive range', async () => {
+    await expect(foundPaths([['Andy']], { from: '2026-07-14', to: '2026-09-02' })).resolves.toEqual(
+      ['daily/2026-09-02.md', 'daily/2026-07-14.md'],
+    )
+  })
+
+  it('keeps only notes that link to a title', async () => {
+    await expect(foundPaths([['Bob']], { linksTo: 'Andy' })).resolves.toEqual([
+      'daily/2026-07-14.md',
+    ])
+  })
+
+  it('refuses a link target that names no note instead of matching nothing', async () => {
+    await expect(foundPaths([['Bob']], { linksTo: 'Andrew' })).resolves.toBe('unresolvedLink')
+  })
+
+  it('accepts a link target written as a wiki link', async () => {
+    await expect(foundPaths([['Bob']], { linksTo: ' [[Andy]] ' })).resolves.toEqual([
+      'daily/2026-07-14.md',
+    ])
+  })
+
+  it('checks the link target even when no word is searchable', async () => {
+    await expect(foundPaths([['--']], { linksTo: 'Andrew' })).resolves.toBe('unresolvedLink')
+  })
+
+  it('refuses a private link target exactly like a missing one', async () => {
+    const notes: TestNote[] = [
+      { path: 'notes/secret.md', markdown: '---\nprivate: true\n---\n# Secret plan\n' },
+      { path: 'notes/hub.md', markdown: '# Hub\n\nAndy on [[Secret plan]].\n' },
+    ]
+
+    await expect(foundPaths([['Andy']], { linksTo: 'Secret plan' }, notes)).resolves.toBe(
+      'unresolvedLink',
+    )
+  })
+
+  it('leaves private notes out of the hits and the truncation flag', async () => {
+    const { retrieval } = await setup({ notes: BEETS_GRAPH, embedded: false })
+
+    // Three public dailies fill the limit; the private fourth must not read as "more".
+    const result = await retrieval.findAll([['Andy'], ['Bob']], { limit: 3, from: '2026-01-01' })
+
+    expect(result).toMatchObject({ ok: true, truncated: false })
+    expect(result.ok ? result.hits.map((hit) => hit.path) : []).toEqual([
+      'daily/2026-10-01.md',
+      'daily/2026-07-14.md',
+      'daily/2026-05-20.md',
+    ])
+  })
+
+  it('keeps the newest matches and flags older ones past the limit', async () => {
+    const { retrieval } = await setup({ notes: BEETS_GRAPH, embedded: false })
+
+    const result = await retrieval.findAll([['Andy']], { limit: 2 })
+
+    expect(result).toMatchObject({ ok: true, truncated: true })
+    expect(result.ok ? result.hits.map((hit) => hit.path) : []).toEqual([
+      'daily/2026-10-01.md',
+      'daily/2026-09-02.md',
+    ])
+  })
+
+  it('keeps words ending in a one-character token as exact matches, so they still narrow', async () => {
+    const notes: TestNote[] = [
+      { path: 'notes/a.md', markdown: "# A\n\nBob's beets are up.\n" },
+      { path: 'notes/b.md', markdown: '# B\n\nThe beets are up.\n' },
+      { path: 'notes/c.md', markdown: '# C\n\nR&D budget for the beets.\n' },
+    ]
+
+    await expect(foundPaths([["Bob's beets"]], {}, notes)).resolves.toEqual(['notes/a.md'])
+    await expect(foundPaths([['beets'], ['R&D']], {}, notes)).resolves.toEqual(['notes/c.md'])
+  })
+
+  it('refuses words the tokenizer drops instead of reporting no matches', async () => {
+    await expect(foundPaths([['--']])).resolves.toBe('unsearchableWords')
+    await expect(foundPaths([['Andy'], ['???']])).resolves.toBe('unsearchableWords')
+  })
+
+  it('refuses a range that ends before it starts', async () => {
+    await expect(foundPaths([['Andy']], { from: '2026-10-31', to: '2026-06-01' })).resolves.toBe(
+      'reversedRange',
+    )
+  })
+
+  it('returns no snippet for a note matched only by its title', async () => {
+    const notes: TestNote[] = [
+      { path: 'notes/plan.md', markdown: '---\ntitle: Harvest plan\n---\nCrop rotation.\n' },
+      { path: 'notes/log.md', markdown: '# Log\n\nHarvest went well.\n' },
+    ]
+    const { retrieval } = await setup({ notes, embedded: false })
+
+    const result = await retrieval.findAll([['harvest']], { limit: 30 })
+
+    const snippets = new Map(result.ok ? result.hits.map((hit) => [hit.path, hit.snippet]) : [])
+    expect(snippets.get('notes/plan.md')).toBe('')
+    expect(snippets.get('notes/log.md')).toContain(
+      `${HIGHLIGHT_START}Harvest${HIGHLIGHT_END} went well.`,
     )
   })
 })

@@ -73,12 +73,7 @@ export function buildFtsMatch(query: string): string | null {
   if (!terms.some(isTokenizable)) {
     return terms.map(quoteFtsLiteral).join(' ')
   }
-  return terms
-    .map((term) => {
-      const literal = quoteFtsLiteral(term)
-      return `(title : ${literal}* OR body : ${literal}*)`
-    })
-    .join(' AND ')
+  return terms.map(wordPrefixClause).join(' AND ')
 }
 
 /**
@@ -92,8 +87,16 @@ export function buildFtsMatch(query: string): string | null {
  * lowercased `İ`), so this errs towards skipping the index.
  */
 export function buildFtsTitlePrefixMatch(text: string): string | null {
+  return isPrefixable(text) ? `title : ${quoteFtsLiteral(text)}*` : null
+}
+
+/**
+ * Whether `text` may take a prefix operator: its last token has two or more
+ * characters (see {@link buildFtsTitlePrefixMatch} for why one is too few).
+ */
+function isPrefixable(text: string): boolean {
   const lastToken = text.split(FTS_TOKEN_SEPARATOR_RE).findLast(Boolean) ?? ''
-  return [...lastToken].length > 1 ? `title : ${quoteFtsLiteral(text)}*` : null
+  return [...lastToken].length > 1
 }
 
 /**
@@ -200,4 +203,44 @@ export function buildTitleMatchSql(
       else 3
     end`,
   }
+}
+
+/**
+ * Build an FTS5 `MATCH` expression from groups of alternatives: a row matches
+ * when, for every group, at least one alternative matches. Within an
+ * alternative every word must match, as in {@link buildFtsMatch}, so
+ * `["battlestar galactica"]` needs both words. This is the shape of a grep
+ * pipeline (`(Andy|Bob)` then `(beets|battle)`), which an AND of plain
+ * terms cannot express. A word whose last token is a single character
+ * matches exactly rather than as a prefix, as in the title prefix search,
+ * since `a*` expands to most of the vocabulary. Untokenizable words, and
+ * alternatives they leave empty, are dropped. `null` when any group is left
+ * empty: dropping that group would widen the match it was meant to narrow.
+ */
+export function buildFtsGroupsMatch(groups: readonly (readonly string[])[]): string | null {
+  const clauses = groups.map((group) => {
+    return group
+      .map((alternative) => splitSearchTerms(alternative).filter(isTokenizable))
+      .filter((words) => words.length > 0)
+      .map((words) => `(${words.map(wordClause).join(' AND ')})`)
+  })
+  if (clauses.length === 0 || clauses.some((alternatives) => alternatives.length === 0)) {
+    return null
+  }
+  return clauses.map((alternatives) => `(${alternatives.join(' OR ')})`).join(' AND ')
+}
+
+/** One word over title and body: a prefix match when {@link isPrefixable}, else exact. */
+function wordClause(word: string): string {
+  if (isPrefixable(word)) {
+    return wordPrefixClause(word)
+  }
+  const literal = quoteFtsLiteral(word)
+  return `(title : ${literal} OR body : ${literal})`
+}
+
+/** One word as a prefix match over title and body. */
+function wordPrefixClause(word: string): string {
+  const literal = quoteFtsLiteral(word)
+  return `(title : ${literal}* OR body : ${literal}*)`
 }

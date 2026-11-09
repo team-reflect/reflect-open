@@ -21,6 +21,8 @@ import type {
   RetrievalHit,
   RetrievalService,
   RetrieveOptions,
+  FindAllOptions,
+  FindAllResult,
 } from '../embeddings/retrieval-service.ts'
 import {
   createSemanticSearchService,
@@ -168,6 +170,13 @@ export interface TestRetrievalServiceOptions {
    * Answers `relatedNotes`. Defaults to no neighbors.
    */
   relatedNotes?: (path: string, limit?: number) => MaybePromise<RetrievalHit[]>
+  /**
+   * Answers `findAll`. Defaults to no matches.
+   */
+  findAll?: (
+    groups: readonly (readonly string[])[],
+    options: FindAllOptions,
+  ) => MaybePromise<FindAllResult>
 }
 
 export interface TestRetrievalService extends RetrievalService {
@@ -200,6 +209,19 @@ class TestRetrievalServiceImpl implements TestRetrievalService {
   async relatedNotes(path: string, limit?: number): Promise<RetrievalHit[]> {
     this.#relatedLog.push(limit === undefined ? { path } : { path, limit })
     return (await this.#options?.relatedNotes?.(path, limit)) ?? []
+  }
+
+  async findAll(
+    groups: readonly (readonly string[])[],
+    findOptions: FindAllOptions,
+  ): Promise<FindAllResult> {
+    return (
+      (await this.#options?.findAll?.(groups, findOptions)) ?? {
+        ok: true,
+        hits: [],
+        truncated: false,
+      }
+    )
   }
 
   retrieveCalls(): readonly { readonly query: string; readonly options?: RetrieveOptions }[] {

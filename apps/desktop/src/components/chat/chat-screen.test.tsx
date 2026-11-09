@@ -485,6 +485,77 @@ describe('ChatScreen', () => {
     expect(probedRouteRef.current).toEqual({ kind: 'daily', date: '2026-06-10' })
   })
 
+  it('renders find chips: groups, range, count, linked notes, and a refusal', async () => {
+    configureModel()
+    scriptTurn([
+      {
+        type: 'tool-call',
+        call: {
+          tool: 'find',
+          toolCallId: 'tool-1',
+          groups: [['Andy', 'Bob'], ['beets']],
+          from: '2026-06-01',
+          to: '2026-10-31',
+          linksTo: null,
+        },
+      },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'find',
+          toolCallId: 'tool-1',
+          notes: [{ path: 'daily/2026-07-14.md', title: '2026-07-14' }],
+          truncated: true,
+          error: null,
+        },
+      },
+      {
+        type: 'tool-call',
+        call: {
+          tool: 'find',
+          toolCallId: 'tool-2',
+          groups: [['Bob']],
+          from: null,
+          to: null,
+          linksTo: '[[Andy]]',
+        },
+      },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'find',
+          toolCallId: 'tool-2',
+          notes: [],
+          truncated: false,
+          error: 'No note has this title.',
+        },
+      },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'Found it.' }] },
+    ])
+    const view = await renderChat()
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'the beets call?{Enter}')
+
+    await expect
+      .element(
+        view.getByText(
+          /Found 1 note \(more matched\) for \(“Andy” or “Bob”\) and “beets” in 6\/1\/2026 – 10\/31\/2026: /,
+        ),
+      )
+      .toBeInTheDocument()
+    // A refusal shows its reason, not a misleading "0 notes".
+    await expect
+      .element(
+        view.getByText(/Couldn't find “Bob” linking to \[\[Andy\]\] — No note has this title\./),
+      )
+      .toBeInTheDocument()
+    // The links come last, past the truncation at this width; the daily chip
+    // test above covers navigating from the shared note links.
+    await expect
+      .element(view.getByRole('button', { name: 'Tue, July 14th, 2026' }))
+      .toBeInTheDocument()
+  })
+
   it('renders an attachment chip: filenames, with per-asset refusals inline', async () => {
     configureModel()
     scriptTurn([
