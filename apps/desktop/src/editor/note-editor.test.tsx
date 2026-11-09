@@ -82,6 +82,12 @@ const YOUTUBE_NOTE = `![](https://www.youtube.com/watch?v=aqz-KE-bpKQ)<!-- ${JSO
 
 const IMAGE_NOTE = 'A photo\n\n![Cat](assets/cat.png)'
 
+/**
+ * Clicks the top-left corner of an image. The small test image is mostly
+ * covered by meowdown's embed menu button, so a center click hits the button.
+ */
+const IMAGE_CORNER_CLICK = { position: { x: 4, y: 4 } }
+
 function renderEditor(
   openAsset: (path: string) => MaybePromise<void> = vi.fn(async () => {}),
   platform?: TestPlatformOptions,
