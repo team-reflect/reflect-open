@@ -2,6 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge.tsx'
 import { MediaLightbox } from '@/editor/media-lightbox.tsx'
 import { MenuBoundaryContext } from '@/editor/menu-boundary.ts'
+import { TitleEndBridge } from '@/editor/title-end-bridge.tsx'
 import { useWikilinkResolver } from '@/editor/resolve-wikilink.ts'
 import { useXPostResolver, X_MEDIA_URL_PROTOCOLS } from '@/editor/use-x-post-resolver.ts'
 import { lightboxItemFromXPostMedia } from '@/editor/x-post-media-lightbox-item.ts'
@@ -91,9 +92,10 @@ export interface NoteEditorHandle {
   /**
    * Move the caret to a document edge and scroll it into view. Used for
    * cross-note arrow navigation in the daily stream (jump to the end of the
-   * previous day / the start of the next day).
+   * previous day / the start of the next day). `titleEnd` is the end of a
+   * non-empty level-1 title, else the document start.
    */
-  setSelection(position: 'start' | 'end'): void
+  setSelection(position: 'start' | 'end' | 'titleEnd'): void
   /** The current selection's text (blocks separated by blank lines). */
   getSelectedText(): string
   /** Open the selection AI menu (no-op on an empty selection). */
@@ -298,6 +300,7 @@ export function NoteEditor({
   const resolveXPost = useXPostResolver()
   const resolveWikilink = useWikilinkResolver()
   const innerRef = useRef<EditorHandle>(null)
+  const titleEndRef = useRef<(() => number | null) | null>(null)
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
@@ -340,7 +343,16 @@ export function NoteEditor({
       // can never delete selected text — plain delegation is the whole story.
       insertMarkdown: (markdown) => innerRef.current?.insertMarkdown(markdown),
       focus: () => innerRef.current?.focus(),
-      setSelection: (position) => innerRef.current?.setSelection(position),
+      setSelection: (position) => {
+        if (position !== 'titleEnd') {
+          innerRef.current?.setSelection(position)
+          return
+        }
+        const titleEnd = titleEndRef.current?.() ?? null
+        innerRef.current?.setSelection(
+          titleEnd === null ? 'start' : { type: 'text', anchor: titleEnd, head: titleEnd },
+        )
+      },
       getSelectedText: () => innerRef.current?.getSelectedText() ?? '',
       openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
       startPendingReplacement: (options) => {
@@ -509,6 +521,7 @@ export function NoteEditor({
         {/* Only a pane that persists files gets the toolbar's attach button;
             `handleFilePaste` is the same handler meowdown pastes through. */}
         <FormattingToolbarBridge saveFile={saveFile !== undefined ? handleFilePaste : undefined} />
+        <TitleEndBridge titleEndRef={titleEndRef} />
         {renderWikilinkHoverCard !== undefined ? (
           <WikilinkHoverCard>{renderWikilinkHoverCard}</WikilinkHoverCard>
         ) : null}

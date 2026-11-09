@@ -235,6 +235,21 @@ describe('NotePane', () => {
     })
   })
 
+  it('puts the caret at the end of an existing title', async () => {
+    const path = 'notes/exist.md'
+    const { core, noteFile } = await renderPane({
+      files: { [path]: '# Hello\n\nWorld\n' },
+      path,
+      autoFocus: true,
+    })
+    await expect.element(editor()).toHaveFocus()
+
+    await userEvent.keyboard('{Enter}Body')
+    await act(() => core.openDocuments.flushAll())
+
+    expect(noteFile.files().get(path)).toBe('# Hello\n\n- Body\n\nWorld\n')
+  })
+
   it('tracks an adopted nested note retitle while keeping its path', async () => {
     const path = 'Projects/exist.md'
     const { core, noteFile } = await renderPane({
