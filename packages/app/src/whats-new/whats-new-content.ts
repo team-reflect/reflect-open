@@ -16,11 +16,6 @@ export interface WhatsNewItem {
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
   '0.18.0': [
     {
-      title: 'What’s New',
-      body: 'After an update, Reflect now shows what changed. This is the first one.',
-      platforms: ['desktop', 'ios'],
-    },
-    {
       title: 'Faster, smoother gestures',
       body: 'Swipes, sheets, and image dragging respond faster and move more smoothly.',
       platforms: ['ios'],
@@ -29,6 +24,21 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       title: 'New AI models',
       body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
       platforms: ['desktop', 'ios'],
+    },
+    {
+      title: 'Code block menu',
+      body: 'Code blocks now have a menu to change the language, copy the code, or delete the block.',
+      platforms: ['desktop', 'ios'],
+    },
+    {
+      title: 'Image and embed menus',
+      body: 'Images, X posts, and YouTube videos now have a menu. Copy the link, turn a card back into a link, or delete it.',
+      platforms: ['desktop', 'ios'],
+    },
+    {
+      title: 'Open menus from the keyboard',
+      body: 'Press ⌘/ (Ctrl+/ on Windows) to open the menu of the selected image, embed, or code block.',
+      platforms: ['desktop'],
     },
   ],
 }
