@@ -66,8 +66,7 @@ describe('decideWhatsNew', () => {
     expect(decide({ seen: true })).toBe('wait')
   })
 
-  it('skips a version without items and the version of a new install', () => {
-    expect(decide({ items: [] })).toBe('skip')
+  it('skips the version of a new install', () => {
     expect(decide({ launch: 'openedAfterSetup' })).toBe('skip')
   })
 

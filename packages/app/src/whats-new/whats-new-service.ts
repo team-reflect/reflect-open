@@ -41,7 +41,7 @@ export interface WhatsNewInputs {
    */
   readonly items: readonly WhatsNewItem[]
   /**
-   * The user already saw or skipped every item.
+   * The user already saw or skipped every item of the current version.
    */
   readonly seen: boolean
   readonly override: boolean
@@ -101,7 +101,7 @@ export function decideWhatsNew(inputs: WhatsNewInputs): WhatsNewDecision {
   if (inputs.isDev || inputs.seen) {
     return 'wait'
   }
-  if (inputs.launch === 'openedAfterSetup' || inputs.items.length === 0) {
+  if (inputs.launch === 'openedAfterSetup') {
     return 'skip'
   }
   return inputs.offerFirst && !inputs.accepted ? 'offer' : 'show'
@@ -183,6 +183,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
   readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
   readonly #accepted = new WritableStore(false)
+  readonly #seen: WritableStore<boolean>
   readonly #decision: Store<WhatsNewDecision>
   readonly #versionIds: readonly string[]
   readonly items: readonly WhatsNewItem[]
@@ -198,29 +199,24 @@ class WhatsNewServiceImpl implements WhatsNewService {
     const platformItems = versionItems.filter((item) => {
       return item.platforms.includes(whatsNewPlatform(platform))
     })
-    const seenAtLaunch = parseSeenIds(storage.local.get(WHATS_NEW_SEEN_STORAGE_KEY))
-    const unseenItems = platformItems.filter((item) => !seenAtLaunch.has(item.id))
+    const seenIds = parseSeenIds(storage.local.get(WHATS_NEW_SEEN_STORAGE_KEY))
+    const unseenItems = platformItems.filter((item) => !seenIds.has(item.id))
+    // Opening What's New again after seeing every item shows them all.
     const items = unseenItems.length > 0 ? unseenItems : platformItems
     this.items = items
+    this.#seen = new WritableStore(unseenItems.length === 0)
     this.override = deriveStore(
       storage.session.store(WHATS_NEW_OVERRIDE_STORAGE_KEY),
       selectIsOverride,
     )
     this.#decision = combineStores(
-      [
-        storage.local.store(WHATS_NEW_SEEN_STORAGE_KEY),
-        this.override,
-        blocked,
-        this.#launch,
-        this.#accepted,
-      ],
+      [this.#seen, this.override, blocked, this.#launch, this.#accepted],
       (seen, override, blockedValue, launch, accepted) => {
-        const seenIds = parseSeenIds(seen)
         return decideWhatsNew({
           isMainWindow,
           isDev: platform.isDev,
           items,
-          seen: items.every((item) => seenIds.has(item.id)),
+          seen,
           override,
           blocked: blockedValue,
           launch,
@@ -253,6 +249,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
 
   #markSeen(): void {
     this.#deps.storage.local.set(WHATS_NEW_SEEN_STORAGE_KEY, JSON.stringify(this.#versionIds))
+    this.#seen.set(true)
   }
 
   start(): Unlisten {
