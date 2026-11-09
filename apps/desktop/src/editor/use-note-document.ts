@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
   createDocumentBinding,
-  INITIAL_NOTE_SNAPSHOT,
   type DocumentBinding,
-  type NoteSession,
   type NoteSessionSnapshot,
   type RenameCoordinator,
 } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import type { NoteEditorHandle } from './note-editor.tsx'
@@ -47,18 +46,6 @@ export interface NoteDocument extends Omit<NoteSessionSnapshot, 'path'> {
   editorPath: string | null
 }
 
-/**
- * What the pane renders from, set as one value so the editor's key, its seed,
- * and its session always come from the same session.
- */
-interface SessionView {
-  readonly epoch: number
-  readonly snapshot: NoteSessionSnapshot
-  readonly session: NoteSession | null
-}
-
-const INITIAL_VIEW: SessionView = { epoch: 0, snapshot: INITIAL_NOTE_SNAPSHOT, session: null }
-
 export interface NoteDocumentOptions {
   /**
    * Treat a missing file as an empty note instead of an error. The file is then
@@ -89,11 +76,6 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
   const createIfMissing = options?.createIfMissing ?? false
   const trackRenames = options?.trackRenames ?? false
   const missingSeed = options?.missingSeed
-  // The epoch lives in state with the snapshot rather than being read from the
-  // binding during render: a mutable read there can be memoized away (React
-  // Compiler) or tear, leaving the previous note's editor mounted under the
-  // next note's session.
-  const [view, setView] = useState<SessionView>(INITIAL_VIEW)
   /**
    * The pane's lifecycle policy object — one per hook instance.
    */
@@ -115,19 +97,18 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
       // The auto-rename lifecycle (Plan 07b/17) is owned by the coordinator —
       // the tracker, the rewrite chain, alias placement, and the file move.
       coordinator: () => (trackRenames ? titleRename.createCoordinator({ path }) : null),
-      session: (coordinator, epoch) => {
-        const session: NoteSession = noteSessions.create({
+      session: (coordinator, onSnapshot) => {
+        return noteSessions.create({
           path,
           readOnly: !canWrite,
           classify: checkRoundTrip,
-          onSnapshot: (snapshot) => setView({ epoch, snapshot, session }),
+          onSnapshot,
           onContent: coordinator
             ? (content, origin) => coordinator.content(content, origin)
             : undefined,
           createIfMissing,
           missingSeed,
         })
-        return session
       },
     })
     if (created) {
@@ -158,7 +139,7 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
       // flush promise resolves could observe a *different* note's session/
       // coordinator if navigation switched panes mid-flush — settling that
       // one early would fire its renames without quiet period or blur.
-      const session = binding.session()
+      const { session } = binding.view.get()
       const coordinator = binding.coordinator()
       // Blur is a settle point for title renames — but only after the flushed
       // save lands, so the tracker has seen the final title. (Quit-time flush
@@ -171,6 +152,9 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
     }
   }, [binding, path])
 
+  // Render reads the binding only through its store: a method call here would
+  // be memoized on the binding and freeze at its first value.
+  const view = useStore(binding.view)
   const { path: editorPath, ...snapshot } = view.snapshot
   const { session } = view
   return {
