@@ -40,12 +40,6 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 interface EditorAiMenuOptions {
   /** Graph-relative path of the note being edited (the privacy subject). */
   path: string
-  /**
-   * The editor-session identity (`useNoteDocument().sessionEpoch`) — bumps
-   * when a new session is created, not when a rename retargets one, so a
-   * title-driven rename never tears down a run under its live preview.
-   */
-  sessionEpoch: number
   /** The mounted editor's handle (staging, streaming, and accept live there). */
   editorRef: RefObject<NoteEditorHandle | null>
 }
@@ -87,36 +81,24 @@ async function forEachAsync<T>(
   }
 }
 
-export function useEditorAiMenu({
-  path,
-  sessionEpoch,
-  editorRef,
-}: EditorAiMenuOptions): EditorAiMenuValue {
+export function useEditorAiMenu({ path, editorRef }: EditorAiMenuOptions): EditorAiMenuValue {
   const toastController = useToastController()
   const noteRow = useNoteRow(path)
-  // The last privacy flag this session resolved, adjusted during render (the
+  // The last privacy flag this editor resolved, adjusted during render (the
   // note-pane seed pattern). A title-driven rename retargets the same note
   // under a new path (Plan 17), and the new path's row query starts empty —
   // the previous flag stays authoritative for that beat, so a Retry mid-
   // rename doesn't misreport a public note as private.
-  const [resolvedPrivacy, setResolvedPrivacy] = useState<{
-    epoch: number
-    isPrivate: boolean
-  } | null>(null)
-  if (
-    noteRow !== null &&
-    (resolvedPrivacy?.epoch !== sessionEpoch || resolvedPrivacy.isPrivate !== noteRow.isPrivate)
-  ) {
-    setResolvedPrivacy({ epoch: sessionEpoch, isPrivate: noteRow.isPrivate })
+  const [resolvedPrivacy, setResolvedPrivacy] = useState<boolean | null>(null)
+  if (noteRow !== null && resolvedPrivacy !== noteRow.isPrivate) {
+    setResolvedPrivacy(noteRow.isPrivate)
   }
-  // Fail closed: with no row resolved in this session yet, the note counts as
+  // Fail closed: with no row resolved for this editor yet, the note counts as
   // private, so the menu (and the CloudSafe mint below) never treats a
   // not-yet-loaded note as sendable. The row is overlay-backed, so an in-app
   // "Mark as private" flips this immediately; only an external edit waits on
   // the watcher's re-index.
-  const isPrivate =
-    noteRow?.isPrivate ??
-    (resolvedPrivacy?.epoch === sessionEpoch ? resolvedPrivacy.isPrivate : true)
+  const isPrivate = noteRow?.isPrivate ?? resolvedPrivacy ?? true
   const { providers } = useAiProviders()
   const { selectionTransform } = useCoreServices()
   const { prompts } = useAiPrompts()
@@ -127,19 +109,16 @@ export function useEditorAiMenu({
   // preview's alternate-placement button can label itself.
   const [runMode, setRunMode] = useState<AiPromptMode | null>(null)
 
-  // A run belongs to one editor session: switching notes (or unmounting)
-  // mid-stream aborts the provider call and drops the run, so a stale stream
-  // can never append into — or Retry restage ranges against — a different
-  // document. Keyed on the session, not the path: a title-driven rename
-  // retargets the live session (Plan 17) and must keep the run alive under
-  // its still-visible preview.
+  // A run belongs to one editor: unmounting mid-stream (the pane mounts one
+  // editor per session) aborts the provider call and drops the run, so a stale
+  // stream can never append into — or Retry restage ranges against — a
+  // different document.
   useEffect(() => {
     return () => {
       runRef.current?.controller.abort()
       runRef.current = null
-      setRunMode(null)
     }
-  }, [sessionEpoch])
+  }, [])
 
   const streamRun = useCallback(
     async (

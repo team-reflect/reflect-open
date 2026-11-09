@@ -2,49 +2,23 @@ import { useEffect, useState } from 'react'
 import {
   createDocumentBinding,
   type DocumentBinding,
-  type NoteSessionSnapshot,
+  type DocumentView,
   type RenameCoordinator,
 } from '@reflect/core'
 import { useStore } from '@/lib/use-store.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
-import type { NoteEditorHandle } from './note-editor.tsx'
 import { checkRoundTrip } from '@meowdown/markdown'
 
 /**
  * React adapter over the `@reflect/core` document state machine
- * (`NoteSessionService`): one session per open path, wired to
- * the watcher event stream (through `OpenDocumentsService`) and the editor's
- * imperative handle. All save/merge/protection semantics live in core's
- * `note-session-service.ts`, and the create/adopt/teardown/hand-off lifecycle
- * (a rename retargets the live session and the route follows, Plan 17) lives
- * in core's `document-binding.ts` — this hook only adapts both to React.
+ * (`NoteSessionService`): one session per open path, wired to the watcher
+ * event stream (through `OpenDocumentsService`). All save/merge/protection
+ * semantics live in core's `note-session-service.ts`, and the
+ * create/adopt/teardown/hand-off lifecycle (a rename retargets the live
+ * session and the route follows, Plan 17) lives in core's
+ * `document-binding.ts` — this hook only adapts both to React.
  */
-
-export interface NoteDocument extends Omit<NoteSessionSnapshot, 'path'> {
-  /**
-   * Wire to the editor: every document change enters the pipeline here.
-   */
-  onEditorChange: (markdown: string) => void
-  /**
-   * Wire to the editor's imperative handle (reload and merged-save application).
-   */
-  bindEditor: (handle: NoteEditorHandle | null) => void
-  /**
-   * Stable identity of the underlying session: increments when a session is
-   * *created*, not when a rename retargets one (Plan 17). Key the editor on
-   * this instead of the path, so a note following its title to a new filename
-   * keeps its live editor — cursor, selection, undo history and all.
-   */
-  sessionEpoch: number
-  /**
-   * The path of the note whose session the editor shows. During a note switch
-   * it briefly differs from the route's path, so anything that sends the
-   * editor's content out (AI, link previews) gates on this note's privacy, not
-   * the route's. Null before the first session reports.
-   */
-  editorPath: string | null
-}
 
 export interface NoteDocumentOptions {
   /**
@@ -69,10 +43,13 @@ export interface NoteDocumentOptions {
 }
 
 /**
+ * The live session of `path` with its snapshot and epoch. Key the editor on
+ * the epoch, not the path: a rename retargets the session and keeps it.
+ *
  * @param path graph-relative path of the open note; the session writes to the
  *   graph open when it is created, and is read-only while no graph is open.
  */
-export function useNoteDocument(path: string | null, options?: NoteDocumentOptions): NoteDocument {
+export function useNoteDocument(path: string | null, options?: NoteDocumentOptions): DocumentView {
   const createIfMissing = options?.createIfMissing ?? false
   const trackRenames = options?.trackRenames ?? false
   const missingSeed = options?.missingSeed
@@ -128,16 +105,5 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
 
   // Render reads the binding only through its store: a method call here would
   // be memoized on the binding and freeze at its first value.
-  const view = useStore(binding.view)
-  const { path: editorPath, ...snapshot } = view.snapshot
-  const { session } = view
-  return {
-    ...snapshot,
-    onEditorChange: (markdown) => session?.editorChanged(markdown),
-    // React detaches this ref while the child editor handle is still live, so
-    // the detaching session can still read the editor's last input.
-    bindEditor: (handle) => session?.attachEditor(handle),
-    sessionEpoch: view.epoch,
-    editorPath,
-  }
+  return useStore(binding.view)
 }
