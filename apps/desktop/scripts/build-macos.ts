@@ -133,6 +133,10 @@ function readTauriConfig(): z.infer<typeof TauriConfigSchema> {
   return TauriConfigSchema.parse(config)
 }
 
+/**
+ * Every path and identifier the build produces or checks for `target`, from
+ * the flavor's Tauri config. Nothing is built yet.
+ */
 function resolveBundle(target: string): Bundle {
   const arch = ARCHS[target]
   if (!arch) {
@@ -190,6 +194,10 @@ function resolveNotaryArgs(identity: string, tempDir: string): string[] {
   return ['--apple-id', APPLE_ID, '--password', APPLE_PASSWORD, '--team-id', teamId]
 }
 
+/**
+ * Builds the app with Tauri (stripped executables, dSYMs kept), then embeds
+ * the Safari app extension. Signing and notarization happen afterwards.
+ */
 async function buildApp(bundle: Bundle): Promise<void> {
   const args = ['build', '--target', bundle.target, '--bundles', 'app', ...getFlavorConfigArgs()]
   // Tauri notarizes whenever these are set, but notarization must wait until
@@ -484,6 +492,11 @@ async function readSignedEntitlements(path: string): Promise<Record<string, unkn
   return await readPlist((await exec('codesign', display, { throwOnError: true })).stdout)
 }
 
+/**
+ * The re-signed app must still carry the profile's application and team
+ * identifiers, or iCloud fails at runtime. A flavor without a profile has
+ * nothing to check.
+ */
 async function verifyProfileIdentity(bundle: Bundle): Promise<void> {
   if (!bundle.profile) {
     return
@@ -540,6 +553,11 @@ async function verifySidecarsLaunch(bundle: Bundle): Promise<void> {
   }
 }
 
+/**
+ * Checks the finished build before it ships: signatures, entitlements, the
+ * Safari app extension and sidecar launches, then Gatekeeper and stapling
+ * when `notarized`.
+ */
 async function verify(bundle: Bundle, notarized: boolean): Promise<void> {
   await expectOutput(
     'codesign',
