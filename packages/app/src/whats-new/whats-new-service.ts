@@ -25,12 +25,6 @@ export const WHATS_NEW_SEEN_STORAGE_KEY = 'reflect.whats-new.seen'
 export const WHATS_NEW_OVERRIDE_STORAGE_KEY = 'reflect.whats-new.override'
 
 /**
- * How far this launch got: no graph open yet, a graph opened, or a graph
- * opened after the graph chooser or the onboarding (a new install).
- */
-export type WhatsNewLaunch = 'opening' | 'opened' | 'openedAfterSetup'
-
-/**
  * Everything {@link decideWhatsNew} reads.
  */
 export interface WhatsNewInputs {
@@ -49,7 +43,10 @@ export interface WhatsNewInputs {
    * Something with priority, like the paywall, shows or may show.
    */
   readonly blocked: boolean
-  readonly launch: WhatsNewLaunch
+  /**
+   * The first graph of this launch opened.
+   */
+  readonly graphOpened: boolean
   /**
    * Offer What's New first, and show it only once the user accepts.
    */
@@ -71,10 +68,9 @@ export function whatsNewPlatform(platform: PlatformFacts): BuildPlatform {
 }
 
 /**
- * `wait` shows nothing for now; `skip` shows nothing and marks the items
- * seen; `offer` asks the user first; `show` shows the items.
+ * `wait` shows nothing for now; `offer` asks the user first; `show` shows the items.
  */
-export type WhatsNewDecision = 'wait' | 'skip' | 'offer' | 'show'
+export type WhatsNewDecision = 'wait' | 'offer' | 'show'
 
 /**
  * Whether What's New is hidden, offered, or shown.
@@ -83,7 +79,6 @@ export type WhatsNewPhase = 'hidden' | 'offered' | 'shown'
 
 const PHASES: Record<WhatsNewDecision, WhatsNewPhase> = {
   wait: 'hidden',
-  skip: 'hidden',
   offer: 'offered',
   show: 'shown',
 }
@@ -92,7 +87,7 @@ const PHASES: Record<WhatsNewDecision, WhatsNewPhase> = {
  * What to do with What's New for the given inputs.
  */
 export function decideWhatsNew(inputs: WhatsNewInputs): WhatsNewDecision {
-  if (!inputs.isMainWindow || inputs.launch === 'opening' || inputs.blocked) {
+  if (!inputs.isMainWindow || !inputs.graphOpened || inputs.blocked) {
     return 'wait'
   }
   if (inputs.override) {
@@ -100,9 +95,6 @@ export function decideWhatsNew(inputs: WhatsNewInputs): WhatsNewDecision {
   }
   if (inputs.isDev || inputs.seen) {
     return 'wait'
-  }
-  if (inputs.launch === 'openedAfterSetup') {
-    return 'skip'
   }
   return inputs.offerFirst && !inputs.accepted ? 'offer' : 'show'
 }
@@ -156,8 +148,9 @@ export interface WhatsNewService {
    */
   dismiss: () => void
   /**
-   * Follows how this launch opens its graph, and marks the items seen when
-   * they should never show. Call it before the graph boot. Returns the function
+   * Follows how this launch opens its first graph, and marks the items seen
+   * when it opens after the graph chooser or the onboarding (a new install).
+   * Call it before the graph boot. Returns the function
    * that stops it.
    */
   start(): Unlisten
@@ -181,7 +174,7 @@ export interface WhatsNewServiceDeps {
 
 class WhatsNewServiceImpl implements WhatsNewService {
   readonly #deps: WhatsNewServiceDeps
-  readonly #launch = new WritableStore<WhatsNewLaunch>('opening')
+  readonly #graphOpened = new WritableStore(false)
   readonly #accepted = new WritableStore(false)
   readonly #seen: WritableStore<boolean>
   readonly #decision: Store<WhatsNewDecision>
@@ -210,8 +203,8 @@ class WhatsNewServiceImpl implements WhatsNewService {
       selectIsOverride,
     )
     this.#decision = combineStores(
-      [this.#seen, this.override, blocked, this.#launch, this.#accepted],
-      (seen, override, blockedValue, launch, accepted) => {
+      [this.#seen, this.override, blocked, this.#graphOpened, this.#accepted],
+      (seen, override, blockedValue, graphOpened, accepted) => {
         return decideWhatsNew({
           isMainWindow,
           isDev: platform.isDev,
@@ -219,7 +212,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
           seen,
           override,
           blocked: blockedValue,
-          launch,
+          graphOpened,
           offerFirst,
           accepted,
         })
@@ -262,25 +255,17 @@ class WhatsNewServiceImpl implements WhatsNewService {
       if (status === 'choosing') {
         setupSeen = true
       } else if (status === 'ready') {
-        this.#launch.set(setupSeen ? 'openedAfterSetup' : 'opened')
+        if (setupSeen) {
+          this.#markSeen()
+        }
+        this.#graphOpened.set(true)
         stopLaunch()
       }
     }
     const stopLaunch = graphSession.subscribe(followLaunch)
     followLaunch()
 
-    const markSkipped = (): void => {
-      if (this.#decision.get() === 'skip') {
-        this.#markSeen()
-      }
-    }
-    const stopDecision = this.#decision.subscribe(markSkipped)
-    markSkipped()
-
-    return () => {
-      stopLaunch()
-      stopDecision()
-    }
+    return stopLaunch
   }
 }
 
