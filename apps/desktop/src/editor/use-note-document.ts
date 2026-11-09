@@ -48,64 +48,16 @@ export interface NoteDocument extends Omit<NoteSessionSnapshot, 'path'> {
 }
 
 /**
- * The editor wiring of one session: an editor mounted with it reads and writes
- * that session only, never whichever session the pane binds next.
- */
-interface SessionEditor {
-  onEditorChange: (markdown: string) => void
-  bindEditor: (handle: NoteEditorHandle | null) => void
-  /**
-   * Push markdown into this session's editor without reporting a change.
-   */
-  applyContent: (markdown: string) => void
-  /**
-   * Let this session's editor report native input it has not reported yet.
-   */
-  reconcilePendingInput: () => void
-}
-
-/**
  * What the pane renders from, set as one value so the editor's key, its seed,
- * and its wiring always come from the same session.
+ * and its session always come from the same session.
  */
 interface SessionView {
   readonly epoch: number
   readonly snapshot: NoteSessionSnapshot
-  readonly editor: SessionEditor
+  readonly session: NoteSession | null
 }
 
-function createSessionEditor(session: () => NoteSession): SessionEditor {
-  let handle: NoteEditorHandle | null = null
-  function reconcilePendingInput(): void {
-    // Meowdown 0.43.1 synchronously emits onDocChange only when this
-    // reconciliation changes the document. Discarding the always-
-    // returned snapshot avoids dirtying files whose serialization is
-    // merely normalized relative to their on-disk Markdown.
-    handle?.getMarkdown()
-  }
-  return {
-    onEditorChange: (markdown) => session().editorChanged(markdown),
-    bindEditor: (next) => {
-      if (next === null) {
-        // React detaches this consumer ref while the child editor handle is
-        // still live, so its last input can still reach this session.
-        reconcilePendingInput()
-      }
-      handle = next
-    },
-    applyContent: (markdown) => handle?.setMarkdown(markdown),
-    reconcilePendingInput,
-  }
-}
-
-const NO_EDITOR: SessionEditor = {
-  onEditorChange: () => {},
-  bindEditor: () => {},
-  applyContent: () => {},
-  reconcilePendingInput: () => {},
-}
-
-const INITIAL_VIEW: SessionView = { epoch: 0, snapshot: INITIAL_NOTE_SNAPSHOT, editor: NO_EDITOR }
+const INITIAL_VIEW: SessionView = { epoch: 0, snapshot: INITIAL_NOTE_SNAPSHOT, session: null }
 
 export interface NoteDocumentOptions {
   /**
@@ -164,16 +116,11 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
       // the tracker, the rewrite chain, alias placement, and the file move.
       coordinator: () => (trackRenames ? titleRename.createCoordinator({ path }) : null),
       session: (coordinator, epoch) => {
-        // A getter, as the wiring and the session need each other: it is first
-        // called from an editor, which mounts only after this session emits.
-        const editor = createSessionEditor(() => session)
-        const session = noteSessions.create({
+        const session: NoteSession = noteSessions.create({
           path,
           readOnly: !canWrite,
           classify: checkRoundTrip,
-          onSnapshot: (snapshot) => setView({ epoch, snapshot, editor }),
-          applyContent: editor.applyContent,
-          reconcilePendingEditorInput: editor.reconcilePendingInput,
+          onSnapshot: (snapshot) => setView({ epoch, snapshot, session }),
           onContent: coordinator
             ? (content, origin) => coordinator.content(content, origin)
             : undefined,
@@ -225,10 +172,13 @@ export function useNoteDocument(path: string | null, options?: NoteDocumentOptio
   }, [binding, path])
 
   const { path: editorPath, ...snapshot } = view.snapshot
+  const { session } = view
   return {
     ...snapshot,
-    onEditorChange: view.editor.onEditorChange,
-    bindEditor: view.editor.bindEditor,
+    onEditorChange: (markdown) => session?.editorChanged(markdown),
+    // React detaches this ref while the child editor handle is still live, so
+    // the detaching session can still read the editor's last input.
+    bindEditor: (handle) => session?.attachEditor(handle),
     sessionEpoch: view.epoch,
     editorPath,
   }

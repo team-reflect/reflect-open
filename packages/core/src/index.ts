@@ -95,6 +95,7 @@ export {
   INITIAL_NOTE_SNAPSHOT,
   type NoteContentOrigin,
   type NoteSession,
+  type NoteSessionEditor,
   type NoteSessionOptions,
   type NoteSessionService,
   type NoteSessionSnapshot,
