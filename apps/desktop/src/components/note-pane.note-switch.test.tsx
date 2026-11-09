@@ -11,6 +11,7 @@ import { PaletteProvider } from '@/components/command-palette/palette-provider.t
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry.ts'
 import { queryClient } from '@/lib/query-client.ts'
 import { useRouterActions } from '@/routing/router.tsx'
+import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import '@/test-utils/locator.ts'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -78,6 +79,8 @@ it('a note switch shows the note it opened, and edits there never take another n
 
   const gammaEditor = noteEditorHandleFor('notes/gamma.md')
   expect(gammaEditor).not.toBeNull()
+  // Flush pending effects first: the editor registers its change listener in one.
+  await act(() => {})
   gammaEditor?.insertMarkdown('typed ')
   await clock.advance(2000)
 
