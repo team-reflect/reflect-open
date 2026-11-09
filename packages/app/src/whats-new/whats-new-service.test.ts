@@ -11,12 +11,13 @@ import {
   createWhatsNewService,
   decideWhatsNew,
   WHATS_NEW_SEEN_STORAGE_KEY,
+  whatsNewPlatform,
   type WhatsNewInputs,
 } from './whats-new-service.ts'
 
 const ITEM_1: WhatsNewItem = { title: 'Item 1', body: 'One', platforms: ['ios'] }
-const ITEM_2: WhatsNewItem = { title: 'Item 2', body: 'Two', platforms: ['desktop'] }
-const ITEM_3: WhatsNewItem = { title: 'Item 3', body: 'Three', platforms: ['ios', 'desktop'] }
+const ITEM_2: WhatsNewItem = { title: 'Item 2', body: 'Two', platforms: ['darwin'] }
+const ITEM_3: WhatsNewItem = { title: 'Item 3', body: 'Three', platforms: ['ios', 'darwin'] }
 
 const CONTENT: Readonly<Record<string, readonly WhatsNewItem[]>> = {
   '0.19.1': [ITEM_1, ITEM_2, ITEM_3],
@@ -83,7 +84,7 @@ describe('decideWhatsNew', () => {
 interface SetupOptions {
   version?: string
   seen?: string
-  appPlatform?: 'desktop' | 'ios'
+  buildPlatform?: 'darwin' | 'ios'
   status?: GraphStatus
   offerFirst?: boolean
 }
@@ -99,7 +100,7 @@ function setup(options: SetupOptions = {}) {
   const whatsNew = createWhatsNewService({
     storage,
     platform: createTestPlatformService({
-      appPlatform: options.appPlatform ?? 'desktop',
+      buildPlatform: options.buildPlatform ?? 'darwin',
       appVersion: options.version ?? '0.19.1',
       isDev: false,
     }),
@@ -129,10 +130,10 @@ describe('createWhatsNewService', () => {
   })
 
   it('shows every item of a beta so far, once per full version', () => {
-    const beta = setup({ appPlatform: 'ios', version: '0.19.1-beta.2', seen: '0.19.1-beta.1' })
+    const beta = setup({ buildPlatform: 'ios', version: '0.19.1-beta.2', seen: '0.19.1-beta.1' })
     expect(beta.whatsNew.phase.get()).toBe('shown')
     expect(beta.whatsNew.items).toEqual([ITEM_1, ITEM_3])
-    const stable = setup({ appPlatform: 'ios', seen: '0.19.1-beta.2' })
+    const stable = setup({ buildPlatform: 'ios', seen: '0.19.1-beta.2' })
     expect(stable.whatsNew.phase.get()).toBe('shown')
   })
 
@@ -193,5 +194,22 @@ describe('createWhatsNewService', () => {
     setStatus('ready')
     expect(whatsNew.phase.get()).toBe('hidden')
     expect(seen()).toBeNull()
+  })
+})
+
+describe('whatsNewPlatform', () => {
+  it('uses the build target', () => {
+    expect(whatsNewPlatform(createTestPlatformService({ buildPlatform: 'windows' }))).toBe(
+      'windows',
+    )
+  })
+
+  it('stands in a build target in browser dev', () => {
+    const platform = (options: Parameters<typeof createTestPlatformService>[0]) => {
+      return whatsNewPlatform({ ...createTestPlatformService(options), buildPlatform: null })
+    }
+    expect(platform({ appPlatform: 'ios' })).toBe('ios')
+    expect(platform({ appPlatform: 'desktop', isApplePlatform: true })).toBe('darwin')
+    expect(platform({ appPlatform: 'desktop', isApplePlatform: false })).toBe('windows')
   })
 })

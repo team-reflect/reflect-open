@@ -4,6 +4,7 @@ import {
   marketingVersion,
   WritableStore,
   type GraphSessionService,
+  type BuildPlatform,
   type PlatformFacts,
   type StorageService,
   type Store,
@@ -56,6 +57,16 @@ export interface WhatsNewInputs {
    * The user accepted the offer in this session.
    */
   readonly accepted: boolean
+}
+
+/**
+ * The build target whose items to show. Browser dev has no Tauri build target,
+ * so it stands in the closest one.
+ */
+export function whatsNewPlatform(platform: PlatformFacts): BuildPlatform {
+  if (platform.buildPlatform) return platform.buildPlatform
+  if (platform.appPlatform !== 'desktop') return platform.appPlatform
+  return platform.isApplePlatform ? 'darwin' : 'windows'
 }
 
 /**
@@ -166,7 +177,7 @@ class WhatsNewServiceImpl implements WhatsNewService {
     const { storage, platform, window, blocked, content, offerFirst } = deps
     const isMainWindow = window.isMainWindow()
     const items = (content[marketingVersion(platform.appVersion)] ?? []).filter((item) => {
-      return item.platforms.includes(platform.appPlatform)
+      return item.platforms.includes(whatsNewPlatform(platform))
     })
     this.items = items
     this.override = deriveStore(

@@ -1,4 +1,4 @@
-import type { AppPlatform } from '@reflect/core'
+import type { BuildPlatform } from '@reflect/core'
 
 /**
  * One user-facing change.
@@ -6,7 +6,20 @@ import type { AppPlatform } from '@reflect/core'
 export interface WhatsNewItem {
   readonly title: string
   readonly body: string
-  readonly platforms: readonly AppPlatform[]
+  readonly platforms: readonly BuildPlatform[]
+}
+
+const ALL_PLATFORMS: readonly BuildPlatform[] = ['darwin', 'windows', 'linux', 'ios', 'android']
+
+/**
+ * The menus item, with the shortcut hint that fits each platform.
+ */
+function menusItem(shortcut: string, platforms: readonly BuildPlatform[]): WhatsNewItem {
+  return {
+    title: 'Menus for code blocks, images, and embeds',
+    body: `Code blocks, images, X posts, and YouTube videos now have a menu to copy, convert, or delete them. ${shortcut}`,
+    platforms,
+  }
 }
 
 /**
@@ -16,11 +29,6 @@ export interface WhatsNewItem {
 export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
   '0.18.0': [
     {
-      title: 'What’s New',
-      body: 'After an update, Reflect now shows what changed. This is the first one.',
-      platforms: ['desktop', 'ios'],
-    },
-    {
       title: 'Faster, smoother gestures',
       body: 'Swipes, sheets, and image dragging respond faster and move more smoothly.',
       platforms: ['ios'],
@@ -28,7 +36,10 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
     {
       title: 'New AI models',
       body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
-      platforms: ['desktop', 'ios'],
+      platforms: ALL_PLATFORMS,
     },
+    menusItem('Press ⌘/ to open it.', ['darwin']),
+    menusItem('Press Ctrl+/ to open it.', ['windows', 'linux']),
+    menusItem('With a keyboard, press ⌘/ to open it.', ['ios']),
   ],
 }
