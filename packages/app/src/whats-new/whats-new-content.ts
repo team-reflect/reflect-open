@@ -15,17 +15,9 @@ export interface WhatsNewItem {
 
 const ALL_PLATFORMS: readonly BuildPlatform[] = ['darwin', 'windows', 'linux', 'ios', 'android']
 
-/**
- * The menus item, with the shortcut hint that fits each platform.
- */
-function menusItem(shortcut: string, platforms: readonly BuildPlatform[]): WhatsNewItem {
-  return {
-    id: 'node-menus',
-    title: 'Menus for code blocks, images, and embeds',
-    body: `Code blocks, images, X posts, and YouTube videos now have a menu to copy, convert, or delete them. ${shortcut}`,
-    platforms,
-  }
-}
+const MENUS_TITLE = 'Menus for code blocks, images, and embeds'
+const MENUS_BODY =
+  'Code blocks, images, X posts, and YouTube videos now have a menu to copy, convert, or delete them.'
 
 /**
  * User-facing changes keyed by marketing version. A beta appends to its
@@ -45,8 +37,23 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
       platforms: ALL_PLATFORMS,
     },
-    menusItem('Press ⌘/ to open it.', ['darwin']),
-    menusItem('Press Ctrl+/ to open it.', ['windows', 'linux']),
-    menusItem('With a keyboard, press ⌘/ to open it.', ['ios']),
+    {
+      id: 'node-menus-macos',
+      title: MENUS_TITLE,
+      body: `${MENUS_BODY} Press ⌘/ to open it.`,
+      platforms: ['darwin'],
+    },
+    {
+      id: 'node-menus-windows-linux',
+      title: MENUS_TITLE,
+      body: `${MENUS_BODY} Press Ctrl+/ to open it.`,
+      platforms: ['windows', 'linux'],
+    },
+    {
+      id: 'node-menus-ios',
+      title: MENUS_TITLE,
+      body: `${MENUS_BODY} With a keyboard, press ⌘/ to open it.`,
+      platforms: ['ios'],
+    },
   ],
 }
