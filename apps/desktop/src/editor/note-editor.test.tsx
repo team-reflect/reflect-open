@@ -5,6 +5,7 @@ import { page, userEvent } from 'vitest/browser'
 import type { TestPlatformOptions } from '@reflect/core/testing'
 import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { pasteFiles } from '@/test-utils/file-events.ts'
+import { getSvgImageUrl } from '@/test-utils/image.ts'
 import '@/test-utils/locator.ts'
 import { hover, unhover } from '@/test-utils/mouse.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
@@ -12,8 +13,7 @@ import type { XPost } from '@post-embed/types'
 import { NoteEditor, type NoteEditorHandle } from './note-editor.tsx'
 
 // Media that loads without the network: the card hides a photo that fails.
-const X_PHOTO_URL =
-  "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='100'%20height='100'/%3E"
+const X_PHOTO_URL = getSvgImageUrl(100, 100)
 const X_VIDEO_URL = 'data:video/mp4;base64,'
 
 // The real resolver only lets `reflect-asset:` media through, which no test
@@ -83,10 +83,10 @@ const YOUTUBE_NOTE = `![](https://www.youtube.com/watch?v=aqz-KE-bpKQ)<!-- ${JSO
 const IMAGE_NOTE = 'A photo\n\n![Cat](assets/cat.png)'
 
 /**
- * Clicks the top-left corner of an image. The small test image is mostly
- * covered by meowdown's embed menu button, so a center click hits the button.
+ * Big enough that a click at its center misses meowdown's embed menu button
+ * in the top-right corner, small enough to keep the note short.
  */
-const IMAGE_CORNER_CLICK = { position: { x: 4, y: 4 } }
+const CAT_URL = getSvgImageUrl(80, 60)
 
 function renderEditor(
   openAsset: (path: string) => MaybePromise<void> = vi.fn(async () => {}),
@@ -95,7 +95,7 @@ function renderEditor(
   return render(
     <NoteEditor
       initialContent={IMAGE_NOTE}
-      resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+      resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
       resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       openAsset={openAsset}
     />,
@@ -313,11 +313,11 @@ describe('NoteEditor image lightbox', () => {
   it('opens a lightbox from an inline image and closes on Escape', async () => {
     await renderEditor()
 
-    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
+    await pmRoot.getByAltText('Cat').click()
     const dialog = page.getByRole('dialog', { name: 'Image preview' })
     await expect.element(dialog).toBeVisible()
     const preview = dialog.locate('img')
-    expect(preview.element()).toHaveProperty('src', 'asset://cat.png')
+    expect(preview.element()).toHaveProperty('src', CAT_URL)
 
     await userEvent.keyboard('{Escape}')
     await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
@@ -327,7 +327,7 @@ describe('NoteEditor image lightbox', () => {
     const openImage = vi.fn(async () => {})
     await renderEditor(openImage)
 
-    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
+    await pmRoot.getByAltText('Cat').click()
     await page.getByRole('button', { name: 'Open' }).click()
     await vi.waitFor(() => {
       expect(openImage).toHaveBeenCalledWith('assets/cat.png')
@@ -337,7 +337,7 @@ describe('NoteEditor image lightbox', () => {
   it('keeps the image opener inside iOS safe-area bounds', async () => {
     await renderEditor()
 
-    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
+    await pmRoot.getByAltText('Cat').click()
     const opener = page.getByRole('button', { name: 'Open' })
     await expect.element(opener).toBeVisible()
     expect(opener.element().parentElement?.className).toContain('top-safe-or-4')
@@ -347,7 +347,7 @@ describe('NoteEditor image lightbox', () => {
   it('shows mobile close chrome inside iOS safe-area bounds', async () => {
     await renderEditor(undefined, MOBILE_APP)
 
-    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
+    await pmRoot.getByAltText('Cat').click()
     const close = page.getByRole('button', { name: 'Close', exact: true })
     await expect.element(close).toBeVisible()
     expect(close.element().parentElement?.className).toContain('top-safe-or-4')
@@ -360,7 +360,7 @@ describe('NoteEditor image lightbox', () => {
   it('dismisses the mobile image lightbox with a downward drag', async () => {
     await renderEditor(undefined, MOBILE_APP)
 
-    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
+    await pmRoot.getByAltText('Cat').click()
     const preview = page.getByRole('button', { name: 'Close image preview' })
     await expect.element(preview).toBeVisible()
     const image = preview.locate('img').element()
@@ -430,7 +430,7 @@ describe('NoteEditor image lightbox', () => {
     const secondOpenImage = vi.fn(async () => {})
     const screen = await renderEditor(firstOpenImage)
 
-    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
+    await pmRoot.getByAltText('Cat').click()
     await expect.element(page.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
     // The rerender is a synchronous update too.
     await settleViewTransition()
@@ -438,7 +438,7 @@ describe('NoteEditor image lightbox', () => {
     await screen.rerender(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
         openAsset={secondOpenImage}
       />,
@@ -455,12 +455,12 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={IMAGE_NOTE}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       />,
     )
 
-    await pmRoot.getByAltText('Cat').click(IMAGE_CORNER_CLICK)
+    await pmRoot.getByAltText('Cat').click()
     await expect.element(page.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
     await expectLocatorToHaveCount(page.getByRole('button', { name: 'Open' }), 0)
   })
@@ -469,7 +469,7 @@ describe('NoteEditor image lightbox', () => {
     await render(
       <NoteEditor
         initialContent={'![Cat](assets/cat.png)\n\n![X](https://blocked.example/x.png)'}
-        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : undefined)}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? CAT_URL : undefined)}
       />,
     )
 
