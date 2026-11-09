@@ -184,10 +184,13 @@ export function NotePaneComponent({
   const onLinkClick = useMarkdownLinkClick(path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
+  // Outbound features gate on the note the editor shows, which can briefly
+  // differ from the route's note during a switch.
+  const editorPath = document.editorPath ?? path
   const hasGraph = graph !== null
   const resolveLinkPreview = useMemo(
-    () => (hasGraph ? linkPreview.createResolver(path) : undefined),
-    [hasGraph, linkPreview, path],
+    () => (hasGraph ? linkPreview.createResolver(editorPath) : undefined),
+    [hasGraph, linkPreview, editorPath],
   )
 
   const bindEditor = document.bindEditor
@@ -243,7 +246,7 @@ export function NotePaneComponent({
   )
 
   const aiMenu = useEditorAiMenu({
-    path,
+    path: editorPath,
     sessionEpoch: document.sessionEpoch,
     editorRef: aiEditorRef,
   })

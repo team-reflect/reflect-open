@@ -277,12 +277,22 @@ describe('useNoteDocument', () => {
     await act(async () => {})
     expect(hook.result.current.status).toBe('ready')
     expect(hook.result.current.sessionEpoch).toBe(epochBefore)
+    // The privacy subject follows at once, before any edit: a Lock or an
+    // external `private: true` that changes no body must still be seen.
+    expect(hook.result.current.editorPath).toBe('notes/new-title.md')
 
     // Subsequent edits land on the new path only — nothing resurrects a.md.
     await act(() => hook.result.current.onEditorChange('# New Title\n\nmore\n'))
     await act(() => clock.advance(1000))
     expect(file('notes/new-title.md')).toContain('# New Title\n\nmore\n')
     expect(file('notes/a.md')).toBeUndefined()
+
+    // Lock reaches the session under its new path, and the privacy subject the
+    // pane gates AI on follows it there.
+    const locked = await act(() => core.noteActions.togglePrivate('notes/new-title.md'))
+    expect(locked).toEqual({ status: 'done', isPrivate: true })
+    expect(file('notes/new-title.md')).toContain('private: true')
+    expect(hook.result.current.editorPath).toBe('notes/new-title.md')
     await hook.unmount()
   })
 
@@ -316,6 +326,85 @@ describe('useNoteDocument', () => {
 
     expect(noteFile.getWrites('notes/a.md')).toContain('# Unsaved on A\n')
     expect(noteFile.getWrites('notes/b.md')).toEqual([])
+  })
+
+  it('a note switch gives the next note a new session epoch, so its editor remounts', async () => {
+    noteFile.set('notes/b.md', '# B\n')
+    const hook = await mount(
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
+      { initialProps: { path: 'notes/a.md' } },
+    )
+    await vi.waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    const epochOnA = hook.result.current.sessionEpoch
+
+    await hook.rerender({ path: 'notes/b.md' })
+    await vi.waitFor(() => expect(hook.result.current.initialContent).toBe('# B\n'))
+
+    // The editor is keyed on the epoch: reusing A's would leave A's text on
+    // screen, wired to B's session.
+    expect(hook.result.current.sessionEpoch).not.toBe(epochOnA)
+  })
+
+  it('every render pairs the content shown with the note it belongs to', async () => {
+    noteFile.set('notes/b.md', '# B\n')
+    const renders: { route: string; editorPath: string | null; content: string | null }[] = []
+    const hook = await mount(
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => {
+        const document = useNoteDocument(path)
+        renders.push({
+          route: path,
+          editorPath: document.editorPath,
+          content: document.status === 'ready' ? document.initialContent : null,
+        })
+        return document
+      },
+      { initialProps: { path: 'notes/a.md' } },
+    )
+    await vi.waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    await hook.rerender({ path: 'notes/b.md' })
+    await vi.waitFor(() => expect(hook.result.current.initialContent).toBe('# B\n'))
+
+    // The render where the route has moved on but the editor still shows A:
+    // its privacy subject must be A, whose text the editor would send.
+    expect(renders).toContainEqual({
+      route: 'notes/b.md',
+      editorPath: 'notes/a.md',
+      content: '# Hello\n',
+    })
+    const owner: Record<string, string> = { '# Hello\n': 'notes/a.md', '# B\n': 'notes/b.md' }
+    for (const render of renders) {
+      if (render.content !== null) {
+        expect(render.editorPath).toBe(owner[render.content])
+      }
+    }
+  })
+
+  it("an editor's input reaches only the note it was opened on", async () => {
+    noteFile.set('notes/b.md', '# B\n')
+    const hook = await mount(
+      ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path),
+      { initialProps: { path: 'notes/a.md' } },
+    )
+    await vi.waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    // The wiring A's editor was mounted with, as the pane hands it over.
+    const { onEditorChange, bindEditor } = hook.result.current
+    const editor = fakeEditor()
+    await act(() => bindEditor(editor))
+
+    await hook.rerender({ path: 'notes/b.md' })
+    await vi.waitFor(() => expect(hook.result.current.initialContent).toBe('# B\n'))
+
+    // A's editor detaches only now, and Meowdown reports its pending native
+    // input as it does.
+    editor.getMarkdown = () => {
+      onEditorChange('# Hello\n\ntyped on A\n')
+      return '# Hello\n\ntyped on A\n'
+    }
+    await act(() => bindEditor(null))
+    await act(() => clock.advance(2000))
+
+    expect(noteFile.getWrites('notes/b.md')).toEqual([])
+    expect(file('notes/b.md')).toBe('# B\n')
   })
 
   it('reconciles pending editor input during a same-path session rebind', async () => {
