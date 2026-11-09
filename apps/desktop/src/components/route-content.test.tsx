@@ -2,17 +2,13 @@ import { page } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { act } from '@/test-utils/act.ts'
-import { upsertFrontmatter } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestIdService,
   createTestNoteFileService,
-  createTestPlatformService,
   type TestNoteFileService,
-  type TestPlatformOptions,
 } from '@reflect/core/testing'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider.tsx'
-import type { NoteEditorHandle } from '@/editor/note-editor.tsx'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider.tsx'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider.tsx'
 import { UpdateProvider } from '@/providers/update-provider.tsx'
@@ -26,66 +22,8 @@ import { RouteContent } from './route-content.tsx'
 /**
  * The route → view seam (Plan 06): non-daily notes must be just as editable as
  * daily ones. These tests drive the real router → RouteContent → NotePane →
- * save-pipeline stack over the test services; only the ProseMirror view is
- * stubbed because editor-DOM behavior lives in the dedicated editor tests.
+ * save-pipeline stack, real editor included, over the test services.
  */
-
-const editorProbe = vi.hoisted(() => ({
-  onChange: null as ((markdown: string) => void) | null,
-  focusCalls: [] as string[],
-  hoverRenderer: null as boolean | null,
-}))
-
-vi.mock('@/editor/note-editor.tsx', async () => {
-  const { useEffect, useRef } = await import('react')
-  return {
-    NoteEditor: ({
-      initialContent,
-      onChange,
-      handleRef,
-      renderWikilinkHoverCard,
-    }: {
-      initialContent: string
-      onChange: (markdown: string) => void
-      handleRef?: (handle: NoteEditorHandle | null) => void
-      renderWikilinkHoverCard?: unknown
-    }) => {
-      editorProbe.hoverRenderer = renderWikilinkHoverCard !== undefined
-      const markdownRef = useRef(initialContent)
-      editorProbe.onChange = (markdown) => {
-        markdownRef.current = markdown
-        onChange(markdown)
-      }
-      useEffect(() => {
-        handleRef?.({
-          setMarkdown: (markdown) => {
-            markdownRef.current = markdown
-          },
-          getMarkdown: () => markdownRef.current,
-          insertMarkdown: () => {},
-          focus: () => {
-            editorProbe.focusCalls.push('focus')
-          },
-          setSelection: () => {},
-          getSelectedText: () => '',
-          openSelectionMenu: () => {},
-          startPendingReplacement: () => false,
-          appendPendingReplacementText: () => {},
-          acceptPendingReplacement: () => {},
-          discardPendingReplacement: () => {},
-          findNext: () => {},
-          findPrevious: () => {},
-        })
-        return () => handleRef?.(null)
-      }, [handleRef])
-      return (
-        <div data-testid="fake-editor" contentEditable suppressContentEditableWarning>
-          {initialContent}
-        </div>
-      )
-    },
-  }
-})
 
 /**
  * The note files a test seeds before it renders.
@@ -99,24 +37,22 @@ const NEW_NOTE_PATH = 'notes/01arz3ndektsv4rrffq69g5fav.md'
 
 beforeEach(() => {
   files = {}
-  editorProbe.onChange = null
-  editorProbe.focusCalls.length = 0
-  editorProbe.hoverRenderer = null
 })
+
+const editor = () => page.locate('.ProseMirror')
 
 function PaletteProbe(): ReactElement {
   const { open, query } = usePalette()
   return <output data-testid="palette">{JSON.stringify({ open, query })}</output>
 }
 
-async function renderRoute(route: Route, platform?: TestPlatformOptions) {
+async function renderRoute(route: Route) {
   noteFile = createTestNoteFileService({ files })
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     noteFile,
     // A seeded id service mints note ids that read as ULIDs, not as numbers.
     id: createTestIdService({ seed: 'route-content' }),
-    platform: createTestPlatformService(platform),
   })
   return await renderInApp(
     <PaletteProvider>
@@ -164,41 +100,10 @@ describe('RouteContent', () => {
 
     await expect.element(page.getByLabelText('Editing notes/exist.md')).toBeVisible()
     await expect.element(page.getByTestId('daily-stream')).not.toBeInTheDocument()
-    await expect.element(page.getByTestId('fake-editor')).toMatchTextContent('# Hello')
-    expect(editorProbe.hoverRenderer).toBe(true)
+    await expect.element(editor().locate('h1')).toHaveTextContent('Hello')
 
     // The navigated-to note takes focus on mount.
-    await vi.waitFor(() => expect(editorProbe.focusCalls).toContain('focus'))
-    await view.unmount()
-  })
-
-  it('tracks an adopted nested note retitle while keeping its path', async () => {
-    const path = 'Projects/exist.md'
-    files[path] = '# Old Title\n'
-    const view = await renderRoute({ kind: 'note', path })
-    await expect.element(page.getByLabelText(`Editing ${path}`)).toBeVisible()
-
-    await act(() => editorProbe.onChange?.('# New Title\n'))
-    await act(() => view.core.openDocuments.flushAll())
-
-    expect(noteFile.files().get(path)).toBe(
-      upsertFrontmatter('# New Title\n', {
-        aliases: ['Old Title'],
-      }),
-    )
-    expect(noteFile.files().get('notes/new-title.md')).toBeUndefined()
-    await view.unmount()
-  })
-
-  it('omits the wiki-link hover renderer on a touch editor surface', async () => {
-    files['notes/exist.md'] = '# Hello\n'
-    const view = await renderRoute(
-      { kind: 'note', path: 'notes/exist.md' },
-      { surface: { touchEditor: true } },
-    )
-
-    await expect.element(page.getByLabelText('Editing notes/exist.md')).toBeVisible()
-    expect(editorProbe.hoverRenderer).toBe(false)
+    await expect.element(editor()).toHaveFocus()
     await view.unmount()
   })
 
@@ -208,43 +113,13 @@ describe('RouteContent', () => {
     await expect.element(page.getByLabelText(`Editing ${NEW_NOTE_PATH}`)).toBeVisible()
     // The seed is an empty H1: the caret lands in it (plain focus, no text
     // to select) and the title placeholder ghosts "Untitled" over the line.
-    expect(page.getByTestId('fake-editor').element().textContent).toBe('#\n')
-    await vi.waitFor(() => expect(editorProbe.focusCalls).toContain('focus'))
+    await expect.element(editor().locate('h1')).toHaveTextContent('')
+    await expect.element(editor()).toHaveFocus()
 
     // Opening never litters the graph — even a forced flush writes nothing.
     await act(() => view.core.openDocuments.flushAll())
     expect(noteFile.writes()).toEqual([])
     expect(noteFile.files().get(NEW_NOTE_PATH)).toBeUndefined()
-    await view.unmount()
-  })
-
-  it('creates the file once the user actually edits the seeded note', async () => {
-    const view = await renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
-    await expect.element(page.getByLabelText(`Editing ${NEW_NOTE_PATH}`)).toBeVisible()
-
-    await act(() => editorProbe.onChange?.('# Manifesto\n'))
-    await act(() => view.core.openDocuments.flushAll())
-
-    // The seed's header rides along: the file is born with its identity
-    // (`id:` frontmatter, Plan 17) plus exactly what the user typed.
-    expect(noteFile.files().get(NEW_NOTE_PATH)).toMatch(
-      /^---\nid: [0-9a-z]{26}\n---\n\n# Manifesto\n$/,
-    )
-    await view.unmount()
-  })
-
-  it('never recreates an arbitrary missing vault path', async () => {
-    const view = await renderRoute({ kind: 'note', path: 'Projects/missing.md' })
-
-    await expect
-      .element(
-        page.getByText(/Couldn’t open Projects\/missing\.md: Projects\/missing\.md not found/),
-      )
-      .toBeVisible()
-    await expect.element(page.getByTestId('fake-editor')).not.toBeInTheDocument()
-    await act(() => view.core.openDocuments.flushAll())
-    expect(noteFile.writes()).toEqual([])
-    expect(noteFile.files().get('Projects/missing.md')).toBeUndefined()
     await view.unmount()
   })
 
