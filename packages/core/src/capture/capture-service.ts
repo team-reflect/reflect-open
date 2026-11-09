@@ -229,12 +229,18 @@ class CaptureSessionImpl implements CaptureSession {
     const { settings, captureInbox, logger } = this.#deps
     const loop = this.#loop
     const parent = deriveStore(settings, (current) => current.quickNoteParent)
-    const write = async (): Promise<void> => {
-      try {
-        await captureInbox.writeQuickNoteDefaults(parent.get())
-      } catch (cause) {
-        logger.error('quick note defaults mirror failed:', errorMessage(cause))
-      }
+    // One write at a time, each reading the latest value, so an earlier write
+    // never lands after a later one.
+    let queue = Promise.resolve()
+    const write = (): Promise<void> => {
+      queue = queue.then(async () => {
+        try {
+          await captureInbox.writeQuickNoteDefaults(parent.get())
+        } catch (cause) {
+          logger.error('quick note defaults mirror failed:', errorMessage(cause))
+        }
+      })
+      return queue
     }
     void (async () => {
       if ((await settings.whenLoaded()) === 'failed' || loop.isStale()) {

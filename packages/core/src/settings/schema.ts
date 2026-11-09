@@ -1,6 +1,6 @@
 import { getWeekStart, type Weekday } from '@reflect/utils'
 import { z } from 'zod'
-import { TEXT_CAPTURE_PARENT_MAX_LENGTH } from '../capture/capture-envelope.ts'
+import { TEXT_CAPTURE_PARENT_MAX_LENGTH } from '../capture/text-capture-limits.ts'
 import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../lib/http-url.ts'
 
 /**

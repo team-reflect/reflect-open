@@ -6,8 +6,8 @@ import {
   inboxEnvelopeSchema,
   textCaptureEnvelopeSchema,
   TEXT_CAPTURE_MAX_LENGTH,
-  TEXT_CAPTURE_PARENT_MAX_LENGTH,
 } from './capture-envelope.ts'
+import { TEXT_CAPTURE_PARENT_MAX_LENGTH } from './text-capture-limits.ts'
 
 const VALID = {
   version: 1,

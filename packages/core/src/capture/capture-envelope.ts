@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { xPostEnvelopeSchema, xPostWireSchema } from './bookmark-envelope.ts'
+import { TEXT_CAPTURE_PARENT_MAX_LENGTH } from './text-capture-limits.ts'
 export * from './bookmark-envelope.ts'
 
 /**
@@ -98,11 +99,6 @@ export type ExtensionCaptureWire = z.infer<typeof extensionCaptureWireSchema>
  * enforces the same number before an envelope is ever spooled.
  */
 export const TEXT_CAPTURE_MAX_LENGTH = 10_000
-
-/**
- * Cap on a text capture's parent bullet: one short label.
- */
-export const TEXT_CAPTURE_PARENT_MAX_LENGTH = 200
 
 /** A trimmed, non-empty line of at most `max` characters. */
 function singleLineSchema(max: number) {

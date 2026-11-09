@@ -299,7 +299,7 @@ top-level bullets at the end of the note. Empty keeps the behavior above.
   rendered text or wiki link target, case-insensitive (`Inbox`, `[[Inbox]]`, `**inbox**`,
   `[[Inbox|My inbox]]`). Tasks, headings, nested bullets, and partial matches do not count.
 - **Missing parent:** `- <setting>`, written as typed, is added after the note's last
-  content. A folded parent stays folded.
+  content, always unfolded. A matched parent keeps its own marker, so a folded one stays folded.
 - **Decided at capture time.** The intent stamps the parent into the envelope's optional
   `parent` field, and the drain passes it to `appendListItem({ parent })`. The drain never
   reads settings, so a later setting change does not move captured notes.

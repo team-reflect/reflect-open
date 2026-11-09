@@ -204,6 +204,29 @@ describe('CaptureService (quick note defaults mirror)', () => {
     expect(kit.captureInbox.quickNoteDefaults()).toEqual(['Inbox', '[[Ideas]]'])
   })
 
+  it('writes the mirror one at a time, ending on the latest value', async () => {
+    const kit = setup({ mobile: true, settings: { quickNoteParent: 'Inbox' } })
+    const firstWrite = Promise.withResolvers<void>()
+    const started: string[] = []
+    vi.spyOn(kit.captureInbox, 'writeQuickNoteDefaults').mockImplementation((parent) => {
+      started.push(parent)
+      return started.length === 1 ? firstWrite.promise : Promise.resolve()
+    })
+
+    const session = kit.capture.openSession({ generation: 3 })
+    session.start()
+    await flush()
+    kit.settings.update({ quickNoteParent: 'Ideas' })
+    kit.settings.update({ quickNoteParent: 'Later' })
+    await flush()
+    expect(started).toEqual(['Inbox'])
+
+    firstWrite.resolve()
+    await flush()
+    expect(started.at(-1)).toBe('Later')
+    session.dispose()
+  })
+
   it('on desktop, never mirrors the quick note parent', async () => {
     const kit = setup({ settings: { quickNoteParent: 'Inbox' } })
 
