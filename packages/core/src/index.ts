@@ -141,7 +141,11 @@ export {
 export { updatePinOrder } from './documents/pin-order.ts'
 export { type OpenDocumentsService } from './documents/open-documents-service.ts'
 export { type RenameCoordinator } from './documents/title-rename-service.ts'
-export { createDocumentBinding, type DocumentBinding } from './documents/document-binding.ts'
+export {
+  createDocumentBinding,
+  type DocumentBinding,
+  type DocumentView,
+} from './documents/document-binding.ts'
 export { type ResolvedArchivedPost } from './embeds/x-archive-service.ts'
 export { marketingVersion } from './ports/app-version.ts'
 export { reachWebStorage, type StorageService } from './ports/storage-service.ts'
