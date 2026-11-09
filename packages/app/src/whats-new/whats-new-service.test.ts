@@ -15,9 +15,14 @@ import {
   type WhatsNewInputs,
 } from './whats-new-service.ts'
 
-const ITEM_1: WhatsNewItem = { title: 'Item 1', body: 'One', platforms: ['ios'] }
-const ITEM_2: WhatsNewItem = { title: 'Item 2', body: 'Two', platforms: ['darwin'] }
-const ITEM_3: WhatsNewItem = { title: 'Item 3', body: 'Three', platforms: ['ios', 'darwin'] }
+const ITEM_1: WhatsNewItem = { id: 'item-1', title: 'Item 1', body: 'One', platforms: ['ios'] }
+const ITEM_2: WhatsNewItem = { id: 'item-2', title: 'Item 2', body: 'Two', platforms: ['darwin'] }
+const ITEM_3: WhatsNewItem = {
+  id: 'item-3',
+  title: 'Item 3',
+  body: 'Three',
+  platforms: ['ios', 'darwin'],
+}
 
 const CONTENT: Readonly<Record<string, readonly WhatsNewItem[]>> = {
   '0.19.1': [ITEM_1, ITEM_2, ITEM_3],
@@ -61,8 +66,7 @@ describe('decideWhatsNew', () => {
     expect(decide({ seen: true })).toBe('wait')
   })
 
-  it('skips a version without items and the version of a new install', () => {
-    expect(decide({ items: [] })).toBe('skip')
+  it('skips the version of a new install', () => {
     expect(decide({ launch: 'openedAfterSetup' })).toBe('skip')
   })
 
@@ -118,7 +122,7 @@ function setup(options: SetupOptions = {}) {
 
 describe('createWhatsNewService', () => {
   it('shows the items for the platform once the graph opens, and hides once dismissed', () => {
-    const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0', status: 'loading' })
+    const { whatsNew, setStatus, seen } = setup({ seen: '["old-item"]', status: 'loading' })
     expect(whatsNew.phase.get()).toBe('hidden')
     setStatus('ready')
     expect(whatsNew.phase.get()).toBe('shown')
@@ -126,15 +130,27 @@ describe('createWhatsNewService', () => {
 
     whatsNew.dismiss()
     expect(whatsNew.phase.get()).toBe('hidden')
-    expect(seen()).toBe('0.19.1')
+    expect(seen()).toBe('["item-1","item-2","item-3"]')
   })
 
-  it('shows every item of a beta so far, once per full version', () => {
-    const beta = setup({ buildPlatform: 'ios', version: '0.19.1-beta.2', seen: '0.19.1-beta.1' })
-    expect(beta.whatsNew.phase.get()).toBe('shown')
-    expect(beta.whatsNew.items).toEqual([ITEM_1, ITEM_3])
-    const stable = setup({ buildPlatform: 'ios', seen: '0.19.1-beta.2' })
-    expect(stable.whatsNew.phase.get()).toBe('shown')
+  it('shows only the items not seen yet', () => {
+    const { whatsNew } = setup({ version: '0.19.1-beta.2', seen: '["item-2"]' })
+    expect(whatsNew.phase.get()).toBe('shown')
+    expect(whatsNew.items).toEqual([ITEM_3])
+  })
+
+  it('shows every item when the stored value is not a JSON array of strings', () => {
+    for (const seen of ['0.19.1-beta.1', '{}', '[1]']) {
+      const { whatsNew } = setup({ seen })
+      expect(whatsNew.phase.get()).toBe('shown')
+      expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])
+    }
+  })
+
+  it('stays hidden when every item was seen', () => {
+    const { whatsNew } = setup({ seen: '["item-2","item-3"]' })
+    expect(whatsNew.phase.get()).toBe('hidden')
+    expect(whatsNew.items).toEqual([ITEM_2, ITEM_3])
   })
 
   it('marks the version seen without showing after the graph chooser', () => {
@@ -142,24 +158,23 @@ describe('createWhatsNewService', () => {
     setStatus('choosing')
     setStatus('ready')
     expect(whatsNew.phase.get()).toBe('hidden')
-    expect(seen()).toBe('0.19.1')
+    expect(seen()).toBe('["item-1","item-2","item-3"]')
   })
 
   it('ignores a graph switch after the first open', () => {
-    const { whatsNew, setStatus, seen } = setup({ seen: '0.19.0' })
+    const { whatsNew, setStatus, seen } = setup()
     setStatus('choosing')
     expect(whatsNew.phase.get()).toBe('shown')
-    expect(seen()).toBe('0.19.0')
+    expect(seen()).toBeNull()
   })
 
-  it('marks a version without items seen at start', () => {
-    const { whatsNew, seen } = setup({ version: '0.20.0', seen: '0.19.1' })
+  it('stays hidden for a version without items', () => {
+    const { whatsNew } = setup({ version: '0.20.0' })
     expect(whatsNew.phase.get()).toBe('hidden')
-    expect(seen()).toBe('0.20.0')
   })
 
-  it('shows a seen version with the override, which dismiss turns off', () => {
-    const { whatsNew } = setup({ seen: '0.19.1' })
+  it('shows seen items with the override, which dismiss turns off', () => {
+    const { whatsNew } = setup({ seen: '["item-2","item-3"]' })
     expect(whatsNew.phase.get()).toBe('hidden')
 
     whatsNew.setOverride(true)
@@ -171,20 +186,20 @@ describe('createWhatsNewService', () => {
   })
 
   it('offers first, and shows once accepted without marking the version seen', () => {
-    const { whatsNew, seen } = setup({ seen: '0.19.0', offerFirst: true })
+    const { whatsNew, seen } = setup({ offerFirst: true })
     expect(whatsNew.phase.get()).toBe('offered')
 
     whatsNew.accept()
     expect(whatsNew.phase.get()).toBe('shown')
     whatsNew.decline()
-    expect(seen()).toBe('0.19.0')
+    expect(seen()).toBeNull()
   })
 
   it('marks the version seen when the offer is declined', () => {
-    const { whatsNew, seen } = setup({ seen: '0.19.0', offerFirst: true })
+    const { whatsNew, seen } = setup({ offerFirst: true })
     whatsNew.decline()
     expect(whatsNew.phase.get()).toBe('hidden')
-    expect(seen()).toBe('0.19.1')
+    expect(seen()).toBe('["item-1","item-2","item-3"]')
   })
 
   it('stops following the launch', () => {
