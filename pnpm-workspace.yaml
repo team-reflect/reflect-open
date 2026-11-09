@@ -33,10 +33,3 @@ patchedDependencies:
 #   '@meowdown/core': https://pkg.pr.new/@meowdown/core@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/react': https://pkg.pr.new/@meowdown/react@346867e5f1b5336c889e829b146a04fcc0c115c1
 #   '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@346867e5f1b5336c889e829b146a04fcc0c115c1
-
-blockExoticSubdeps: false
-overrides:
-  '@meowdown/core': https://pkg.pr.new/@meowdown/core@aa567a824248c4907d5e3a43700d5c860d7224b4
-  '@meowdown/embed': https://pkg.pr.new/@meowdown/embed@aa567a824248c4907d5e3a43700d5c860d7224b4
-  '@meowdown/react': https://pkg.pr.new/@meowdown/react@aa567a824248c4907d5e3a43700d5c860d7224b4
-  '@meowdown/markdown': https://pkg.pr.new/@meowdown/markdown@aa567a824248c4907d5e3a43700d5c860d7224b4
