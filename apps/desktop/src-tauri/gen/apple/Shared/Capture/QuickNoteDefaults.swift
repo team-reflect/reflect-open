@@ -14,9 +14,7 @@ enum QuickNoteDefaults {
   /// The parent bullet set in Settings, or nil to append at the end of the note.
   static func parent() -> String? {
     guard
-      !CaptureInbox.groupId.isEmpty,
-      let container = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: CaptureInbox.groupId),
+      let container = CaptureInbox.containerUrl(),
       let data = try? Data(contentsOf: container.appendingPathComponent(fileName)),
       let file = try? JSONDecoder().decode(File.self, from: data),
       file.version == 1

@@ -104,6 +104,16 @@ export const TEXT_CAPTURE_MAX_LENGTH = 10_000
  */
 export const TEXT_CAPTURE_PARENT_MAX_LENGTH = 200
 
+/** A trimmed, non-empty line of at most `max` characters. */
+function singleLineSchema(max: number) {
+  return z
+    .string()
+    .trim()
+    .min(1)
+    .max(max)
+    .regex(/^[^\r\n]+$/, 'must be a single line')
+}
+
 /**
  * What a text capture materializes as on the capture-day daily note. One
  * vocabulary end-to-end: the `reflect://append`/`reflect://checkbox`/
@@ -142,24 +152,13 @@ export const textCaptureEnvelopeSchema = z.object({
   /** Discriminates from link envelopes, which carry no `kind`. */
   kind: textCaptureKindSchema,
   /** The payload, already whitespace-folded to one line by the URL parser. */
-  text: z
-    .string()
-    .trim()
-    .min(1)
-    .max(TEXT_CAPTURE_MAX_LENGTH)
-    .regex(/^[^\r\n]+$/, 'must be a single line'),
+  text: singleLineSchema(TEXT_CAPTURE_MAX_LENGTH),
   /**
    * The top-level bullet the entry nests under, as the user typed it
    * (`Inbox` or `[[Inbox]]`). Absent means the end of the note. Ignored for
    * `task`, which always files into the Tasks section.
    */
-  parent: z
-    .string()
-    .trim()
-    .min(1)
-    .max(TEXT_CAPTURE_PARENT_MAX_LENGTH)
-    .regex(/^[^\r\n]+$/, 'must be a single line')
-    .optional(),
+  parent: singleLineSchema(TEXT_CAPTURE_PARENT_MAX_LENGTH).optional(),
   /** When the link fired, ISO-8601 — decides the daily note it lands on. */
   capturedAt: z.iso.datetime({ offset: true }),
   /** Where the capture came from. */

@@ -25,6 +25,7 @@ import type { CaptureInboxService } from '../graph/capture-inbox-service.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { deriveStore } from '../store.ts'
 import type { PrivacyService } from '../privacy/privacy-service.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
 import type { XArchiveService } from '../embeds/x-archive-service.ts'
@@ -227,17 +228,11 @@ class CaptureSessionImpl implements CaptureSession {
   #mirrorQuickNoteParent(): void {
     const { settings, captureInbox, logger } = this.#deps
     const loop = this.#loop
-    let written: string | undefined
+    const parent = deriveStore(settings, (current) => current.quickNoteParent)
     const write = async (): Promise<void> => {
-      const parent = settings.get().quickNoteParent
-      if (parent === written) {
-        return
-      }
-      written = parent
       try {
-        await captureInbox.writeQuickNoteDefaults(parent)
+        await captureInbox.writeQuickNoteDefaults(parent.get())
       } catch (cause) {
-        written = undefined
         logger.error('quick note defaults mirror failed:', errorMessage(cause))
       }
     }
@@ -247,7 +242,7 @@ class CaptureSessionImpl implements CaptureSession {
       }
       void write()
       loop.onDispose(
-        settings.subscribe(() => {
+        parent.subscribe(() => {
           void write()
         }),
       )

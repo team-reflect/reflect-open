@@ -6,7 +6,6 @@ import {
   type MarkdownBlock,
   type MarkdownBlockquote,
   type MarkdownDocument,
-  type MarkdownHeading,
   type MarkdownListItem,
   type MarkdownNode,
   type MarkdownTableCell,
@@ -419,17 +418,9 @@ export interface SectionTarget {
 const TASKS_SECTION: SectionTarget = { titles: ['Tasks'], linked: false }
 
 /**
- * Whether a heading names one of `titles`: by the text it renders as, or by
- * the target of a wiki link in it (`## [[Links|Saved links]]` is the Links
- * section).
- */
-function headingNames(heading: MarkdownHeading, titles: readonly string[]): boolean {
-  return inlineNames(heading.value, titles)
-}
-
-/**
- * Whether inline Markdown names one of `titles`: by the text it renders as,
- * or by the target of a wiki link in it.
+ * Whether a heading's or bullet's inline Markdown names one of `titles`: by
+ * the text it renders as, or by the target of a wiki link in it
+ * (`## [[Links|Saved links]]` is the Links section).
  */
 function inlineNames(value: string, titles: readonly string[]): boolean {
   const keys = titles.map((title) => foldKey(title))
@@ -444,9 +435,9 @@ function findSectionHeading(
   children: readonly MarkdownBlock[],
   section: SectionTarget,
 ): number | undefined {
-  const index = children.findIndex(
-    (block) => block.type === 'heading' && block.level <= 2 && headingNames(block, section.titles),
-  )
+  const index = children.findIndex((block) => {
+    return block.type === 'heading' && block.level <= 2 && inlineNames(block.value, section.titles)
+  })
   return index === -1 ? undefined : index
 }
 
@@ -492,36 +483,29 @@ function findSectionList(
 }
 
 /**
- * The first top-level plain bullet whose own text names `parent` (by its
- * rendered text or a wiki link target), else a new `- parent` bullet after
- * the note's last content.
+ * After the last child of the first top-level plain bullet whose own text
+ * names `parent`, joining its list. A missing parent is added as `- parent`
+ * after the note's last content.
  */
-function findOrCreateParentBullet(document: MarkdownDocument, parent: string): MarkdownListItem {
+function parentSlot(document: MarkdownDocument, parent: string): SlotTarget {
   const titles = [
     renderInlineText(parent),
     ...scanInlineWikiLinks(parent).map((link) => link.target),
   ]
-  for (const block of document.children) {
-    if (block.type !== 'listItem' || block.kind !== 'bullet') {
-      continue
-    }
-    const first = block.children[0]
-    if (first?.type === 'paragraph' && inlineNames(first.value, titles)) {
-      return block
-    }
+  let container = document.children.find((block): block is MarkdownListItem => {
+    return (
+      block.type === 'listItem' &&
+      block.kind === 'bullet' &&
+      inlineNames(getFirstParagraphMarkdown(block), titles)
+    )
+  })
+  if (container === undefined) {
+    // Always `-`: joining a folded `+` list would fold the new parent and hide the entry.
+    container = createListItem('bullet', '-', parent)
+    insertItem(document, bodyEndSlot(document), container)
   }
-  // Always `-`: joining a folded `+` list would fold the new parent and hide the entry.
-  const created = createListItem('bullet', '-', parent)
-  insertItem(document, bodyEndSlot(document), created)
-  return created
-}
-
-/** After the parent's last child item, joining its list, else as its first child. */
-function lastChildSlot(parent: MarkdownListItem): SlotTarget {
-  const last = parent.children.at(-1)
-  return last?.type === 'listItem'
-    ? { kind: 'after', anchor: last }
-    : { kind: 'end', container: parent }
+  const last = container.children.at(-1)
+  return last?.type === 'listItem' ? { kind: 'after', anchor: last } : { kind: 'end', container }
 }
 
 /** After the section's list, else right under its heading, else in a new section after the last content. */
@@ -633,7 +617,7 @@ export function appendListItem(source: string, insert: ListItemInsert): string {
     linkHeading(document, insert.section)
   }
   const slot = parent
-    ? lastChildSlot(findOrCreateParentBullet(document, parent))
+    ? parentSlot(document, parent)
     : insert.section === undefined
       ? bodyEndSlot(document)
       : sectionSlot(document, insert.section, insert.kind)

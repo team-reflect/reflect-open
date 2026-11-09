@@ -169,14 +169,18 @@ enum CaptureInbox {
   }
 
   private static func inboxUrl() throws -> URL {
-    guard
-      !groupId.isEmpty,
-      let container = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: groupId)
-    else {
+    guard let container = containerUrl() else {
       throw CaptureInboxError.containerUnavailable
     }
     return container.appendingPathComponent(inboxDir, isDirectory: true)
+  }
+
+  /// The flavor's App Group container, or nil when it is unavailable.
+  static func containerUrl() -> URL? {
+    guard !groupId.isEmpty else {
+      return nil
+    }
+    return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupId)
   }
 
   // MARK: - field shaping
