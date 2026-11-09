@@ -25,6 +25,8 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: 'You can now choose GPT-6.1 Terra and Gemini Flash Lite Latest as your AI model.',
       platforms: ['desktop', 'ios'],
     },
+
+    // FIXME: Only show one item from all informattion below in the app. Use different text based on: whether you have keyboard and which platform you're using
     {
       title: 'Code block menu',
       body: 'Code blocks now have a menu to change the language, copy the code, or delete the block.',
