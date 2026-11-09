@@ -291,6 +291,7 @@ async function readPlist(
   return PlistSchema.parse(JSON.parse(stdout))
 }
 
+/** The entitlements the provisioning profile at `path` grants (a CMS-signed plist). */
 async function readProfileEntitlements(path: string): Promise<Record<string, unknown>> {
   const profile = await exec('security', ['cms', '-D', '-i', path], { throwOnError: true })
   return await readPlist(profile.stdout, ['-extract', 'Entitlements', 'json'])
@@ -334,6 +335,7 @@ async function assertProfileAuthorizesAppGroup(bundle: Bundle): Promise<void> {
   }
 }
 
+/** Writes `entitlements` as an XML plist for `codesign --entitlements` and returns its path. */
 async function writeEntitlements(
   name: string,
   entitlements: Record<string, unknown>,
@@ -476,6 +478,7 @@ async function expectOutput(
   }
 }
 
+/** The entitlements `path` was actually signed with, read back from its signature. */
 async function readSignedEntitlements(path: string): Promise<Record<string, unknown>> {
   const display = ['--display', '--entitlements', '-', '--xml', path]
   return await readPlist((await exec('codesign', display, { throwOnError: true })).stdout)

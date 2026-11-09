@@ -45,6 +45,7 @@ const TauriConfigSchema = z.object({
 })
 type TauriConfig = z.infer<typeof TauriConfigSchema>
 
+/** The plist at `path` (XML or binary), parsed through JSON. */
 async function readPlist(path: string): Promise<Entitlements> {
   const json = await exec('plutil', ['-convert', 'json', '-o', '-', path], { throwOnError: true })
   return EntitlementsSchema.parse(JSON.parse(json.stdout))
@@ -77,6 +78,7 @@ async function readEntitlements(path: string, tempDir: string): Promise<Entitlem
   return await readPlist(plist)
 }
 
+/** The Tauri config file `name` in `src-tauri/`, alone: no base or platform merge. */
 function readTauriConfig(name: string): TauriConfig {
   return TauriConfigSchema.parse(JSON.parse(readFileSync(join(TAURI_SRC_DIR, name), 'utf8')))
 }
