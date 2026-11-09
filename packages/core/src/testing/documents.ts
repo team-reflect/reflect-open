@@ -9,7 +9,7 @@ import {
   frontmatterPatchToYaml,
   type FrontmatterPatch,
 } from '../documents/note-session-frontmatter.ts'
-import type { NoteSession } from '../documents/note-session-types.ts'
+import type { NoteSession, NoteSessionEditor } from '../documents/note-session-types.ts'
 import { appendBlock } from '../markdown/append-section.ts'
 import { upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { createTestLoggerService } from './logger.ts'
@@ -89,6 +89,10 @@ class TestNoteSessionImpl implements TestNoteSession {
 
   editorChanged(markdown: string): void {
     this.#record('editorChanged', markdown)
+  }
+
+  attachEditor(editor: NoteSessionEditor | null): void {
+    this.#record('attachEditor', editor)
   }
 
   externalChanged(): void {

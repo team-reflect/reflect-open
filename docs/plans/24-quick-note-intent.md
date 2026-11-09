@@ -24,6 +24,18 @@ bullet list (verified against the raw markdown bytes). Remaining before
 TestFlight: the physical-device pass — Siri phrase from the lock screen
 (Face ID), Action button, dictation quality.
 
+**Code moved since this plan was written:**
+
+- `actions/capture-drain.ts` is now `packages/core/src/capture/capture-drain-service.ts`
+  (`#drainTextCapture`).
+- `markdown/append-list-item.ts` was folded into `packages/core/src/markdown/task-ast.ts`:
+  `appendListItem` works on the meowdown AST, and `appendListItemAtHeading` is gone (a
+  heading target is `appendListItem`'s `section` option).
+- `ShareExtension/CaptureInbox.swift` is now `gen/apple/Shared/Capture/CaptureInbox.swift`,
+  a synced folder compiled into the app and the share extension. Phase 2's project
+  plumbing step no longer applies: a new file in that folder needs no project change, and
+  `src-tauri/ios.project.yml` no longer exists.
+
 **Explicitly not in scope:**
 
 - A lock-screen widget / iOS 18 Control that opens an in-app capture sheet
@@ -277,6 +289,28 @@ decision) before any real Swift work is invested.
   round-trip latency with the app killed (the go/no-go signal for the
   App Intents extension fallback).
 
+## Parent bullet (issue #1695)
+
+An iOS setting, Settings > Quick notes > Add under (`quickNoteParent`), names a
+top-level bullet in the daily note. Quick notes become its last children instead of
+top-level bullets at the end of the note. Empty keeps the behavior above.
+
+- **Matching:** the first top-level plain bullet whose own text names the setting, by
+  rendered text or wiki link target, case-insensitive (`Inbox`, `[[Inbox]]`, `**inbox**`,
+  `[[Inbox|My inbox]]`). Tasks, headings, nested bullets, and partial matches do not count.
+- **Missing parent:** `- <setting>`, written as typed, is added after the note's last
+  content, always unfolded. A matched parent keeps its own marker, so a folded one stays folded.
+- **Decided at capture time.** The intent stamps the parent into the envelope's optional
+  `parent` field, and the drain passes it to `appendListItem({ parent })`. The drain never
+  reads settings, so a later setting change does not move captured notes.
+- **App Group mirror.** The intent runs while the app is closed and cannot read the
+  settings document. On mobile, the capture session writes the setting to
+  `<App Group>/quick-note.json` (`capture_quick_note_defaults_write`) after the settings
+  load and on every change. `QuickNoteDefaults.swift` reads it.
+- **Dialog:** "Saved to Inbox" when a parent is set, otherwise "Saved".
+- **Scope:** only `ios-intent` producers set `parent`. The share sheet and `reflect://`
+  deep links append at the end of the note as before.
+
 ## Resolved decisions
 
 1. **Duplicates are allowed** (Alex, 2026-08-11). The drain's same-line dedup
@@ -285,6 +319,9 @@ decision) before any real Swift work is invested.
    and that failure mode (a crash in the narrow window between the note
    write and the spool removal, duplicating one line once) is accepted.
    Revisit only if real usage surfaces a problem.
+2. **Quick notes nest under a bullet, not a heading** (issue #1695). The parent is a
+   top-level bullet, matching Reflect Classic's `list_name` option. A heading target
+   already exists as `appendListItem`'s `section` option if it is needed later.
 
 ## Open questions
 

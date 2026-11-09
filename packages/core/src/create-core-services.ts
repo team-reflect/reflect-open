@@ -1364,6 +1364,7 @@ export function composeCoreServices(
       fileChanges,
       progress,
       platform,
+      settings,
       logger,
     }),
     audioMemo,

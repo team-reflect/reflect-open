@@ -473,16 +473,21 @@ fn bundle_app_group(bundle: &objc2_foundation::NSBundle) -> Option<String> {
     (!group.is_empty()).then_some(group)
 }
 
-/// `<App Group container>/inbox`, or `None` when the container is
-/// unavailable (a build without the App Group entitlement).
+/// The App Group container, or `None` when it is unavailable (a build
+/// without the App Group entitlement).
 #[cfg(any(target_os = "ios", target_os = "macos"))]
-fn group_inbox_dir(group: &str) -> Option<PathBuf> {
+fn group_container_dir(group: &str) -> Option<PathBuf> {
     use objc2_foundation::{NSFileManager, NSString};
     let manager = NSFileManager::defaultManager();
     let group = NSString::from_str(group);
     let container = manager.containerURLForSecurityApplicationGroupIdentifier(&group)?;
-    let path = container.path()?.to_string();
-    Some(PathBuf::from(path).join(SHARED_INBOX_DIR))
+    Some(PathBuf::from(container.path()?.to_string()))
+}
+
+/// `<App Group container>/inbox`, or `None` when the container is unavailable.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+fn group_inbox_dir(group: &str) -> Option<PathBuf> {
+    Some(group_container_dir(group)?.join(SHARED_INBOX_DIR))
 }
 
 /// The shared inbox the iOS share extension writes. `None` for a build
@@ -542,6 +547,45 @@ pub async fn capture_shared_inbox_relay(app: tauri::AppHandle, generation: u64) 
         relay_shared_spools(&shared, &root)
     })
     .await
+}
+
+/// The quick note defaults inside the App Group container, read by the iOS
+/// App Intent (`QuickNoteDefaults.swift`).
+#[cfg(any(target_os = "ios", test))]
+const QUICK_NOTE_DEFAULTS_FILE: &str = "quick-note.json";
+
+/// Mirror the quick note parent into the App Group container, so the iOS App
+/// Intent reads it while the app is closed. An empty `parent` removes the
+/// file. A no-op without that container.
+#[tauri::command]
+pub async fn capture_quick_note_defaults_write(parent: String) -> AppResult<()> {
+    #[cfg(target_os = "ios")]
+    {
+        let Some(container) = bundle_app_group(&objc2_foundation::NSBundle::mainBundle())
+            .and_then(|group| group_container_dir(&group))
+        else {
+            return Ok(());
+        };
+        crate::blocking::run_blocking(move || write_quick_note_defaults(&container, &parent)).await
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        let _ = parent;
+        Ok(())
+    }
+}
+
+#[cfg(any(target_os = "ios", test))]
+fn write_quick_note_defaults(container: &Path, parent: &str) -> AppResult<()> {
+    let path = container.join(QUICK_NOTE_DEFAULTS_FILE);
+    if parent.is_empty() {
+        return match fs::remove_file(&path) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            result => Ok(result?),
+        };
+    }
+    let json = serde_json::json!({ "version": 1, "parent": parent }).to_string();
+    atomic_write_bytes_to(&path, json.as_bytes())
 }
 
 // ---- screenshot promote ---------------------------------------------------------
@@ -953,6 +997,25 @@ mod tests {
         assert!(rejected.join("big.jpg").is_file());
         assert!(rejected.join("big.json").is_file());
         assert!(!graph.path().join(INBOX_DIR).exists());
+    }
+
+    #[test]
+    fn quick_note_defaults_write_and_clear() {
+        let container = tempfile::tempdir().unwrap();
+        let path = container.path().join(QUICK_NOTE_DEFAULTS_FILE);
+
+        write_quick_note_defaults(container.path(), "[[Inbox]]").unwrap();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            parsed,
+            serde_json::json!({ "version": 1, "parent": "[[Inbox]]" })
+        );
+
+        write_quick_note_defaults(container.path(), "").unwrap();
+        assert!(!path.exists());
+        // Clearing again finds nothing to remove.
+        write_quick_note_defaults(container.path(), "").unwrap();
     }
 
     #[test]

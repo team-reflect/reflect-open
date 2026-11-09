@@ -10,7 +10,14 @@ function createFakeWhatsNew() {
   const phase = new WritableStore<WhatsNewPhase>('shown')
   let dismissed = 0
   const whatsNew: WhatsNewService = {
-    items: [{ title: 'Chat in the All tab', body: 'Ask your notes anywhere.', platforms: ['ios'] }],
+    items: [
+      {
+        id: 'chat',
+        title: 'Chat in the All tab',
+        body: 'Ask your notes anywhere.',
+        platforms: ['ios'],
+      },
+    ],
     phase,
     override: new WritableStore(false),
     setOverride: () => {},

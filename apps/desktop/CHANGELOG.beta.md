@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.18.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.12...v0.18.0-beta.13) (2026-11-09)
+
+
+### Bug Fixes
+
+* **desktop:** stop note switches overwriting notes and exposing private notes ([#1800](https://github.com/team-reflect/reflect-open/issues/1800)) ([8266c5d](https://github.com/team-reflect/reflect-open/commit/8266c5d3cdec6361ffa495996a70a57b9a31d050))
+
+## [0.18.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.11...v0.18.0-beta.12) (2026-11-09)
+
+
+### Features
+
+* **desktop:** log uncaught errors to the log file ([#2034](https://github.com/team-reflect/reflect-open/issues/2034)) ([a363a14](https://github.com/team-reflect/reflect-open/commit/a363a1451c52a56295133ba96036f85ccd0a9967))
+* **desktop:** show only unseen What's New items ([#2041](https://github.com/team-reflect/reflect-open/issues/2041)) ([f8bdf25](https://github.com/team-reflect/reflect-open/commit/f8bdf25b9591c2a933a2d318f322542a5b45c17c))
+* **editor:** add embed menus ([#2040](https://github.com/team-reflect/reflect-open/issues/2040)) ([3fa77a7](https://github.com/team-reflect/reflect-open/commit/3fa77a7727c047ddd9b57194ada0c4eaf2cc6e75))
+* **mobile:** choose the parent bullet for quick notes ([#2043](https://github.com/team-reflect/reflect-open/issues/2043)) ([fdb122c](https://github.com/team-reflect/reflect-open/commit/fdb122cda943672741d9e3a321e2d43b4cd23e80))
+
 ## [0.18.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.10...v0.18.0-beta.11) (2026-11-06)
 
 

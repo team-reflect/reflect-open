@@ -6,7 +6,6 @@ import {
   type MarkdownBlock,
   type MarkdownBlockquote,
   type MarkdownDocument,
-  type MarkdownHeading,
   type MarkdownListItem,
   type MarkdownNode,
   type MarkdownTableCell,
@@ -419,15 +418,15 @@ export interface SectionTarget {
 const TASKS_SECTION: SectionTarget = { titles: ['Tasks'], linked: false }
 
 /**
- * Whether a heading names one of `titles`: by the text it renders as, or by
- * the target of a wiki link in it (`## [[Links|Saved links]]` is the Links
- * section).
+ * Whether a heading's or bullet's inline Markdown names one of `titles`: by
+ * the text it renders as, or by the target of a wiki link in it
+ * (`## [[Links|Saved links]]` is the Links section).
  */
-function headingNames(heading: MarkdownHeading, titles: readonly string[]): boolean {
+function inlineNames(value: string, titles: readonly string[]): boolean {
   const keys = titles.map((title) => foldKey(title))
   return (
-    keys.includes(foldKey(renderInlineText(heading.value))) ||
-    scanInlineWikiLinks(heading.value).some((link) => keys.includes(foldKey(link.target)))
+    keys.includes(foldKey(renderInlineText(value))) ||
+    scanInlineWikiLinks(value).some((link) => keys.includes(foldKey(link.target)))
   )
 }
 
@@ -436,9 +435,9 @@ function findSectionHeading(
   children: readonly MarkdownBlock[],
   section: SectionTarget,
 ): number | undefined {
-  const index = children.findIndex(
-    (block) => block.type === 'heading' && block.level <= 2 && headingNames(block, section.titles),
-  )
+  const index = children.findIndex((block) => {
+    return block.type === 'heading' && block.level <= 2 && inlineNames(block.value, section.titles)
+  })
   return index === -1 ? undefined : index
 }
 
@@ -481,6 +480,32 @@ function findSectionList(
     }
   }
   return undefined
+}
+
+/**
+ * After the last child of the first top-level plain bullet whose own text
+ * names `parent`, joining its list. A missing parent is added as `- parent`
+ * after the note's last content.
+ */
+function parentSlot(document: MarkdownDocument, parent: string): SlotTarget {
+  const titles = [
+    renderInlineText(parent),
+    ...scanInlineWikiLinks(parent).map((link) => link.target),
+  ]
+  let container = document.children.find((block): block is MarkdownListItem => {
+    return (
+      block.type === 'listItem' &&
+      block.kind === 'bullet' &&
+      inlineNames(getFirstParagraphMarkdown(block), titles)
+    )
+  })
+  if (container === undefined) {
+    // Always `-`: joining a folded `+` list would fold the new parent and hide the entry.
+    container = createListItem('bullet', '-', parent)
+    insertItem(document, bodyEndSlot(document), container)
+  }
+  const last = container.children.at(-1)
+  return last?.type === 'listItem' ? { kind: 'after', anchor: last } : { kind: 'end', container }
 }
 
 /** After the section's list, else right under its heading, else in a new section after the last content. */
@@ -549,18 +574,24 @@ function createListItem(
   return item
 }
 
-/** One list item to file: its kind, its Markdown, and the section it belongs in (the end of the note when absent). */
+/** One list item to file: its kind, its Markdown, and where it belongs (the end of the note when neither is set). */
 export interface ListItemInsert {
   readonly kind: ListItemKind
   readonly markdown: string
   readonly section?: SectionTarget | undefined
+  /**
+   * The top-level bullet the item nests under as its last child, created
+   * after the note's last content when missing. Takes precedence over `section`.
+   */
+  readonly parent?: string | undefined
 }
 
 /**
  * Append one list item to a note the way captures, meetings, and audio memos
  * file their entries: into the section's first joinable list, directly under
  * its heading when it has none, or in a new section after the note's last
- * content; without a section, after the note's last content too. Trailing
+ * content; without a section, after the note's last content too. With a
+ * parent, as the last child of that top-level bullet instead. Trailing
  * blank lines stay below the entry. The serializer decides the other blank
  * lines and keeps a list of another marker separate.
  */
@@ -581,11 +612,13 @@ export function appendListItem(source: string, insert: ListItemInsert): string {
     return appendBlock(source, `${marker} ${payload}`)
   }
   const { document, bodyOffset } = editable
-  if (insert.section?.linked) {
+  const parent = insert.parent?.trim()
+  if (!parent && insert.section?.linked) {
     linkHeading(document, insert.section)
   }
-  const slot =
-    insert.section === undefined
+  const slot = parent
+    ? parentSlot(document, parent)
+    : insert.section === undefined
       ? bodyEndSlot(document)
       : sectionSlot(document, insert.section, insert.kind)
   const marker = markerFor(insert.kind, slot)

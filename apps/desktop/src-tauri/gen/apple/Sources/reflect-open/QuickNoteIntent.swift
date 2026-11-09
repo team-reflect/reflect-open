@@ -8,7 +8,8 @@ import AppIntents
 /// through the share extension's `CaptureInbox` (compiled into this target
 /// too — the shared-source pattern). Durability, not visibility: the app
 /// relays + drains the inbox into the capture-day daily note on its next
-/// launch/foreground, so the dialog says "Saved", never "added".
+/// launch/foreground, so the dialog says "Saved", never "added". The note
+/// nests under the parent bullet set in Settings (`QuickNoteDefaults`).
 ///
 /// `openAppWhenRun = false`: when the app is not running, iOS launches it
 /// in the background to run this — but `perform()` touches only Foundation
@@ -19,7 +20,7 @@ import AppIntents
 struct QuickNoteIntent: AppIntent {
   static var title: LocalizedStringResource = "Add quick note"
   static var description = IntentDescription(
-    "Append a one-line note to today's daily note in Reflect.")
+    "Append a one-line note to today's daily note in Reflect, under the bullet set in Settings.")
   static var openAppWhenRun = false
 
   /// Apple's default is `.alwaysAllowed` (runs on a locked device), and
@@ -35,12 +36,25 @@ struct QuickNoteIntent: AppIntent {
   var text: String
 
   func perform() async throws -> some IntentResult & ProvidesDialog {
+    let parent = QuickNoteDefaults.parent()
     // `spoolText` folds whitespace to one line and returns false when
     // nothing printable remains — reprompt instead of claiming "Saved".
-    guard try CaptureInbox.spoolText(text, source: "ios-intent") else {
+    guard try CaptureInbox.spoolText(text, source: "ios-intent", parent: parent) else {
       throw $text.needsValueError("What do you want to note down?")
     }
-    return .result(dialog: "Saved")
+    return .result(dialog: Self.savedDialog(parent: parent))
+  }
+
+  /// "Saved to Inbox" when the note nests under a parent bullet, else "Saved".
+  static func savedDialog(parent: String?) -> IntentDialog {
+    guard let parent else {
+      return "Saved"
+    }
+    let label =
+      parent
+      .replacingOccurrences(of: "[[", with: "")
+      .replacingOccurrences(of: "]]", with: "")
+    return "Saved to \(label)"
   }
 }
 #endif

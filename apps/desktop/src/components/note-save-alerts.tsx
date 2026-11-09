@@ -1,25 +1,25 @@
 import type { ReactElement } from 'react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import type { AssetSaveError } from '@reflect/core'
-import type { NoteDocument } from '@/editor/use-note-document.ts'
 
 interface NoteSaveAlertsProps {
-  document: NoteDocument
+  /** The session's save error, if its last write failed. */
+  saveError: string | null
   /** A pasted image or dropped file that could not be saved. */
   assetSaveError?: AssetSaveError | null | undefined
 }
 
 /** What went wrong saving a ready document. */
 export function NoteSaveAlerts({
-  document,
+  saveError,
   assetSaveError = null,
 }: NoteSaveAlertsProps): ReactElement {
   return (
     <>
-      {document.error !== null ? (
+      {saveError !== null ? (
         <InlineAlert tone="error" className="mb-4">
-          Saving failed: {document.error}. Your edits are kept in the editor and the next successful
-          save will persist them.
+          Saving failed: {saveError}. Your edits are kept in the editor and the next successful save
+          will persist them.
         </InlineAlert>
       ) : null}
       {assetSaveError !== null ? (
