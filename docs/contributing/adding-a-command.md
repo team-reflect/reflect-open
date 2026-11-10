@@ -20,8 +20,11 @@ First check whether you need a new command. Per
 
 ## 1. The Rust command
 
-Put it in the module that owns the capability (`fs/`, `db/`, `settings.rs`,
-`recents.rs`, `secrets.rs`, `git.rs`, `capture.rs`, `embed.rs`, …) or a new one.
+Put it in the module that owns the capability (`fs/`, `db/`, `git.rs`,
+`capture.rs`, `embed.rs`, …) or a new one. The settings, recents, and secrets
+commands are methods on `Core` in `crates/core` (crate `reflect-core`, no
+Tauri); their `#[tauri::command]` functions only forward to those methods, and
+`Core::dispatch` lists each of them once.
 Commands are snake_case, return `AppResult<T>`, and serialize camelCase:
 
 ```rust
@@ -66,8 +69,8 @@ Register it in `tauri::generate_handler![...]` in
 fails at runtime with "command not found".
 
 Test the pure helper with `#[cfg(test)]`, not the command wrapper.
-`settings.rs` is the model: `settings_load`/`settings_save` wrap
-`load_from`/`save_to`, which the tests exercise with `tempfile`. Stage the
+`crates/core/src/settings.rs` is the model: `settings_load`/`settings_save`
+wrap `load_from`/`save_to`, which the tests exercise with `tempfile`. Stage the
 sidecars once before compiling the desktop crate:
 
 ```bash

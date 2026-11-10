@@ -25,6 +25,7 @@ mod editor_link_preview;
 mod error;
 mod fs;
 mod git;
+mod host;
 mod icloud;
 mod link_preview;
 mod logging;
@@ -54,6 +55,9 @@ mod watcher;
 #[path = "watcher_mobile.rs"]
 mod watcher;
 
+use std::sync::Arc;
+
+use reflect_core::{Core, CoreConfig};
 use tauri::{Emitter, Manager};
 
 /// Builds the HTTP User-Agent from the same resolved version shown in the UI.
@@ -133,6 +137,10 @@ pub fn run() {
     // UI would never appear.
     let builder = builder.setup(|app| {
         logging::init(app.handle());
+        let host = Arc::new(host::TauriHost::new(app.handle().clone()));
+        let core =
+            Core::new(CoreConfig::default(), host).map_err(|err| err.message().to_string())?;
+        app.manage(Arc::new(core));
         #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
         {
             use tauri_plugin_deep_link::DeepLinkExt;

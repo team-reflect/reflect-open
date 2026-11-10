@@ -148,7 +148,7 @@ fn emit_import_progress(app: &tauri::AppHandle, stage: &'static str, done: usize
 /// with the UI). Best-effort, log and move on.
 fn open_graph(state: &GraphState, root: &Path) -> AppResult<GraphInfo> {
     let info = activate(state, root)?;
-    if let Err(err) = crate::recents::record(root, &info.name) {
+    if let Err(err) = reflect_core::recents::record(root, &info.name) {
         tracing::warn!(?err, "failed to record recent graph");
     }
     Ok(info)
@@ -558,7 +558,7 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
         // Recents is a convenience cache (same stance as `activate`): the
         // directory is already in the trash, so a failure to persist must not
         // report the delete as failed. A stale entry fails loudly on open.
-        if let Err(err) = crate::recents::forget(&root.to_string_lossy()) {
+        if let Err(err) = reflect_core::recents::forget(&root.to_string_lossy()) {
             tracing::warn!(?err, "failed to forget deleted graph");
         }
         Ok(())
