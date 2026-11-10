@@ -161,7 +161,7 @@ jobs:
 
       - name: Build apple/ for the iOS Simulator
         working-directory: apple
-        run: xcodebuild build -scheme ReflectApple -destination 'generic/platform=iOS Simulator' -quiet
+        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
 
   lint-rust:
     needs: classify

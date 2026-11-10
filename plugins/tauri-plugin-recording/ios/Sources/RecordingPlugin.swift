@@ -1,4 +1,5 @@
 import AVFoundation
+import RecordingKit
 import Tauri
 import UIKit
 import UserNotifications
@@ -77,22 +78,6 @@ struct StopResponse: Encodable {
   let part: Int
   /// The whole session's recorded length.
   let durationMs: Double
-}
-
-struct StagedFile: Encodable {
-  let path: String
-  /// The session every sibling segment shares, parsed out of the filename.
-  let sessionStartedMs: Double
-  /// 1-based position within the session.
-  let part: Int
-  /// True on a segment the recorder finalized as its session's last.
-  let end: Bool
-  /// Modification time in epoch milliseconds.
-  let modifiedMs: Double
-}
-
-struct ListStagedResponse: Encodable {
-  let files: [StagedFile]
 }
 
 struct StartArgs: Decodable {
@@ -340,30 +325,10 @@ class RecordingPlugin: Plugin {
   @objc public func listStaged(_ invoke: Invoke) {
     DispatchQueue.main.async {
       do {
-        let directory = try self.stagingDirectory()
-        let live = self.recorder?.url.standardizedFileURL.path
-        let urls = try FileManager.default.contentsOfDirectory(
-          at: directory,
-          includingPropertiesForKeys: [.contentModificationDateKey],
-          options: [.skipsHiddenFiles]
-        )
-        let files: [StagedFile] = urls.compactMap { url in
-          let path = url.standardizedFileURL.path
-          // The in-flight segment's file is not staged output yet.
-          guard path != live else { return nil }
-          let modified =
-            (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
-            .contentModificationDate ?? Date(timeIntervalSince1970: 0)
-          return Self.stagedInfo(path: path, modifiedMs: modified.timeIntervalSince1970 * 1000)
-        }
-        // Oldest session first, and within one session the segments in order:
-        // part numbers are not fixed-width, so sorting by name would put
-        // `part-1000` before `part-999`.
-        invoke.resolve(
-          ListStagedResponse(
-            files: files.sorted {
-              ($0.sessionStartedMs, $0.part) < ($1.sessionStartedMs, $1.part)
-            }))
+        let files = try RecordingFiles.listStaged(
+          in: try self.stagingDirectory(),
+          excluding: self.recorder?.url.standardizedFileURL.path)
+        invoke.resolve(ListStagedResponse(files: files))
       } catch {
         invoke.reject("listing staged recordings failed: \(error.localizedDescription)")
       }
@@ -424,7 +389,7 @@ class RecordingPlugin: Plugin {
   private func startSegment() throws {
     let part = partIndex + 1
     let url = try stagingDirectory().appendingPathComponent(
-      Self.stagedName(sessionStartedMs: sessionStartedMs, part: part, end: false))
+      RecordingFiles.stagedName(sessionStartedMs: sessionStartedMs, part: part, end: false))
     // AAC mono 44.1 kHz — the V1 recorder's format, and the `.m4a` container
     // the transcription providers accept (`AUDIO_EXTENSION_BY_MIME`).
     let settings: [String: Any] = [
@@ -461,53 +426,12 @@ class RecordingPlugin: Plugin {
     self.lastMeteredSegmentMs = 0
   }
 
-  /// `recording-<sessionStartMs>.part-NNN[-end].m4a`. Session identity,
-  /// segment position, and the end marker all live in the name, so a crash
-  /// orphan regroups into one session from the staging directory alone.
-  private static func stagedName(sessionStartedMs: Double, part: Int, end: Bool) -> String {
-    let position = String(format: "%03d", part)
-    return "recording-\(Int(sessionStartedMs)).part-\(position)\(end ? "-end" : "").m4a"
-  }
-
-  /// Parse a staged filename back into its session identity and position. A
-  /// legacy name (`recording-<ms>.m4a`, written before segmented sessions)
-  /// reads as a one-part closed session keyed by the file's mtime, which is
-  /// the identity the webview already ingests those under: an upgrade with an
-  /// orphan pending must not re-ingest it under a second name.
-  private static func stagedInfo(path: String, modifiedMs: Double) -> StagedFile? {
-    let name = URL(fileURLWithPath: path).lastPathComponent
-    guard name.hasPrefix("recording-"), name.hasSuffix(".m4a") else { return nil }
-    let body = name.dropFirst("recording-".count).dropLast(".m4a".count)
-    let fields = body.split(separator: ".", omittingEmptySubsequences: false)
-    guard let first = fields.first, let session = Double(String(first)) else { return nil }
-    if fields.count == 1 {
-      return StagedFile(
-        path: path, sessionStartedMs: modifiedMs, part: 1, end: true, modifiedMs: modifiedMs)
-    }
-    guard fields.count == 2, fields[1].hasPrefix("part-") else { return nil }
-    let end = fields[1].hasSuffix("-end")
-    // A session has no length limit, so the position is not fixed-width:
-    // strip the prefix and the marker, then read whatever digits remain.
-    var digits = fields[1].dropFirst("part-".count)
-    if end {
-      digits = digits.dropLast("-end".count)
-    }
-    guard let part = Int(digits), part > 0 else { return nil }
-    return StagedFile(
-      path: path, sessionStartedMs: session, part: part, end: end, modifiedMs: modifiedMs)
-  }
-
-  /// Rename a finished segment to carry the session's end marker. The marker
-  /// must live in the filename, not only in the event: a crash between the
-  /// finalize and the webview's ingest would otherwise leave the session
-  /// looking open until the age fallback closes it half an hour later.
+  /// Rename a finished segment to carry the session's end marker; on failure
+  /// the segment keeps its open name.
   private func markEnded(_ path: String) -> String {
-    let url = URL(fileURLWithPath: path)
-    let ended = url.deletingLastPathComponent().appendingPathComponent(
-      Self.stagedName(sessionStartedMs: sessionStartedMs, part: partIndex, end: true))
     do {
-      try FileManager.default.moveItem(at: url, to: ended)
-      return ended.standardizedFileURL.path
+      return try RecordingFiles.markEnded(
+        path: path, sessionStartedMs: sessionStartedMs, part: partIndex)
     } catch {
       Logger.error("marking the session's final segment failed: \(error)")
       return path
@@ -517,11 +441,9 @@ class RecordingPlugin: Plugin {
   /// Delete every staged segment of the live session: a cancel must leave
   /// nothing for the orphan scan to resurrect.
   private func discardSession() throws {
-    let directory = try stagingDirectory()
-    let prefix = "recording-\(Int(sessionStartedMs))."
-    let urls = try FileManager.default.contentsOfDirectory(
-      at: directory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
-    for url in urls where url.lastPathComponent.hasPrefix(prefix) {
+    let urls = try RecordingFiles.sessionFiles(
+      in: try stagingDirectory(), sessionStartedMs: sessionStartedMs)
+    for url in urls {
       try FileManager.default.removeItem(at: url)
     }
   }
@@ -893,17 +815,9 @@ class RecordingPlugin: Plugin {
     return directory
   }
 
-  /// Resolve a caller-supplied path, refusing anything outside staging — the
-  /// webview must not be able to read or delete arbitrary sandbox files.
+  /// Resolve a caller-supplied path, refusing anything outside staging.
   private func stagedURL(for path: String) throws -> URL {
-    let directory = try stagingDirectory().standardizedFileURL
-    let url = URL(fileURLWithPath: path).standardizedFileURL
-    guard url.path.hasPrefix(directory.path + "/") else {
-      throw NSError(
-        domain: "app.reflect.recording", code: 2,
-        userInfo: [NSLocalizedDescriptionKey: "path is outside the recording staging directory"])
-    }
-    return url
+    try RecordingFiles.stagedURL(for: path, in: try stagingDirectory())
   }
 }
 
