@@ -1,5 +1,5 @@
-import Foundation
 import CaptureShared
+import Foundation
 import UniformTypeIdentifiers
 
 /// What one share-sheet invocation extracted, ready to spool.

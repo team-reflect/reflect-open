@@ -1,5 +1,5 @@
-import Foundation
 import CaptureShared
+import Foundation
 
 #if canImport(AppIntents)
 import AppIntents
