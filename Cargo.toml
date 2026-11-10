@@ -9,6 +9,7 @@ members = [
   "apps/desktop/src-tauri",
   "apps/native-host",
   "crates/core",
+  "crates/ffi",
   "crates/graph-io",
   "crates/git",
   "crates/graph-paths",
