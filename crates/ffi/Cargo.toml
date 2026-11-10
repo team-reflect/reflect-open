@@ -16,3 +16,7 @@ reflect-core = { workspace = true }
 reflect-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+reflect-graph-io = { workspace = true }
+tempfile = { workspace = true }

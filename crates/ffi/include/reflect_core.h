@@ -86,6 +86,26 @@ void reflect_core_dispatch(const ReflectCore *core,
                            ReflectReplyFn reply,
                            void *reply_ctx);
 
+// Resolves the file that `reflect-asset://localhost/<generation>/<path>`
+// names, with the checks the desktop scheme handler makes. `path` is the
+// percent-decoded graph-relative path. With `raster_only`, only PNG, JPEG,
+// GIF and WebP content is served. It returns a JSON string for
+// `reflect_core_string_free`: `{"path":...,"mime":...}` with the absolute
+// file path and the `Content-Type` to serve, or
+// `{"kind":...,"message":...,"status":...}` with the HTTP status the desktop
+// handler answers with. It reads the first bytes of the file to sniff the
+// MIME type, so it can block while iCloud downloads the file: do not call it
+// on the main thread.
+//
+// # Safety
+//
+// `core` comes from `reflect_core_new` and is not freed. `path` is NULL or a
+// NUL-terminated string.
+char *reflect_core_asset_resolve(const ReflectCore *core,
+                                 uint64_t generation,
+                                 const char *path,
+                                 bool raster_only);
+
 // Runs a task that `on_main` received. NULL does nothing.
 //
 // # Safety
