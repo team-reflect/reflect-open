@@ -29,6 +29,7 @@ import { createBrowserDialogService } from '@/services/browser-dialog.ts'
 import { createBrowserOpenerTransport } from '@/services/browser-opener.ts'
 import { createBrowserImageCodec } from '@/services/browser-image-codec.ts'
 import { createDomLifecycleAdapter } from '@/services/dom-lifecycle.ts'
+import type { HostKind } from '@/services/detect-platform.ts'
 import { createTauriDeepLinkSource } from '@/services/tauri-deep-link.ts'
 import { createTauriDialogService } from '@/services/tauri-dialog.ts'
 import { createTauriNativeMenuHost } from '@/services/native-menu.ts'
@@ -51,12 +52,13 @@ export interface DesktopPrimitives {
 }
 
 /**
- * The desktop app's core adapters for `facts.hostKind`: the Tauri ones in the
+ * The desktop app's core adapters for `hostKind`: the Tauri ones in the
  * Tauri shell, the Swift ones in the Swift shell, the browser ones in
  * plain-browser dev. `role` is this webview's window role.
  */
 export function createDesktopAdapters(
   facts: PlatformFacts,
+  hostKind: HostKind,
   { ipc, logger, clock }: DesktopPrimitives,
   role: GraphRole,
 ): Omit<CoreAdapters, 'ipc' | 'activity' | 'progress' | 'role' | 'createGraphServices'> {
@@ -70,7 +72,7 @@ export function createDesktopAdapters(
     },
     imageCodec: createBrowserImageCodec(),
   }
-  switch (facts.hostKind) {
+  switch (hostKind) {
     case 'tauri':
       return {
         ...common,
@@ -104,11 +106,12 @@ export function createDesktopAdapters(
  */
 export function createDesktopHost(
   facts: PlatformFacts,
+  hostKind: HostKind,
   { ipc, clock, logger }: DesktopPrimitives,
 ): AppHost {
   const lifecycle = createLifecycleService({ ipc, dom: createDomLifecycleAdapter(), clock, logger })
   const windowHost =
-    facts.hostKind === 'tauri'
+    hostKind === 'tauri'
       ? createTauriWindowHost({ multiWindow: !isMobilePlatform(facts.appPlatform), logger })
       : createSingleWindowHost()
   const common = {
@@ -124,7 +127,7 @@ export function createDesktopHost(
     sdk: sentryExceptionTelemetrySdk,
     logger,
   })
-  switch (facts.hostKind) {
+  switch (hostKind) {
     case 'tauri':
       return {
         ...common,

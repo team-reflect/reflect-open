@@ -12,12 +12,6 @@ export function isMobilePlatform(platform: AppPlatform): boolean {
 export type BuildPlatform = 'darwin' | 'windows' | 'linux' | 'ios' | 'android'
 
 /**
- * The shell that hosts the webview: Tauri, the Swift iOS shell, or a plain
- * browser in dev.
- */
-export type HostKind = 'tauri' | 'swift' | 'browser'
-
-/**
  * How the running surface differs from stock desktop.
  */
 export interface PlatformSurface {
@@ -43,10 +37,6 @@ export interface PlatformFacts {
    * A real native shell (plugins, OS windows) exists; false in browser dev.
    */
   readonly isNativeShell: boolean
-  /**
-   * The shell that hosts the webview.
-   */
-  readonly hostKind: HostKind
   /**
    * The Tauri build target; null outside a Tauri build.
    */

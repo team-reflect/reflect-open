@@ -1,7 +1,7 @@
 import { detectPlatformFacts } from '@/services/detect-platform.ts'
 
 /** Event modifier fields for the platform's `Mod` key: ⌘ on Apple, Ctrl elsewhere. */
-export const MOD_KEY: { metaKey: boolean; ctrlKey: boolean } = detectPlatformFacts('browser')
+export const MOD_KEY: { metaKey: boolean; ctrlKey: boolean } = detectPlatformFacts(false)
   .isApplePlatform
   ? { metaKey: true, ctrlKey: false }
   : { metaKey: false, ctrlKey: true }

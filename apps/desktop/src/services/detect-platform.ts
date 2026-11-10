@@ -1,4 +1,4 @@
-import type { AppPlatform, BuildPlatform, HostKind, PlatformFacts } from '@reflect/core'
+import type { AppPlatform, BuildPlatform, PlatformFacts } from '@reflect/core'
 import type { ReflectHost } from '@/services/swift-host/host-events.ts'
 import { version } from '../../package.json' with { type: 'json' }
 
@@ -53,6 +53,12 @@ function devPlatformOverride(env: string): AppPlatform | null {
 }
 
 /**
+ * The shell that hosts the webview: Tauri, the Swift iOS shell, or a plain
+ * browser in dev.
+ */
+export type HostKind = 'tauri' | 'swift' | 'browser'
+
+/**
  * The globals that tell the shells apart: Tauri sets `isTauri`, the Swift
  * shell injects `__reflectHost`.
  */
@@ -76,13 +82,13 @@ export function detectHostKind(globals: HostGlobals): HostKind {
 
 /**
  * Detect the host's platform facts from the user agent and the build env.
+ * `nativeShell` is true when Tauri or the Swift shell hosts the webview.
  *
  * The surface facets follow `appPlatform`, which is also what selects the
  * mobile root (`@platform-root` in `vite.config.ts`, `platform-root.unknown.tsx`
  * in plain-browser dev): the mobile tree and the mobile surface cannot disagree.
  */
-export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
-  const nativeShell = hostKind !== 'browser'
+export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
   const env = import.meta.env.TAURI_ENV_PLATFORM || ''
   const hasNavigator = typeof navigator !== 'undefined'
   // iPadOS masquerades as macOS in the user agent; the touch-point check excludes it.
@@ -98,7 +104,6 @@ export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
   return {
     appPlatform,
     isNativeShell: nativeShell,
-    hostKind,
     buildPlatform: buildPlatformFromEnv(env),
     isMacosDesktop: macosDesktop,
     isApplePlatform:

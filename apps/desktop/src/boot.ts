@@ -16,7 +16,8 @@ import {
   type LoggerService,
 } from '@reflect/core'
 
-const facts = detectPlatformFacts(detectHostKind(window))
+const hostKind = detectHostKind(window)
+const facts = detectPlatformFacts(hostKind !== 'browser')
 
 /**
  * Plain-browser dev (`pnpm dev` without the shell) has no transport yet: the
@@ -24,14 +25,14 @@ const facts = detectPlatformFacts(detectHostKind(window))
  * `null` inside a native shell. Features that need the real shell rather
  * than an answering transport gate on `isNativeShell()`.
  */
-export const pendingDevIpc = facts.hostKind === 'browser' ? createDeferredIpcTransport() : null
+export const pendingDevIpc = hostKind === 'browser' ? createDeferredIpcTransport() : null
 
 const transport =
   pendingDevIpc?.transport ??
-  (facts.hostKind === 'swift' ? createSwiftIpcTransport(fetch) : createTauriIpcTransport())
+  (hostKind === 'swift' ? createSwiftIpcTransport(fetch) : createTauriIpcTransport())
 
 function createLogger(): LoggerService {
-  switch (facts.hostKind) {
+  switch (hostKind) {
     case 'tauri':
       return createTauriLogger(createConsoleLogger())
     case 'swift':
@@ -45,10 +46,10 @@ const logger = createLogger()
 const clock = createSystemClock()
 const ipc = createIpcBridgeService({ transport, logger })
 
-const host = createDesktopHost(facts, { ipc, clock, logger })
+const host = createDesktopHost(facts, hostKind, { ipc, clock, logger })
 const role = host.window.isMainWindow() ? 'main' : 'note-window'
 
-const adapters = createDesktopAdapters(facts, { ipc, logger, clock }, role)
+const adapters = createDesktopAdapters(facts, hostKind, { ipc, logger, clock }, role)
 
 /**
  * The app-scoped services of this webview.

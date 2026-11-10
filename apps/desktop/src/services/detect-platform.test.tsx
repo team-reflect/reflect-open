@@ -20,21 +20,21 @@ function setQuery(query: string): void {
 describe('detectPlatformFacts', () => {
   it.each(['darwin', 'windows', 'linux'])('is the desktop surface in a %s build', (env) => {
     vi.stubEnv('TAURI_ENV_PLATFORM', env)
-    const facts = detectPlatformFacts('tauri')
+    const facts = detectPlatformFacts(true)
     expect(facts.appPlatform).toBe('desktop')
     expect(facts.surface).toEqual(DESKTOP_SURFACE)
   })
 
   it.each(['ios', 'android'] as const)('is the mobile surface in an %s build', (env) => {
     vi.stubEnv('TAURI_ENV_PLATFORM', env)
-    const facts = detectPlatformFacts('tauri')
+    const facts = detectPlatformFacts(true)
     expect(facts.appPlatform).toBe(env)
     expect(facts.surface).toEqual(MOBILE_SURFACE)
   })
 
   it('is the desktop surface in plain-browser dev', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', '')
-    const facts = detectPlatformFacts('browser')
+    const facts = detectPlatformFacts(false)
     expect(facts.appPlatform).toBe('desktop')
     expect(facts.surface).toEqual(DESKTOP_SURFACE)
   })
@@ -44,7 +44,7 @@ describe('detectPlatformFacts', () => {
     (platform) => {
       vi.stubEnv('TAURI_ENV_PLATFORM', '')
       setQuery(`?platform=${platform}`)
-      const facts = detectPlatformFacts('browser')
+      const facts = detectPlatformFacts(false)
       expect(facts.appPlatform).toBe(platform)
       expect(facts.surface).toEqual(MOBILE_SURFACE)
     },
@@ -53,20 +53,20 @@ describe('detectPlatformFacts', () => {
   it('follows the `?platform=desktop` override in plain-browser dev', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', '')
     setQuery('?platform=desktop')
-    expect(detectPlatformFacts('browser').surface).toEqual(DESKTOP_SURFACE)
+    expect(detectPlatformFacts(false).surface).toEqual(DESKTOP_SURFACE)
   })
 
   it('ignores the override in a build with a Tauri target', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', 'darwin')
     setQuery('?platform=ios')
-    const facts = detectPlatformFacts('tauri')
+    const facts = detectPlatformFacts(true)
     expect(facts.appPlatform).toBe('desktop')
     expect(facts.surface).toEqual(DESKTOP_SURFACE)
   })
 
   it('gives the platform its mobile surface at boot, so the mobile root sets nothing', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', 'ios')
-    expect(detectPlatformFacts('tauri').surface).toEqual(MOBILE_SURFACE)
+    expect(detectPlatformFacts(true).surface).toEqual(MOBILE_SURFACE)
   })
 })
 
