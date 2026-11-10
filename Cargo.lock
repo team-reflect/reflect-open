@@ -4742,7 +4742,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
- "trash",
  "walkdir",
 ]
 
