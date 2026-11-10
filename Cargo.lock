@@ -4637,9 +4637,11 @@ name = "reflect-ffi"
 version = "0.0.0"
 dependencies = [
  "reflect-core",
+ "reflect-graph-io",
  "reflect-types",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
