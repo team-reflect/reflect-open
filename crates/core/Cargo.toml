@@ -14,6 +14,7 @@ reflect-graph-paths = { workspace = true }
 tracing = { workspace = true }
 dirs = { workspace = true }
 keyring-core = { workspace = true }
+reflect-git = { workspace = true }
 reflect-graph-io = { workspace = true }
 reflect-index = { workspace = true }
 reflect-types = { workspace = true }
