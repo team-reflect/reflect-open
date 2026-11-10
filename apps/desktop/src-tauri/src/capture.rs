@@ -31,11 +31,13 @@ const HOST_BINARY: &str = "reflect-capture-host";
 
 /// Extension IDs allowed to launch the host. The first is the dev/unpacked ID,
 /// pinned by the `key` field in `apps/extension/wxt.config.ts`; the second is
-/// the published Chrome Web Store listing.
+/// the published Chrome Web Store listing; the third is the Markway web
+/// highlighter (https://markway.io), which sends the same capture envelope.
 #[cfg(any(target_os = "macos", test))]
-const EXTENSION_ORIGINS: [&str; 2] = [
+const EXTENSION_ORIGINS: [&str; 3] = [
     "chrome-extension://dlbliojklpickgimjdmjjdnbjdiomjik/",
     "chrome-extension://ccabifmooehighoonjeiololjfofkhkd/",
+    "chrome-extension://hponfflfgcjikmehlcdcnpapicnljkkc/",
 ];
 
 /// Graph-relative spool directory the host writes and the drain reads.
@@ -750,7 +752,8 @@ mod tests {
             parsed["allowed_origins"],
             serde_json::json!([
                 "chrome-extension://dlbliojklpickgimjdmjjdnbjdiomjik/",
-                "chrome-extension://ccabifmooehighoonjeiololjfofkhkd/"
+                "chrome-extension://ccabifmooehighoonjeiololjfofkhkd/",
+                "chrome-extension://hponfflfgcjikmehlcdcnpapicnljkkc/"
             ])
         );
     }
