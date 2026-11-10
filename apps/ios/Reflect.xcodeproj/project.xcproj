@@ -20,6 +20,7 @@
   "files": [
     { "kind": "folder", "path": "Sources", "target-membership": [ "Reflect" ] },
     { "kind": "folder", "path": "Resources", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "Tests", "target-membership": [ "ReflectTests" ] },
     { "kind": "folder", "path": "Config" },
     { "kind": "folder", "path": "scripts" },
     { "path": "Web", "type": "folder", "target-membership": [ "Reflect/resources" ] },
@@ -42,6 +43,7 @@
       "name": "Products",
       "children": [
         { "path": "<PRODUCTS>/Reflect.app", "id": "3736B32D1D954CBA3FFAC312", "index": false },
+        { "path": "<PRODUCTS>/ReflectTests.xctest", "id": "8E41C0A2B7D94F15A3C6E9D1", "type": "wrapper.cfbundle", "index": false },
       ],
     },
   ],
@@ -64,6 +66,25 @@
           "shell": "/bin/sh",
           "script": "\"${SRCROOT:?}/scripts/xcode-build-core.sh\"",
         },
+        "compile-sources",
+        "resources",
+        "frameworks",
+      ],
+    }, {
+      "name": "ReflectTests",
+      "id": "C2F7A91E5B3D48A6B0E4D8F3",
+      "product": "Products/ReflectTests.xctest",
+      "product-type": "bundle.unit-test",
+      "test-host-target": "Reflect",
+      "specialized-configurations": [
+        { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "Tests.xcconfig" } },
+        { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "Tests.xcconfig" } },
+        { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "Tests.xcconfig" } },
+      ],
+      "dependencies": [
+        "Reflect",
+      ],
+      "build-phases": [
         "compile-sources",
         "resources",
         "frameworks",
