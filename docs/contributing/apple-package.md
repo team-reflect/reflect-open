@@ -9,7 +9,6 @@ in the plugins; App Intents stay in the Xcode targets.
 | `ReflectCapture` | shared | App target, `ShareExtension` |
 | `RecordingShared` | shared | `RecordingWidget`, `RecordingKit` |
 | `RecordingKit` | engine | `tauri-plugin-recording` |
-| `AppStoreKit` | engine | `tauri-plugin-app-store` |
 
 ```bash
 swift build --package-path apple
