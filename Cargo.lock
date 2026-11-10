@@ -4605,6 +4605,7 @@ dependencies = [
  "objc2",
  "objc2-foundation",
  "objc2-ui-kit",
+ "reflect-git",
  "reflect-graph-io",
  "reflect-index",
  "reflect-types",
@@ -4612,6 +4613,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tracing",
  "windows-native-keyring-store",
 ]
 
