@@ -128,7 +128,6 @@ fn launcher(url: &str) -> Result<Command, CliError> {
     Ok(command)
 }
 
-/// Platforms without a URL opener command, such as iOS.
 #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 fn launcher(url: &str) -> Result<Command, CliError> {
     Err(CliError::Runtime(format!(

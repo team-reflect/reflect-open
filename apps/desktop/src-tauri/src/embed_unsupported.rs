@@ -9,9 +9,6 @@ use crate::error::{AppError, AppResult};
 
 /// Empty stand-in for the runtime state, so `lib.rs` manages the same type
 /// name on every platform.
-///
-/// Braced instead of a unit struct, so `EmbedState::default()` in `lib.rs`
-/// passes `clippy::default_constructed_unit_structs`.
 #[derive(Default)]
 pub struct EmbedState {}
 
