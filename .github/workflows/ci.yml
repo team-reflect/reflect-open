@@ -246,7 +246,17 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [classify, lint-node, test-node, test-chromium, test-swift, lint-rust, test-rust, check-rust-ios]
+    needs:
+      [
+        classify,
+        lint-node,
+        test-node,
+        test-chromium,
+        test-swift,
+        lint-rust,
+        test-rust,
+        check-rust-ios,
+      ]
 
     steps:
       # A PR in the middle of a stack skips its jobs on purpose: the top PR of
