@@ -51,13 +51,17 @@ function log(message: string): void {
 /** Installs the pinned cbindgen into target/apple/tools and returns its path. */
 async function installCbindgen(): Promise<string> {
   const binary = join(TOOLS_DIR, 'bin', 'cbindgen')
-  if (!existsSync(binary)) {
-    await exec(
-      'cargo',
-      ['install', 'cbindgen', '--version', CBINDGEN_VERSION, '--locked', '--root', TOOLS_DIR],
-      INHERIT,
-    )
+  if (existsSync(binary)) {
+    const { stdout } = await exec(binary, ['--version'], { throwOnError: true })
+    if (stdout.trim() === `cbindgen ${CBINDGEN_VERSION}`) {
+      return binary
+    }
   }
+  await exec(
+    'cargo',
+    ['install', 'cbindgen', '--version', CBINDGEN_VERSION, '--locked', '--root', TOOLS_DIR],
+    INHERIT,
+  )
   return binary
 }
 
