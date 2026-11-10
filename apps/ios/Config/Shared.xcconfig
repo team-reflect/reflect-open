@@ -1,0 +1,30 @@
+// Project-level settings shared by every configuration. The project file holds
+// no build settings: they all live in Config/*.xcconfig.
+
+SDKROOT = iphoneos
+// Separate header maps; the traditional style is deprecated and warns on every build.
+ALWAYS_SEARCH_USER_PATHS = NO
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+// iPhone and iPad.
+TARGETED_DEVICE_FAMILY = 1,2
+// The app's minimum iOS. scripts/build-ffi.ts builds the Rust core for the same version.
+IPHONEOS_DEPLOYMENT_TARGET = 16.0
+
+// Swift 5 language mode, like the apple/ package. Shell types are marked
+// @MainActor one by one; there is no target-wide default actor isolation.
+// Complete checking reports concurrency issues as warnings.
+SWIFT_VERSION = 5.0
+SWIFT_STRICT_CONCURRENCY = complete
+
+// Automatic signing with the Reflect team. No provisioning profiles are committed.
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM = 789ULN5MZB
+
+// Release scripts pass REFLECT_MARKETING_VERSION and REFLECT_BUILD_NUMBER on
+// the xcodebuild command line or in the environment. Local builds use the defaults.
+MARKETING_VERSION = $(REFLECT_MARKETING_VERSION:default=0.0.0)
+CURRENT_PROJECT_VERSION = $(REFLECT_BUILD_NUMBER:default=1)
+
+// The Rust core has arm64 slices only. The generic simulator destination also
+// asks for x86_64, which would fail to link.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = x86_64

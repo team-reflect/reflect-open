@@ -1,0 +1,8 @@
+// Release build behaviour (the values of Xcode's Release template).
+
+// A dSYM lets Sentry symbolicate crashes.
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ENABLE_NS_ASSERTIONS = NO
+SWIFT_OPTIMIZATION_LEVEL = -O
+SWIFT_COMPILATION_MODE = wholemodule
+VALIDATE_PRODUCT = YES
