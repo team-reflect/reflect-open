@@ -2,7 +2,7 @@ import Foundation
 import WebKit
 
 /// Handles the `reflect-app` scheme, the origin of the web app. It serves the
-/// static files of `WebBundle`.
+/// static files of `WebBundle` and sends `__http` requests through `HTTPProxy`.
 @MainActor
 final class AppSchemeHandler: NSObject, WKURLSchemeHandler {
   static let scheme = "reflect-app"
@@ -10,8 +10,13 @@ final class AppSchemeHandler: NSObject, WKURLSchemeHandler {
 
   /// The tasks that WebKit started and did not stop yet. A reply goes only to a live task.
   private var liveTasks: Set<ObjectIdentifier> = []
+  private let httpProxy = HTTPProxy()
 
   func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
+    if urlSchemeTask.request.url?.path == HTTPProxy.path {
+      httpProxy.start(urlSchemeTask)
+      return
+    }
     let id = ObjectIdentifier(urlSchemeTask)
     liveTasks.insert(id)
     let path = urlSchemeTask.request.url?.path ?? "/"
@@ -24,6 +29,7 @@ final class AppSchemeHandler: NSObject, WKURLSchemeHandler {
 
   func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
     liveTasks.remove(ObjectIdentifier(urlSchemeTask))
+    httpProxy.stop(urlSchemeTask)
   }
 
   private func send(_ reply: SchemeReply, to urlSchemeTask: any WKURLSchemeTask) {
