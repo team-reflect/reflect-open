@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
  * Drift guard for the pinned extension identity. The manifest `key` in
  * `wxt.config.ts` determines the extension ID everywhere (unpacked dev, CI,
  * but not the Chrome Web Store), and the desktop app's native-messaging manifests
- * (`apps/desktop/src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`) must
+ * (`crates/core/src/capture.rs`, `EXTENSION_ORIGINS`) must
  * allowlist that ID for development alongside the published store ID. They
  * are coupled only by convention, so this test recomputes the derivation
  * (SHA-256 of the DER key, first 16 bytes, hex mapped onto a-p) and pins the
@@ -29,7 +29,7 @@ describe('pinned extension identity', () => {
     const keyMatch = /const PUBLIC_KEY =\s*'([A-Za-z0-9+/=]+)'/.exec(wxtConfig)
     expect(keyMatch, 'PUBLIC_KEY not found in wxt.config.ts').not.toBeNull()
 
-    const captureRs = readFileSync(resolve(here, '../desktop/src-tauri/src/capture.rs'), 'utf8')
+    const captureRs = readFileSync(resolve(here, '../../crates/core/src/capture.rs'), 'utf8')
     const originMatches = [...captureRs.matchAll(/chrome-extension:\/\/([a-p]{32})\//g)].map(
       (match) => match[1],
     )
