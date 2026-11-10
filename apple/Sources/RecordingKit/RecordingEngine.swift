@@ -1,102 +1,102 @@
+#if os(iOS)
 import AVFoundation
-import RecordingKit
+public import Foundation
 import RecordingShared
-import Tauri
 import UIKit
 import UserNotifications
-import WebKit
 
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
 
 /// The payload of the plugin's ~10 Hz `recordingLevel` event.
-struct RecordingLevel: Encodable {
+public struct RecordingLevel: Encodable {
   /// Linear input level 0…1, from the recorder's average power meter.
-  let level: Float
+  public let level: Float
   /// Recorded time so far in milliseconds (pauses excluded).
-  let elapsedMs: Double
+  public let elapsedMs: Double
 }
 
 /// The payload of the `recordingSegment` event: a finished segment of a
 /// session that is still recording. The final segment never arrives here (a
 /// webview stop resolves its own invoke, a native stop fires
 /// `recordingStopped`), so every segment is announced exactly once.
-struct RecordingSegment: Encodable {
+public struct RecordingSegment: Encodable {
   /// Absolute path of the staged `.m4a`.
-  let path: String
+  public let path: String
   /// The session's identity timestamp in epoch ms, shared by every segment.
-  let sessionStartedMs: Double
+  public let sessionStartedMs: Double
   /// 1-based position within the session.
-  let part: Int
+  public let part: Int
 }
 
 /// The payload of the `recordingStopped` event — a stop the *native* side
 /// initiated (interruption, route change, a remote stop, or an encoder
 /// error). A stop the webview asked for resolves its own invoke instead and
 /// never fires this event.
-struct RecordingStopped: Encodable {
+public struct RecordingStopped: Encodable {
   /// Absolute path of the staged `.m4a`, already `-end`-marked.
-  let path: String
+  public let path: String
   /// The session's identity timestamp in epoch ms, shared by every segment.
-  let sessionStartedMs: Double
+  public let sessionStartedMs: Double
   /// 1-based position of this final segment.
-  let part: Int
+  public let part: Int
   /// The whole session's recorded length, not this segment's.
-  let durationMs: Double
+  public let durationMs: Double
   /// `interruption` | `routeChange` | `remote` | `error`
-  let reason: String
+  public let reason: String
 }
 
 /// `recordingStatus`'s response — whether a native recording is live right
 /// now. A fresh webview mount uses this to find a recording that outlived
 /// its UI (a reload or crash mid-memo) and stop-and-save it.
-struct RecordingStatus: Encodable {
-  let recording: Bool
+public struct RecordingStatus: Encodable {
+  public let recording: Bool
   /// The session's recorded length so far, across every segment.
-  let elapsedMs: Double
+  public let elapsedMs: Double
 }
 
 /// The payload of the `nativeAction` event — an OS entry point (Siri, the
 /// home-screen quick action, the lock-screen widget's `reflect://` URL)
 /// asked for something only the webview can present.
-struct NativeAction: Encodable {
+public struct NativeAction: Encodable {
   /// Currently only `recordAudio`.
-  let action: String
-}
-
-struct QueueActionArgs: Decodable {
-  let action: String
+  public let action: String
 }
 
 /// `stopRecording`'s response: the session's final segment.
-struct StopResponse: Encodable {
+public struct StopResponse: Encodable {
   /// Absolute path of the staged `.m4a`, already `-end`-marked.
-  let path: String
+  public let path: String
   /// The session's identity timestamp in epoch ms, shared by every segment.
-  let sessionStartedMs: Double
+  public let sessionStartedMs: Double
   /// 1-based position of this final segment.
-  let part: Int
+  public let part: Int
   /// The whole session's recorded length.
-  let durationMs: Double
-}
-
-struct StartArgs: Decodable {
-  /// Rotate the recorder after this much audio; each segment lands as its own
-  /// complete `.m4a`, so a session has no length limit.
-  let segmentMs: Double
-  /// Remind the user this often while the session runs.
-  let reminderMs: Double
+  public let durationMs: Double
 }
 
 /// `startRecording`'s response: the identity the webview files this session's
 /// segments under.
-struct StartResponse: Encodable {
-  let sessionStartedMs: Double
+public struct StartResponse: Encodable {
+  public let sessionStartedMs: Double
 }
 
-struct StagedPathArgs: Decodable {
-  let path: String
+/// An event for the host to forward to the webview.
+public enum RecordingEvent {
+  /// `recordingLevel`, ~10 Hz while recording in the foreground.
+  case level(RecordingLevel)
+  /// `recordingSegment`, a finished segment of a session still recording.
+  case segment(RecordingSegment)
+  /// `recordingStopped`, a stop the native side initiated.
+  case stopped(RecordingStopped)
+  /// `nativeAction`, an OS entry point's request for the webview.
+  case nativeAction(NativeAction)
+}
+
+/// A failed command; `message` is what the host rejects the call with.
+public struct RecordingError: Error {
+  public let message: String
 }
 
 /// Reflect's native audio-memo recorder (the mobile leg of the raw-first
@@ -114,9 +114,10 @@ struct StagedPathArgs: Decodable {
 /// a launch-time orphan scan for recordings whose stop it never saw — and
 /// only then deletes them, so a crash anywhere in the chain loses nothing.
 ///
-/// All state is confined to the main queue: invokes hop onto it, the meter
-/// timer runs on it, and AVFoundation notifications are delivered to it.
-class RecordingPlugin: Plugin {
+/// All state is confined to the main queue: the host calls every method on
+/// it, the meter timer runs on it, and AVFoundation notifications are
+/// delivered to it. Completions run on it too.
+public final class RecordingEngine: NSObject {
 
   /// Why the native side is finalizing the file. `nil` while recording and
   /// for webview-initiated stops (which resolve their invoke instead).
@@ -174,10 +175,10 @@ class RecordingPlugin: Plugin {
   /// for stops that never pass through `finalize` (a rotation boundary firing
   /// the delegate directly), where `currentTime` already reads 0.
   private var lastMeteredSegmentMs: Double = 0
-  /// The webview's `stopRecording` invoke, resolved when the file finalizes.
-  private var pendingStop: Invoke?
-  /// The webview's `cancelRecording` invoke — finalize, then delete.
-  private var pendingCancel: Invoke?
+  /// The webview's `stopRecording` call, settled when the file finalizes.
+  private var pendingStop: ((Result<StopResponse, RecordingError>) -> Void)?
+  /// The webview's `cancelRecording` call — finalize, then delete.
+  private var pendingCancel: ((Result<Void, RecordingError>) -> Void)?
   private var nativeStopReason: NativeStopReason?
   /// Bumped by cancel so a permission grant arriving later starts nothing.
   private var startSession = 0
@@ -190,8 +191,23 @@ class RecordingPlugin: Plugin {
   /// The live recording's Live Activity (`Activity<RecordingActivityAttributes>`,
   /// type-erased: stored properties can't be availability-restricted).
   private var liveActivity: Any?
+  /// The staging directory the recorder writes into.
+  private let stagingDirectory: () throws -> URL
 
-  @objc public override func load(webview: WKWebView) {
+  /// Receives every event; set before `activate()`.
+  public var onEvent: ((RecordingEvent) -> Void)?
+  /// Receives error log lines.
+  public var log: ((String) -> Void)?
+
+  /// `stagingDirectory` returns the directory to record into, creating it.
+  public init(stagingDirectory: @escaping () throws -> URL) {
+    self.stagingDirectory = stagingDirectory
+  }
+
+  /// Start observing the audio session, app lifecycle, and OS entry points,
+  /// and clear what a previous process left behind. Call once, when the host
+  /// loads.
+  public func activate() {
     let center = NotificationCenter.default
     center.addObserver(
       self,
@@ -244,110 +260,96 @@ class RecordingPlugin: Plugin {
 
   // MARK: - Commands
 
-  @objc public func startRecording(_ invoke: Invoke) throws {
-    let args = try invoke.parseArgs(StartArgs.self)
-    DispatchQueue.main.async {
-      guard self.recorder == nil else {
-        invoke.reject("already recording")
-        return
-      }
-      let session = self.startSession
-      let audioSession = AVAudioSession.sharedInstance()
-      audioSession.requestRecordPermission { granted in
-        DispatchQueue.main.async {
-          guard self.startSession == session, self.recorder == nil else {
-            // Cancelled while the permission prompt was up, or a retry beat
-            // this grant — nothing to start.
-            invoke.reject("recording start was cancelled")
-            return
-          }
-          guard granted else {
-            invoke.reject("microphone access denied")
-            return
-          }
-          do {
-            try self.beginSession(segmentMs: args.segmentMs, reminderMs: args.reminderMs)
-            invoke.resolve(StartResponse(sessionStartedMs: self.sessionStartedMs))
-          } catch {
-            self.deactivateAudioSession()
-            invoke.reject("recording failed to start: \(error.localizedDescription)")
-          }
+  /// `segmentMs`: rotate the recorder after this much audio; each segment
+  /// lands as its own complete `.m4a`, so a session has no length limit.
+  /// `reminderMs`: remind the user this often while the session runs.
+  public func start(
+    segmentMs: Double, reminderMs: Double,
+    completion: @escaping (Result<StartResponse, RecordingError>) -> Void
+  ) {
+    guard self.recorder == nil else {
+      completion(.failure(RecordingError(message: "already recording")))
+      return
+    }
+    let session = self.startSession
+    let audioSession = AVAudioSession.sharedInstance()
+    audioSession.requestRecordPermission { granted in
+      DispatchQueue.main.async {
+        guard self.startSession == session, self.recorder == nil else {
+          // Cancelled while the permission prompt was up, or a retry beat
+          // this grant — nothing to start.
+          completion(.failure(RecordingError(message: "recording start was cancelled")))
+          return
+        }
+        guard granted else {
+          completion(.failure(RecordingError(message: "microphone access denied")))
+          return
+        }
+        do {
+          try self.beginSession(segmentMs: segmentMs, reminderMs: reminderMs)
+          completion(.success(StartResponse(sessionStartedMs: self.sessionStartedMs)))
+        } catch {
+          self.deactivateAudioSession()
+          completion(
+            .failure(
+              RecordingError(
+                message: "recording failed to start: \(error.localizedDescription)")))
         }
       }
     }
   }
 
-  @objc public func stopRecording(_ invoke: Invoke) {
-    DispatchQueue.main.async {
-      guard let recorder = self.recorder else {
-        invoke.reject("no active recording")
-        return
-      }
-      guard self.pendingStop == nil, self.pendingCancel == nil else {
-        invoke.reject("a stop is already in flight")
-        return
-      }
-      self.pendingStop = invoke
-      self.finalize(recorder)
+  public func stop(completion: @escaping (Result<StopResponse, RecordingError>) -> Void) {
+    guard let recorder = self.recorder else {
+      completion(.failure(RecordingError(message: "no active recording")))
+      return
     }
+    guard self.pendingStop == nil, self.pendingCancel == nil else {
+      completion(.failure(RecordingError(message: "a stop is already in flight")))
+      return
+    }
+    self.pendingStop = completion
+    self.finalize(recorder)
   }
 
-  @objc public func cancelRecording(_ invoke: Invoke) {
-    DispatchQueue.main.async {
-      // Cancel during the permission prompt: invalidate the pending start.
-      self.startSession += 1
-      guard let recorder = self.recorder else {
-        invoke.resolve()
-        return
-      }
-      guard self.pendingStop == nil, self.pendingCancel == nil else {
-        invoke.reject("a stop is already in flight")
-        return
-      }
-      self.pendingCancel = invoke
-      self.finalize(recorder)
+  public func cancel(completion: @escaping (Result<Void, RecordingError>) -> Void) {
+    // Cancel during the permission prompt: invalidate the pending start.
+    self.startSession += 1
+    guard let recorder = self.recorder else {
+      completion(.success(()))
+      return
     }
+    guard self.pendingStop == nil, self.pendingCancel == nil else {
+      completion(.failure(RecordingError(message: "a stop is already in flight")))
+      return
+    }
+    self.pendingCancel = completion
+    self.finalize(recorder)
   }
 
   /// Whether a recording is live right now. A fresh webview mount asks this
   /// to find a recording that outlived its UI (a reload or crash mid-memo)
   /// and stop-and-save it instead of leaving a hidden hot microphone.
-  @objc public func recordingStatus(_ invoke: Invoke) {
-    DispatchQueue.main.async {
-      let recorder = self.recorder
-      invoke.resolve(
-        RecordingStatus(
-          recording: recorder != nil,
-          elapsedMs: recorder.map { self.elapsedBeforeSegmentMs + $0.currentTime * 1000 } ?? 0
-        ))
-    }
+  public func status() -> RecordingStatus {
+    let recorder = self.recorder
+    return RecordingStatus(
+      recording: recorder != nil,
+      elapsedMs: recorder.map { self.elapsedBeforeSegmentMs + $0.currentTime * 1000 } ?? 0
+    )
   }
 
-  @objc public func listStaged(_ invoke: Invoke) {
-    DispatchQueue.main.async {
-      do {
-        let files = try RecordingFiles.listStaged(
-          in: try self.stagingDirectory(),
-          excluding: self.recorder?.url.standardizedFileURL.path)
-        invoke.resolve(ListStagedResponse(files: files))
-      } catch {
-        invoke.reject("listing staged recordings failed: \(error.localizedDescription)")
-      }
-    }
+  /// The staged recordings, without the segment being recorded.
+  public func listStaged() throws -> [StagedFile] {
+    try RecordingFiles.listStaged(
+      in: try self.stagingDirectory(),
+      excluding: self.recorder?.url.standardizedFileURL.path)
   }
 
-  @objc public func deleteStaged(_ invoke: Invoke) throws {
-    let args = try invoke.parseArgs(StagedPathArgs.self)
-    DispatchQueue.main.async {
-      do {
-        let url = try self.stagedURL(for: args.path)
-        if FileManager.default.fileExists(atPath: url.path) {
-          try FileManager.default.removeItem(at: url)
-        }
-        invoke.resolve()
-      } catch {
-        invoke.reject("deleting staged recording failed: \(error.localizedDescription)")
-      }
+  /// Delete one staged recording; a missing file is not an error.
+  public func deleteStaged(path: String) throws {
+    let url = try self.stagedURL(for: path)
+    if FileManager.default.fileExists(atPath: url.path) {
+      try FileManager.default.removeItem(at: url)
     }
   }
 
@@ -434,7 +436,7 @@ class RecordingPlugin: Plugin {
       return try RecordingFiles.markEnded(
         path: path, sessionStartedMs: sessionStartedMs, part: partIndex)
     } catch {
-      Logger.error("marking the session's final segment failed: \(error)")
+      self.log?("marking the session's final segment failed: \(error)")
       return path
     }
   }
@@ -460,13 +462,8 @@ class RecordingPlugin: Plugin {
   }
 
   private func emitSegment(path: String, part: Int) {
-    do {
-      try trigger(
-        "recordingSegment",
-        data: RecordingSegment(path: path, sessionStartedMs: sessionStartedMs, part: part))
-    } catch {
-      Logger.error("recordingSegment event failed to serialize: \(error)")
-    }
+    onEvent?(
+      .segment(RecordingSegment(path: path, sessionStartedMs: sessionStartedMs, part: part)))
   }
 
   /// Capture the duration and ask the recorder to finalize the file; the
@@ -504,7 +501,7 @@ class RecordingPlugin: Plugin {
         // close the session on the segment that just landed, rather than
         // leave the audio session, the meter timer, the idle-timer hold, the
         // Live Activity, and the reminder running behind a dead recorder.
-        Logger.error("rotating to the next segment failed: \(error)")
+        self.log?("rotating to the next segment failed: \(error)")
         nativeStopReason = .error
       }
     }
@@ -527,9 +524,12 @@ class RecordingPlugin: Plugin {
       // so the caller can surface it rather than silently keeping the audio.
       do {
         try discardSession()
-        cancel.resolve()
+        cancel(.success(()))
       } catch {
-        cancel.reject("discarding the recording failed: \(error.localizedDescription)")
+        cancel(
+          .failure(
+            RecordingError(
+              message: "discarding the recording failed: \(error.localizedDescription)")))
       }
       resetSession()
       return
@@ -539,12 +539,13 @@ class RecordingPlugin: Plugin {
       // A failed finalization produced no usable file — reject rather than
       // hand back a StopResponse pointing at a corrupt/absent recording.
       if !successfully {
-        stop.reject("the recording failed to finalize")
+        stop(.failure(RecordingError(message: "the recording failed to finalize")))
       } else {
-        stop.resolve(
-          StopResponse(
-            path: markEnded(path), sessionStartedMs: sessionStartedMs, part: partIndex,
-            durationMs: sessionDurationMs))
+        stop(
+          .success(
+            StopResponse(
+              path: markEnded(path), sessionStartedMs: sessionStartedMs, part: partIndex,
+              durationMs: sessionDurationMs)))
       }
       resetSession()
       return
@@ -560,15 +561,11 @@ class RecordingPlugin: Plugin {
     // causeless finish, and it returns above), so the fallback is a formality.
     let reason = nativeStopReason ?? .error
     let finalPath = markEnded(path)
-    do {
-      try trigger(
-        "recordingStopped",
-        data: RecordingStopped(
+    onEvent?(
+      .stopped(
+        RecordingStopped(
           path: finalPath, sessionStartedMs: sessionStartedMs, part: partIndex,
-          durationMs: durationMs, reason: reason.rawValue))
-    } catch {
-      Logger.error("recordingStopped event failed to serialize: \(error)")
-    }
+          durationMs: durationMs, reason: reason.rawValue)))
     resetSession()
   }
 
@@ -581,14 +578,9 @@ class RecordingPlugin: Plugin {
     recorder.updateMeters()
     // Average power is dBFS (−160…0); linearize for the waveform.
     let level = pow(10, recorder.averagePower(forChannel: 0) / 20)
-    do {
-      try trigger(
-        "recordingLevel",
-        data: RecordingLevel(
-          level: level, elapsedMs: elapsedBeforeSegmentMs + lastMeteredSegmentMs))
-    } catch {
-      Logger.error("recordingLevel event failed to serialize: \(error)")
-    }
+    onEvent?(
+      .level(
+        RecordingLevel(level: level, elapsedMs: elapsedBeforeSegmentMs + lastMeteredSegmentMs)))
   }
 
   private func deactivateAudioSession() {
@@ -632,30 +624,20 @@ class RecordingPlugin: Plugin {
   /// The webview's action surface is mounted and listening: deliver the
   /// queued action, if any. The action stays queued until `actionPerformed`
   /// — a webview that crashes mid-delivery gets it again on the next launch.
-  @objc public func actionsReady(_ invoke: Invoke) {
-    DispatchQueue.main.async {
-      self.webviewReadyForActions = true
-      self.deliverPendingAction()
-      invoke.resolve()
-    }
+  public func actionsReady() {
+    self.webviewReadyForActions = true
+    self.deliverPendingAction()
   }
 
   /// The webview executed the delivered action — retire it from the queue.
-  @objc public func actionPerformed(_ invoke: Invoke) {
-    DispatchQueue.main.async {
-      Self.clearPendingAction()
-      invoke.resolve()
-    }
+  public func actionPerformed() {
+    Self.clearPendingAction()
   }
 
   /// Queue a native action from the Rust side (the lock-screen widget's
   /// `reflect://record-audio` URL arrives as a tao `Opened` event).
-  @objc public func queueAction(_ invoke: Invoke) throws {
-    let args = try invoke.parseArgs(QueueActionArgs.self)
-    DispatchQueue.main.async {
-      self.queueNativeAction(args.action)
-      invoke.resolve()
-    }
+  public func queueAction(_ action: String) {
+    self.queueNativeAction(action)
   }
 
   /// Persist the request, then deliver it if the webview is listening. The
@@ -679,11 +661,7 @@ class RecordingPlugin: Plugin {
       Self.clearPendingAction()
       return
     }
-    do {
-      try trigger("nativeAction", data: NativeAction(action: action))
-    } catch {
-      Logger.error("nativeAction event failed to serialize: \(error)")
-    }
+    onEvent?(.nativeAction(NativeAction(action: action)))
   }
 
   private static func clearPendingAction() {
@@ -719,7 +697,7 @@ class RecordingPlugin: Plugin {
     // running indicator.
     center.requestAuthorization(options: [.alert]) { granted, error in
       if let error {
-        Logger.error("recording reminder authorization failed: \(error)")
+        self.log?("recording reminder authorization failed: \(error)")
         return
       }
       guard granted else { return }
@@ -740,7 +718,7 @@ class RecordingPlugin: Plugin {
         )
         center.add(request) { error in
           if let error {
-            Logger.error("scheduling the recording reminder failed: \(error)")
+            self.log?("scheduling the recording reminder failed: \(error)")
           }
         }
       }
@@ -774,7 +752,7 @@ class RecordingPlugin: Plugin {
           pushType: nil
         )
       } catch {
-        Logger.error("recording Live Activity failed to start: \(error)")
+        self.log?("recording Live Activity failed to start: \(error)")
       }
     }
     #endif
@@ -808,14 +786,6 @@ class RecordingPlugin: Plugin {
 
   // MARK: - Staging directory
 
-  private func stagingDirectory() throws -> URL {
-    let base = try FileManager.default.url(
-      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let directory = base.appendingPathComponent("audio-memo-staging", isDirectory: true)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    return directory
-  }
-
   /// Resolve a caller-supplied path, refusing anything outside staging.
   private func stagedURL(for path: String) throws -> URL {
     try RecordingFiles.stagedURL(for: path, in: try stagingDirectory())
@@ -823,7 +793,7 @@ class RecordingPlugin: Plugin {
 }
 
 /// `AVAudioRecorderDelegate` requires `NSObject`; a tiny proxy keeps the
-/// plugin class free of that conformance and the callbacks on closures.
+/// engine free of that conformance and the callbacks on closures.
 private class RecorderDelegateProxy: NSObject, AVAudioRecorderDelegate {
   private let onFinish: (Bool) -> Void
   private let onEncodeError: () -> Void
@@ -841,8 +811,4 @@ private class RecorderDelegateProxy: NSObject, AVAudioRecorderDelegate {
     onEncodeError()
   }
 }
-
-@_cdecl("init_plugin_recording")
-public func initPlugin() -> Plugin {
-  return RecordingPlugin()
-}
+#endif

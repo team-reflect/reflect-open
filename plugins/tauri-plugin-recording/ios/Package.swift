@@ -4,10 +4,10 @@ import PackageDescription
 
 let package = Package(
   name: "tauri-plugin-recording",
-  // iOS only: RecordingPlugin.swift imports UIKit/AVFoundation
-  // unconditionally, and only the iOS target registers the plugin
-  // (desktop builds do not compile this crate at all; see
-  // `src/desktop.rs`). iOS 16 matches the `apple/` package it depends on.
+  // iOS only: the recording engine (`RecordingKit` in the repo's `apple/`
+  // package) uses UIKit/AVFoundation, and only the iOS target registers the
+  // plugin (desktop builds do not compile this crate at all; see
+  // `src/desktop.rs`). iOS 16 matches the `apple/` package.
   platforms: [
     .iOS(.v16)
   ],
@@ -27,7 +27,6 @@ let package = Package(
       dependencies: [
         .byName(name: "Tauri"),
         .product(name: "RecordingKit", package: "ReflectApple"),
-        .product(name: "RecordingShared", package: "ReflectApple"),
       ],
       path: "Sources")
   ]
