@@ -183,11 +183,9 @@ jobs:
         include:
           - name: Linux
             os: ubuntu-24.04
-          - name: macOS
+          - name: Apple
             os: xcode-27
-          - name: iOS
-            os: xcode-27
-            target: aarch64-apple-ios-sim
+            args: --target aarch64-apple-darwin --target aarch64-apple-ios-sim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -199,17 +197,8 @@ jobs:
       - if: runner.os == 'macOS'
         uses: ./.github/actions/setup-xcode
 
-      # Cargo reads `CARGO_BUILD_TARGET` as `--target`. Set it before
-      # setup-rust, which hashes `CARGO*` variables into its cache key.
-      - if: matrix.target
-        run: echo "CARGO_BUILD_TARGET=${{ matrix.target }}" >> "$GITHUB_ENV"
-
       - uses: ./.github/actions/setup-rust
-        with:
-          cache-key: ${{ matrix.name }}
 
-      # rustfmt and cargo-shear read every source file whatever the target, so
-      # one platform is enough.
       - name: Format check
         if: matrix.name == 'Linux'
         run: cargo fmt --all -- --check
@@ -227,7 +216,7 @@ jobs:
         run: cargo shear
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets ${{ matrix.args }}
 
   test-rust:
     needs: classify
