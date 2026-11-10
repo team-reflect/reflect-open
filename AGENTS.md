@@ -118,6 +118,8 @@ TypeScript frontend bundled by Vite, in a Rust native shell. The Rust crates for
 - `apps/extension/`: the Chrome and Safari capture extension;
   `apps/native-host/`: its Chrome native-messaging sidecar `reflect-capture-host`
   (Plan 11).
+- `apple/`: the local Swift package with iOS code shared between targets and
+  plugins ([docs/contributing/apple-package.md](docs/contributing/apple-package.md)).
 - `packages/core/`, `packages/app/`, `packages/db/`: see Services below and each
   package's README.
 - `crates/index-schema/`: the SQLite migrations shared by the desktop writer and the

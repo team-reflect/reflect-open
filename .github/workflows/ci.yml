@@ -142,6 +142,30 @@ jobs:
       - name: Test browser (shard 3/3)
         run: pnpm run test:browser --shard=3/3
 
+  test-swift:
+    needs: classify
+    if: needs.classify.outputs.stack-middle == 'false'
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-xcode
+
+      - run: swift --version
+      - run: swift format --version
+      - run: git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
+      - run: git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
+      - run: git diff --exit-code '*.swift'
+
+      - name: Test apple/
+        run: swift test --package-path apple
+
+      - name: Build apple/ for the iOS Simulator
+        working-directory: apple
+        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
+
   lint-rust:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
@@ -177,13 +201,6 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets
 
-      - name: Swift format and lint
-        run: |
-          swift format --version
-          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
-          git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
-          git diff --exit-code '*.swift'
-
   test-rust:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
@@ -213,7 +230,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [classify, lint-node, test-node, test-chromium, lint-rust, test-rust]
+    needs: [classify, lint-node, test-node, test-chromium, test-swift, lint-rust, test-rust]
 
     steps:
       # A PR in the middle of a stack skips its jobs on purpose: the top PR of

@@ -1,4 +1,5 @@
 import ActivityKit
+import RecordingShared
 import SwiftUI
 import WidgetKit
 

@@ -116,6 +116,7 @@ reflect-open/
 ├── apps/cli/              # `reflect` CLI
 ├── apps/extension/        # Chrome capture extension
 ├── apps/native-host/      # Browser capture helper
+├── apple/                 # Shared Swift package
 ├── packages/core/         # Shared TypeScript logic
 ├── packages/db/           # Database types and helpers
 ├── crates/index-schema/   # Shared index schema

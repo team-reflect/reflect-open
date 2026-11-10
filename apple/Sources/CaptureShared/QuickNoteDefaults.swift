@@ -3,7 +3,7 @@ import Foundation
 /// The quick note defaults the app mirrors into the App Group container
 /// (`capture_quick_note_defaults_write` in `capture.rs`). A missing or
 /// unreadable file means no defaults.
-enum QuickNoteDefaults {
+public enum QuickNoteDefaults {
   static let fileName = "quick-note.json"
 
   private struct File: Decodable {
@@ -12,7 +12,7 @@ enum QuickNoteDefaults {
   }
 
   /// The parent bullet set in Settings, or nil to append at the end of the note.
-  static func parent() -> String? {
+  public static func parent() -> String? {
     guard
       let container = CaptureInbox.containerUrl(),
       let data = try? Data(contentsOf: container.appendingPathComponent(fileName)),

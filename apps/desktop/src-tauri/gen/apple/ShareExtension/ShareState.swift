@@ -1,3 +1,4 @@
+import CaptureShared
 import Foundation
 import UniformTypeIdentifiers
 
