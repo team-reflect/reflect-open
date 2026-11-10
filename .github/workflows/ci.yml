@@ -82,7 +82,6 @@ jobs:
             local file=$1 pattern
             shift
             for pattern in "$@"; do
-              # shellcheck disable=SC2053 # The pattern is a glob.
               [[ $file == $pattern ]] && return 0
             done
             return 1
