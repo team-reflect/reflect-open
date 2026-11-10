@@ -122,9 +122,10 @@ func isHttpUrl(candidate: String, expected: Bool) {
   #expect(files == ["\(testId).json"])
 }
 
-@Test func envelopeIdIsLowercase() {
+@Test func envelopeIdIsLowercaseUUID() {
   let id = CaptureInbox.envelopeId()
   #expect(id == id.lowercased())
+  #expect(UUID(uuidString: id) != nil)
 }
 
 @Test func spoolTextSkipsBlank() throws {

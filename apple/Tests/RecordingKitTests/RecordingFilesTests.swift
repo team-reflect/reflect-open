@@ -116,7 +116,7 @@ func stagedInfoRejectsForeignNames(name: String) {
   defer { try? FileManager.default.removeItem(at: directory) }
   let path = directory.appendingPathComponent("recording-1.part-001.m4a").path
   let url = try RecordingFiles.stagedURL(for: path, in: directory)
-  #expect(url.lastPathComponent == "recording-1.part-001.m4a")
+  #expect(url == URL(fileURLWithPath: path).standardizedFileURL)
 }
 
 @Test func stagedURLRejectsEscapes() throws {
