@@ -1,4 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
+import { CodeBlockLanguageKeymap } from '@/editor/code-block-language-keymap.tsx'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge.tsx'
 import { MediaLightbox } from '@/editor/media-lightbox.tsx'
 import { MenuBoundaryContext } from '@/editor/menu-boundary.ts'
@@ -506,6 +507,7 @@ export function NoteEditor({
         resolveFileInfo={handleResolveFileInfo}
         onExitBoundary={handleExitBoundary}
       >
+        <CodeBlockLanguageKeymap />
         {/* Only a pane that persists files gets the toolbar's attach button;
             `handleFilePaste` is the same handler meowdown pastes through. */}
         <FormattingToolbarBridge saveFile={saveFile !== undefined ? handleFilePaste : undefined} />
