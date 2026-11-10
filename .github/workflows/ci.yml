@@ -48,16 +48,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          swift_files=('*.swift' 'apple/*' '.swift-format')
-          rust_files=(
-            '*.rs' '*Cargo.toml' 'Cargo.lock' 'rust-toolchain.toml' '.cargo/*' 'about.toml'
-            'crates/*' 'plugins/*' 'apps/cli/*' 'apps/native-host/*' 'apps/desktop/src-tauri/*' 'fixtures/*'
-          )
-          rust_only_files=('*.rs' '*.toml' 'Cargo.lock' '*.sql')
           js_files=(
-            'apps/*' 'packages/*' 'design-system/*' 'patches/*' 'fixtures/*'
+            '.github/*' 'patches/*'
             '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.css' '*.html' '*.json' '*.yaml' '*.yml'
           )
+          rust_files=('.github/*' '*.rs' '*.toml' 'Cargo.lock' '*.sql' 'apps/desktop/src-tauri/*.json')
+          swift_files=('.github/*' '*.swift' '.swift-format' 'apple/*' 'apps/desktop/src-tauri/safari-extension/*')
 
           matches() {
             local file=$1 pattern
@@ -78,17 +74,14 @@ jobs:
             git diff -z --name-only --no-renames HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
             while IFS= read -r -d '' file; do
               echo "$file"
-              if matches "$file" '.github/*'; then
-                js=true rust=true swift=true
-              elif matches "$file" "${swift_files[@]}"; then
+              if matches "$file" "${js_files[@]}"; then
+                js=true
+              fi
+              if matches "$file" "${rust_files[@]}"; then
+                rust=true
+              fi
+              if matches "$file" "${swift_files[@]}"; then
                 swift=true
-              else
-                if matches "$file" "${rust_files[@]}"; then
-                  rust=true
-                fi
-                if matches "$file" "${js_files[@]}" && ! matches "$file" "${rust_only_files[@]}"; then
-                  js=true
-                fi
               fi
             done < "$RUNNER_TEMP/changed-files"
           fi
