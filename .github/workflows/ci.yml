@@ -153,7 +153,21 @@ jobs:
 
       - uses: ./.github/actions/setup-xcode
 
-      - name: Test apple/ on macOS
+      - name: Check swift version
+        run: swift --version
+          swift format --version
+
+      - name: Check swift format version
+        run: swift format --version
+
+      - name: Swift format and lint
+        run: |
+          git diff --exit-code '*.swift'
+          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
+          git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
+          git diff --exit-code '*.swift'
+
+      - name: Test apple/
         run: swift test --package-path apple
 
       - name: Build apple/ for the iOS Simulator
@@ -194,13 +208,6 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets
-
-      - name: Swift format and lint
-        run: |
-          swift format --version
-          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
-          git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
-          git diff --exit-code '*.swift'
 
   test-rust:
     needs: classify
