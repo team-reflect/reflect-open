@@ -7,7 +7,7 @@ in the plugins; App Intents stay in the Xcode targets.
 | Module | Layer | Used by |
 | --- | --- | --- |
 | `CaptureShared` | shared | App target, `ShareExtension` |
-| `RecordingShared` | shared | `RecordingWidget`, `RecordingKit` |
+| `RecordingShared` | shared | App target, `RecordingWidget`, `RecordingKit` |
 | `RecordingKit` | engine | `tauri-plugin-recording` |
 
 ```bash
@@ -42,8 +42,9 @@ app, so it does not replace a full iOS app build.
   `../../apple/Sources` with `cargo:rerun-if-changed` in its `build.rs`;
   without them an edit in `apple/` links stale Swift.
 - **App target and plugins talk through `NotificationCenter`.** The app target
-  cannot import a module that reaches it only through a plugin, and it links no
-  module a plugin uses.
+  cannot import a plugin module, so shared names live in a `.shared` module
+  that both link (`RecordingNotifications.swift`). Linking a module that
+  `libapp.a` also contains works.
 - **App Intents stay in the target.** Their metadata is extracted from the
   target's own sources, so intent files stay in `gen/apple/` (`Shared/` when two
   targets compile one).
