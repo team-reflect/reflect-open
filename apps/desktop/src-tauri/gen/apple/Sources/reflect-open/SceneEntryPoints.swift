@@ -13,7 +13,7 @@ import UIKit
 /// the quick action through the notification the Siri intents post
 /// (`RecordingIntents.swift`), URLs through tao's own `scene:openURLContexts:`
 /// to the Rust shell. The names mirror the constants in
-/// `plugins/tauri-plugin-recording/ios/Sources/RecordingPlugin.swift`.
+/// `apple/Sources/RecordingKit/RecordingEngine.swift`.
 private enum SceneEntryPoints {
   /// The quick action's `UIApplicationShortcutItemType` (`project.yml`).
   static let recordShortcutType = "app.reflect.record-audio"

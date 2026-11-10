@@ -1,10 +1,10 @@
 import Foundation
 
-/// The capture envelopes this extension produces and the App Group inbox it
+/// The capture envelopes the iOS producers spool and the App Group inbox they
 /// spools them into — the iOS half of Plan 11's platform-agnostic capture
 /// contract. The TypeScript zod schema
 /// (`packages/core/src/capture/capture-envelope.ts`) is the source of truth;
-/// these structs must stay in sync with it. The extension never opens the
+/// these structs must stay in sync with it. A producer never opens the
 /// graph, the Git repo, or SQLite: the inbox is the only contract, and the
 /// main app relays + drains it on next launch/foreground.
 
@@ -70,7 +70,7 @@ public enum CaptureInbox {
   /// same directory name (`SHARED_INBOX_DIR`).
   static let inboxDir = "inbox"
 
-  /// This extension's envelope budget: a share is one short link or line,
+  /// The producers' envelope budget: a share is one short link or line,
   /// so anything near it is not a capture. Well inside the relay's cap
   /// (`SHARED_ENVELOPE_MAX_BYTES` in `capture.rs`), which also takes the
   /// Safari extension's page text.

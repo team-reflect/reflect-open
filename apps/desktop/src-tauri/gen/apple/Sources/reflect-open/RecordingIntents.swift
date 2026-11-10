@@ -10,7 +10,7 @@ import AppIntents
 /// process — but in a different module from the recording plugin (a static
 /// library compiled through swift-rs). They talk to it through
 /// NotificationCenter; the names mirror the constants in
-/// `plugins/tauri-plugin-recording/ios/Sources/RecordingPlugin.swift`.
+/// `apple/Sources/RecordingKit/RecordingEngine.swift`.
 /// Starting goes through the plugin's persisted action queue (the webview
 /// must present recording UI); stopping is finalized natively at once.
 struct StartRecordingIntent: AppIntent {

@@ -15,3 +15,6 @@ keyboard and `--keyboard-height` stays 0. Turn it off to test keyboard avoidance
 `tauri ios dev` rewrites files under `apps/desktop/src-tauri/gen/apple/` (`project.pbxproj`
 build settings, the merged `Info.plist`). Do not commit those changes. To change the project,
 edit `gen/apple/project.yml` and follow its header comment.
+
+Shared Swift code lives in the `apple/` package ([apple-package.md](apple-package.md)). The
+next build picks up an edit there: the plugins that depend on it rebuild through cargo.

@@ -159,10 +159,11 @@ describe('inboxEnvelopeSchema', () => {
   })
 
   // Literal producer output from the iOS share extension's Swift structs
-  // (`gen/apple/ShareExtension/CaptureInbox.swift` — JSONEncoder, lowercased
-  // UUID, ISO-8601 with fractional seconds). The Swift side has no test
-  // harness, so this is what pins the third producer to the zod contract;
-  // update BOTH sides together.
+  // (`apple/Sources/ReflectCapture/CaptureInbox.swift` — JSONEncoder,
+  // lowercased UUID, ISO-8601 with fractional seconds). The Swift tests
+  // (`apple/Tests/ReflectCaptureTests`) do not check the zod schema, so this
+  // is what pins the third producer to the zod contract; update BOTH sides
+  // together.
   it('accepts the Swift producer shapes verbatim', () => {
     const swiftLink = JSON.parse(
       '{"capturedAt":"2026-07-05T07:12:30.123Z","id":"7c9e6679-7425-40de-944b-e07fc1f90ae7",' +
