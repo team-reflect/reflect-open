@@ -1,5 +1,5 @@
-use crate::error::{AppError, AppResult as Result};
 use reflect_graph_io::x_archive_store as archive;
+use reflect_types::{AppError, AppResult as Result};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -83,7 +83,7 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
     let cache_root = root.clone();
     let cache_hash = hash.clone();
     if let Some(receipt) =
-        tauri::async_runtime::spawn_blocking(move || archive::find_cache(&cache_root, &cache_hash))
+        tokio::task::spawn_blocking(move || archive::find_cache(&cache_root, &cache_hash))
             .await
             .map_err(|error| AppError::io(error.to_string()))??
     {
@@ -110,7 +110,7 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
     if response.content_length().is_some_and(|bytes| bytes > limit) {
         return Err(AppError::parse("media-too-large"));
     }
-    let directory = super::resolve(&root, "assets/x")?;
+    let directory = reflect_graph_io::resolve(&root, "assets/x")?;
     tokio::fs::create_dir_all(&directory).await?;
 
     let temporary = tempfile::Builder::new()
@@ -127,10 +127,10 @@ async fn download_once(root: PathBuf, url: String, hash: String) -> Result<archi
     }
     file.sync_all().await?;
     drop(file);
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         let (extension, mime, bytes) = archive::sniff(temporary.path())?;
         let name = format!("url_sha256_{hash}.{extension}");
-        let path = super::resolve(&root, &format!("assets/x/{name}"))?;
+        let path = reflect_graph_io::resolve(&root, &format!("assets/x/{name}"))?;
         temporary.persist(path).map_err(|error| error.error)?;
         #[cfg(unix)]
         std::fs::File::open(directory)?.sync_all()?;
@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn concurrent_callers_share_failure_and_later_calls_retry() {
-        tauri::async_runtime::block_on(async {
+        crate::test_support::core().runtime.block_on(async {
             let key = tempfile::tempdir().unwrap();
             let key = key.path().join("shared-failure");
             let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -175,7 +175,7 @@ mod tests {
                 let key = key.clone();
                 let calls = calls.clone();
                 let release = release.clone();
-                tasks.push(tauri::async_runtime::spawn(async move {
+                tasks.push(tokio::spawn(async move {
                     shared_download(key, async {
                         calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         release.notified().await;
@@ -225,15 +225,17 @@ mod tests {
         std::fs::create_dir_all(&directory).unwrap();
         let name = format!("url_sha256_{hash}.png");
         std::fs::write(directory.join(&name), b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR").unwrap();
-        let receipt =
-            tauri::async_runtime::block_on(download(root.path().to_owned(), url.into())).unwrap();
+        let receipt = crate::test_support::core()
+            .runtime
+            .block_on(download(root.path().to_owned(), url.into()))
+            .unwrap();
         assert_eq!(receipt.name, name);
         assert_eq!(receipt.mime, "image/png");
         assert_eq!(std::fs::read_dir(directory).unwrap().count(), 1);
     }
     #[test]
     fn queued_download_waits_for_capacity_but_offline_cache_does_not() {
-        tauri::async_runtime::block_on(async {
+        crate::test_support::core().runtime.block_on(async {
             let root = tempfile::tempdir().unwrap();
             let permits = DOWNLOAD_SLOTS
                 .acquire_many(MAX_CONCURRENT_DOWNLOADS as u32)

@@ -264,14 +264,14 @@ mod tests {
         let core = core();
         core.runtime.block_on(async {
             assert_eq!(
-                core.dispatch("background_task_begin", b"{}", None)
+                core.dispatch("background_task_begin", b"{}", b"{}", None)
                     .await
                     .unwrap(),
                 Reply::Json("null".into())
             );
             let args = br#"{"token":"background-task-1"}"#;
             assert_eq!(
-                core.dispatch("background_task_end", args, None)
+                core.dispatch("background_task_end", args, b"{}", None)
                     .await
                     .unwrap(),
                 Reply::Json("null".into())

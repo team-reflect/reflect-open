@@ -727,14 +727,14 @@ mod tests {
         core.runtime.block_on(async {
             let args = format!(r#"{{"name":"a.json","json":"{{}}","generation":{generation}}}"#);
             assert_eq!(
-                core.dispatch("capture_inbox_spool", args.as_bytes(), None)
+                core.dispatch("capture_inbox_spool", args.as_bytes(), b"{}", None)
                     .await
                     .unwrap(),
                 Reply::Json("null".into())
             );
             let args = format!(r#"{{"name":"a.json","generation":{generation}}}"#);
             assert_eq!(
-                core.dispatch("capture_inbox_read", args.as_bytes(), None)
+                core.dispatch("capture_inbox_read", args.as_bytes(), b"{}", None)
                     .await
                     .unwrap(),
                 Reply::Json(r#""{}""#.into())

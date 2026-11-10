@@ -284,6 +284,11 @@ mod tests {
         fn open_url(&self, _url: &str) -> AppResult<()> {
             Ok(())
         }
+
+        #[cfg(not(target_os = "ios"))]
+        fn reveal_path(&self, _path: &std::path::Path) -> AppResult<()> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -293,12 +298,15 @@ mod tests {
         let core = Arc::new(Core::new(CoreConfig::default(), host.clone()).unwrap());
         reflect_graph_io::activate(&core.graph, dir.path()).unwrap();
         core.runtime.block_on(async {
-            let Reply::Json(generation) = core.dispatch("index_open", b"{}", None).await.unwrap()
+            let Reply::Json(generation) = core
+                .dispatch("index_open", b"{}", b"{}", None)
+                .await
+                .unwrap()
             else {
                 panic!("expected JSON");
             };
             let args = format!(r#"{{"generation":{generation}}}"#);
-            core.dispatch("index_clear", args.as_bytes(), None)
+            core.dispatch("index_clear", args.as_bytes(), b"{}", None)
                 .await
                 .unwrap();
             assert_eq!(
@@ -310,7 +318,7 @@ mod tests {
             );
             let args = br#"{"sql":"select 1 as one","params":[]}"#;
             assert_eq!(
-                core.dispatch("db_query", args, None).await.unwrap(),
+                core.dispatch("db_query", args, b"{}", None).await.unwrap(),
                 Reply::Json(r#"[{"one":1}]"#.into())
             );
         });

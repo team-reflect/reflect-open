@@ -129,12 +129,16 @@ mod tests {
         core.runtime.block_on(async {
             let args = br#"{"name":"ai-api-key:dispatch","value":"sk-secret"}"#;
             assert_eq!(
-                core.dispatch("secret_set", args, None).await.unwrap(),
+                core.dispatch("secret_set", args, b"{}", None)
+                    .await
+                    .unwrap(),
                 Reply::Json("null".into())
             );
             let args = br#"{"name":"ai-api-key:dispatch"}"#;
             assert_eq!(
-                core.dispatch("secret_get", args, None).await.unwrap(),
+                core.dispatch("secret_get", args, b"{}", None)
+                    .await
+                    .unwrap(),
                 Reply::Json(r#""sk-secret""#.into())
             );
         });

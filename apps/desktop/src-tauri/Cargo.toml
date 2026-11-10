@@ -34,7 +34,6 @@ percent-encoding = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync", "fs", "io-util"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-reflect-graph-paths = { workspace = true }
 reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 reflect-index = { workspace = true }
 reflect-graph-io = { workspace = true }
@@ -43,7 +42,6 @@ reflect-core = { workspace = true }
 tempfile = { workspace = true }
 dirs = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
-base64 = { workspace = true }
 # `tracing` has no subscriber here: its `log` feature forwards every event to
 # the `log` crate, where `tauri-plugin-log` owns the sinks (see `logging.rs`).
 tracing = { workspace = true, features = ["log"] }
@@ -52,7 +50,6 @@ tauri-plugin-log = { workspace = true }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
 tauri-plugin-http = { workspace = true, features = ["unsafe-headers"] }
-reqwest = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
@@ -107,13 +104,11 @@ tauri-plugin-app-store = { workspace = true }
 tauri-plugin-web-auth = { workspace = true }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
-# the app stores), window-state (no windows to restore on mobile), and OS-trash
-# deletes (mobile moves into the graph-local `.reflect/trash/` instead).
+# the app stores) and window-state (no windows to restore on mobile).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = { workspace = true }
 tauri-plugin-process = { workspace = true }
 tauri-plugin-window-state = { workspace = true }
-trash = { workspace = true }
 tauri-plugin-deep-link = { workspace = true }
 tauri-plugin-single-instance = { workspace = true, features = ["deep-link"] }
 
