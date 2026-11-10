@@ -1,8 +1,8 @@
 use reflect_graph_io::x_archive_store as archive;
 use reflect_graph_io::{current_root, resolve, root_for_generation};
+use reflect_types::AppResult;
 use reflect_types::FileChange;
 use reflect_types::events::INDEX_CHANGED;
-use reflect_types::{AppError, AppResult};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -15,10 +15,7 @@ impl Core {
         root: PathBuf,
         action: impl FnOnce(PathBuf) -> AppResult<T> + Send + 'static,
     ) -> AppResult<T> {
-        self.runtime
-            .spawn_blocking(move || action(root))
-            .await
-            .map_err(|error| AppError::io(error.to_string()))?
+        self.spawn_blocking(move || action(root)).await
     }
 
     fn download_media(self: &Arc<Self>, root: PathBuf, generation: u64, urls: Vec<String>) {
