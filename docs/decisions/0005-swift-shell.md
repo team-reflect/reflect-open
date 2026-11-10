@@ -37,8 +37,10 @@ implementation next to Tauri and the browser dev bridge.
   call into `reflect-core`. Desktop keeps typed commands and pays no JSON
   round trip.
 - A new crate `reflect-ffi` (`staticlib`) exposes a small C ABI: create and
-  free a core, dispatch a command by name with JSON arguments and an optional
-  byte body, and register event and main-thread callbacks. `cbindgen`
+  free a core, dispatch a command by name with JSON arguments, request
+  headers, and an optional byte body, and register event and main-thread
+  callbacks. Headers carry the metadata of binary commands (the upload id of
+  `asset_upload_append`). `cbindgen`
   generates the header. A script packs device and simulator builds into the
   xcframework.
 - **No UniFFI for now.** The caller of almost every command is the Web layer,
@@ -57,9 +59,12 @@ implementation next to Tauri and the browser dev bridge.
 - The shell pushes events to the page with `callAsyncJavaScript`.
 - Command names and the wire format do not change: `plugin:<name>|<cmd>`
   names stay, arguments are camelCase JSON, and errors are
-  `{ kind, message }`. This is the same mechanism that wry uses on iOS today,
-  so binary bodies, `crypto.subtle`, and `localStorage` already work under a
-  custom scheme.
+  `{ kind, message }`.
+- The JavaScript side is new: the `swift-host` adapters replace `invoke` and
+  `listen` from `@tauri-apps/api`. They must keep the behaviour of binary
+  bodies, binary replies, events, and plugin calls. Underneath, Tauri on iOS
+  also sends IPC as `fetch` to a custom scheme, so binary bodies,
+  `crypto.subtle`, and `localStorage` already work in this setup.
 
 ### Frontend
 
@@ -81,15 +86,20 @@ implementation next to Tauri and the browser dev bridge.
   stays as it is. A second manual workflow builds the new shell. The person
   who runs a workflow picks the shell.
 - **Build number:** stays the commit count (`git rev-list --count HEAD`),
-  with no offset.
+  with no offset. Both workflows upload to the same beta record, so one
+  commit can go to TestFlight from only one of them.
 - **Origin change:** the move from `tauri://localhost` to
-  `reflect-app://localhost` resets `localStorage` once. We accept this. The
-  affected keys (for example the IAP seed and the What's New "seen" state)
-  only cause a fresh subscription query and one more What's New display.
+  `reflect-app://localhost` resets `localStorage` once. We accept this.
+  The keys there are caches and once-per-period UI markers (subscription
+  seed, App Store environment, theme cache, What's New seen ids, skippable
+  paywall day, review prompt times). After the reset the app queries the
+  subscription again and can show What's New, the skippable paywall, or the
+  review prompt one more time.
 - **ATS:** starts with `NSAllowsLocalNetworking` only. We relax it only when
   a real request needs it.
-- **Xcode project:** uses the JSON project format (`project.xcproj`).
-  Build settings live in `.xcconfig` files.
+- **Xcode project:** uses the JSON project format of Xcode 27.2
+  (`Reflect.xcodeproj/project.xcproj`), not XcodeGen. Build settings live in
+  `.xcconfig` files.
 - **Swift language mode:** the new Swift targets use Swift 5 language mode
   with explicit `@MainActor`. A Swift 6 module that hands a `@MainActor`
   closure to a Swift 5 module crashes at runtime when the closure runs off
@@ -105,8 +115,9 @@ implementation next to Tauri and the browser dev bridge.
 - **Reuse stays full.** The Web layer already reaches the host only through
   the adapters in `apps/desktop/src/services/`. The heavy Rust logic already
   lives in crates without Tauri types. The Tauri crate is a thin wrapper.
-- **Small, known protocol.** The shell copies the scheme-based IPC that
-  Tauri uses on iOS today, so the Web layer sees the same behaviour.
+- **Small, known protocol.** The shell uses the same scheme-based IPC
+  mechanism that Tauri uses on iOS today, with the same command names and
+  payloads.
 - **Desktop gains too.** The core extraction makes the Tauri crate thinner
   and testable without Tauri mocks.
 
@@ -128,8 +139,8 @@ implementation next to Tauri and the browser dev bridge.
 
 ## Phased route
 
-1. **Prerequisites:** extract `reflect-core` from the Tauri crate one domain
-   at a time, add `reflect-ffi` and the xcframework build, add the
+1. **Prerequisites:** land the `apple/` Swift package with the shared Swift
+   code, extract `reflect-core` from the Tauri crate one domain at a time, add `reflect-ffi` and the xcframework build, add the
    `swift-host` adapters. No user-visible change. Desktop works after every
    step.
 2. **Shell boots:** the Swift app loads the bundle, routes `__ipc`, serves
