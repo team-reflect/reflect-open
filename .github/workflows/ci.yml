@@ -201,6 +201,19 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets
 
+      # Keep the version equal to `CBINDGEN_VERSION` in
+      # `apps/ios/scripts/build-core.ts`.
+      - name: Install cbindgen
+        uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
+        with:
+          tool: cbindgen@0.29.4
+
+      - name: Verify the generated C header is current
+        run: |
+          cbindgen --config crates/ffi/cbindgen.toml --output crates/ffi/include/reflect_core.h crates/ffi
+          git diff --exit-code crates/ffi/include/reflect_core.h \
+            || (echo "::error::reflect_core.h is stale — run 'pnpm --filter @reflect/ios build:core' and commit the result." && exit 1)
+
   test-rust:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
