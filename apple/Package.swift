@@ -28,6 +28,7 @@ let modules: [Module] = [
   Module(name: "ReflectCapture", layer: .shared, hasTests: true),
   Module(name: "RecordingShared", layer: .shared),
   Module(name: "RecordingKit", layer: .engine, deps: ["RecordingShared"], hasTests: true),
+  Module(name: "AppStoreKit", layer: .engine),
 ]
 
 let layerOf = Dictionary(uniqueKeysWithValues: modules.map { ($0.name, $0.layer) })

@@ -1,68 +1,35 @@
-import Foundation
-import StoreKit
+import AppStoreKit
 import Tauri
 import UIKit
 
-/// The install-channel probe. StoreKit 2's `AppTransaction.environment` is
-/// the official signal: `Production` for the App Store, `Sandbox` for
-/// TestFlight and development installs, `Xcode` for StoreKit-configuration
-/// runs. With no app transaction to read, the receipt path still separates a
-/// sandbox install from an App Store one; short of both, the probe rejects
-/// rather than naming a channel, so a failure is never mistaken for a verdict.
+/// The Tauri adapter for `AppStoreClient`: it finds the window scene,
+/// checks the OS version, and maps results onto `Invoke`.
 class AppStorePlugin: Plugin {
   // `async throws` (never throws): Tauri dispatches async commands through
   // the `command:completionHandler:` selector with an `(NSError?) -> Void`
   // block, the bridge only a throwing async method generates; a plain
   // `async` method would take a zero-argument block and mismatch that ABI.
   @objc public func getEnvironment(_ invoke: Invoke) async throws {
-    if #available(iOS 16.0, *), let result = try? await AppTransaction.shared {
-      // An unverified payload names the same environment as a verified one:
-      // StoreKit lists it beside a thrown error as a case for
-      // `AppTransaction.refresh()`, not as a wrong answer.
-      switch result {
-      case .verified(let transaction), .unverified(let transaction, _):
-        invoke.resolve(["environment": transaction.environment.rawValue])
-        return
-      }
-    }
-    // Reading an app transaction can need the network and an authenticated
-    // App Store account; the receipt path needs neither, and names a sandbox
-    // install `sandboxReceipt` where an App Store install is `receipt`. The
-    // property is deprecated for Swift in favor of the call above, which is
-    // exactly the call that just failed.
-    //
-    // A simulator has no App Store account and names its receipt `receipt`,
-    // so it fails both checks; it is always a development install.
-    #if targetEnvironment(simulator)
-    let isSandboxInstall = true
-    #else
-    let isSandboxInstall = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-    #endif
-    if isSandboxInstall {
-      invoke.resolve(["environment": "Sandbox"])
+    guard let environment = await AppStoreClient.environment() else {
+      invoke.reject("the app transaction is unavailable")
       return
     }
-    invoke.reject("the app transaction is unavailable")
+    invoke.resolve(["environment": environment])
   }
 
-  /// Forces StoreKit to refetch transactions and subscription status from
-  /// the App Store. May show Apple's sign-in prompt, so it runs only behind
-  /// an explicit user action.
   @objc public func sync(_ invoke: Invoke) async throws {
     guard #available(iOS 15.0, *) else {
       invoke.reject("AppStore.sync needs iOS 15")
       return
     }
     do {
-      try await AppStore.sync()
+      try await AppStoreClient.sync()
       invoke.resolve()
     } catch {
       invoke.reject("AppStore.sync failed: \(error.localizedDescription)")
     }
   }
 
-  /// Shows Apple's offer-code redemption sheet inside the app. A redeemed
-  /// code lands as a transaction on `Transaction.updates`.
   @MainActor
   @objc public func presentOfferCodeRedeemSheet(_ invoke: Invoke) async throws {
     guard #available(iOS 16.0, *) else {
@@ -77,16 +44,13 @@ class AppStorePlugin: Plugin {
       return
     }
     do {
-      try await AppStore.presentOfferCodeRedeemSheet(in: scene)
+      try await AppStoreClient.presentOfferCodeRedeemSheet(in: scene)
       invoke.resolve()
     } catch {
       invoke.reject("presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")
     }
   }
 
-  /// Asks StoreKit for its review prompt. The system decides whether it
-  /// shows (at most three times in 365 days on App Store installs, never in
-  /// TestFlight) and reports nothing back.
   @MainActor
   @objc public func requestReview(_ invoke: Invoke) async throws {
     // The Swift package says iOS 16, but the TestFlight build compiles this
@@ -102,7 +66,7 @@ class AppStorePlugin: Plugin {
       invoke.reject("no active window scene")
       return
     }
-    AppStore.requestReview(in: scene)
+    AppStoreClient.requestReview(in: scene)
     invoke.resolve()
   }
 }
