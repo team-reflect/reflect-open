@@ -142,9 +142,6 @@ jobs:
       - name: Test browser (shard 3/3)
         run: pnpm run test:browser --shard=3/3
 
-  # Not part of `all-green` yet. It compiles apple/ for iOS 16 only; the
-  # plugins compile it again through swift-rs with a lower deployment target,
-  # which only the iOS app build covers.
   test-swift:
     needs: classify
     if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
@@ -234,7 +231,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [classify, lint-node, test-node, test-chromium, lint-rust, test-rust]
+    needs: [classify, lint-node, test-node, test-chromium, lint-rust, test-rust, test-swift]
 
     steps:
       # A PR in the middle of a stack skips its jobs on purpose: the top PR of
