@@ -79,7 +79,8 @@ jobs:
           )
 
           matches() {
-            local file=$1 pattern
+            local file=$1
+            local pattern
             shift
             for pattern in "$@"; do
               [[ $file == $pattern ]] && return 0
@@ -87,11 +88,15 @@ jobs:
             return 1
           }
 
-          js=false rust=false swift=false
+          js=false
+          rust=false
+          swift=false
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
           elif [[ $EVENT_NAME != pull_request || $HEAD_REF == release-please--* ]]; then
-            js=true rust=true swift=true
+            js=true
+            rust=true
+            swift=true
           else
             git diff -z --name-only --no-renames HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
             while IFS= read -r -d '' file; do
