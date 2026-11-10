@@ -75,16 +75,11 @@ jobs:
             done < "$RUNNER_TEMP/changed-files"
           fi
 
-          webkit=$js
-          if [[ $PR_IS_DRAFT == true ]]; then
-            webkit=false
-          fi
-
           {
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
-            echo "test-webkit=$webkit"
+            echo "test-webkit=$([[ $js == true && $PR_IS_DRAFT == false ]] && echo true || echo false)"
             echo "test-swift=$swift"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
