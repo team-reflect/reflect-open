@@ -113,8 +113,8 @@ pub unsafe extern "C" fn reflect_core_new(
 
 /// Runs `command` and calls `reply` once with the result. `args_json` is a
 /// JSON object of camelCase arguments; empty arguments are `{}`.
-/// `headers_json` is a JSON object of request headers; no command reads it
-/// yet. `body` is the raw request body, or NULL for none. Each pointer may be
+/// `headers_json` is a JSON object of lowercase request header names and
+/// values; empty headers are `{}`. `body` is the raw request body, or NULL for none. Each pointer may be
 /// NULL when its length is 0. The function copies every input before it
 /// returns.
 ///
@@ -148,12 +148,19 @@ pub unsafe extern "C" fn reflect_core_dispatch(
         if args.is_empty() {
             args = b"{}".to_vec();
         }
-        let _ = (headers_json, headers_len);
+        let mut headers = unsafe { bytes(headers_json, headers_len) }.to_vec();
+        if headers.is_empty() {
+            headers = b"{}".to_vec();
+        }
         let body = (!body.is_null()).then(|| unsafe { bytes(body, body_len) }.to_vec());
         let core = ffi.core.clone();
         spawn_reply(
             ffi,
-            async move { core.arc().dispatch(&command, &args, body.as_deref()).await },
+            async move {
+                core.arc()
+                    .dispatch(&command, &args, &headers, body.as_deref())
+                    .await
+            },
             target,
         );
         Ok(())
@@ -397,6 +404,14 @@ impl Host for FfiHost {
 
     fn open_url(&self, url: &str) -> AppResult<()> {
         Err(AppError::io(format!("this host cannot open {url}")))
+    }
+
+    #[cfg(not(target_os = "ios"))]
+    fn reveal_path(&self, path: &std::path::Path) -> AppResult<()> {
+        Err(AppError::io(format!(
+            "this host cannot reveal {}",
+            path.display()
+        )))
     }
 }
 

@@ -4607,6 +4607,7 @@ dependencies = [
  "file-id",
  "hf-hub",
  "image",
+ "infer",
  "keyring-core",
  "notify",
  "notify-debouncer-full",
@@ -4626,6 +4627,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "trash",
  "walkdir",
  "windows-native-keyring-store",
 ]
@@ -4712,7 +4714,6 @@ dependencies = [
 name = "reflect-open"
 version = "0.0.0"
 dependencies = [
- "base64 0.23.1",
  "block2",
  "dirs 7.0.0",
  "http-range-header",
@@ -4725,10 +4726,8 @@ dependencies = [
  "reflect-core",
  "reflect-git",
  "reflect-graph-io",
- "reflect-graph-paths",
  "reflect-index",
  "reflect-types",
- "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",
@@ -4751,7 +4750,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
- "trash",
 ]
 
 [[package]]

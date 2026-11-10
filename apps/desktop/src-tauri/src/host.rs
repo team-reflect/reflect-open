@@ -33,4 +33,12 @@ impl<R: Runtime> Host for TauriHost<R> {
             .open_url(url, None::<&str>)
             .map_err(|err| AppError::io(err.to_string()))
     }
+
+    #[cfg(not(target_os = "ios"))]
+    fn reveal_path(&self, path: &std::path::Path) -> AppResult<()> {
+        self.app
+            .opener()
+            .reveal_item_in_dir(path)
+            .map_err(|err| AppError::io(err.to_string()))
+    }
 }

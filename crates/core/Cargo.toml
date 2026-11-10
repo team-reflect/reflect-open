@@ -8,6 +8,10 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+base64 = { workspace = true }
+infer = { workspace = true }
+reflect-graph-paths = { workspace = true }
+tracing = { workspace = true }
 dirs = { workspace = true }
 keyring-core = { workspace = true }
 reflect-git = { workspace = true }
@@ -15,14 +19,11 @@ reflect-graph-io = { workspace = true }
 reflect-index = { workspace = true }
 reflect-types = { workspace = true }
 reqwest = { workspace = true }
-base64 = { workspace = true }
 image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
-reflect-graph-paths = { workspace = true }
-tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "sync", "fs", "io-util"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc2 = { workspace = true }
@@ -51,21 +52,22 @@ block2 = { workspace = true }
 objc2-foundation = { workspace = true, features = ["std", "NSString"] }
 objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"] }
 
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-native-keyring-store = { workspace = true }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust"] }
-
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+trash = { workspace = true }
 # The file watcher is desktop-only: nothing else writes the mobile sandbox, and
 # local writes notify in-process.
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 notify = { workspace = true }
 notify-debouncer-full = { workspace = true }
 # The watcher's pruned file-ID cache (rename stitching without the full-tree
 # walk) reuses the debouncer's own building blocks directly.
 file-id = { workspace = true }
 walkdir = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust"] }
 
 # The embedding runtime. Intel macOS has none: ONNX Runtime 1.24+ ships no
 # macOS x86_64 binaries.
@@ -74,3 +76,7 @@ fastembed = { workspace = true }
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { workspace = true, features = ["ureq", "native-tls"] }
+
+[dev-dependencies]
+reflect-graph-io = { workspace = true, features = ["test-support"] }
+tokio = { workspace = true, features = ["time"] }

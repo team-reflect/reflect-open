@@ -3,11 +3,12 @@
 //! and JSON arguments through [`Core::dispatch`].
 
 pub mod background_task;
-mod db;
-mod git;
 pub mod capture;
 pub mod contacts;
+mod db;
 pub mod editor_link_preview;
+pub mod fs;
+mod git;
 pub mod icloud;
 mod link_preview;
 pub mod recents;
@@ -47,6 +48,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::background_task::BackgroundTaskState;
+use crate::fs::assets::{AssetUploads, UPLOAD_ID_HEADER};
+use reflect_graph_io::import::ImportCancel;
 
 /// What the shell provides to the core.
 pub trait Host: Send + Sync + 'static {
@@ -56,6 +59,9 @@ pub trait Host: Send + Sync + 'static {
     fn run_on_main(&self, task: Box<dyn FnOnce() + Send>) -> AppResult<()>;
     /// Opens `url` with the system handler.
     fn open_url(&self, url: &str) -> AppResult<()>;
+    /// Shows `path` selected in the system file manager.
+    #[cfg(not(target_os = "ios"))]
+    fn reveal_path(&self, path: &std::path::Path) -> AppResult<()>;
 }
 
 /// Values the shell knows at launch.
@@ -66,6 +72,8 @@ pub struct CoreConfig {
     /// The app-sandbox `Documents/` directory, or `None` when the shell has
     /// none.
     pub document_dir: Option<std::path::PathBuf>,
+    /// The HTTP User-Agent for the app's own requests.
+    pub user_agent: String,
 }
 
 /// The result of [`Core::dispatch`].
@@ -90,6 +98,10 @@ pub struct Core {
     pub watcher: watcher::WatcherState,
     /// The embedding runtime.
     pub embed: embed::EmbedState,
+    /// The running Reflect V1 import's cancellation flag.
+    pub import_cancel: ImportCancel,
+    /// The in-flight streamed asset uploads.
+    pub asset_uploads: AssetUploads,
     config: CoreConfig,
     host: Arc<dyn Host>,
     runtime: tokio::runtime::Runtime,
@@ -108,6 +120,8 @@ impl Core {
             background_tasks: BackgroundTaskState::default(),
             watcher: Default::default(),
             embed: Default::default(),
+            import_cancel: ImportCancel::default(),
+            asset_uploads: AssetUploads::default(),
             config,
             host,
             runtime,
@@ -151,12 +165,43 @@ impl Core {
     }
 
     /// Runs `command` with `args_json`, a JSON object of camelCase arguments.
+    /// `headers_json` is a JSON object of the request's lowercase header names
+    /// and values, and `body` the raw request body of a binary command.
     pub async fn dispatch(
         self: &Arc<Self>,
         command: &str,
         args_json: &[u8],
-        _body: Option<&[u8]>,
+        headers_json: &[u8],
+        body: Option<&[u8]>,
     ) -> AppResult<Reply> {
+        match command {
+            "asset_read_binary" => {
+                #[derive(serde::Deserialize)]
+                struct Args {
+                    path: String,
+                    generation: u64,
+                }
+                let Args { path, generation } = parse_args(command, args_json)?;
+                return self.asset_read_binary(path, generation).map(Reply::Bytes);
+            }
+            "asset_upload_append" => {
+                let headers: std::collections::HashMap<String, String> =
+                    serde_json::from_slice(headers_json).map_err(|err| {
+                        AppError::parse(format!("invalid headers for {command}: {err}"))
+                    })?;
+                let id = headers
+                    .get(UPLOAD_ID_HEADER)
+                    .ok_or_else(|| AppError::io(format!("missing {UPLOAD_ID_HEADER} header")))?;
+                let Some(bytes) = body else {
+                    return Err(AppError::io(
+                        "asset_upload_append expects a raw binary body, got JSON",
+                    ));
+                };
+                self.asset_upload_append(id, bytes)?;
+                return json_reply(&());
+            }
+            _ => {}
+        }
         dispatch_table! { self, command, args_json;
             "settings_load" => settings_load(),
             "settings_save" => settings_save(settings: settings::SettingsDoc),
@@ -246,6 +291,38 @@ impl Core {
             "capture_oembed_fetch" => capture_oembed_fetch(url: String).await,
             "link_preview_fetch_html" => link_preview_fetch_html(url: String).await,
             "link_preview_fetch_icon" => link_preview_fetch_icon(url: String).await,
+            "graph_create" => graph_create(path: String),
+            "graph_import_reflect_v1_zip" => graph_import_reflect_v1_zip(path: String, generation: u64).await,
+            "graph_import_cancel" => graph_import_cancel() infallible,
+            "graph_open" => graph_open(path: String),
+            "graph_delete" => graph_delete(generation: u64),
+            "note_read" => note_read(path: String, generation: Option<u64>).await,
+            "note_read_local" => note_read_local(path: String, generation: Option<u64>).await,
+            "note_write" => note_write(path: String, contents: String, generation: u64, check_contents: Option<bool>, expected_contents: Option<String>),
+            "note_create" => note_create(path: String, contents: String, generation: u64),
+            "note_exists" => note_exists(path: String),
+            "note_delete" => note_delete(path: String, generation: u64),
+            "asset_write" => asset_write(path: String, contents_base64: String, generation: u64),
+            "asset_read" => asset_read(path: String, generation: u64),
+            "asset_open" => asset_open(path: String, generation: u64),
+            "asset_reveal" => asset_reveal(path: String, generation: u64),
+            "audio_memo_delete" => audio_memo_delete(path: String, generation: u64),
+            "transcript_cache_read" => transcript_cache_read(name: String, generation: u64),
+            "transcript_cache_write" => transcript_cache_write(name: String, contents: String, generation: u64),
+            "dir_list" => dir_list(dir: String, generation: u64),
+            "list_files" => list_files(generation: Option<u64>).await,
+            "list_attachments" => list_attachments(generation: Option<u64>).await,
+            "vault_scan_stats" => vault_scan_stats(generation: Option<u64>),
+            "asset_upload_begin" => asset_upload_begin(generation: u64),
+            "asset_upload_commit" => asset_upload_commit(id: String, desired_name: String, generation: u64),
+            "asset_upload_commit_path" => asset_upload_commit_path(id: String, path: String, generation: u64),
+            "asset_upload_abort" => asset_upload_abort(id: String),
+            "asset_import" => asset_import(source_path: String, desired_name: String, generation: u64).await,
+            "audio_memo_import" => audio_memo_import(source_path: String, path: String, generation: u64).await,
+            "x_archive_write" => x_archive_write(generation: u64, value: serde_json::Value).await,
+            "x_archive_resolve" => x_archive_resolve(generation: u64, post_id: String).await,
+            "x_archive_owners" => x_archive_owners(asset_path: String, generation: Option<u64>).await,
+            "x_syndication_fetch" => x_syndication_fetch(post_id: String).await,
         }
     }
 }
@@ -328,6 +405,11 @@ pub(crate) mod test_support {
         fn open_url(&self, _url: &str) -> AppResult<()> {
             Ok(())
         }
+
+        #[cfg(not(target_os = "ios"))]
+        fn reveal_path(&self, _path: &std::path::Path) -> AppResult<()> {
+            Ok(())
+        }
     }
 
     pub fn core() -> Arc<Core> {
@@ -345,7 +427,7 @@ mod tests {
         let core = core();
         let error = core
             .runtime
-            .block_on(core.dispatch("no_such_command", b"{}", None))
+            .block_on(core.dispatch("no_such_command", b"{}", b"{}", None))
             .unwrap_err();
         assert!(matches!(error, AppError::NotFound { .. }), "{error:?}");
     }
@@ -355,7 +437,7 @@ mod tests {
         let core = core();
         let error = core
             .runtime
-            .block_on(core.dispatch("forget_recent", br#"{"path":"/g"}"#, None))
+            .block_on(core.dispatch("forget_recent", br#"{"path":"/g"}"#, b"{}", None))
             .unwrap_err();
         assert!(matches!(error, AppError::Parse { .. }), "{error:?}");
     }
