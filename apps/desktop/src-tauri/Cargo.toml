@@ -34,7 +34,6 @@ percent-encoding = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync", "fs", "io-util"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-reflect-graph-paths = { workspace = true }
 reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 reflect-index = { workspace = true }
 reflect-graph-io = { workspace = true }
@@ -43,7 +42,6 @@ reflect-core = { workspace = true }
 tempfile = { workspace = true }
 dirs = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
-base64 = { workspace = true }
 # `tracing` has no subscriber here: its `log` feature forwards every event to
 # the `log` crate, where `tauri-plugin-log` owns the sinks (see `logging.rs`).
 tracing = { workspace = true, features = ["log"] }
@@ -52,9 +50,6 @@ tauri-plugin-log = { workspace = true }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
 tauri-plugin-http = { workspace = true, features = ["unsafe-headers"] }
-# Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
-image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
-reqwest = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
@@ -99,23 +94,9 @@ objc2-app-kit = { workspace = true, features = [
   "NSWorkspace",
 ] }
 
-# Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
-# macOS and iOS — never a mirrored copy of the address book. block2 bridges the
-# requestAccessForEntityType completion handler back into blocking Rust.
-# dispatch2 supplies MainThreadBound, keeping the iCloud metadata query's
-# non-Send Objective-C handles pinned to the main thread (`icloud/watch.rs`).
+# `blocking.rs` drains an autorelease pool around blocking-pool work.
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-dispatch2 = { workspace = true }
 objc2 = { workspace = true }
-objc2-foundation = { workspace = true, features = ["default"] }
-objc2-contacts = { workspace = true }
-objc2-link-presentation = { workspace = true, features = [
-  "std",
-  "LPLinkMetadata",
-  "LPMetadataProvider",
-  "block2",
-] }
-block2 = { workspace = true }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 tauri-plugin-iap = { workspace = true }

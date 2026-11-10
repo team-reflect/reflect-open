@@ -19,6 +19,7 @@ reflect-graph-io = { workspace = true }
 reflect-index = { workspace = true }
 reflect-types = { workspace = true }
 reqwest = { workspace = true }
+image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
@@ -26,6 +27,19 @@ tokio = { workspace = true, features = ["rt-multi-thread", "sync", "fs", "io-uti
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc2 = { workspace = true }
+# iCloud (`icloud/`), Contacts (`contacts.rs`), LinkPresentation
+# (`link_preview.rs`) and the App Group container (`capture.rs`). dispatch2's
+# `MainThreadBound` keeps main-thread-only handles in globals.
+block2 = { workspace = true }
+dispatch2 = { workspace = true }
+objc2-contacts = { workspace = true }
+objc2-foundation = { workspace = true, features = ["default"] }
+objc2-link-presentation = { workspace = true, features = [
+  "std",
+  "LPLinkMetadata",
+  "LPMetadataProvider",
+  "block2",
+] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 apple-native-keyring-store = { workspace = true, features = ["keychain"] }

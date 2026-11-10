@@ -27,7 +27,6 @@ mod fs;
 mod git;
 mod host;
 mod icloud;
-mod link_preview;
 mod logging;
 mod menu;
 mod quit;
@@ -38,7 +37,6 @@ mod skill;
 #[cfg(target_os = "macos")]
 mod wake;
 mod watcher;
-use reflect_core::web_fetch;
 mod windows;
 
 // Intel macOS and mobile have no embedding runtime: their stand-in commands
@@ -135,6 +133,11 @@ pub fn run() {
         let host = Arc::new(host::TauriHost::new(app.handle().clone()));
         let config = CoreConfig {
             app_data_dir: app.path().app_data_dir().ok(),
+            document_dir: app
+                .path()
+                .document_dir()
+                .inspect_err(|err| tracing::warn!(%err, "no documents directory"))
+                .ok(),
             user_agent: app_user_agent(app.handle()),
         };
         let core = Core::new(config, host).map_err(|err| err.message().to_string())?;
