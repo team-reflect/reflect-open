@@ -1,4 +1,5 @@
 import Foundation
+import RecordingShared
 
 #if canImport(AppIntents)
 import AppIntents
@@ -11,7 +12,6 @@ import AppIntents
 ///
 /// Compiled into BOTH the app target (execution) and the widget extension
 /// (the button references the type) — the standard shared-source pattern.
-/// The notification name mirrors `RecordingPlugin.stopRequestedNotification`.
 @available(iOS 17.0, *)
 struct StopRecordingLiveActivityIntent: LiveActivityIntent {
   static var title: LocalizedStringResource = "Stop recording"
@@ -22,7 +22,7 @@ struct StopRecordingLiveActivityIntent: LiveActivityIntent {
   @MainActor
   func perform() async throws -> some IntentResult {
     NotificationCenter.default.post(
-      name: Notification.Name("app.reflect.recording.stop-requested"), object: nil)
+      name: .recordingStopRequested, object: nil)
     return .result()
   }
 }
