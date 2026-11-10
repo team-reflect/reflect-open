@@ -138,8 +138,10 @@ pub fn run() {
     let builder = builder.setup(|app| {
         logging::init(app.handle());
         let host = Arc::new(host::TauriHost::new(app.handle().clone()));
-        let core =
-            Core::new(CoreConfig::default(), host).map_err(|err| err.message().to_string())?;
+        let config = CoreConfig {
+            user_agent: app_user_agent(app.handle()),
+        };
+        let core = Core::new(config, host).map_err(|err| err.message().to_string())?;
         app.manage(Arc::new(core));
         #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
         {
@@ -255,8 +257,6 @@ pub fn run() {
             fs::asset_protocol::SCHEME,
             fs::asset_protocol::handle,
         )
-        .manage(fs::ImportCancel::default())
-        .manage(fs::assets::AssetUploads::default())
         .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
         .manage(windows::WindowInit::default())

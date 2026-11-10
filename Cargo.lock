@@ -4598,14 +4598,17 @@ name = "reflect-core"
 version = "0.0.0"
 dependencies = [
  "apple-native-keyring-store",
+ "base64 0.23.1",
  "block2",
  "dbus-secret-service-keyring-store",
  "dirs 7.0.0",
+ "infer",
  "keyring-core",
  "objc2",
  "objc2-foundation",
  "objc2-ui-kit",
  "reflect-graph-io",
+ "reflect-graph-paths",
  "reflect-index",
  "reflect-types",
  "reqwest 0.12.28",
@@ -4613,6 +4616,8 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tracing",
+ "trash",
  "windows-native-keyring-store",
 ]
 
