@@ -159,8 +159,6 @@ jobs:
           git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
           git diff --exit-code '*.swift'
 
-  # Runs on drafts too: `all-green` needs it, and a skipped need fails
-  # `all-green`.
   test-swift:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
