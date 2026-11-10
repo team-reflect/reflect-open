@@ -169,7 +169,8 @@ jobs:
   lint-rust:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
-    runs-on: ubuntu-24.04
+    name: lint-rust (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     # Clippy and the tests never run the desktop sidecars, so drop them from the
     # Tauri config instead of building them (tauri-build and tauri-codegen merge
     # this JSON into the config). `pnpm sidecar` still stages them for dev and
@@ -192,26 +193,37 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-apt # TODO: add a if name == Linux
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/setup-apt
 
-      - uses: ./.github/actions/setup-xcode # TODO: add a if name == macOS or iOS
+      - if: runner.os == 'macOS'
+        uses: ./.github/actions/setup-xcode
 
+      # Cargo reads `CARGO_BUILD_TARGET` as `--target`. Set it before
+      # setup-rust, which hashes `CARGO*` variables into its cache key.
       - if: matrix.target
         run: echo "CARGO_BUILD_TARGET=${{ matrix.target }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: ${{ matrix.name }}
 
-      - name: Format check # TODO: I'm not sure if I need to run this format in all three systems. If we do not need to run this, we can just run that in Linux. If we need to run that, we just run it everywhere, I guess.
+      # rustfmt and cargo-shear read every source file whatever the target, so
+      # one platform is enough.
+      - name: Format check
+        if: matrix.name == 'Linux'
         run: cargo fmt --all -- --check
 
-      - name: Install cargo-shear # TODO: add a if name == Linux
+      - name: Install cargo-shear
+        if: matrix.name == 'Linux'
         uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
         with:
           tool: cargo-shear@1.14.0
 
       # Fails on a dependency that no code uses, in a member or in the root
-      # `[workspace.dependencies]`. # TODO: add a if name == Linux
+      # `[workspace.dependencies]`.
       - name: Unused dependencies
+        if: matrix.name == 'Linux'
         run: cargo shear
 
       - name: Clippy
@@ -231,6 +243,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - uses: ./.github/actions/setup-apt
 
       - uses: ./.github/actions/setup-rust
 
