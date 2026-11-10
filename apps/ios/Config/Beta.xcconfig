@@ -1,0 +1,11 @@
+// Configuration Release-Beta: the beta flavor. It has its own App Group and
+// shares the iCloud container with stable.
+
+#include "Shared.xcconfig"
+#include "Release.xcconfig"
+
+REFLECT_FLAVOR = beta
+REFLECT_BUNDLE_ID = app.reflect.ios.beta
+REFLECT_DISPLAY_NAME = Reflect Beta
+REFLECT_APP_GROUP = group.app.reflect.beta
+REFLECT_APP_ICON = AppIcon-Beta

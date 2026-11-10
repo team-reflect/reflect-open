@@ -1,0 +1,10 @@
+// Configuration Release-Stable: the App Store flavor.
+
+#include "Shared.xcconfig"
+#include "Release.xcconfig"
+
+REFLECT_FLAVOR = stable
+REFLECT_BUNDLE_ID = app.reflect.ios
+REFLECT_DISPLAY_NAME = Reflect
+REFLECT_APP_GROUP = group.app.reflect
+REFLECT_APP_ICON = AppIcon
