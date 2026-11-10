@@ -16,9 +16,8 @@ swift test --package-path apple    # or `pnpm test:swift`
 (cd apple && xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet)
 ```
 
-The `test-swift` CI job runs the last two commands. It compiles for iOS 16
-only, so it does not replace a full iOS app build (see the deployment target
-rule below).
+The `test-swift` CI job runs the last two commands. It does not build the iOS
+app, so it does not replace a full iOS app build.
 
 ## Adding a module
 
@@ -33,7 +32,7 @@ rule below).
    `apps/desktop/src-tauri/gen/apple/project.yml` (`- package: ReflectApple`,
    `product: <Module>`), then regenerate the project (see that file's header).
    A plugin adds `.product(name: "<Module>", package: "ReflectApple")` to its
-   `ios/Package.swift` (tools 5.9, `.iOS(.v16)`).
+   `ios/Package.swift` (tools 6.2, `.iOS(.v15)`, `swiftLanguageModes: [.v5]`).
 
 ## Rules
 
@@ -52,9 +51,9 @@ rule below).
   no new `@MainActor`, `async`, or `Task {}`.
 - **`InternalImportsByDefault` is on.** A module used in a `public` signature
   needs `public import`.
-- **Keep every `#available`.** `swift-rs` compiles plugins and their `apple/`
-  modules for iOS 15 (Xcode 27 clamps Tauri's iOS 13 to 15), below the package's
-  iOS 16.
+- **iOS 15 is the floor.** `swift-rs` compiles plugins and their `apple/`
+  modules for iOS 15 (Xcode 27 clamps Tauri's iOS 13 to 15), so the package
+  declares `.iOS(.v15)` and the compiler checks every `#available`.
 - **Wrap iOS-only files in `#if os(iOS)`.** `swift build` and `swift test`
   compile every target for macOS too, and `canImport(ActivityKit)` is true
   there. Keep logic you want to test on the Mac in a separate, unwrapped file.

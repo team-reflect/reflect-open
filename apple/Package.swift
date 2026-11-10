@@ -60,13 +60,10 @@ let swiftSettings: [SwiftSetting] = [
 
 let package = Package(
   name: "ReflectApple",
-  // FIXME: [review by claude-opus-5-5]: the docs say swift-rs compiles plugins and their `apple/` modules for iOS 15, below this iOS 16
-  //   floor. Please verify what actually happens: does SwiftPM accept a product with a higher minimum
-  //   than the client's deployment target, or is the floor silently ignored? PR CI builds no iOS app,
-  //   so please run a real `tauri ios build` (or simulator dev run) and record the result in the PR.
-  //   If the effective floor is iOS 15, declaring `.iOS(.v15)` here would make the `#available` rule
-  //   self-explaining instead of a doc-only trap.
-  platforms: [.iOS(.v16), .macOS(.v13)],
+  // swift-rs builds the plugins, and these modules with them, with the
+  // triple `arm64-apple-ios15.0-simulator` (`-ios15.0` on device): the
+  // objects get `minos 15.0` whatever floor a manifest declares.
+  platforms: [.iOS(.v15), .macOS(.v13)],
   products: modules.map { .library(name: $0.name, targets: [$0.name]) },
   targets:
     modules.map { module in
