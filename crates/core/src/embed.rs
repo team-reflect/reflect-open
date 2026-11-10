@@ -11,10 +11,10 @@ use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
 use hf_hub::Cache;
 use hf_hub::api::Progress;
 use hf_hub::api::sync::ApiBuilder;
+use reflect_types::{AppError, AppResult};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::error::{AppError, AppResult};
+use crate::{Core, Host};
 
 /// Identifier recorded per vector; changing the model bumps this and triggers
 /// an embedding rebuild (`index_meta.embeddingModel` comparison in TS).
@@ -90,7 +90,7 @@ enum Runtime {
 
 /// Process-wide embedding runtime state.
 #[derive(Default)]
-pub struct EmbedState(Mutex<Runtime>);
+pub struct EmbedState(Arc<Mutex<Runtime>>);
 
 /// ort's prebuilt x86_64 ONNX Runtime requires AVX2. Without it, runtime init
 /// dies with SIGILL, which no error path can catch, so check before any ort
@@ -127,17 +127,18 @@ fn status_of(runtime: &Runtime) -> EmbedStatus {
     }
 }
 
-fn emit_status(app: &AppHandle, status: &EmbedStatus) {
-    let _ = app.emit("embed:status", status);
+fn emit_status(host: &dyn Host, status: &EmbedStatus) {
+    if let Ok(payload) = serde_json::to_value(status) {
+        host.emit("embed:status", payload);
+    }
 }
 
 /// Record download progress on the runtime state, so an `embed_status` poll
 /// (e.g. a UI surface mounted mid-download) reports the same bytes as the
 /// `embed:status` events. Only an in-flight load is updated — by the time a
 /// stale progress callback could land, the state owns a terminal status.
-fn store_progress(app: &AppHandle, progress: ByteProgress) {
-    let state = app.state::<EmbedState>();
-    let Ok(mut runtime) = state.0.lock() else {
+fn store_progress(state: &Mutex<Runtime>, progress: ByteProgress) {
+    let Ok(mut runtime) = state.lock() else {
         return;
     };
     if matches!(*runtime, Runtime::Loading { .. }) {
@@ -153,7 +154,8 @@ fn store_progress(app: &AppHandle, progress: ByteProgress) {
 const PROGRESS_EMIT_STEP: u64 = 1024 * 1024;
 
 struct DownloadState {
-    app: AppHandle,
+    host: Arc<dyn Host>,
+    state: Arc<Mutex<Runtime>>,
     downloaded: u64,
     total: u64,
     emitted: u64,
@@ -166,9 +168,9 @@ impl DownloadState {
             downloaded: self.downloaded,
             total: self.total,
         };
-        store_progress(&self.app, progress);
+        store_progress(&self.state, progress);
         emit_status(
-            &self.app,
+            self.host.as_ref(),
             &EmbedStatus::Loading {
                 progress: Some(progress),
             },
@@ -183,9 +185,10 @@ impl DownloadState {
 struct DownloadProgress(Arc<Mutex<DownloadState>>);
 
 impl DownloadProgress {
-    fn new(app: AppHandle, total: u64) -> Self {
+    fn new(host: Arc<dyn Host>, state: Arc<Mutex<Runtime>>, total: u64) -> Self {
         let mut state = DownloadState {
-            app,
+            host,
+            state,
             downloaded: 0,
             total,
             emitted: 0,
@@ -219,7 +222,11 @@ impl Progress for DownloadProgress {
 /// them first through the same hf-hub cache gives the UI a real progress bar
 /// and leaves `try_new` a pure cache hit. Mirrors fastembed's resolution —
 /// env overrides included — so both sides agree on location and endpoint.
-fn download_model_files(app: &AppHandle, cache_dir: &Path) -> Result<(), String> {
+fn download_model_files(
+    host: Arc<dyn Host>,
+    state: Arc<Mutex<Runtime>>,
+    cache_dir: &Path,
+) -> Result<(), String> {
     let cache_dir = std::env::var("HF_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| cache_dir.to_path_buf());
@@ -254,7 +261,7 @@ fn download_model_files(app: &AppHandle, cache_dir: &Path) -> Result<(), String>
             .size() as u64;
     }
 
-    let progress = DownloadProgress::new(app.clone(), total);
+    let progress = DownloadProgress::new(host, state, total);
     for file in missing {
         repo.download_with_progress(file, progress.clone())
             .map_err(|err| format!("downloading {file}: {err}"))?;
@@ -262,101 +269,101 @@ fn download_model_files(app: &AppHandle, cache_dir: &Path) -> Result<(), String>
     Ok(())
 }
 
-/// Current runtime status (poll on startup; live changes arrive on
-/// `embed:status` events).
-#[tauri::command]
-pub fn embed_status(state: State<EmbedState>) -> AppResult<EmbedStatus> {
-    if !cpu_supported() {
-        return Ok(EmbedStatus::Unsupported);
+impl Core {
+    /// Current runtime status (poll on startup; live changes arrive on
+    /// `embed:status` events).
+    pub fn embed_status(&self) -> AppResult<EmbedStatus> {
+        if !cpu_supported() {
+            return Ok(EmbedStatus::Unsupported);
+        }
+        Ok(status_of(&*lock_state(&self.embed)?))
     }
-    Ok(status_of(&*lock_state(&state)?))
-}
 
-/// Ensure the model is loaded, downloading it on first use. Idempotent: a
-/// concurrent call while loading returns immediately (the event stream carries
-/// the outcome). Runs the load on a blocking thread — model init is seconds
-/// even when cached, and the first run downloads.
-#[tauri::command]
-pub async fn embed_ensure(app: AppHandle, state: State<'_, EmbedState>) -> AppResult<EmbedStatus> {
-    if !cpu_supported() {
-        return Ok(EmbedStatus::Unsupported);
-    }
-    // Resolve the cache dir BEFORE flipping to Loading: it's the only step
-    // here that may fail without a guaranteed state transition afterwards.
-    let cache_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|err| AppError::io(format!("no app data dir: {err}")))?
-        .join("models");
+    /// Ensure the model is loaded, downloading it on first use. Idempotent: a
+    /// concurrent call while loading returns immediately (the event stream carries
+    /// the outcome). Runs the load on a blocking thread — model init is seconds
+    /// even when cached, and the first run downloads.
+    pub async fn embed_ensure(&self) -> AppResult<EmbedStatus> {
+        if !cpu_supported() {
+            return Ok(EmbedStatus::Unsupported);
+        }
+        // Resolve the cache dir BEFORE flipping to Loading: it's the only step
+        // here that may fail without a guaranteed state transition afterwards.
+        let cache_dir = self
+            .config
+            .app_data_dir
+            .as_ref()
+            .ok_or_else(|| AppError::io("no app data dir"))?
+            .join("models");
 
-    {
-        let mut runtime = lock_state(&state)?;
-        match &*runtime {
-            Runtime::Ready(_) | Runtime::Loading { .. } => return Ok(status_of(&runtime)),
-            Runtime::Uninitialized | Runtime::Failed(_) => {
-                *runtime = Runtime::Loading { progress: None };
+        {
+            let mut runtime = lock_state(&self.embed)?;
+            match &*runtime {
+                Runtime::Ready(_) | Runtime::Loading { .. } => return Ok(status_of(&runtime)),
+                Runtime::Uninitialized | Runtime::Failed(_) => {
+                    *runtime = Runtime::Loading { progress: None };
+                }
             }
         }
-    }
-    emit_status(&app, &EmbedStatus::Loading { progress: None });
+        emit_status(self.host(), &EmbedStatus::Loading { progress: None });
 
-    // From here every path — success, load failure, even a panicked blocking
-    // task — must land the state in Ready or Failed: an early `?` would wedge
-    // the runtime in Loading forever (later ensures return early on Loading).
-    let app_for_progress = app.clone();
-    let loaded: Result<TextEmbedding, String> =
-        match tauri::async_runtime::spawn_blocking(move || {
-            download_model_files(&app_for_progress, &cache_dir)?;
-            TextEmbedding::try_new(
-                TextInitOptions::new(EmbeddingModel::AllMiniLML6V2)
-                    .with_cache_dir(cache_dir)
-                    .with_intra_threads(INTRA_OP_THREADS),
-            )
-            .map_err(|err| err.to_string())
-        })
-        .await
+        // From here every path — success, load failure, even a panicked blocking
+        // task — must land the state in Ready or Failed: an early `?` would wedge
+        // the runtime in Loading forever (later ensures return early on Loading).
+        let host = Arc::clone(&self.host);
+        let state = Arc::clone(&self.embed.0);
+        let loaded: Result<TextEmbedding, String> = match self
+            .runtime
+            .spawn_blocking(move || {
+                download_model_files(host, state, &cache_dir)?;
+                TextEmbedding::try_new(
+                    TextInitOptions::new(EmbeddingModel::AllMiniLML6V2)
+                        .with_cache_dir(cache_dir)
+                        .with_intra_threads(INTRA_OP_THREADS),
+                )
+                .map_err(|err| err.to_string())
+            })
+            .await
         {
             Ok(result) => result,
             Err(err) => Err(format!("embedding load task panicked: {err}")),
         };
 
-    let status = {
-        let mut runtime = lock_state(&state)?;
-        *runtime = match loaded {
-            Ok(model) => Runtime::Ready(Arc::new(Mutex::new(model))),
-            Err(message) => {
-                tracing::error!(message, "embedding model load failed");
-                Runtime::Failed(message)
+        let status = {
+            let mut runtime = lock_state(&self.embed)?;
+            *runtime = match loaded {
+                Ok(model) => Runtime::Ready(Arc::new(Mutex::new(model))),
+                Err(message) => {
+                    tracing::error!(message, "embedding model load failed");
+                    Runtime::Failed(message)
+                }
+            };
+            status_of(&runtime)
+        };
+        emit_status(self.host(), &status);
+        Ok(status)
+    }
+
+    /// Embed a batch of texts → 384-dim vectors, off the UI thread. Errors if the
+    /// model isn't `Ready` (callers gate on `embed_status`/`embed_ensure`).
+    pub async fn embed_texts(&self, texts: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
+        let model = {
+            let runtime = lock_state(&self.embed)?;
+            match &*runtime {
+                Runtime::Ready(model) => Arc::clone(model),
+                _ => return Err(AppError::io("embedding model is not loaded")),
             }
         };
-        status_of(&runtime)
-    };
-    emit_status(&app, &status);
-    Ok(status)
-}
-
-/// Embed a batch of texts → 384-dim vectors, off the UI thread. Errors if the
-/// model isn't `Ready` (callers gate on `embed_status`/`embed_ensure`).
-#[tauri::command]
-pub async fn embed_texts(
-    texts: Vec<String>,
-    state: State<'_, EmbedState>,
-) -> AppResult<Vec<Vec<f32>>> {
-    let model = {
-        let runtime = lock_state(&state)?;
-        match &*runtime {
-            Runtime::Ready(model) => Arc::clone(model),
-            _ => return Err(AppError::io("embedding model is not loaded")),
-        }
-    };
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut model = model
-            .lock()
-            .map_err(|_| AppError::io("embedding model lock poisoned"))?;
-        model
-            .embed(texts, Some(EMBED_BATCH_SIZE))
-            .map_err(|err| AppError::io(format!("embedding failed: {err}")))
-    })
-    .await
-    .map_err(|err| AppError::io(format!("embedding task panicked: {err}")))?
+        self.runtime
+            .spawn_blocking(move || {
+                let mut model = model
+                    .lock()
+                    .map_err(|_| AppError::io("embedding model lock poisoned"))?;
+                model
+                    .embed(texts, Some(EMBED_BATCH_SIZE))
+                    .map_err(|err| AppError::io(format!("embedding failed: {err}")))
+            })
+            .await
+            .map_err(|err| AppError::io(format!("embedding task panicked: {err}")))?
+    }
 }

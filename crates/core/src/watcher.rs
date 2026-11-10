@@ -27,17 +27,15 @@ use notify::{EventKindMask, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, new_debouncer_opt,
 };
-use reflect_core::Core;
 use reflect_graph_paths::{
     GraphPathKind, classify, evicted_logical_path, eviction_placeholder, has_pruned_component,
     is_pruned_dir_name, to_slash_lossy, wire_path,
 };
-use tauri::{AppHandle, Emitter, Manager, State};
+use reflect_types::events::{INDEX_CHANGED, INDEX_RECONCILE};
+use reflect_types::{AppError, AppResult, ChangeKind, FileChange};
 use walkdir::WalkDir;
 
-use crate::error::{AppError, AppResult};
-use reflect_types::events::{INDEX_CHANGED, INDEX_RECONCILE};
-use reflect_types::{ChangeKind, FileChange};
+use crate::Core;
 
 type GraphDebouncer = Debouncer<RecommendedWatcher, PrunedFileIdMap>;
 
@@ -212,11 +210,11 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
                 // pass into a blocking on-demand download. Same rule as the
                 // stub form below — evicted, not deleted, no event; the
                 // re-download (or a targeted request) emits the real upsert.
-                Ok(meta) if crate::fs::is_dataless(&meta) => continue,
+                Ok(meta) if reflect_graph_paths::is_dataless(&meta) => continue,
                 Ok(meta) => FileChange {
                     path: rel.clone(),
                     kind: ChangeKind::Upsert,
-                    modified_ms: crate::fs::modified_ms(&meta),
+                    modified_ms: reflect_graph_io::io::modified_ms(&meta),
                 },
                 Err(_) => {
                     // `symlink_metadata` on the stub so a symlinked `.icloud`
@@ -256,9 +254,9 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
     }
 }
 
-fn lock_watcher<'a>(
-    watcher: &'a State<WatcherState>,
-) -> AppResult<std::sync::MutexGuard<'a, Option<(PathBuf, FileId, GraphDebouncer)>>> {
+fn lock_watcher(
+    watcher: &WatcherState,
+) -> AppResult<std::sync::MutexGuard<'_, Option<(PathBuf, FileId, GraphDebouncer)>>> {
     watcher.0.lock().map_err(|err| {
         tracing::error!(?err, "watcher state lock poisoned by an earlier panic");
         AppError::io("watcher state lock poisoned")
@@ -289,79 +287,81 @@ fn watch_graph(root: &Path, handler: impl DebounceEventHandler) -> notify::Resul
 /// leave a watcher bound to the previous graph emitting events attributed to
 /// the new one. Lock order is graph → watcher; nothing locks the reverse way,
 /// so this can't deadlock.
-#[tauri::command]
-pub fn watch_start(
-    app: AppHandle,
-    core: State<Arc<Core>>,
-    watcher: State<WatcherState>,
-) -> AppResult<()> {
-    let graph_guard = core.graph.0.lock().map_err(|err| {
-        tracing::error!(?err, "graph state lock poisoned by an earlier panic");
-        AppError::io("graph state lock poisoned")
-    })?;
-    let root = graph_guard.root.clone().ok_or_else(AppError::no_graph)?;
+impl Core {
+    pub fn watch_start(self: &Arc<Self>) -> AppResult<()> {
+        let graph_guard = self.graph.0.lock().map_err(|err| {
+            tracing::error!(?err, "graph state lock poisoned by an earlier panic");
+            AppError::io("graph state lock poisoned")
+        })?;
+        let root = graph_guard.root.clone().ok_or_else(AppError::no_graph)?;
 
-    let mut active = lock_watcher(&watcher)?;
-    let root_id = get_file_id(&root);
-    // Every index pass ends here. Keep a watcher on this very directory at this
-    // path: the file ID differs for a folder replaced at the same path. On
-    // Linux, a dropped watcher keeps its thread and inotify fd while events
-    // keep arriving, so replacing it on every pass leaks.
-    let unchanged = root_id.as_ref().is_ok_and(|root_id| {
-        active
-            .as_ref()
-            .is_some_and(|(path, id, _)| *path == root && id == root_id)
-    });
-    if unchanged {
-        return Ok(());
+        let mut active = lock_watcher(&self.watcher)?;
+        let root_id = get_file_id(&root);
+        // Every index pass ends here. Keep a watcher on this very directory at this
+        // path: the file ID differs for a folder replaced at the same path. On
+        // Linux, a dropped watcher keeps its thread and inotify fd while events
+        // keep arriving, so replacing it on every pass leaks.
+        let unchanged = root_id.as_ref().is_ok_and(|root_id| {
+            active
+                .as_ref()
+                .is_some_and(|(path, id, _)| *path == root && id == root_id)
+        });
+        if unchanged {
+            return Ok(());
+        }
+        // Drop any previous watcher first: if installing the new one fails we're then
+        // left with no watcher, rather than the previous graph's still driving
+        // index:changed against the now-current graph.
+        *active = None;
+        let root_id = root_id.map_err(|err| AppError::io(err.to_string()))?;
+
+        let started = std::time::Instant::now();
+        let handler_root = root.clone();
+        let core = Arc::downgrade(self);
+        let debouncer = watch_graph(&root, move |result: DebounceEventResult| {
+            let Ok(events) = result else {
+                return; // watch errors are transient; the next batch recovers
+            };
+            let rescan_demanded = events.iter().any(|event| event.need_rescan());
+            let paths: Vec<PathBuf> = events
+                .iter()
+                .flat_map(|event| event.paths.clone())
+                .collect();
+            let Some(core) = core.upgrade() else {
+                return;
+            };
+            let mut effects = collect_changes(&paths, &handler_root);
+            effects.reconcile |= rescan_demanded;
+            if effects.reconcile || !effects.changes.is_empty() {
+                // Drop the cached catalog before telling the frontend: its
+                // follow-up `list_files` must re-walk, not replay the cache.
+                reflect_graph_io::invalidate_file_catalog(&core.graph, &handler_root);
+            }
+            if !effects.changes.is_empty()
+                && let Ok(payload) = serde_json::to_value(&effects.changes)
+            {
+                core.host().emit(INDEX_CHANGED, payload);
+            }
+            if effects.reconcile {
+                core.host().emit(INDEX_RECONCILE, serde_json::Value::Null);
+            }
+        })
+        .map_err(|err| AppError::io(err.to_string()))?;
+
+        *active = Some((root, root_id, debouncer));
+        drop(graph_guard);
+        tracing::info!(
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "watch_start installed"
+        );
+        Ok(())
     }
-    // Drop any previous watcher first: if installing the new one fails we're then
-    // left with no watcher, rather than the previous graph's still driving
-    // index:changed against the now-current graph.
-    *active = None;
-    let root_id = root_id.map_err(|err| AppError::io(err.to_string()))?;
 
-    let started = std::time::Instant::now();
-    let handler_root = root.clone();
-    let debouncer = watch_graph(&root, move |result: DebounceEventResult| {
-        let Ok(events) = result else {
-            return; // watch errors are transient; the next batch recovers
-        };
-        let rescan_demanded = events.iter().any(|event| event.need_rescan());
-        let paths: Vec<PathBuf> = events
-            .iter()
-            .flat_map(|event| event.paths.clone())
-            .collect();
-        let mut effects = collect_changes(&paths, &handler_root);
-        effects.reconcile |= rescan_demanded;
-        if effects.reconcile || !effects.changes.is_empty() {
-            // Drop the cached catalog before telling the frontend: its
-            // follow-up `list_files` must re-walk, not replay the cache.
-            crate::fs::invalidate_file_catalog(&app.state::<Arc<Core>>().graph, &handler_root);
-        }
-        if !effects.changes.is_empty() {
-            let _ = app.emit(INDEX_CHANGED, &effects.changes);
-        }
-        if effects.reconcile {
-            let _ = app.emit(INDEX_RECONCILE, ());
-        }
-    })
-    .map_err(|err| AppError::io(err.to_string()))?;
-
-    *active = Some((root, root_id, debouncer));
-    drop(graph_guard);
-    tracing::info!(
-        elapsed_ms = started.elapsed().as_millis() as u64,
-        "watch_start installed"
-    );
-    Ok(())
-}
-
-/// Stop watching (drops the debouncer).
-#[tauri::command]
-pub fn watch_stop(watcher: State<WatcherState>) -> AppResult<()> {
-    *lock_watcher(&watcher)? = None;
-    Ok(())
+    /// Stop watching (drops the debouncer).
+    pub fn watch_stop(&self) -> AppResult<()> {
+        *lock_watcher(&self.watcher)? = None;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
