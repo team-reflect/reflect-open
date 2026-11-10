@@ -4638,6 +4638,7 @@ version = "0.0.0"
 dependencies = [
  "reflect-core",
  "reflect-types",
+ "serde",
  "serde_json",
 ]
 
