@@ -37,6 +37,9 @@ import { createTauriOpenerTransport } from '@/services/tauri-opener.ts'
 import { createTauriPathTransport } from '@/services/tauri-path.ts'
 import { createTauriUpdaterAdapter } from '@/services/tauri-updater.ts'
 import { createTauriWindowHost } from '@/services/tauri-window.ts'
+import { createSwiftDeepLinkSource } from '@/services/swift-host/swift-deep-link.ts'
+import { createSwiftHttpService } from '@/services/swift-host/swift-http.ts'
+import { createSwiftOpenerTransport } from '@/services/swift-host/swift-opener.ts'
 
 /**
  * The host primitives that `boot.ts` builds once and shares between the layers.
@@ -48,13 +51,13 @@ export interface DesktopPrimitives {
 }
 
 /**
- * The desktop app's core adapters: the Tauri ones inside the native shell
- * (`facts.isNativeShell`), the browser ones in plain-browser dev. `role` is
- * this webview's window role.
+ * The desktop app's core adapters for `facts.hostKind`: the Tauri ones in the
+ * Tauri shell, the Swift ones in the Swift shell, the browser ones in
+ * plain-browser dev. `role` is this webview's window role.
  */
 export function createDesktopAdapters(
   facts: PlatformFacts,
-  { logger, clock }: Omit<DesktopPrimitives, 'ipc'>,
+  { ipc, logger, clock }: DesktopPrimitives,
   role: GraphRole,
 ): Omit<CoreAdapters, 'ipc' | 'activity' | 'progress' | 'role' | 'createGraphServices'> {
   const common = {
@@ -67,27 +70,36 @@ export function createDesktopAdapters(
     },
     imageCodec: createBrowserImageCodec(),
   }
-  if (facts.isNativeShell) {
-    return {
-      ...common,
-      http: createTauriHttpService(),
-      path: createTauriPathTransport(),
-      convertFileSrc,
-      // The OS delivers deep links to every webview; only the main window takes them.
-      deepLink: role === 'main' ? createTauriDeepLinkSource() : createNoDeepLinkSource(),
-    }
-  }
-  return {
-    ...common,
-    http: createBrowserHttpService(),
-    path: createPosixPathTransport('/'),
+  switch (facts.hostKind) {
+    case 'tauri':
+      return {
+        ...common,
+        http: createTauriHttpService(),
+        path: createTauriPathTransport(),
+        convertFileSrc,
+        // The OS delivers deep links to every webview; only the main window takes them.
+        deepLink: role === 'main' ? createTauriDeepLinkSource() : createNoDeepLinkSource(),
+      }
+    case 'swift':
+      return {
+        ...common,
+        http: createSwiftHttpService(fetch),
+        path: createPosixPathTransport('/'),
+        deepLink: createSwiftDeepLinkSource(ipc, logger),
+      }
+    case 'browser':
+      return {
+        ...common,
+        http: createBrowserHttpService(),
+        path: createPosixPathTransport('/'),
+      }
   }
 }
 
 /**
  * The desktop app's host for the app layer: the window service, the lifecycle
  * service and the operations list over the page, the Tauri dialogs, updater
- * and native menus inside the native shell, and Sentry exception telemetry
+ * and native menus inside the Tauri shell, and Sentry exception telemetry
  * everywhere.
  */
 export function createDesktopHost(
@@ -95,9 +107,10 @@ export function createDesktopHost(
   { ipc, clock, logger }: DesktopPrimitives,
 ): AppHost {
   const lifecycle = createLifecycleService({ ipc, dom: createDomLifecycleAdapter(), clock, logger })
-  const windowHost = facts.isNativeShell
-    ? createTauriWindowHost({ multiWindow: !isMobilePlatform(facts.appPlatform), logger })
-    : createSingleWindowHost()
+  const windowHost =
+    facts.hostKind === 'tauri'
+      ? createTauriWindowHost({ multiWindow: !isMobilePlatform(facts.appPlatform), logger })
+      : createSingleWindowHost()
   const common = {
     window: createWindowService({ ipc, host: windowHost, logger }),
     lifecycle,
@@ -111,20 +124,29 @@ export function createDesktopHost(
     sdk: sentryExceptionTelemetrySdk,
     logger,
   })
-  if (facts.isNativeShell) {
-    return {
-      ...common,
-      dialog: createTauriDialogService(),
-      opener: createTauriOpenerTransport(),
-      exceptionTelemetry,
-      updater: createTauriUpdaterAdapter(),
-      nativeMenu: createTauriNativeMenuHost(),
-    }
-  }
-  return {
-    ...common,
-    dialog: createBrowserDialogService(),
-    opener: createBrowserOpenerTransport(),
-    exceptionTelemetry,
+  switch (facts.hostKind) {
+    case 'tauri':
+      return {
+        ...common,
+        dialog: createTauriDialogService(),
+        opener: createTauriOpenerTransport(),
+        exceptionTelemetry,
+        updater: createTauriUpdaterAdapter(),
+        nativeMenu: createTauriNativeMenuHost(),
+      }
+    case 'swift':
+      return {
+        ...common,
+        dialog: createBrowserDialogService(),
+        opener: createSwiftOpenerTransport(ipc),
+        exceptionTelemetry,
+      }
+    case 'browser':
+      return {
+        ...common,
+        dialog: createBrowserDialogService(),
+        opener: createBrowserOpenerTransport(),
+        exceptionTelemetry,
+      }
   }
 }

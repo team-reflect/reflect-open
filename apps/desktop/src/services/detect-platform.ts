@@ -1,4 +1,5 @@
-import type { AppPlatform, BuildPlatform, PlatformFacts } from '@reflect/core'
+import type { AppPlatform, BuildPlatform, HostKind, PlatformFacts } from '@reflect/core'
+import type { ReflectHost } from '@/services/swift-host/host-events.ts'
 import { version } from '../../package.json' with { type: 'json' }
 
 function buildPlatformFromEnv(env: string): BuildPlatform | null {
@@ -52,14 +53,36 @@ function devPlatformOverride(env: string): AppPlatform | null {
 }
 
 /**
+ * The globals that tell the shells apart: Tauri sets `isTauri`, the Swift
+ * shell injects `__reflectHost`.
+ */
+export interface HostGlobals {
+  readonly isTauri?: boolean | undefined
+  readonly __reflectHost?: ReflectHost | undefined
+}
+
+/**
+ * Detect which shell hosts the webview from its globals.
+ */
+export function detectHostKind(globals: HostGlobals): HostKind {
+  if (globals.isTauri === true) {
+    return 'tauri'
+  }
+  if (globals.__reflectHost !== undefined) {
+    return 'swift'
+  }
+  return 'browser'
+}
+
+/**
  * Detect the host's platform facts from the user agent and the build env.
- * `nativeShell` is Tauri's `isTauri()`, passed in so this module stays free of Tauri imports.
  *
  * The surface facets follow `appPlatform`, which is also what selects the
  * mobile root (`@platform-root` in `vite.config.ts`, `platform-root.unknown.tsx`
  * in plain-browser dev): the mobile tree and the mobile surface cannot disagree.
  */
-export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
+export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
+  const nativeShell = hostKind !== 'browser'
   const env = import.meta.env.TAURI_ENV_PLATFORM || ''
   const hasNavigator = typeof navigator !== 'undefined'
   // iPadOS masquerades as macOS in the user agent; the touch-point check excludes it.
@@ -75,6 +98,7 @@ export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
   return {
     appPlatform,
     isNativeShell: nativeShell,
+    hostKind,
     buildPlatform: buildPlatformFromEnv(env),
     isMacosDesktop: macosDesktop,
     isApplePlatform:

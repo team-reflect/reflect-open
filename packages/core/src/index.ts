@@ -52,7 +52,7 @@ export { type GistPublishService } from './sync/gist-publish-service.ts'
 export { isMobilePlatform, type AppPlatform } from './ports/platform-facts.ts'
 export { createSystemClock, type ClockService, type TimerHandle } from './ports/clock-service.ts'
 export { type IdService } from './ports/id-service.ts'
-export { type BuildPlatform, type PlatformFacts } from './ports/platform-facts.ts'
+export { type BuildPlatform, type HostKind, type PlatformFacts } from './ports/platform-facts.ts'
 export { appleFileSrc, type FileSrcConverter, type FileSrcSource } from './ports/file-src.ts'
 
 export {
