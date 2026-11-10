@@ -8,8 +8,9 @@
 //!   that side: the host frees Rust strings with [`reflect_core_string_free`].
 //! - `reflect_core_dispatch` returns at once. The command runs on the core
 //!   runtime, and `reply` runs exactly once on a Rust thread.
-//! - `on_event` runs on a Rust thread. `on_main` hands the host a task that
-//!   the host runs on its main thread with [`reflect_core_run_task`].
+//! - `on_event` and `on_open_url` run on a Rust thread. `on_main` hands the
+//!   host a task that the host runs on its main thread with
+//!   [`reflect_core_run_task`].
 //! - No callback starts after `reflect_core_free` returns, and a callback that
 //!   is running when it is called finishes before it returns. A reply that is
 //!   not sent by then is never sent. Do not call `reflect_core_free` from
@@ -58,6 +59,12 @@ pub type ReflectEventFn = Option<
 /// main thread.
 pub type ReflectMainFn = Option<unsafe extern "C" fn(ctx: *mut c_void, task: *mut c_void)>;
 
+/// Asks the host to open a NUL-terminated URL or absolute file path with the
+/// system handler. It returns whether the host accepted it. The pointer is
+/// valid only during the call.
+pub type ReflectOpenUrlFn =
+    Option<unsafe extern "C" fn(ctx: *mut c_void, url: *const c_char) -> bool>;
+
 /// A core created by `reflect_core_new`.
 pub struct ReflectCore {
     core: CoreRef,
@@ -67,9 +74,10 @@ pub struct ReflectCore {
 type MainTask = Box<dyn FnOnce() + Send>;
 
 /// Creates a core. `config_json` is a NUL-terminated JSON object, or NULL
-/// for an empty one. `ctx` is passed to `on_event` and `on_main`. On failure
-/// it returns NULL and, when `error_out` is not NULL, stores an error JSON
-/// `{"kind":...,"message":...}` there for `reflect_core_string_free`.
+/// for an empty one. `ctx` is passed to `on_event`, `on_main` and
+/// `on_open_url`. On failure it returns NULL and, when `error_out` is not
+/// NULL, stores an error JSON `{"kind":...,"message":...}` there for
+/// `reflect_core_string_free`.
 ///
 /// # Safety
 ///
@@ -80,6 +88,7 @@ pub unsafe extern "C" fn reflect_core_new(
     config_json: *const c_char,
     on_event: ReflectEventFn,
     on_main: ReflectMainFn,
+    on_open_url: ReflectOpenUrlFn,
     ctx: *mut c_void,
     error_out: *mut *mut c_char,
 ) -> *mut ReflectCore {
@@ -89,6 +98,7 @@ pub unsafe extern "C" fn reflect_core_new(
         let host = Arc::new(FfiHost {
             on_event,
             on_main,
+            on_open_url,
             ctx: Ctx(ctx),
             gate: Arc::clone(&gate),
         });
@@ -370,6 +380,7 @@ impl ReplyTarget {
 struct FfiHost {
     on_event: ReflectEventFn,
     on_main: ReflectMainFn,
+    on_open_url: ReflectOpenUrlFn,
     ctx: Ctx,
     gate: Arc<Gate>,
 }
@@ -403,7 +414,24 @@ impl Host for FfiHost {
     }
 
     fn open_url(&self, url: &str) -> AppResult<()> {
-        Err(AppError::io(format!("this host cannot open {url}")))
+        let on_open_url = self
+            .on_open_url
+            .ok_or_else(|| AppError::io(format!("this host cannot open {url}")))?;
+        let c_url = CString::new(url)
+            .map_err(|_| AppError::parse(format!("the URL has a NUL byte: {url}")))?;
+        let ctx = self.ctx;
+        let mut accepted = false;
+        if !self
+            .gate
+            .run(|| accepted = unsafe { on_open_url(ctx.get(), c_url.as_ptr()) })
+        {
+            return Err(AppError::io("the core is freed"));
+        }
+        if accepted {
+            Ok(())
+        } else {
+            Err(AppError::io(format!("the host could not open {url}")))
+        }
     }
 
     #[cfg(not(target_os = "ios"))]
@@ -528,6 +556,16 @@ mod tests {
         recorder.push(name, unsafe { bytes(json, json_len) }.to_vec());
     }
 
+    /// Records the URL as an `open-url` call and refuses URLs that start
+    /// with `refuse:`.
+    unsafe extern "C" fn record_open_url(ctx: *mut c_void, url: *const c_char) -> bool {
+        let recorder = unsafe { &*ctx.cast::<Recorder>() };
+        let url = unsafe { CStr::from_ptr(url) }.to_bytes().to_vec();
+        let accepted = !url.starts_with(b"refuse:");
+        recorder.push("open-url".to_owned(), url);
+        accepted
+    }
+
     unsafe extern "C" fn run_main_inline(_ctx: *mut c_void, task: *mut c_void) {
         unsafe { reflect_core_run_task(task) };
     }
@@ -542,6 +580,7 @@ mod tests {
                 config.as_ptr(),
                 Some(record_event),
                 Some(run_main_inline),
+                Some(record_open_url),
                 events.ctx(),
                 &mut error,
             )
@@ -612,8 +651,16 @@ mod tests {
     fn invalid_config_returns_error() {
         let config = CString::new("[]").unwrap();
         let mut error = ptr::null_mut();
-        let core =
-            unsafe { reflect_core_new(config.as_ptr(), None, None, ptr::null_mut(), &mut error) };
+        let core = unsafe {
+            reflect_core_new(
+                config.as_ptr(),
+                None,
+                None,
+                None,
+                ptr::null_mut(),
+                &mut error,
+            )
+        };
         assert!(core.is_null());
         let json: Value =
             serde_json::from_slice(unsafe { CStr::from_ptr(error) }.to_bytes()).unwrap();
@@ -657,6 +704,32 @@ mod tests {
             .unwrap();
         assert!(ran.load(Ordering::SeqCst));
         unsafe { reflect_core_free(core) };
+    }
+
+    #[test]
+    fn host_open_url_calls_the_callback() {
+        let events = Recorder::default();
+        let core = new_core(&events);
+        let host_core = unsafe { &*core }.core.clone();
+        host_core
+            .arc()
+            .host()
+            .open_url("https://reflect.app")
+            .unwrap();
+        assert_eq!(
+            events.first(WAIT),
+            Some(("open-url".to_owned(), b"https://reflect.app".to_vec()))
+        );
+        let refused = host_core.arc().host().open_url("refuse:x").unwrap_err();
+        assert_eq!(refused.message(), "the host could not open refuse:x");
+        unsafe { reflect_core_free(core) };
+        assert!(
+            host_core
+                .arc()
+                .host()
+                .open_url("https://reflect.app")
+                .is_err()
+        );
     }
 
     #[test]
