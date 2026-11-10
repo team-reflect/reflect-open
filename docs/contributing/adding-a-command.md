@@ -21,10 +21,12 @@ First check whether you need a new command. Per
 ## 1. The Rust command
 
 Put it in the module that owns the capability (`fs/`, `db/`, `git.rs`,
-`capture.rs`, `embed.rs`, …) or a new one. The settings, recents, and secrets
-commands are methods on `Core` in `crates/core` (crate `reflect-core`, no
-Tauri); their `#[tauri::command]` functions only forward to those methods, and
-`Core::dispatch` lists each of them once.
+`capture.rs`, `embed.rs`, …) or a new one. The settings, recents, secrets, and
+background task commands are methods on `Core` in `crates/core` (crate
+`reflect-core`, no Tauri); their `#[tauri::command]` functions only forward to
+those methods, and `Core::dispatch` lists each of them once. State that
+commands share (the graph session, the index session, the background
+assertions) is a field of `Core`, reached through the managed `Arc<Core>`.
 Commands are snake_case, return `AppResult<T>`, and serialize camelCase:
 
 ```rust
@@ -38,8 +40,8 @@ pub struct NoteStat {
 
 /// Command: file metadata for one note (graph-relative path).
 #[tauri::command]
-pub fn note_stat(path: String, state: tauri::State<GraphState>) -> AppResult<NoteStat> {
-    let root = current_root(&state)?;
+pub fn note_stat(path: String, core: tauri::State<Arc<Core>>) -> AppResult<NoteStat> {
+    let root = current_root(&core.graph)?;
     let resolved = resolve(&root, &path)?; // traversal guard — see below
     // ...
 }

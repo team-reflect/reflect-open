@@ -15,7 +15,9 @@ pub mod x_syndication;
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use reflect_core::Core;
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -60,11 +62,11 @@ pub(crate) use reflect_graph_paths::icloud_placeholder_target;
 pub(crate) use reflect_graph_paths::is_dataless;
 /// Create a new graph at `path` (scaffolds the layout) and open it.
 #[tauri::command]
-pub fn graph_create(path: String, state: State<GraphState>) -> AppResult<GraphInfo> {
+pub fn graph_create(path: String, core: State<Arc<Core>>) -> AppResult<GraphInfo> {
     let root = PathBuf::from(&path);
     fs::create_dir_all(&root)?;
     bootstrap(&root)?;
-    open_graph(&state, &root)
+    open_graph(&core.graph, &root)
 }
 
 /// Import a user-selected Reflect V1 export `.zip` into the open graph. V1's
@@ -82,10 +84,10 @@ pub async fn graph_import_reflect_v1_zip(
     path: String,
     generation: u64,
     app: tauri::AppHandle,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
     cancel: State<'_, ImportCancel>,
 ) -> AppResult<import::ImportSummary> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     // Holds the one import slot until this command returns on any path — a
     // second import starting mid-run would clear a cancel meant for the
     // first and race its writes.
@@ -109,13 +111,13 @@ pub async fn graph_import_reflect_v1_zip(
     // has switched away from (or an import the user cancelled) in the
     // meantime — nothing has been written yet.
     cancel.ensure_active()?;
-    root_for_generation(&state, generation)?;
+    root_for_generation(&core.graph, generation)?;
     // Writing is fast and local; throttle the events to ~100 per import so a
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
     let summary = with_graph_lock(&root, || {
         cancel.ensure_active()?;
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         import::finalize_import(&root, prepared, downloads, |done, total| {
             let step = (total / 100).max(1);
             if done == total || done >= last_emitted + step {
@@ -124,7 +126,7 @@ pub async fn graph_import_reflect_v1_zip(
             }
         })
     })?;
-    invalidate_file_catalog(&state, &root);
+    invalidate_file_catalog(&core.graph, &root);
     Ok(summary)
 }
 
@@ -157,13 +159,13 @@ fn open_graph(state: &GraphState, root: &Path) -> AppResult<GraphInfo> {
 /// Open an existing Markdown vault in place, adding only `.reflect/` runtime
 /// state. Reflect's authoring directories remain lazy for adopted vaults.
 #[tauri::command]
-pub fn graph_open(path: String, state: State<GraphState>) -> AppResult<GraphInfo> {
+pub fn graph_open(path: String, core: State<Arc<Core>>) -> AppResult<GraphInfo> {
     let root = PathBuf::from(&path);
     if !root.is_dir() {
         return Err(AppError::not_found(format!("not a directory: {path}")));
     }
     initialize_runtime(&root)?;
-    open_graph(&state, &root)
+    open_graph(&core.graph, &root)
 }
 
 /// Read a note's markdown by graph-relative path. `generation`, when given,
@@ -177,9 +179,9 @@ pub fn graph_open(path: String, state: State<GraphState>) -> AppResult<GraphInfo
 pub async fn note_read(
     path: String,
     generation: Option<u64>,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<String> {
-    let root = root_for(&state, generation)?;
+    let root = root_for(&core.graph, generation)?;
     let abs = resolve(&root, &path)?;
     crate::blocking::run_blocking(move || Ok(io::read_note_no_follow(&root, &abs)?)).await
 }
@@ -199,9 +201,9 @@ pub async fn note_read(
 pub async fn note_read_local(
     path: String,
     generation: Option<u64>,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<LocalNoteRead> {
-    let root = root_for(&state, generation)?;
+    let root = root_for(&core.graph, generation)?;
     let abs = resolve(&root, &path)?;
     let read_root = root;
     crate::blocking::run_blocking(move || {
@@ -247,18 +249,18 @@ pub fn note_write(
     generation: u64,
     check_contents: Option<bool>,
     expected_contents: Option<String>,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<NoteWriteOutcome> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let outcome = write_note_revision(
         &root,
         &path,
         &contents,
         check_contents == Some(true),
         expected_contents.as_deref(),
-        || root_for_generation(&state, generation).map(drop),
+        || root_for_generation(&core.graph, generation).map(drop),
     )?;
-    invalidate_file_catalog(&state, &root);
+    invalidate_file_catalog(&core.graph, &root);
     Ok(outcome)
 }
 
@@ -270,11 +272,11 @@ pub fn note_create(
     path: String,
     contents: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<NoteCreateOutcome> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let outcome = with_graph_lock(&root, || {
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         let target = resolve(&root, &path)?;
         let outcome = atomic_create(&root, &target, &contents)?;
         if matches!(outcome, AtomicCreateOutcome::Created(_)) {
@@ -284,7 +286,7 @@ pub fn note_create(
     })?;
     match outcome {
         AtomicCreateOutcome::Created(modified_ms) => {
-            invalidate_file_catalog(&state, &root);
+            invalidate_file_catalog(&core.graph, &root);
             Ok(NoteCreateOutcome::Created { modified_ms })
         }
         AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
@@ -299,18 +301,18 @@ pub fn asset_write(
     path: String,
     contents_base64: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
     use base64::Engine;
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
     with_graph_lock(&root, || {
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)
     })?;
-    invalidate_file_catalog(&state, &root);
+    invalidate_file_catalog(&core.graph, &root);
     Ok(())
 }
 
@@ -320,15 +322,15 @@ pub fn asset_write(
 /// file-delete IPC. Idempotent — a segment deleted twice (or never written)
 /// is fine.
 #[tauri::command(async)]
-pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
+pub fn audio_memo_delete(path: String, generation: u64, core: State<Arc<Core>>) -> AppResult<()> {
     if !path.starts_with("audio-memos/") {
         return Err(AppError::traversal(format!(
             "not an audio memo path: {path}"
         )));
     }
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     with_graph_lock(&root, || {
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         let abs = resolve(&root, &path)?;
         // An iCloud-evicted segment exists only as its `.name.icloud` stub,
         // mirror `note_delete` so a cancelled session's evicted parts still
@@ -353,9 +355,9 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
 pub fn transcript_cache_read(
     name: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<String> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     match fs::read_to_string(transcript_cache_file(&root, &name)?) {
         Ok(contents) => Ok(contents),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
@@ -372,9 +374,9 @@ pub fn transcript_cache_write(
     name: String,
     contents: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     fs::write(transcript_cache_file(&root, &name)?, contents)?;
     Ok(())
 }
@@ -387,9 +389,9 @@ pub fn transcript_cache_write(
 pub fn asset_read_binary(
     path: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<tauri::ipc::Response> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     Ok(tauri::ipc::Response::new(fs::read(resolve(&root, &path)?)?))
 }
 
@@ -399,10 +401,10 @@ pub fn asset_read_binary(
 /// switch, and an unpinned read would resolve against the *new* root —
 /// handing back (and possibly sending to a provider) another graph's file.
 #[tauri::command]
-pub fn asset_read(path: String, generation: u64, state: State<GraphState>) -> AppResult<String> {
+pub fn asset_read(path: String, generation: u64, core: State<Arc<Core>>) -> AppResult<String> {
     use base64::Engine;
     ensure_readable_attachment_path(&path)?;
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let bytes = fs::read(resolve(&root, &path)?)?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
@@ -415,10 +417,10 @@ pub fn asset_open(
     path: String,
     generation: u64,
     app: tauri::AppHandle,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
     ensure_readable_attachment_path(&path)?;
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let abs = resolve(&root, &path)?;
     if !abs.is_file() {
         return Err(AppError::not_found(format!("asset not found: {path}")));
@@ -450,10 +452,10 @@ pub fn asset_reveal(
     path: String,
     generation: u64,
     app: tauri::AppHandle,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
     ensure_revealable_path(&path)?;
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let abs = resolve(&root, &path)?;
     if !abs.is_file() {
         return Err(AppError::not_found(format!("asset not found: {path}")));
@@ -489,12 +491,8 @@ fn asset_file_url(path: &Path) -> AppResult<tauri::Url> {
 /// reason as `asset_read` — the listing seeds a background pass that must
 /// never mix graphs.
 #[tauri::command]
-pub fn dir_list(
-    dir: String,
-    generation: u64,
-    state: State<GraphState>,
-) -> AppResult<Vec<FileMeta>> {
-    let root = root_for_generation(&state, generation)?;
+pub fn dir_list(dir: String, generation: u64, core: State<Arc<Core>>) -> AppResult<Vec<FileMeta>> {
+    let root = root_for_generation(&core.graph, generation)?;
     resolve(&root, &dir)?; // traversal guard; the walk itself skips symlinks
     let mut out = Vec::new();
     io::collect_files(&root, &dir, None, &mut out)?;
@@ -505,8 +503,8 @@ pub fn dir_list(
 /// (Plan 17) probes disk as well as the index — the index lags the watcher by
 /// a debounce, and an unindexed file must never be clobbered by a new note.
 #[tauri::command]
-pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
-    let root = current_root(&state)?;
+pub fn note_exists(path: String, core: State<Arc<Core>>) -> AppResult<bool> {
+    let root = current_root(&core.graph)?;
     // Occupied, not merely readable: an iCloud-evicted note is only a stub on
     // disk, but creating a new note at its path would collide the moment the
     // real file re-downloads (Plan 21).
@@ -518,10 +516,10 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
 /// `.reflect/trash/` instead (Plan 19), the same recoverability promise, and
 /// `.reflect/` is already excluded from sync and indexing.
 #[tauri::command(async)]
-pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
-    let root = root_for_generation(&state, generation)?;
+pub fn note_delete(path: String, generation: u64, core: State<Arc<Core>>) -> AppResult<()> {
+    let root = root_for_generation(&core.graph, generation)?;
     with_graph_lock(&root, || {
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         delete_note_locked(&root, &path, |target| {
             #[cfg(desktop)]
             return os_trash_delete(target);
@@ -529,7 +527,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
             move_to_graph_trash(&root, target)
         })
     })?;
-    invalidate_file_catalog(&state, &root);
+    invalidate_file_catalog(&core.graph, &root);
     Ok(())
 }
 
@@ -544,15 +542,15 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
 /// never trash the newly opened graph. Desktop-only: mobile's fixed roots
 /// have no OS trash and no delete UI.
 #[tauri::command(async)]
-pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> {
+pub fn graph_delete(generation: u64, core: State<Arc<Core>>) -> AppResult<()> {
     #[cfg(desktop)]
     {
-        let root = root_for_generation(&state, generation)?;
+        let root = root_for_generation(&core.graph, generation)?;
         // Take the graph lock first, then check the generation and invalidate
         // under one session lock hold. Pinned writes re-check the generation
         // under the graph lock, so one that waited here fails afterwards.
         with_graph_lock(&root, || {
-            invalidate_for_delete(&state, generation)?;
+            invalidate_for_delete(&core.graph, generation)?;
             os_trash_delete(&root)
         })?;
         // Recents is a convenience cache (same stance as `activate`): the
@@ -565,7 +563,7 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
     }
     #[cfg(mobile)]
     {
-        let _ = (generation, &state);
+        let _ = (generation, &core);
         Err(AppError::io(
             "deleting a graph is not supported on this platform",
         ))
@@ -635,13 +633,13 @@ where
     let generation = match generation {
         Some(generation) => generation,
         None => {
-            let state = app.state::<GraphState>();
-            current_graph_info(&state)?.generation
+            let core = app.state::<Arc<Core>>();
+            current_graph_info(&core.graph)?.generation
         }
     };
     crate::blocking::run_blocking(move || {
-        let state = app.state::<GraphState>();
-        Ok(listing(file_catalog(&state, Some(generation))?))
+        let core = app.state::<Arc<Core>>();
+        Ok(listing(file_catalog(&core.graph, Some(generation))?))
     })
     .await
 }
@@ -649,9 +647,9 @@ where
 #[tauri::command]
 pub fn vault_scan_stats(
     generation: Option<u64>,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<VaultScanStats> {
-    let catalog = file_catalog(&state, generation)?;
+    let catalog = file_catalog(&core.graph, generation)?;
     Ok(VaultScanStats {
         notes: catalog.notes.len() as u32,
         attachments: catalog.attachments.len() as u32,
@@ -675,9 +673,10 @@ mod asset_url_tests {
 
 #[cfg(test)]
 mod graph_delete_race_tests {
-    use super::{GraphState, note_write};
+    use super::note_write;
+    use reflect_core::{Core, CoreConfig};
     use reflect_graph_io::{graph_lock_holders, invalidate_for_delete, with_graph_lock};
-    use std::sync::mpsc;
+    use std::sync::{Arc, mpsc};
     use std::time::{Duration, Instant};
     use tauri::Manager;
 
@@ -689,17 +688,17 @@ mod graph_delete_race_tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("graph");
         std::fs::create_dir_all(root.join("notes")).unwrap();
-        let state = GraphState::default();
+        let app = tauri::test::mock_builder()
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        let host = Arc::new(crate::host::TauriHost::new(app.handle().clone()));
+        app.manage(Arc::new(Core::new(CoreConfig::default(), host).unwrap()));
+        let graph = &app.state::<Arc<Core>>().inner().graph;
         {
-            let mut inner = state.0.lock().unwrap();
+            let mut inner = graph.0.lock().unwrap();
             inner.generation = 1;
             inner.root = Some(root.clone());
         }
-        let app = tauri::test::mock_builder()
-            .manage(state)
-            .build(tauri::test::mock_context(tauri::test::noop_assets()))
-            .expect("mock app");
-        let graph = app.state::<GraphState>().inner();
         let handle = app.handle().clone();
 
         std::thread::scope(|scope| {
@@ -723,7 +722,7 @@ mod graph_delete_race_tests {
                     1,
                     None,
                     None,
-                    handle.state::<GraphState>(),
+                    handle.state::<Arc<Core>>(),
                 )
             });
             let deadline = Instant::now() + Duration::from_secs(10);

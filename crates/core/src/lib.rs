@@ -2,15 +2,20 @@
 //! its [`Host`] and either calls the typed methods or routes a command name
 //! and JSON arguments through [`Core::dispatch`].
 
+pub mod background_task;
 pub mod recents;
 mod secrets;
 pub mod settings;
 
 use std::sync::Arc;
 
+use reflect_graph_io::GraphState;
+use reflect_index::IndexSession;
 use reflect_types::{AppError, AppResult};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+
+use crate::background_task::BackgroundTaskState;
 
 /// What the shell provides to the core.
 pub trait Host: Send + Sync + 'static {
@@ -35,9 +40,15 @@ pub enum Reply {
     Bytes(Vec<u8>),
 }
 
-/// The command implementations, the runtime they run on, and the shell's
-/// [`Host`].
+/// The command implementations, the state they share, the runtime they run
+/// on, and the shell's [`Host`].
 pub struct Core {
+    /// The open graph session.
+    pub graph: GraphState,
+    /// The open index session.
+    pub index: IndexSession,
+    /// The native background assertions.
+    pub background_tasks: BackgroundTaskState,
     config: CoreConfig,
     host: Arc<dyn Host>,
     runtime: tokio::runtime::Runtime,
@@ -51,6 +62,9 @@ impl Core {
             .enable_all()
             .build()?;
         Ok(Self {
+            graph: GraphState::default(),
+            index: IndexSession::default(),
+            background_tasks: BackgroundTaskState::default(),
             config,
             host,
             runtime,
@@ -95,6 +109,8 @@ impl Core {
             "secret_set" => secret_set(name: String, value: String).await,
             "secret_get" => secret_get(name: String).await,
             "secret_delete" => secret_delete(name: String).await,
+            "background_task_begin" => background_task_begin() infallible,
+            "background_task_end" => background_task_end(token: String) infallible,
         }
     }
 }
@@ -125,23 +141,39 @@ fn json_reply<T: Serialize>(value: &T) -> AppResult<Reply> {
 
 /// Expands to a `match` on the command name. Each line deserializes a
 /// camelCase argument struct, calls the method of the same shape, and
-/// serializes its result. A trailing `.await` marks an async method.
+/// serializes its result. A trailing `.await` marks an async method, and a
+/// trailing `infallible` a method that returns its value without `AppResult`.
 macro_rules! dispatch_table {
     ($core:ident, $command:ident, $args:ident;
-     $( $name:literal => $method:ident ( $( $arg:ident : $ty:ty ),* ) $( . $await:tt )? ),* $(,)?) => {
+     $( $name:literal => $method:ident ( $( $arg:ident : $ty:ty ),* )
+        $( . $await:tt )? $( $infallible:ident )? ),* $(,)?) => {
         match $command {
             $( $name => {
                 #[derive(serde::Deserialize)]
                 #[serde(rename_all = "camelCase")]
                 struct Args { $( $arg: $ty ),* }
                 let Args { $( $arg ),* } = parse_args($command, $args)?;
-                json_reply(&$core.$method($( $arg ),*) $( . $await )? ?)
+                json_reply(&method_result!(
+                    $core.$method($( $arg ),*) $( . $await )? $( , $infallible )?
+                ))
             } )*
             other => Err(AppError::not_found(format!("unknown command: {other}"))),
         }
     };
 }
 use dispatch_table;
+
+/// The value of one `dispatch_table!` method call, with `?` applied unless
+/// the line is marked `infallible`.
+macro_rules! method_result {
+    ($call:expr) => {
+        $call?
+    };
+    ($call:expr, infallible) => {
+        $call
+    };
+}
+use method_result;
 
 #[cfg(test)]
 pub(crate) mod test_support {

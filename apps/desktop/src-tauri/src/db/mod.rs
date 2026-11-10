@@ -8,14 +8,14 @@
 //! broadcasts after a committed write.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use reflect_core::{Core, background_task};
 use reflect_index::{Applied, FileIndexConnections};
 use serde_json::{Map, Value};
 use tauri::{Manager, State};
 
-use crate::background_task::{self, BackgroundTaskState};
 use crate::error::{AppError, AppResult};
-use crate::fs::GraphState;
 
 pub use reflect_index::{
     ChatConversation, ChatMessageRow, EmbeddedChunk, IndexSession as IndexState, IndexTouch,
@@ -54,13 +54,10 @@ fn now_ms() -> u64 {
 /// Open + migrate the index for the active graph (reads the root from state).
 /// Returns the new generation, which write commands must echo back.
 #[tauri::command]
-pub fn index_open(
-    graph: State<GraphState>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
-) -> AppResult<u64> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index open");
-    let root: PathBuf = graph
+pub fn index_open(core: State<Arc<Core>>) -> AppResult<u64> {
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect index open");
+    let root: PathBuf = core
+        .graph
         .0
         .lock()
         .map_err(|err| {
@@ -70,7 +67,7 @@ pub fn index_open(
         .root
         .clone()
         .ok_or_else(AppError::no_graph)?;
-    index.open(&root, &FileIndexConnections)
+    core.index.open(&root, &FileIndexConnections)
 }
 
 /// Apply one note's extracted projection in a single transaction (no-op if
@@ -80,11 +77,10 @@ pub fn index_apply<R: tauri::Runtime>(
     note: IndexedNote,
     generation: u64,
     app: tauri::AppHandle<R>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index update");
-    if index.apply(generation, std::slice::from_ref(&note))? == Applied::Committed {
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect index update");
+    if core.index.apply(generation, std::slice::from_ref(&note))? == Applied::Committed {
         emit_index_written(&app);
     }
     Ok(())
@@ -96,11 +92,10 @@ pub fn index_apply_batch<R: tauri::Runtime>(
     notes: Vec<IndexedNote>,
     generation: u64,
     app: tauri::AppHandle<R>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index update");
-    if index.apply(generation, &notes)? == Applied::Committed {
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect index update");
+    if core.index.apply(generation, &notes)? == Applied::Committed {
         emit_index_written(&app);
     }
     Ok(())
@@ -113,11 +108,10 @@ pub fn index_remove<R: tauri::Runtime>(
     path: String,
     generation: u64,
     app: tauri::AppHandle<R>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index remove");
-    if index.remove(generation, &path)? == Applied::Committed {
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect index remove");
+    if core.index.remove(generation, &path)? == Applied::Committed {
         emit_index_written(&app);
     }
     Ok(())
@@ -132,19 +126,17 @@ pub fn note_move_indexed<R: tauri::Runtime>(
     request: NoteMoveRequest,
     generation: u64,
     app: tauri::AppHandle<R>,
-    graph: State<GraphState>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect note move");
-    let root = crate::fs::root_for_generation(&graph, generation)?;
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect note move");
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     crate::fs::with_graph_lock(&root, || {
-        crate::fs::root_for_generation(&graph, generation)?;
-        index.move_note(&root, &request, || {
+        crate::fs::root_for_generation(&core.graph, generation)?;
+        core.index.move_note(&root, &request, || {
             crate::fs::move_note_file(&root, &request.from, &request.to)
         })
     })?;
-    crate::fs::invalidate_file_catalog(&graph, &root);
+    crate::fs::invalidate_file_catalog(&core.graph, &root);
     emit_index_written(&app);
     emit_note_moved(&app, &request.from, &request.to);
     Ok(())
@@ -159,11 +151,10 @@ pub fn index_move<R: tauri::Runtime>(
     generation: u64,
     to_address: MovedNoteAddress,
     app: tauri::AppHandle<R>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index move");
-    if index.move_rows(generation, &from, &to, &to_address)? == Applied::Committed {
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect index move");
+    if core.index.move_rows(generation, &from, &to, &to_address)? == Applied::Committed {
         emit_index_written(&app);
         emit_note_moved(&app, &from, &to);
     }
@@ -184,14 +175,14 @@ pub async fn index_reconcile_scan<R: tauri::Runtime>(
     // post-paint "I can see a note but can't tap it" freeze on every open.
     crate::blocking::run_blocking(move || {
         let started = std::time::Instant::now();
-        let index = app.state::<IndexState>();
-        let Some(root) = index.root_for_generation(generation)? else {
+        let core = app.state::<Arc<Core>>();
+        let Some(root) = core.index.root_for_generation(generation)? else {
             return Ok(ReconcileScan::empty());
         };
         let walk_started = std::time::Instant::now();
         let files = crate::fs::note_files(&root);
         let walk_ms = walk_started.elapsed().as_millis() as u64;
-        let scan = index.reconcile_scan(generation, &files, now_ms())?;
+        let scan = core.index.reconcile_scan(generation, &files, now_ms())?;
         tracing::info!(
             files = scan.total,
             candidates = scan.candidates.len(),
@@ -211,11 +202,10 @@ pub async fn index_reconcile_scan<R: tauri::Runtime>(
 pub fn index_touch(
     entries: Vec<IndexTouch>,
     generation: u64,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index touch");
-    index.touch(generation, &entries).map(drop)
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect index touch");
+    core.index.touch(generation, &entries).map(drop)
 }
 
 /// Upsert one `index_meta` key (no-op if stale). Reads go through `db_query`.
@@ -224,11 +214,11 @@ pub fn index_meta_set(
     key: String,
     value: String,
     generation: u64,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index metadata");
-    index.set_meta(generation, &key, &value).map(drop)
+    let _background_task =
+        background_task::scoped(&core.background_tasks, "Reflect index metadata");
+    core.index.set_meta(generation, &key, &value).map(drop)
 }
 
 /// Wipe all derived tables (the TS layer then re-applies every note; no-op if
@@ -237,11 +227,10 @@ pub fn index_meta_set(
 pub fn index_clear<R: tauri::Runtime>(
     generation: u64,
     app: tauri::AppHandle<R>,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect index clear");
-    if index.clear(generation)? == Applied::Committed {
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect index clear");
+    if core.index.clear(generation)? == Applied::Committed {
         emit_index_written(&app);
     }
     Ok(())
@@ -254,11 +243,10 @@ pub fn chat_message_save(
     conversation: ChatConversation,
     message: ChatMessageRow,
     generation: u64,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect chat save");
-    index
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect chat save");
+    core.index
         .save_chat_message(generation, &conversation, &message)
         .map(drop)
 }
@@ -268,11 +256,12 @@ pub fn chat_message_save(
 pub fn chat_conversation_delete(
     id: String,
     generation: u64,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect chat delete");
-    index.delete_chat_conversation(generation, &id).map(drop)
+    let _background_task = background_task::scoped(&core.background_tasks, "Reflect chat delete");
+    core.index
+        .delete_chat_conversation(generation, &id)
+        .map(drop)
 }
 
 /// Replace a note's embedding chunk set (no-op if stale).
@@ -281,23 +270,21 @@ pub fn embed_apply(
     path: String,
     chunks: Vec<EmbeddedChunk>,
     generation: u64,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect embeddings update");
-    index.apply_embeddings(generation, &path, &chunks).map(drop)
+    let _background_task =
+        background_task::scoped(&core.background_tasks, "Reflect embeddings update");
+    core.index
+        .apply_embeddings(generation, &path, &chunks)
+        .map(drop)
 }
 
 /// Drop a deleted note's chunks + vectors (no-op if stale).
 #[tauri::command]
-pub fn embed_remove(
-    path: String,
-    generation: u64,
-    index: State<IndexState>,
-    background_tasks: State<BackgroundTaskState>,
-) -> AppResult<()> {
-    let _background_task = background_task::scoped(&background_tasks, "Reflect embeddings remove");
-    index.remove_embeddings(generation, &path).map(drop)
+pub fn embed_remove(path: String, generation: u64, core: State<Arc<Core>>) -> AppResult<()> {
+    let _background_task =
+        background_task::scoped(&core.background_tasks, "Reflect embeddings remove");
+    core.index.remove_embeddings(generation, &path).map(drop)
 }
 
 /// Execute a read query (compiled by Kysely on the frontend) and return rows.
@@ -315,7 +302,11 @@ pub async fn db_query<R: tauri::Runtime>(
     // Pin the index session before the hop: with no main-thread FIFO, a
     // graph switch can rebind the index between invoke and execution, and a
     // query issued for graph A must not return graph B's rows.
-    let requested = app.state::<IndexState>().read_generation()?;
-    crate::blocking::run_blocking(move || app.state::<IndexState>().query(requested, &sql, &params))
-        .await
+    let requested = app.state::<Arc<Core>>().index.read_generation()?;
+    crate::blocking::run_blocking(move || {
+        app.state::<Arc<Core>>()
+            .index
+            .query(requested, &sql, &params)
+    })
+    .await
 }

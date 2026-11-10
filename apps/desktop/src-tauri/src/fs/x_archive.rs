@@ -1,10 +1,11 @@
-use super::GraphState;
 use crate::error::{AppError, AppResult};
+use reflect_core::Core;
 use reflect_graph_io::x_archive_store as archive;
 use reflect_types::FileChange;
 use reflect_types::events::INDEX_CHANGED;
 use serde_json::{Value, json};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::{Emitter, Manager, State};
 
 async fn blocking<T: Send + 'static>(
@@ -28,7 +29,9 @@ fn download_media<R: tauri::Runtime>(
         tauri::async_runtime::spawn(async move {
             match super::x_download::download(root, url).await {
                 Ok(receipt) => {
-                    if super::root_for_generation(&app.state::<GraphState>(), generation).is_ok() {
+                    if super::root_for_generation(&app.state::<Arc<Core>>().graph, generation)
+                        .is_ok()
+                    {
                         let change = FileChange::upsert(format!("assets/x/{}", receipt.name), None);
                         let _ = app.emit(INDEX_CHANGED, vec![change]);
                     }
@@ -46,7 +49,7 @@ pub async fn x_archive_write<R: tauri::Runtime>(
     generation: u64,
     value: Value,
 ) -> AppResult<()> {
-    let root = super::root_for_generation(&app.state::<GraphState>(), generation)?;
+    let root = super::root_for_generation(&app.state::<Arc<Core>>().graph, generation)?;
     let saved = value;
     let saved = blocking(root.clone(), move |root| {
         let view = archive::post_view(&saved)?;
@@ -65,7 +68,7 @@ pub async fn x_archive_resolve<R: tauri::Runtime>(
     generation: u64,
     post_id: String,
 ) -> AppResult<Option<Value>> {
-    let root = super::root_for_generation(&app.state::<GraphState>(), generation)?;
+    let root = super::root_for_generation(&app.state::<Arc<Core>>().graph, generation)?;
     let post = blocking(root.clone(), move |root| {
         archive::read_post(&root, &post_id)
     })
@@ -91,13 +94,13 @@ pub async fn x_archive_resolve<R: tauri::Runtime>(
 #[tauri::command]
 
 pub async fn x_archive_owners(
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
     asset_path: String,
     generation: Option<u64>,
 ) -> AppResult<Vec<String>> {
     let root = match generation {
-        Some(generation) => super::root_for_generation(&state, generation)?,
-        None => super::current_root(&state)?,
+        Some(generation) => super::root_for_generation(&core.graph, generation)?,
+        None => super::current_root(&core.graph)?,
     };
     blocking(root, move |root| {
         if !asset_path.starts_with("assets/x/") {

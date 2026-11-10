@@ -17,12 +17,13 @@
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use reflect_core::Core;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
-use crate::fs::GraphState;
 use reflect_graph_io::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use reflect_graph_io::conflict::ladder::{self, ConflictInput};
 use reflect_graph_io::conflict::shadow::{ShadowStore, blob_hash8_of_file, content_hash};
@@ -89,10 +90,10 @@ pub async fn icloud_conflicts_scan(
     ingested_paths: Vec<String>,
     record_baseline: bool,
     scope: SweepScope,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<SweepOutcome> {
     let started = std::time::Instant::now();
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     let sweep_root = root.clone();
     let outcome = crate::blocking::run_blocking(move || {
         let candidates = conflict_candidates(scope, &ingested_paths);
@@ -117,7 +118,7 @@ pub async fn icloud_conflicts_scan(
         );
     }
     // Folds rename files; a cached listing would pin the old names.
-    crate::fs::invalidate_file_catalog(&state, &root);
+    crate::fs::invalidate_file_catalog(&core.graph, &root);
     outcome
 }
 

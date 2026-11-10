@@ -1,22 +1,22 @@
 //! The [`Host`] that `reflect-core` reaches the Tauri app through.
 
 use reflect_core::Host;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{AppError, AppResult};
 
-pub struct TauriHost {
-    app: AppHandle,
+pub struct TauriHost<R: Runtime> {
+    app: AppHandle<R>,
 }
 
-impl TauriHost {
-    pub fn new(app: AppHandle) -> Self {
+impl<R: Runtime> TauriHost<R> {
+    pub fn new(app: AppHandle<R>) -> Self {
         Self { app }
     }
 }
 
-impl Host for TauriHost {
+impl<R: Runtime> Host for TauriHost<R> {
     fn emit(&self, event: &str, payload: serde_json::Value) {
         let _ = self.app.emit(event, payload);
     }

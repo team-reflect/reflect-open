@@ -9,7 +9,9 @@
 //! `git_clone`, which runs before any graph is open.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use reflect_core::Core;
 use tauri::State;
 
 use reflect_git::{
@@ -19,7 +21,6 @@ use reflect_git::{
 
 use crate::blocking::run_blocking;
 use crate::error::AppResult;
-use crate::fs::GraphState;
 
 /// Run a git operation on a blocking thread, retrying once after clearing a
 /// stale `.lock` file.
@@ -33,8 +34,8 @@ where
 
 /// Snapshot the backup repository (cheap, no network).
 #[tauri::command]
-pub async fn git_status(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+pub async fn git_status(generation: u64, core: State<'_, Arc<Core>>) -> AppResult<GitStatus> {
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     run_blocking(move || reflect_git::status(&root)).await
 }
 
@@ -48,9 +49,9 @@ pub async fn git_setup(
     remote_url: Option<String>,
     branch: Option<String>,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<GitStatus> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     run_git(root, move |root| {
         crate::fs::with_graph_lock(root, || {
             reflect_git::setup(root, remote_url.clone(), branch.clone())
@@ -62,8 +63,8 @@ pub async fn git_setup(
 /// Stop backing this graph up (drop `origin`; repo, history, and the
 /// machine-level credential all stay).
 #[tauri::command]
-pub async fn git_disconnect(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+pub async fn git_disconnect(generation: u64, core: State<'_, Arc<Core>>) -> AppResult<GitStatus> {
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     run_git(root, |root| {
         crate::fs::with_graph_lock(root, || reflect_git::disconnect(root))
     })
@@ -87,9 +88,9 @@ pub async fn git_clone(
 pub async fn git_commit_all(
     message: String,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<CommitOutcome> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     let started = std::time::Instant::now();
     let outcome = run_git(root, move |root| {
         reflect_git::commit_all(root, &message, MAX_FILE_BYTES)
@@ -111,9 +112,9 @@ pub async fn git_commit_all(
 pub async fn git_fetch(
     credential: Option<GitCredential>,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<RemoteDelta> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     run_git(root, move |root| {
         reflect_git::fetch(root, credential.clone())
     })
@@ -127,9 +128,9 @@ pub async fn git_remote_head(
     url: Option<String>,
     credential: Option<GitCredential>,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<RemoteTip> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     run_blocking(move || reflect_git::remote_head(&root, url.as_deref(), credential)).await
 }
 
@@ -138,16 +139,16 @@ pub async fn git_remote_head(
 pub async fn git_pull(
     message: String,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<PullOutcome> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     let outcome = run_git(root, move |root| {
         reflect_git::pull_all(root, &message, MAX_FILE_BYTES)
     })
     .await;
     // Invalidate on both arms: a failed pull can leave the tree half written.
-    let root = crate::fs::root_for_generation(&state, generation)?;
-    crate::fs::invalidate_file_catalog(&state, &root);
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
+    crate::fs::invalidate_file_catalog(&core.graph, &root);
     outcome
 }
 
@@ -157,9 +158,9 @@ pub async fn git_pull(
 pub async fn git_push(
     credential: Option<GitCredential>,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<PushOutcome> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     run_git(root, move |root| {
         reflect_git::push(root, credential.clone())
     })

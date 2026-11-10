@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use file_id::{FileId, get_file_id};
@@ -27,6 +27,7 @@ use notify::{EventKindMask, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, new_debouncer_opt,
 };
+use reflect_core::Core;
 use reflect_graph_paths::{
     GraphPathKind, classify, evicted_logical_path, eviction_placeholder, has_pruned_component,
     is_pruned_dir_name, to_slash_lossy, wire_path,
@@ -35,7 +36,6 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use walkdir::WalkDir;
 
 use crate::error::{AppError, AppResult};
-use crate::fs::GraphState;
 use reflect_types::events::{INDEX_CHANGED, INDEX_RECONCILE};
 use reflect_types::{ChangeKind, FileChange};
 
@@ -292,10 +292,10 @@ fn watch_graph(root: &Path, handler: impl DebounceEventHandler) -> notify::Resul
 #[tauri::command]
 pub fn watch_start(
     app: AppHandle,
-    graph: State<GraphState>,
+    core: State<Arc<Core>>,
     watcher: State<WatcherState>,
 ) -> AppResult<()> {
-    let graph_guard = graph.0.lock().map_err(|err| {
+    let graph_guard = core.graph.0.lock().map_err(|err| {
         tracing::error!(?err, "graph state lock poisoned by an earlier panic");
         AppError::io("graph state lock poisoned")
     })?;
@@ -337,7 +337,7 @@ pub fn watch_start(
         if effects.reconcile || !effects.changes.is_empty() {
             // Drop the cached catalog before telling the frontend: its
             // follow-up `list_files` must re-walk, not replay the cache.
-            crate::fs::invalidate_file_catalog(&app.state::<GraphState>(), &handler_root);
+            crate::fs::invalidate_file_catalog(&app.state::<Arc<Core>>().graph, &handler_root);
         }
         if !effects.changes.is_empty() {
             let _ = app.emit(INDEX_CHANGED, &effects.changes);

@@ -1,8 +1,9 @@
-use super::GraphState;
 use super::x_archive_store as archive;
+use reflect_core::Core;
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::sync::Arc;
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, Runtime, UriSchemeResponder};
 
@@ -57,7 +58,7 @@ async fn serve<R: Runtime>(
     if request.method() != "GET" {
         return error(StatusCode::METHOD_NOT_ALLOWED);
     }
-    let Ok(root) = super::root_for_generation(&app.state::<GraphState>(), generation) else {
+    let Ok(root) = super::root_for_generation(&app.state::<Arc<Core>>().graph, generation) else {
         return error(StatusCode::FORBIDDEN);
     };
     let lookup_root = root.clone();
