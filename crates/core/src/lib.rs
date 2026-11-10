@@ -3,6 +3,11 @@
 //! and JSON arguments through [`Core::dispatch`].
 
 pub mod background_task;
+pub mod capture;
+pub mod contacts;
+pub mod editor_link_preview;
+pub mod icloud;
+mod link_preview;
 pub mod recents;
 mod secrets;
 pub mod settings;
@@ -30,7 +35,11 @@ pub trait Host: Send + Sync + 'static {
 
 /// Values the shell knows at launch.
 #[derive(Debug, Clone, Default)]
-pub struct CoreConfig {}
+pub struct CoreConfig {
+    /// The app-sandbox `Documents/` directory, or `None` when the shell has
+    /// none.
+    pub document_dir: Option<std::path::PathBuf>,
+}
 
 /// The result of [`Core::dispatch`].
 #[derive(Debug, Clone, PartialEq)]
@@ -112,6 +121,34 @@ impl Core {
             "secret_delete" => secret_delete(name: String).await,
             "background_task_begin" => background_task_begin() infallible,
             "background_task_end" => background_task_end(token: String) infallible,
+            "mobile_storage" => mobile_storage().await,
+            "mobile_storage_local" => mobile_storage_local(),
+            "icloud_download_pending" => icloud_download_pending(root: String, notes_only: bool).await,
+            "icloud_pending_count" => icloud_pending_count(root: String, notes_only: bool).await,
+            "icloud_request_downloads" => icloud_request_downloads(paths: Vec<String>).await,
+            "icloud_status" => icloud_status().await,
+            "icloud_adopt_graph" => icloud_adopt_graph(generation: u64).await,
+            "icloud_conflicts_scan" => icloud_conflicts_scan(generation: u64, skip_paths: Vec<String>, ingested_paths: Vec<String>, record_baseline: bool, scope: icloud::sweep::SweepScope).await,
+            "icloud_watch_start" => icloud_watch_start(root: String).await,
+            "icloud_watch_stop" => icloud_watch_stop(),
+            "contacts_authorization_status" => contacts_authorization_status().await,
+            "contacts_request_access" => contacts_request_access().await,
+            "contacts_lookup_by_email" => contacts_lookup_by_email(email: String).await,
+            "contacts_lookup_by_name" => contacts_lookup_by_name(name: String).await,
+            "capture_host_register" => capture_host_register(),
+            "capture_inbox_list" => capture_inbox_list(generation: u64),
+            "capture_inbox_spool" => capture_inbox_spool(name: String, json: String, generation: u64),
+            "capture_inbox_read" => capture_inbox_read(name: String, generation: u64),
+            "capture_inbox_remove" => capture_inbox_remove(name: String, generation: u64),
+            "capture_inbox_reject" => capture_inbox_reject(name: String, generation: u64),
+            "capture_shared_inbox_relay" => capture_shared_inbox_relay(generation: u64).await,
+            "capture_quick_note_defaults_write" => capture_quick_note_defaults_write(parent: String).await,
+            "capture_screenshot_promote" => capture_screenshot_promote(spool_name: String, asset_path: String, max_dim: u32, generation: u64),
+            "capture_link_preview" => capture_link_preview(url: String).await,
+            "capture_meta_fetch" => capture_meta_fetch(url: String).await,
+            "capture_oembed_fetch" => capture_oembed_fetch(url: String).await,
+            "link_preview_fetch_html" => link_preview_fetch_html(url: String).await,
+            "link_preview_fetch_icon" => link_preview_fetch_icon(url: String).await,
         }
     }
 }

@@ -27,7 +27,6 @@ mod fs;
 mod git;
 mod host;
 mod icloud;
-mod link_preview;
 mod logging;
 mod menu;
 mod quit;
@@ -138,8 +137,10 @@ pub fn run() {
     let builder = builder.setup(|app| {
         logging::init(app.handle());
         let host = Arc::new(host::TauriHost::new(app.handle().clone()));
-        let core =
-            Core::new(CoreConfig::default(), host).map_err(|err| err.message().to_string())?;
+        let config = CoreConfig {
+            document_dir: app.path().document_dir().ok(),
+        };
+        let core = Core::new(config, host).map_err(|err| err.message().to_string())?;
         app.manage(Arc::new(core));
         #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
         {

@@ -44,18 +44,13 @@ pub(crate) use reflect_graph_io::io::atomic_write_bytes;
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use reflect_graph_io::io::file_occupied;
+/// Modification time in epoch ms, shared with the desktop watcher.
+#[cfg(desktop)]
 pub(crate) use reflect_graph_io::io::modified_ms;
-/// The full traversal guard, shared with sibling modules that address graph
-/// files (capture promotes screenshots into `assets/`).
-pub(crate) use reflect_graph_io::resolve as resolve_in_graph;
 /// iCloud eviction-placeholder path construction, shared with note deletion
 /// and the desktop watcher (which treats an evicted note as present, not
 /// deleted — Plan 21). The grammar now lives in `reflect-graph-paths`.
 pub(crate) use reflect_graph_paths::eviction_placeholder;
-/// iCloud eviction-placeholder name mapping, shared with the iCloud
-/// container discovery (`icloud::storage`) — Apple-only, like its callers.
-#[cfg(any(target_os = "ios", target_os = "macos"))]
-pub(crate) use reflect_graph_paths::icloud_placeholder_target;
 /// Dataless-file probe (modern macOS eviction: bytes remote, real path
 /// intact), shared with the desktop watcher and the iCloud pending walk —
 /// every place that must not mistake an evicted note for a readable one.
