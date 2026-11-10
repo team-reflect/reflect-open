@@ -17,4 +17,4 @@ build settings, the merged `Info.plist`). Do not commit those changes. To change
 edit `gen/apple/project.yml` and follow its header comment.
 
 Shared Swift code lives in the `apple/` package ([apple-package.md](apple-package.md)). The
-next build picks up an edit there: the plugins that depend on it rebuild through cargo.
+next build picks up an edit there: the plugins that depend on it rebuild through cargo. // FIXME: this paragraph is useless, delete
