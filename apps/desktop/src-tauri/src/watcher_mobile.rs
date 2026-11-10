@@ -15,10 +15,13 @@ use tauri::State;
 
 use crate::error::AppResult;
 
-/// Unit stand-in for the desktop watcher state, so `lib.rs` manages the same
+/// Empty stand-in for the desktop watcher state, so `lib.rs` manages the same
 /// type name on every platform.
+///
+/// Braced instead of a unit struct, so `WatcherState::default()` in `lib.rs`
+/// passes `clippy::default_constructed_unit_structs`.
 #[derive(Default)]
-pub struct WatcherState;
+pub struct WatcherState {}
 
 /// No-op: mobile has no platform watcher to start. `index:changed` events
 /// never come from the shell here — local writes notify in-process instead.
