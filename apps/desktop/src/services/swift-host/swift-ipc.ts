@@ -14,10 +14,10 @@ async function send(
     body,
     headers,
   })
-  if (!response.ok) {
+  const failed = response.headers.get('x-reflect-response') === 'error'
+  if (!failed && !response.ok) {
     throw new AppError('io', `the Swift shell answered ${response.status} for "${command}"`)
   }
-  const failed = response.headers.get('x-reflect-response') === 'error'
   const contentType = response.headers.get('content-type') ?? ''
   if (!failed && contentType.startsWith('application/octet-stream')) {
     return await response.arrayBuffer()
@@ -55,12 +55,16 @@ export function createSwiftIpcTransport(fetchFn: typeof fetch): IpcBridge {
         'content-type': 'application/octet-stream',
       })
     },
+    // The executor subscribes synchronously and turns a throw into a rejection.
     listen: (event, handler) => {
-      return Promise.resolve().then(() => listenHostEvent(event, handler))
+      return new Promise((resolve) => {
+        resolve(listenHostEvent(event, handler))
+      })
     },
     listenPlugin: (plugin, event, handler) => {
-      return Promise.resolve().then(() => {
+      return new Promise((resolve) => {
         listenHostEvent(`plugin:${plugin}:${event}`, handler)
+        resolve()
       })
     },
   }

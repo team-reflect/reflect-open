@@ -45,6 +45,7 @@ describe('createSwiftHttpService', () => {
     expect(request.url).toBe(
       'reflect-app://localhost/__http?url=https%3A%2F%2Fapi.anthropic.com%2Fv1%2Fmessages',
     )
+    expect(request.method).toBe('POST')
     expect(request.headers.get('x-api-key')).toBe('sk-ant-test')
     expect(await request.text()).toBe('payload')
   })
