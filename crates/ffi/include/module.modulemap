@@ -1,0 +1,15 @@
+// The system libraries and frameworks that the static library links against,
+// from `cargo rustc -p reflect-ffi --target aarch64-apple-ios --lib
+// --crate-type staticlib -- --print native-static-libs`. The `link` lines let
+// Xcode link them with no list in the app target.
+module ReflectCoreFFI {
+    header "reflect_core.h"
+    link "iconv"
+    link "objc"
+    link "z"
+    link framework "CoreFoundation"
+    link framework "Foundation"
+    link framework "Security"
+    link framework "UIKit"
+    export *
+}
