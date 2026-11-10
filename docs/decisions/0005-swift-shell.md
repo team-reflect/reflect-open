@@ -60,7 +60,7 @@ implementation next to Tauri and the browser dev bridge.
 - Command names and the wire format do not change: `plugin:<name>|<cmd>`
   names stay, arguments are camelCase JSON, and errors are
   `{ kind, message }`.
-- The JavaScript side is new: the `swift-host` adapters replace `invoke` and
+- The JavaScript side is new: the `swift-*.ts` adapters replace `invoke` and
   `listen` from `@tauri-apps/api`. They must keep the behaviour of binary
   bodies, binary replies, events, and plugin calls. Underneath, Tauri on iOS
   also sends IPC as `fetch` to a custom scheme, so binary bodies,
@@ -68,9 +68,9 @@ implementation next to Tauri and the browser dev bridge.
 
 ### Frontend
 
-- One more host implementation goes in
-  `apps/desktop/src/services/swift-host/`, next to the Tauri and browser
-  adapters, plus host detection at boot.
+- One more host implementation: the `swift-*.ts` adapters sit in
+  `apps/desktop/src/services/`, next to the Tauri and browser adapters, plus
+  host detection at boot.
 - Business code does not change: `packages/core`, `packages/app`, and
   `apps/desktop/src/mobile/` stay host-agnostic.
 
@@ -141,7 +141,7 @@ implementation next to Tauri and the browser dev bridge.
 
 1. **Prerequisites:** land the `apple/` Swift package with the shared Swift
    code, extract `reflect-core` from the Tauri crate one domain at a time, add `reflect-ffi` and the xcframework build, add the
-   `swift-host` adapters. No user-visible change. Desktop works after every
+   `swift-*.ts` adapters. No user-visible change. Desktop works after every
    step.
 2. **Shell boots:** the Swift app loads the bundle, routes `__ipc`, serves
    assets, proxies HTTP, and opens an iCloud graph. Daily note editing works
