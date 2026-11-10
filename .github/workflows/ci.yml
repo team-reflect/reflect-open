@@ -247,16 +247,14 @@ jobs:
 
     if: always()
     needs:
-      [
-        classify,
-        lint-node,
-        test-node,
-        test-chromium,
-        test-swift,
-        lint-rust,
-        test-rust,
-        check-rust-ios,
-      ]
+      - classify
+      - lint-node
+      - test-node
+      - test-chromium
+      - test-swift
+      - lint-rust
+      - test-rust
+      - check-rust-ios
 
     steps:
       # A PR in the middle of a stack skips its jobs on purpose: the top PR of
