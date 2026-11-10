@@ -26,7 +26,7 @@ struct Module {
 
 let modules: [Module] = [
   Module(name: "ReflectCapture", layer: .shared, hasTests: true),
-  Module(name: "RecordingKit", layer: .engine, hasTests: false),
+  Module(name: "RecordingKit", layer: .engine, hasTests: true),
 ]
 
 let layerOf = Dictionary(uniqueKeysWithValues: modules.map { ($0.name, $0.layer) })
