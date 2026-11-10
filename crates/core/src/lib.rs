@@ -96,7 +96,7 @@ impl Core {
 
     /// Runs `command` with `args_json`, a JSON object of camelCase arguments.
     pub async fn dispatch(
-        &self,
+        self: &Arc<Self>,
         command: &str,
         args_json: &[u8],
         _body: Option<&[u8]>,
@@ -194,8 +194,8 @@ pub(crate) mod test_support {
         }
     }
 
-    pub fn core() -> Core {
-        Core::new(CoreConfig::default(), Arc::new(NoopHost)).unwrap()
+    pub fn core() -> Arc<Core> {
+        Arc::new(Core::new(CoreConfig::default(), Arc::new(NoopHost)).unwrap())
     }
 }
 
