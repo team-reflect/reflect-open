@@ -48,6 +48,27 @@ jobs:
         run: |
           set -euo pipefail
 
+          swift_files=('*.swift' 'apple/*' '.swift-format')
+          rust_files=(
+            '*.rs' '*Cargo.toml' 'Cargo.lock' 'rust-toolchain.toml' '.cargo/*' 'about.toml'
+            'crates/*' 'plugins/*' 'apps/cli/*' 'apps/native-host/*' 'apps/desktop/src-tauri/*' 'fixtures/*'
+          )
+          rust_only_files=('*.rs' '*.toml' 'Cargo.lock' '*.sql')
+          js_files=(
+            'apps/*' 'packages/*' 'design-system/*' 'patches/*' 'fixtures/*'
+            '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.css' '*.html' '*.json' '*.yaml' '*.yml'
+          )
+
+          matches() {
+            local file=$1 pattern
+            shift
+            for pattern in "$@"; do
+              # shellcheck disable=SC2053 # The pattern is a glob.
+              [[ $file == $pattern ]] && return 0
+            done
+            return 1
+          }
+
           js=false rust=false swift=false
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
@@ -57,21 +78,18 @@ jobs:
             git diff -z --name-only --no-renames HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
             while IFS= read -r -d '' file; do
               echo "$file"
-              case $file in
-                .github/*) js=true rust=true swift=true; continue ;;
-                *.swift | apple/* | .swift-format) swift=true; continue ;;
-              esac
-              case $file in
-                *.rs | *Cargo.toml | Cargo.lock | rust-toolchain.toml | .cargo/* | about.toml | \
-                  crates/* | plugins/* | apps/cli/* | apps/native-host/* | apps/desktop/src-tauri/* | fixtures/*)
-                  rust=true ;;
-              esac
-              case $file in
-                *.rs | *.toml | Cargo.lock | *.sql) ;;
-                apps/* | packages/* | design-system/* | patches/* | fixtures/* | \
-                  *.ts | *.tsx | *.js | *.mjs | *.cjs | *.css | *.html | *.json | *.yaml | *.yml)
-                  js=true ;;
-              esac
+              if matches "$file" '.github/*'; then
+                js=true rust=true swift=true
+              elif matches "$file" "${swift_files[@]}"; then
+                swift=true
+              else
+                if matches "$file" "${rust_files[@]}"; then
+                  rust=true
+                fi
+                if matches "$file" "${js_files[@]}" && ! matches "$file" "${rust_only_files[@]}"; then
+                  js=true
+                fi
+              fi
             done < "$RUNNER_TEMP/changed-files"
           fi
 
