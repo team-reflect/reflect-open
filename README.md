@@ -116,7 +116,7 @@ reflect-open/
 ├── apps/cli/              # `reflect` CLI
 ├── apps/extension/        # Chrome capture extension
 ├── apps/native-host/      # Browser capture helper
-├── apple/                 # Shared iOS Swift package // FIXME: remove "iOS" from the name
+├── apple/                 # Shared iOS Swift package /// FIXME: remove "iOS" from the name
 ├── packages/core/         # Shared TypeScript logic
 ├── packages/db/           # Database types and helpers
 ├── crates/index-schema/   # Shared index schema
