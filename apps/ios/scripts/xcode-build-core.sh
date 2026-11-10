@@ -4,6 +4,10 @@
 # configuration and SDK. A Debug simulator build compiles only the simulator
 # slice with the dev profile; every other build compiles the release profile.
 #
+# The Reflect scheme also runs this script as a build pre-action when the
+# xcframework is missing: Xcode looks for it while it plans the build, before
+# any build phase runs.
+#
 # Xcode launched from the Dock runs script phases with the minimal launchd
 # PATH, so node comes from apps/desktop/src-tauri/.xcode.env.local (written by
 # `pnpm install`) and cargo from rustup's fixed install location.
