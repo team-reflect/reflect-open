@@ -28,10 +28,10 @@ app, so it does not replace a full iOS app build.
    load otherwise.
 2. Put sources in `apple/Sources/<Module>/`. Set `hasTests: true` and add
    `apple/Tests/<Module>Tests/` (Swift Testing) for tests.
-3. Every module is a product. An Xcode target links it in
-   `apps/desktop/src-tauri/gen/apple/project.yml` (`- package: ReflectApple`,
-   `product: <Module>`), then regenerate the project (see that file's header).
-   A plugin adds `.product(name: "<Module>", package: "ReflectApple")` to its
+3. Every module is a product. Link it only where it is used. An Xcode target
+   links it in `apps/desktop/src-tauri/gen/apple/project.yml`
+   (`- package: ReflectApple`, `product: <Module>`), then regenerate the
+   project (see that file's header). A plugin adds `.product(name: "<Module>", package: "ReflectApple")` to its
    `ios/Package.swift` (tools 6.2, `.iOS(.v15)`, `swiftLanguageModes: [.v5]`).
 
 ## Rules
