@@ -142,6 +142,27 @@ jobs:
       - name: Test browser (shard 3/3)
         run: pnpm run test:browser --shard=3/3
 
+  # Not part of `all-green` yet. It compiles apple/ for iOS 16 only; the
+  # plugins compile it again through swift-rs with a lower deployment target,
+  # which only the iOS app build covers.
+  test-swift:
+    needs: classify
+    if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-xcode
+
+      - name: Test apple/ on macOS
+        run: swift test --package-path apple
+
+      - name: Build apple/ for the iOS Simulator
+        working-directory: apple
+        run: xcodebuild build -scheme ReflectApple -destination 'generic/platform=iOS Simulator' -quiet
+
   lint-rust:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
