@@ -4625,6 +4625,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect-ffi"
+version = "0.0.0"
+dependencies = [
+ "reflect-core",
+ "reflect-types",
+ "serde_json",
+]
+
+[[package]]
 name = "reflect-git"
 version = "0.0.0"
 dependencies = [
