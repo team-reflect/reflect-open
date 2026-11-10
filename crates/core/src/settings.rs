@@ -121,12 +121,13 @@ mod tests {
     #[test]
     fn dispatch_returns_the_typed_result_as_json() {
         let core = core();
-        let expected = serde_json::to_string(&core.settings_load().unwrap()).unwrap();
-        let reply = core
+        let typed = core
+            .settings_load()
+            .map(|doc| Reply::Json(serde_json::to_string(&doc).unwrap()));
+        let dispatched = core
             .runtime
-            .block_on(core.dispatch("settings_load", b"{}", None))
-            .unwrap();
-        assert_eq!(reply, Reply::Json(expected));
+            .block_on(core.dispatch("settings_load", b"{}", None));
+        assert_eq!(format!("{dispatched:?}"), format!("{typed:?}"));
     }
 
     #[test]

@@ -35,6 +35,8 @@ pub enum Reply {
     Bytes(Vec<u8>),
 }
 
+/// The command implementations, the runtime they run on, and the shell's
+/// [`Host`].
 pub struct Core {
     config: CoreConfig,
     host: Arc<dyn Host>,
@@ -42,6 +44,7 @@ pub struct Core {
 }
 
 impl Core {
+    /// Builds a core with its own multi-thread runtime.
     pub fn new(config: CoreConfig, host: Arc<dyn Host>) -> AppResult<Self> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -54,10 +57,12 @@ impl Core {
         })
     }
 
+    /// The values the core was built with.
     pub fn config(&self) -> &CoreConfig {
         &self.config
     }
 
+    /// The shell the core was built with.
     pub fn host(&self) -> &dyn Host {
         self.host.as_ref()
     }
