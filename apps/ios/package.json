@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:core": "node scripts/build-core.ts"
+    "build:core": "node scripts/build-core.ts",
+    "build:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/desktop build",
+    "dev:web": "TAURI_ENV_PLATFORM=ios TAURI_DEV_HOST=0.0.0.0 pnpm --filter @reflect/desktop dev"
   },
   "devDependencies": {
     "tinyexec": "^1.3.1"

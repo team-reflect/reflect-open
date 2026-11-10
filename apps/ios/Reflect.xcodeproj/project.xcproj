@@ -1,0 +1,73 @@
+{
+  "default-configuration": "Release-Stable",
+  "configurations": [
+    { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "Dev.xcconfig" } },
+    { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "Beta.xcconfig" } },
+    { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "Stable.xcconfig" } },
+  ],
+  "localizations": {
+    "development": "en",
+    "supported": [
+      "Base",
+    ],
+  },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "../../apple",
+    },
+  ],
+  "files": [
+    { "kind": "folder", "path": "Sources", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "Resources", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "Config" },
+    { "kind": "folder", "path": "scripts" },
+    { "path": "Web", "type": "folder", "target-membership": [ "Reflect/resources" ] },
+    {
+      "kind": "group",
+      "name": "Icons",
+      "children": [
+        { "path": "../desktop/src-tauri/icons/AppIcon.icon", "target-membership": [ "Reflect/resources" ] },
+        { "path": "../desktop/src-tauri/icons-beta/AppIcon-Beta.icon", "target-membership": [ "Reflect/resources" ] },
+        { "path": "../desktop/src-tauri/icons-dev/AppIcon-Dev.icon", "target-membership": [ "Reflect/resources" ] },
+      ],
+    }, {
+      "kind": "group",
+      "name": "Frameworks",
+      "children": [
+        { "path": "../../target/apple/ReflectCore.xcframework", "target-membership": [ "Reflect/frameworks" ] },
+      ],
+    }, {
+      "kind": "group",
+      "name": "Products",
+      "children": [
+        { "path": "<PRODUCTS>/Reflect.app", "id": "3736B32D1D954CBA3FFAC312", "index": false },
+      ],
+    },
+  ],
+  "targets": [
+    {
+      "name": "Reflect",
+      "id": "F5BC8B83DA18E783A886C8AA",
+      "product": "Products/Reflect.app",
+      "product-type": "application",
+      "specialized-configurations": [
+        { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "App.xcconfig" } },
+        { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "App.xcconfig" } },
+        { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "App.xcconfig" } },
+      ],
+      "build-phases": [
+        {
+          "kind": "script",
+          "name": "Build Rust core",
+          "run-on-every-build": true,
+          "shell": "/bin/sh",
+          "script": "\"${SRCROOT:?}/scripts/xcode-build-core.sh\"",
+        },
+        "compile-sources",
+        "resources",
+        "frameworks",
+      ],
+    },
+  ],
+}

@@ -1,0 +1,10 @@
+// Configuration Debug-Dev: the dev flavor. It has its own App Group and no iCloud container.
+
+#include "Shared.xcconfig"
+#include "Debug.xcconfig"
+
+REFLECT_FLAVOR = dev
+REFLECT_BUNDLE_ID = app.reflect.ios.dev
+REFLECT_DISPLAY_NAME = Reflect Dev
+REFLECT_APP_GROUP = group.app.reflect.dev
+REFLECT_APP_ICON = AppIcon-Dev
