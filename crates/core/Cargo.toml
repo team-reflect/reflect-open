@@ -10,6 +10,8 @@ publish.workspace = true
 [dependencies]
 dirs = { workspace = true }
 keyring-core = { workspace = true }
+reflect-graph-io = { workspace = true }
+reflect-index = { workspace = true }
 reflect-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -24,6 +26,11 @@ apple-native-keyring-store = { workspace = true, features = ["keychain"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 apple-native-keyring-store = { workspace = true, features = ["protected"] }
+# Finite-length execution assertions around iOS persistence. UIKit's begin/end
+# methods keep file and SQLite locks from surviving process suspension.
+block2 = { workspace = true }
+objc2-foundation = { workspace = true, features = ["std", "NSString"] }
+objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-native-keyring-store = { workspace = true }

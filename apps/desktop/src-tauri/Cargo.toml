@@ -117,10 +117,7 @@ objc2-link-presentation = { workspace = true, features = [
 ] }
 block2 = { workspace = true }
 
-# Finite-length execution assertions around iOS persistence. UIKit's begin/end
-# methods keep file and SQLite locks from surviving process suspension.
 [target.'cfg(target_os = "ios")'.dependencies]
-objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"] }
 tauri-plugin-iap = { workspace = true }
 tauri-plugin-app-store = { workspace = true }
 tauri-plugin-web-auth = { workspace = true }

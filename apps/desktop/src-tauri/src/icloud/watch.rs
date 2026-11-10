@@ -649,10 +649,10 @@ mod platform {
             // (a download materialized, a Mac-side edit landed). Try every
             // root variant: invalidation is root-checked, so the one matching
             // the open graph wins and the others are no-ops.
-            let state = app.state::<crate::fs::GraphState>();
+            let core = app.state::<std::sync::Arc<reflect_core::Core>>();
             for root in roots {
                 let root = std::path::Path::new(root.trim_end_matches('/'));
-                crate::fs::invalidate_file_catalog(&state, root);
+                crate::fs::invalidate_file_catalog(&core.graph, root);
             }
             if is_update {
                 let _ = app.emit(INDEX_CHANGED, round.changes);
