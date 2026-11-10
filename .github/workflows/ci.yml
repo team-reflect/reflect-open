@@ -326,9 +326,16 @@ jobs:
       - test-rust
 
     steps:
-      # A skipped job counts as passed: classify skips jobs on purpose.
-      - name: Verify that all jobs succeeded
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+      # Each job must succeed when classify runs it, and be skipped otherwise.
+      - name: Verify that every job matches classify
+        if: >-
+          needs.classify.result != 'success'
+          || needs.lint-node.result != (needs.classify.outputs.lint-node == 'true' && 'success' || 'skipped')
+          || needs.test-node.result != (needs.classify.outputs.test-node == 'true' && 'success' || 'skipped')
+          || needs.test-chromium.result != (needs.classify.outputs.test-chromium == 'true' && 'success' || 'skipped')
+          || needs.test-swift.result != (needs.classify.outputs.test-swift == 'true' && 'success' || 'skipped')
+          || needs.lint-rust.result != (needs.classify.outputs.lint-rust == 'true' && 'success' || 'skipped')
+          || needs.test-rust.result != (needs.classify.outputs.test-rust == 'true' && 'success' || 'skipped')
         run: |
-          echo 'Some jobs did not succeed: ${{ toJSON(needs) }}'
+          echo 'Some jobs do not match classify: ${{ toJSON(needs) }}'
           exit 1
