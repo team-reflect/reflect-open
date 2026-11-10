@@ -1,5 +1,6 @@
 import AVFoundation
 import RecordingKit
+import RecordingShared
 import Tauri
 import UIKit
 import UserNotifications

@@ -19,10 +19,11 @@ fails the build on purpose (`src/mobile.rs`).
 
 ## Sharp edges
 
-- `ios/Sources/RecordingActivityAttributes.swift` is compiled into both the plugin and
-  the `RecordingWidget` target (by path, see
+- `RecordingActivityAttributes` lives in the `RecordingShared` module of the
+  repo's `apple/` Swift package, which both the plugin and the
+  `RecordingWidget` target link (see
   `apps/desktop/src-tauri/gen/apple/project.yml`); ActivityKit matches the
-  two sides by type name, so keep the file free of plugin imports.
+  two sides by type name, so keep the module free of plugin imports.
 - `queueAction` is a Rust-only Swift method (the shell calls it for
   `reflect://record-audio` deep links). It is deliberately absent from
   `generate_handler!` and `build.rs` `COMMANDS`: the webview must not be able

@@ -27,6 +27,7 @@ let package = Package(
       dependencies: [
         .byName(name: "Tauri"),
         .product(name: "RecordingKit", package: "ReflectApple"),
+        .product(name: "RecordingShared", package: "ReflectApple"),
       ],
       path: "Sources")
   ]
