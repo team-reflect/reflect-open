@@ -183,7 +183,7 @@ jobs:
         include:
           - name: Linux
             os: ubuntu-24.04
-          - name: Apple
+          - name: macOS
             os: xcode-27
             args: --target aarch64-apple-darwin --target aarch64-apple-ios-sim
     steps:
