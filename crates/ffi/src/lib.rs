@@ -21,6 +21,7 @@
 use std::any::Any;
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::ptr;
 use std::sync::{Arc, PoisonError, RwLock};
@@ -74,7 +75,8 @@ pub struct ReflectCore {
 type MainTask = Box<dyn FnOnce() + Send>;
 
 /// Creates a core. `config_json` is a NUL-terminated JSON object, or NULL
-/// for an empty one. `ctx` is passed to `on_event`, `on_main` and
+/// for an empty one, with the optional string keys `documentDir`,
+/// `appDataDir` (or `dataDir`) and `userAgent`; other keys are ignored. `ctx` is passed to `on_event`, `on_main` and
 /// `on_open_url`. On failure it returns NULL and, when `error_out` is not
 /// NULL, stores an error JSON `{"kind":...,"message":...}` there for
 /// `reflect_core_string_free`.
@@ -443,15 +445,30 @@ impl Host for FfiHost {
     }
 }
 
-/// Parses `config_json`, a JSON object. `CoreConfig` has no fields yet, so
-/// every key is ignored.
+/// The keys of `config_json` that map to [`CoreConfig`]. Other keys are
+/// ignored.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfigJson {
+    #[serde(alias = "dataDir")]
+    app_data_dir: Option<PathBuf>,
+    document_dir: Option<PathBuf>,
+    user_agent: Option<String>,
+}
+
+/// Parses `config_json`, a JSON object.
 unsafe fn read_config(config_json: *const c_char) -> AppResult<CoreConfig> {
-    if !config_json.is_null() {
-        let raw = unsafe { CStr::from_ptr(config_json) }.to_bytes();
-        serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(raw)
-            .map_err(|err| AppError::parse(format!("invalid core config: {err}")))?;
+    if config_json.is_null() {
+        return Ok(CoreConfig::default());
     }
-    Ok(CoreConfig::default())
+    let raw = unsafe { CStr::from_ptr(config_json) }.to_bytes();
+    let config: ConfigJson = serde_json::from_slice(raw)
+        .map_err(|err| AppError::parse(format!("invalid core config: {err}")))?;
+    Ok(CoreConfig {
+        app_data_dir: config.app_data_dir,
+        document_dir: config.document_dir,
+        user_agent: config.user_agent.unwrap_or_default(),
+    })
 }
 
 unsafe fn read_str(string: *const c_char) -> AppResult<String> {
@@ -666,6 +683,27 @@ mod tests {
             serde_json::from_slice(unsafe { CStr::from_ptr(error) }.to_bytes()).unwrap();
         assert_eq!(json["kind"], "parse");
         unsafe { reflect_core_string_free(error) };
+    }
+
+    #[test]
+    fn config_json_fills_core_config() {
+        let read = |json: &str| {
+            let json = CString::new(json).unwrap();
+            unsafe { read_config(json.as_ptr()) }.unwrap()
+        };
+        let config = read(
+            r#"{"documentDir":"/d","dataDir":"/a","userAgent":"Reflect/1.2.3","flavor":"dev"}"#,
+        );
+        assert_eq!(config.document_dir, Some(PathBuf::from("/d")));
+        assert_eq!(config.app_data_dir, Some(PathBuf::from("/a")));
+        assert_eq!(config.user_agent, "Reflect/1.2.3");
+        assert_eq!(
+            read(r#"{"appDataDir":"/b"}"#).app_data_dir,
+            Some(PathBuf::from("/b"))
+        );
+        let empty = unsafe { read_config(ptr::null()) }.unwrap();
+        assert_eq!(empty.document_dir, None);
+        assert_eq!(empty.user_agent, "");
     }
 
     #[test]
