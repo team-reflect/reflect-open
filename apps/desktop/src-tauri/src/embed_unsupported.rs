@@ -7,10 +7,10 @@ use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
 
-/// Unit stand-in for the runtime state, so `lib.rs` manages the same type
+/// Empty stand-in for the runtime state, so `lib.rs` manages the same type
 /// name on every platform.
 #[derive(Default)]
-pub struct EmbedState;
+pub struct EmbedState {}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "status")]
