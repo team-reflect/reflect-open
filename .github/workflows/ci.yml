@@ -18,11 +18,27 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     outputs:
-      draft: ${{ steps.classify.outputs.draft }}
-      stack-middle: ${{ steps.classify.outputs.stack-middle }}
+      lint-node: ${{ steps.classify.outputs.lint-node }}
+      test-node: ${{ steps.classify.outputs.test-node }}
+      test-chromium: ${{ steps.classify.outputs.test-chromium }}
+      test-webkit: ${{ steps.classify.outputs.test-webkit }}
+      test-swift: ${{ steps.classify.outputs.test-swift }}
+      lint-rust: ${{ steps.classify.outputs.lint-rust }}
+      test-rust: ${{ steps.classify.outputs.test-rust }}
     steps:
+      # The merge commit's first parent is the base branch, so the diff
+      # against it is the change that the PR brings in.
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+          filter: blob:none
+
       - id: classify
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
           PR_IS_DRAFT: ${{ github.event.pull_request.draft == true }}
           # In a stack, but neither the lowest unmerged PR nor the top PR.
           PR_IS_STACK_MIDDLE: >-
@@ -30,12 +46,53 @@ jobs:
             && github.event.pull_request.stack.base.ref != github.event.pull_request.base.ref
             && github.event.pull_request.stack.position != github.event.pull_request.stack.size }}
         run: |
-          echo "draft=$PR_IS_DRAFT" >> "$GITHUB_OUTPUT"
-          echo "stack-middle=$PR_IS_STACK_MIDDLE" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+
+          js=false rust=false swift=false
+          if [[ $PR_IS_STACK_MIDDLE == true ]]; then
+            echo "In the middle of a stack: the top PR runs the jobs."
+          elif [[ $EVENT_NAME != pull_request || $HEAD_REF == release-please--* ]]; then
+            js=true rust=true swift=true
+          else
+            git diff -z --name-only --no-renames HEAD^1 HEAD > "$RUNNER_TEMP/changed-files"
+            while IFS= read -r -d '' file; do
+              echo "$file"
+              case $file in
+                .github/*) js=true rust=true swift=true; continue ;;
+                *.swift | apple/* | .swift-format) swift=true; continue ;;
+              esac
+              case $file in
+                *.rs | *Cargo.toml | Cargo.lock | rust-toolchain.toml | .cargo/* | about.toml | \
+                  crates/* | plugins/* | apps/cli/* | apps/native-host/* | apps/desktop/src-tauri/* | fixtures/*)
+                  rust=true ;;
+              esac
+              case $file in
+                *.rs | *.toml | Cargo.lock | *.sql) ;;
+                apps/* | packages/* | design-system/* | patches/* | fixtures/* | \
+                  *.ts | *.tsx | *.js | *.mjs | *.cjs | *.css | *.html | *.json | *.yaml | *.yml)
+                  js=true ;;
+              esac
+            done < "$RUNNER_TEMP/changed-files"
+          fi
+
+          webkit=$js
+          if [[ $PR_IS_DRAFT == true ]]; then
+            webkit=false
+          fi
+
+          {
+            echo "lint-node=$js"
+            echo "test-node=$js"
+            echo "test-chromium=$js"
+            echo "test-webkit=$webkit"
+            echo "test-swift=$swift"
+            echo "lint-rust=$rust"
+            echo "test-rust=$rust"
+          } | tee -a "$GITHUB_OUTPUT"
 
   lint-node:
     needs: classify
-    if: needs.classify.outputs.stack-middle == 'false'
+    if: needs.classify.outputs.lint-node == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -61,7 +118,7 @@ jobs:
 
   test-node:
     needs: classify
-    if: needs.classify.outputs.stack-middle == 'false'
+    if: needs.classify.outputs.test-node == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,7 +132,7 @@ jobs:
 
   test-chromium:
     needs: classify
-    if: needs.classify.outputs.stack-middle == 'false'
+    if: needs.classify.outputs.test-chromium == 'true'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -109,7 +166,7 @@ jobs:
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
     needs: classify
-    if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
+    if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
     env:
       REFLECT_TEST_BROWSER: webkit
@@ -144,7 +201,7 @@ jobs:
 
   test-swift:
     needs: classify
-    if: needs.classify.outputs.stack-middle == 'false'
+    if: needs.classify.outputs.test-swift == 'true'
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -168,7 +225,7 @@ jobs:
 
   lint-rust:
     needs: classify
-    if: needs.classify.outputs.stack-middle == 'false'
+    if: needs.classify.outputs.lint-rust == 'true'
     name: lint-rust (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     # Clippy and the tests never run the desktop sidecars, so drop them from the
@@ -219,7 +276,7 @@ jobs:
 
   test-rust:
     needs: classify
-    if: needs.classify.outputs.stack-middle == 'false'
+    if: needs.classify.outputs.test-rust == 'true'
     runs-on: ubuntu-24.04
     # Clippy and the tests never run the desktop sidecars, so drop them from the
     # Tauri config instead of building them (tauri-build and tauri-codegen merge
@@ -256,11 +313,9 @@ jobs:
       - test-rust
 
     steps:
-      # A PR in the middle of a stack skips its jobs on purpose: the top PR of
-      # the stack runs them on the same code. Passing here lets the whole
-      # stack merge at once.
+      # A skipped job counts as passed: classify skips jobs on purpose.
       - name: Verify that all jobs succeeded
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || (needs.classify.outputs.stack-middle != 'true' && contains(needs.*.result, 'skipped')) }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
           echo 'Some jobs did not succeed: ${{ toJSON(needs) }}'
           exit 1
