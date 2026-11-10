@@ -7,8 +7,10 @@ module ReflectCoreFFI {
     link "iconv"
     link "objc"
     link "z"
+    link framework "Contacts"
     link framework "CoreFoundation"
     link framework "Foundation"
+    link framework "LinkPresentation"
     link framework "Security"
     link framework "UIKit"
     export *
