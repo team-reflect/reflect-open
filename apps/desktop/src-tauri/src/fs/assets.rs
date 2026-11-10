@@ -22,9 +22,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
+use reflect_core::Core;
 use tauri::State;
 use tauri::ipc::{InvokeBody, Request};
 
@@ -32,7 +33,7 @@ use crate::error::{AppError, AppResult};
 use reflect_graph_io::io::staging_dir;
 
 use super::resolve;
-use super::{GraphState, root_for_generation, with_graph_lock};
+use super::{root_for_generation, with_graph_lock};
 
 /// Header carrying the upload id on `asset_upload_append` calls — raw-body
 /// requests have no JSON args, so the id travels out-of-band.
@@ -133,13 +134,13 @@ fn assets_dir_for(root: &Path, name: &str) -> AppResult<std::path::PathBuf> {
 #[tauri::command]
 pub fn asset_upload_begin(
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
     uploads: State<AssetUploads>,
 ) -> AppResult<String> {
     // Process-local sequence: ids only need to be unique within this app run
     // (the registry dies with the process), so a counter beats a uuid dep.
     static NEXT_UPLOAD_ID: AtomicU64 = AtomicU64::new(1);
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let file = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
     let id = format!("upload-{}", NEXT_UPLOAD_ID.fetch_add(1, Ordering::Relaxed));
     lock_uploads(&uploads)?.insert(id.clone(), Upload { generation, file });
@@ -177,7 +178,7 @@ pub fn asset_upload_commit(
     id: String,
     desired_name: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
     uploads: State<AssetUploads>,
 ) -> AppResult<String> {
     let upload = lock_uploads(&uploads)?
@@ -190,13 +191,13 @@ pub fn asset_upload_commit(
     }
     // Pin the root before persisting: after the file lands, a failed root
     // lookup would otherwise skip invalidation and strand a stale catalog.
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let final_name = with_graph_lock(&root, || {
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         let assets_dir = assets_dir_for(&root, &desired_name)?;
         persist_unique(upload.file, &assets_dir, &desired_name)
     })?;
-    super::invalidate_file_catalog(&state, &root);
+    super::invalidate_file_catalog(&core.graph, &root);
     Ok(format!("assets/{final_name}"))
 }
 
@@ -235,7 +236,7 @@ pub fn asset_upload_commit_path(
     id: String,
     path: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
     uploads: State<AssetUploads>,
 ) -> AppResult<()> {
     let upload = lock_uploads(&uploads)?
@@ -246,13 +247,13 @@ pub fn asset_upload_commit_path(
             "upload was started for a different graph session; dropping it",
         ));
     }
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     with_graph_lock(&root, || {
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         let target = resolve(&root, &path)?;
         persist_exact(upload.file, &target)
     })?;
-    super::invalidate_file_catalog(&state, &root);
+    super::invalidate_file_catalog(&core.graph, &root);
     Ok(())
 }
 
@@ -272,14 +273,14 @@ pub async fn asset_import(
     source_path: String,
     desired_name: String,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<String> {
     if !Path::new(&source_path).is_file() {
         return Err(AppError::not_found(format!(
             "import source is not a file: {source_path}"
         )));
     }
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let staging = staging_dir(&root)?;
     let temp = crate::blocking::run_blocking(move || {
         let mut temp = tempfile::NamedTempFile::new_in(staging)?;
@@ -289,11 +290,11 @@ pub async fn asset_import(
     })
     .await?;
     let final_name = with_graph_lock(&root, || {
-        root_for_generation(&state, generation)?;
+        root_for_generation(&core.graph, generation)?;
         let assets_dir = assets_dir_for(&root, &desired_name)?;
         persist_unique(temp, &assets_dir, &desired_name)
     })?;
-    super::invalidate_file_catalog(&state, &root);
+    super::invalidate_file_catalog(&core.graph, &root);
     Ok(format!("assets/{final_name}"))
 }
 
@@ -352,14 +353,14 @@ pub async fn audio_memo_import(
     source_path: String,
     path: String,
     generation: u64,
-    state: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<()> {
     if !path.starts_with("audio-memos/") {
         return Err(AppError::traversal(format!(
             "not an audio memo path: {path}"
         )));
     }
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let staging = staging_dir(&root)?;
     let target = resolve(&root, &path)?;
     let staged = crate::blocking::run_blocking(move || {
@@ -368,11 +369,11 @@ pub async fn audio_memo_import(
     .await?;
     if let Some(temp) = staged {
         with_graph_lock(&root, || {
-            root_for_generation(&state, generation)?;
+            root_for_generation(&core.graph, generation)?;
             persist_import(temp, &resolve(&root, &path)?)
         })?;
     }
-    super::invalidate_file_catalog(&state, &root);
+    super::invalidate_file_catalog(&core.graph, &root);
     Ok(())
 }
 

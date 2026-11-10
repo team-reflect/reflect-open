@@ -21,12 +21,12 @@
 //! so an SVG renamed with a raster extension cannot load subresources there.
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
+use reflect_core::Core;
 use tauri::http::{Request, Response, StatusCode, header};
 use tauri::utils::mime_type::MimeType;
 use tauri::{AppHandle, Manager, Runtime, UriSchemeContext, UriSchemeResponder};
-
-use super::GraphState;
 
 /// The scheme name, shared with the `lib.rs` registration. The frontend and
 /// the CSP `img-src` grant in `tauri.conf.json` spell it out literally.
@@ -111,8 +111,9 @@ fn serve<R: Runtime>(
     request_path: &str,
 ) -> Result<(String, Vec<u8>), StatusCode> {
     let (generation, rel) = parse_request_path(request_path)?;
-    let state = app.state::<GraphState>();
-    let root = super::root_for_generation(&state, generation).map_err(|_| StatusCode::FORBIDDEN)?;
+    let core = app.state::<Arc<Core>>();
+    let root =
+        super::root_for_generation(&core.graph, generation).map_err(|_| StatusCode::FORBIDDEN)?;
     let abs = super::resolve(&root, rel).map_err(|_| StatusCode::FORBIDDEN)?;
     // On an iCloud graph this read blocks until the file is materialized on
     // the device — acceptable here on the blocking pool, and exactly the wait

@@ -3,10 +3,11 @@
 # existing gen/apple/project.yml, so no template is needed.
 #
 # Source folders are synced folders (Xcode 16 buildable folders): adding,
-# removing, or renaming a file inside one needs no regeneration. A file that
-# more than one target compiles goes in a Shared/ folder synced to each of
-# those targets; listing it by path inside another target's synced folder
-# makes XcodeGen output nondeterministic.
+# removing, or renaming a file inside one needs no regeneration. Code that
+# more than one target uses goes in a module of the local Swift package at
+# apple/ (repo root). Shared/ keeps only App Intents files, which must be
+# compiled into each target that exposes them; listing a file by path inside
+# another target's synced folder makes XcodeGen output nondeterministic.
 #
 # To regenerate the Xcode project after a spec change, run XcodeGen 2.46.0
 # (`brew install xcodegen` once):
@@ -29,6 +30,10 @@ packages:
   Sentry:
     url: https://github.com/getsentry/sentry-cocoa
     exactVersion: 9.31.0
+  # Code shared between targets (and with the Tauri plugins): see
+  # docs/contributing/apple-package.md.
+  ReflectApple:
+    path: ../../../../../apple
 configs:
   debug: debug
   release: release
@@ -95,11 +100,6 @@ targets:
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
-      # The capture-inbox producer, shared with the share extension: the
-      # quick-note intent (Plan 24) spools envelopes from the app process
-      # through the same atomic App Group writer the share sheet uses.
-      - path: Shared/Capture
-        type: syncedFolder
       # The stop LiveActivityIntent, shared with the widget; it executes here.
       - path: Shared/Recording
         type: syncedFolder
@@ -238,6 +238,15 @@ targets:
       # every TestFlight upload. The dynamic product embeds the real dylib.
       - package: Sentry
         product: Sentry-Dynamic
+      # The capture-inbox producer, shared with the share extension: the
+      # quick-note intent (Plan 24) spools envelopes from the app process
+      # through the same atomic App Group writer the share sheet uses.
+      - package: ReflectApple
+        product: CaptureShared
+      # The recording notification names the intents post. The recording
+      # plugin inside libapp.a links this module too.
+      - package: ReflectApple
+        product: RecordingShared
       - framework: libapp.a
         embed: false
       # libgit2 (vendored into libapp.a) needs zlib and iconv at the final
@@ -277,8 +286,6 @@ targets:
       # attributes reference by base name.
       - path: ShareExtension
         type: syncedFolder
-      - path: Shared/Capture
-        type: syncedFolder
     info:
       path: ShareExtension/Info.plist
       properties:
@@ -303,6 +310,9 @@ targets:
               NSExtensionActivationSupportsWebPageWithMaxCount: 1
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
             NSExtensionJavaScriptPreprocessingFile: ExtensionClass
+    dependencies:
+      - package: ReflectApple
+        product: CaptureShared
     # The extension's only capability: the App Group container it spools
     # capture envelopes into. Must match the main app's entry per flavor (the
     # app reads the same container to relay envelopes into the graph). The
@@ -346,10 +356,11 @@ targets:
 
   # The audio-memo widget extension (wave 3): the lock-screen / home-screen
   # "record" widget plus the recording Live Activity. Swift only — no Rust,
-  # no webview. Two sources are shared: the Live Activity attributes, by path
-  # (also compiled into the recording plugin — ActivityKit matches app and
-  # widget by type name), and the stop LiveActivityIntent in Shared/Recording
-  # (also compiled into the app target, where it executes).
+  # no webview. It shares the Live Activity attributes through the
+  # RecordingShared module of apple/ (the recording plugin links the same
+  # module — ActivityKit matches app and widget by type name), and compiles
+  # the stop LiveActivityIntent in Shared/Recording (also compiled into the
+  # app target, where it executes).
   RecordingWidget:
     type: app-extension
     platform: iOS
@@ -359,7 +370,6 @@ targets:
         type: syncedFolder
       - path: Shared/Recording
         type: syncedFolder
-      - path: ../../../../../plugins/tauri-plugin-recording/ios/Sources/RecordingActivityAttributes.swift
     info:
       path: RecordingWidget/Info.plist
       properties:
@@ -368,6 +378,9 @@ targets:
         CFBundleVersion: $(TAURI_REFLECT_BUILD_NUMBER:default=1)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    dependencies:
+      - package: ReflectApple
+        product: RecordingShared
     # The widget needs no capability of its own, but the release pipeline
     # asserts every appex carries the App Group (build-ios.ts), and the
     # skip-codesign ad-hoc phase below must have entitlements to preserve —

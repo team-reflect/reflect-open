@@ -223,9 +223,9 @@ pub(crate) fn request_download(_abs: &Path) {}
 #[tauri::command]
 pub async fn icloud_request_downloads(
     paths: Vec<String>,
-    state: tauri::State<'_, crate::fs::GraphState>,
+    core: tauri::State<'_, std::sync::Arc<reflect_core::Core>>,
 ) -> AppResult<u32> {
-    let root = crate::fs::current_root(&state)?;
+    let root = crate::fs::current_root(&core.graph)?;
     crate::blocking::run_blocking(move || {
         let mut requested: u32 = 0;
         for path in &paths {
@@ -441,9 +441,9 @@ pub async fn icloud_status() -> AppResult<IcloudStatus> {
 #[tauri::command]
 pub async fn icloud_adopt_graph(
     generation: u64,
-    state: tauri::State<'_, crate::fs::GraphState>,
+    core: tauri::State<'_, std::sync::Arc<reflect_core::Core>>,
 ) -> AppResult<String> {
-    let root = crate::fs::root_for_generation(&state, generation)?;
+    let root = crate::fs::root_for_generation(&core.graph, generation)?;
     crate::blocking::run_blocking(move || adopt_graph(&root)).await
 }
 

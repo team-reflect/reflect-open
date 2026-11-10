@@ -39,6 +39,7 @@ reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 reflect-index = { workspace = true }
 reflect-graph-io = { workspace = true }
 reflect-git = { workspace = true }
+reflect-core = { workspace = true }
 tempfile = { workspace = true }
 dirs = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
@@ -48,7 +49,6 @@ base64 = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 log = { workspace = true }
 tauri-plugin-log = { workspace = true }
-keyring-core = { workspace = true }
 # unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
 # the plugin treats as "send no Origin header" (see providerFetch's doc).
 tauri-plugin-http = { workspace = true, features = ["unsafe-headers"] }
@@ -57,7 +57,6 @@ image = { workspace = true, features = ["gif", "ico", "jpeg", "png", "webp"] }
 reqwest = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-apple-native-keyring-store = { workspace = true, features = ["keychain"] }
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
 # objc2 bindings, trimmed to the classes the modules touch. objc2-app-kit
 # backs EKCalendar's NSColor → hex conversion and the Edit menu's Paste and
@@ -118,14 +117,10 @@ objc2-link-presentation = { workspace = true, features = [
 ] }
 block2 = { workspace = true }
 
-# Finite-length execution assertions around iOS persistence. UIKit's begin/end
-# methods keep file and SQLite locks from surviving process suspension.
 [target.'cfg(target_os = "ios")'.dependencies]
-objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"] }
 tauri-plugin-iap = { workspace = true }
 tauri-plugin-app-store = { workspace = true }
 tauri-plugin-web-auth = { workspace = true }
-apple-native-keyring-store = { workspace = true, features = ["protected"] }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
@@ -162,12 +157,6 @@ hf-hub = { workspace = true, features = ["ureq", "native-tls"] }
 tauri-plugin-keyboard = { workspace = true }
 tauri-plugin-mobile-haptics = { workspace = true }
 tauri-plugin-recording = { workspace = true }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-native-keyring-store = { workspace = true }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust"] }
 
 [build-dependencies]
 tauri-build = { workspace = true }

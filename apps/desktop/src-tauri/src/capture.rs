@@ -9,12 +9,14 @@
 use std::fs;
 use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
+use reflect_core::Core;
 use tauri::State;
 
 use crate::error::{AppError, AppResult};
-use crate::fs::{FileMeta, GraphState, current_root, modified_ms, root_for_generation};
+use crate::fs::{FileMeta, current_root, modified_ms, root_for_generation};
 #[cfg(test)]
 use crate::web_fetch::classify_fetch_status;
 use crate::web_fetch::{fetch_capture_html, fetch_capture_json};
@@ -161,8 +163,8 @@ fn host_binary_path() -> AppResult<PathBuf> {
 /// macOS-only for now (the first release ships macOS; Windows registry keys
 /// and Linux paths land with Plan 15 packaging).
 #[tauri::command]
-pub fn capture_host_register(state: State<GraphState>) -> AppResult<()> {
-    let root = current_root(&state)?;
+pub fn capture_host_register(core: State<Arc<Core>>) -> AppResult<()> {
+    let root = current_root(&core.graph)?;
     fs::create_dir_all(root.join(INBOX_DIR))?;
     atomic_write_to(&pointer_path()?, &pointer_json(&root))?;
 
@@ -199,8 +201,8 @@ fn inbox_file(root: &Path, name: &str) -> AppResult<PathBuf> {
 /// List the capture inbox (flat; `.json` envelopes and their screenshot
 /// siblings). A missing inbox lists as empty — the host creates it lazily.
 #[tauri::command]
-pub fn capture_inbox_list(generation: u64, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
-    let root = root_for_generation(&state, generation)?;
+pub fn capture_inbox_list(generation: u64, core: State<Arc<Core>>) -> AppResult<Vec<FileMeta>> {
+    let root = root_for_generation(&core.graph, generation)?;
     let inbox = root.join(INBOX_DIR);
     let mut out = Vec::new();
     let entries = match fs::read_dir(&inbox) {
@@ -248,10 +250,10 @@ pub fn capture_inbox_spool(
     name: String,
     json: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
     ensure_spool_size(&json)?;
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     atomic_write_to(&inbox_file(&root, &name)?, &json)
 }
 
@@ -260,9 +262,9 @@ pub fn capture_inbox_spool(
 pub fn capture_inbox_read(
     name: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<String> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     Ok(fs::read_to_string(inbox_file(&root, &name)?)?)
 }
 
@@ -272,9 +274,9 @@ pub fn capture_inbox_read(
 pub fn capture_inbox_remove(
     name: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     match fs::remove_file(inbox_file(&root, &name)?) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -306,9 +308,9 @@ fn quarantine_spool(root: &Path, name: &str) -> AppResult<()> {
 pub fn capture_inbox_reject(
     name: String,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    quarantine_spool(&root_for_generation(&state, generation)?, &name)
+    quarantine_spool(&root_for_generation(&core.graph, generation)?, &name)
 }
 
 // ---- App Group shared inbox ---------------------------------------------------
@@ -320,9 +322,10 @@ pub fn capture_inbox_reject(
 /// The Info.plist key naming an App Group, per flavor so dev, beta, and stable
 /// never drain each other's inbox. It matches the
 /// `com.apple.security.application-groups` entitlement. On iOS it sits in the
-/// app's Info.plist (`gen/apple/project.yml`), and `CaptureInbox.swift` reads the
-/// same key from the extension's. On macOS it sits in the Safari app
-/// extension's, set when `scripts/safari-extension.ts` builds it.
+/// app's Info.plist (`gen/apple/project.yml`), and `CaptureInbox.swift`
+/// (`apple/Sources/CaptureShared/`) reads the same key from the extension's.
+/// On macOS it sits in the Safari app extension's, set when
+/// `scripts/safari-extension.ts` builds it.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const APP_GROUP_KEY: &str = "ReflectAppGroup";
 
@@ -543,14 +546,14 @@ pub async fn capture_shared_inbox_relay(app: tauri::AppHandle, generation: u64) 
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         // Checked under the lock: a pass that waited out a graph switch
         // must not relay into a graph it no longer belongs to.
-        let root = root_for_generation(&app.state::<GraphState>(), generation)?;
+        let root = root_for_generation(&app.state::<Arc<Core>>().graph, generation)?;
         relay_shared_spools(&shared, &root)
     })
     .await
 }
 
 /// The quick note defaults inside the App Group container, read by the iOS
-/// App Intent (`QuickNoteDefaults.swift`).
+/// App Intent (`apple/Sources/CaptureShared/QuickNoteDefaults.swift`).
 #[cfg(any(target_os = "ios", test))]
 const QUICK_NOTE_DEFAULTS_FILE: &str = "quick-note.json";
 
@@ -648,9 +651,9 @@ pub fn capture_screenshot_promote(
     asset_path: String,
     max_dim: u32,
     generation: u64,
-    state: State<GraphState>,
+    core: State<Arc<Core>>,
 ) -> AppResult<()> {
-    let root = root_for_generation(&state, generation)?;
+    let root = root_for_generation(&core.graph, generation)?;
     let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
     let jpeg = downscale_jpeg(&bytes, max_dim)?;
     persist_asset(&root, &asset_path, &jpeg)

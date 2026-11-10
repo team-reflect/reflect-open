@@ -1,0 +1,39 @@
+[package]
+name = "reflect-core"
+version = "0.0.0"
+description = "The app's commands with no Tauri in them: typed methods on `Core`, a JSON dispatch table, and the `Host` trait a shell implements."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+dirs = { workspace = true }
+keyring-core = { workspace = true }
+reflect-graph-io = { workspace = true }
+reflect-index = { workspace = true }
+reflect-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+objc2 = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { workspace = true, features = ["keychain"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+apple-native-keyring-store = { workspace = true, features = ["protected"] }
+# Finite-length execution assertions around iOS persistence. UIKit's begin/end
+# methods keep file and SQLite locks from surviving process suspension.
+block2 = { workspace = true }
+objc2-foundation = { workspace = true, features = ["std", "NSString"] }
+objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust"] }
