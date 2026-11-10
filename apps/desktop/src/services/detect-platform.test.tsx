@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { detectPlatformFacts } from './detect-platform.ts'
+import { detectHostKind, detectPlatformFacts } from './detect-platform.ts'
 
 const DESKTOP_SURFACE = { touchEditor: false, mobileApp: false }
 const MOBILE_SURFACE = { touchEditor: true, mobileApp: true }
@@ -67,5 +67,19 @@ describe('detectPlatformFacts', () => {
   it('gives the platform its mobile surface at boot, so the mobile root sets nothing', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', 'ios')
     expect(detectPlatformFacts(true).surface).toEqual(MOBILE_SURFACE)
+  })
+})
+
+describe('detectHostKind', () => {
+  it('is Tauri when Tauri sets `isTauri`', () => {
+    expect(detectHostKind({ isTauri: true })).toBe('tauri')
+  })
+
+  it('is Swift when the Swift shell injects `__reflectHost`', () => {
+    expect(detectHostKind({ __reflectHost: { on: () => () => {} } })).toBe('swift')
+  })
+
+  it('is the browser without either global', () => {
+    expect(detectHostKind({})).toBe('browser')
   })
 })

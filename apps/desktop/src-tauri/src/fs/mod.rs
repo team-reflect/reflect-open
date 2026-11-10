@@ -44,9 +44,6 @@ pub(crate) use reflect_graph_io::io::atomic_write_bytes;
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use reflect_graph_io::io::file_occupied;
-/// Modification time in epoch ms, shared with the desktop watcher.
-#[cfg(desktop)]
-pub(crate) use reflect_graph_io::io::modified_ms;
 /// iCloud eviction-placeholder path construction, shared with note deletion
 /// and the desktop watcher (which treats an evicted note as present, not
 /// deleted — Plan 21). The grammar now lives in `reflect-graph-paths`.
