@@ -7,6 +7,29 @@ pub mod recents;
 mod secrets;
 pub mod settings;
 
+// The watcher and the embedding runtime are desktop capabilities, and Intel
+// macOS has no embedding runtime either: other platforms swap in stand-ins
+// with the same `Core` methods.
+#[cfg(not(any(
+    target_os = "android",
+    target_os = "ios",
+    all(target_os = "macos", target_arch = "x86_64")
+)))]
+pub mod embed;
+#[cfg(any(
+    target_os = "android",
+    target_os = "ios",
+    all(target_os = "macos", target_arch = "x86_64")
+))]
+#[path = "embed_unsupported.rs"]
+pub mod embed;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub mod watcher;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+#[path = "watcher_mobile.rs"]
+pub mod watcher;
+
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use reflect_graph_io::GraphState;
@@ -29,7 +52,10 @@ pub trait Host: Send + Sync + 'static {
 
 /// Values the shell knows at launch.
 #[derive(Debug, Clone, Default)]
-pub struct CoreConfig {}
+pub struct CoreConfig {
+    /// The app's data directory, when the platform has one.
+    pub app_data_dir: Option<PathBuf>,
+}
 
 /// The result of [`Core::dispatch`].
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +75,10 @@ pub struct Core {
     pub index: IndexSession,
     /// The native background assertions.
     pub background_tasks: BackgroundTaskState,
+    /// The file watcher over the open graph.
+    pub watcher: watcher::WatcherState,
+    /// The embedding runtime.
+    pub embed: embed::EmbedState,
     config: CoreConfig,
     host: Arc<dyn Host>,
     runtime: tokio::runtime::Runtime,
@@ -65,6 +95,8 @@ impl Core {
             graph: GraphState::default(),
             index: IndexSession::default(),
             background_tasks: BackgroundTaskState::default(),
+            watcher: Default::default(),
+            embed: Default::default(),
             config,
             host,
             runtime,
@@ -96,7 +128,7 @@ impl Core {
 
     /// Runs `command` with `args_json`, a JSON object of camelCase arguments.
     pub async fn dispatch(
-        &self,
+        self: &Arc<Self>,
         command: &str,
         args_json: &[u8],
         _body: Option<&[u8]>,
@@ -111,6 +143,33 @@ impl Core {
             "secret_delete" => secret_delete(name: String).await,
             "background_task_begin" => background_task_begin() infallible,
             "background_task_end" => background_task_end(token: String) infallible,
+            "embed_status" => embed_status(),
+            #[cfg(not(any(
+                target_os = "android",
+                target_os = "ios",
+                all(target_os = "macos", target_arch = "x86_64")
+            )))]
+            "embed_ensure" => embed_ensure().await,
+            #[cfg(any(
+                target_os = "android",
+                target_os = "ios",
+                all(target_os = "macos", target_arch = "x86_64")
+            ))]
+            "embed_ensure" => embed_ensure(),
+            #[cfg(not(any(
+                target_os = "android",
+                target_os = "ios",
+                all(target_os = "macos", target_arch = "x86_64")
+            )))]
+            "embed_texts" => embed_texts(texts: Vec<String>).await,
+            #[cfg(any(
+                target_os = "android",
+                target_os = "ios",
+                all(target_os = "macos", target_arch = "x86_64")
+            ))]
+            "embed_texts" => embed_texts(),
+            "watch_start" => watch_start(),
+            "watch_stop" => watch_stop(),
         }
     }
 }
@@ -143,12 +202,13 @@ fn json_reply<T: Serialize>(value: &T) -> AppResult<Reply> {
 /// camelCase argument struct, calls the method of the same shape, and
 /// serializes its result. A trailing `.await` marks an async method, and a
 /// trailing `infallible` a method that returns its value without `AppResult`.
+/// Attributes before a line, such as `#[cfg(...)]`, apply to its match arm.
 macro_rules! dispatch_table {
     ($core:ident, $command:ident, $args:ident;
-     $( $name:literal => $method:ident ( $( $arg:ident : $ty:ty ),* )
+     $( $(#[$attr:meta])* $name:literal => $method:ident ( $( $arg:ident : $ty:ty ),* )
         $( . $await:tt )? $( $infallible:ident )? ),* $(,)?) => {
         match $command {
-            $( $name => {
+            $( $(#[$attr])* $name => {
                 #[derive(serde::Deserialize)]
                 #[serde(rename_all = "camelCase")]
                 struct Args { $( $arg: $ty ),* }
@@ -194,8 +254,8 @@ pub(crate) mod test_support {
         }
     }
 
-    pub fn core() -> Core {
-        Core::new(CoreConfig::default(), Arc::new(NoopHost)).unwrap()
+    pub fn core() -> Arc<Core> {
+        Arc::new(Core::new(CoreConfig::default(), Arc::new(NoopHost)).unwrap())
     }
 }
 
