@@ -32,6 +32,8 @@ packages:
     exactVersion: 9.31.0
   # Code shared between targets (and with the Tauri plugins): see
   # docs/contributing/apple-package.md.
+  # FIXME: [review by claude-opus-5-5]: please confirm the committed `project.pbxproj` is exactly what XcodeGen 2.46.0 generates from
+  #   this spec (run it twice, diff must be empty), since a local package reference is new here.
   ReflectApple:
     path: ../../../../../apple
 configs:

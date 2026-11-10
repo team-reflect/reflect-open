@@ -3,6 +3,8 @@ import Testing
 
 @testable import ReflectCapture
 
+// FIXME: [review by claude-opus-5-5]: every test leaves a UUID directory in the temp dir (same in `RecordingFilesTests`). Minor, but a
+//   `defer { try? FileManager.default.removeItem(at:) }` or a shared helper would keep runs clean.
 private func makeInbox() -> URL {
   FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
 }
@@ -93,6 +95,8 @@ func isHttpUrl(candidate: String, expected: Bool) {
   #expect(!FileManager.default.fileExists(atPath: inbox.path))
 }
 
+// FIXME: [review by claude-opus-5-5]: the name promises atomicity, but the test only checks that no `.json.tmp` is left behind
+//   after a successful write. Rename it (e.g. `writesOneCommittedEnvelope`) or drop the claim.
 @Test func writesAtomically() throws {
   let inbox = makeInbox()
   try CaptureInbox.spoolLink(
@@ -122,6 +126,10 @@ func isHttpUrl(candidate: String, expected: Bool) {
   #expect(try CaptureInbox.spoolText(" \n ", source: "ios-share", parent: nil) == false)
 }
 
+// FIXME: [review by claude-opus-5-5]: `capture-envelope.test.ts` pins a literal Swift JSON fixture to the zod schema, but nothing pins
+//   the Swift encoder to that fixture: the two can drift. Idea: let `spoolLink` / `spoolText` take
+//   `id` and `now` (internal params), then assert the encoded JSON equals the exact strings used in
+//   the TS test (with `.sortedKeys`). Then both sides check one shared shape.
 @Test func spoolTextEnvelopeShape() throws {
   let inbox = makeInbox()
   #expect(

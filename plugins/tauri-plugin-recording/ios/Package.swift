@@ -1,4 +1,8 @@
 // swift-tools-version:5.9
+// FIXME: [review by claude-opus-5-5]: this 5.9 manifest depends on `apple/`, which needs tools 6.2. It works only because the
+//   toolchain is new enough. Why keep the plugins at 5.9 (docs say "tools 5.9" as a rule)? If
+//   there is no swift-rs constraint, bump both plugin manifests to 6.2 so one toolchain floor is
+//   stated once. Please verify swift-rs builds with 6.2 before changing.
 
 import PackageDescription
 

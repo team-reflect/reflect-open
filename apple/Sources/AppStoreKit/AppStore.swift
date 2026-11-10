@@ -3,6 +3,11 @@ import Foundation
 import StoreKit
 public import UIKit
 
+// FIXME: [review by claude-opus-5-5]: does this module earn its keep? `sync`, `presentOfferCodeRedeemSheet`, and `requestReview` are
+//   one-line pass-throughs to StoreKit, `environment()` needs a real App Store / StoreKit env so it
+//   has no tests, and the plugin still keeps its own `#available` guards. Net effect: one more layer
+//   and one more product for no testability gain. Consider leaving `tauri-plugin-app-store` as it was
+//   (revert this move), or move only `environment()` if a Swift shell (phase 1+) will need it.
 /// StoreKit calls a host drives on behalf of the app.
 public enum AppStoreClient {
   /// The install-channel probe. StoreKit 2's `AppTransaction.environment` is

@@ -25,6 +25,11 @@ struct Module {
 }
 
 let modules: [Module] = [
+  // FIXME: [review by claude-opus-5-5]: module names are inconsistent: `ReflectCapture` has a `Reflect` prefix, `RecordingShared` /
+  //   `RecordingKit` / `AppStoreKit` do not, and `-Kit` vs `-Shared` vs nothing is not a rule a reader
+  //   can guess. Pick one scheme (e.g. `CaptureKit`, `RecordingShared`, `RecordingKit`, `StoreKitClient`,
+  //   or prefix all with `Reflect`). `AppStoreKit` is also very close to Apple's `StoreKit` / `AppStore`
+  //   names, and its only file is `AppStore.swift` while the type is `AppStoreClient`.
   Module(name: "ReflectCapture", layer: .shared, hasTests: true),
   Module(name: "RecordingShared", layer: .shared),
   Module(name: "RecordingKit", layer: .engine, deps: ["RecordingShared"], hasTests: true),
@@ -50,6 +55,12 @@ let swiftSettings: [SwiftSetting] = [
 
 let package = Package(
   name: "ReflectApple",
+  // FIXME: [review by claude-opus-5-5]: the docs say swift-rs compiles plugins and their `apple/` modules for iOS 15, below this iOS 16
+  //   floor. Please verify what actually happens: does SwiftPM accept a product with a higher minimum
+  //   than the client's deployment target, or is the floor silently ignored? PR CI builds no iOS app,
+  //   so please run a real `tauri ios build` (or simulator dev run) and record the result in the PR.
+  //   If the effective floor is iOS 15, declaring `.iOS(.v15)` here would make the `#available` rule
+  //   self-explaining instead of a doc-only trap.
   platforms: [.iOS(.v16), .macOS(.v13)],
   products: modules.map { .library(name: $0.name, targets: [$0.name]) },
   targets:

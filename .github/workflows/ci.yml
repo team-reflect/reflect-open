@@ -144,6 +144,13 @@ jobs:
 
   test-swift:
     needs: classify
+    # FIXME: [review by claude-opus-5-5]: `test-swift` is skipped on draft PRs, but `all-green` treats any `skipped` need as a failure
+    #   (unless stack-middle). So with `test-swift` in `all-green.needs`, every draft PR goes red.
+    #   `test-webkit` has the same draft gate and is NOT in `all-green` for this reason. Please verify on a
+    #   draft PR, then either drop the draft gate here or keep `test-swift` out of `all-green`.
+    #   Also: `swift format lint --strict` moved from the Linux `lint-rust` job (no draft gate) into this
+    #   draft-gated macOS job, so drafts lose the lint check. Consider a separate cheap `lint-swift` job on
+    #   ubuntu (Swift is preinstalled there, it ran fine before) and keep only build/test on `xcode-27`.
     if: needs.classify.outputs.draft == 'false' && needs.classify.outputs.stack-middle == 'false'
     runs-on: xcode-27
     steps:
@@ -153,6 +160,10 @@ jobs:
 
       - uses: ./.github/actions/setup-xcode
 
+      # FIXME: [review by claude-opus-5-5]: this `run:` is a plain YAML scalar, so the two lines fold into ONE command:
+      #   `swift --version swift format --version` (checked with Ruby's YAML parser). `swift` ignores the
+      #   extra args, so it passes but never prints the swift-format version. The next step duplicates it
+      #   anyway. Merge into one step with `run: |`.
       - name: Check swift version
         run: swift --version
           swift format --version
@@ -162,6 +173,7 @@ jobs:
 
       - name: Swift format and lint
         run: |
+          # FIXME: [review by claude-opus-5-5]: this first `git diff` runs right after a fresh checkout, so it can never fail. Delete it?
           git diff --exit-code '*.swift'
           git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
           git ls-files -z '*.swift' | xargs -0 swift format lint --strict --parallel
@@ -238,6 +250,7 @@ jobs:
     timeout-minutes: 10
 
     if: always()
+    # FIXME: [review by claude-opus-5-5]: see the FIXME on `test-swift` above: a draft-gated job here makes every draft PR fail.
     needs: [classify, lint-node, test-node, test-chromium, test-swift, lint-rust, test-rust]
 
     steps:

@@ -321,6 +321,7 @@ pub fn capture_inbox_reject(
 /// never drain each other's inbox. It matches the
 /// `com.apple.security.application-groups` entitlement. On iOS it sits in the
 /// app's Info.plist (`gen/apple/project.yml`), and `CaptureInbox.swift`
+/// FIXME: [review by claude-opus-5-5]: the next line is ~115 chars; please reflow this doc comment to the file's width.
 /// (`apple/Sources/ReflectCapture/`) reads the same key from the extension's. On macOS it sits in the Safari app
 /// extension's, set when `scripts/safari-extension.ts` builds it.
 #[cfg(any(target_os = "ios", target_os = "macos"))]

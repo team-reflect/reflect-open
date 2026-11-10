@@ -117,6 +117,10 @@ public struct RecordingError: Error {
 /// All state is confined to the main queue: the host calls every method on
 /// it, the meter timer runs on it, and AVFoundation notifications are
 /// delivered to it. Completions run on it too.
+// FIXME: [review by claude-opus-5-5]: follow-up (not this PR, which should stay a literal move): the engine is now an `NSObject`
+//   (for the `#selector` observers), so `RecorderDelegateProxy` no longer keeps anything "free of
+//   that conformance"; the engine could conform to `AVAudioRecorderDelegate` itself. Same for
+//   `queueAction` -> `queueNativeAction`, a public wrapper around a private one-liner.
 public final class RecordingEngine: NSObject {
 
   /// Why the native side is finalizing the file. `nil` while recording and
@@ -134,6 +138,12 @@ public final class RecordingEngine: NSObject {
   /// different module, so they talk to the plugin through NotificationCenter.
   /// Names are duplicated in `gen/apple/Sources/reflect-open/` — keep them in
   /// sync.
+  // FIXME: [review by claude-opus-5-5]: these names are still duplicated as string literals in three app-target files
+  //   (`RecordingIntents.swift`, `SceneEntryPoints.swift`, `StopRecordingLiveActivityIntent.swift`).
+  //   Now that a package exists, could they live in `RecordingShared` and be imported by both sides?
+  //   The doc rule says the app target must not link a module a plugin uses (duplicate symbols with
+  //   `libapp.a`?). Please verify that claim with a real link: if a module of only `public static let`
+  //   constants links fine twice, the duplication can go.
   static let startRequestedNotification = Notification.Name(
     "app.reflect.recording.start-requested")
   static let stopRequestedNotification = Notification.Name(
