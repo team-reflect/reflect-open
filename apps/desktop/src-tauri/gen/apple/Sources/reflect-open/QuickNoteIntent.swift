@@ -1,12 +1,12 @@
 import Foundation
-import ReflectCapture
+import CaptureShared
 
 #if canImport(AppIntents)
 import AppIntents
 
 /// Siri / Shortcuts / Action-button quick capture (Plan 24): spools the
 /// text into the App Group capture inbox as an `ios-intent` envelope
-/// through `CaptureInbox` from the `ReflectCapture` module (`apple/`).
+/// through `CaptureInbox` from the `CaptureShared` module (`apple/`).
 /// Durability, not visibility: the app relays + drains the inbox into the
 /// capture-day daily note on its next launch/foreground, so the dialog says
 /// "Saved", never "added". The note nests under the parent bullet set in

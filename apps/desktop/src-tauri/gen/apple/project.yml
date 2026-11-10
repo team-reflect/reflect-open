@@ -244,7 +244,7 @@ targets:
       # quick-note intent (Plan 24) spools envelopes from the app process
       # through the same atomic App Group writer the share sheet uses.
       - package: ReflectApple
-        product: ReflectCapture
+        product: CaptureShared
       - framework: libapp.a
         embed: false
       # libgit2 (vendored into libapp.a) needs zlib and iconv at the final
@@ -310,7 +310,7 @@ targets:
             NSExtensionJavaScriptPreprocessingFile: ExtensionClass
     dependencies:
       - package: ReflectApple
-        product: ReflectCapture
+        product: CaptureShared
     # The extension's only capability: the App Group container it spools
     # capture envelopes into. Must match the main app's entry per flavor (the
     # app reads the same container to relay envelopes into the graph). The

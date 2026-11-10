@@ -9,6 +9,14 @@ enum Layer {
   /// Platform logic driven by a host (a Tauri plugin today).
   case engine
 
+  /// Every module name ends with its layer's suffix.
+  var suffix: String {
+    switch self {
+    case .shared: "Shared"
+    case .engine: "Kit"
+    }
+  }
+
   var allowed: Set<Layer> {
     switch self {
     case .shared: []
@@ -25,18 +33,16 @@ struct Module {
 }
 
 let modules: [Module] = [
-  // FIXME: [review by claude-opus-5-5]: module names are inconsistent: `ReflectCapture` has a `Reflect` prefix, `RecordingShared` /
-  //   `RecordingKit` / `AppStoreKit` do not, and `-Kit` vs `-Shared` vs nothing is not a rule a reader
-  //   can guess. Pick one scheme (e.g. `CaptureKit`, `RecordingShared`, `RecordingKit`, `StoreKitClient`,
-  //   or prefix all with `Reflect`). `AppStoreKit` is also very close to Apple's `StoreKit` / `AppStore`
-  //   names, and its only file is `AppStore.swift` while the type is `AppStoreClient`.
-  Module(name: "ReflectCapture", layer: .shared, hasTests: true),
+  Module(name: "CaptureShared", layer: .shared, hasTests: true),
   Module(name: "RecordingShared", layer: .shared),
   Module(name: "RecordingKit", layer: .engine, deps: ["RecordingShared"], hasTests: true),
 ]
 
 let layerOf = Dictionary(uniqueKeysWithValues: modules.map { ($0.name, $0.layer) })
 for module in modules {
+  precondition(
+    module.name.hasSuffix(module.layer.suffix),
+    "\(module.name) (\(module.layer)) must end with \(module.layer.suffix)")
   for dep in module.deps {
     guard let depLayer = layerOf[dep] else {
       fatalError("\(module.name) depends on unknown module \(dep)")

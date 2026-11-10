@@ -6,7 +6,7 @@ in the plugins; App Intents stay in the Xcode targets.
 
 | Module | Layer | Used by |
 | --- | --- | --- |
-| `ReflectCapture` | shared | App target, `ShareExtension` |
+| `CaptureShared` | shared | App target, `ShareExtension` |
 | `RecordingShared` | shared | `RecordingWidget`, `RecordingKit` |
 | `RecordingKit` | engine | `tauri-plugin-recording` |
 
@@ -24,7 +24,9 @@ rule below).
 
 1. Add a `Module(...)` row to the `modules` table in `apple/Package.swift`.
    `layer` decides what it may depend on: `.shared` modules depend on nothing,
-   `.engine` modules on `.shared` ones. The manifest fails to load otherwise.
+   `.engine` modules on `.shared` ones. The name is `<Domain>` plus the layer's
+   suffix: `Shared` for `.shared`, `Kit` for `.engine`. The manifest fails to
+   load otherwise.
 2. Put sources in `apple/Sources/<Module>/`. Set `hasTests: true` and add
    `apple/Tests/<Module>Tests/` (Swift Testing) for tests.
 3. Every module is a product. An Xcode target links it in

@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import ReflectCapture
+@testable import CaptureShared
 
 // FIXME: [review by claude-opus-5-5]: every test leaves a UUID directory in the temp dir (same in `RecordingFilesTests`). Minor, but a
 //   `defer { try? FileManager.default.removeItem(at:) }` or a shared helper would keep runs clean.
