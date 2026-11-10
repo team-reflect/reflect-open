@@ -199,8 +199,10 @@ jobs:
 
       - uses: ./.github/actions/setup-rust
 
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets ${{ matrix.args }}
+
       - name: Format check
-        if: matrix.name == 'Linux'
         run: cargo fmt --all -- --check
 
       - name: Install cargo-shear
@@ -214,9 +216,6 @@ jobs:
       - name: Unused dependencies
         if: matrix.name == 'Linux'
         run: cargo shear
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets ${{ matrix.args }}
 
   test-rust:
     needs: classify
