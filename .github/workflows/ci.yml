@@ -176,25 +176,41 @@ jobs:
     # release builds.
     env:
       TAURI_CONFIG: '{"bundle":{"externalBin":null}}'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-24.04
+          - name: macOS
+            os: xcode-27
+          - name: iOS
+            os: xcode-27
+            target: aarch64-apple-ios-sim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-apt
+      - uses: ./.github/actions/setup-apt # TODO: add a if name == Linux
+
+      - uses: ./.github/actions/setup-xcode # TODO: add a if name == macOS or iOS
+
+      - if: matrix.target
+        run: echo "CARGO_BUILD_TARGET=${{ matrix.target }}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-rust
 
-      - name: Format check
+      - name: Format check # TODO: I'm not sure if I need to run this format in all three systems. If we do not need to run this, we can just run that in Linux. If we need to run that, we just run it everywhere, I guess.
         run: cargo fmt --all -- --check
 
-      - name: Install cargo-shear
+      - name: Install cargo-shear # TODO: add a if name == Linux
         uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
         with:
           tool: cargo-shear@1.14.0
 
       # Fails on a dependency that no code uses, in a member or in the root
-      # `[workspace.dependencies]`.
+      # `[workspace.dependencies]`. # TODO: add a if name == Linux
       - name: Unused dependencies
         run: cargo shear
 
@@ -216,8 +232,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-apt
-
       - uses: ./.github/actions/setup-rust
 
       - name: Test
@@ -230,7 +244,14 @@ jobs:
     timeout-minutes: 10
 
     if: always()
-    needs: [classify, lint-node, test-node, test-chromium, test-swift, lint-rust, test-rust]
+    needs:
+      - classify
+      - lint-node
+      - test-node
+      - test-chromium
+      - test-swift
+      - lint-rust
+      - test-rust
 
     steps:
       # A PR in the middle of a stack skips its jobs on purpose: the top PR of
