@@ -1,5 +1,5 @@
 import { AppError, toAppError, type IpcBridge } from '@reflect/core'
-import { listenHostEvent } from '@/services/swift-host/host-events.ts'
+import { listenHostEvent } from '@/services/swift-events.ts'
 
 const IPC_URL = 'reflect-app://localhost/__ipc/'
 

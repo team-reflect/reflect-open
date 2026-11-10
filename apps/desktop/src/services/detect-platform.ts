@@ -1,5 +1,5 @@
 import type { AppPlatform, BuildPlatform, PlatformFacts } from '@reflect/core'
-import type { ReflectHost } from '@/services/swift-host/host-events.ts'
+import type { ReflectHost } from '@/services/swift-events.ts'
 import { version } from '../../package.json' with { type: 'json' }
 
 function buildPlatformFromEnv(env: string): BuildPlatform | null {

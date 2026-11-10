@@ -38,9 +38,9 @@ import { createTauriOpenerTransport } from '@/services/tauri-opener.ts'
 import { createTauriPathTransport } from '@/services/tauri-path.ts'
 import { createTauriUpdaterAdapter } from '@/services/tauri-updater.ts'
 import { createTauriWindowHost } from '@/services/tauri-window.ts'
-import { createSwiftDeepLinkSource } from '@/services/swift-host/swift-deep-link.ts'
-import { createSwiftHttpService } from '@/services/swift-host/swift-http.ts'
-import { createSwiftOpenerTransport } from '@/services/swift-host/swift-opener.ts'
+import { createSwiftDeepLinkSource } from '@/services/swift-deep-link.ts'
+import { createSwiftHttpService } from '@/services/swift-http.ts'
+import { createSwiftOpenerTransport } from '@/services/swift-opener.ts'
 
 /**
  * The host primitives that `boot.ts` builds once and shares between the layers.
