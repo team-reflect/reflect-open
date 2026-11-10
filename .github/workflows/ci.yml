@@ -49,11 +49,34 @@ jobs:
           set -euo pipefail
 
           js_files=(
-            '.github/*' 'patches/*'
-            '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.css' '*.html' '*.json' '*.yaml' '*.yml'
+            '.github/*'
+            'patches/*'
+            '*.ts'
+            '*.tsx'
+            '*.js'
+            '*.mjs'
+            '*.cjs'
+            '*.css'
+            '*.html'
+            '*.json'
+            '*.yaml'
+            '*.yml'
           )
-          rust_files=('.github/*' '*.rs' '*.toml' 'Cargo.lock' '*.sql' 'apps/desktop/src-tauri/*.json')
-          swift_files=('.github/*' '*.swift' '.swift-format' 'apple/*' 'apps/desktop/src-tauri/safari-extension/*')
+          rust_files=(
+            '.github/*'
+            '*.rs'
+            '*.toml'
+            'Cargo.lock'
+            '*.sql'
+            'apps/desktop/src-tauri/*.json'
+          )
+          swift_files=(
+            '.github/*'
+            '*.swift'
+            '.swift-format'
+            'apple/*'
+            'apps/desktop/src-tauri/safari-extension/*'
+          )
 
           matches() {
             local file=$1 pattern
