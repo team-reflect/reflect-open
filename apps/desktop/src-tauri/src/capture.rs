@@ -322,9 +322,10 @@ pub fn capture_inbox_reject(
 /// The Info.plist key naming an App Group, per flavor so dev, beta, and stable
 /// never drain each other's inbox. It matches the
 /// `com.apple.security.application-groups` entitlement. On iOS it sits in the
-/// app's Info.plist (`gen/apple/project.yml`), and `CaptureInbox.swift` reads the
-/// same key from the extension's. On macOS it sits in the Safari app
-/// extension's, set when `scripts/safari-extension.ts` builds it.
+/// app's Info.plist (`gen/apple/project.yml`), and `CaptureInbox.swift`
+/// (`apple/Sources/CaptureShared/`) reads the same key from the extension's.
+/// On macOS it sits in the Safari app extension's, set when
+/// `scripts/safari-extension.ts` builds it.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const APP_GROUP_KEY: &str = "ReflectAppGroup";
 
@@ -552,7 +553,7 @@ pub async fn capture_shared_inbox_relay(app: tauri::AppHandle, generation: u64) 
 }
 
 /// The quick note defaults inside the App Group container, read by the iOS
-/// App Intent (`QuickNoteDefaults.swift`).
+/// App Intent (`apple/Sources/CaptureShared/QuickNoteDefaults.swift`).
 #[cfg(any(target_os = "ios", test))]
 const QUICK_NOTE_DEFAULTS_FILE: &str = "quick-note.json";
 

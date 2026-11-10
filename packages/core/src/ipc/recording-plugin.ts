@@ -6,7 +6,8 @@ import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.
  * recorder (the desktop half currently rejects every command with
  * `UnsupportedPlatform`, see the plugin's `desktop.rs`). Each schema and
  * args type mirrors a serde model in the plugin's `src/models.rs` (commands)
- * or an `Encodable` struct in `ios/Sources/RecordingPlugin.swift` (events);
+ * or an `Encodable` struct in `apple/Sources/RecordingKit/RecordingEngine.swift`
+ * (events);
  * a field change there must land here in the same review.
  */
 

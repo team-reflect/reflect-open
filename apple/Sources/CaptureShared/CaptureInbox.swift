@@ -1,10 +1,10 @@
 import Foundation
 
-/// The capture envelopes this extension produces and the App Group inbox it
+/// The capture envelopes the iOS producers spool and the App Group inbox they
 /// spools them into — the iOS half of Plan 11's platform-agnostic capture
 /// contract. The TypeScript zod schema
 /// (`packages/core/src/capture/capture-envelope.ts`) is the source of truth;
-/// these structs must stay in sync with it. The extension never opens the
+/// these structs must stay in sync with it. A producer never opens the
 /// graph, the Git repo, or SQLite: the inbox is the only contract, and the
 /// main app relays + drains it on next launch/foreground.
 
@@ -34,7 +34,7 @@ struct TextCaptureEnvelope: Encodable {
   var source: String
 }
 
-enum CaptureInboxError: Error {
+public enum CaptureInboxError: Error {
   /// The App Group container is unreachable — an entitlements mismatch, not
   /// a user-fixable state.
   case containerUnavailable
@@ -57,7 +57,7 @@ private enum FieldCap {
   static let parent = 200
 }
 
-enum CaptureInbox {
+public enum CaptureInbox {
   /// The flavor's App Group: `ReflectAppGroup` in the Info.plist of the
   /// running bundle (the app or the share extension), which
   /// `project.yml` sets per flavor so dev, beta, and stable never drain
@@ -70,7 +70,7 @@ enum CaptureInbox {
   /// same directory name (`SHARED_INBOX_DIR`).
   static let inboxDir = "inbox"
 
-  /// This extension's envelope budget: a share is one short link or line,
+  /// The producers' envelope budget: a share is one short link or line,
   /// so anything near it is not a capture. Well inside the relay's cap
   /// (`SHARED_ENVELOPE_MAX_BYTES` in `capture.rs`), which also takes the
   /// Safari extension's page text.
@@ -78,20 +78,35 @@ enum CaptureInbox {
 
   /// Spool a link capture. Empty titles are allowed (the drain falls back
   /// to the URL's host); empty selections and descriptions are dropped.
-  static func spoolLink(
+  public static func spoolLink(
     url: String,
     title: String,
     selection: String?,
     metaDescription: String?
   ) throws {
-    let id = envelopeId()
+    try spoolLink(
+      url: url, title: title, selection: selection, metaDescription: metaDescription,
+      id: envelopeId(), now: Date(), into: try inboxUrl())
+  }
+
+  /// `spoolLink(url:title:selection:metaDescription:)` into `inbox`, as
+  /// envelope `id` captured at `now`.
+  static func spoolLink(
+    url: String,
+    title: String,
+    selection: String?,
+    metaDescription: String?,
+    id: String,
+    now: Date,
+    into inbox: URL
+  ) throws {
     var envelope = LinkCaptureEnvelope(
       id: id,
       url: url,
       title: capped(title, at: FieldCap.title),
       selection: nonEmpty(capped(selection ?? "", at: FieldCap.selection)),
       metaDescription: nonEmpty(capped(metaDescription ?? "", at: FieldCap.description)),
-      capturedAt: capturedAt()
+      capturedAt: capturedAt(now)
     )
     // The URL is the one uncapped field (truncating it would save a
     // broken link): a pathological one can outgrow the spool cap. Shed
@@ -110,27 +125,39 @@ enum CaptureInbox {
     guard data.count <= spoolMaxBytes else {
       throw CaptureInboxError.envelopeTooLarge
     }
-    try spool(data, id: id)
+    try spool(data, id: id, into: inbox)
   }
 
   /// Spool text as an append capture — the daily note gets a bullet, under
   /// `parent` when it is set. Returns false (spooling nothing) when the text
   /// folds to empty. `source` and `parent` deliberately have no default, so
   /// the compiler names every producer.
-  static func spoolText(_ text: String, source: String, parent: String?) throws -> Bool {
+  public static func spoolText(_ text: String, source: String, parent: String?) throws -> Bool {
+    // Blank text returns false before the container lookup can throw.
+    guard foldedLine(text) != nil else {
+      return false
+    }
+    return try spoolText(
+      text, source: source, parent: parent, id: envelopeId(), now: Date(), into: try inboxUrl())
+  }
+
+  /// `spoolText(_:source:parent:)` into `inbox`, as envelope `id` captured
+  /// at `now`.
+  static func spoolText(
+    _ text: String, source: String, parent: String?, id: String, now: Date, into inbox: URL
+  ) throws -> Bool {
     guard let line = foldedLine(text) else {
       return false
     }
-    let id = envelopeId()
     let envelope = TextCaptureEnvelope(
-      id: id, text: line, parent: parent.flatMap(foldedParent), capturedAt: capturedAt(),
+      id: id, text: line, parent: parent.flatMap(foldedParent), capturedAt: capturedAt(now),
       source: source)
-    try spool(try JSONEncoder().encode(envelope), id: id)
+    try spool(try JSONEncoder().encode(envelope), id: id, into: inbox)
     return true
   }
 
   /// Only web pages are capturable as links — everything else shares as text.
-  static func isHttpUrl(_ candidate: String) -> Bool {
+  public static func isHttpUrl(_ candidate: String) -> Bool {
     candidate.hasPrefix("https://") || candidate.hasPrefix("http://")
   }
 
@@ -159,8 +186,7 @@ enum CaptureInbox {
   /// Write one envelope atomically: a `.json.tmp` sibling first, then a
   /// same-volume rename to `<id>.json` — the relay only picks up committed
   /// `.json` files, so it can never see a half-written envelope.
-  private static func spool(_ data: Data, id: String) throws {
-    let inbox = try inboxUrl()
+  private static func spool(_ data: Data, id: String, into inbox: URL) throws {
     try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
     let tmp = inbox.appendingPathComponent("\(id).json.tmp")
     let committed = inbox.appendingPathComponent("\(id).json")
@@ -187,16 +213,16 @@ enum CaptureInbox {
 
   /// Lowercased to match the producer convention (the drain's identity
   /// slice and the spool filename both derive from it).
-  private static func envelopeId() -> String {
+  static func envelopeId() -> String {
     UUID().uuidString.lowercased()
   }
 
   /// ISO-8601 with milliseconds — what `Date.toISOString()` produces, and
   /// what the drain's zod schema validates.
-  private static func capturedAt() -> String {
+  private static func capturedAt(_ now: Date) -> String {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: Date())
+    return formatter.string(from: now)
   }
 
   /// Trim, then cap by UTF-16 code units (what the drain's zod `.max()`

@@ -1,4 +1,5 @@
 import ObjectiveC
+import RecordingShared
 import UIKit
 
 /// OS entry points that the scene lifecycle hands to the scene instead of the
@@ -12,12 +13,10 @@ import UIKit
 /// scene, delivers the connection options the way a running app receives them:
 /// the quick action through the notification the Siri intents post
 /// (`RecordingIntents.swift`), URLs through tao's own `scene:openURLContexts:`
-/// to the Rust shell. The names mirror the constants in
-/// `plugins/tauri-plugin-recording/ios/Sources/RecordingPlugin.swift`.
+/// to the Rust shell.
 private enum SceneEntryPoints {
   /// The quick action's `UIApplicationShortcutItemType` (`project.yml`).
   static let recordShortcutType = "app.reflect.record-audio"
-  static let startRecordingRequested = Notification.Name("app.reflect.recording.start-requested")
   /// tao registers its scene delegate class under this name before
   /// `UIApplicationMain` runs (scene sessions restore it by name), so it exists
   /// once launching finishes, before the first scene connects.
@@ -114,7 +113,7 @@ private enum SceneEntryPoints {
 
   private static func performQuickAction(_ item: UIApplicationShortcutItem) -> Bool {
     guard item.type == recordShortcutType else { return false }
-    NotificationCenter.default.post(name: startRecordingRequested, object: nil)
+    NotificationCenter.default.post(name: .recordingStartRequested, object: nil)
     return true
   }
 }
