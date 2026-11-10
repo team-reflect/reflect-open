@@ -160,13 +160,8 @@ jobs:
 
       - uses: ./.github/actions/setup-xcode
 
-      # FIXME: [review by claude-opus-5-5]: this `run:` is a plain YAML scalar, so the two lines fold into ONE command:
-      #   `swift --version swift format --version` (checked with Ruby's YAML parser). `swift` ignores the
-      #   extra args, so it passes but never prints the swift-format version. The next step duplicates it
-      #   anyway. Merge into one step with `run: |`.
       - name: Check swift version
         run: swift --version
-          swift format --version
 
       - name: Check swift format version
         run: swift format --version
