@@ -151,7 +151,7 @@ jobs:
     #   Also: `swift format lint --strict` moved from the Linux `lint-rust` job (no draft gate) into this
     #   draft-gated macOS job, so drafts lose the lint check. Consider a separate cheap `lint-swift` job on
     #   ubuntu (Swift is preinstalled there, it ran fine before) and keep only build/test on `xcode-27`.
-    if: needs.classify.outputs.stack-middle == 'false' // FIXED.
+    if: needs.classify.outputs.stack-middle == 'false' #// FIXED. // FIXME:delete this comment
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
