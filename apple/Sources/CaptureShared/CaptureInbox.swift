@@ -86,25 +86,27 @@ public enum CaptureInbox {
   ) throws {
     try spoolLink(
       url: url, title: title, selection: selection, metaDescription: metaDescription,
-      into: try inboxUrl())
+      id: envelopeId(), now: Date(), into: try inboxUrl())
   }
 
-  /// `spoolLink(url:title:selection:metaDescription:)` into `inbox`.
+  /// `spoolLink(url:title:selection:metaDescription:)` into `inbox`, as
+  /// envelope `id` captured at `now`.
   static func spoolLink(
     url: String,
     title: String,
     selection: String?,
     metaDescription: String?,
+    id: String,
+    now: Date,
     into inbox: URL
   ) throws {
-    let id = envelopeId()
     var envelope = LinkCaptureEnvelope(
       id: id,
       url: url,
       title: capped(title, at: FieldCap.title),
       selection: nonEmpty(capped(selection ?? "", at: FieldCap.selection)),
       metaDescription: nonEmpty(capped(metaDescription ?? "", at: FieldCap.description)),
-      capturedAt: capturedAt()
+      capturedAt: capturedAt(now)
     )
     // The URL is the one uncapped field (truncating it would save a
     // broken link): a pathological one can outgrow the spool cap. Shed
@@ -135,19 +137,20 @@ public enum CaptureInbox {
     guard foldedLine(text) != nil else {
       return false
     }
-    return try spoolText(text, source: source, parent: parent, into: try inboxUrl())
+    return try spoolText(
+      text, source: source, parent: parent, id: envelopeId(), now: Date(), into: try inboxUrl())
   }
 
-  /// `spoolText(_:source:parent:)` into `inbox`.
+  /// `spoolText(_:source:parent:)` into `inbox`, as envelope `id` captured
+  /// at `now`.
   static func spoolText(
-    _ text: String, source: String, parent: String?, into inbox: URL
+    _ text: String, source: String, parent: String?, id: String, now: Date, into inbox: URL
   ) throws -> Bool {
     guard let line = foldedLine(text) else {
       return false
     }
-    let id = envelopeId()
     let envelope = TextCaptureEnvelope(
-      id: id, text: line, parent: parent.flatMap(foldedParent), capturedAt: capturedAt(),
+      id: id, text: line, parent: parent.flatMap(foldedParent), capturedAt: capturedAt(now),
       source: source)
     try spool(try JSONEncoder().encode(envelope), id: id, into: inbox)
     return true
@@ -210,16 +213,16 @@ public enum CaptureInbox {
 
   /// Lowercased to match the producer convention (the drain's identity
   /// slice and the spool filename both derive from it).
-  private static func envelopeId() -> String {
+  static func envelopeId() -> String {
     UUID().uuidString.lowercased()
   }
 
   /// ISO-8601 with milliseconds — what `Date.toISOString()` produces, and
   /// what the drain's zod schema validates.
-  private static func capturedAt() -> String {
+  private static func capturedAt(_ now: Date) -> String {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: Date())
+    return formatter.string(from: now)
   }
 
   /// Trim, then cap by UTF-16 code units (what the drain's zod `.max()`

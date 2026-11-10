@@ -58,6 +58,7 @@ func stagedInfoRejectsForeignNames(name: String) {
 
 @Test func markEndedRenamesToEndName() throws {
   let directory = try makeDirectory()
+  defer { try? FileManager.default.removeItem(at: directory) }
   let open = try touch("recording-42.part-002.m4a", in: directory)
 
   let ended = try RecordingFiles.markEnded(path: open.path, sessionStartedMs: 42, part: 2)
@@ -72,6 +73,7 @@ func stagedInfoRejectsForeignNames(name: String) {
 
 @Test func listStagedSortsNumerically() throws {
   let directory = try makeDirectory()
+  defer { try? FileManager.default.removeItem(at: directory) }
   _ = try touch("recording-20.part-001.m4a", in: directory)
   _ = try touch("recording-10.part-1000.m4a", in: directory)
   _ = try touch("recording-10.part-999.m4a", in: directory)
@@ -85,6 +87,7 @@ func stagedInfoRejectsForeignNames(name: String) {
 
 @Test func listStagedExcludesLiveFile() throws {
   let directory = try makeDirectory()
+  defer { try? FileManager.default.removeItem(at: directory) }
   let done = try touch("recording-10.part-001.m4a", in: directory)
   let live = try touch("recording-10.part-002.m4a", in: directory)
 
@@ -96,6 +99,7 @@ func stagedInfoRejectsForeignNames(name: String) {
 
 @Test func sessionFilesOnlyMatchSession() throws {
   let directory = try makeDirectory()
+  defer { try? FileManager.default.removeItem(at: directory) }
   _ = try touch("recording-10.part-001.m4a", in: directory)
   _ = try touch("recording-10.part-002-end.m4a", in: directory)
   _ = try touch("recording-100.part-001.m4a", in: directory)
@@ -109,6 +113,7 @@ func stagedInfoRejectsForeignNames(name: String) {
 
 @Test func stagedURLAcceptsFilesInside() throws {
   let directory = try makeDirectory()
+  defer { try? FileManager.default.removeItem(at: directory) }
   let path = directory.appendingPathComponent("recording-1.part-001.m4a").path
   let url = try RecordingFiles.stagedURL(for: path, in: directory)
   #expect(url.lastPathComponent == "recording-1.part-001.m4a")
@@ -116,6 +121,7 @@ func stagedInfoRejectsForeignNames(name: String) {
 
 @Test func stagedURLRejectsEscapes() throws {
   let directory = try makeDirectory()
+  defer { try? FileManager.default.removeItem(at: directory) }
   for path in [
     directory.appendingPathComponent("../x.m4a").path,
     "/etc/hosts",
