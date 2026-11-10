@@ -22,6 +22,7 @@
 		9D7F5A94048CECBFC3D89BBA /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F28F8A628D32337E04C0CBC0 /* libapp.a */; };
 		A2E5A9558E714E679520EA9E /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E66BC7105426B91F03659B53 /* MetalKit.framework */; };
 		B109D161D258110DC703F97C /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 51006DE1482D28D9562253A1 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BADC36F7F3D7B16A05FF8059 /* RecordingShared in Frameworks */ = {isa = PBXBuildFile; productRef = 357ACF14D12B90963C61453C /* RecordingShared */; };
 		BB860922C6BE0A0EF50D9F56 /* AppIcon-Dev.icon in Resources */ = {isa = PBXBuildFile; fileRef = 1AD2D308CA9C249EE2DE548C /* AppIcon-Dev.icon */; };
 		BF7E53C67D6BA31063A66D0C /* CaptureShared in Frameworks */ = {isa = PBXBuildFile; productRef = 25DB74B74736C68612041E1E /* CaptureShared */; };
 		C1FBC0B57C41A13D88225DFB /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 3ED6411036D50396010D935D /* assets */; };
@@ -179,6 +180,7 @@
 			files = (
 				0B64041CFADD8313F72A847E /* Sentry-Dynamic in Frameworks */,
 				BF7E53C67D6BA31063A66D0C /* CaptureShared in Frameworks */,
+				BADC36F7F3D7B16A05FF8059 /* RecordingShared in Frameworks */,
 				9D7F5A94048CECBFC3D89BBA /* libapp.a in Frameworks */,
 				319EDF8F46AB05DFBA9D674F /* libz.tbd in Frameworks */,
 				E9E7B6C59015E7301EE63308 /* libiconv.tbd in Frameworks */,
@@ -368,6 +370,7 @@
 			packageProductDependencies = (
 				27BF2501FCD1BD0D24DB4908 /* Sentry-Dynamic */,
 				25DB74B74736C68612041E1E /* CaptureShared */,
+				357ACF14D12B90963C61453C /* RecordingShared */,
 			);
 			productName = "reflect-open_iOS";
 			productReference = BC3901740F3A40252C3750C7 /* reflect-open_iOS.app */;
@@ -902,6 +905,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 66F54EA13384DC78CB89C8EA /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
 			productName = "Sentry-Dynamic";
+		};
+		357ACF14D12B90963C61453C /* RecordingShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RecordingShared;
 		};
 		592417A9612E41653BC905FD /* RecordingShared */ = {
 			isa = XCSwiftPackageProductDependency;
