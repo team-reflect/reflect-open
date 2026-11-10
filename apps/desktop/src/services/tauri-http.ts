@@ -1,13 +1,37 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
 import type { HttpService } from '@reflect/core'
 
+async function cancelUnreadBody(body: ReadableStream<Uint8Array>): Promise<void> {
+  if (body.locked) {
+    return
+  }
+  try {
+    await body.cancel()
+  } catch {
+    // An errored body has nothing left to release.
+  }
+}
+
+/**
+ * The plugin keeps each response in the Rust resource table until its body
+ * is read to the end or cancelled. Cancels the body of a response that was
+ * garbage collected unread, e.g. after a `!response.ok` early return.
+ */
+const unreadBodies = new FinalizationRegistry<ReadableStream<Uint8Array>>((body) => {
+  void cancelUnreadBody(body)
+})
+
 class TauriHttpServiceImpl implements HttpService {
-  fetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  async fetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
     const headers = new Headers(init?.headers)
     if (!headers.has('Origin')) {
       headers.set('Origin', '')
     }
-    return tauriFetch(input, { ...init, headers })
+    const response = await tauriFetch(input, { ...init, headers })
+    if (response.body !== null) {
+      unreadBodies.register(response, response.body)
+    }
+    return response
   }
 }
 
