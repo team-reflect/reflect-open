@@ -33,15 +33,15 @@ func isHttpUrl(candidate: String, expected: Bool) {
 @Test func foldedLine() {
   #expect(CaptureInbox.foldedLine("  a \n\t b  ") == "a b")
   #expect(CaptureInbox.foldedLine(" \n\t ") == nil)
-  let long = String(repeating: "x", count: 10_001)
-  #expect(CaptureInbox.foldedLine(long)?.utf16.count == 10_000)
+  let long = String((0..<10_001).map { Character(String($0 % 10)) })
+  #expect(CaptureInbox.foldedLine(long) == String(long.prefix(10_000)))
 }
 
 @Test func foldedParent() {
   #expect(CaptureInbox.foldedParent("  Ideas \n inbox ") == "Ideas inbox")
   #expect(CaptureInbox.foldedParent("   ") == nil)
-  let long = String(repeating: "x", count: 201)
-  #expect(CaptureInbox.foldedParent(long)?.utf16.count == 200)
+  let long = String((0..<201).map { Character(String($0 % 10)) })
+  #expect(CaptureInbox.foldedParent(long) == String(long.prefix(200)))
 }
 
 @Test func cappedTitleKeepsWholeCharacters() throws {
@@ -57,7 +57,8 @@ func isHttpUrl(candidate: String, expected: Bool) {
   let capped = try #require(try readOnlyEnvelope(in: inbox)["title"] as? String)
   #expect(capped.utf16.count <= 1_000)
   #expect(capped.utf16.count > 990)
-  #expect(capped.dropFirst().allSatisfy { $0 == "👍🏽" })
+  // A whole-character prefix: a cut inside 👍🏽 would not match.
+  #expect(title.hasPrefix(capped))
 }
 
 @Test func oversizedEnvelopeDropsSelectionFirst() throws {
