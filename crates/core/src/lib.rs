@@ -151,6 +151,19 @@ impl Core {
             .map_err(|err| AppError::io(format!("blocking task panicked: {err}")))?
     }
 
+    /// Runs `task` to completion on a blocking-pool thread, inside an
+    /// autorelease pool. A command body that blocks then holds a blocking
+    /// thread instead of one of the async worker threads.
+    pub fn spawn_blocking_future<F>(&self, task: F) -> tokio::task::JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let handle = self.runtime.handle().clone();
+        self.runtime
+            .spawn_blocking(move || drain_autoreleased(|| handle.block_on(task)))
+    }
+
     /// Runs `command` with `args_json`, a JSON object of camelCase arguments.
     /// `headers_json` is a JSON object of the request's lowercase header names
     /// and values, and `body` the raw request body of a binary command.
