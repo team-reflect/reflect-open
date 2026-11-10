@@ -4608,6 +4608,7 @@ dependencies = [
  "reflect-graph-io",
  "reflect-index",
  "reflect-types",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tempfile",

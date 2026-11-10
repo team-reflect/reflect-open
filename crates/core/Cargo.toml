@@ -13,6 +13,7 @@ keyring-core = { workspace = true }
 reflect-graph-io = { workspace = true }
 reflect-index = { workspace = true }
 reflect-types = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }

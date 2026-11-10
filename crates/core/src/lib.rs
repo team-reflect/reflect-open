@@ -6,6 +6,7 @@ pub mod background_task;
 pub mod recents;
 mod secrets;
 pub mod settings;
+pub mod web_fetch;
 
 use std::sync::Arc;
 
