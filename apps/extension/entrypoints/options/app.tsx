@@ -20,7 +20,9 @@ import { useStoredSetting } from './use-stored-setting.ts'
  * single capture. Chrome opens it in a dialog over chrome://extensions.
  */
 
-const SITE_ACCESS_FALLBACK = 'Allow it under Site access in chrome://extensions.'
+const SITE_ACCESS_FALLBACK = import.meta.env.SAFARI
+  ? 'Allow it for x.com in Safari Settings → Extensions.'
+  : 'Allow it under Site access in chrome://extensions.'
 
 function useXAccess(): [granted: boolean | null, request: () => Promise<boolean>] {
   const [granted, setGranted] = useState<boolean | null>(null)

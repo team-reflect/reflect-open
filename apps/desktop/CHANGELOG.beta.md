@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.18.0...v0.19.0-beta.1) (2026-11-10)
+
+
+### Features
+
+* save pages from Safari on macOS ([#2036](https://github.com/team-reflect/reflect-open/issues/2036)) ([f7cb87a](https://github.com/team-reflect/reflect-open/commit/f7cb87a25985d9e5d2635bbf8efda517304a20f1))
+
 ## [0.18.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.18.0-beta.12...v0.18.0-beta.13) (2026-11-09)
 
 

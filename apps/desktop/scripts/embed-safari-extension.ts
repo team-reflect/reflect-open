@@ -1,6 +1,5 @@
-// Builds the Safari app extension and embeds it in a built Reflect.app, so
-// Safari can deliver the capture extension's messages to it. Tauri's bundler
-// cannot build app extensions; `build-macos.ts` does not run this yet.
+// Adds the Safari extension to a local build, for testing it without the
+// release credentials. Release builds get it from `build-macos.ts`.
 //
 //   pnpm --filter @reflect/desktop safari:embed --app=<path> [flags]
 //
@@ -16,25 +15,23 @@
 //                       App Group.
 //   --team=<id>         The identity's Team ID, which prefixes the App Group.
 //                       Default: Reflect's team.
-//
-// The App Group is `<team>.<app bundle id>`, so each flavor spools into its
-// own container. A team-prefixed group needs no provisioning-profile grant.
-// The relay in `src-tauri/src/capture.rs` reads it back from the app
-// extension's Info.plist.
 
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
-import { APP_DIR, INHERIT, log, runWithTempDir, TAURI_SRC_DIR } from './helpers.ts'
+import { INHERIT, log, runWithTempDir, TAURI_SRC_DIR } from './helpers.ts'
+import {
+  APP_GROUPS_KEY,
+  embedSafariExtension,
+  readAppInfo,
+  REFLECT_TEAM_ID,
+  safariAppexEntitlements,
+  safariAppexPath,
+  safariAppGroup,
+} from './safari-extension.ts'
 
-const REFLECT_TEAM_ID = '789ULN5MZB'
-/** Must match `SAFARI_APPEX` in `src-tauri/src/capture.rs`. */
-const APPEX = 'SafariExtension.appex'
-const PROJECT_DIR = join(TAURI_SRC_DIR, 'safari-extension')
-const WEB_EXTENSION_DIR = join(APP_DIR, '..', 'extension', '.output', 'safari-mv3')
-const APP_GROUPS_KEY = 'com.apple.security.application-groups'
 const FLAVOR_OVERLAYS = ['tauri.dev.conf.json', 'tauri.beta.conf.json']
 
 const EntitlementsSchema = z.record(z.string(), z.unknown())
@@ -48,14 +45,7 @@ const TauriConfigSchema = z.object({
 })
 type TauriConfig = z.infer<typeof TauriConfigSchema>
 
-async function readInfo(app: string, key: string): Promise<string> {
-  const plist = join(app, 'Contents', 'Info.plist')
-  const { stdout } = await exec('plutil', ['-extract', key, 'raw', '-o', '-', plist], {
-    throwOnError: true,
-  })
-  return stdout.trim()
-}
-
+/** The plist at `path` (XML or binary), parsed through JSON. */
 async function readPlist(path: string): Promise<Entitlements> {
   const json = await exec('plutil', ['-convert', 'json', '-o', '-', path], { throwOnError: true })
   return EntitlementsSchema.parse(JSON.parse(json.stdout))
@@ -88,6 +78,7 @@ async function readEntitlements(path: string, tempDir: string): Promise<Entitlem
   return await readPlist(plist)
 }
 
+/** The Tauri config file `name` in `src-tauri/`, alone: no base or platform merge. */
 function readTauriConfig(name: string): TauriConfig {
   return TauriConfigSchema.parse(JSON.parse(readFileSync(join(TAURI_SRC_DIR, name), 'utf8')))
 }
@@ -139,36 +130,6 @@ async function sign(
   )
 }
 
-async function buildAppex(
-  app: string,
-  identifier: string,
-  group: string,
-  tempDir: string,
-): Promise<string> {
-  await exec(
-    'xcodebuild',
-    [
-      '-project',
-      join(PROJECT_DIR, 'ReflectSafari.xcodeproj'),
-      '-target',
-      'SafariExtension',
-      '-configuration',
-      'Release',
-      `SYMROOT=${tempDir}`,
-      `REFLECT_APP_IDENTIFIER=${identifier}`,
-      `REFLECT_APP_GROUP=${group}`,
-      `MARKETING_VERSION=${await readInfo(app, 'CFBundleShortVersionString')}`,
-      `CURRENT_PROJECT_VERSION=${await readInfo(app, 'CFBundleVersion')}`,
-      'build',
-    ],
-    INHERIT,
-  )
-  const appex = join(tempDir, 'Release', APPEX)
-  // Safari loads the web extension from the app extension's Resources.
-  cpSync(WEB_EXTENSION_DIR, join(appex, 'Contents', 'Resources'), { recursive: true })
-  return appex
-}
-
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
@@ -185,28 +146,13 @@ async function main(): Promise<void> {
   if (!identity) {
     throw new Error('Pass --identity=<name> or set APPLE_SIGNING_IDENTITY (`-` signs ad-hoc)')
   }
-  const identifier = await readInfo(app, 'CFBundleIdentifier')
-  const group = `${values.team}.${identifier}`
+  const identifier = await readAppInfo(app, 'CFBundleIdentifier')
+  const group = safariAppGroup(values.team, identifier)
 
-  log('Building the Safari web extension')
-  await exec('pnpm', ['--filter', '@reflect/extension', 'build:safari'], INHERIT)
-
+  await embedSafariExtension(app, group)
   await runWithTempDir(async (tempDir) => {
-    log('Building the Safari app extension')
-    const appex = await buildAppex(app, identifier, group, tempDir)
-
     log(`Signing with ${identity === '-' ? 'an ad-hoc signature' : identity}`)
-    // Nested code first: re-signing the app seals the app extension's signature.
-    await sign(
-      appex,
-      identity,
-      { 'com.apple.security.app-sandbox': true, [APP_GROUPS_KEY]: [group] },
-      tempDir,
-    )
-    const plugIns = join(app, 'Contents', 'PlugIns')
-    rmSync(join(plugIns, APPEX), { recursive: true, force: true })
-    mkdirSync(plugIns, { recursive: true })
-    await exec('ditto', [appex, join(plugIns, APPEX)], INHERIT)
+    await sign(safariAppexPath(app), identity, safariAppexEntitlements(group), tempDir)
     // The app keeps its flavor's entitlements plus what it was signed with
     // (a release build's profile identity), and joins the group, so it can
     // read the container without a macOS access prompt.
@@ -218,7 +164,7 @@ async function main(): Promise<void> {
     await sign(app, identity, entitlements, tempDir)
   })
   await exec('codesign', ['--verify', '--deep', '--strict', app], INHERIT)
-  log(`Embedded ${APPEX} in ${app} (App Group ${group})`)
+  log(`Embedded the Safari extension in ${app} (App Group ${group})`)
 }
 
 await main()

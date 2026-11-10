@@ -5,11 +5,11 @@
 # inbox the desktop app relays into the graph (`capture.rs`). Swift only — no
 # Rust, no network.
 #
-# Tauri's bundler cannot build app extensions, so
-# `scripts/embed-safari-extension.ts` builds the target unsigned, copies the
-# WXT Safari build into its Resources, then signs and embeds it. The script
-# passes the flavor's identifiers as build settings (REFLECT_APP_IDENTIFIER,
-# REFLECT_APP_GROUP) and the app's version.
+# Tauri's bundler cannot build app extensions, so `scripts/safari-extension.ts`
+# builds the target unsigned, copies the WXT Safari build into its Resources,
+# and embeds it for its callers to sign. The script passes the flavor's
+# identifiers as build settings (REFLECT_APP_IDENTIFIER, REFLECT_APP_GROUP) and
+# the app's version.
 #
 # `ReflectSafari.xcodeproj` and `Info.plist` are generated from this file and
 # committed, so building needs only Xcode. `Sources` is a synced folder: new
@@ -50,6 +50,7 @@ targets:
         # An appex bundle id must be prefixed by its containing app's.
         PRODUCT_BUNDLE_IDENTIFIER: $(REFLECT_APP_IDENTIFIER).safari-extension
         SWIFT_VERSION: '5.0'
-        # Signed by the embed script, with the sandbox and App Group
-        # entitlements, once the web extension is in its Resources.
+        # Signed by the callers of `scripts/safari-extension.ts`, with the
+        # sandbox and App Group entitlements, once the web extension is in its
+        # Resources.
         CODE_SIGNING_ALLOWED: 'NO'
