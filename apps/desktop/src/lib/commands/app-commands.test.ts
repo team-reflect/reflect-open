@@ -125,9 +125,16 @@ describe('keybindingFor', () => {
     expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
   })
 
-  it('graph switch commands use command-number bindings', () => {
+  it('graph switch commands use the first five command-number bindings', () => {
     expect(keybindingFor('graph.switch1')).toBe('Mod-1')
-    expect(keybindingFor('graph.switch9')).toBe('Mod-9')
+    expect(keybindingFor('graph.switch5')).toBe('Mod-5')
+    expect(keybindingFor('graph.switch6')).toBeNull()
+  })
+
+  it('pinned note commands take the remaining command-number bindings', () => {
+    expect(keybindingFor('pinned.open1')).toBe('Mod-6')
+    expect(keybindingFor('pinned.open4')).toBe('Mod-9')
+    expect(keybindingFor('pinned.open5')).toBeNull()
   })
 })
 
@@ -210,10 +217,10 @@ describe('app commands', () => {
     const { context } = fakeContext({ switchGraph })
 
     await command('graph.switch1').run(context)
-    await command('graph.switch9').run(context)
+    await command('graph.switch5').run(context)
 
     expect(switchGraph).toHaveBeenNthCalledWith(1, 0)
-    expect(switchGraph).toHaveBeenNthCalledWith(2, 8)
+    expect(switchGraph).toHaveBeenNthCalledWith(2, 4)
   })
 
   it('note.new clears daily scroll and navigates to a fresh lazy ULID note path', async () => {

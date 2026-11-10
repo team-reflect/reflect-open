@@ -2,6 +2,7 @@ import type { NoteCreationService } from '@reflect/core'
 import { type CommandService, routeForPath, type Route } from '@reflect/app'
 import { attachFilesToNote } from '@/lib/attach-files.ts'
 import { copyNoteDeepLink, copyNotePath, publishGistAndCopyLink } from '@/lib/clipboard-actions.ts'
+import { GRAPH_SWITCH_COUNT, PINNED_NOTE_COMMANDS } from './pinned-note-commands.ts'
 import type { AppCommand, CommandContext } from './types.ts'
 
 /**
@@ -33,19 +34,23 @@ function openNewNote(context: CommandContext): void {
   context.navigate(newNoteRoute(context.services.noteCreation))
 }
 
-const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
-  const position = index + 1
-  return {
-    id: `graph.switch${position}`,
-    title: `Switch to graph ${position}`,
-    keywords: ['graph', 'workspace', 'switch', 'recent'],
-    keybinding: `Mod-${position}`,
-    run: (context) => context.switchGraph(index),
-  }
-})
+const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from(
+  { length: GRAPH_SWITCH_COUNT },
+  (_, index) => {
+    const position = index + 1
+    return {
+      id: `graph.switch${position}`,
+      title: `Switch to graph ${position}`,
+      keywords: ['graph', 'workspace', 'switch', 'recent'],
+      keybinding: `Mod-${position}`,
+      run: (context) => context.switchGraph(index),
+    }
+  },
+)
 
 const APP_COMMANDS: AppCommand[] = [
   ...GRAPH_SWITCH_COMMANDS,
+  ...PINNED_NOTE_COMMANDS,
   {
     id: 'nav.today',
     title: 'Go to today',
