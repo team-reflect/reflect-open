@@ -325,9 +325,9 @@ export default defineESLintConfig(
     files: [
       // The adapters.
       `apps/desktop/src/services/**/*.${SOURCE_EXTENSIONS}`,
-      // The composition roots: `boot.ts` asks Tauri whether the shell is
-      // native before any service exists; `main.tsx` is listed with it and
-      // imports nothing from Tauri today.
+      // The composition roots: `boot.ts` picks the shell's adapters before
+      // any service exists; `main.tsx` is listed with it. Neither imports
+      // from Tauri today.
       'apps/desktop/src/boot.ts',
       'apps/desktop/src/main.tsx',
     ],

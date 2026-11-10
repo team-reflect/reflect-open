@@ -37,23 +37,18 @@ mod settings;
 mod skill;
 #[cfg(target_os = "macos")]
 mod wake;
+mod watcher;
 use reflect_core::web_fetch;
 mod windows;
 
-// The watcher and the embedding runtime are desktop capabilities (Plan 19),
-// and Intel macOS has no embedding runtime either: other platforms swap in
-// stand-ins with the identical command surface, so
-// the `invoke_handler` list below needs no platform branches.
+// Intel macOS and mobile have no embedding runtime: their stand-in commands
+// keep the identical command surface, so the `invoke_handler` list below
+// needs no platform branches.
 #[cfg(all(desktop, not(all(target_os = "macos", target_arch = "x86_64"))))]
 mod embed;
 #[cfg(any(mobile, all(target_os = "macos", target_arch = "x86_64")))]
 #[path = "embed_unsupported.rs"]
 mod embed;
-#[cfg(desktop)]
-mod watcher;
-#[cfg(mobile)]
-#[path = "watcher_mobile.rs"]
-mod watcher;
 
 use std::sync::Arc;
 
@@ -139,6 +134,7 @@ pub fn run() {
         logging::init(app.handle());
         let host = Arc::new(host::TauriHost::new(app.handle().clone()));
         let config = CoreConfig {
+            app_data_dir: app.path().app_data_dir().ok(),
             user_agent: app_user_agent(app.handle()),
         };
         let core = Core::new(config, host).map_err(|err| err.message().to_string())?;
@@ -257,10 +253,8 @@ pub fn run() {
             fs::asset_protocol::SCHEME,
             fs::asset_protocol::handle,
         )
-        .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
         .manage(windows::WindowInit::default())
-        .manage(embed::EmbedState::default())
         .invoke_handler(tauri::generate_handler![
             fs::x_archive::x_archive_write,
             fs::x_archive::x_archive_resolve,

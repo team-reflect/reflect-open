@@ -4602,8 +4602,13 @@ dependencies = [
  "block2",
  "dbus-secret-service-keyring-store",
  "dirs 7.0.0",
+ "fastembed",
+ "file-id",
+ "hf-hub",
  "infer",
  "keyring-core",
+ "notify",
+ "notify-debouncer-full",
  "objc2",
  "objc2-foundation",
  "objc2-ui-kit",
@@ -4618,6 +4623,7 @@ dependencies = [
  "tokio",
  "tracing",
  "trash",
+ "walkdir",
  "windows-native-keyring-store",
 ]
 
@@ -4698,14 +4704,9 @@ dependencies = [
  "block2",
  "dirs 7.0.0",
  "dispatch2",
- "fastembed",
- "file-id",
- "hf-hub",
  "http-range-header",
  "image",
  "log",
- "notify",
- "notify-debouncer-full",
  "objc2",
  "objc2-app-kit",
  "objc2-contacts",
@@ -4742,7 +4743,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
- "walkdir",
 ]
 
 [[package]]

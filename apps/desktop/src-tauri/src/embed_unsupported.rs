@@ -1,38 +1,25 @@
-//! Stand-in for the embedding runtime on platforms that have none: the
-//! commands stay registered so the IPC surface is identical everywhere, and
-//! the status reports `unsupported` so the frontend can turn semantic search
-//! off. Search stays lexical (FTS5).
+//! Stand-in embedding commands for platforms with no embedding runtime,
+//! forwarded to [`reflect_core::Core`].
 
-use serde::Serialize;
+use std::sync::Arc;
 
-use crate::error::{AppError, AppResult};
+use reflect_core::Core;
+use reflect_core::embed::EmbedStatus;
+use tauri::State;
 
-/// Unit stand-in for the runtime state, so `lib.rs` manages the same type
-/// name on every platform.
-#[derive(Default)]
-pub struct EmbedState;
+use crate::error::AppResult;
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase", tag = "status")]
-pub enum EmbedStatus {
-    /// This platform has no embedding runtime.
-    Unsupported,
+#[tauri::command]
+pub fn embed_status(core: State<'_, Arc<Core>>) -> AppResult<EmbedStatus> {
+    core.embed_status()
 }
 
 #[tauri::command]
-pub fn embed_status() -> AppResult<EmbedStatus> {
-    Ok(EmbedStatus::Unsupported)
+pub fn embed_ensure(core: State<'_, Arc<Core>>) -> AppResult<EmbedStatus> {
+    core.embed_ensure()
 }
 
 #[tauri::command]
-pub fn embed_ensure() -> AppResult<EmbedStatus> {
-    Ok(EmbedStatus::Unsupported)
-}
-
-/// Fails loudly: the frontend never embeds on an `unsupported` runtime.
-#[tauri::command]
-pub fn embed_texts() -> AppResult<()> {
-    Err(AppError::Unknown {
-        message: "the embedding runtime is not supported on this platform".into(),
-    })
+pub fn embed_texts(core: State<'_, Arc<Core>>) -> AppResult<()> {
+    core.embed_texts()
 }
