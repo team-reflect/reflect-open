@@ -84,6 +84,19 @@ public enum CaptureInbox {
     selection: String?,
     metaDescription: String?
   ) throws {
+    try spoolLink(
+      url: url, title: title, selection: selection, metaDescription: metaDescription,
+      into: try inboxUrl())
+  }
+
+  /// `spoolLink(url:title:selection:metaDescription:)` into `inbox`.
+  static func spoolLink(
+    url: String,
+    title: String,
+    selection: String?,
+    metaDescription: String?,
+    into inbox: URL
+  ) throws {
     let id = envelopeId()
     var envelope = LinkCaptureEnvelope(
       id: id,
@@ -110,7 +123,7 @@ public enum CaptureInbox {
     guard data.count <= spoolMaxBytes else {
       throw CaptureInboxError.envelopeTooLarge
     }
-    try spool(data, id: id)
+    try spool(data, id: id, into: inbox)
   }
 
   /// Spool text as an append capture — the daily note gets a bullet, under
@@ -118,6 +131,17 @@ public enum CaptureInbox {
   /// folds to empty. `source` and `parent` deliberately have no default, so
   /// the compiler names every producer.
   public static func spoolText(_ text: String, source: String, parent: String?) throws -> Bool {
+    // Blank text returns false before the container lookup can throw.
+    guard foldedLine(text) != nil else {
+      return false
+    }
+    return try spoolText(text, source: source, parent: parent, into: try inboxUrl())
+  }
+
+  /// `spoolText(_:source:parent:)` into `inbox`.
+  static func spoolText(
+    _ text: String, source: String, parent: String?, into inbox: URL
+  ) throws -> Bool {
     guard let line = foldedLine(text) else {
       return false
     }
@@ -125,7 +149,7 @@ public enum CaptureInbox {
     let envelope = TextCaptureEnvelope(
       id: id, text: line, parent: parent.flatMap(foldedParent), capturedAt: capturedAt(),
       source: source)
-    try spool(try JSONEncoder().encode(envelope), id: id)
+    try spool(try JSONEncoder().encode(envelope), id: id, into: inbox)
     return true
   }
 
@@ -159,8 +183,7 @@ public enum CaptureInbox {
   /// Write one envelope atomically: a `.json.tmp` sibling first, then a
   /// same-volume rename to `<id>.json` — the relay only picks up committed
   /// `.json` files, so it can never see a half-written envelope.
-  private static func spool(_ data: Data, id: String) throws {
-    let inbox = try inboxUrl()
+  private static func spool(_ data: Data, id: String, into inbox: URL) throws {
     try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
     let tmp = inbox.appendingPathComponent("\(id).json.tmp")
     let committed = inbox.appendingPathComponent("\(id).json")
