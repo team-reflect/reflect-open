@@ -1,15 +1,16 @@
 import Foundation
+import ReflectCapture
 
 #if canImport(AppIntents)
 import AppIntents
 
 /// Siri / Shortcuts / Action-button quick capture (Plan 24): spools the
 /// text into the App Group capture inbox as an `ios-intent` envelope
-/// through the share extension's `CaptureInbox` (compiled into this target
-/// too — the shared-source pattern). Durability, not visibility: the app
-/// relays + drains the inbox into the capture-day daily note on its next
-/// launch/foreground, so the dialog says "Saved", never "added". The note
-/// nests under the parent bullet set in Settings (`QuickNoteDefaults`).
+/// through `CaptureInbox` from the `ReflectCapture` module (`apple/`).
+/// Durability, not visibility: the app relays + drains the inbox into the
+/// capture-day daily note on its next launch/foreground, so the dialog says
+/// "Saved", never "added". The note nests under the parent bullet set in
+/// Settings (`QuickNoteDefaults`).
 ///
 /// `openAppWhenRun = false`: when the app is not running, iOS launches it
 /// in the background to run this — but `perform()` touches only Foundation

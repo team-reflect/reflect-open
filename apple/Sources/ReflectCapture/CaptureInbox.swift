@@ -34,7 +34,7 @@ struct TextCaptureEnvelope: Encodable {
   var source: String
 }
 
-enum CaptureInboxError: Error {
+public enum CaptureInboxError: Error {
   /// The App Group container is unreachable — an entitlements mismatch, not
   /// a user-fixable state.
   case containerUnavailable
@@ -57,7 +57,7 @@ private enum FieldCap {
   static let parent = 200
 }
 
-enum CaptureInbox {
+public enum CaptureInbox {
   /// The flavor's App Group: `ReflectAppGroup` in the Info.plist of the
   /// running bundle (the app or the share extension), which
   /// `project.yml` sets per flavor so dev, beta, and stable never drain
@@ -78,7 +78,7 @@ enum CaptureInbox {
 
   /// Spool a link capture. Empty titles are allowed (the drain falls back
   /// to the URL's host); empty selections and descriptions are dropped.
-  static func spoolLink(
+  public static func spoolLink(
     url: String,
     title: String,
     selection: String?,
@@ -117,7 +117,7 @@ enum CaptureInbox {
   /// `parent` when it is set. Returns false (spooling nothing) when the text
   /// folds to empty. `source` and `parent` deliberately have no default, so
   /// the compiler names every producer.
-  static func spoolText(_ text: String, source: String, parent: String?) throws -> Bool {
+  public static func spoolText(_ text: String, source: String, parent: String?) throws -> Bool {
     guard let line = foldedLine(text) else {
       return false
     }
@@ -130,7 +130,7 @@ enum CaptureInbox {
   }
 
   /// Only web pages are capturable as links — everything else shares as text.
-  static func isHttpUrl(_ candidate: String) -> Bool {
+  public static func isHttpUrl(_ candidate: String) -> Bool {
     candidate.hasPrefix("https://") || candidate.hasPrefix("http://")
   }
 
