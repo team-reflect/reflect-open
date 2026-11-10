@@ -37,7 +37,7 @@ mod settings;
 mod skill;
 #[cfg(target_os = "macos")]
 mod wake;
-mod web_fetch;
+use reflect_core::web_fetch;
 mod windows;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19),
