@@ -73,5 +73,11 @@ export const WHATS_NEW: Readonly<Record<string, readonly WhatsNewItem[]>> = {
       body: `${MENUS_BODY} With a keyboard, press ⌘/ to open it.`,
       platforms: ['ios'],
     },
+    {
+      id: 'safari-capture',
+      title: 'Save pages from Safari',
+      body: 'Turn on Reflect Capture in Safari Settings to save pages to your daily note.',
+      platforms: ['darwin'],
+    },
   ],
 }

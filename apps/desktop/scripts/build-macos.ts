@@ -1,5 +1,6 @@
-// Builds a signed, notarized macOS app and DMG. The shipped executables are
-// stripped; their symbols stay in dSYMs. See docs/distribution.md.
+// Builds a signed, notarized macOS app and DMG, with the Safari extension
+// inside. The shipped executables are stripped; their symbols stay in dSYMs.
+// See docs/distribution.md.
 //
 //   pnpm build:macos [flags]
 //
@@ -11,6 +12,7 @@
 import { randomBytes } from 'node:crypto'
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   realpathSync,
@@ -39,6 +41,14 @@ import {
   TARGET_DIR,
   TAURI_SRC_DIR,
 } from './helpers.ts'
+import {
+  APP_GROUPS_KEY,
+  embedSafariExtension,
+  REFLECT_TEAM_ID,
+  safariAppexEntitlements,
+  safariAppexPath,
+  safariAppGroup,
+} from './safari-extension.ts'
 
 const APPLE_SILICON_TARGET = 'aarch64-apple-darwin'
 const INTEL_TARGET = 'x86_64-apple-darwin'
@@ -93,8 +103,13 @@ interface Bundle {
   readonly assetName: string
   readonly version: string
   readonly entitlements: string
-  readonly hasProfile: boolean
+  /** The flavor's provisioning profile in the source tree, when it has one. */
+  readonly profile: string | null
   readonly app: string
+  /** The Safari app extension inside {@link app}. */
+  readonly appex: string
+  /** The App Group the app and its Safari extension share. */
+  readonly appGroup: string
   readonly sidecars: readonly string[]
   readonly executables: readonly Executable[]
   readonly dmg: string
@@ -118,6 +133,10 @@ function readTauriConfig(): z.infer<typeof TauriConfigSchema> {
   return TauriConfigSchema.parse(config)
 }
 
+/**
+ * Every path and identifier the build produces or checks for `target`, from
+ * the flavor's Tauri config. Nothing is built yet.
+ */
 function resolveBundle(target: string): Bundle {
   const arch = ARCHS[target]
   if (!arch) {
@@ -143,6 +162,7 @@ function resolveBundle(target: string): Bundle {
     }))
     return { path, symbol, dsyms }
   })
+  const profile = bundle.macOS.files['embedded.provisionprofile']
   return {
     target,
     arch,
@@ -150,8 +170,10 @@ function resolveBundle(target: string): Bundle {
     assetName: productName.replaceAll(' ', '.'),
     version,
     entitlements: join(TAURI_SRC_DIR, bundle.macOS.entitlements),
-    hasProfile: 'embedded.provisionprofile' in bundle.macOS.files,
+    profile: profile ? join(TAURI_SRC_DIR, profile) : null,
     app,
+    appex: safariAppexPath(app),
+    appGroup: safariAppGroup(REFLECT_TEAM_ID, identifier),
     sidecars,
     executables,
     dmg: join(bundleDir, 'dmg', `${productName}_${version}_${arch}.dmg`),
@@ -172,6 +194,10 @@ function resolveNotaryArgs(identity: string, tempDir: string): string[] {
   return ['--apple-id', APPLE_ID, '--password', APPLE_PASSWORD, '--team-id', teamId]
 }
 
+/**
+ * Builds the app with Tauri (stripped executables, dSYMs kept), then embeds
+ * the Safari app extension. Signing and notarization happen afterwards.
+ */
 async function buildApp(bundle: Bundle): Promise<void> {
   const args = ['build', '--target', bundle.target, '--bundles', 'app', ...getFlavorConfigArgs()]
   // Tauri notarizes whenever these are set, but notarization must wait until
@@ -193,6 +219,7 @@ async function buildApp(bundle: Bundle): Promise<void> {
       symbol,
     )
   }
+  await embedSafariExtension(bundle.app, bundle.appGroup)
 }
 
 /**
@@ -272,14 +299,19 @@ async function readPlist(
   return PlistSchema.parse(JSON.parse(stdout))
 }
 
+/** The entitlements the provisioning profile at `path` grants (a CMS-signed plist). */
+async function readProfileEntitlements(path: string): Promise<Record<string, unknown>> {
+  const profile = await exec('security', ['cms', '-D', '-i', path], { throwOnError: true })
+  return await readPlist(profile.stdout, ['-extract', 'Entitlements', 'json'])
+}
+
 /**
  * The application and team identifiers from the embedded provisioning profile.
  * A Developer ID app that uses iCloud must carry them in its signature.
  */
 async function readProfileIdentity(bundle: Bundle): Promise<Record<string, string>> {
   const profilePath = join(bundle.app, 'Contents', 'embedded.provisionprofile')
-  const profile = await exec('security', ['cms', '-D', '-i', profilePath], { throwOnError: true })
-  const entitlements = await readPlist(profile.stdout, ['-extract', 'Entitlements', 'json'])
+  const entitlements = await readProfileEntitlements(profilePath)
   const identity = z
     .record(z.string(), z.string())
     .parse(Object.fromEntries(PROFILE_IDENTITY_KEYS.map((key) => [key, entitlements[key]])))
@@ -290,30 +322,71 @@ async function readProfileIdentity(bundle: Bundle): Promise<Record<string, strin
   return identity
 }
 
-/** The entitlements file for the app: the configured one plus the profile identity. */
-async function prepareEntitlements(bundle: Bundle, tempDir: string): Promise<string> {
-  if (!bundle.hasProfile) {
-    return bundle.entitlements
+/**
+ * The app claims the App Group so it can read the Safari extension's inbox
+ * without a macOS prompt. That claim is validation-required: if the embedded
+ * profile does not authorize it, the app still launches, but with its
+ * entitlements-validated flag cleared, and Apple does not say what that does
+ * to iCloud. Refuse before the build instead of finding out in a release.
+ */
+async function assertProfileAuthorizesAppGroup(bundle: Bundle): Promise<void> {
+  if (!bundle.profile) {
+    return
   }
-  const merged = {
-    ...(await readPlist(readFileSync(bundle.entitlements, 'utf8'))),
-    ...(await readProfileIdentity(bundle)),
+  const { [APP_GROUPS_KEY]: claim } = await readProfileEntitlements(bundle.profile)
+  const authorized = z.array(z.string()).default([]).parse(claim)
+  if (!authorized.includes(bundle.appGroup) && !authorized.includes(`${REFLECT_TEAM_ID}.*`)) {
+    throw new Error(
+      `${basename(bundle.profile)} does not authorize the App Group ${bundle.appGroup}: ` +
+        'see "Safari extension" in docs/distribution.md',
+    )
   }
-  const path = join(tempDir, 'Entitlements.plist')
-  writeFileSync(path, JSON.stringify(merged))
+}
+
+/** Writes `entitlements` as an XML plist for `codesign --entitlements` and returns its path. */
+async function writeEntitlements(
+  name: string,
+  entitlements: Record<string, unknown>,
+  tempDir: string,
+): Promise<string> {
+  const path = join(tempDir, name)
+  writeFileSync(path, JSON.stringify(entitlements))
   await exec('plutil', ['-convert', 'xml1', path], { throwOnError: true })
   return path
+}
+
+/** The entitlements file for the app: the configured ones, its profile identity and its App Group. */
+async function prepareEntitlements(bundle: Bundle, tempDir: string): Promise<string> {
+  const merged = {
+    ...(await readPlist(readFileSync(bundle.entitlements, 'utf8'))),
+    ...(bundle.profile ? await readProfileIdentity(bundle) : {}),
+    [APP_GROUPS_KEY]: [bundle.appGroup],
+  }
+  return await writeEntitlements('Entitlements.plist', merged, tempDir)
 }
 
 /**
  * Tauri signs the sidecars with the app's entitlements. The restricted iCloud
  * entitlements have no matching profile there, so the system kills them at
- * launch. Re-sign the sidecars without entitlements, then the app around them.
+ * launch. Re-sign the sidecars without entitlements, sign the Safari app
+ * extension with its own, then sign the app around them.
  */
 async function resignApp(bundle: Bundle, signer: Signer, tempDir: string): Promise<void> {
   for (const sidecar of bundle.sidecars) {
     await runCodesign(signer, ['--options', 'runtime', sidecar])
   }
+  const appexEntitlements = await writeEntitlements(
+    'SafariExtension.plist',
+    safariAppexEntitlements(bundle.appGroup),
+    tempDir,
+  )
+  await runCodesign(signer, [
+    '--options',
+    'runtime',
+    '--entitlements',
+    appexEntitlements,
+    bundle.appex,
+  ])
   const entitlements = await prepareEntitlements(bundle, tempDir)
   await runCodesign(signer, ['--options', 'runtime', '--entitlements', entitlements, bundle.app])
 }
@@ -413,16 +486,51 @@ async function expectOutput(
   }
 }
 
+/** The entitlements `path` was actually signed with, read back from its signature. */
+async function readSignedEntitlements(path: string): Promise<Record<string, unknown>> {
+  const display = ['--display', '--entitlements', '-', '--xml', path]
+  return await readPlist((await exec('codesign', display, { throwOnError: true })).stdout)
+}
+
+/**
+ * The re-signed app must still carry the profile's application and team
+ * identifiers, or iCloud fails at runtime. A flavor without a profile has
+ * nothing to check.
+ */
 async function verifyProfileIdentity(bundle: Bundle): Promise<void> {
-  if (!bundle.hasProfile) {
+  if (!bundle.profile) {
     return
   }
-  const display = ['--display', '--entitlements', '-', '--xml', bundle.app]
-  const signed = await readPlist((await exec('codesign', display, { throwOnError: true })).stdout)
+  const signed = await readSignedEntitlements(bundle.app)
   for (const [key, value] of Object.entries(await readProfileIdentity(bundle))) {
     if (signed[key] !== value) {
       throw new Error(`the signed app lost the "${key}" entitlement`)
     }
+  }
+}
+
+/**
+ * A wrong App Group passes `codesign --verify` and only shows as Safari
+ * captures that never save, so check what was signed.
+ */
+async function verifySafariExtension(bundle: Bundle): Promise<void> {
+  for (const path of [bundle.app, bundle.appex]) {
+    const display = ['--display', '--verbose=2', path]
+    await expectOutput('codesign', display, [`TeamIdentifier=${REFLECT_TEAM_ID}`])
+    const groups = z.array(z.string()).parse((await readSignedEntitlements(path))[APP_GROUPS_KEY])
+    if (!groups.includes(bundle.appGroup)) {
+      throw new Error(`${basename(path)} is not signed into ${bundle.appGroup}`)
+    }
+  }
+  const signed = await readSignedEntitlements(bundle.appex)
+  if (signed['com.apple.security.app-sandbox'] !== true) {
+    throw new Error('Safari loads only a sandboxed app extension')
+  }
+  const info = join(bundle.appex, 'Contents', 'Info.plist')
+  const readGroup = ['-extract', 'ReflectAppGroup', 'raw', '-o', '-', info]
+  await expectOutput('plutil', readGroup, [bundle.appGroup])
+  if (!existsSync(join(bundle.appex, 'Contents', 'Resources', 'manifest.json'))) {
+    throw new Error('the Safari app extension has no web extension in its Resources')
   }
 }
 
@@ -445,6 +553,11 @@ async function verifySidecarsLaunch(bundle: Bundle): Promise<void> {
   }
 }
 
+/**
+ * Checks the finished build before it ships: signatures, entitlements, the
+ * Safari app extension and sidecar launches, then Gatekeeper and stapling
+ * when `notarized`.
+ */
 async function verify(bundle: Bundle, notarized: boolean): Promise<void> {
   await expectOutput(
     'codesign',
@@ -452,6 +565,7 @@ async function verify(bundle: Bundle, notarized: boolean): Promise<void> {
     ['valid on disk', 'satisfies its Designated Requirement'],
   )
   await verifyProfileIdentity(bundle)
+  await verifySafariExtension(bundle)
   await verifySidecarsLaunch(bundle)
   if (!notarized) {
     return
@@ -511,6 +625,7 @@ async function main(): Promise<void> {
   if (artifactDir && !hasUpdaterKey) {
     throw new Error('TAURI_SIGNING_PRIVATE_KEY is not set')
   }
+  await assertProfileAuthorizesAppGroup(bundle)
 
   await runWithTempDir(async (tempDir) => {
     const notaryArgs = values['no-notarize'] ? null : resolveNotaryArgs(identity, tempDir)
