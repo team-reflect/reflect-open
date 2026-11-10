@@ -6,7 +6,7 @@
 //! - [`versions`] — the `NSFileVersion` surface: list a file's unresolved
 //!   conflict versions, and mark them resolved once handled.
 //! - [`sweep`] — the conflict sweep: run every conflicted note through the
-//!   deterministic resolution ladder ([`crate::conflict`]), write conflict
+//!   deterministic resolution ladder ([`reflect_graph_io::conflict::ladder`]), write conflict
 //!   copies for other file types, fold creation-collision duplicates
 //!   (`name 2.md`) back into their canonical file, and keep the shadow base
 //!   advancing.

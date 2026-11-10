@@ -138,7 +138,11 @@ pub fn run() {
         logging::init(app.handle());
         let host = Arc::new(host::TauriHost::new(app.handle().clone()));
         let config = CoreConfig {
-            document_dir: app.path().document_dir().ok(),
+            document_dir: app
+                .path()
+                .document_dir()
+                .inspect_err(|err| tracing::warn!(%err, "no documents directory"))
+                .ok(),
         };
         let core = Core::new(config, host).map_err(|err| err.message().to_string())?;
         app.manage(Arc::new(core));
