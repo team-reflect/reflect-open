@@ -56,6 +56,16 @@
                ReferencedContainer = "container:Reflect.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A9E3F6C17D524B08B6F1D4E7"
+               BuildableName = "ReflectUITests.xctest"
+               BlueprintName = "ReflectUITests"
+               ReferencedContainer = "container:Reflect.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
