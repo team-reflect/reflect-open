@@ -1,20 +1,30 @@
 import UIKit
 
-/// Shows one full-screen `ReflectWebView`. It loads the bundled web app, or
-/// the URL in the `REFLECT_DEV_URL` environment variable when that is set.
+/// Shows one full-screen `ReflectWebView` with the web app, or the error of a
+/// shell that did not start.
 @MainActor
 final class RootViewController: UIViewController {
-  private let webView = ReflectWebView()
+  private var host: AppHost?
 
   override func loadView() {
-    view = webView
+    do {
+      let host = try AppHost()
+      self.host = host
+      view = host.webView
+    } catch {
+      let label = UILabel()
+      label.text = "Reflect could not start.\n\(error)"
+      label.numberOfLines = 0
+      label.textAlignment = .center
+      label.backgroundColor = .systemBackground
+      view = label
+    }
   }
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    let devURL = ProcessInfo.processInfo.environment["REFLECT_DEV_URL"]
-    if let url = URL(string: devURL ?? AppSchemeHandler.indexURL) {
-      webView.load(URLRequest(url: url))
+    if let host {
+      host.webView.load(URLRequest(url: host.startURL))
     }
   }
 }
