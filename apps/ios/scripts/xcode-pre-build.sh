@@ -3,8 +3,9 @@
 #
 # Xcode checks that ReflectCore.xcframework has a library for the current SDK
 # before any build phase runs. The xcframework holds only the slice of the
-# last build, so this script builds the Rust core when that slice is missing:
-# on the first build, and when the SDK changes between device and simulator.
+# last build, so this script builds the Rust core when the xcframework is
+# incomplete or that slice is missing: on the first build, after a restored
+# build cache, and when the SDK changes between device and simulator.
 # The "Build Rust core" phase keeps the slice up to date after that.
 
 set -euo pipefail
@@ -18,6 +19,6 @@ else
   slice="ios-arm64"
 fi
 
-if [ ! -d "$xcframework/$slice" ]; then
+if [ ! -f "$xcframework/Info.plist" ] || [ ! -d "$xcframework/$slice" ]; then
   "$scripts_dir/xcode-build-ffi.sh"
 fi

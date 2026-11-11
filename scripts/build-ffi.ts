@@ -118,7 +118,7 @@ async function main(): Promise<void> {
   })
   const stamp = stampOf([...libraryPaths, ...headerPaths])
   const isFresh =
-    existsSync(XCFRAMEWORK_PATH) &&
+    existsSync(join(XCFRAMEWORK_PATH, 'Info.plist')) &&
     existsSync(STAMP_PATH) &&
     readFileSync(STAMP_PATH, 'utf8') === stamp
   if (isFresh) {
