@@ -36,5 +36,7 @@ fi
 
 # A clean environment: Xcode's SDKROOT and deployment target variables would
 # otherwise leak into the host build scripts that cargo compiles for macOS.
+# DEVELOPER_DIR stays, so the Rust build uses the Xcode that runs this build.
 exec env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} \
   node scripts/build-ffi.ts $args
