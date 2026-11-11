@@ -29,8 +29,8 @@ const KEYBOARD_MIN_OVERLAP = 60
 const KEYBOARD_STALE_DELAY_MS = 1750
 
 /**
- * The keyboard overlap per `visualViewport`. `KeyboardPlugin.swift` pins the
- * webview (frame and scroll offset), so the layout viewport always matches
+ * The keyboard overlap per `visualViewport`. `KeyboardTuning.swift` (`apple/Sources/KeyboardKit`)
+ * pins the webview (frame and scroll offset), so the layout viewport always matches
  * the screen and the visual-viewport shortfall is exactly the keyboard
  * overlap (decision 0003).
  */
@@ -165,7 +165,7 @@ export function useKeyboardFieldReveal(): void {
  * Focus raises the keyboard before any height arrives, so the focus-time
  * reveal ran against the full-height viewport and did nothing; once the shell
  * shrinks, nothing else scrolls the caret back (WebKit's own reveal is pinned
- * off in `KeyboardPlugin.swift`). Mounted once: every screen's editors publish
+ * off in `KeyboardTuning.swift`). Mounted once: every screen's editors publish
  * to the same focused-editor slot, and `scrollCaretIntoView` is a no-op while
  * the caret is already visible.
  */

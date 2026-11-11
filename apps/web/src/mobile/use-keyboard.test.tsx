@@ -53,7 +53,7 @@ describe('keyboard height', () => {
 
 /**
  * The visual-viewport reader that feeds the service: with the webview pinned by
- * `KeyboardPlugin.swift`, `window.innerHeight - visualViewport.height` is the
+ * `KeyboardTuning.swift`, `window.innerHeight - visualViewport.height` is the
  * keyboard overlap. A fake viewport stands in for the real one, which never
  * shrinks inside the test browser.
  */

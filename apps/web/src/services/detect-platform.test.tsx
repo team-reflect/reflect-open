@@ -25,10 +25,11 @@ describe('detectPlatformFacts', () => {
     expect(facts.surface).toEqual(DESKTOP_SURFACE)
   })
 
-  it.each(['ios', 'android'] as const)('is the mobile surface in an %s build', (env) => {
-    vi.stubEnv('TAURI_ENV_PLATFORM', env)
-    const facts = detectPlatformFacts('tauri')
-    expect(facts.appPlatform).toBe(env)
+  it('is the mobile surface in the Swift shell', () => {
+    vi.stubEnv('TAURI_ENV_PLATFORM', 'ios')
+    const facts = detectPlatformFacts('swift')
+    expect(facts.appPlatform).toBe('ios')
+    expect(facts.isSwiftMobile).toBe(true)
     expect(facts.surface).toEqual(MOBILE_SURFACE)
   })
 
@@ -66,7 +67,7 @@ describe('detectPlatformFacts', () => {
 
   it('gives the platform its mobile surface at boot, so the mobile root sets nothing', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', 'ios')
-    expect(detectPlatformFacts('tauri').surface).toEqual(MOBILE_SURFACE)
+    expect(detectPlatformFacts('swift').surface).toEqual(MOBILE_SURFACE)
   })
 })
 

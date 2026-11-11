@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { addPluginListener, invoke } from '@tauri-apps/api/core'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import type { IpcBridge } from '@reflect/core'
@@ -56,9 +56,6 @@ export function createTauriIpcTransport(): IpcBridge {
         // as an unhandled promise rejection.
         void Promise.resolve(unlisten() as MaybePromise<void>).catch(noop)
       }
-    },
-    listenPlugin: async (plugin, event, handler) => {
-      await addPluginListener<unknown>(plugin, event, handler)
     },
   }
 }
