@@ -52,6 +52,6 @@ final class SmokeUITests: XCTestCase {
     app.activate()
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     XCTAssertTrue(editor.waitForExistence(timeout: 10))
-    XCTAssertTrue(app.webViews.buttons["Daily"].exists)
+    XCTAssertTrue(app.webViews.buttons["Daily"].waitForExistence(timeout: 10))
   }
 }
