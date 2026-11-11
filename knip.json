@@ -6,8 +6,8 @@
     ".": { "entry": ["fixtures/*.mjs"] },
     "design-system": { "ignore": "./**/*" },
     "apps/desktop": {
-      "ignoreDependencies": ["@sentry/cli"],
-      "ignore": "src-tauri/gen/**"
-    }
+      "ignoreDependencies": ["@sentry/cli"]
+    },
+    "apps/ios": { "ignore": "Extensions/**" }
   }
 }

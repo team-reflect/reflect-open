@@ -2,7 +2,10 @@ import { installQueryInvalidation } from '@/lib/query-invalidation.ts'
 import { installUncaughtErrorLogging } from '@/lib/uncaught-errors.ts'
 import { createDesktopAdapters, createDesktopHost } from '@/services/create-desktop-services.ts'
 import { createDeferredIpcTransport } from '@/services/deferred-ipc.ts'
-import { detectPlatformFacts } from '@/services/detect-platform.ts'
+import { detectHostKind, detectPlatformFacts } from '@/services/detect-platform.ts'
+import { installHostEvents } from '@/services/swift-events.ts'
+import { createSwiftIpcTransport } from '@/services/swift-ipc.ts'
+import { createSwiftLogger } from '@/services/swift-logger.ts'
 import { createTauriIpcTransport } from '@/services/tauri-ipc.ts'
 import { createTauriLogger } from '@/services/tauri-logger.ts'
 import { createAppGraphServices, createAppServices } from '@reflect/app'
@@ -11,32 +14,46 @@ import {
   createCoreServices,
   createIpcBridgeService,
   createSystemClock,
+  type LoggerService,
 } from '@reflect/core'
-import { isTauri } from '@tauri-apps/api/core'
 
-const facts = detectPlatformFacts(isTauri())
+const hostKind = detectHostKind(window)
+const facts = detectPlatformFacts(hostKind)
 
 /**
  * Plain-browser dev (`pnpm dev` without the shell) has no transport yet: the
  * platform root connects the in-memory dev transport here once it is ready.
- * `null` inside a Tauri webview. Features that need the real shell rather
+ * `null` inside a native shell. Features that need the real shell rather
  * than an answering transport gate on `isNativeShell()`.
  */
-export const pendingDevIpc = facts.isNativeShell ? null : createDeferredIpcTransport()
+export const pendingDevIpc = hostKind === 'browser' ? createDeferredIpcTransport() : null
 
-const logger = facts.isNativeShell
-  ? createTauriLogger(createConsoleLogger())
-  : createConsoleLogger()
+const transport =
+  pendingDevIpc?.transport ??
+  (hostKind === 'swift' ? createSwiftIpcTransport(fetch) : createTauriIpcTransport())
+
+function createLogger(): LoggerService {
+  switch (hostKind) {
+    case 'tauri':
+      return createTauriLogger(createConsoleLogger())
+    case 'swift':
+      return createSwiftLogger(createConsoleLogger(), transport)
+    case 'browser':
+      return createConsoleLogger()
+  }
+}
+
+const logger = createLogger()
+if (hostKind === 'swift') {
+  installHostEvents(window, logger)
+}
 const clock = createSystemClock()
-const ipc = createIpcBridgeService({
-  transport: pendingDevIpc?.transport ?? createTauriIpcTransport(),
-  logger,
-})
+const ipc = createIpcBridgeService({ transport, logger })
 
-const host = createDesktopHost(facts, { ipc, clock, logger })
+const host = createDesktopHost(facts, hostKind, { ipc, clock, logger })
 const role = host.window.isMainWindow() ? 'main' : 'note-window'
 
-const adapters = createDesktopAdapters(facts, { logger, clock }, role)
+const adapters = createDesktopAdapters(facts, hostKind, { ipc, logger, clock }, role)
 
 /**
  * The app-scoped services of this webview.

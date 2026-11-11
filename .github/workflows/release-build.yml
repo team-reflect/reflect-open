@@ -33,6 +33,10 @@ jobs:
           - name: ios
             os: xcode-27
             command: pnpm build:ios --build-number=1 --flavor=stable --no-sign
+          # The Swift shell in apps/ios.
+          - name: ios-swift
+            os: xcode-27
+            command: pnpm build:ipa --build-number=1 --flavor=stable --no-sign
           - name: windows
             os: windows-2025
             command: pnpm build:windows
@@ -65,6 +69,10 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: build-${{ matrix.name }}
+
+      # The Rust build of the Swift shell runs cbindgen.
+      - uses: ./.github/actions/setup-mise
+        if: matrix.name == 'ios-swift'
 
       # The universal build also compiles the x86_64 slice on this arm64 runner.
       - name: Add the x86_64 macOS target

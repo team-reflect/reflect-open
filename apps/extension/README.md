@@ -75,7 +75,7 @@ once the host is reachable.
 
 `wxt.config.ts` explains the two IDs: a public `key` pins the unpacked ID, and
 the store rejects `key` and minted its own ID, so `pnpm zip` drops it.
-`EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs` must keep both
+`EXTENSION_ORIGINS` in `crates/core/src/capture.rs` must keep both
 IDs, or the native hop fails for one of the two install modes. Changing the key
 without updating that constant silently breaks unpacked loads.
 

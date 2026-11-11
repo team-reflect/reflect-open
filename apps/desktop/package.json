@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:ios": "node scripts/build-ios.ts",
+    "build:ipa": "node scripts/build-ipa.ts",
     "build:linux": "node scripts/build-installers.ts",
     "build:macos": "node scripts/build-macos.ts",
     "safari:embed": "node scripts/embed-safari-extension.ts",

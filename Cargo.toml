@@ -8,6 +8,8 @@ members = [
   "apps/cli",
   "apps/desktop/src-tauri",
   "apps/native-host",
+  "crates/core",
+  "crates/ffi",
   "crates/graph-io",
   "crates/git",
   "crates/graph-paths",
@@ -34,6 +36,7 @@ publish = false
 # the default features adds `features = ["default"]`.
 
 # Workspace crates
+reflect-core = { path = "crates/core" }
 reflect-graph-io = { path = "crates/graph-io" }
 reflect-graph-paths = { path = "crates/graph-paths" }
 reflect-git = { path = "crates/git" }
@@ -62,6 +65,7 @@ fastembed = { version = "7.5.0", default-features = false, features = [
   "ort-download-binaries-native-tls",
 ] }
 file-id = "0.2.3"
+futures-util = { version = "0.3.33", default-features = false, features = ["std"] }
 # Everything is vendored/static: libssh2 and openssl must never link against
 # homebrew dylibs the distributed app won't have (libssh2-sys only consults
 # pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG is set, and vendored-openssl pins

@@ -90,7 +90,7 @@
          </EnvironmentVariable>
       </EnvironmentVariables>
       <StoreKitConfigurationFileReference
-         identifier = "../../reflect-open-storekit.storekit">
+         identifier = "../../../../../../ios/Config/reflect-open-storekit.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction

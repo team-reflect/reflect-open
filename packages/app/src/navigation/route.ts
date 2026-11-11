@@ -9,22 +9,29 @@
  */
 import { isIsoDate } from '@reflect/utils'
 import { dailyPath, dateFromDailyPath, isDaily } from '@reflect/core'
+import { z } from 'zod'
 
-export type Route =
-  | { kind: 'today' }
-  | { kind: 'daily'; date: string }
-  | { kind: 'note'; path: string }
-  | { kind: 'allNotes'; tag: string | null }
-  | { kind: 'search'; query: string }
-  | { kind: 'tasks' }
-  | { kind: 'chat' }
-  | { kind: 'settings' }
+/**
+ * Parses a route that was stored as JSON.
+ */
+export const routeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('today') }),
+  z.object({ kind: z.literal('daily'), date: z.string() }),
+  z.object({ kind: z.literal('note'), path: z.string() }),
+  z.object({ kind: z.literal('allNotes'), tag: z.string().nullable() }),
+  z.object({ kind: z.literal('search'), query: z.string() }),
+  z.object({ kind: z.literal('tasks') }),
+  z.object({ kind: z.literal('chat') }),
+  z.object({ kind: z.literal('settings') }),
   // The graph-switcher screen — a mobile settings sub-screen; desktop renders
   // it as the settings screen (its switcher lives in the sidebar footer).
-  | { kind: 'graphs' }
+  z.object({ kind: z.literal('graphs') }),
   // The Open Source Licenses screen: a mobile settings sub-screen. Desktop
   // shows licenses in a dialog and renders this route as the settings screen.
-  | { kind: 'licenses' }
+  z.object({ kind: z.literal('licenses') }),
+])
+
+export type Route = z.infer<typeof routeSchema>
 
 /**
  * A route that addresses one concrete note, including a dated daily note.

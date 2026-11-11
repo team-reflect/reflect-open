@@ -23,6 +23,7 @@ jobs:
       test-chromium: ${{ steps.classify.outputs.test-chromium }}
       test-webkit: ${{ steps.classify.outputs.test-webkit }}
       test-swift: ${{ steps.classify.outputs.test-swift }}
+      test-ios: ${{ steps.classify.outputs.test-ios }}
       lint-rust: ${{ steps.classify.outputs.lint-rust }}
       test-rust: ${{ steps.classify.outputs.test-rust }}
     steps:
@@ -75,7 +76,22 @@ jobs:
             '*.swift'
             '.swift-format'
             'apple/*'
+            'apps/ios/*'
             'apps/desktop/src-tauri/safari-extension/*'
+          )
+
+          # What the Swift shell is built from: Swift, Rust, and the web adapters.
+          ios_files=(
+            '.github/*'
+            'apple/*'
+            'apps/ios/*'
+            'crates/*'
+            'Cargo.toml'
+            'Cargo.lock'
+            'scripts/build-ffi.ts'
+            'apps/desktop/src/services/swift-*'
+            'apps/desktop/src/boot.ts'
+            'apps/desktop/src/services/detect-platform.ts'
           )
 
           changed() {
@@ -85,12 +101,14 @@ jobs:
           js=false
           rust=false
           swift=false
+          ios=false
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
           elif [[ $EVENT_NAME != pull_request || $HEAD_REF == release-please--* ]]; then
             js=true
             rust=true
             swift=true
+            ios=true
           else
             git diff --name-only --no-renames HEAD^1 HEAD
             if changed "${js_files[@]}"; then
@@ -102,6 +120,9 @@ jobs:
             if changed "${swift_files[@]}"; then
               swift=true
             fi
+            if changed "${ios_files[@]}"; then
+              ios=true
+            fi
           fi
 
           {
@@ -110,6 +131,7 @@ jobs:
             echo "test-chromium=$js"
             echo "test-webkit=$([[ $js == true && $PR_IS_DRAFT == false ]] && echo true || echo false)"
             echo "test-swift=$swift"
+            echo "test-ios=$ios"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
@@ -130,6 +152,12 @@ jobs:
           pnpm --filter @reflect/db db:codegen
           git diff --exit-code packages/db/src/schema.gen.ts \
             || (echo "::error::schema.gen.ts is stale — run 'pnpm --filter @reflect/db db:codegen' and commit the result." && exit 1)
+
+      - name: Verify the generated iOS CSP is current
+        run: |
+          pnpm gen:ios-csp
+          git diff --exit-code apple/Sources/WebHostKit/ContentSecurityPolicy.gen.swift \
+            || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
 
       - name: Lint
         run: pnpm lint
@@ -247,6 +275,80 @@ jobs:
         working-directory: apple
         run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
 
+  # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
+  test-ios:
+    needs: classify
+    if: needs.classify.outputs.test-ios == 'true'
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-xcode
+
+      - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: test-ios
+
+      - uses: ./.github/actions/setup-mise
+
+      - name: Build the web app
+        run: pnpm --filter @reflect/ios build:web
+
+      # A simulator that still does its first-boot work launches the app
+      # slowly, or not at all.
+      - name: Boot the simulator
+        run: |
+          udid=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
+          xcrun simctl bootstatus "$udid" -b
+          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+
+      # The steps are separate so that the job page shows the time of each.
+      - name: Build the Rust core
+        run: pnpm build:ffi --debug --sdk iphonesimulator
+
+      - name: Resolve the Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project apps/ios/Reflect.xcodeproj \
+            -scheme Reflect \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
+
+      - name: Build the app and the tests
+        run: |
+          xcodebuild build-for-testing \
+            -project apps/ios/Reflect.xcodeproj \
+            -scheme Reflect \
+            -configuration Debug-Dev \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -showBuildTimingSummary
+
+      - name: Run the unit tests
+        run: |
+          xcodebuild test-without-building \
+            -project apps/ios/Reflect.xcodeproj \
+            -scheme Reflect \
+            -configuration Debug-Dev \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -only-testing:ReflectTests
+
+      - name: Run the UI tests
+        run: |
+          xcodebuild test-without-building \
+            -project apps/ios/Reflect.xcodeproj \
+            -scheme Reflect \
+            -configuration Debug-Dev \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -only-testing:ReflectUITests
+
   lint-rust:
     needs: classify
     if: needs.classify.outputs.lint-rust == 'true'
@@ -286,8 +388,7 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
-      - name: Install cargo-shear
-        if: matrix.name == 'Linux'
+      - if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise
 
       # Fails on a dependency that no code uses, in a member or in the root
@@ -295,6 +396,13 @@ jobs:
       - name: Unused dependencies
         if: matrix.name == 'Linux'
         run: cargo shear
+
+      - name: Verify the generated C header is current
+        if: matrix.name == 'Linux'
+        run: |
+          cbindgen --config crates/ffi/cbindgen.toml --output crates/ffi/include/reflect_core.h crates/ffi
+          git diff --exit-code crates/ffi/include/reflect_core.h \
+            || (echo "::error::reflect_core.h is stale. Run 'pnpm build:ffi' and commit the result." && exit 1)
 
   test-rust:
     needs: classify

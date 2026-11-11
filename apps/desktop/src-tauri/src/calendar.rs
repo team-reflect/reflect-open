@@ -12,9 +12,12 @@
 //! network access. Other platforms get a fail-loud stub with the identical
 //! command surface.
 
-use serde::Serialize;
+use std::sync::Arc;
 
-use crate::blocking::run_blocking;
+use reflect_core::Core;
+use serde::Serialize;
+use tauri::State;
+
 use crate::error::AppResult;
 
 /// A calendar known to macOS, across every account the user has added in
@@ -80,17 +83,20 @@ pub fn calendar_authorization_status() -> AppResult<String> {
 /// the OS remembers the answer) and resolve with whether full access is
 /// granted. Runs off the main thread because the completion waits on the user.
 #[tauri::command]
-pub async fn calendar_request_access() -> AppResult<bool> {
-    run_blocking(platform::request_access).await
+pub async fn calendar_request_access(core: State<'_, Arc<Core>>) -> AppResult<bool> {
+    core.spawn_blocking(platform::request_access).await
 }
 
 /// Command: every event calendar on this Mac, across all accounts. Like the
 /// events listing, installs the change observer — the Settings section
 /// subscribes to `calendar:changed` before any events are ever fetched.
 #[tauri::command]
-pub async fn calendar_list_calendars(app: tauri::AppHandle) -> AppResult<Vec<CalendarInfo>> {
+pub async fn calendar_list_calendars(
+    app: tauri::AppHandle,
+    core: State<'_, Arc<Core>>,
+) -> AppResult<Vec<CalendarInfo>> {
     platform::ensure_change_observer(&app);
-    run_blocking(platform::list_calendars).await
+    core.spawn_blocking(platform::list_calendars).await
 }
 
 /// Command: events from the given calendars overlapping `[start, end]`
@@ -102,9 +108,11 @@ pub async fn calendar_list_events(
     start: f64,
     end: f64,
     calendar_ids: Vec<String>,
+    core: State<'_, Arc<Core>>,
 ) -> AppResult<Vec<CalendarEvent>> {
     platform::ensure_change_observer(&app);
-    run_blocking(move || platform::list_events(start, end, &calendar_ids)).await
+    core.spawn_blocking(move || platform::list_events(start, end, &calendar_ids))
+        .await
 }
 
 #[cfg(target_os = "macos")]

@@ -46,6 +46,10 @@ export interface PlatformFacts {
    */
   readonly isMacosDesktop: boolean
   /**
+   * The Swift iOS shell hosts the mobile app.
+   */
+  readonly isSwiftMobile: boolean
+  /**
    * Mod renders as ⌘ rather than Ctrl.
    */
   readonly isApplePlatform: boolean

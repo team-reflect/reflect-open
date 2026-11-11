@@ -1,0 +1,216 @@
+{
+  "default-configuration": "Release-Stable",
+  "configurations": [
+    { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "Dev.xcconfig" } },
+    { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "Beta.xcconfig" } },
+    { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "Stable.xcconfig" } },
+  ],
+  "localizations": {
+    "development": "en",
+    "supported": [
+      "Base",
+    ],
+  },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "../../apple",
+    }, {
+      "kind": "remote",
+      "repository": "https://github.com/getsentry/sentry-cocoa",
+      "version": {
+        "version": "9.31.0",
+      },
+    },
+  ],
+  "files": [
+    { "kind": "folder", "path": "Sources", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "Resources", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "Tests", "target-membership": [ "ReflectTests" ] },
+    { "path": "Config/reflect-open-storekit.storekit", "target-membership": [ "ReflectTests/resources" ] },
+    { "kind": "folder", "path": "UITests", "target-membership": [ "ReflectUITests" ] },
+    { "kind": "folder", "path": "Config" },
+    { "kind": "folder", "path": "Extensions/ShareExtension", "target-membership": [ "ShareExtension" ] },
+    { "kind": "folder", "path": "Extensions/RecordingWidget", "target-membership": [ "RecordingWidget" ] },
+    { "kind": "folder", "path": "Shared/Recording", "target-membership": [ "RecordingWidget", "Reflect" ] },
+    { "kind": "folder", "path": "Shared/Intents", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "Shared/Diagnostics", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "scripts" },
+    { "path": "Web", "type": "folder", "target-membership": [ "Reflect/resources" ] },
+    {
+      "kind": "group",
+      "name": "Icons",
+      "children": [
+        { "path": "../desktop/src-tauri/icons/AppIcon.icon", "target-membership": [ "Reflect/resources" ] },
+        { "path": "../desktop/src-tauri/icons-beta/AppIcon-Beta.icon", "target-membership": [ "Reflect/resources" ] },
+        { "path": "../desktop/src-tauri/icons-dev/AppIcon-Dev.icon", "target-membership": [ "Reflect/resources" ] },
+      ],
+    }, {
+      "kind": "group",
+      "name": "Frameworks",
+      "children": [
+        { "path": "../../target/apple/ReflectCore.xcframework", "target-membership": [ "Reflect/frameworks" ] },
+      ],
+    }, {
+      "kind": "group",
+      "name": "Products",
+      "children": [
+        { "path": "<PRODUCTS>/Reflect.app", "id": "3736B32D1D954CBA3FFAC312", "index": false },
+        { "path": "<PRODUCTS>/ShareExtension.appex", "id": "6B1F0C52E7A94D3C8F2A5B10", "index": false, "target-membership": [ { "build-phase": "Reflect/copy/Embed Foundation Extensions", "header-preservation": "remove-on-copy" } ] },
+        { "path": "<PRODUCTS>/RecordingWidget.appex", "id": "D4A7E3916C2B4F85A1D09E37", "index": false, "target-membership": [ { "build-phase": "Reflect/copy/Embed Foundation Extensions", "header-preservation": "remove-on-copy" } ] },
+        { "path": "<PRODUCTS>/ReflectTests.xctest", "id": "8E41C0A2B7D94F15A3C6E9D1", "type": "wrapper.cfbundle", "index": false },
+        { "path": "<PRODUCTS>/ReflectUITests.xctest", "id": "5D7B1E90A4C24F6B9E3A7C21", "type": "wrapper.cfbundle", "index": false },
+      ],
+    },
+  ],
+  "targets": [
+    {
+      "name": "Reflect",
+      "id": "F5BC8B83DA18E783A886C8AA",
+      "product": "Products/Reflect.app",
+      "product-type": "application",
+      "specialized-configurations": [
+        { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "App.xcconfig" } },
+        { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "App.xcconfig" } },
+        { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "App.xcconfig" } },
+      ],
+      "dependencies": [
+        "ShareExtension",
+        "RecordingWidget",
+      ],
+      "build-phases": [
+        {
+          "kind": "script",
+          "name": "Build Rust core",
+          "run-on-every-build": true,
+          "shell": "/bin/sh",
+          "script": "\"${SRCROOT:?}/scripts/xcode-build-ffi.sh\"",
+        },
+        "compile-sources",
+        "resources",
+        "frameworks",
+        {
+          "kind": "copy",
+          "name": "Embed Foundation Extensions",
+          "bundle-base-path": "plugins-directory",
+        },
+      ],
+      "package-product-members": [
+        {
+          "package": "apple",
+          "product-name": "AppStoreKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "CaptureShared",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "KeyboardKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "RecordingKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "RecordingShared",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "WebAuthKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "WebHostKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "sentry-cocoa",
+          "product-name": "Sentry-Dynamic",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+    }, {
+      "name": "ReflectTests",
+      "id": "C2F7A91E5B3D48A6B0E4D8F3",
+      "product": "Products/ReflectTests.xctest",
+      "product-type": "bundle.unit-test",
+      "test-host-target": "Reflect",
+      "specialized-configurations": [
+        { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "Tests.xcconfig" } },
+        { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "Tests.xcconfig" } },
+        { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "Tests.xcconfig" } },
+      ],
+      "dependencies": [
+        "Reflect",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "resources",
+        "frameworks",
+      ],
+    }, {
+      "name": "ReflectUITests",
+      "id": "A9E3F6C17D524B08B6F1D4E7",
+      "product": "Products/ReflectUITests.xctest",
+      "product-type": "bundle.ui-testing",
+      "specialized-configurations": [
+        { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "UITests.xcconfig" } },
+        { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "UITests.xcconfig" } },
+        { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "UITests.xcconfig" } },
+      ],
+      "dependencies": [
+        "Reflect",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "resources",
+        "frameworks",
+      ],
+    }, {
+      "name": "ShareExtension",
+      "id": "2E9C4A7B5D1F43E6B8A0C6F2",
+      "product": "Products/ShareExtension.appex",
+      "product-type": "app-extension",
+      "specialized-configurations": [
+        { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "ShareExtension.xcconfig" } },
+        { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "ShareExtension.xcconfig" } },
+        { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "ShareExtension.xcconfig" } },
+      ],
+      "build-phases": [
+        "compile-sources",
+        "resources",
+        "frameworks",
+      ],
+      "package-product-members": [
+        {
+          "package": "apple",
+          "product-name": "CaptureShared",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+    }, {
+      "name": "RecordingWidget",
+      "id": "9F3B6D1A8C4E4A27B5E2D7C4",
+      "product": "Products/RecordingWidget.appex",
+      "product-type": "app-extension",
+      "specialized-configurations": [
+        { "name": "Debug-Dev", "file": { "anchor": "Config", "relative-path": "RecordingWidget.xcconfig" } },
+        { "name": "Release-Beta", "file": { "anchor": "Config", "relative-path": "RecordingWidget.xcconfig" } },
+        { "name": "Release-Stable", "file": { "anchor": "Config", "relative-path": "RecordingWidget.xcconfig" } },
+      ],
+      "build-phases": [
+        "compile-sources",
+        "resources",
+        "frameworks",
+      ],
+      "package-product-members": [
+        {
+          "package": "apple",
+          "product-name": "RecordingShared",
+          "build-phase": { "build-phase": "frameworks" },
+        },
+      ],
+    },
+  ],
+}

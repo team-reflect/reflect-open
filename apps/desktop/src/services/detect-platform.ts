@@ -1,4 +1,5 @@
 import type { AppPlatform, BuildPlatform, PlatformFacts } from '@reflect/core'
+import type { SwiftMessageHandler } from '@/services/swift-events.ts'
 import { version } from '../../package.json' with { type: 'json' }
 
 function buildPlatformFromEnv(env: string): BuildPlatform | null {
@@ -52,17 +53,52 @@ function devPlatformOverride(env: string): AppPlatform | null {
 }
 
 /**
+ * The shell that hosts the webview: Tauri, the Swift iOS shell, or a plain
+ * browser in dev.
+ */
+export type HostKind = 'tauri' | 'swift' | 'browser'
+
+/**
+ * The globals that tell the shells apart: Tauri sets `isTauri`, the Swift
+ * shell adds the `reflectHost` script message handler.
+ */
+export interface HostGlobals {
+  readonly isTauri?: boolean | undefined
+  readonly webkit?:
+    | { messageHandlers?: { reflectHost?: SwiftMessageHandler | undefined } | undefined }
+    | undefined
+}
+
+/**
+ * Detect which shell hosts the webview from its globals.
+ */
+export function detectHostKind(globals: HostGlobals): HostKind {
+  if (globals.isTauri === true) {
+    return 'tauri'
+  }
+  // The shell is known only at runtime: one build, and one dev server, serves
+  // a browser tab, a Tauri window and the Swift shell. Each shell names
+  // itself with a global that exists before any page script runs.
+  if (globals.webkit?.messageHandlers?.reflectHost !== undefined) {
+    return 'swift'
+  }
+  return 'browser'
+}
+
+/**
  * Detect the host's platform facts from the user agent and the build env.
- * `nativeShell` is Tauri's `isTauri()`, passed in so this module stays free of Tauri imports.
+ * `hostKind` is the shell that hosts the webview.
  *
  * The surface facets follow `appPlatform`, which is also what selects the
  * mobile root (`@platform-root` in `vite.config.ts`, `platform-root.unknown.tsx`
  * in plain-browser dev): the mobile tree and the mobile surface cannot disagree.
  */
-export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
+export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
+  const nativeShell = hostKind !== 'browser'
   const env = import.meta.env.TAURI_ENV_PLATFORM || ''
   const hasNavigator = typeof navigator !== 'undefined'
   // iPadOS masquerades as macOS in the user agent; the touch-point check excludes it.
+  // TODO: the latest MacBook Pro released on November 6, 2026 has a touch screen. We need to double check this detection logic.
   const macosDesktop =
     nativeShell &&
     hasNavigator &&
@@ -75,6 +111,7 @@ export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
   return {
     appPlatform,
     isNativeShell: nativeShell,
+    isSwiftMobile: hostKind === 'swift',
     buildPlatform: buildPlatformFromEnv(env),
     isMacosDesktop: macosDesktop,
     isApplePlatform:

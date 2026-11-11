@@ -1,12 +1,18 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
+// The Swift code that the iOS apps share: it depends on no app target, on no
+// Rust binary and on no third-party package, and `swift test` runs its tests
+// on macOS. App and extension entry points, the adapters that turn a command
+// into a call of a module here, and the code that needs the Rust core live in
+// the app targets (`apps/ios`, the Tauri plugins).
+
 // MARK: - Layer rules (checked when SwiftPM loads this manifest)
 
 enum Layer {
   /// Data types and small helpers shared across processes.
   case shared
-  /// Platform logic driven by a host (a Tauri plugin today).
+  /// Platform logic driven by a host: the Swift shell or a Tauri plugin.
   case engine
 
   /// Every module name ends with its layer's suffix.
@@ -33,9 +39,13 @@ struct Module {
 }
 
 let modules: [Module] = [
+  Module(name: "AppStoreKit", layer: .engine),
   Module(name: "CaptureShared", layer: .shared, hasTests: true),
+  Module(name: "KeyboardKit", layer: .engine),
   Module(name: "RecordingShared", layer: .shared),
   Module(name: "RecordingKit", layer: .engine, deps: ["RecordingShared"], hasTests: true),
+  Module(name: "WebAuthKit", layer: .engine),
+  Module(name: "WebHostKit", layer: .engine, hasTests: true),
 ]
 
 let layerOf = Dictionary(uniqueKeysWithValues: modules.map { ($0.name, $0.layer) })
@@ -60,7 +70,7 @@ let swiftSettings: [SwiftSetting] = [
 
 let package = Package(
   name: "ReflectApple",
-  // swift-rs builds the plugins, and these modules with them, with the
+  // swift-rs builds the Tauri plugins, and the modules they use, with the
   // triple `arm64-apple-ios15.0-simulator` (`-ios15.0` on device): the
   // objects get `minos 15.0` whatever floor a manifest declares.
   platforms: [.iOS(.v15), .macOS(.v13)],
