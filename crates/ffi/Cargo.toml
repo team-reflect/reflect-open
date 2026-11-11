@@ -12,10 +12,15 @@ publish.workspace = true
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
+jiff = { workspace = true }
+log = { workspace = true, features = ["std"] }
 reflect-core = { workspace = true }
 reflect-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# `tracing` has no subscriber here: its `log` feature forwards every event to
+# the `log` crate, where `logging.rs` owns the sinks.
+tracing = { workspace = true, features = ["log"] }
 
 [dev-dependencies]
 reflect-graph-io = { workspace = true }
