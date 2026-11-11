@@ -18,6 +18,8 @@
 //! - A Rust panic does not cross the ABI: a panicking command replies with
 //!   the error `{"kind":"unknown"}`.
 
+mod logging;
+
 use std::any::Any;
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::io::Read;
@@ -41,6 +43,13 @@ pub const REFLECT_STATUS_JSON: i32 = 0;
 pub const REFLECT_STATUS_BYTES: i32 = 1;
 /// The reply status of an error: `json` is `{"kind":...,"message":...}`.
 pub const REFLECT_STATUS_ERROR: i32 = 2;
+
+/// The `level` of an error line for `reflect_core_log`.
+pub const REFLECT_LOG_ERROR: i32 = 1;
+/// The `level` of a warning line for `reflect_core_log`.
+pub const REFLECT_LOG_WARN: i32 = 2;
+/// The `level` of an info line for `reflect_core_log`.
+pub const REFLECT_LOG_INFO: i32 = 3;
 
 /// Receives the result of one dispatch. `status` is one of the
 /// `REFLECT_STATUS_*` values. The pointers are valid only during the call.
@@ -101,6 +110,13 @@ pub unsafe extern "C" fn reflect_core_new(
 ) -> *mut ReflectCore {
     let result = catch_unwind(AssertUnwindSafe(|| {
         let config = unsafe { read_config(config_json) }?;
+        logging::init(
+            config
+                .app_data_dir
+                .as_deref()
+                .map(|dir| dir.join("logs"))
+                .as_deref(),
+        );
         let gate = Arc::new(Gate::new());
         let host = Arc::new(FfiHost {
             on_event,
@@ -283,6 +299,28 @@ fn resolve_asset(
         ));
     }
     Ok(serde_json::json!({ "path": asset.path, "mime": mime }))
+}
+
+/// Writes one line of the host or the web app to the log: stderr and
+/// `<appDataDir>/logs/reflect.log`. `level` is one of the `REFLECT_LOG_*`
+/// values; any other value is an info line. A line before the first
+/// `reflect_core_new` is dropped.
+///
+/// # Safety
+///
+/// `message` is NULL or a NUL-terminated string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn reflect_core_log(level: i32, message: *const c_char) {
+    if message.is_null() {
+        return;
+    }
+    let message = unsafe { CStr::from_ptr(message) }.to_string_lossy();
+    let level = match level {
+        REFLECT_LOG_ERROR => log::Level::Error,
+        REFLECT_LOG_WARN => log::Level::Warn,
+        _ => log::Level::Info,
+    };
+    let _ = catch_unwind(AssertUnwindSafe(|| logging::write(level, &message)));
 }
 
 /// Runs a task that `on_main` received. NULL does nothing.

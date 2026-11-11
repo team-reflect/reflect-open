@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 
 /// Builds the parts of the shell and connects them: the Rust core, the
 /// routes of the `reflect-app` scheme, the event bridge and the web view.
@@ -10,16 +10,22 @@ final class AppHost {
 
   private let core: ReflectCore
   private let bridge = HostBridge()
+  private let deepLinks: DeepLinks
+  private let navigation: ExternalNavigation
   private var eventPump: Task<Void, Never>?
 
   init() throws {
-    let core = try ReflectCore(config: .current(), openURL: { _ in false })
+    let core = try ReflectCore(config: .current(), openURL: Self.openFromCore)
     self.core = core
+    let deepLinks = DeepLinks { [bridge] name, payload in bridge.emit(name, payload: payload) }
+    self.deepLinks = deepLinks
 
     let devURL = ProcessInfo.processInfo.environment["REFLECT_DEV_URL"].flatMap(URL.init(string:))
     startURL = devURL ?? URL(string: AppSchemeHandler.indexURL) ?? URL(fileURLWithPath: "/")
 
-    var shellCommands = HostCommands.all()
+    var shellCommands = HostCommands.all(deepLinks: deepLinks) { url in
+      await UIApplication.shared.open(url)
+    }
     var routes: [any SchemeRoute] = []
     #if DEBUG
     shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
@@ -39,6 +45,12 @@ final class AppHost {
     }
     webView = ReflectWebView(routes: routes, assets: assets, bridge: bridge)
 
+    navigation = ExternalNavigation(startURL: startURL) { url in
+      UIApplication.shared.open(url)
+    }
+    webView.navigationDelegate = navigation
+    webView.uiDelegate = navigation
+
     eventPump = Task { [bridge, events = core.events] in
       for await event in events {
         bridge.emit(event.name, payload: event.payload)
@@ -48,6 +60,33 @@ final class AppHost {
 
   deinit {
     eventPump?.cancel()
+  }
+
+  /// The system opened the app with `urls`.
+  func open(_ urls: [URL]) {
+    deepLinks.open(urls)
+  }
+
+  /// The scene came to the foreground: emits `host:foreground`.
+  func didEnterForeground() {
+    bridge.emit("host:foreground", payload: Data())
+  }
+
+  /// The scene went to the background: emits `host:background`.
+  func didEnterBackground() {
+    bridge.emit("host:background", payload: Data())
+  }
+
+  /// Opens a URL that a core command hands to the system. It runs on a Rust
+  /// thread. An absolute file path is refused.
+  private static let openFromCore: @Sendable (String) -> Bool = { target in
+    guard !target.hasPrefix("/"), let url = URL(string: target), url.scheme != nil else {
+      return false
+    }
+    DispatchQueue.main.async {
+      UIApplication.shared.open(url)
+    }
+    return true
   }
 
   /// The origin of a URL as the `Origin` header spells it, such as `http://localhost:1420`.
