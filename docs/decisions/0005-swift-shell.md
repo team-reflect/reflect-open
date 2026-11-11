@@ -12,6 +12,8 @@
 - **Alternatives evaluated:** stay on Tauri iOS; UniFFI for the Swift to
   Rust boundary.
 
+<!--FIXME: check if there is any different and/or not-matching betweent the doc and the implement. Adress these issues if any -->
+
 ---
 
 ## TL;DR
