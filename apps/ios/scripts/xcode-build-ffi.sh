@@ -1,4 +1,5 @@
 #!/bin/sh
+# FIXME: use bash instead of sh.
 # The "Build Rust core" phase of Reflect.xcodeproj: builds
 # target/apple/ReflectCore.xcframework through scripts/build-ffi.ts for the current
 # configuration and SDK. Every build compiles only the slice of its SDK. A
