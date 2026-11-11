@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "postinstall": "node generate-xcode-env.mjs"
+  },
   "devDependencies": {
     "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",

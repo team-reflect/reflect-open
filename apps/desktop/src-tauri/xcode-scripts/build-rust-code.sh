@@ -9,7 +9,7 @@
 # PATH (no Homebrew, no cargo), so nothing here may rely on the caller's
 # PATH: the tauri CLI is addressed through the package's own node_modules,
 # node comes from the generated src-tauri/.xcode.env.local (written by
-# xcode-scripts/generate-xcode-env.mjs on `pnpm install`), and cargo from
+# scripts/generate-xcode-env.mjs on `pnpm install`), and cargo from
 # rustup's fixed install location.
 set -euo pipefail
 
