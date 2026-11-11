@@ -1,5 +1,0 @@
-xcuserdata/
-build/
-Externals/
-# Tauri copies `bundle.resources` here on every build; Reflect has none.
-assets/

@@ -1,7 +1,7 @@
 //! The file read layer: note metadata straight from disk, no index required.
 //! Title derivation mirrors `deriveTitle` in
-//! `packages/core/src/markdown/extract.ts`; the walk mirrors the desktop's
-//! `collect_markdown` (`apps/desktop/src-tauri/src/fs/io.rs`).
+//! `packages/core/src/markdown/extract.ts`; the walk mirrors
+//! `collect_note_files` (`crates/graph-io/src/io.rs`).
 
 use std::fs;
 use std::path::{Path, PathBuf};

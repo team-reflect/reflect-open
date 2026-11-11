@@ -16,7 +16,7 @@
       }
     },
     {
-      "files": ["apps/desktop/src/components/ui/**", "**/scripts/**"],
+      "files": ["apps/web/src/components/ui/**", "**/scripts/**"],
       "rules": {
         "import/no-namespace": "off"
       }

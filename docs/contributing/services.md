@@ -12,7 +12,7 @@ packages/core/src/documents/note-move-service.test.ts  the real service over tes
 packages/core/src/testing/documents.ts                 createTestNoteMoveService
 packages/core/src/create-core-services.ts              CoreServices.noteMove
 packages/core/src/testing/services.ts                  the test factory table
-apps/desktop/src/routing/router.tsx                    useCoreServices().noteMove
+apps/web/src/routing/router.tsx                    useCoreServices().noteMove
 ```
 
 ## Do you need a service?
@@ -31,8 +31,8 @@ Ask the questions in order. The first "yes" decides.
 
 | Question | Kind | Package | Example |
 | --- | --- | --- | --- |
-| Is it a thin wrapper over a Rust command, a Tauri plugin or a Web API, with no product rule? | Platform primitive | `@reflect/core` over `ipc`, or an adapter interface that `apps/desktop` implements | `NoteFileService` |
-| Does it know windows, routes, scrolling, focus, key events, menus, pixels or toasts? | Interaction | `@reflect/app`; code that needs React stays in `apps/desktop` | `NavigationService` |
+| Is it a thin wrapper over a Rust command, a Tauri plugin or a Web API, with no product rule? | Platform primitive | `@reflect/core` over `ipc`, or an adapter interface that `apps/web` implements | `NoteFileService` |
+| Does it know windows, routes, scrolling, focus, key events, menus, pixels or toasts? | Interaction | `@reflect/app`; code that needs React stays in `apps/web` | `NavigationService` |
 | Is it the app's policy for reporting errors, updating itself or quitting, with no caller in core? | App shell | `@reflect/app` | `UpdateService` |
 | Must it behave the same in another client (a CLI, a watch, a share extension)? | Business | `@reflect/core` | `TaskService` |
 
@@ -181,7 +181,7 @@ invalidates queries on `indexLifecycle.onApplied`.
 
 ## 5. Add it to a composition root
 
-There are two roots, core and app. `apps/desktop/src/boot.ts` builds the
+There are two roots, core and app. `apps/web/src/boot.ts` builds the
 shared primitives (`logger`, `clock`, `ipc`), then the host (`createDesktopHost`:
 the app services core needs as ports, plus the other `AppHost` fields), then
 core (`createCoreServices`, with ports taken from the host), then app
@@ -253,12 +253,12 @@ covers the containers and `renderInApp`.
 ## 8. Use it from the app
 
 **React.** Read core services with `useCoreServices()` and app services with
-`useAppServices()` (`apps/desktop/src/services/services-provider.tsx`), and
+`useAppServices()` (`apps/web/src/services/services-provider.tsx`), and
 destructure. A component that reads both calls both hooks. Do not add a
 `useNoteMoveService()` hook.
 
 ```tsx
-// apps/desktop/src/routing/router.tsx
+// apps/web/src/routing/router.tsx
 const { noteMove } = useCoreServices()
 useEffect(
   () => noteMove.onMoved((from, to) => navigation.noteMoved(from, to)),
@@ -268,19 +268,19 @@ useEffect(
 
 - An event subscription is a `useEffect` that returns the unsubscribe.
 - Read a store with `useStore(service)`, or one field with
-  `useSelector(service, selectX)` (`apps/desktop/src/lib/use-store.ts`),
+  `useSelector(service, selectX)` (`apps/web/src/lib/use-store.ts`),
   where it is used. Read a graph-scoped instance from `useGraphServices()`. A
   provider exists only for an instance it creates (`AudioMemoProvider`).
 - A query calls the service in its `queryFn`. Put the options in
-  `apps/desktop/src/lib/query-options.ts`.
+  `apps/web/src/lib/query-options.ts`.
 
-**Non-React modules** in `apps/desktop/src/lib/` take the services as
+**Non-React modules** in `apps/web/src/lib/` take the services as
 parameters: the services they use, or the container when they use three or
 more. A module that needs both layers takes two
 (`installQueryInvalidation(core, app)` in `lib/query-invalidation.ts`).
 
 **Commands** read `context.services` (core) and `context.app` (app)
-(`CommandContext` in `apps/desktop/src/lib/commands/types.ts`). Never import
+(`CommandContext` in `apps/web/src/lib/commands/types.ts`). Never import
 `coreServices` or `appServices` from `boot.ts`: only `main.tsx` and the
 platform roots do.
 
@@ -295,7 +295,7 @@ have) needs an **adapter**, because the packages must not import
 
 - **A core adapter.** Define the interface in core, add a field to
   `CoreAdapters`, and pass it from `createDesktopAdapters`
-  (`apps/desktop/src/services/create-desktop-services.ts`). Example: `path`
+  (`apps/web/src/services/create-desktop-services.ts`). Example: `path`
   (`PathTransport`, implemented by `tauri-path.ts`).
 - **An app host primitive.** Define the interface in app, add a field to
   `AppHost`, and pass it from `createDesktopHost`. Example: `updater`
@@ -306,7 +306,7 @@ have) needs an **adapter**, because the packages must not import
   interface to `packages/core/src/ports/` and a field to `CoreAdapters`,
   and let an app service implement it (`ProgressPort` and `OperationsService`).
 
-Implement the native side in `apps/desktop/src/services/` (plus a browser one
+Implement the native side in `apps/web/src/services/` (plus a browser one
 if plain-browser dev needs it) and a test double (`createTestUpdaterAdapter`).
 Keep the adapter thin: every decision stays in the service.
 

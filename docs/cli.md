@@ -58,7 +58,7 @@ Settings → Agents installs a per-graph agent skill
 (`~/.agents/skills/reflect-<graph-slug>/SKILL.md`) that teaches coding agents
 this contract. A `reflect-managed` sha256 marker lets the app refresh its own
 installs without overwriting a hand-edited one
-(`apps/desktop/src-tauri/src/skill.rs`).
+(`apps/tauri/src/skill.rs`).
 
 ## Development notes
 
@@ -70,7 +70,7 @@ installs without overwriting a hand-edited one
   generates `expected.json` from the real core pipeline and the Rust tests
   assert against it. Don't grow the surface.
 - tauri-build requires the sidecar binary
-  (`apps/desktop/src-tauri/binaries/`, gitignored) to exist before the desktop
+  (`apps/tauri/binaries/`, gitignored) to exist before the desktop
   crate compiles. `pnpm tauri dev`/`build` stage it automatically. Before a
-  bare `cargo build/test --workspace`, run `pnpm --filter @reflect/desktop
+  bare `cargo build/test --workspace`, run `pnpm --filter @reflect/tauri
   sidecar` once.

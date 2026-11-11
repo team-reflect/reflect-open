@@ -58,7 +58,7 @@ another git remote are connected directly by the user.
 
 You can also build from source (below).
 
-See [CHANGELOG.md](apps/desktop/CHANGELOG.md) for release notes.
+See [CHANGELOG.md](apps/web/CHANGELOG.md) for release notes.
 
 ## Your Notes Are Files
 
@@ -112,7 +112,9 @@ Reflect is a pnpm/Turborepo monorepo:
 
 ```text
 reflect-open/
-├── apps/desktop/          # Mac and iOS app
+├── apps/web/              # Web app shown by both shells
+├── apps/tauri/            # Mac app (Tauri)
+├── apps/ios/              # iOS app (Swift)
 ├── apps/cli/              # `reflect` CLI
 ├── apps/extension/        # Chrome capture extension
 ├── apps/native-host/      # Browser capture helper
@@ -137,11 +139,12 @@ pnpm check            # typecheck + lint
 pnpm test --run path/to/test
 
 # Rust tests that compile the desktop crate need sidecars staged first
-pnpm --filter @reflect/desktop sidecar
+pnpm --filter @reflect/tauri sidecar
 cargo test --workspace
-
-pnpm tauri:ios:dev "iPhone 17 Pro"   # iOS simulator
 ```
+
+The iOS simulator setup is in
+[docs/contributing/mobile-simulator.md](docs/contributing/mobile-simulator.md).
 
 Release and TestFlight builds are in [docs/distribution.md](docs/distribution.md).
 

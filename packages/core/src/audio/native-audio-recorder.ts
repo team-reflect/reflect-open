@@ -300,8 +300,8 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
 }
 
 /**
- * The recorder over `plugins/tauri-plugin-recording`. Capture is native:
- * the plugin writes straight into a staging directory it owns, rotates
+ * The recorder over the `plugin:recording` commands. Capture is native:
+ * the iOS app writes straight into a staging directory it owns, rotates
  * segments and schedules reminders itself, and finalizes the file on
  * interruptions without JS. This service presents that state and claims the
  * staged files it hands out.

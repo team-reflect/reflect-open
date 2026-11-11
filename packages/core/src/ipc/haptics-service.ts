@@ -3,8 +3,8 @@ import type { IpcBridgeService } from './ipc-service.ts'
 import { definePluginCommand, ignoredResult } from './plugin.ts'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-mobile-haptics`, the app's
- * single haptic.
+ * Typed bindings for the `plugin:mobile-haptics` commands, the app's
+ * single haptic (`apps/ios/Sources/Capabilities/HapticsCapability.swift`).
  */
 
 const impactLightCommand = definePluginCommand<Record<string, never>, unknown>(

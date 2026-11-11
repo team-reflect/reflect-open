@@ -69,7 +69,7 @@ jobs:
             '*.toml'
             'Cargo.lock'
             '*.sql'
-            'apps/desktop/src-tauri/*.json'
+            'apps/tauri/*.json'
           )
           swift_files=(
             '.github/*'
@@ -77,7 +77,7 @@ jobs:
             '.swift-format'
             'apple/*'
             'apps/ios/*'
-            'apps/desktop/src-tauri/safari-extension/*'
+            'apps/tauri/safari-extension/*'
           )
 
           # What the Swift shell is built from: Swift, Rust, and the web adapters.
@@ -89,9 +89,10 @@ jobs:
             'Cargo.toml'
             'Cargo.lock'
             'scripts/build-ffi.ts'
-            'apps/desktop/src/services/swift-*'
-            'apps/desktop/src/boot.ts'
-            'apps/desktop/src/services/detect-platform.ts'
+            'apps/web/src/services/swift-*'
+            'apps/web/src/boot.ts'
+            'apps/web/src/services/detect-platform.ts'
+            'apps/web/vite.config.ts'
           )
 
           changed() {
@@ -210,7 +211,7 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - name: Install Playwright
-        run: pnpm --filter @reflect/desktop test:install:chromium
+        run: pnpm --filter @reflect/web test:install:chromium
 
       - name: Test
         run: pnpm run test:browser --shard=${{ matrix.shard }}/3
@@ -238,7 +239,7 @@ jobs:
       - uses: ./.github/actions/setup-node
 
       - name: Install Playwright
-        run: pnpm --filter @reflect/desktop test:install:webkit
+        run: pnpm --filter @reflect/web test:install:webkit
 
       # WebKit keeps the memory of every finished test file, so each shard
       # runs in its own Vitest process to restart the browser.
@@ -368,7 +369,7 @@ jobs:
             os: ubuntu-24.04
           - name: macOS
             os: xcode-27
-            args: --target aarch64-apple-darwin --target aarch64-apple-ios-sim
+            args: --target aarch64-apple-darwin
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -384,6 +385,12 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets ${{ matrix.args }}
+
+      # The iOS app links the core crates through `reflect-ffi`. The Tauri
+      # shell (`reflect-open`) builds for desktop only.
+      - name: Clippy (iOS simulator)
+        if: matrix.name == 'macOS'
+        run: cargo clippy --workspace --exclude reflect-open --all-targets --target aarch64-apple-ios-sim
 
       - name: Format check
         run: cargo fmt --all -- --check

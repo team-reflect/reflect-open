@@ -1,0 +1,26 @@
+{
+  "name": "@reflect/tauri",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:linux": "node scripts/build-installers.ts",
+    "build:macos": "node scripts/build-macos.ts",
+    "build:windows": "node scripts/build-installers.ts",
+    "safari:embed": "node scripts/embed-safari-extension.ts",
+    "sidecar": "node scripts/build-sidecar.ts",
+    "gen:icons": "node scripts/generate-icons.ts",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config tauri.dev.conf.json",
+    "tauri:build:dev": "tauri build --config tauri.dev.conf.json",
+    "tauri:build:beta": "tauri build --config tauri.beta.conf.json"
+  },
+  "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
+    "@tauri-apps/cli": "^2.12.4",
+    "@types/node": "^24.0.0",
+    "tiny-merge-patch": "^1.0.0",
+    "tinyexec": "^1.3.1",
+    "zod": "^4.6.7"
+  }
+}

@@ -11,19 +11,19 @@ The root `vitest.config.ts` collects every app and package into one workspace.
 | --- | --- | --- | --- |
 | `core` | `packages/core/vitest.config.ts` | `src/**/*.test.ts` | node |
 | `app` | `packages/app/vitest.config.ts` | `src/**/*.test.ts` | node |
-| `desktop-node` | `apps/desktop/vitest.node.config.ts` | `src/**/*.test.ts` | node |
-| `desktop-browser` | `apps/desktop/vitest.browser.config.ts` | `src/**/*.test.tsx` | Playwright browser |
+| `web-node` | `apps/web/vitest.node.config.ts` | `src/**/*.test.ts` | node |
+| `web-browser` | `apps/web/vitest.browser.config.ts` | `src/**/*.test.tsx` | Playwright browser |
 
 Every other app and package has its own `vitest.config.ts`, a node project named after the directory.
 
 The file extension decides the environment: `.test.ts` runs in node,
 `.test.tsx` runs in a real browser. There is no jsdom. A test that needs a DOM
-therefore lives in `apps/desktop`, never in `packages/core` or `packages/app`.
+therefore lives in `apps/web`, never in `packages/core` or `packages/app`.
 
 Browser test files run in parallel. Each Vitest worker has its own Playwright
 page, and Playwright emulates focus per page. CI runs the browser project on Chromium
 and on WebKit, because the Tauri webview is WebKit.
-`pnpm --filter @reflect/desktop test:install` downloads both browsers.
+`pnpm --filter @reflect/web test:install` downloads both browsers.
 `REFLECT_TEST_BROWSER=webkit` selects WebKit, and `DEBUG=1` opens a headed browser.
 
 ## Console output fails tests
@@ -31,7 +31,7 @@ and on WebKit, because the Tauri webview is WebKit.
 `vitest-fail-on-console` fails a test on any `console.warn` or `console.error`,
 in the core, app and desktop projects.
 
-- Fix the warning. Do not add to `apps/desktop/src/test-utils/allowed-console.ts`
+- Fix the warning. Do not add to `apps/web/src/test-utils/allowed-console.ts`
   without a measured reason in that file.
 - Code logs through `LoggerService`. A test of an error path passes
   `createTestLoggerService()` and asserts `logger.getErrors()`.
@@ -79,7 +79,7 @@ builds `AppServices` over `core`, sharing its platform and ports.
 Components read `useCoreServices()` and `useAppServices()`, which throw
 outside their providers. Every desktop test that renders goes through
 `renderInApp(ui, options)` or `renderHookInApp(hook, options)`
-(`apps/desktop/src/test-utils/render-in-app.tsx`), which mount the app's
+(`apps/web/src/test-utils/render-in-app.tsx`), which mount the app's
 providers as `main.tsx` does. The options are documented on
 `RenderInAppOptions`.
 

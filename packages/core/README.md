@@ -19,7 +19,7 @@ no module-level mutable state.
   webview, before `createAppServices`. `CoreInternalServices` holds the services
   that only other services use.
 - **`CoreAdapters`** is what the host supplies. The desktop builds them in
-  `apps/desktop/src/services/create-desktop-services.ts`
+  `apps/web/src/services/create-desktop-services.ts`
   (`createDesktopAdapters`).
 - **Ports** are the `CoreAdapters` fields that the app layer implements:
   `progress`, `activity`, `role` and `createGraphServices`.

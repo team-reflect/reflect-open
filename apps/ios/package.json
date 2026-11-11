@@ -4,7 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/desktop build",
-    "dev:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/desktop dev"
+    "build:ipa": "node scripts/build-ipa.ts",
+    "build:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/web build",
+    "dev:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/web dev",
+    "upload:testflight": "node scripts/upload-testflight.ts"
+  },
+  "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
+    "@sentry/cli": "^3.8.2",
+    "@types/node": "^24.0.0",
+    "tinyexec": "^1.3.1"
   }
 }

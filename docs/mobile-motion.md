@@ -1,7 +1,7 @@
 # Mobile motion: engine facts
 
-The mobile gesture and scroll code (`apps/desktop/src/lib/scroll-settle.ts`,
-`apps/desktop/src/lib/scroll-pager.ts`, `apps/desktop/src/mobile/`) relies on the browser engine
+The mobile gesture and scroll code (`apps/web/src/lib/scroll-settle.ts`,
+`apps/web/src/lib/scroll-pager.ts`, `apps/web/src/mobile/`) relies on the browser engine
 facts below. Each fact names the engines it was verified on. Do not remove a workaround for a fact
 here until you verify that the fact changed on every engine we ship to.
 
@@ -14,8 +14,8 @@ here until you verify that the fact changed on every engine we ship to.
 | Safari            | Safari 27.0.1 on macOS                                   |
 | iOS               | Safari on iOS 26.4 (iPhone 17 Pro simulator, real touch) |
 
-The minimum iOS target is 16.2 (`deploymentTarget` in
-`apps/desktop/src-tauri/gen/apple/project.yml`). Engines in the supported range can be older
+The minimum iOS target is 16.0 (`IPHONEOS_DEPLOYMENT_TARGET` in
+`apps/ios/Config/Shared.xcconfig`). Engines in the supported range can be older
 than the ones above.
 
 **Playwright WebKit is not Safari for scroll snap.** The two differ on snap behavior (see

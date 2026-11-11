@@ -5,10 +5,10 @@ import type { Unlisten } from '../unlisten.ts'
 import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.ts'
 
 /**
- * Typed bindings for `tauri-plugin-iap` — the StoreKit In-App Purchase
- * bridge (third-party, iOS-only in our build). Each schema mirrors the
- * plugin's wire format as of v0.9.1; check the permalinks below when
- * bumping the plugin version.
+ * Typed bindings for the `plugin:iap` commands, the StoreKit In-App
+ * Purchase bridge (`apps/ios/Sources/Capabilities/StoreCapability.swift`).
+ * Each schema mirrors the wire format of `tauri-plugin-iap` v0.9.1, which
+ * the permalinks below show.
  * TS shapes (hand-written, no runtime guarantee):
  * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts
  * iOS ground truth (hand-built dictionaries; fields vary by code path):

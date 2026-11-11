@@ -4,8 +4,8 @@ import type { IpcBridgeService } from './ipc-service.ts'
 import { definePluginCommand, ignoredResult } from './plugin.ts'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-app-store`, the install-channel
- * probe.
+ * Typed bindings for the `plugin:app-store` commands, the install-channel
+ * probe (`apps/ios/Sources/Capabilities/StoreCapability.swift`).
  */
 
 const appStoreEnvironmentSchema = z.object({ environment: z.string() })

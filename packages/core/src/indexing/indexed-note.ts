@@ -31,7 +31,7 @@ import { serializeWikiSuggestionAddress } from './suggest.ts'
  *
  * The zod schemas below are the single source of truth for the payload shape —
  * the TS types are inferred from them. They mirror the serde `IndexedNote` struct
- * in `apps/desktop/src-tauri/src/db.rs` field-for-field (camelCase ↔ serde
+ * in `crates/index/src/write.rs` field-for-field (camelCase ↔ serde
  * `rename_all = "camelCase"`); a change on either side must be mirrored on the
  * other, and {@link indexedNoteSchema} is the contract a drift test can assert.
  */

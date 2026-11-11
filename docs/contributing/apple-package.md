@@ -1,21 +1,20 @@
 # The `apple/` Swift package
 
-`apple/` is a local Swift package (`ReflectApple`) for the Swift code that the
-iOS apps share: the Swift shell (`apps/ios`) and the Tauri iOS app. A module
+`apple/` is a local Swift package (`ReflectApple`) for the Swift code of the
+iOS app (`apps/ios`) and its extensions. A module
 depends on no app target, on no Rust binary and on no third-party package, so
 `swift test` runs its tests on macOS. The adapters that turn a command into a
-call of a module stay in the shells: `apps/ios/Sources/Capabilities` and the
-Tauri plugins. App entry points, App Intents, and the code that needs the Rust
+call of a module stay in the app: `apps/ios/Sources/Capabilities`. App entry points, App Intents, and the code that needs the Rust
 core or a third-party package stay in the Xcode targets.
 
 | Module | Layer | Used by |
 | --- | --- | --- |
 | `CaptureShared` | shared | App targets, `ShareExtension` |
 | `RecordingShared` | shared | App targets, `RecordingWidget`, `RecordingKit` |
-| `AppStoreKit` | engine | Swift shell, `tauri-plugin-app-store` |
-| `KeyboardKit` | engine | Swift shell, `tauri-plugin-keyboard` |
-| `RecordingKit` | engine | Swift shell, `tauri-plugin-recording` |
-| `WebAuthKit` | engine | Swift shell, `tauri-plugin-web-auth` |
+| `AppStoreKit` | engine | Swift shell |
+| `KeyboardKit` | engine | Swift shell |
+| `RecordingKit` | engine | Swift shell |
+| `WebAuthKit` | engine | Swift shell |
 | `WebHostKit` | engine | Swift shell |
 
 ```bash
@@ -38,11 +37,7 @@ app, so it does not replace a full iOS app build.
    `apple/Tests/<Module>Tests/` (Swift Testing) for tests.
 3. Every module is a product. Link it only where it is used. The Swift shell
    links it under `package-product-members` in
-   `apps/ios/Reflect.xcodeproj/project.xcproj`. A target of the Tauri app
-   links it in `apps/desktop/src-tauri/gen/apple/project.yml`
-   (`- package: ReflectApple`, `product: <Module>`), then regenerate the
-   project (see that file's header). A plugin adds `.product(name: "<Module>", package: "ReflectApple")` to its
-   `ios/Package.swift` (tools 6.2, `.iOS(.v15)`, `swiftLanguageModes: [.v5]`).
+   `apps/ios/Reflect.xcodeproj/project.xcproj`.
 
 ## Rules
 
