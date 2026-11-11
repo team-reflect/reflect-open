@@ -144,10 +144,12 @@ async function main(): Promise<void> {
     ],
     INHERIT,
   )
-  const libraryPaths = targets.map((target) => { return join(TARGET_DIR, target, profile, 'libreflect_ffi.a') },
-  )
-  const headerPaths = ['reflect_core.h', 'module.modulemap'].map((file) => { return join(CRATE_INCLUDE_DIR, file) },
-  )
+  const libraryPaths = targets.map((target) => {
+    return join(TARGET_DIR, target, profile, 'libreflect_ffi.a')
+  })
+  const headerPaths = ['reflect_core.h', 'module.modulemap'].map((file) => {
+    return join(CRATE_INCLUDE_DIR, file)
+  })
   const stamp = stampOf(libraryPaths, headerPaths)
   const isFresh =
     existsSync(XCFRAMEWORK_PATH) &&
