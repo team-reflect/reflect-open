@@ -258,7 +258,7 @@ export default defineESLintConfig(
     jsdoc: false,
   },
   {
-    ignores: ['./design-system/', '**/.wxt/', '**/.output/'],
+    ignores: ['./design-system/', '**/.wxt/', '**/.output/', 'apps/ios/Extensions/'],
   },
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.mjs'],
