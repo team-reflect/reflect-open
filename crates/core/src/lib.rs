@@ -11,6 +11,7 @@ pub mod fs;
 mod git;
 pub mod icloud;
 mod link_preview;
+pub mod logging;
 pub mod recents;
 mod secrets;
 pub mod settings;

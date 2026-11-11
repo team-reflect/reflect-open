@@ -1,4 +1,4 @@
-//! The log sinks of a host without `tauri-plugin-log`: stderr and a
+//! The log sinks of a shell without `tauri-plugin-log`: stderr and a
 //! size-rotated `reflect.log`. With no `tracing` subscriber installed, the
 //! `tracing` crate's `log` feature turns every event into a `log` record.
 
@@ -13,10 +13,10 @@ use log::{Level, LevelFilter, Log, Metadata, Record};
 const FILE_NAME: &str = "reflect.log";
 
 /// `reflect.log` rotates once it reaches this size.
-const MAX_FILE_SIZE: u64 = 5 * 1024 * 1024;
+pub const MAX_FILE_SIZE: u64 = 5 * 1024 * 1024;
 
 /// Rotated files to keep next to the active one.
-const MAX_ROTATED_FILES: usize = 3;
+pub const MAX_ROTATED_FILES: usize = 3;
 
 /// The logger of this process. The `log` crate takes one logger for the life
 /// of the process.
@@ -61,7 +61,8 @@ pub fn write(level: Level, message: &str) {
 }
 
 /// `RUST_LOG` as one global level (`debug`, `warn`, ...), `info` otherwise.
-fn level_from_env(value: Option<&str>) -> LevelFilter {
+/// Per-target directives (`reflect_open::git=debug`) are not supported.
+pub fn level_from_env(value: Option<&str>) -> LevelFilter {
     value
         .and_then(|value| value.trim().parse().ok())
         .unwrap_or(LevelFilter::Info)
@@ -181,6 +182,7 @@ mod tests {
     fn level_from_env_parses_one_level_or_defaults_to_info() {
         assert_eq!(level_from_env(None), LevelFilter::Info);
         assert_eq!(level_from_env(Some("debug")), LevelFilter::Debug);
+        assert_eq!(level_from_env(Some("WARN")), LevelFilter::Warn);
         assert_eq!(level_from_env(Some("core=debug")), LevelFilter::Info);
     }
 

@@ -5,15 +5,10 @@
 //! command.
 
 use log::LevelFilter;
+use reflect_core::logging::{MAX_FILE_SIZE, MAX_ROTATED_FILES, level_from_env};
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
-
-/// `reflect.log` rotates once it reaches this size.
-const MAX_FILE_SIZE: u128 = 5 * 1024 * 1024;
-
-/// Rotated files to keep next to the active one.
-const MAX_ROTATED_FILES: usize = 3;
 
 /// Install the logger: stderr plus the log file, or stderr alone when the
 /// log file cannot be opened. A missing log file must never block launch.
@@ -40,31 +35,7 @@ fn plugin<R: Runtime>(level: LevelFilter, with_file: bool) -> TauriPlugin<R> {
     tauri_plugin_log::Builder::new()
         .level(level)
         .targets(targets)
-        .max_file_size(MAX_FILE_SIZE)
+        .max_file_size(u128::from(MAX_FILE_SIZE))
         .rotation_strategy(RotationStrategy::KeepSome(MAX_ROTATED_FILES))
         .build()
-}
-
-/// `RUST_LOG` as one global level (`debug`, `warn`, ...), `info` otherwise.
-/// Per-target directives (`reflect_open::git=debug`) are not supported.
-fn level_from_env(value: Option<&str>) -> LevelFilter {
-    value
-        .and_then(|value| value.trim().parse().ok())
-        .unwrap_or(LevelFilter::Info)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn level_from_env_parses_one_level_or_defaults_to_info() {
-        assert_eq!(level_from_env(None), LevelFilter::Info);
-        assert_eq!(level_from_env(Some("debug")), LevelFilter::Debug);
-        assert_eq!(level_from_env(Some("WARN")), LevelFilter::Warn);
-        assert_eq!(
-            level_from_env(Some("reflect_open::git=debug")),
-            LevelFilter::Info
-        );
-    }
 }

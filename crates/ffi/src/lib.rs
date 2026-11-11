@@ -18,17 +18,14 @@
 //! - A Rust panic does not cross the ABI: a panicking command replies with
 //!   the error `{"kind":"unknown"}`.
 
-mod logging;
-
 use std::any::Any;
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::ptr;
 use std::sync::{Arc, PoisonError, RwLock};
-use std::task::{Context, Poll};
 
+use futures_util::FutureExt;
 use reflect_core::{Core, CoreConfig, Host, Reply};
 use reflect_types::{AppError, AppResult};
 
@@ -115,7 +112,7 @@ pub unsafe extern "C" fn reflect_core_new(
             gate: Arc::clone(&gate),
         });
         let core = Core::new(config, host)?;
-        logging::init(log_dir.as_deref());
+        reflect_core::logging::init(log_dir.as_deref());
         Ok(ReflectCore {
             core: CoreRef(Some(Arc::new(core))),
             gate,
@@ -272,7 +269,9 @@ pub unsafe extern "C" fn reflect_core_log(level: i32, message: *const c_char) {
         REFLECT_LOG_WARN => log::Level::Warn,
         _ => log::Level::Info,
     };
-    let _ = catch_unwind(AssertUnwindSafe(|| logging::write(level, &message)));
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        reflect_core::logging::write(level, &message)
+    }));
 }
 
 /// Runs a task that `on_main` received. NULL does nothing.
@@ -330,29 +329,14 @@ where
 {
     let gate = Arc::clone(&ffi.gate);
     drop(ffi.core.arc().spawn_blocking_future(async move {
-        let result = CatchUnwind(Box::pin(work))
+        let result = AssertUnwindSafe(work)
+            .catch_unwind()
             .await
             .unwrap_or_else(|payload| Err(panic_error(payload)));
         gate.run(|| {
             let _ = catch_unwind(AssertUnwindSafe(|| target.send(result)));
         });
     }));
-}
-
-/// Polls a future and returns the payload of a panic during a poll as `Err`.
-struct CatchUnwind<F>(Pin<Box<F>>);
-
-impl<F: Future> Future for CatchUnwind<F> {
-    type Output = Result<F::Output, Box<dyn Any + Send>>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let inner = self.get_mut().0.as_mut();
-        match catch_unwind(AssertUnwindSafe(|| inner.poll(cx))) {
-            Ok(Poll::Ready(output)) => Poll::Ready(Ok(output)),
-            Ok(Poll::Pending) => Poll::Pending,
-            Err(payload) => Poll::Ready(Err(payload)),
-        }
-    }
 }
 
 /// A strong reference to a [`Core`]. The last one drops the core on a new

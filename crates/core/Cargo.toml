@@ -12,7 +12,11 @@ base64 = { workspace = true }
 http-range-header = { workspace = true }
 infer = { workspace = true }
 reflect-graph-paths = { workspace = true }
-tracing = { workspace = true }
+# With no `tracing` subscriber, the `log` feature forwards every event to the
+# `log` crate, where `logging.rs` or `tauri-plugin-log` owns the sinks.
+tracing = { workspace = true, features = ["log"] }
+jiff = { workspace = true }
+log = { workspace = true, features = ["std"] }
 dirs = { workspace = true }
 keyring-core = { workspace = true }
 reflect-git = { workspace = true }

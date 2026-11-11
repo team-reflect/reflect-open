@@ -65,6 +65,7 @@ fastembed = { version = "7.5.0", default-features = false, features = [
   "ort-download-binaries-native-tls",
 ] }
 file-id = "0.2.3"
+futures-util = { version = "0.3.33", default-features = false, features = ["std"] }
 # Everything is vendored/static: libssh2 and openssl must never link against
 # homebrew dylibs the distributed app won't have (libssh2-sys only consults
 # pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG is set, and vendored-openssl pins
