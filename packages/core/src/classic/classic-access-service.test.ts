@@ -618,7 +618,7 @@ describe('subscribe', () => {
     const classic = service()
 
     classic.subscribe(noop)
-    classic.subscribe(noop)
+    classic.subscribe(vi.fn())
     await vi.waitFor(() => expect(classic.get().isLoading).toBe(false))
 
     expect(reads).toHaveBeenCalledOnce()
@@ -629,7 +629,7 @@ describe('subscribe', () => {
     routes({ '/api/users/me': meRoute(true) })
     const classic = service()
     const unsubscribeFirst = classic.subscribe(noop)
-    const unsubscribeSecond = classic.subscribe(noop)
+    const unsubscribeSecond = classic.subscribe(vi.fn())
     await vi.waitFor(() => expect(paths()).toHaveLength(1))
 
     unsubscribeFirst()

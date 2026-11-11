@@ -901,7 +901,7 @@ describe('task list state', () => {
 
   it('keeps reading while one subscription is left, however often another unsubscribes', async () => {
     const { getOpenTasks, unsubscribe } = await subscribed()
-    tasks.subscribe(noop)
+    tasks.subscribe(vi.fn())
     unsubscribe()
     unsubscribe()
 

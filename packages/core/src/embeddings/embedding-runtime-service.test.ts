@@ -67,7 +67,7 @@ describe('createEmbeddingRuntimeService', () => {
     const listen = vi.spyOn(ipc, 'listen').mockResolvedValue(stop)
 
     const first = runtime.subscribe(noop)
-    const second = runtime.subscribe(noop)
+    const second = runtime.subscribe(vi.fn())
     await sleep(0)
     first()
     first()

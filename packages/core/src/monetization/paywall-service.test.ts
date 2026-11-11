@@ -213,7 +213,7 @@ describe('PaywallService.gate', () => {
     expect(watchers).toBe(0)
 
     const first = paywall.gate.subscribe(noop)
-    const second = paywall.gate.subscribe(noop)
+    const second = paywall.gate.subscribe(vi.fn())
     expect(watchers).toBe(2)
 
     first()

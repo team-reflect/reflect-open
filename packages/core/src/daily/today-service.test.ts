@@ -83,7 +83,7 @@ describe('createTodayService', () => {
     const clock = createTestClockService({ now: new Date(2026, 5, 9, 12, 0, 0).getTime() })
     const today = createTodayService({ clock })
     const first = today.subscribe(noop)
-    const second = today.subscribe(noop)
+    const second = today.subscribe(vi.fn())
     expect(clock.pendingTimers()).toBe(2)
     first()
     expect(clock.pendingTimers()).toBe(2)
