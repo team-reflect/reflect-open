@@ -223,6 +223,8 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+  # FIXME: 1. merge `origin/master` into `swift` and resolve conflicts
+  # FIXME: 2. after merging, is `check-rust-ios` still needed? Remove it if not. Leave some comments in the code if you still want to keep it, explaining why.
   check-rust-ios:
     needs: classify
     if: needs.classify.outputs.stack-middle == 'false'
