@@ -52,9 +52,10 @@ final class StoreCapabilityTests: XCTestCase {
     XCTAssertTrue(products.allSatisfy { $0["formattedPrice"]?.isEmpty == false })
   }
 
-  func testPurchaseOwnsTheProductUntilItExpires() async throws {
-    _ = try await call(
-      "plugin:iap|purchase", #"{"payload":{"productId":"\#(monthly)","productType":"subs"}}"#)
+  // The purchase command needs the system's purchase sheet, which does not
+  // answer in a simulator's first run. The test session buys the product.
+  func testAProductIsOwnedUntilItExpires() async throws {
+    try session.buyProduct(productIdentifier: monthly)
     let afterPurchase = try await isOwned()
     XCTAssertTrue(afterPurchase)
 

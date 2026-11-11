@@ -18,6 +18,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   ) {
     guard let windowScene = scene as? UIWindowScene else { return }
     let window = UIWindow(windowScene: windowScene)
+    // A unit test run hosts its tests in this app. The tests build the parts
+    // they need, so the app shows an empty window and starts nothing itself.
+    guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+      window.rootViewController = UIViewController()
+      window.makeKeyAndVisible()
+      self.window = window
+      return
+    }
     let root = RootViewController()
     window.rootViewController = root
     window.makeKeyAndVisible()

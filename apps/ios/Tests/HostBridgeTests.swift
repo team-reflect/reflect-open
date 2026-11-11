@@ -101,7 +101,8 @@ final class HostBridgeTests: XCTestCase {
   }
 
   private func poll(_ what: String, until condition: () async -> Bool) async throws {
-    let deadline = Date().addingTimeInterval(10)
+    // The first web view of a new simulator takes long to start its processes.
+    let deadline = Date().addingTimeInterval(60)
     while !(await condition()) {
       guard Date() < deadline else {
         XCTFail("timed out before \(what)")
