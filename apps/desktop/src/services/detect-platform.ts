@@ -92,6 +92,7 @@ export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
   const env = import.meta.env.TAURI_ENV_PLATFORM || ''
   const hasNavigator = typeof navigator !== 'undefined'
   // iPadOS masquerades as macOS in the user agent; the touch-point check excludes it.
+  // TODO: the latest MacBook Pro released on November 6, 2026 has a touch screen. We need to double check this detection logic.
   const macosDesktop =
     nativeShell &&
     hasNavigator &&
