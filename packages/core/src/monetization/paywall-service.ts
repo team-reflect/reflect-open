@@ -84,11 +84,9 @@ export interface PaywallService {
 }
 
 /**
- * Whether the paywall may block this install. Only a definite `Sandbox`
+ * Whether the paywall may block this install. A definite `Sandbox`
  * (TestFlight or a development install) or `Xcode` (a StoreKit-configuration
- * run) lifts the gate: an unfinished probe, a failed probe, and an
- * unrecognized value all count as an App Store install. The paywall's job is
- * to be shown, so a broken probe must never hand the customer base a free app.
+ * run) lifts the gate; an unrecognized value counts as an App Store install.
  */
 function isAppStoreInstall(environment: AppStoreEnvironment): boolean {
   return environment !== 'Sandbox' && environment !== 'Xcode'
@@ -126,6 +124,13 @@ function computeGate({
   }
   if (active.isLoading || classic.isLoading || clock.isLoading) {
     return 'hidden'
+  }
+  if (override === null && environment.isLoading) {
+    return 'hidden'
+  }
+  // A failed probe opens the paywall only on an explicit request, so it never blocks a paying user.
+  if (override === null && environment.isError && environment.value === null) {
+    return requested ? 'skippable' : 'hidden'
   }
   const phase = override ?? clock.phase
   if (phase === 'required') {

@@ -126,7 +126,7 @@
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "sentry-cocoa",
-          "product-name": "Sentry-Dynamic",
+          "product-name": "Sentry",
           "build-phase": { "build-phase": "frameworks" },
         },
       ],
