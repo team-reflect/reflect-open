@@ -155,7 +155,7 @@ implementation next to Tauri and the browser dev bridge.
    `master`. The first TestFlight build of the new shell follows the merge.
 5. **Later:** native chrome (tab bar, navigation bar, native screens), then
    the switch of the stable identity `app.reflect.ios` to the Swift shell
-   and removal of the Tauri iOS code.
+   and removal of the Tauri iOS code. // FIXME: I do not think you need to meantion the `swift` branch here. This is just a detail of the implementation and it's useless for the decision record. Review the whole doc and cleanup any other implementation details that are not relevant to the decision record. The decision record should focus on the "what" and "why", not the "how".
 
 Until step 5, the Tauri iOS shell stays the shipping iOS app, and we can stop
 at any point. The core extraction and the extra host adapter keep their value
