@@ -9,6 +9,7 @@
  */
 import { isIsoDate } from '@reflect/utils'
 import { dailyPath, dateFromDailyPath, isDaily } from '@reflect/core'
+import { z } from 'zod'
 
 export type Route =
   | { kind: 'today' }
@@ -25,6 +26,22 @@ export type Route =
   // The Open Source Licenses screen: a mobile settings sub-screen. Desktop
   // shows licenses in a dialog and renders this route as the settings screen.
   | { kind: 'licenses' }
+
+/**
+ * Parses a route that was stored as JSON.
+ */
+export const routeSchema: z.ZodType<Route> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('today') }),
+  z.object({ kind: z.literal('daily'), date: z.string() }),
+  z.object({ kind: z.literal('note'), path: z.string() }),
+  z.object({ kind: z.literal('allNotes'), tag: z.string().nullable() }),
+  z.object({ kind: z.literal('search'), query: z.string() }),
+  z.object({ kind: z.literal('tasks') }),
+  z.object({ kind: z.literal('chat') }),
+  z.object({ kind: z.literal('settings') }),
+  z.object({ kind: z.literal('graphs') }),
+  z.object({ kind: z.literal('licenses') }),
+])
 
 /**
  * A route that addresses one concrete note, including a dated daily note.
