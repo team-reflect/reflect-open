@@ -47,6 +47,7 @@ async function installCbindgen(): Promise<string> {
   }
   await exec(
     'cargo',
+    // FIXME: do not use `cargo install` to install `cbindgen`. Use the root mise.toml instead.
     ['install', 'cbindgen', '--version', CBINDGEN_VERSION, '--locked', '--root', TOOLS_DIR],
     INHERIT,
   )
