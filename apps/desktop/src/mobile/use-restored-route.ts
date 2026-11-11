@@ -22,7 +22,7 @@ export function useRestoredRoute(graphRoot: string): Route | undefined {
 
   const [restored] = useState(() => {
     if (!enabled) {
-      return undefined
+      return
     }
     const stored = storedRouteSchema.safeParse(
       safeParseJson(storage.session.get(STORAGE_KEY) ?? ''),
