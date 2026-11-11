@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "build:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/desktop build",
-    "dev:web": "TAURI_ENV_PLATFORM=ios TAURI_DEV_HOST=0.0.0.0 pnpm --filter @reflect/desktop dev"
+    "dev:web": "TAURI_ENV_PLATFORM=ios pnpm --filter @reflect/desktop dev"
   }
 }
