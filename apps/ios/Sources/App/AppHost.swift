@@ -33,7 +33,10 @@ final class AppHost {
         shellCommands: shellCommands,
         allowedOrigin: devURL.flatMap(Self.origin(of:)),
         onRequest: { [bridge] in bridge.markReady() }))
-    webView = ReflectWebView(routes: routes, bridge: bridge)
+    let assets = AssetSchemeHandler { [core] requestPath, rasterOnly in
+      await core.resolveAsset(requestPath: requestPath, rasterOnly: rasterOnly)
+    }
+    webView = ReflectWebView(routes: routes, assets: assets, bridge: bridge)
 
     eventPump = Task { [bridge, events = core.events] in
       for await event in events {

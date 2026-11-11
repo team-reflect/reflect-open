@@ -3,7 +3,7 @@ import XCTest
 @testable import Reflect
 
 final class ReflectCoreTests: XCTestCase {
-  private func makeCore() throws -> ReflectCore {
+  func makeCore() throws -> ReflectCore {
     let root = FileManager.default.temporaryDirectory
       .appendingPathComponent("ReflectCoreTests-\(UUID().uuidString)")
     let documents = root.appendingPathComponent("Documents")
@@ -49,5 +49,20 @@ final class ReflectCoreTests: XCTestCase {
         XCTAssertTrue(ok)
       }
     }
+  }
+}
+
+extension ReflectCoreTests {
+  func testAssetRequestsWithoutAGraphAreRefused() async throws {
+    let core = try makeCore()
+    let asset = await core.resolveAsset(requestPath: "1/assets/a.png", rasterOnly: false)
+    XCTAssertEqual(asset, .refused(status: 403))
+    let hash = String(repeating: "a", count: 64)
+    let media = await core.resolveAsset(requestPath: "1/x-media/123/\(hash)", rasterOnly: false)
+    XCTAssertEqual(media, .refused(status: 403))
+    let badMedia = await core.resolveAsset(requestPath: "1/x-media/nope/abc", rasterOnly: false)
+    XCTAssertEqual(badMedia, .refused(status: 400))
+    let malformed = await core.resolveAsset(requestPath: "assets/a.png", rasterOnly: false)
+    XCTAssertEqual(malformed, .refused(status: 400))
   }
 }

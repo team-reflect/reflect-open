@@ -4,10 +4,13 @@ import WebKit
 /// The web view that renders the web app from the `reflect-app` scheme.
 @MainActor
 final class ReflectWebView: WKWebView {
-  init(routes: [any SchemeRoute] = [], bridge: HostBridge = HostBridge()) {
+  init(
+    routes: [any SchemeRoute], assets: AssetSchemeHandler, bridge: HostBridge
+  ) {
     let configuration = WKWebViewConfiguration()
     configuration.setURLSchemeHandler(
       AppSchemeHandler(routes: routes), forURLScheme: AppSchemeHandler.scheme)
+    configuration.setURLSchemeHandler(assets, forURLScheme: AssetSchemeHandler.scheme)
     configuration.userContentController.addUserScript(HostBridge.userScript)
     configuration.userContentController.add(bridge, name: HostBridge.messageHandlerName)
     configuration.allowsInlineMediaPlayback = true
