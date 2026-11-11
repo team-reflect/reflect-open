@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react'
+import { useEffect, type ReactElement, type ReactNode } from 'react'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
@@ -14,6 +14,7 @@ import {
   useKeyboardHeightVar,
 } from '@/mobile/use-keyboard.ts'
 import { usePaywallGate } from '@/mobile/use-paywall-gate.ts'
+import { useRestoredRoute } from '@/mobile/use-restored-route.ts'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics.ts'
 import { useGraphError, useGraphInfo, useGraphStatus } from '@/providers/graph-provider.tsx'
 import { useNeedsOnboarding } from '@/providers/use-mobile-graph-boot.ts'
@@ -40,6 +41,21 @@ export function MobileApp(): ReactElement {
       <MobileOverlay />
     </>
   )
+}
+
+/**
+ * The router of one graph. It starts on the route that the page showed
+ * before a reload, when there is one.
+ */
+function MobileRouter({
+  graphRoot,
+  children,
+}: {
+  graphRoot: string
+  children: ReactNode
+}): ReactElement {
+  const initialRoute = useRestoredRoute(graphRoot)
+  return <RouterProvider initialRoute={initialRoute}>{children}</RouterProvider>
 }
 
 /**
@@ -98,7 +114,7 @@ function MobileSurface(): ReactElement {
   if (status === 'ready' && graph) {
     return (
       <AppErrorBoundary>
-        <RouterProvider key={graph.root}>
+        <MobileRouter key={graph.root} graphRoot={graph.root}>
           {/* Native recording over the shared capture pipeline — the
               mobile leg of desktop's audio memos. Mounted here so the
               queue, the reconciler, and the orphan scan survive tab
@@ -110,7 +126,7 @@ function MobileSurface(): ReactElement {
                 so a live recording's sheet survives tab switches. */}
             <RecordingDrawer />
           </MobileAudioMemoProvider>
-        </RouterProvider>
+        </MobileRouter>
       </AppErrorBoundary>
     )
   }

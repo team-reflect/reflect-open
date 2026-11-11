@@ -3,11 +3,13 @@ import WebKit
 
 /// Keeps the web view on the web app: a main-frame navigation to any other
 /// page opens with the system handler. A `target=_blank` link does the same,
-/// or loads in this web view when it stays in the web app.
+/// or loads in this web view when it stays in the web app. When the system
+/// ends the web content process, the page loads again.
 @MainActor
 final class ExternalNavigation: NSObject, WKNavigationDelegate, WKUIDelegate {
   private let startURL: URL
   private let openURL: @MainActor (URL) -> Void
+  private var terminations = 0
 
   /// `startURL` is the page of the web app: the bundled one or a dev server.
   init(startURL: URL, openURL: @escaping @MainActor (URL) -> Void) {
@@ -55,5 +57,11 @@ final class ExternalNavigation: NSObject, WKNavigationDelegate, WKUIDelegate {
       webView.load(navigationAction.request)
     }
     return nil
+  }
+
+  func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+    terminations += 1
+    ReflectCore.log(.warn, "the web content process ended (\(terminations) in this launch)")
+    webView.reload()
   }
 }
