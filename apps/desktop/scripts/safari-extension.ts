@@ -3,7 +3,7 @@
 // `embed-safari-extension.ts` adds it to a local build. See docs/distribution.md.
 //
 // The App Group is `<team>.<app bundle id>`, so each flavor spools into its own
-// container. The relay in `src-tauri/src/capture.rs` reads it back from the app
+// container. The relay in `crates/core/src/capture.rs` reads it back from the app
 // extension's Info.plist.
 
 import { cpSync, mkdirSync, rmSync } from 'node:fs'
@@ -13,7 +13,7 @@ import { APP_DIR, INHERIT, log, runWithTempDir, TAURI_SRC_DIR } from './helpers.
 
 export const REFLECT_TEAM_ID = '789ULN5MZB'
 export const APP_GROUPS_KEY = 'com.apple.security.application-groups'
-/** Must match `SAFARI_APPEX` in `src-tauri/src/capture.rs`. */
+/** Must match `SAFARI_APPEX` in `crates/core/src/capture.rs`. */
 const APPEX = 'SafariExtension.appex'
 const PROJECT_DIR = join(TAURI_SRC_DIR, 'safari-extension')
 const WEB_EXTENSION_DIR = join(APP_DIR, '..', 'extension', '.output', 'safari-mv3')

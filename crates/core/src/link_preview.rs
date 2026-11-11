@@ -3,13 +3,12 @@
 //! Apple platforms ask the system for one representative image. Other
 //! platforms return no image and never perform a network request.
 
-use crate::error::AppResult;
+use reflect_types::AppResult;
 
-pub(crate) async fn fetch<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-    url: &str,
-) -> AppResult<Option<Vec<u8>>> {
-    platform::fetch(app, url).await
+use crate::Core;
+
+pub(crate) async fn fetch(core: &Core, url: &str) -> AppResult<Option<Vec<u8>>> {
+    platform::fetch(core, url).await
 }
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -24,7 +23,9 @@ mod platform {
     use objc2_foundation::{NSData, NSError, NSString, NSURL};
     use objc2_link_presentation::{LPLinkMetadata, LPMetadataProvider};
 
-    use crate::error::{AppError, AppResult};
+    use reflect_types::{AppError, AppResult};
+
+    use crate::Core;
 
     const PROVIDER_TIMEOUT_SECONDS: f64 = 15.0;
     const RECEIVER_TIMEOUT: Duration = Duration::from_secs(20);
@@ -34,28 +35,32 @@ mod platform {
     type PreviewResult = Result<Option<Vec<u8>>, String>;
     type Provider = Arc<MainThreadBound<Retained<LPMetadataProvider>>>;
 
-    pub async fn fetch<R: tauri::Runtime>(
-        app: &tauri::AppHandle<R>,
-        url: &str,
-    ) -> AppResult<Option<Vec<u8>>> {
+    pub async fn fetch(core: &Core, url: &str) -> AppResult<Option<Vec<u8>>> {
         if !url.starts_with("https://") && !url.starts_with("http://") {
             return Err(AppError::parse("link preview requires an http(s) URL"));
         }
 
         let (sender, receiver) = mpsc::sync_channel::<PreviewResult>(1);
         let url = url.to_owned();
-        app.run_on_main_thread(move || {
-            let start_sender = sender.clone();
-            if let Err(message) = start(&url, start_sender) {
-                let _ = sender.send(Err(message));
-            }
-        })
-        .map_err(|error| AppError::io(format!("could not schedule link preview: {error}")))?;
+        core.host()
+            .run_on_main(Box::new(move || {
+                let start_sender = sender.clone();
+                if let Err(message) = start(&url, start_sender) {
+                    let _ = sender.send(Err(message));
+                }
+            }))
+            .map_err(|error| {
+                AppError::io(format!(
+                    "could not schedule link preview: {}",
+                    error.message()
+                ))
+            })?;
 
-        let received =
-            tauri::async_runtime::spawn_blocking(move || receiver.recv_timeout(RECEIVER_TIMEOUT))
-                .await
-                .map_err(|error| AppError::io(format!("link preview task failed: {error}")))?;
+        let received = core
+            .runtime
+            .spawn_blocking(move || receiver.recv_timeout(RECEIVER_TIMEOUT))
+            .await
+            .map_err(|error| AppError::io(format!("link preview task failed: {error}")))?;
 
         received
             .map_err(|_| AppError::Network {
@@ -130,12 +135,11 @@ mod platform {
 
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 mod platform {
-    use crate::error::AppResult;
+    use reflect_types::AppResult;
 
-    pub async fn fetch<R: tauri::Runtime>(
-        _app: &tauri::AppHandle<R>,
-        _url: &str,
-    ) -> AppResult<Option<Vec<u8>>> {
+    use crate::Core;
+
+    pub async fn fetch(_core: &Core, _url: &str) -> AppResult<Option<Vec<u8>>> {
         Ok(None)
     }
 }

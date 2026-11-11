@@ -4,13 +4,21 @@ How a value travels from Rust to a React component. **Adding a command is two
 things: the Rust command, and a method on the core service that owns the
 domain.** This guide walks the path with a hypothetical `note_stat` command.
 
+The Rust command is a method on `Core` in `crates/core` (crate `reflect-core`,
+no Tauri). Two shells call it: the Tauri app through a `#[tauri::command]`
+that forwards, and the Swift iOS shell through `Core::dispatch` by name.
+
 ```text
 React component / hook        useCoreServices()
   └─ service method           packages/core/src/<domain>/<name>-service.ts
        └─ ipc.call            packages/core/src/ipc/ipc-service.ts  (zod validation)
             └─ transport.invoke   the `IpcBridge` given to `createCoreServices`
-                 └─ Tauri IPC apps/desktop/src/services/tauri-ipc.ts
-                      └─ #[tauri::command]  apps/desktop/src-tauri/src/<module>.rs
+                 ├─ Tauri IPC apps/desktop/src/services/tauri-ipc.ts
+                 │    └─ #[tauri::command]  apps/desktop/src-tauri/src/<module>.rs
+                 │         └─ Core method   crates/core/src/<module>.rs
+                 └─ Swift IPC apps/desktop/src/services/swift-ipc.ts
+                      └─ Core::dispatch     crates/core/src/lib.rs
+                           └─ Core method   crates/core/src/<module>.rs
 ```
 
 First check whether you need a new command. Per
@@ -20,12 +28,14 @@ First check whether you need a new command. Per
 
 ## 1. The Rust command
 
-Put it in the module that owns the capability (`fs/`, `db/`, `settings.rs`,
-`recents.rs`, `secrets.rs`, `git.rs`, `capture.rs`, `embed.rs`, …) or a new one.
-Commands are snake_case, return `AppResult<T>`, and serialize camelCase:
+Put the method in the `crates/core` module that owns the capability (`fs/`,
+`db.rs`, `git.rs`, `capture.rs`, `embed.rs`, …) or a new one. State that
+commands share (the graph session, the index session, the background
+assertions) is a field of `Core`. Commands are snake_case, return
+`AppResult<T>` unless they cannot fail, and serialize camelCase:
 
 ```rust
-// apps/desktop/src-tauri/src/fs/mod.rs
+// crates/core/src/fs/mod.rs
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteStat {
@@ -33,14 +43,35 @@ pub struct NoteStat {
     pub modified_ms: u64,
 }
 
-/// Command: file metadata for one note (graph-relative path).
-#[tauri::command]
-pub fn note_stat(path: String, state: tauri::State<GraphState>) -> AppResult<NoteStat> {
-    let root = current_root(&state)?;
-    let resolved = resolve(&root, &path)?; // traversal guard — see below
-    // ...
+impl Core {
+    /// Command: file metadata for one note (graph-relative path).
+    pub fn note_stat(&self, path: String) -> AppResult<NoteStat> {
+        let root = current_root(&self.graph)?;
+        let resolved = resolve(&root, &path)?; // traversal guard — see below
+        // ...
+    }
 }
 ```
+
+Then wire it up for both shells:
+
+```rust
+// crates/core/src/lib.rs, in `Core::dispatch`: one row per command.
+// The argument names are the camelCase keys of the JSON arguments.
+"note_stat" => note_stat(path: String),
+
+// apps/desktop/src-tauri/src/fs/mod.rs: the Tauri command only forwards.
+#[tauri::command]
+pub fn note_stat(core: tauri::State<'_, Arc<Core>>, path: String) -> AppResult<NoteStat> {
+    core.note_stat(path)
+}
+```
+
+A row for an `async` method ends in `.await`. A row for a method that returns
+its value without `AppResult` ends in `infallible`. A sync
+`#[tauri::command]` runs on the main thread, so make the forwarding function
+`async` when the method can block. A command that exists only on the desktop
+(windows, menus) stays in the Tauri crate and gets no `dispatch` row.
 
 - **Errors are the shared contract.** Return `AppError` (from `reflect-types`,
   `crates/types/src/error.rs`). It serializes as `{ kind, message }`, and the
@@ -61,19 +92,21 @@ pub fn note_stat(path: String, state: tauri::State<GraphState>) -> AppResult<Not
 - **No product policy.** A command exposes a primitive. "What to do when X"
   belongs in `@reflect/core`.
 
-Register it in `tauri::generate_handler![...]` in
+Register the Tauri command in `tauri::generate_handler![...]` in
 `apps/desktop/src-tauri/src/lib.rs`. A missing registration compiles fine and
-fails at runtime with "command not found".
+fails at runtime with "command not found". A missing `dispatch` row fails the
+same way in the Swift shell, with a `notFound` error.
 
 Test the pure helper with `#[cfg(test)]`, not the command wrapper.
-`settings.rs` is the model: `settings_load`/`settings_save` wrap
-`load_from`/`save_to`, which the tests exercise with `tempfile`. Stage the
-sidecars once before compiling the desktop crate:
+`crates/core/src/settings.rs` is the model: `settings_load`/`settings_save`
+wrap `load_from`/`save_to`, which the tests exercise with `tempfile`.
 
 ```bash
-pnpm --filter @reflect/desktop sidecar
-cargo test -p reflect-open
+cargo test -p reflect-core
 ```
+
+Stage the sidecars once before compiling the desktop crate
+(`pnpm --filter @reflect/desktop sidecar`).
 
 ## 2. The service method
 
@@ -154,10 +187,12 @@ behavior in the module that consumes it. See [testing.md](testing.md).
 
 ## Checklist
 
-- [ ] Rust: command in the owning module, `AppResult<T>`, camelCase serde,
-      `resolve()`d paths, generation-pinned if mutating or a background read
-- [ ] Rust: registered in `lib.rs` `generate_handler!`
-- [ ] Rust: `#[cfg(test)]` tests on the pure helper; `cargo test -p reflect-open`
+- [ ] Rust: `Core` method in the owning `crates/core` module, `AppResult<T>`,
+      camelCase serde, `resolve()`d paths, generation-pinned if mutating or a
+      background read
+- [ ] Rust: a row in `Core::dispatch`, a forwarding `#[tauri::command]`, and
+      its registration in `lib.rs` `generate_handler!`
+- [ ] Rust: `#[cfg(test)]` tests on the pure helper; `cargo test -p reflect-core`
 - [ ] TS: zod schema + method through `ipc.call()` on the owning service;
       `generation` parameter if mutating
 - [ ] TS: test double updated; new types exported from `packages/core/src/index.ts`

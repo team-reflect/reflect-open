@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "2720"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES">
+      <PreActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Build Rust core if missing"
+               scriptText = "[ -d &quot;${SRCROOT}/../../target/apple/ReflectCore.xcframework&quot; ] || &quot;${SRCROOT}/scripts/xcode-build-ffi.sh&quot;&#10;">
+               <EnvironmentBuildable>
+               <BuildableReference
+                  BuildableIdentifier = "primary"
+                  BlueprintIdentifier = "F5BC8B83DA18E783A886C8AA"
+                  BuildableName = "Reflect.app"
+                  BlueprintName = "Reflect"
+                  ReferencedContainer = "container:Reflect.xcodeproj">
+               </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PreActions>
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F5BC8B83DA18E783A886C8AA"
+               BuildableName = "Reflect.app"
+               BlueprintName = "Reflect"
+               ReferencedContainer = "container:Reflect.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug-Dev"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C2F7A91E5B3D48A6B0E4D8F3"
+               BuildableName = "ReflectTests.xctest"
+               BlueprintName = "ReflectTests"
+               ReferencedContainer = "container:Reflect.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A9E3F6C17D524B08B6F1D4E7"
+               BuildableName = "ReflectUITests.xctest"
+               BlueprintName = "ReflectUITests"
+               ReferencedContainer = "container:Reflect.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug-Dev"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "F5BC8B83DA18E783A886C8AA"
+            BuildableName = "Reflect.app"
+            BlueprintName = "Reflect"
+            ReferencedContainer = "container:Reflect.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "REFLECT_DEV_URL"
+            value = "http://localhost:1420"
+            isEnabled = "NO">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "RUST_BACKTRACE"
+            value = "full"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "RUST_LOG"
+            value = "info"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release-Stable"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug-Dev">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release-Stable"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>

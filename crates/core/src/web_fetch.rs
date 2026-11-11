@@ -9,13 +9,13 @@ use std::time::{Duration, Instant};
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use reqwest::{Client, StatusCode, Url, redirect};
 
-use crate::error::{AppError, AppResult};
+use reflect_types::{AppError, AppResult};
 
 const FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_REDIRECTS: usize = 5;
 const MAX_CONCURRENT_DNS_LOOKUPS: usize = 8;
 const HTML_MAX_BYTES: usize = 2 * 1024 * 1024;
-pub(crate) const USER_AGENT: &str = concat!(
+pub const USER_AGENT: &str = concat!(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ",
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
 );
@@ -26,9 +26,9 @@ enum NetworkScope {
     PublicHttp,
 }
 
-pub(crate) struct FetchResponse {
-    pub(crate) body: Vec<u8>,
-    pub(crate) final_url: String,
+pub struct FetchResponse {
+    pub body: Vec<u8>,
+    pub final_url: String,
 }
 
 type ContentTypeValidator = fn(&str, &str) -> AppResult<()>;
@@ -72,7 +72,7 @@ enum LimitBehavior {
     Reject,
 }
 
-pub(crate) fn classify_fetch_error(error: reqwest::Error) -> AppError {
+pub fn classify_fetch_error(error: reqwest::Error) -> AppError {
     if error.is_timeout() || error.is_connect() || error.is_request() {
         AppError::Network {
             message: error.to_string(),
@@ -82,7 +82,7 @@ pub(crate) fn classify_fetch_error(error: reqwest::Error) -> AppError {
     }
 }
 
-pub(crate) fn classify_fetch_status(url: &str, status: StatusCode) -> Option<AppError> {
+pub fn classify_fetch_status(url: &str, status: StatusCode) -> Option<AppError> {
     if status.is_success() {
         return None;
     }
@@ -223,7 +223,7 @@ impl Resolve for PublicDnsResolver {
             let permit = DnsLookupPermit::acquire()
                 .map_err(|error| -> Box<dyn std::error::Error + Send + Sync> { Box::new(error) })?;
             let resolve_host = host.clone();
-            let addresses = tauri::async_runtime::spawn_blocking(move || {
+            let addresses = tokio::task::spawn_blocking(move || {
                 let _permit = permit;
                 (resolve_host.as_str(), 0)
                     .to_socket_addrs()
@@ -422,12 +422,12 @@ async fn fetch_bytes(
 }
 
 /// Fetch capture HTML while preserving capture's existing intranet behavior.
-pub(crate) async fn fetch_capture_html(value: &str) -> AppResult<FetchResponse> {
+pub async fn fetch_capture_html(value: &str) -> AppResult<FetchResponse> {
     fetch_html(value, NetworkScope::AnyHttp).await
 }
 
 /// Fetch a bounded HTTPS JSON response without following redirects.
-pub(crate) async fn fetch_capture_json(value: &str, max_bytes: usize) -> AppResult<FetchResponse> {
+pub async fn fetch_capture_json(value: &str, max_bytes: usize) -> AppResult<FetchResponse> {
     let url = parse_http_url(value)?;
     if url.scheme() != "https" {
         return Err(AppError::parse(format!("not an https URL: {value}")));
@@ -445,12 +445,12 @@ pub(crate) async fn fetch_capture_json(value: &str, max_bytes: usize) -> AppResu
 }
 
 /// Fetch editor-preview HTML from public internet destinations only.
-pub(crate) async fn fetch_public_html(value: &str) -> AppResult<FetchResponse> {
+pub async fn fetch_public_html(value: &str) -> AppResult<FetchResponse> {
     fetch_html(value, NetworkScope::PublicHttp).await
 }
 
 /// Fetch a bounded image from public internet destinations only.
-pub(crate) async fn fetch_public_image(
+pub async fn fetch_public_image(
     value: &str,
     max_bytes: usize,
     validate_content_type: ContentTypeValidator,

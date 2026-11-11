@@ -11,13 +11,15 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use reflect_core::Core;
 use serde::Serialize;
 use tauri::State;
 
 use crate::capture::atomic_write_to;
 use crate::error::{AppError, AppResult};
-use crate::fs::{GraphState, current_root, root_for_generation};
+use crate::fs::{current_root, root_for_generation};
 
 /// The bundled template; placeholders are `{{SKILL_NAME}}`, `{{GRAPH_NAME}}`,
 /// `{{GRAPH_ROOT}}`, and `{{CLI_PATH}}`.
@@ -236,8 +238,8 @@ fn status_of(context: &SkillContext) -> AppResult<SkillStatus> {
 /// Command: the skill's name, target path, and install state for the open
 /// graph. Read-only.
 #[tauri::command]
-pub fn skill_status(state: State<GraphState>) -> AppResult<SkillStatus> {
-    let root = current_root(&state)?;
+pub fn skill_status(core: State<Arc<Core>>) -> AppResult<SkillStatus> {
+    let root = current_root(&core.graph)?;
     status_of(&context_for_graph(&root)?)
 }
 
@@ -245,8 +247,8 @@ pub fn skill_status(state: State<GraphState>) -> AppResult<SkillStatus> {
 /// an install racing a graph switch can't write the wrong graph's skill.
 /// Refuses to touch a file we don't manage.
 #[tauri::command]
-pub fn skill_install(generation: u64, state: State<GraphState>) -> AppResult<SkillStatus> {
-    let root = root_for_generation(&state, generation)?;
+pub fn skill_install(generation: u64, core: State<Arc<Core>>) -> AppResult<SkillStatus> {
+    let root = root_for_generation(&core.graph, generation)?;
     let context = context_for_graph(&root)?;
     let status = status_of(&context)?;
     match status.install_state {
@@ -287,8 +289,8 @@ fn atomic_create_new(path: &Path, contents: &str) -> AppResult<()> {
 /// Command: remove the graph's skill file (and its directory when that leaves
 /// it empty). Only removes files carrying our managed marker.
 #[tauri::command]
-pub fn skill_uninstall(generation: u64, state: State<GraphState>) -> AppResult<SkillStatus> {
-    let root = root_for_generation(&state, generation)?;
+pub fn skill_uninstall(generation: u64, core: State<Arc<Core>>) -> AppResult<SkillStatus> {
+    let root = root_for_generation(&core.graph, generation)?;
     let context = context_for_graph(&root)?;
     let status = status_of(&context)?;
     match status.install_state {

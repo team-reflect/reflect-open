@@ -8,6 +8,8 @@ members = [
   "apps/cli",
   "apps/desktop/src-tauri",
   "apps/native-host",
+  "crates/core",
+  "crates/ffi",
   "crates/graph-io",
   "crates/git",
   "crates/graph-paths",
@@ -34,6 +36,7 @@ publish = false
 # the default features adds `features = ["default"]`.
 
 # Workspace crates
+reflect-core = { path = "crates/core" }
 reflect-graph-io = { path = "crates/graph-io" }
 reflect-graph-paths = { path = "crates/graph-paths" }
 reflect-git = { path = "crates/git" }
