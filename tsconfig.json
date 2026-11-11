@@ -8,9 +8,6 @@
       "path": "./apps/extension/tsconfig.json"
     },
     {
-      "path": "./apps/ios/tsconfig.json"
-    },
-    {
       "path": "./packages/app/tsconfig.json"
     },
     {
@@ -24,6 +21,9 @@
     },
     {
       "path": "./packages/utils/tsconfig.json"
+    },
+    {
+      "path": "./scripts/tsconfig.json"
     }
   ]
 }

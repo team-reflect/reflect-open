@@ -1,21 +1,16 @@
 // Builds `reflect-ffi` for the iOS device and simulator and packs both static
 // libraries with the C header into target/apple/ReflectCore.xcframework.
 //
-//   pnpm --filter @reflect/ios build:core [--debug]
+//   pnpm build:ffi [--debug]
 //
 //   --debug   Dev profile, simulator only
-
-// FIXME: 1. move this script into reflect-open/scripts/
-// FIXME: 2. add a new reflect-open/scripts/tsconfig.json and link it to the root reflect-open/tsconfig.json
-// FIXME: 3. check if apps/ios/tsconfig.json is still needed. If not, remove it.
-// FIXME: 4. rename this script to build-ffi.ts
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
 
-const ROOT_DIR = join(import.meta.dirname, '..', '..', '..')
+const ROOT_DIR = join(import.meta.dirname, '..')
 const TARGET_DIR = join(ROOT_DIR, 'target')
 const APPLE_DIR = join(TARGET_DIR, 'apple')
 const TOOLS_DIR = join(APPLE_DIR, 'tools')
@@ -50,7 +45,7 @@ const MODULE_MAP = `module ReflectCoreFFI {
 `
 
 function log(message: string): void {
-  console.log(`[build-core] ${message}`)
+  console.log(`[build-ffi] ${message}`)
 }
 
 /** Installs the pinned cbindgen into target/apple/tools and returns its path. */
