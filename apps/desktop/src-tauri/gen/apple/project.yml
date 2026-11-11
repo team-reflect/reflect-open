@@ -5,9 +5,12 @@
 # Source folders are synced folders (Xcode 16 buildable folders): adding,
 # removing, or renaming a file inside one needs no regeneration. Code that
 # more than one target uses goes in a module of the local Swift package at
-# apple/ (repo root). Shared/ keeps only App Intents files, which must be
-# compiled into each target that exposes them; listing a file by path inside
-# another target's synced folder makes XcodeGen output nondeterministic.
+# apple/ (repo root). The sources that this app shares with the Swift shell
+# are in apps/ios/: the extensions (Extensions/) and the files that each app
+# target compiles for itself (Shared/): App Intents, which must be compiled
+# into each target that exposes them, and the Sentry reporter. Listing a file
+# by path inside another target's synced folder makes XcodeGen output
+# nondeterministic.
 #
 # To regenerate the Xcode project after a spec change, run XcodeGen 2.46.0
 # (`brew install xcodegen` once):
@@ -101,7 +104,11 @@ targets:
         type: folder
       - path: LaunchScreen.storyboard
       # The stop LiveActivityIntent, shared with the widget; it executes here.
-      - path: Shared/Recording
+      - path: ../../../../ios/Shared/Recording
+        type: syncedFolder
+      - path: ../../../../ios/Shared/Intents
+        type: syncedFolder
+      - path: ../../../../ios/Shared/Diagnostics
         type: syncedFolder
     info:
       path: reflect-open_iOS/Info.plist
@@ -209,7 +216,7 @@ targets:
       # spec's directory). Only the Run action applies it; plain xcodebuild
       # and `tauri ios dev` launches run without it, so the paywall shows
       # "Could not load subscription options" there.
-      storeKitConfiguration: reflect-open-storekit.storekit
+      storeKitConfiguration: ../../../../ios/Config/reflect-open-storekit.storekit
     settings:
       base:
         ENABLE_BITCODE: false
@@ -284,7 +291,7 @@ targets:
       # Includes ExtensionClass.js, the Safari preprocessor (title/URL/
       # selection/meta description): a bundle resource the NSExtension
       # attributes reference by base name.
-      - path: ShareExtension
+      - path: ../../../../ios/Extensions/ShareExtension
         type: syncedFolder
     info:
       path: ShareExtension/Info.plist
@@ -366,9 +373,9 @@ targets:
     platform: iOS
     deploymentTarget: '16.2'
     sources:
-      - path: RecordingWidget
+      - path: ../../../../ios/Extensions/RecordingWidget
         type: syncedFolder
-      - path: Shared/Recording
+      - path: ../../../../ios/Shared/Recording
         type: syncedFolder
     info:
       path: RecordingWidget/Info.plist

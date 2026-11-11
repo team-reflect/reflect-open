@@ -106,7 +106,7 @@
          </EnvironmentVariable>
       </EnvironmentVariables>
    <StoreKitConfigurationFileReference
-         identifier = "../../../desktop/src-tauri/gen/apple/reflect-open-storekit.storekit">
+         identifier = "../../Config/reflect-open-storekit.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction

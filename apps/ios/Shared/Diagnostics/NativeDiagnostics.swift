@@ -13,7 +13,7 @@ import Sentry
 /// `docs/privacy.md`.
 enum NativeDiagnostics {
   /// The production Reflect project, expanded into Info.plist from the
-  /// `REFLECT_SENTRY_DSN` build setting. Sentry DSNs authorize event
+  /// `ReflectSentryDSN` key of the app's Info.plist. Sentry DSNs authorize event
   /// submission only; builds without one (local and fork builds) leave the
   /// reporter off.
   /// https://docs.sentry.io/concepts/key-terms/dsn-explainer/
@@ -67,7 +67,8 @@ enum NativeDiagnostics {
   ]
 
   /// Starts the reporter in an official release build that carries a DSN.
-  static func start() {
+  /// `runtime` is the `runtime` tag of every event: it names the app shell.
+  static func start(runtime: String) {
     guard !dsn.isEmpty, let identifier = Bundle.main.bundleIdentifier,
       officialBundleIdentifiers.contains(identifier)
     else {
@@ -121,14 +122,14 @@ enum NativeDiagnostics {
       options.enableMetricKitRawPayload = false
 
       options.beforeSend = { event in
-        scrub(event: event)
+        scrub(event: event, runtime: runtime)
       }
     }
   }
 
   /// Drop anything without a stack, then strip every field that is not an
   /// address, a symbol, or allow-listed device metadata.
-  private static func scrub(event: Event) -> Event? {
+  private static func scrub(event: Event, runtime: String) -> Event? {
     let hasDiagnosticStack =
       event.stacktrace != nil || event.exceptions?.isEmpty == false
       || event.threads?.isEmpty == false
@@ -147,7 +148,7 @@ enum NativeDiagnostics {
     event.modules = nil
     event.fingerprint = nil
     event.breadcrumbs = []
-    event.tags = ["runtime": "swift-native"]
+    event.tags = ["runtime": runtime]
     event.context = scrub(context: event.context)
     // Debug images keep their UUID and address range — that is what Sentry
     // matches the uploaded dSYMs against — but not their build-machine paths.

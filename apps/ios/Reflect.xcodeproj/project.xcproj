@@ -27,47 +27,14 @@
     { "kind": "folder", "path": "Sources", "target-membership": [ "Reflect" ] },
     { "kind": "folder", "path": "Resources", "target-membership": [ "Reflect" ] },
     { "kind": "folder", "path": "Tests", "target-membership": [ "ReflectTests" ] },
-    { "path": "../desktop/src-tauri/gen/apple/reflect-open-storekit.storekit", "target-membership": [ "ReflectTests/resources" ] },
+    { "path": "Config/reflect-open-storekit.storekit", "target-membership": [ "ReflectTests/resources" ] },
     { "kind": "folder", "path": "UITests", "target-membership": [ "ReflectUITests" ] },
     { "kind": "folder", "path": "Config" },
-    {
-      "kind": "group",
-      "name": "Extensions",
-      "children": [
-        {
-          "kind": "folder",
-          "path": "../desktop/src-tauri/gen/apple/ShareExtension",
-          "target-membership": [
-            "ShareExtension",
-          ],
-          "membership-exceptions": [
-            {
-              "target": "ShareExtension",
-              "exclusions": [
-                "Info.plist",
-              ],
-            },
-          ],
-        }, {
-          "kind": "folder",
-          "path": "../desktop/src-tauri/gen/apple/RecordingWidget",
-          "target-membership": [
-            "RecordingWidget",
-          ],
-          "membership-exceptions": [
-            {
-              "target": "RecordingWidget",
-              "exclusions": [
-                "Info.plist",
-              ],
-            },
-          ],
-        },
-        { "kind": "folder", "path": "../desktop/src-tauri/gen/apple/Shared/Recording", "target-membership": [ "RecordingWidget", "Reflect" ] },
-        { "path": "../desktop/src-tauri/gen/apple/Sources/reflect-open/QuickNoteIntent.swift", "target-membership": [ "Reflect/compile-sources" ] },
-        { "path": "../desktop/src-tauri/gen/apple/Sources/reflect-open/RecordingIntents.swift", "target-membership": [ "Reflect/compile-sources" ] },
-      ],
-    },
+    { "kind": "folder", "path": "Extensions/ShareExtension", "target-membership": [ "ShareExtension" ] },
+    { "kind": "folder", "path": "Extensions/RecordingWidget", "target-membership": [ "RecordingWidget" ] },
+    { "kind": "folder", "path": "Shared/Recording", "target-membership": [ "RecordingWidget", "Reflect" ] },
+    { "kind": "folder", "path": "Shared/Intents", "target-membership": [ "Reflect" ] },
+    { "kind": "folder", "path": "Shared/Diagnostics", "target-membership": [ "Reflect" ] },
     { "kind": "folder", "path": "scripts" },
     { "path": "Web", "type": "folder", "target-membership": [ "Reflect/resources" ] },
     {

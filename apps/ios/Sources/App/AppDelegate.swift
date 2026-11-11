@@ -10,7 +10,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     #if !DEBUG
-    NativeDiagnostics.start()
+    NativeDiagnostics.start(runtime: "swift-native")
     #endif
     return true
   }
