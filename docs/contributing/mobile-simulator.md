@@ -15,3 +15,18 @@ keyboard and `--keyboard-height` stays 0. Turn it off to test keyboard avoidance
 `tauri ios dev` rewrites files under `apps/desktop/src-tauri/gen/apple/` (`project.pbxproj`
 build settings, the merged `Info.plist`). Do not commit those changes. To change the project,
 edit `gen/apple/project.yml` and follow its header comment.
+
+## Evaluating JavaScript in the web view
+
+`pnpm web-inspector` connects to the Web Inspector of the booted simulator and serves an HTTP
+endpoint on localhost. The request body is a JavaScript expression. The response is JSON with the
+awaited `value`, or an `error`.
+
+```bash
+pnpm web-inspector
+curl -d 'document.title' http://127.0.0.1:9229
+curl -d 'fetch("/index.html").then((r) => r.status)' http://127.0.0.1:9229
+```
+
+The web view must be inspectable (`WKWebView.isInspectable`). The connection reopens after the
+app restarts.
