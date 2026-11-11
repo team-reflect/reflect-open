@@ -10,7 +10,8 @@
 #
 # Xcode launched from the Dock runs script phases with the minimal launchd
 # PATH, so node comes from apps/desktop/src-tauri/.xcode.env.local (written by
-# `pnpm install`) and cargo from rustup's fixed install location.
+# `pnpm install`), cargo from rustup's fixed install location, and cbindgen
+# from the mise shims.
 set -eu
 
 cd "$(dirname "$0")/../../.."
@@ -18,7 +19,7 @@ cd "$(dirname "$0")/../../.."
 if [ -f apps/desktop/src-tauri/.xcode.env.local ]; then
   . apps/desktop/src-tauri/.xcode.env.local
 fi
-PATH="$PATH:$HOME/.cargo/bin"
+PATH="$PATH:$HOME/.cargo/bin:$HOME/.local/share/mise/shims"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "error: node not found; run \`pnpm install\` once from a terminal" >&2

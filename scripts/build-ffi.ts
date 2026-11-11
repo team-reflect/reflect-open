@@ -28,7 +28,6 @@ import { exec } from 'tinyexec'
 const ROOT_DIR = join(import.meta.dirname, '..')
 const TARGET_DIR = join(ROOT_DIR, 'target')
 const APPLE_DIR = join(TARGET_DIR, 'apple')
-const TOOLS_DIR = join(APPLE_DIR, 'tools')
 const INCLUDE_DIR = join(APPLE_DIR, 'include')
 // A subdirectory keeps this `module.modulemap` apart from the ones of other
 // libraries that Xcode copies into the same include directory.
@@ -40,7 +39,6 @@ const CRATE_DIR = join(ROOT_DIR, 'crates', 'ffi')
 // The committed C header and the module map that declares it.
 const CRATE_INCLUDE_DIR = join(CRATE_DIR, 'include')
 
-const CBINDGEN_VERSION = '0.29.4'
 const DEVICE_TARGET = 'aarch64-apple-ios'
 const SIMULATOR_TARGET = 'aarch64-apple-ios-sim'
 const TARGET_BY_SDK: Record<string, string> = {
@@ -55,22 +53,33 @@ function log(message: string): void {
   console.log(`[build-ffi] ${message}`)
 }
 
-/** Installs the pinned cbindgen into target/apple/tools and returns its path. */
-async function installCbindgen(): Promise<string> {
-  const binary = join(TOOLS_DIR, 'bin', 'cbindgen')
-  if (existsSync(binary)) {
-    const { stdout } = await exec(binary, ['--version'], { throwOnError: true })
-    if (stdout.trim() === `cbindgen ${CBINDGEN_VERSION}`) {
-      return binary
-    }
+/** The cbindgen version that the root mise.toml pins. */
+function pinnedCbindgenVersion(): string {
+  const mise = readFileSync(join(ROOT_DIR, 'mise.toml'), 'utf8')
+  const version = /^"cargo:cbindgen" = "([^"]+)"$/m.exec(mise)?.[1]
+  if (version === undefined) {
+    throw new Error('mise.toml does not pin "cargo:cbindgen"')
   }
-  await exec(
-    'cargo',
-    // FIXME: do not use `cargo install` to install `cbindgen`. Use the root mise.toml instead. You probally want to assert that cbindgen is already installed and has the correct version. you do not need to install it in this script.
-    ['install', 'cbindgen', '--version', CBINDGEN_VERSION, '--locked', '--root', TOOLS_DIR],
-    INHERIT,
-  )
-  return binary
+  return version
+}
+
+/** The version line of the cbindgen on PATH, or a note that there is none. */
+async function findCbindgen(): Promise<string> {
+  try {
+    const { stdout } = await exec('cbindgen', ['--version'], { throwOnError: true })
+    return stdout.trim()
+  } catch {
+    return 'no cbindgen on PATH'
+  }
+}
+
+/** Checks that the cbindgen on PATH is the version that mise.toml pins. */
+async function checkCbindgen(): Promise<void> {
+  const expected = `cbindgen ${pinnedCbindgenVersion()}`
+  const found = await findCbindgen()
+  if (found !== expected) {
+    throw new Error(`build-ffi needs ${expected}, found ${found}. Run \`mise install\`.`)
+  }
 }
 
 /** The Rust targets to build for the `--debug` and `--sdk` options. */
@@ -133,9 +142,9 @@ async function main(): Promise<void> {
     },
   })
 
-  const cbindgen = await installCbindgen()
+  await checkCbindgen()
   await exec(
-    cbindgen,
+    'cbindgen',
     [
       '--config',
       join(CRATE_DIR, 'cbindgen.toml'),
