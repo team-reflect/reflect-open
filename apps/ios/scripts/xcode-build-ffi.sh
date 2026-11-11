@@ -1,44 +1,26 @@
-#!/bin/sh
-# FIXME: use bash instead of sh.
+#!/bin/bash
 # The "Build Rust core" phase of Reflect.xcodeproj: builds
-# target/apple/ReflectCore.xcframework through scripts/build-ffi.ts for the current
-# configuration and SDK. Every build compiles only the slice of its SDK. A
-# Debug simulator build uses the dev profile; every other build the release
-# profile.
+# target/apple/ReflectCore.xcframework through scripts/build-ffi.ts for the
+# SDK of the current build. A Debug build uses the dev profile.
 #
 # The Reflect scheme also runs this script as a build pre-action when the
 # xcframework is missing: Xcode looks for it while it plans the build, before
 # any build phase runs.
-#
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
+
 # Xcode launched from the Dock runs script phases with the minimal launchd
-# PATH, so node comes from apps/desktop/src-tauri/.xcode.env.local (written by
-# `pnpm install`), cargo from rustup's fixed install location, and cbindgen
-# from the mise shims.
-set -eu
-
-cd "$(dirname "$0")/../../.."
-
-# FIXME: 1. in generate-xcode-env.mjs, also genenrate a .xcode.env.local file under apps/ios/; 2. use that .xcode.env.local here instead of apps/desktop/src-tauri/.xcode.env.local
-if [ -f apps/desktop/src-tauri/.xcode.env.local ]; then
-  . apps/desktop/src-tauri/.xcode.env.local
-fi
-
-# FIXME: move the following logic into generate-xcode-env.mjs, so that we can use these PATH shims in differnt scripts.
-PATH="$HOME/.local/share/mise/shims:$PATH:$HOME/.cargo/bin"
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "error: node not found; run \`pnpm install\` once from a terminal" >&2
+# PATH. This file adds node, cargo and the mise shims to it.
+if [ ! -f apps/ios/.xcode.env.local ]; then
+  echo "error: apps/ios/.xcode.env.local is missing; run \`pnpm install\` once from a terminal" >&2
   exit 1
 fi
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "error: cargo not found on PATH or in \$HOME/.cargo/bin; install rustup" >&2
-  exit 1
-fi
+source apps/ios/.xcode.env.local
 
-# FIXME: I feel that xcode-build-ffi.sh and build-ffi.ts is too complex. Do we really need to support so many cases? simplify the logic and remove unnecessary code.
-args="--sdk ${PLATFORM_NAME:?}"
-if [ "${CONFIGURATION:?}" = "Debug-Dev" ] && [ "$PLATFORM_NAME" = "iphonesimulator" ]; then
-  args="$args --debug"
+args=(--sdk "${PLATFORM_NAME:?}")
+if [ "${CONFIGURATION:?}" = "Debug-Dev" ]; then
+  args+=(--debug)
 fi
 
 # A clean environment: Xcode's SDKROOT and deployment target variables would
@@ -46,4 +28,4 @@ fi
 # DEVELOPER_DIR stays, so the Rust build uses the Xcode that runs this build.
 exec env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} \
-  node scripts/build-ffi.ts $args
+  node scripts/build-ffi.ts "${args[@]}"
