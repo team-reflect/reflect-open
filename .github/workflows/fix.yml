@@ -37,6 +37,7 @@ jobs:
               Cargo.lock; then
             echo "licenses=true" >> "$GITHUB_OUTPUT"
           fi
+          echo "licenses=true" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/setup-node
 
