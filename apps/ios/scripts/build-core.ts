@@ -75,7 +75,12 @@ async function main(): Promise<void> {
   const profile = values.debug ? 'debug' : 'release'
   const targets = values.debug ? [SIMULATOR_TARGET] : [DEVICE_TARGET, SIMULATOR_TARGET]
 
-  const cargoArgs = ['build', '-p', 'reflect-ffi', ...targets.flatMap((t) => ['--target', t])]
+  const cargoArgs = [
+    'build',
+    '-p',
+    'reflect-ffi',
+    ...targets.flatMap((target) => ['--target', target]),
+  ]
   if (!values.debug) {
     cargoArgs.push('--release')
   }
