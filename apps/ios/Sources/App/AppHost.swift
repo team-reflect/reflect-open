@@ -48,7 +48,8 @@ final class AppHost {
 
   /// The origin of a URL as the `Origin` header spells it, such as `http://localhost:1420`.
   private static func origin(of url: URL) -> String? {
-    guard let scheme = url.scheme, let host = url.host else { return nil }
+    guard let scheme = url.scheme, let rawHost = url.host else { return nil }
+    let host = rawHost.contains(":") ? "[\(rawHost)]" : rawHost
     return url.port.map { "\(scheme)://\(host):\($0)" } ?? "\(scheme)://\(host)"
   }
 }

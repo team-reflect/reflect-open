@@ -81,7 +81,7 @@ final class IPCRouteTests: XCTestCase {
   func testBinaryCommandPassesBodyAndLowercaseHeaders() async {
     let fake = await post(
       route(reply: .bytes(Data([1, 2, 3]))), command: "asset_upload_append", body: "raw",
-      headers: ["Content-Type": "application/octet-stream", "X-Upload-Id": "u1"])
+      headers: ["Content-Type": "Application/Octet-Stream", "X-Upload-Id": "u1"])
 
     XCTAssertEqual(calls.first?.args, "")
     XCTAssertEqual(calls.first?.body, Data("raw".utf8))
@@ -121,9 +121,11 @@ final class IPCRouteTests: XCTestCase {
 
     task.stop()
     gate.open()
-    while calls.isEmpty {
+    let deadline = Date().addingTimeInterval(5)
+    while calls.isEmpty, Date() < deadline {
       await Task.yield()
     }
+    XCTAssertEqual(calls.count, 1)
     for _ in 0..<10 {
       await Task.yield()
     }
@@ -132,12 +134,15 @@ final class IPCRouteTests: XCTestCase {
   }
 
   func testDevOriginGetsCORSHeadersAndPreflight() async {
-    let route = route(allowedOrigin: "http://localhost:1420")
+    var requests = 0
+    let route = IPCRoute(
+      dispatch: { _, _, _, _ in .json(Data("1".utf8)) }, shellCommands: [:],
+      allowedOrigin: "http://localhost:1420", onRequest: { requests += 1 })
     let preflight = FakeSchemeTask(path: "/__ipc/graph_open", method: "OPTIONS")
     route.start(SchemeTask(preflight))
+    XCTAssertEqual(requests, 0)
     XCTAssertEqual(preflight.response?.statusCode, 204)
     XCTAssertEqual(preflight.header("Access-Control-Allow-Origin"), "http://localhost:1420")
-    XCTAssertEqual(calls, [])
 
     let fake = await post(route, command: "graph_open")
     XCTAssertEqual(fake.header("Access-Control-Allow-Origin"), "http://localhost:1420")

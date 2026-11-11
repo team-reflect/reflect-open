@@ -23,13 +23,15 @@ final class AppSchemeHandlerTests: XCTestCase {
   func testRequestGoesToTheFirstMatchingRoute() {
     let ipc = RecordingRoute(pathPrefix: "/__ipc/")
     let http = RecordingRoute(pathPrefix: "/__http")
-    let handler = AppSchemeHandler(routes: [ipc, http])
+    let shadowed = RecordingRoute(pathPrefix: "/__ipc/")
+    let handler = AppSchemeHandler(routes: [ipc, http, shadowed])
 
     handler.webView(webView, start: FakeSchemeTask(path: "/__http?url=x"))
     handler.webView(webView, start: FakeSchemeTask(path: "/__ipc/settings_load"))
 
     XCTAssertEqual(ipc.started.count, 1)
     XCTAssertEqual(http.started.count, 1)
+    XCTAssertEqual(shadowed.started.count, 0)
   }
 
   func testStopReachesTheRouteTask() {
