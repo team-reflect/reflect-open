@@ -1,6 +1,8 @@
 # TDR 0003 — Mobile app shell: Tauri 2 mobile
 
-- **Status:** Accepted
+- **Status:** Superseded by [TDR 0005](./0005-swift-shell.md) for iOS. The
+  Tauri iOS shell stays the shipping iOS app until the Swift shell replaces
+  it.
 - **Date:** 2026-06-12
 - **Scope:** The shell technology for the Reflect mobile companion app (iOS
   first, Android shortly after). The v1 product scope is deliberately small

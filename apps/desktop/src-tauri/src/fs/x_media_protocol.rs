@@ -1,8 +1,9 @@
-use super::GraphState;
-use super::x_archive_store as archive;
+use reflect_core::Core;
+use reflect_core::fs::x_media_protocol::{XMediaFile, parse_x_media_path};
 use std::borrow::Cow;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::sync::Arc;
 use tauri::http::{Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, Runtime, UriSchemeResponder};
 
@@ -13,6 +14,9 @@ fn error(status: StatusCode) -> Response<Cow<'static, [u8]>> {
     builder
         .body(Cow::Borrowed(&[] as &[u8]))
         .expect("valid response")
+}
+fn status_code(status: u16) -> StatusCode {
+    StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
 }
 fn range(header: Option<&str>, length: u64) -> Result<Option<(u64, u64)>, ()> {
     let Some(header) = header else {
@@ -42,35 +46,17 @@ async fn serve<R: Runtime>(
     request: Request<Vec<u8>>,
     path: String,
 ) -> Response<Cow<'static, [u8]>> {
-    let segments: Vec<_> = path.split('/').collect();
-    if segments.len() != 4 || segments[1] != "x-media" {
-        return error(StatusCode::BAD_REQUEST);
-    }
-    let Ok(generation) = segments[0].parse::<u64>() else {
-        return error(StatusCode::BAD_REQUEST);
+    let media = match parse_x_media_path(&path) {
+        Ok(media) => media,
+        Err(status) => return error(status_code(status)),
     };
-    let post = segments[2].to_string();
-    let hash = segments[3].to_string();
-    if !archive::valid_id(&post) || !archive::valid_hash(&hash) {
-        return error(StatusCode::BAD_REQUEST);
-    }
     if request.method() != "GET" {
         return error(StatusCode::METHOD_NOT_ALLOWED);
     }
-    let Ok(root) = super::root_for_generation(&app.state::<GraphState>(), generation) else {
-        return error(StatusCode::FORBIDDEN);
-    };
-    let lookup_root = root.clone();
-    let source = tauri::async_runtime::spawn_blocking(move || {
-        archive::resource_url(&lookup_root, &post, &hash)
-    })
-    .await;
-    let Ok(Ok(source)) = source else {
-        return error(StatusCode::NOT_FOUND);
-    };
-    // Keep this request pending until the shared download publishes a complete file.
-    let Ok(receipt) = super::x_download::download(root.clone(), source).await else {
-        return error(StatusCode::BAD_GATEWAY);
+    let core = Arc::clone(app.state::<Arc<Core>>().inner());
+    let XMediaFile { root, receipt } = match core.x_media_file(media).await {
+        Ok(file) => file,
+        Err(status) => return error(status_code(status)),
     };
     let selected = match range(
         request

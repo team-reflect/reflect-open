@@ -4,7 +4,7 @@ User settings are one JSON document in the OS config dir, next to the recents
 store. It is never inside a graph's `.reflect/`: preferences follow the user
 across graphs and must survive graph deletion.
 
-- **Rust** (`apps/desktop/src-tauri/src/settings.rs`) persists the document as
+- **Rust** (`crates/core/src/settings.rs`) persists the document as
   an *opaque* JSON object. **You will not touch Rust to add a setting.**
 - **`@reflect/core`** owns the keys, defaults and validation
   (`packages/core/src/settings/schema.ts`) and the runtime document
