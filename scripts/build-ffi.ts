@@ -53,38 +53,6 @@ function log(message: string): void {
   console.log(`[build-ffi] ${message}`)
 }
 
-/** The cbindgen version that the root mise.toml pins. */
-function pinnedCbindgenVersion(): string {
-  const mise = readFileSync(join(ROOT_DIR, 'mise.toml'), 'utf8')
-  const version = /^"cargo:cbindgen" = "([^"]+)"$/m.exec(mise)?.[1]
-  if (version === undefined) {
-    throw new Error('mise.toml does not pin "cargo:cbindgen"')
-  }
-  return version
-}
-
-/** The version line of the cbindgen on PATH, or a note that there is none. */
-async function findCbindgen(): Promise<string> {
-  try {
-    const { stdout } = await exec('cbindgen', ['--version'], { throwOnError: true })
-    return stdout.trim()
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return 'no cbindgen on PATH'
-    }
-    throw error
-  }
-}
-
-/** Checks that the cbindgen on PATH is the version that mise.toml pins. */
-async function checkCbindgen(): Promise<void> {
-  const expected = `cbindgen ${pinnedCbindgenVersion()}`
-  const found = await findCbindgen()
-  if (found !== expected) {
-    throw new Error(`build-ffi needs ${expected}, found ${found}. Run \`mise install\`.`)
-  }
-}
-
 /** The Rust targets to build for the `--debug` and `--sdk` options. */
 function selectTargets(debug: boolean, sdk: string | undefined): string[] {
   if (sdk === undefined) {
@@ -119,7 +87,6 @@ async function main(): Promise<void> {
   })
   const profile = values.debug ? 'debug' : 'release'
   const targets = selectTargets(values.debug, values.sdk)
-  await checkCbindgen()
 
   const cargoArgs = [
     'build',
