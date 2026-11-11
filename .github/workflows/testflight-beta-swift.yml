@@ -4,6 +4,10 @@ name: TestFlight beta (Swift shell)
 # flavor and uploads it to the Reflect Beta TestFlight app, without a release.
 # The build keeps the version of the last release; its build number (the
 # commit count) tells it apart.
+#
+# `testflight-beta.yml` uploads the Tauri shell to the same app with the same
+# build number. App Store Connect takes one build per number, so run only one
+# of the two workflows for a commit.
 
 on:
   workflow_dispatch:
