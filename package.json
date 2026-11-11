@@ -38,7 +38,7 @@
     "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
-    "@ocavue/eslint-config": "^4.23.0",
+    "@ocavue/eslint-config": "^4.24.0",
     "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
     "eslint": "^10.14.0",
