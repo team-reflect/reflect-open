@@ -11,6 +11,8 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export function MobileDeepLinks({ children }: { children: ReactNode }): ReactElement {
   const { deepLinkIntake, logger } = useCoreServices()
+
+  // FIXME: do not use "[enabled] = useState(() => detectHostKind(window) === 'swift')". use the isSwiftMobile fact instead. const enabled = whateverService.platformFacts.isSwiftMobile something like this.
   const [enabled] = useState(() => detectHostKind(window) === 'swift')
 
   useEffect(() => {
