@@ -45,6 +45,9 @@ jobs:
         if: steps.changes.outputs.rust == 'true' || steps.changes.outputs.licenses == 'true'
         run: rustup toolchain install --no-self-update
 
+      - name: Generate WXT types
+        run: pnpm gen:wxt
+
       - name: Fix (TypeScript)
         run: pnpm run fix
 
