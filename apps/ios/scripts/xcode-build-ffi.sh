@@ -35,6 +35,7 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 
+# FIXME: I feel that xcode-build-ffi.sh and build-ffi.ts is too complex. Do we really need to support so many cases? simplify the logic and remove unnecessary code.
 args="--sdk ${PLATFORM_NAME:?}"
 if [ "${CONFIGURATION:?}" = "Debug-Dev" ] && [ "$PLATFORM_NAME" = "iphonesimulator" ]; then
   args="$args --debug"
