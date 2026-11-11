@@ -55,9 +55,10 @@ use reflect_graph_io::import::ImportCancel;
 pub trait Host: Send + Sync + 'static {
     /// Sends an event to the frontend.
     fn emit(&self, event: &str, payload: serde_json::Value);
-    /// Runs `task` on the main thread.
+    /// Runs `task` on the main thread. Can wait for the main thread.
     fn run_on_main(&self, task: Box<dyn FnOnce() + Send>) -> AppResult<()>;
-    /// Opens `url` with the system handler.
+    /// Opens `url` with the system handler. Can wait for the main thread, so
+    /// call it from a blocking-pool thread.
     fn open_url(&self, url: &str) -> AppResult<()>;
     /// Shows `path` selected in the system file manager.
     #[cfg(not(target_os = "ios"))]

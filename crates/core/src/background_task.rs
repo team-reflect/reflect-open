@@ -4,9 +4,11 @@
 //! suspension while SQLite or a file writer owns a lock is fatal (`0xdead10cc`),
 //! so native write commands can hold a [`ScopedBackgroundTask`] and the mobile
 //! frontend can bracket its whole background persistence flush through the two
-//! commands below. Each path has an isolated registry; within either registry,
-//! normal completion and UIKit's expiration callback race to remove the token,
-//! and only the winner ends the native assertion.
+//! commands below. Each path has an isolated registry. In the frontend
+//! registry, normal completion and UIKit's expiration callback race to remove
+//! the token, and only the winner ends the native assertion. In the scoped
+//! registry, the expiration callback waits for the guard to drop, so the
+//! assertion always ends after the lock is released.
 
 #[cfg(any(target_os = "ios", test))]
 use std::collections::HashMap;
@@ -14,7 +16,7 @@ use std::sync::Arc;
 #[cfg(any(target_os = "ios", test))]
 use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(any(target_os = "ios", test))]
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Condvar, Mutex, MutexGuard};
 
 use crate::Core;
 
@@ -26,6 +28,7 @@ type NativeIdentifier = usize;
 struct TaskRegistry {
     next_token: AtomicU64,
     tasks: Mutex<HashMap<String, Option<NativeIdentifier>>>,
+    removed: Condvar,
 }
 
 #[cfg(not(any(target_os = "ios", test)))]
@@ -62,11 +65,25 @@ impl TaskRegistry {
 
     /// Remove a token and return its identifier, if UIKit had assigned one.
     fn take(&self, token: &str) -> Option<NativeIdentifier> {
-        self.lock().remove(token).flatten()
+        let identifier = self.lock().remove(token).flatten();
+        self.removed.notify_all();
+        identifier
     }
 
     fn cancel(&self, token: &str) {
         self.lock().remove(token);
+        self.removed.notify_all();
+    }
+
+    /// Block until the owner of `token` removed it.
+    fn wait_until_removed(&self, token: &str) {
+        let mut tasks = self.lock();
+        while tasks.contains_key(token) {
+            tasks = self
+                .removed
+                .wait(tasks)
+                .unwrap_or_else(|poison| poison.into_inner());
+        }
     }
 }
 
@@ -81,7 +98,7 @@ pub struct BackgroundTaskState {
 
 impl BackgroundTaskState {
     fn begin_frontend(&self, name: &str) -> Option<String> {
-        platform::begin(Arc::clone(&self.frontend), name)
+        platform::begin(Arc::clone(&self.frontend), name, Expiration::End)
     }
 
     fn end_frontend(&self, token: &str) {
@@ -89,14 +106,20 @@ impl BackgroundTaskState {
     }
 }
 
+/// What UIKit's expiration callback does with an assertion.
+#[derive(Clone, Copy)]
+enum Expiration {
+    /// End the assertion at once.
+    End,
+    /// Block the main thread until the owner drops its guard, which ends the
+    /// assertion.
+    WaitForOwner,
+}
+
 /// RAII assertion for native operations that may own a file or SQLite lock.
-/// Expiration and `Drop` are idempotent through [`TaskRegistry::take`].
-///
-/// Current consumers are synchronous Tauri DB commands on iOS's main thread;
-/// UIKit also invokes expiration handlers on that thread, so expiration cannot
-/// end their assertion until the command returns and has released its SQLite
-/// lock. Do not use this guard for background-thread work without adding an
-/// expiration signal that cancels the operation before ending the assertion.
+/// Only `Drop` ends the assertion: UIKit's expiration callback blocks the
+/// main thread until then, so the operation releases its lock first on any
+/// thread. The operation must not wait for the main thread.
 pub struct ScopedBackgroundTask {
     registry: Arc<TaskRegistry>,
     token: Option<String>,
@@ -115,7 +138,7 @@ impl Drop for ScopedBackgroundTask {
 pub fn scoped(state: &BackgroundTaskState, name: &str) -> ScopedBackgroundTask {
     ScopedBackgroundTask {
         registry: Arc::clone(&state.scoped),
-        token: platform::begin(Arc::clone(&state.scoped), name),
+        token: platform::begin(Arc::clone(&state.scoped), name, Expiration::WaitForOwner),
     }
 }
 
@@ -145,14 +168,21 @@ mod platform {
     use objc2_foundation::NSString;
     use objc2_ui_kit::UIBackgroundTaskInvalid;
 
-    use super::{NativeIdentifier, TaskRegistry};
+    use super::{Expiration, NativeIdentifier, TaskRegistry};
 
-    pub fn begin(registry: Arc<TaskRegistry>, name: &str) -> Option<String> {
+    pub fn begin(
+        registry: Arc<TaskRegistry>,
+        name: &str,
+        expiration: Expiration,
+    ) -> Option<String> {
         let token = registry.reserve();
         let expiration_registry = Arc::clone(&registry);
         let expiration_token = token.clone();
-        let expiration_handler = RcBlock::new(move || {
-            end(&expiration_registry, &expiration_token);
+        let expiration_handler = RcBlock::new(move || match expiration {
+            Expiration::End => end(&expiration_registry, &expiration_token),
+            Expiration::WaitForOwner => {
+                expiration_registry.wait_until_removed(&expiration_token);
+            }
         });
         let task_name = NSString::from_str(name);
 
@@ -203,9 +233,13 @@ mod platform {
 mod platform {
     use std::sync::Arc;
 
-    use super::TaskRegistry;
+    use super::{Expiration, TaskRegistry};
 
-    pub fn begin(_registry: Arc<TaskRegistry>, _name: &str) -> Option<String> {
+    pub fn begin(
+        _registry: Arc<TaskRegistry>,
+        _name: &str,
+        _expiration: Expiration,
+    ) -> Option<String> {
         None
     }
 
@@ -214,6 +248,8 @@ mod platform {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::{BackgroundTaskState, TaskRegistry};
     use crate::Reply;
     use crate::test_support::core;
@@ -242,6 +278,31 @@ mod tests {
         registry.cancel(&token);
         registry.cancel(&token);
         assert_eq!(registry.take("not-issued"), None);
+    }
+
+    #[test]
+    fn expiration_of_a_scoped_assertion_waits_for_its_owner() {
+        let registry = Arc::new(TaskRegistry::default());
+        let token = registry.reserve();
+        assert!(registry.activate(&token, 42));
+        let (expired, did_expire) = std::sync::mpsc::channel();
+        let expiration = std::thread::spawn({
+            let registry = Arc::clone(&registry);
+            let token = token.clone();
+            move || {
+                registry.wait_until_removed(&token);
+                let _ = expired.send(());
+            }
+        });
+
+        assert!(
+            did_expire
+                .recv_timeout(std::time::Duration::from_millis(50))
+                .is_err()
+        );
+        assert_eq!(registry.take(&token), Some(42));
+        expiration.join().expect("the expiration thread panicked");
+        assert!(did_expire.try_recv().is_ok());
     }
 
     #[test]
