@@ -68,8 +68,11 @@ async function findCbindgen(): Promise<string> {
   try {
     const { stdout } = await exec('cbindgen', ['--version'], { throwOnError: true })
     return stdout.trim()
-  } catch {
-    return 'no cbindgen on PATH'
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return 'no cbindgen on PATH'
+    }
+    throw error
   }
 }
 
@@ -116,6 +119,7 @@ async function main(): Promise<void> {
   })
   const profile = values.debug ? 'debug' : 'release'
   const targets = selectTargets(values.debug, values.sdk)
+  await checkCbindgen()
 
   const cargoArgs = [
     'build',
@@ -142,7 +146,6 @@ async function main(): Promise<void> {
     },
   })
 
-  await checkCbindgen()
   await exec(
     'cbindgen',
     [

@@ -2,6 +2,11 @@
 
 lockfile_version = 4
 
+[[tools."cargo:cbindgen"]]
+version = "0.29.4"
+backend = "cargo:cbindgen"
+specifiers = ["0.29.4"]
+
 [[tools."github:Boshen/cargo-shear"]]
 version = "1.14.0"
 backend = "github:Boshen/cargo-shear"

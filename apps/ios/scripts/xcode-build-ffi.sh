@@ -19,7 +19,7 @@ cd "$(dirname "$0")/../../.."
 if [ -f apps/desktop/src-tauri/.xcode.env.local ]; then
   . apps/desktop/src-tauri/.xcode.env.local
 fi
-PATH="$PATH:$HOME/.cargo/bin:$HOME/.local/share/mise/shims"
+PATH="$HOME/.local/share/mise/shims:$PATH:$HOME/.cargo/bin"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "error: node not found; run \`pnpm install\` once from a terminal" >&2
