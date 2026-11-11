@@ -12,8 +12,6 @@
 - **Alternatives evaluated:** stay on Tauri iOS; UniFFI for the Swift to
   Rust boundary.
 
-<!--FIXME: check if there is any different and/or not-matching betweent the doc and the implement. Adress these issues if any -->
-
 ---
 
 ## TL;DR
@@ -41,10 +39,7 @@ implementation next to Tauri and the browser dev bridge.
 - A new crate `reflect-ffi` (`staticlib`) exposes a small C ABI: create and
   free a core, dispatch a command by name with JSON arguments, request
   headers, and an optional byte body, and register event and main-thread
-  callbacks. Headers carry the metadata of binary commands (the upload id of
-  `asset_upload_append`). `cbindgen`
-  generates the header. A script packs device and simulator builds into the
-  xcframework.
+  callbacks. The app links it as `ReflectCore.xcframework`.
 - **No UniFFI for now.** The caller of almost every command is the Web layer,
   so Swift should be a pipe: adding a command must need no Swift change.
   UniFFI generates Swift types, not TypeScript, so it adds a translation
@@ -56,9 +51,13 @@ implementation next to Tauri and the browser dev bridge.
 
 - The page loads from the custom scheme `reflect-app://localhost`.
 - JavaScript calls a command with `fetch` to `__ipc/<command>` on that
-  origin. A `WKURLSchemeHandler` passes the request to `reflect-core` on a
-  background thread and returns JSON or raw bytes.
-- The shell pushes events to the page with `callAsyncJavaScript`.
+  origin. A `WKURLSchemeHandler` answers it: `plugin:` and `host.` commands
+  run in the shell, every other command goes to `reflect-core` on a
+  background thread. The reply is JSON or raw bytes.
+- The same scheme proxies the app's HTTP requests (`__http`), and a second
+  scheme, `reflect-asset`, serves files of the graph.
+- The shell injects `window.__reflectHost` before any page script runs, and
+  delivers an event by evaluating a dispatch call on it.
 - Command names and the wire format do not change: `plugin:<name>|<cmd>`
   names stay, arguments are camelCase JSON, and errors are
   `{ kind, message }`.
@@ -73,23 +72,26 @@ implementation next to Tauri and the browser dev bridge.
 - One more host implementation: the `swift-*.ts` adapters sit in
   `apps/desktop/src/services/`, next to the Tauri and browser adapters, plus
   host detection at boot.
-- Business code does not change: `packages/core`, `packages/app`, and
-  `apps/desktop/src/mobile/` stay host-agnostic.
+- Business code stays host-agnostic: `packages/core`, `packages/app`, and
+  `apps/desktop/src/mobile/` do not call a shell. Where the mobile app must
+  differ in the Swift shell, it reads the `isSwiftMobile` platform fact.
 
 ### Settled details
 
 - **Shared Swift code:** the shell depends on the `apple/` Swift package.
-  Recording, App Store, and capture code exist only there. The Tauri plugins
-  and the Swift shell each add a thin adapter.
+  Recording and capture code exist only there; the Tauri plugin and the
+  Swift shell each add a thin adapter. The share extension, the widget, and
+  the App Intents are the same source files in both apps. The shell has its
+  own StoreKit code, because the Tauri app uses a third-party plugin for
+  purchases.
 - **Minimum iOS:** stays 16.0 (widget 16.2). The Vite target stays
   `safari16`.
 - **Identity and release:** the new shell ships first under the beta
-  identity `app.reflect.ios.beta`. The existing manual TestFlight workflow
-  stays as it is. A second manual workflow builds the new shell. The person
-  who runs a workflow picks the shell.
+  identity `app.reflect.ios.beta`: the manual TestFlight beta workflow builds
+  the Swift shell. Release builds of the stable identity stay on the Tauri
+  shell until the switch.
 - **Build number:** stays the commit count (`git rev-list --count HEAD`),
-  with no offset. Both workflows upload to the same beta record, so one
-  commit can go to TestFlight from only one of them.
+  with no offset.
 - **Origin change:** the move from `tauri://localhost` to
   `reflect-app://localhost` resets `localStorage` once. We accept this.
   The keys there are caches and once-per-period UI markers (subscription
@@ -132,31 +134,25 @@ implementation next to Tauri and the browser dev bridge.
 - **One more native codebase.** We maintain a Swift app in addition to the
   Tauri desktop shell. Policy stays in TypeScript and capabilities stay in
   Rust, so the shell stays small.
-- **Long-lived integration branch.** The work lands on a `swift` branch
-  that merges back to `master` once, after pre-merge validation. The core
-  extraction moves code that changes on `master`, so we merge `master` into
-  `swift` often.// FIXME: I do not think you need to meantion the `swift` branch here. This is just a detail of the implementation and it's useless for the decision record. Review the whole doc and cleanup any other implementation details that are not relevant to the decision record. The decision record should focus on the "what" and "why", not the "how".
 - **Yearly Xcode and iOS updates** are now ours. We no longer wait for tao
   and wry to adapt.
 
 ## Phased route
 
-1. **Prerequisites:** land the `apple/` Swift package with the shared Swift
-   code, extract `reflect-core` from the Tauri crate one domain at a time, add `reflect-ffi` and the xcframework build, add the
-   `swift-*.ts` adapters. No user-visible change. Desktop works after every
-   step.
-2. **Shell boots:** the Swift app loads the bundle, routes `__ipc`, serves
-   assets, proxies HTTP, and opens an iCloud graph. Daily note editing works
-   on a device.
-3. **Parity:** keyboard behaviour, plugins as Swift capabilities, StoreKit,
-   recording, share extension, widget, intents, flavors, Sentry, WebContent
-   recovery, and CI. The shell produces an uploadable IPA.
-4. **Pre-merge validation:** the `swift` branch is reviewed and merged to
-   `master`. The first TestFlight build of the new shell follows the merge.
+1. **Prerequisites:** the shared `apple/` Swift package, `reflect-core`
+   extracted from the Tauri crate, `reflect-ffi`, and the `swift-*.ts`
+   adapters. No user-visible change.
+2. **Shell boots:** the Swift app loads the bundle, answers commands, serves
+   assets, proxies HTTP, and opens an iCloud graph.
+3. **Parity:** keyboard behaviour, the plugins as Swift capabilities,
+   StoreKit, recording, share extension, widget, intents, flavors, Sentry,
+   WebContent recovery, and CI. The shell produces an uploadable IPA.
+4. **Beta:** TestFlight builds of the beta identity come from the Swift
+   shell.
 5. **Later:** native chrome (tab bar, navigation bar, native screens), then
    the switch of the stable identity `app.reflect.ios` to the Swift shell
-   and removal of the Tauri iOS code. // FIXME: I do not think you need to meantion the `swift` branch here. This is just a detail of the implementation and it's useless for the decision record. Review the whole doc and cleanup any other implementation details that are not relevant to the decision record. The decision record should focus on the "what" and "why", not the "how".
+   and removal of the Tauri iOS code.
 
-Until step 5, the Tauri iOS shell stays the shipping iOS app, and we can stop
-at any point. The core extraction and the extra host adapter keep their value
-for desktop either way.
+Until step 5, the Tauri iOS shell stays the shipping App Store app, and we
+can stop at any point. The core extraction and the extra host adapter keep
+their value for desktop either way.

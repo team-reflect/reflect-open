@@ -118,7 +118,8 @@ pnpm upload:testflight
 
 To ship the current `master` to Reflect Beta without a release, run the **TestFlight beta**
 workflow from the Actions tab. The build keeps the last release's version; its build number (the
-commit count) tells it apart.
+commit count) tells it apart. This workflow builds the Swift shell (`apps/ios`) with
+`pnpm build:ipa` and uploads it with `pnpm upload:testflight --swift`.
 
 ### Install
 
