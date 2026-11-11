@@ -9,6 +9,7 @@ import type {
 import { wikiNoteReference } from './note-reference.ts'
 import { isDaily, isTemplatePath, notePath } from './paths.ts'
 import type { MaybePromise } from '@reflect/utils'
+import { returnNull } from '@ocavue/utils'
 
 /**
  * The outcome of resolving an existing wiki target or safely creating it.
@@ -147,7 +148,7 @@ class NoteCreationServiceImpl implements NoteCreationService {
       slugForTitle(title),
       this.#newNoteSource(title, body),
       generation,
-      () => null,
+      returnNull,
     )
     return claimed.path
   }

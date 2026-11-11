@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { combineStores, deriveStore, WritableStore } from './store.ts'
+import { noop } from '@ocavue/utils'
 
 describe('WritableStore', () => {
   it('returns the value it holds', () => {
@@ -50,7 +51,7 @@ describe('WritableStore', () => {
   it('reports whether it has listeners', () => {
     const store = new WritableStore(1)
     expect(store.subscribed()).toBe(false)
-    const unlisten = store.subscribe(() => {})
+    const unlisten = store.subscribe(noop)
     expect(store.subscribed()).toBe(true)
     unlisten()
     expect(store.subscribed()).toBe(false)

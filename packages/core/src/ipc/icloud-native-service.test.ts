@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createICloudNativeService } from './icloud-native-service.ts'
+import { noop, returnNull } from '@ocavue/utils'
 
 function serviceOver(commands?: Record<string, (args: Record<string, unknown>) => unknown>) {
   const ipc = createTestIpcBridgeService({ commands })
@@ -18,8 +19,8 @@ describe('createICloudNativeService', () => {
       icloud_status: () => ({ available: true, documentsRoot: '/c', existingGraphRoots: [] }),
       icloud_adopt_graph: () => '/c/Notes',
       icloud_conflicts_scan: () => SWEEP,
-      icloud_watch_start: () => null,
-      icloud_watch_stop: () => null,
+      icloud_watch_start: returnNull,
+      icloud_watch_stop: returnNull,
       icloud_download_pending: () => 4,
       icloud_pending_count: () => 2,
       icloud_request_downloads: (args) => (args.paths as string[]).length,
@@ -102,7 +103,7 @@ describe('createICloudNativeService', () => {
     vi.spyOn(ipc, 'listen').mockRejectedValue(new Error('no events'))
     const icloud = createICloudNativeService({ ipc, logger })
 
-    icloud.subscribeWatchFailed(() => {})
+    icloud.subscribeWatchFailed(noop)
 
     await expect.poll(() => logger.getErrors()).toHaveLength(1)
   })

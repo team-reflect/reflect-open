@@ -29,6 +29,7 @@ import {
   createChatSessionService,
 } from './chat-session-service.ts'
 import { NO_REPLY_NOTICE, type ChatTurn } from './transcript.ts'
+import { sleep, noop } from '@ocavue/utils'
 
 /**
  * The session's lifecycle over in-memory services: resuming the latest
@@ -166,7 +167,7 @@ async function setup(options: SetupOptions = {}) {
  * Let the started promise chains (a resume, a save) run to their end.
  */
 async function flush(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await sleep(0)
 }
 
 describe('conversationTitle', () => {
@@ -647,7 +648,7 @@ describe('ChatSession graph binding', () => {
       signal = request.signal
       yield { type: 'text-delta', text: 'Hi' }
       // Never settles — the turn only ends through the abort signal.
-      await new Promise<never>(() => {})
+      await new Promise<never>(noop)
     })
     const detach = session.attach()
 

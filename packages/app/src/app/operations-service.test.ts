@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestOperationsService } from '../testing/operations.ts'
 import { LINGER_MS, MIN_VISIBLE_MS } from './operations-service.ts'
+import { noop } from '@ocavue/utils'
 
 describe('createOperationsService', () => {
   it('tracks start, progress, and done', async () => {
@@ -78,7 +79,7 @@ describe('createOperationsService', () => {
 
   it('stores optional metadata and can dismiss immediately', async () => {
     const operations = createTestOperationsService()
-    const action = { label: 'Install', run: () => {} }
+    const action = { label: 'Install', run: noop }
     const handle = operations.start('Install update', {
       description: 'Reflect 1.2.3 is ready.',
       persistent: true,

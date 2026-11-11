@@ -3,6 +3,7 @@ import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import type { IpcBridge } from '@reflect/core'
+import { noop } from '@ocavue/utils'
 
 /**
  * Adapts Tauri's IPC primitives to the `@reflect/core` bridge contract. This is
@@ -53,7 +54,7 @@ export function createTauriIpcTransport(): IpcBridge {
         // owner has already unmounted hit this (`listenNow` in core). The
         // teardown is benign, so swallow the rejection instead of letting it surface
         // as an unhandled promise rejection.
-        void Promise.resolve(unlisten() as MaybePromise<void>).catch(() => {})
+        void Promise.resolve(unlisten() as MaybePromise<void>).catch(noop)
       }
     },
     listenPlugin: async (plugin, event, handler) => {

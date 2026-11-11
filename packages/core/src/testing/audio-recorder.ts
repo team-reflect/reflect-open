@@ -15,6 +15,7 @@ import type {
 } from '../ipc/recording-plugin.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Unlisten } from '../unlisten.ts'
+import { returnFalse } from '@ocavue/utils'
 
 export type AudioRecorderCall =
   | { method: 'start'; options: StartRecordingOptions }
@@ -134,7 +135,7 @@ class TestAudioRecorderServiceImpl implements TestAudioRecorderService {
       this.#cancelHeldStart = () => {
         cancelled.resolve(true)
       }
-      const wasCancelled = await Promise.race([held.then(() => false), cancelled.promise])
+      const wasCancelled = await Promise.race([held.then(returnFalse), cancelled.promise])
       this.#cancelHeldStart = null
       if (wasCancelled) {
         return null

@@ -21,6 +21,7 @@ import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyStream, ESTIMATED_DAY_HEIGHT } from './daily-stream.tsx'
+import { noop } from '@ocavue/utils'
 
 /**
  * The stream's first-paint anchor: virtua must put the scroll element at the
@@ -51,7 +52,7 @@ function Stream({ children }: { children: ReactNode }): ReactElement {
 async function renderStream(children: ReactNode, clock: ClockService = createSystemClock()) {
   const core = createTestCoreServices({ database: createWasmTestDatabaseService(), clock })
   // Reads never resolve: every day stays a loading placeholder.
-  vi.spyOn(core.noteFile, 'read').mockReturnValue(new Promise(() => {}))
+  vi.spyOn(core.noteFile, 'read').mockReturnValue(new Promise(noop))
   return await renderInApp(<Stream>{children}</Stream>, {
     core,
     graph: { root: '/g', name: 'g', generation: 1 },

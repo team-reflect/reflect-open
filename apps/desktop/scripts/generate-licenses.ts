@@ -1,8 +1,7 @@
 // Regenerates `src/lib/licenses/licenses.gen.json`, the data behind
 // Settings → Open Source Licenses.
 //
-// Needs cargo-about on the PATH:
-// `cargo install --locked cargo-about@0.9.2 --features cli`
+// Needs cargo-about from `mise.toml` on the PATH (`mise install`).
 
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'

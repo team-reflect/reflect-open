@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createIapService } from './iap-service.ts'
+import { noop } from '@ocavue/utils'
 
 function setup(options?: { pluginEvents?: boolean }) {
   const ipc = createTestIpcBridgeService({ pluginEvents: options?.pluginEvents ?? true })
@@ -62,7 +63,7 @@ describe('IapService', () => {
 
   it('logs a purchaseUpdated registration the bridge cannot make', async () => {
     const { iap, logger } = setup({ pluginEvents: false })
-    iap.subscribePurchaseUpdated(() => {})
+    iap.subscribePurchaseUpdated(noop)
     await vi.waitFor(() => {
       expect(logger.getErrors().map((entry) => entry.message)).toEqual([
         'subscribing to purchaseUpdated failed',

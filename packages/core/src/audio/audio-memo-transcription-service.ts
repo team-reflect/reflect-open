@@ -39,6 +39,7 @@ import { WritableStore, type Store } from '../store.ts'
 import { wikiLinkSafe } from '../markdown/edit.ts'
 import { appendListItem } from '../markdown/task-ast.ts'
 import type { SettingsService } from '../settings/settings-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 /**
  * The category note every audio-memo section backlinks.
@@ -441,7 +442,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
         ? null
         : enrichmentConfig.id === config.id
           ? apiKey
-          : await aiCredentials.read(enrichmentConfig).catch(() => null)
+          : await aiCredentials.read(enrichmentConfig).catch(returnNull)
     const fallbackEnrichmentConfig = audioMemoEnrichmentConfig(config)
     const enrichmentCredentials: AudioMemoEnrichmentCredentials | null =
       enrichmentConfig !== null && enrichmentApiKey !== null

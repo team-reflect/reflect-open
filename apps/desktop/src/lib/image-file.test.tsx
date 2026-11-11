@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestImageCodec, type TestImageCodecService } from '@reflect/core/testing'
 import { toPortableImageFile } from './image-file.ts'
+import { returnNull } from '@ocavue/utils'
 
 let codec: TestImageCodecService
 
@@ -38,7 +39,7 @@ describe('toPortableImageFile', () => {
   })
 
   it('keeps the original when the webview cannot decode it', async () => {
-    installCodec({ size: () => null })
+    installCodec({ size: returnNull })
     const picked = new File(['not an image'], 'broken.heic', { type: 'image/heic' })
     expect(await toPortableImageFile(codec, picked)).toBe(picked)
   })

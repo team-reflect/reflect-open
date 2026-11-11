@@ -18,6 +18,7 @@ import {
 } from '@reflect/core/testing'
 import { createCommandService } from '../commands/command-service.ts'
 import { createPaletteSearchService } from './palette-search-service.ts'
+import { noop } from '@ocavue/utils'
 
 const NOON_JUNE_9 = new Date(2026, 5, 9, 12).getTime()
 
@@ -152,9 +153,9 @@ describe('PaletteSearchService', () => {
       id: 'theme.toggle',
       title: 'Toggle theme',
       keywords: ['dark'],
-      run: () => {},
+      run: noop,
     }
-    commands.register([{ id: 'nav.today', title: 'Go to today', run: () => {} }, toggleTheme])
+    commands.register([{ id: 'nav.today', title: 'Go to today', run: noop }, toggleTheme])
 
     const sections = service.sections({
       query: 'dark',

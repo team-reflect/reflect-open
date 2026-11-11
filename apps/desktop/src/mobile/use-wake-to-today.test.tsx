@@ -3,6 +3,7 @@ import type { ReactElement } from 'react'
 import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { useWakeToToday } from './use-wake-to-today.ts'
+import { sleep } from '@ocavue/utils'
 
 /**
  * V1's wake-to-today: foregrounding the app on a later calendar date than it
@@ -42,7 +43,7 @@ describe('useWakeToToday', () => {
     view.core.clock.setNow(new Date(2026, 5, 12, 23, 30, 0).getTime()) // later the same evening
     view.core.activity.emitVisible()
 
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await sleep(50)
     await expect.element(view.getByRole('status')).toMatchTextContent('daily:2026-06-10')
   })
 })

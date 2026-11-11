@@ -7,6 +7,7 @@ import {
   createAppStoreEnvironmentService,
   type AppStoreEnvironmentService,
 } from './app-store-environment-service.ts'
+import { noop } from '@ocavue/utils'
 
 let storage: TestStorageService
 /**
@@ -92,7 +93,7 @@ describe('AppStoreEnvironmentService', () => {
     await service().environment()
     expect(remembered()).toBe(JSON.stringify('Sandbox'))
 
-    probe = () => new Promise(() => {})
+    probe = () => new Promise(noop)
     expect(service().get()).toEqual({ value: 'Sandbox', isLoading: false, isError: false })
   })
 
@@ -135,7 +136,7 @@ describe('AppStoreEnvironmentService', () => {
   it('probes again after `invalidate` while subscribed', async () => {
     const environment = service()
     await environment.environment()
-    environment.subscribe(() => {})
+    environment.subscribe(noop)
 
     probe = () => Promise.resolve('Sandbox')
     environment.invalidate()
@@ -164,7 +165,7 @@ describe('AppStoreEnvironmentService', () => {
   it('stops probing on `invalidate` once the last subscriber leaves', async () => {
     const environment = service()
     await environment.environment()
-    const unsubscribe = environment.subscribe(() => {})
+    const unsubscribe = environment.subscribe(noop)
 
     unsubscribe()
     unsubscribe()

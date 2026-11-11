@@ -11,6 +11,7 @@ import {
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { CalendarIntegrationField } from './calendar-integration-field.tsx'
+import { noop } from '@ocavue/utils'
 
 const CALENDARS = [
   { id: 'cal-work', title: 'Work', source: 'Google', color: '#ff0000' },
@@ -76,7 +77,7 @@ describe('CalendarIntegrationField', () => {
   it('shows nothing (not "No calendars found") while the list is still loading', async () => {
     stored = { calendarEnabled: true }
     calendar.setStatus('fullAccess')
-    vi.spyOn(calendar, 'listCalendars').mockReturnValue(new Promise(() => {}))
+    vi.spyOn(calendar, 'listCalendars').mockReturnValue(new Promise(noop))
     await renderSection()
 
     await expect.element(calendarSwitch()).toHaveAttribute('aria-checked', 'true')

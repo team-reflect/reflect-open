@@ -5,6 +5,7 @@ import {
   isTranscriptionRejected,
   send,
 } from './transcribe-http.ts'
+import { returnTrue } from '@ocavue/utils'
 
 const googleInvalidKey = JSON.stringify({
   error: {
@@ -71,7 +72,7 @@ describe('send', () => {
       return Promise.resolve(new Response('ok'))
     }) as typeof fetch
     await expect(
-      send(fetchFn, 'https://provider.test', {}, { isStale: () => true }),
+      send(fetchFn, 'https://provider.test', {}, { isStale: returnTrue }),
     ).rejects.toThrow(/session ended/)
     expect(called).toBe(false)
   })

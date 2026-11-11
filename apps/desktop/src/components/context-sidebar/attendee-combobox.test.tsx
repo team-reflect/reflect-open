@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AttendeeCombobox } from './attendee-combobox.tsx'
+import { noop } from '@ocavue/utils'
 
 // The note suggestions are the seam: one case needs a fetch that never settles.
 const suggestWikiTargets = vi.fn<SuggestionService['suggestWikiTargets']>(() => [])
@@ -141,7 +142,7 @@ describe('AttendeeCombobox', () => {
     // Keep typing: the popover still shows the previous query's rows
     // (keepPreviousData) while the new fetch hangs. Enter must take the
     // live text, not the stale highlighted suggestion.
-    suggestWikiTargets.mockReturnValue(new Promise(() => {}))
+    suggestWikiTargets.mockReturnValue(new Promise(noop))
     await input.fill('Adam Smith')
     await userEvent.keyboard('{Enter}')
 

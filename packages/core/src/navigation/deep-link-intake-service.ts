@@ -10,6 +10,7 @@ import type { IndexQueryService } from '../indexing/index-query-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { DeepLinkPlace } from './deep-link.ts'
 import { parseDeepLink } from './deep-link-parse.ts'
+import { noop } from '@ocavue/utils'
 
 /**
 
@@ -34,7 +35,7 @@ export interface DeepLinkSource {
  */
 export function createNoDeepLinkSource(): DeepLinkSource {
   return {
-    onOpenUrl: () => Promise.resolve(() => {}),
+    onOpenUrl: () => Promise.resolve(noop),
     getCurrent: () => Promise.resolve(null),
   }
 }

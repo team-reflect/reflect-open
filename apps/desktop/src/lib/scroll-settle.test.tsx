@@ -3,6 +3,7 @@ import { userEvent } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
+import { sleep, returnTrue } from '@ocavue/utils'
 
 /**
  * Settle reports for a native scroller: one report per scroll, never while a
@@ -82,7 +83,7 @@ describe('watchScrollSettle', () => {
     element.scrollLeft = 50
     await scrollElement({ element, left: 0 })
     // Longer than the quiet time, so only the touchend can report.
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(onSettle).not.toHaveBeenCalled()
 
     await touch(element, 'end')
@@ -97,7 +98,7 @@ describe('watchScrollSettle', () => {
       element,
       onSettle,
       signal: listeners.controller.signal,
-      isSettled: () => true,
+      isSettled: returnTrue,
     })
 
     element.dispatchEvent(new Event('scroll'))
@@ -158,7 +159,7 @@ describe('watchScrollSettle', () => {
     await scrollElement({ element, left: 1, touch: true })
     expect(onSettle).toHaveBeenCalledOnce()
 
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     await scrollElement({ element, left: 0 })
 
     expect(onSettle).toHaveBeenCalledTimes(2)
@@ -271,7 +272,7 @@ describe('watchScrollSettle', () => {
 
       expect(element.scrollLeft).toBe(0)
       expect(onClick).toHaveReturnedWith(false)
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await sleep(200)
       expect(onSettle).not.toHaveBeenCalled()
     })
 
@@ -303,7 +304,7 @@ describe('watchScrollSettle', () => {
       // A second press during the release scroll.
       await mouse.down()
       await mouseTo(element, 5)
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await sleep(200)
 
       expect(watch.isTouching()).toBe(true)
       expect(onSettle).not.toHaveBeenCalled()
@@ -425,7 +426,7 @@ describe('watchScrollSettle', () => {
 
     element.scrollLeft = 50
 
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(onSettle).not.toHaveBeenCalled()
   })
 })

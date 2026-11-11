@@ -15,6 +15,7 @@ import type {
 } from '@reflect/core'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useSelector } from '@/lib/use-store.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The mobile React surface for audio memos: a thin shell over the
@@ -93,11 +94,11 @@ function selectHasTranscriptionConfig(
   return state.hasTranscriptionConfig
 }
 
-const CLOSED_TICK: Store<number> = { get: () => 0, subscribe: () => () => {} }
+const CLOSED_TICK: Store<number> = { get: () => 0, subscribe: () => noop }
 
 const CLOSED_SESSION: MobileAudioMemoSessionStores = {
   get: () => CLOSED_STATE,
-  subscribe: () => () => {},
+  subscribe: () => noop,
   elapsedMs: CLOSED_TICK,
   level: CLOSED_TICK,
 }

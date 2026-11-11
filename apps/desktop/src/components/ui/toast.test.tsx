@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, vi } from 'vitest'
 import { Toaster, toast } from './toast.tsx'
+import { noop } from '@ocavue/utils'
 
 /**
  * The stacking transforms are arbitrary-value classes, so neither typecheck
@@ -18,7 +19,7 @@ function addSampleToasts(): void {
     description: 'persistent, non-dismissible',
     timeout: 0,
     data: { dismissible: false },
-    actionProps: { children: 'Install', onClick: () => {} },
+    actionProps: { children: 'Install', onClick: noop },
   })
 }
 

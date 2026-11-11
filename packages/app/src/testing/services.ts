@@ -21,6 +21,7 @@ import {
   createTestSystemPreferencesService,
   type TestSystemPreferencesService,
 } from './system-preferences.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * {@link AppServices} where each service with a test double is that double.
@@ -58,7 +59,7 @@ export function createTestAppHost(overrides: Partial<AppHost> = {}): AppHost {
     lifecycle: createTestLifecycleService(),
     operations: createTestOperationsService(),
     clipboard: createTestClipboardService(),
-    opener: { openUrl: () => {}, revealItemInDir: () => {} },
+    opener: { openUrl: noop, revealItemInDir: noop },
     ...overrides,
   }
 }

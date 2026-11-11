@@ -2,6 +2,7 @@ import { page, userEvent } from 'vitest/browser'
 import { describe, expect, it, vi } from 'vitest'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MonthPickerDrawer } from './month-picker-drawer.tsx'
+import { noop } from '@ocavue/utils'
 
 /**
  * The month title's picker sheet: a year pager over a twelve-month grid.
@@ -14,7 +15,7 @@ async function mount(overrides: Partial<Parameters<typeof MonthPickerDrawer>[0]>
   const view = await renderInApp(
     <MonthPickerDrawer
       open
-      onOpenChange={() => {}}
+      onOpenChange={noop}
       month="2026-06"
       selected="2026-06"
       today="2026-07"
@@ -68,11 +69,11 @@ describe('MonthPickerDrawer', () => {
     await view.rerender(
       <MonthPickerDrawer
         open={false}
-        onOpenChange={() => {}}
+        onOpenChange={noop}
         month="2026-06"
         selected="2026-06"
         today="2026-07"
-        onPick={() => {}}
+        onPick={noop}
       />,
     )
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
@@ -80,11 +81,11 @@ describe('MonthPickerDrawer', () => {
     await view.rerender(
       <MonthPickerDrawer
         open
-        onOpenChange={() => {}}
+        onOpenChange={noop}
         month="2026-06"
         selected="2026-06"
         today="2026-07"
-        onPick={() => {}}
+        onPick={noop}
       />,
     )
     await expect.element(page.getByText('2026')).toBeVisible()

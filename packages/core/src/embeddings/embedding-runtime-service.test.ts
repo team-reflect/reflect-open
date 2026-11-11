@@ -3,6 +3,7 @@ import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 
 import { createEmbeddingRuntimeService, type EmbedStatus } from './embedding-runtime-service.ts'
+import { noop, sleep } from '@ocavue/utils'
 
 const READY: EmbedStatus = { status: 'ready', model: 'all-MiniLM-L6-v2' }
 const LOADING: EmbedStatus = { status: 'loading' }
@@ -65,9 +66,9 @@ describe('createEmbeddingRuntimeService', () => {
     const stop = vi.fn()
     const listen = vi.spyOn(ipc, 'listen').mockResolvedValue(stop)
 
-    const first = runtime.subscribe(() => {})
-    const second = runtime.subscribe(() => {})
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    const first = runtime.subscribe(noop)
+    const second = runtime.subscribe(vi.fn())
+    await sleep(0)
     first()
     first()
     expect(listen).toHaveBeenCalledTimes(1)
@@ -79,7 +80,7 @@ describe('createEmbeddingRuntimeService', () => {
 
   it('logs an invalid status event', () => {
     const { ipc, logger, runtime } = setup()
-    runtime.subscribe(() => {})
+    runtime.subscribe(noop)
     ipc.emit('embed:status', { status: 'mystery' })
 
     expect(runtime.get()).toEqual({ status: 'uninitialized' })
@@ -90,7 +91,7 @@ describe('createEmbeddingRuntimeService', () => {
     const { ipc, logger } = setup()
     vi.spyOn(ipc, 'listen').mockRejectedValue(new Error('no events'))
     const runtime = createEmbeddingRuntimeService({ ipc, logger })
-    runtime.subscribe(() => {})
+    runtime.subscribe(noop)
     await vi.waitFor(() => expect(logger.getWarnings()).toHaveLength(1))
   })
 
