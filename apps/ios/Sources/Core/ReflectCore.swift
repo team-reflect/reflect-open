@@ -134,8 +134,11 @@ final class ReflectCore: Sendable {
   }
 
   /// The JSON answer of `reflect_core_asset_resolve`: `{path, mime}` or
-  /// `{kind, message, status}`. It reads the file, so it can block.
-  func resolveAssetJSON(_ generation: UInt64, _ path: String, _ rasterOnly: Bool) -> Data {
+  /// `{kind, message, status}`. It reads the first bytes of the file, so it
+  /// blocks the calling thread while iCloud downloads the file.
+  func resolveAssetJSONBlocking(_ generation: UInt64, _ path: String, _ rasterOnly: Bool)
+    -> Data
+  {
     guard let json = reflect_core_asset_resolve(handle, generation, path, rasterOnly) else {
       return Data()
     }

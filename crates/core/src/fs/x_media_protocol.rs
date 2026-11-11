@@ -8,6 +8,8 @@ use std::path::PathBuf;
 use reflect_graph_io::root_for_generation;
 use reflect_graph_io::x_archive_store as archive;
 
+use reflect_types::AppError;
+
 use crate::Core;
 
 /// HTTP status for a malformed request path.
@@ -16,6 +18,8 @@ pub const STATUS_BAD_REQUEST: u16 = 400;
 pub const STATUS_FORBIDDEN: u16 = 403;
 /// HTTP status for a post or resource the archive does not hold.
 pub const STATUS_NOT_FOUND: u16 = 404;
+/// HTTP status for a file path that cannot be resolved.
+pub const STATUS_INTERNAL_ERROR: u16 = 500;
 /// HTTP status for a failed media download.
 pub const STATUS_BAD_GATEWAY: u16 = 502;
 
@@ -75,6 +79,8 @@ pub enum XMediaResolved {
 impl Core {
     /// Resolves the percent-decoded request path `<generation>/x-media/<post>/<hash>`
     /// for a shell that reads the file itself. It waits like [`Core::x_media_file`].
+    /// `bytes` is the length of the complete file: a file of another length
+    /// changed after the download.
     pub async fn x_media_resolve(&self, path: String) -> XMediaResolved {
         let request = match parse_x_media_path(&path) {
             Ok(request) => request,
@@ -84,14 +90,21 @@ impl Core {
             Ok(file) => file,
             Err(status) => return XMediaResolved::Refused { status },
         };
-        match reflect_graph_io::resolve(&root, &format!("assets/x/{}", receipt.name)) {
+        let relative = format!("assets/x/{}", receipt.name);
+        let path = self
+            .spawn_blocking(move || reflect_graph_io::resolve(&root, &relative))
+            .await;
+        match path {
             Ok(path) => XMediaResolved::File {
                 path,
                 mime: receipt.mime,
                 bytes: receipt.bytes,
             },
-            Err(_) => XMediaResolved::Refused {
+            Err(AppError::Traversal { .. }) => XMediaResolved::Refused {
                 status: STATUS_FORBIDDEN,
+            },
+            Err(_) => XMediaResolved::Refused {
+                status: STATUS_INTERNAL_ERROR,
             },
         }
     }

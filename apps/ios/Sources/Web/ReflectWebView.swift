@@ -5,8 +5,7 @@ import WebKit
 @MainActor
 final class ReflectWebView: WKWebView {
   init(
-    routes: [any SchemeRoute] = [], assets: AssetSchemeHandler? = nil,
-    bridge: HostBridge = HostBridge()
+    routes: [any SchemeRoute], assets: AssetSchemeHandler, bridge: HostBridge
   ) {
     let configuration = WKWebViewConfiguration()
     configuration.setURLSchemeHandler(

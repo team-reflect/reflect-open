@@ -65,6 +65,13 @@ final class AssetSchemeHandlerTests: XCTestCase {
     XCTAssertEqual(fake.response?.statusCode, 403)
   }
 
+  func testAFileOfAnotherLengthIs500() async {
+    let fake = await get(resolution: .file(path: fileURL.path, mime: "video/mp4", length: 5))
+    XCTAssertEqual(fake.response?.statusCode, 500)
+    let same = await get(resolution: .file(path: fileURL.path, mime: "video/mp4", length: 600_000))
+    XCTAssertEqual(same.response?.statusCode, 200)
+  }
+
   func testAMissingFileIs404() async {
     let fake = await get(resolution: .file(path: "/no/such/file", mime: "image/png"))
     XCTAssertEqual(fake.response?.statusCode, 404)

@@ -2,8 +2,9 @@ import Foundation
 import WebKit
 
 /// The file that an asset request names, or the HTTP status to refuse it with.
+/// `length` is the length the file must have, when the resolver knows it.
 enum AssetResolution: Sendable, Equatable {
-  case file(path: String, mime: String)
+  case file(path: String, mime: String, length: UInt64? = nil)
   case refused(status: Int)
 }
 
@@ -58,8 +59,8 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
       switch await resolve(requestPath, rasterOnly) {
       case .refused(let status):
         Self.refuse(task, status: status)
-      case .file(let path, let mime):
-        await Self.serve(path: path, mime: mime, rangeHeader: range, to: task)
+      case .file(let path, let mime, let length):
+        await Self.serve(path: path, mime: mime, length: length, rangeHeader: range, to: task)
       }
     }
   }
@@ -106,10 +107,14 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
   }
 
   private static func serve(
-    path: String, mime: String, rangeHeader: String?, to task: SchemeTask
+    path: String, mime: String, length: UInt64?, rangeHeader: String?, to task: SchemeTask
   ) async {
     guard let file = await AssetFile.open(path: path) else {
       refuse(task, status: 404)
+      return
+    }
+    if let length, file.length != length {
+      refuse(task, status: 500)
       return
     }
     var headers = ["Content-Type": mime, "Accept-Ranges": "bytes"]
