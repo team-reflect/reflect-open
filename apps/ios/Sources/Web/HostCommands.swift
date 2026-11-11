@@ -6,7 +6,6 @@ import os
 enum HostCommands {
   private static let webLogger = Logger(
     subsystem: Bundle.main.bundleIdentifier ?? "app.reflect.ios", category: "web")
-  private static let null = CoreReply.json(Data("null".utf8))
   /// Keeps the file writes of `host.log` in order and off the main thread.
   private static let logQueue = DispatchQueue(label: "app.reflect.host-log", qos: .utility)
 
@@ -20,7 +19,7 @@ enum HostCommands {
       "host.deep_link_pending": { _ in
         guard let urls = deepLinks.takePending(),
           let json = try? JSONSerialization.data(withJSONObject: urls)
-        else { return null }
+        else { return .null }
         return .json(json)
       },
     ]
@@ -33,7 +32,7 @@ enum HostCommands {
       var level: String
       var message: String
     }
-    guard let args = try? JSONDecoder().decode(Args.self, from: request.args) else {
+    guard let args = request.decodeArgs(Args.self) else {
       return .error(kind: "parse", message: "host.log takes {level, message}")
     }
     let level: ReflectCore.LogLevel
@@ -51,7 +50,7 @@ enum HostCommands {
     logQueue.async {
       ReflectCore.log(level, args.message)
     }
-    return null
+    return .null
   }
 
   /// `host.open_url {url}`: opens a URL with the system handler.
@@ -61,7 +60,7 @@ enum HostCommands {
     struct Args: Decodable {
       var url: String
     }
-    guard let args = try? JSONDecoder().decode(Args.self, from: request.args),
+    guard let args = request.decodeArgs(Args.self),
       let url = URL(string: args.url), url.scheme != nil
     else {
       return .error(kind: "parse", message: "host.open_url takes {url} with an absolute URL")
@@ -69,6 +68,6 @@ enum HostCommands {
     guard await openURL(url) else {
       return .error(kind: "io", message: "no app opens \(args.url)")
     }
-    return null
+    return .null
   }
 }

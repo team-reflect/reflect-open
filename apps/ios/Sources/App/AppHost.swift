@@ -1,3 +1,4 @@
+import AuthenticationServices
 import UIKit
 import os
 
@@ -13,6 +14,7 @@ final class AppHost {
   private let bridge = HostBridge()
   private let deepLinks: DeepLinks
   private let navigation: ExternalNavigation
+  private let webAuth: WebAuthCapability
   private var eventPump: Task<Void, Never>?
 
   init() throws {
@@ -27,6 +29,12 @@ final class AppHost {
     var shellCommands = HostCommands.all(deepLinks: deepLinks) { url in
       await UIApplication.shared.open(url)
     }
+    // The web view exists only after the commands: the sign-in sheet reads its window later.
+    weak var presenter: UIView?
+    let webAuth = WebAuthCapability { presenter?.window ?? ASPresentationAnchor() }
+    self.webAuth = webAuth
+    shellCommands.merge(HapticsCapability.commands) { _, new in new }
+    shellCommands.merge(webAuth.commands) { _, new in new }
     var routes: [any SchemeRoute] = []
     #if DEBUG
     shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
@@ -45,6 +53,7 @@ final class AppHost {
       await core.resolveAsset(requestPath: requestPath, rasterOnly: rasterOnly)
     }
     webView = ReflectWebView(routes: routes, assets: assets, bridge: bridge)
+    presenter = webView
 
     navigation = ExternalNavigation(startURL: startURL) { url in
       UIApplication.shared.open(url)
