@@ -3,9 +3,9 @@
 # target/apple/ReflectCore.xcframework through scripts/build-ffi.ts for the
 # SDK of the current build. A Debug build uses the dev profile.
 #
-# The Reflect scheme also runs this script as a build pre-action when the
-# xcframework is missing: Xcode looks for it while it plans the build, before
-# any build phase runs.
+# The Reflect scheme also runs this script as a build pre-action: Xcode reads
+# the xcframework and its header while it plans the build, before any build
+# phase runs.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
