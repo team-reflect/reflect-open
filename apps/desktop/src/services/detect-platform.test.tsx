@@ -32,6 +32,14 @@ describe('detectPlatformFacts', () => {
     expect(facts.surface).toEqual(MOBILE_SURFACE)
   })
 
+  it.each([
+    ['tauri', { isNativeShell: true, isSwiftMobile: false }],
+    ['swift', { isNativeShell: true, isSwiftMobile: true }],
+    ['browser', { isNativeShell: false, isSwiftMobile: false }],
+  ] as const)('names the shell of a %s host', (hostKind, expected) => {
+    expect(detectPlatformFacts(hostKind)).toMatchObject(expected)
+  })
+
   it('is the desktop surface in plain-browser dev', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', '')
     const facts = detectPlatformFacts('browser')
