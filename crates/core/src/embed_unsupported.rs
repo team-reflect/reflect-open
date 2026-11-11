@@ -25,12 +25,12 @@ impl Core {
         Ok(EmbedStatus::Unsupported)
     }
 
-    pub fn embed_ensure(&self) -> AppResult<EmbedStatus> {
+    pub async fn embed_ensure(&self) -> AppResult<EmbedStatus> {
         Ok(EmbedStatus::Unsupported)
     }
 
     /// Fails loudly: the frontend never embeds on an `unsupported` runtime.
-    pub fn embed_texts(&self) -> AppResult<()> {
+    pub async fn embed_texts(&self, _texts: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
         Err(AppError::Unknown {
             message: "the embedding runtime is not supported on this platform".into(),
         })
