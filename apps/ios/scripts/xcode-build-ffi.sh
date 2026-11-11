@@ -28,4 +28,5 @@ fi
 # DEVELOPER_DIR stays, so the Rust build uses the Xcode that runs this build.
 exec env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   ${DEVELOPER_DIR:+DEVELOPER_DIR="$DEVELOPER_DIR"} \
+  ${CARGO_PROFILE_RELEASE_DEBUG:+CARGO_PROFILE_RELEASE_DEBUG="$CARGO_PROFILE_RELEASE_DEBUG"} \
   node scripts/build-ffi.ts "${args[@]}"

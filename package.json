@@ -8,6 +8,7 @@
     "dev:web": "pnpm --filter @reflect/desktop dev",
     "build": "turbo run build",
     "build:ios": "pnpm --filter @reflect/desktop build:ios",
+    "build:ipa": "pnpm --filter @reflect/desktop build:ipa",
     "build:ffi": "node scripts/build-ffi.ts",
     "build:linux": "pnpm --filter @reflect/desktop build:linux",
     "build:macos": "pnpm --filter @reflect/desktop build:macos",

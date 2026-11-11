@@ -23,6 +23,7 @@ jobs:
       test-chromium: ${{ steps.classify.outputs.test-chromium }}
       test-webkit: ${{ steps.classify.outputs.test-webkit }}
       test-swift: ${{ steps.classify.outputs.test-swift }}
+      test-ios: ${{ steps.classify.outputs.test-ios }}
       lint-rust: ${{ steps.classify.outputs.lint-rust }}
       test-rust: ${{ steps.classify.outputs.test-rust }}
     steps:
@@ -75,6 +76,7 @@ jobs:
             '*.swift'
             '.swift-format'
             'apple/*'
+            'apps/ios/*'
             'apps/desktop/src-tauri/safari-extension/*'
           )
 
@@ -110,6 +112,7 @@ jobs:
             echo "test-chromium=$js"
             echo "test-webkit=$([[ $js == true && $PR_IS_DRAFT == false ]] && echo true || echo false)"
             echo "test-swift=$swift"
+            echo "test-ios=$swift"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
@@ -247,6 +250,39 @@ jobs:
         working-directory: apple
         run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
 
+  # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
+  test-ios:
+    needs: classify
+    if: needs.classify.outputs.test-ios == 'true'
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-xcode
+
+      - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/setup-rust
+        with:
+          cache-key: test-ios
+
+      - uses: ./.github/actions/setup-mise
+
+      - name: Build the web app
+        run: pnpm --filter @reflect/ios build:web
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project apps/ios/Reflect.xcodeproj \
+            -scheme Reflect \
+            -configuration Debug-Dev \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
+
   lint-rust:
     needs: classify
     if: needs.classify.outputs.lint-rust == 'true'
@@ -337,6 +373,7 @@ jobs:
       - test-node
       - test-chromium
       - test-swift
+      - test-ios
       - lint-rust
       - test-rust
 
