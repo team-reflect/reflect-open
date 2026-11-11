@@ -74,6 +74,7 @@ export function detectHostKind(globals: HostGlobals): HostKind {
   if (globals.isTauri === true) {
     return 'tauri'
   }
+  // DO we need to do this at runtime? Cannot we just use some kind of `import.meta.env.XXXXX` to detect? FIXME
   if (globals.__reflectHost !== undefined) {
     return 'swift'
   }
