@@ -21,6 +21,7 @@ import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GithubAuthStep } from './github-auth-step.tsx'
+import { noop, sleep } from '@ocavue/utils'
 
 // The device flow leads and the PAT path sits behind a "use a personal access
 // token instead" toggle. The
@@ -71,7 +72,7 @@ async function renderCodeView(): Promise<void> {
   fakeKeychain()
   mockFlow.mockImplementation(async (options) => {
     options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
-    return await new Promise(() => {}) // polling stays in flight
+    return await new Promise(noop) // polling stays in flight
   })
   await renderStep(<GithubAuthStep onAuthed={vi.fn()} />)
   await userEvent.click(page.getByRole('button', { name: 'Sign in with GitHub' }))
@@ -172,7 +173,7 @@ describe('GithubAuthStep', () => {
     // PAT meanwhile. Both paths complete — but the parent connects on every
     // onAuthed, so the late probe must be swallowed, not start a second run.
     fakeKeychain({ 'github-auth': JSON.stringify({ kind: 'pat', token: 'ghp_old' }) })
-    let resolveProbe: (response: Response) => void = () => {}
+    let resolveProbe: (response: Response) => void = noop
     let probes = 0
     http.on('GET', USER_URL, () => {
       probes += 1
@@ -198,7 +199,7 @@ describe('GithubAuthStep', () => {
         headers: { 'Content-Type': 'application/json' },
       }),
     )
-    await new Promise((resolve) => setTimeout(resolve, 0)) // flush the probe's chain
+    await sleep(0) // flush the probe's chain
     expect(onAuthed).toHaveBeenCalledTimes(1)
   })
 

@@ -3,6 +3,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import type { Unlisten } from '../unlisten.ts'
 import type { AudioRecorderFinalSegment, AudioRecorderService } from './audio-recorder-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * How long the recording UI must survive before a delivered native action is
@@ -66,7 +67,7 @@ class NativeActionServiceImpl implements NativeActionService {
   open(handler: NativeRecordActionHandler): Unlisten {
     const { audioRecorder, clock, platform, logger } = this.#deps
     if (!platform.isNativeShell) {
-      return () => {}
+      return noop
     }
     let disposed = false
     const stopped = new AbortController()

@@ -4,6 +4,7 @@ import type { ClockService } from '../ports/clock-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import { base64ToBytes, blobChunks, bytesToBase64 } from '@reflect/utils'
+import { noop } from '@ocavue/utils'
 
 /**
 
@@ -209,7 +210,7 @@ class AssetStoreServiceImpl implements AssetStoreService {
     } catch (error) {
       // Best-effort cleanup of the staged temp file; the original error is the
       // one worth surfacing.
-      await ipc.call('asset_upload_abort', { id }, voidSchema).catch(() => {})
+      await ipc.call('asset_upload_abort', { id }, voidSchema).catch(noop)
       throw error
     }
   }

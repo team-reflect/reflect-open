@@ -4,6 +4,7 @@ import { isModEvent } from '@meowdown/core'
 import type { BacklinkSource } from '@/lib/group-backlinks.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { BacklinkSourceGroup } from './backlink-source-group.tsx'
+import { noop } from '@ocavue/utils'
 
 const SOURCE: BacklinkSource = {
   path: 'notes/source.md',
@@ -20,7 +21,7 @@ function mount(onOpen: OnOpen) {
       first
       expanded={false}
       onOpen={onOpen}
-      onWikilinkClick={() => {}}
+      onWikilinkClick={noop}
     />,
   )
 }

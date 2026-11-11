@@ -11,6 +11,7 @@ import type { Unlisten } from '../unlisten.ts'
 import type { FileChange, FileChangeService } from './file-change-service.ts'
 import { createNoteIndexer, type IndexingDeps, type NoteIndexer } from './indexer.ts'
 import { createLiveIndex, type LiveIndex } from './live.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * Stage of the index lifecycle that failed.
@@ -461,11 +462,11 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   async stop(): Promise<void> {
     this.#abort?.abort()
-    await this.#done.catch(() => {})
+    await this.#done.catch(noop)
   }
 
   async settled(): Promise<void> {
-    await this.#done.catch(() => {})
+    await this.#done.catch(noop)
   }
 
   async close(): Promise<void> {
@@ -507,7 +508,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   followActivity(): Unlisten {
     const { graphSession, activity, platform, role } = this.#deps
     if (!isMobilePlatform(platform.appPlatform) || role !== 'main') {
-      return () => {}
+      return noop
     }
     // The lifecycle events perform the active teardown; this dynamic guard
     // also closes the launch race where the first sync is scheduled after iOS

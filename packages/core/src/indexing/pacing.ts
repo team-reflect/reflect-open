@@ -7,11 +7,10 @@
  */
 
 /** Files processed between event-loop breaks in an index pass. */
+import { sleep } from '@ocavue/utils'
 export const INDEX_PASS_YIELD_EVERY = 16
 
 /** Complete after a macrotask turn, letting rendering and input run. */
 export function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, 0)
-  })
+  return sleep(0)
 }

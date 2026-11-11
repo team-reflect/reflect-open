@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
 import { anySignal } from '@/lib/any-signal.ts'
+import { sleep } from '@ocavue/utils'
 
 /**
  * Allocates until the garbage collector has run a few times and has freed an
@@ -12,7 +13,7 @@ async function collectGarbage(): Promise<void> {
       throw new Error('The garbage collector did not run')
     }
     // A new task: `deref()` keeps the probe alive until the current one ends.
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await sleep(100)
     let junk: object[] | undefined = []
     for (let i = 0; i < 200_000; i++) {
       junk.push({ i })

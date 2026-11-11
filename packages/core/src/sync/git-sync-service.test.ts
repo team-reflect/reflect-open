@@ -38,6 +38,7 @@ import type {
   PullOutcome,
   PushOutcome,
 } from './git-repository-service.ts'
+import { sleep } from '@ocavue/utils'
 
 let http: TestHttpService
 let clock: TestClockService
@@ -334,7 +335,7 @@ function createGitSync(options: {
  * Let every promise chain that is already runnable settle.
  */
 async function flush(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await sleep(0)
 }
 
 /**

@@ -16,6 +16,7 @@ import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteActionsMenu } from './note-actions-menu.tsx'
+import { noop } from '@ocavue/utils'
 
 // What the app's fakes answer; each test sets them before `mount`.
 const getNote = vi.fn<IndexQueryService['getNote']>()
@@ -48,9 +49,7 @@ beforeEach(() => {
   currentNoteRow = noteRow('notes/meeting.md', false)
   currentNoteRowSettled = true
   getNote.mockReset().mockImplementation(() => {
-    return currentNoteRowSettled
-      ? Promise.resolve(currentNoteRow ?? undefined)
-      : new Promise(() => {})
+    return currentNoteRowSettled ? Promise.resolve(currentNoteRow ?? undefined) : new Promise(noop)
   })
   noteSource.value = '# A\n'
   readNoteSource.mockReset().mockImplementation(() => Promise.resolve(noteSource.value))

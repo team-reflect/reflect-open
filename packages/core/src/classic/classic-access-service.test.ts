@@ -20,6 +20,7 @@ import {
   type ClassicAccessService,
   type ClassicInvoice,
 } from './classic-access-service.ts'
+import { noop } from '@ocavue/utils'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const YEAR_MS = 365 * DAY_MS
@@ -576,7 +577,7 @@ describe('subscribe', () => {
     routes({ '/api/users/me': meRoute(true) })
     const classic = service()
 
-    classic.subscribe(() => {})
+    classic.subscribe(noop)
     await vi.waitFor(() => expect(paths()).toEqual(['/api/users/me']))
     expect(classic.get().access?.checkedAt).toBe(NOW)
 
@@ -589,7 +590,7 @@ describe('subscribe', () => {
     withStored(storedAccess({ token: null }))
     const classic = service()
 
-    classic.subscribe(() => {})
+    classic.subscribe(noop)
     await vi.waitFor(() => expect(classic.get().isLoading).toBe(false))
     const reads = vi.spyOn(secrets, 'get')
     activity.emitVisible()
@@ -601,7 +602,7 @@ describe('subscribe', () => {
     withStored(storedAccess())
     routes({ '/api/users/me': meRoute(true) })
     const classic = service()
-    classic.subscribe(() => {})
+    classic.subscribe(noop)
     await vi.waitFor(() => expect(paths()).toHaveLength(1))
 
     await classic.signOut()
@@ -616,8 +617,8 @@ describe('subscribe', () => {
     const reads = vi.spyOn(secrets, 'get')
     const classic = service()
 
-    classic.subscribe(() => {})
-    classic.subscribe(() => {})
+    classic.subscribe(noop)
+    classic.subscribe(vi.fn())
     await vi.waitFor(() => expect(classic.get().isLoading).toBe(false))
 
     expect(reads).toHaveBeenCalledOnce()
@@ -627,8 +628,8 @@ describe('subscribe', () => {
     withStored(storedAccess())
     routes({ '/api/users/me': meRoute(true) })
     const classic = service()
-    const unsubscribeFirst = classic.subscribe(() => {})
-    const unsubscribeSecond = classic.subscribe(() => {})
+    const unsubscribeFirst = classic.subscribe(noop)
+    const unsubscribeSecond = classic.subscribe(vi.fn())
     await vi.waitFor(() => expect(paths()).toHaveLength(1))
 
     unsubscribeFirst()
@@ -646,7 +647,7 @@ describe('subscribe', () => {
   it('logs a failed keychain read', async () => {
     secrets = createTestSecretStoreService()
     vi.spyOn(secrets, 'get').mockRejectedValue(new Error('locked'))
-    service().subscribe(() => {})
+    service().subscribe(noop)
 
     await vi.waitFor(() => {
       expect(logger.getErrors()).toEqual([
@@ -660,7 +661,7 @@ describe('subscribe', () => {
     const reads = vi.spyOn(secrets, 'get')
     const classic = service({ appPlatform: 'desktop' })
 
-    classic.subscribe(() => {})
+    classic.subscribe(noop)
     activity.emitVisible()
 
     expect(reads).not.toHaveBeenCalled()

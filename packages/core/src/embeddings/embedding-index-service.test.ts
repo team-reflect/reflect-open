@@ -9,6 +9,7 @@ import {
   seedNotes,
   type TestDatabaseService,
 } from '../testing/index.ts'
+import { sleep } from '@ocavue/utils'
 
 const NOTE_PATH = 'notes/a.md'
 
@@ -397,7 +398,7 @@ function setupGraph(options?: { unreadable?: string[] }) {
  * Long enough for every queued item of a follow to have run.
  */
 async function queueDrained(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 20))
+  await sleep(20)
 }
 
 describe('removeNote', () => {

@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { noop } from '@ocavue/utils'
 
 export interface ScrollToIndexBridge {
   /** Scroll a row index into view (a no-op until the owner registers). */
@@ -18,7 +19,7 @@ export interface ScrollToIndexBridge {
  * across the boundary never re-triggers effects.
  */
 export function useScrollToIndexBridge(): ScrollToIndexBridge {
-  const scrollToIndexRef = useRef<(index: number) => void>(() => {})
+  const scrollToIndexRef = useRef<(index: number) => void>(noop)
   const registerScrollToIndex = useCallback((scrollToIndex: (index: number) => void) => {
     scrollToIndexRef.current = scrollToIndex
   }, [])

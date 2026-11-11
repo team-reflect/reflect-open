@@ -14,6 +14,7 @@ import { useRouterState } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SimilarNotesSection } from './similar-notes-section.tsx'
+import { sleep } from '@ocavue/utils'
 
 const relatedNotes = vi.fn<RetrievalService['relatedNotes']>()
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
@@ -71,7 +72,7 @@ describe('SimilarNotesSection', () => {
     ])
     const view = await renderSimilar('notes/languages.md', false)
     // Give a would-be fetch a tick to fire before asserting it never did.
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(relatedNotes).not.toHaveBeenCalled()
     expect(view.container.firstChild).toBeNull()
   })

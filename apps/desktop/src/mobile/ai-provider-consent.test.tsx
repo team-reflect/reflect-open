@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { aiProvider } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { AiProviderConsent } from './ai-provider-consent.tsx'
+import { noop } from '@ocavue/utils'
 
 describe('AiProviderConsent', () => {
   it('opens the privacy policy in the system browser', async () => {
@@ -9,7 +10,7 @@ describe('AiProviderConsent', () => {
       <AiProviderConsent
         provider={aiProvider('openai')}
         consented={false}
-        onConsentedChange={() => {}}
+        onConsentedChange={noop}
       />,
     )
 

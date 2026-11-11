@@ -32,6 +32,7 @@ import {
   type LinkNavigationService,
 } from './link-navigation-service.ts'
 import type { Route } from './route.ts'
+import { sleep, returnFalse } from '@ocavue/utils'
 
 function AMBIGUOUS_MESSAGE(title: string): string {
   return `Couldn’t safely choose one note matching “${title}”. Rename conflicting notes or wait for unavailable notes to become available, then try again.`
@@ -136,7 +137,7 @@ function createHost(linkNavigation: LinkNavigationService): LinkNavigationHost &
  * Lets settled promises of the in-memory doubles run their continuations.
  */
 async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await sleep(0)
 }
 
 describe('intent token', () => {
@@ -198,7 +199,7 @@ describe('openRouteInNewWindow', () => {
   })
 
   it('answers false when the window does not open', async () => {
-    const { linkNavigation } = setup({ openNoteWindow: () => false })
+    const { linkNavigation } = setup({ openNoteWindow: returnFalse })
     await expect(
       linkNavigation.openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' }),
     ).resolves.toBe(false)
@@ -262,7 +263,7 @@ describe('openNoteLink', () => {
   })
 
   it('falls back to current-window navigation when a secondary window is declined', async () => {
-    const { linkNavigation, host } = setup({ openNoteWindow: () => false })
+    const { linkNavigation, host } = setup({ openNoteWindow: returnFalse })
     linkNavigation.openNoteLink({ target: alpha, openInNewWindow: true }, host)
     await settle()
     expect(host.routes()).toEqual([alpha])
@@ -482,7 +483,7 @@ describe('followWikiLink', () => {
   it('falls back to in-window navigation when the new window is declined', async () => {
     const { linkNavigation, host } = setup({
       files: { 'notes/target.md': '# Target' },
-      openNoteWindow: () => false,
+      openNoteWindow: returnFalse,
     })
     linkNavigation.followWikiLink({ target: 'Target', openInNewWindow: true }, host)
     await settle()
@@ -716,7 +717,7 @@ describe('followDeepLink', () => {
   })
 
   it('falls back to in-window dispatch when the window open is declined', async () => {
-    const { linkNavigation, host, deepLinkIntake } = setup({ openNoteWindow: () => false })
+    const { linkNavigation, host, deepLinkIntake } = setup({ openNoteWindow: returnFalse })
     linkNavigation.followDeepLink({ href: 'reflect://note/older', openInNewWindow: true }, host)
     await settle()
     expect(deepLinkIntake.dispatched()).toEqual(['reflect://note/older'])

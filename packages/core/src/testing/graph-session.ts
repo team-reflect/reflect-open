@@ -21,6 +21,7 @@ import { createTestIpcBridgeService } from './ipc.ts'
 import { createTestLoggerService } from './logger.ts'
 import { createTestMobileStorageService } from './mobile-storage.ts'
 import { createTestICloudNativeService } from './sync.ts'
+import { returnNull } from '@ocavue/utils'
 
 /**
  * An open graph as a test names it. The defaults are the graph `test` at
@@ -240,7 +241,7 @@ export function createTestGraphSessionService<Services = never>(
           generation += 1
           return { root, name: baseName(root), generation }
         },
-        graph_delete: () => null,
+        graph_delete: returnNull,
       },
     })
   }

@@ -32,6 +32,7 @@ import { createTestLoggerService } from './logger.ts'
 import { createTestPlatformService } from './platform.ts'
 import { createTestProgressPort } from './ports.ts'
 import { createTestActivityPort } from './shell.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The services a test lifecycle runs on; each defaults to a fresh test double.
@@ -245,7 +246,7 @@ export function createTestIndexLifecycleService(
   const clock = options?.clock ?? createTestClockService()
   const graphSession = options?.graphSession ?? {
     get: () => ({ session: null }),
-    subscribe: () => () => {},
+    subscribe: () => noop,
   }
   const inner = createIndexLifecycleService({
     indexStore: options?.indexStore ?? createTestIndexStoreService(),

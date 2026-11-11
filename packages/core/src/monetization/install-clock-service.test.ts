@@ -12,6 +12,7 @@ import {
   type InstallClockService,
 } from './install-clock-service.ts'
 import { DAY_MS, PAYWALL_HIDDEN_DAYS, PAYWALL_SKIPPABLE_DAYS } from './paywall-phase.ts'
+import { noop } from '@ocavue/utils'
 
 const NOW = Date.UTC(2026, 10, 4, 12)
 const HOUR_MS = 60 * 60 * 1000
@@ -50,7 +51,7 @@ function withStored(firstLaunchAt: number, lastSeenAt = firstLaunchAt): void {
 }
 
 async function settled(installClock: InstallClockService): Promise<void> {
-  installClock.subscribe(() => {})
+  installClock.subscribe(noop)
   await vi.waitFor(() => expect(installClock.get().isLoading).toBe(false))
 }
 
@@ -203,7 +204,7 @@ describe('InstallClockService', () => {
     const reads = vi.spyOn(secrets, 'get')
     const installClock = service({ appPlatform: 'desktop' })
 
-    installClock.subscribe(() => {})
+    installClock.subscribe(noop)
 
     expect(installClock.get()).toMatchObject({ phase: 'hidden', isLoading: false })
     expect(reads).not.toHaveBeenCalled()

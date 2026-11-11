@@ -8,6 +8,7 @@ import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useNoteLinkNavigation } from './use-note-link-navigation.ts'
+import { sleep, noop } from '@ocavue/utils'
 
 // Receives the `reflect://` link of every note window a test opens.
 const openNoteWindow = vi.fn<(deepLink: string) => MaybePromise<boolean>>()
@@ -95,7 +96,7 @@ function route(view: Awaited<ReturnType<typeof mount>>): unknown {
 
 /** Lets a settled fallback promise run its continuation (and any React flush it would cause). */
 async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 50))
+  await sleep(50)
 }
 
 describe('useNoteLinkNavigation', () => {
@@ -152,7 +153,7 @@ describe('useNoteLinkNavigation', () => {
   })
 
   it('does not let an older rejected open override a newer note-link intent', async () => {
-    let rejectOpen: (cause: Error) => void = () => {}
+    let rejectOpen: (cause: Error) => void = noop
     openNoteWindow
       .mockImplementationOnce(() => {
         return new Promise((_resolve, reject) => {

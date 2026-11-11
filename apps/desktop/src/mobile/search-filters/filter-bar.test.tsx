@@ -6,6 +6,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { FilterBar } from './filter-bar.tsx'
 import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from '@reflect/app'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The filter badge row (Plan 19): chips toggle or open pickers, everything
@@ -21,8 +22,8 @@ const FACETS: NoteTagFacet[] = [
 /** The bar under a stateful owner, the way the shell owns filters. */
 function Harness({
   routeTag = null,
-  onClearRouteTag = () => {},
-  onChange = () => {},
+  onClearRouteTag = noop,
+  onChange = noop,
 }: {
   routeTag?: string | null
   onClearRouteTag?: () => void

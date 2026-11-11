@@ -17,6 +17,7 @@ import { createRef, useLayoutEffect, type ReactNode, type RefObject } from 'reac
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useWikiLinkNavigation, type WikiLinkNavigation } from './use-wiki-link-navigation.ts'
+import { sleep } from '@ocavue/utils'
 
 const resolveWikiTarget = vi.fn()
 const resolveExistingWikiTarget = vi.fn()
@@ -259,7 +260,7 @@ describe('useWikiLinkNavigation', () => {
   it('ignores an unresolved empty target', async () => {
     const view = await renderHost()
     lastHandlerRef.current?.({ target: '   ', openInNewWindow: false })
-    await new Promise((tick) => setTimeout(tick, 0))
+    await sleep(0)
     expect(resolveWikiTarget).not.toHaveBeenCalled()
     expect(resolveOrCreateNoteWithTitle).not.toHaveBeenCalled()
     expect(currentRoute(view)).toContain('"today"')
@@ -380,7 +381,7 @@ describe('useWikiLinkNavigation', () => {
       </>,
     )
     pending.resolve({ kind: 'resolved', path: 'notes/target.md' })
-    await new Promise((tick) => setTimeout(tick, 0))
+    await sleep(0)
     expect(view.getByTestId('route').element().textContent).toContain('"today"')
   })
 
@@ -399,7 +400,7 @@ describe('useWikiLinkNavigation', () => {
     lastHandlerRef.current?.({ target: 'Newer', openInNewWindow: false })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('notes/newer.md'))
     pendingOlder.resolve({ kind: 'resolved', path: 'notes/older.md' })
-    await new Promise((tick) => setTimeout(tick, 0))
+    await sleep(0)
 
     expect(currentRoute(view)).toContain('notes/newer.md')
     expect(currentRoute(view)).not.toContain('notes/older.md')
@@ -416,7 +417,7 @@ describe('useWikiLinkNavigation', () => {
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
     pendingResolution.resolve({ kind: 'resolved', path: 'notes/target.md' })
-    await new Promise((tick) => setTimeout(tick, 0))
+    await sleep(0)
 
     expect(currentRoute(view)).toContain('"settings"')
     expect(currentRoute(view)).not.toContain('notes/target.md')
@@ -435,7 +436,7 @@ describe('useWikiLinkNavigation', () => {
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
     pendingCreation.resolve({ kind: 'created', path: 'notes/created.md' })
-    await new Promise((tick) => setTimeout(tick, 0))
+    await sleep(0)
 
     expect(currentRoute(view)).toContain('"settings"')
     expect(currentRoute(view)).not.toContain('notes/created.md')

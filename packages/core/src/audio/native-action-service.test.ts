@@ -10,6 +10,7 @@ import {
   createNativeActionService,
   type NativeRecordActionHandler,
 } from './native-action-service.ts'
+import { noop } from '@ocavue/utils'
 
 const ORPHANED: AudioRecorderFinalSegment = {
   audio: { kind: 'staged', path: '/staging/recording-1700000050000.part-001-end.m4a' },
@@ -104,7 +105,7 @@ describe('NativeActionService.open', () => {
 
   it('disposing during the handshake aborts its signal', async () => {
     const { recorder, clock, service, handler } = setup()
-    const handshake = vi.spyOn(recorder, 'actionsReady').mockReturnValue(new Promise(() => {}))
+    const handshake = vi.spyOn(recorder, 'actionsReady').mockReturnValue(new Promise(noop))
 
     const close = service.open(handler)
     await clock.advance(0)

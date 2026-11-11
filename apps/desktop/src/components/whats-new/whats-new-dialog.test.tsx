@@ -11,6 +11,7 @@ import {
   type TestToastController,
 } from '@/test-utils/toast.tsx'
 import { WhatsNewDialog } from './whats-new-dialog.tsx'
+import { noop } from '@ocavue/utils'
 
 let toastController: TestToastController
 
@@ -33,7 +34,7 @@ function createFakeWhatsNew(initial: WhatsNewPhase = 'shown') {
     ],
     phase,
     override: new WritableStore(false),
-    setOverride: () => {},
+    setOverride: noop,
     accept: () => {
       calls.push('accept')
       phase.set('shown')
@@ -45,7 +46,7 @@ function createFakeWhatsNew(initial: WhatsNewPhase = 'shown') {
       dismissed += 1
       phase.set('hidden')
     },
-    start: () => () => {},
+    start: () => noop,
   }
   return { whatsNew, phase, calls, dismissed: () => dismissed }
 }

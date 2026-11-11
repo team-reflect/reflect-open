@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTestClockService } from '../testing/clock.ts'
 import { createTodayService } from './today-service.ts'
+import { noop } from '@ocavue/utils'
 
 describe('createTodayService', () => {
   afterEach(() => {
@@ -81,8 +82,8 @@ describe('createTodayService', () => {
   it('subscribers share one timer set, released by the last unsubscribe', () => {
     const clock = createTestClockService({ now: new Date(2026, 5, 9, 12, 0, 0).getTime() })
     const today = createTodayService({ clock })
-    const first = today.subscribe(() => {})
-    const second = today.subscribe(() => {})
+    const first = today.subscribe(noop)
+    const second = today.subscribe(vi.fn())
     expect(clock.pendingTimers()).toBe(2)
     first()
     expect(clock.pendingTimers()).toBe(2)

@@ -5,6 +5,7 @@ import { WritableStore } from '@reflect/core'
 import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { WhatsNewDrawer } from './whats-new-drawer.tsx'
+import { noop } from '@ocavue/utils'
 
 function createFakeWhatsNew() {
   const phase = new WritableStore<WhatsNewPhase>('shown')
@@ -20,14 +21,14 @@ function createFakeWhatsNew() {
     ],
     phase,
     override: new WritableStore(false),
-    setOverride: () => {},
-    accept: () => {},
-    decline: () => {},
+    setOverride: noop,
+    accept: noop,
+    decline: noop,
     dismiss: () => {
       dismissed += 1
       phase.set('hidden')
     },
-    start: () => () => {},
+    start: () => noop,
   }
   return { whatsNew, dismissed: () => dismissed }
 }
@@ -36,7 +37,7 @@ function createFakeReview() {
   const calls: string[] = []
   const review: ReviewService = {
     override: new WritableStore(false),
-    setOverride: () => {},
+    setOverride: noop,
     shouldAsk: () => Promise.resolve(true),
     markShown: () => {
       calls.push('markShown')

@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createHapticsService } from './haptics-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 describe('HapticsService', () => {
   it('fires the plugin impact command on every call while the plugin answers', async () => {
     const ipc = createTestIpcBridgeService()
-    ipc.onCommand('plugin:mobile-haptics|impact_light', () => null)
+    ipc.onCommand('plugin:mobile-haptics|impact_light', returnNull)
     const haptics = createHapticsService({ ipc, logger: createTestLoggerService() })
 
     await haptics.impactLight()
@@ -38,7 +39,7 @@ describe('HapticsService', () => {
     const logger = createTestLoggerService()
     await createHapticsService({ ipc, logger }).impactLight()
 
-    ipc.onCommand('plugin:mobile-haptics|impact_light', () => null)
+    ipc.onCommand('plugin:mobile-haptics|impact_light', returnNull)
     await createHapticsService({ ipc, logger }).impactLight()
 
     expect(ipc.calls()).toHaveLength(2)

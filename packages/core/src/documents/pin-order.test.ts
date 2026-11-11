@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PinnedNote } from '../indexing/index-query-service.ts'
 import { getNextPinOrder, isValidPinOrder, updatePinOrder, renumberPinOrder } from './pin-order.ts'
+import { returnNull } from '@ocavue/utils'
 
 const HI = 2 ** 31 - 1
 
@@ -85,7 +86,7 @@ describe('renumberPinOrder', () => {
   })
 
   it('stays in range and strictly ascending across a long shelf', () => {
-    const orders = renumberPinOrder(shelf(...Array.from({ length: 200 }, () => null)))
+    const orders = renumberPinOrder(shelf(...Array.from({ length: 200 }, returnNull)))
       .map((note) => note.pinnedOrder)
       .filter(isValidPinOrder)
     expect(orders).toHaveLength(200)

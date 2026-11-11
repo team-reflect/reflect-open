@@ -5,6 +5,7 @@ import type { GitHostCredentialService } from './git-host-credential-service.ts'
 import type { GitCredential } from './git-repository-service.ts'
 import { githubCredential, type GithubAuthService } from './github-auth-service.ts'
 import type { GitRemote } from './remote-url.ts'
+import { returnNull } from '@ocavue/utils'
 
 /**
  * Whether a remote can sync right now. `ready` carries the per-cycle lookup
@@ -73,7 +74,7 @@ class CredentialResolverImpl implements CredentialResolver {
       }
       case 'ssh':
       case 'path':
-        return { kind: 'ready', get: () => null }
+        return { kind: 'ready', get: returnNull }
     }
   }
 }

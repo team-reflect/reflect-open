@@ -6,6 +6,7 @@ import type {
 } from '@reflect/core'
 import type { WindowService } from './window-service.ts'
 import type { AppLifecycleService } from './lifecycle-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * When the app lands its dirty state: on quit and window close on desktop,
@@ -45,7 +46,7 @@ class QuitPolicyServiceImpl implements QuitPolicyService {
   installDesktopQuitPolicy(): Unlisten {
     const { lifecycle, window, platform, persistenceFlush } = this.#deps
     if (!platform.isNativeShell) {
-      return () => {}
+      return noop
     }
     const removeClose = window.onCloseRequested(async (event) => {
       const shouldHide = platform.isMacosDesktop && this.#mainWindow
@@ -112,7 +113,7 @@ class QuitPolicyServiceImpl implements QuitPolicyService {
         return
       }
       inFlight = runProtected()
-        .catch(() => {})
+        .catch(noop)
         .finally(() => {
           inFlight = null
           if (rerun) {

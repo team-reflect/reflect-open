@@ -8,6 +8,7 @@ import { createTestSystemPreferencesService } from '@reflect/app/testing'
 import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement, touch } from '@/test-utils/scroll.ts'
 import { shouldRecenterWeeks, useWeekStrip, type WeekStrip } from './use-week-strip.ts'
+import { noop, sleep } from '@ocavue/utils'
 
 /**
  * The strip's paging driven through a real native scroller: a finger scroll
@@ -29,7 +30,7 @@ interface StripProps {
 
 async function mountStrip(options?: { reducedMotion?: boolean }) {
   const strip: { current: WeekStrip | null } = { current: null }
-  const update: { current: (props: Partial<StripProps>) => void } = { current: () => {} }
+  const update: { current: (props: Partial<StripProps>) => void } = { current: noop }
   function Harness(): ReactElement {
     const [props, setProps] = useState<StripProps>({
       date: DATE,
@@ -106,7 +107,7 @@ describe('useWeekStrip', () => {
     await vi.waitFor(() => {
       return expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 2))
     })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(strip().weekWindow).toEqual(initialWindow)
     expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
   })
@@ -146,7 +147,7 @@ describe('useWeekStrip', () => {
 
     expect(strip().displayedWeekStart).toBe(weekAtIndex(initialWindow, ANCHOR + 2))
     await vi.waitFor(() => expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH))
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
   })
 
@@ -157,7 +158,7 @@ describe('useWeekStrip', () => {
     // strip back to the (unchanged) date's week.
     await scrollElement({ element: scroller, left: (ANCHOR + 2) * WIDTH, touch: true })
     await update({ width: WIDTH })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(scroller.scrollLeft).toBe((ANCHOR + 2) * WIDTH)
 
     await update({ date: '2026-06-19' })
@@ -238,7 +239,7 @@ describe('useWeekStrip', () => {
 
     await touch(scroller, 'start')
     await update({ width: 500 })
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await sleep(100)
 
     expect(scroller.scrollLeft).toBe(ANCHOR * WIDTH)
     await touch(scroller, 'end')

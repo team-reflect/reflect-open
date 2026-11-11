@@ -20,6 +20,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { Unlisten } from '../unlisten.ts'
 import { WritableStore, type Store } from '../store.ts'
 import { formatBytes } from '../lib/format-bytes.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * Above this size, a save gets a non-blocking status-line warning. Never a
@@ -357,7 +358,7 @@ class AttachmentServiceImpl implements AttachmentService {
 
   watchCatalog(generation: number): Unlisten {
     const { fileChanges } = this.#deps
-    this.#loadCatalog(generation).catch(() => {})
+    this.#loadCatalog(generation).catch(noop)
     const stopChanges = fileChanges.subscribe(({ changes }) => {
       if (changes.some((change) => isAttachmentPath(change.path))) {
         this.#relist(generation)
@@ -614,7 +615,7 @@ class AttachmentServiceImpl implements AttachmentService {
 
   #relist(generation: number): void {
     if (this.#entry?.generation === generation) {
-      this.#list(this.#entry).catch(() => {})
+      this.#list(this.#entry).catch(noop)
     }
   }
 

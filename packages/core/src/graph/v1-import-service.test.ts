@@ -10,6 +10,7 @@ import {
   IMPORT_PROGRESS_EVENT,
   type V1ImportState,
 } from './v1-import-service.ts'
+import { sleep, returnNull } from '@ocavue/utils'
 
 const GRAPH: GraphInfo = { root: '/graphs/notes', name: 'Notes', generation: 42 }
 
@@ -34,7 +35,7 @@ function setup(options?: { graph?: GraphInfo | null; cancel?: () => Promise<null
   const ipc = createTestIpcBridgeService({
     commands: {
       graph_import_reflect_v1_zip: () => pendingImport.promise,
-      graph_import_cancel: options?.cancel ?? (() => null),
+      graph_import_cancel: options?.cancel ?? returnNull,
     },
   })
   const fileChanges = createTestFileChangeService()
@@ -77,7 +78,7 @@ function setup(options?: { graph?: GraphInfo | null; cancel?: () => Promise<null
  * Let the import's settle handlers and the listener registration run.
  */
 async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await sleep(0)
 }
 
 describe('V1ImportService', () => {

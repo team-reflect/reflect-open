@@ -2,6 +2,7 @@ import { useCoreServices } from '@/services/services-provider.tsx'
 import { arrayMove } from '@dnd-kit/sortable'
 import { updatePinOrder, type PinnedNote } from '@reflect/core'
 import { useCallback } from 'react'
+import { noop } from '@ocavue/utils'
 
 export function useReorderPinnedNotes(
   pinned: readonly PinnedNote[],
@@ -29,7 +30,7 @@ export function useReorderPinnedNotes(
       })
 
       // A failed write drops its overlay, so the shelf shows the index again.
-      noteActions.reorderPinned(updated).catch(() => {})
+      noteActions.reorderPinned(updated).catch(noop)
     },
     [noteActions, pinned],
   )

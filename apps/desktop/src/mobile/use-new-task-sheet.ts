@@ -9,6 +9,7 @@ import {
 import { useTaskActions, type TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import { useToday } from '@/lib/use-today.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { noop } from '@ocavue/utils'
 
 /**
  * The Daily capture menu's new-task sheet state; see {@link useNewTaskSheet}.
@@ -67,7 +68,7 @@ export function useNewTaskSheet(): NewTaskSheet {
   // every open task in the graph and re-reads on each index change, which the
   // Daily screen otherwise has no use for.
   const subscribe = useCallback(
-    (listener: VoidFunction): Unlisten => (open ? taskService.subscribe(listener) : () => {}),
+    (listener: VoidFunction): Unlisten => (open ? taskService.subscribe(listener) : noop),
     [taskService, open],
   )
   const rows = useSyncExternalStore(subscribe, taskService.get, taskService.get).open

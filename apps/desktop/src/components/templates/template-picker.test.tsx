@@ -9,6 +9,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { TemplateCreateDialog } from './template-create-dialog.tsx'
 import { TemplatePicker } from './template-picker.tsx'
+import { noop, returnNull } from '@ocavue/utils'
 
 function Opener(): ReactElement {
   const { openTemplatePicker } = useNoteTemplates()
@@ -30,12 +31,12 @@ async function renderPicker(): Promise<void> {
     app: createTestAppServices(core),
     navigate: vi.fn(),
     route: () => ({ kind: 'today' }),
-    notePath: () => null,
+    notePath: returnNull,
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
-    togglePin: vi.fn(() => {}),
-    togglePrivate: vi.fn(() => {}),
+    togglePin: vi.fn(noop),
+    togglePrivate: vi.fn(noop),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
