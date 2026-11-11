@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createTestLoggerService, type TestLoggerService } from '../testing/logger.ts'
 import { createTestPlatformService } from '../testing/platform.ts'
 import { createTestAppStoreService } from '../testing/plugins.ts'
 import { createTestStorageService, type TestStorageService } from '../testing/storage.ts'
@@ -10,6 +11,7 @@ import {
 import { noop } from '@ocavue/utils'
 
 let storage: TestStorageService
+let logger: TestLoggerService
 /**
  * What the install-channel probe answers, or how it fails to.
  */
@@ -18,6 +20,7 @@ let probes: number
 
 beforeEach(() => {
   storage = createTestStorageService()
+  logger = createTestLoggerService()
   probe = () => Promise.resolve('Production')
   probes = 0
 })
@@ -32,6 +35,7 @@ function service(appPlatform: 'ios' | 'desktop' = 'ios'): AppStoreEnvironmentSer
     appStore,
     storage,
     platform: createTestPlatformService({ appPlatform }),
+    logger,
   })
 }
 
@@ -60,6 +64,12 @@ describe('AppStoreEnvironmentService', () => {
 
     await expect(environment.environment()).resolves.toBeNull()
     expect(environment.get()).toEqual({ value: null, isLoading: false, isError: true })
+    expect(logger.getWarnings()).toEqual([
+      {
+        message: 'Probing the App Store environment failed',
+        cause: expect.any(Error) as Error,
+      },
+    ])
   })
 
   it('retries a failed probe once', async () => {
