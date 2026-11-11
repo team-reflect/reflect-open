@@ -1,5 +1,6 @@
 import StoreKit
 import UIKit
+import WebHostKit
 
 /// The `plugin:iap` and `plugin:app-store` commands: subscriptions and the
 /// App Store sheets, on StoreKit 2.

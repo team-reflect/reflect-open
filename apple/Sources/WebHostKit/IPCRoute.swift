@@ -1,26 +1,32 @@
-import Foundation
+public import Foundation
 
 /// The request of a command that the shell answers itself.
-struct ShellRequest: Sendable {
+public struct ShellRequest: Sendable {
   /// The JSON object of camelCase arguments; empty for a binary request.
-  var args: Data
+  public var args: Data
   /// The request headers under lowercase names.
-  var headers: [String: String]
+  public var headers: [String: String]
   /// The raw body of a binary request; empty otherwise.
-  var body: Data
+  public var body: Data
+
+  public init(args: Data, headers: [String: String], body: Data) {
+    self.args = args
+    self.headers = headers
+    self.body = body
+  }
 
   /// The arguments decoded as `T`, or nil when they do not match it.
-  func decodeArgs<T: Decodable>(_ type: T.Type) -> T? {
+  public func decodeArgs<T: Decodable>(_ type: T.Type) -> T? {
     try? JSONDecoder().decode(type, from: args)
   }
 }
 
 extension CoreReply {
   /// The JSON reply `null`: the answer of a command that returns nothing.
-  static let null = CoreReply.json(Data("null".utf8))
+  public static let null = CoreReply.json(Data("null".utf8))
 
   /// A JSON reply that encodes `value`.
-  static func value(_ value: some Encodable) -> CoreReply {
+  public static func value(_ value: some Encodable) -> CoreReply {
     guard let json = try? JSONEncoder().encode(value) else {
       return .error(kind: "unknown", message: "the shell could not encode a reply")
     }
@@ -30,7 +36,7 @@ extension CoreReply {
 
 /// A command that the shell answers itself: a `host.` command or a
 /// `plugin:<name>|<command>` capability.
-typealias ShellCommand = @MainActor (ShellRequest) async -> CoreReply
+public typealias ShellCommand = @MainActor (ShellRequest) async -> CoreReply
 
 /// The pages that may call the privileged routes of the `reflect-app` scheme.
 ///
@@ -45,25 +51,29 @@ typealias ShellCommand = @MainActor (ShellRequest) async -> CoreReply
 ///   trusted only by its `Referer`, which must be a URL of the bundled app
 ///   or the dev server.
 /// - A request with neither header is refused.
-struct TrustedCallers: Sendable {
+public struct TrustedCallers: Sendable {
   /// The origin of the bundled web app.
-  static let appOrigin = "reflect-app://localhost"
+  public static let appOrigin = "reflect-app://localhost"
 
   /// The origin of a dev server page that hosts the web app, if any.
-  var devOrigin: String?
+  public var devOrigin: String?
+
+  public init(devOrigin: String? = nil) {
+    self.devOrigin = devOrigin
+  }
 
   /// The origin of the caller when it is trusted, else nil.
-  func trustedOrigin(of request: URLRequest) -> String? {
+  public func trustedOrigin(of request: URLRequest) -> String? {
     let origin =
       request.value(forHTTPHeaderField: "Origin")
-      ?? request.value(forHTTPHeaderField: "Referer").flatMap(Self.origin(ofURL:))
+      ?? request.value(forHTTPHeaderField: "Referer").flatMap(URL.init(string:))?.webOrigin
     guard let origin, origin == Self.appOrigin || origin == devOrigin else { return nil }
     return origin
   }
 
   /// The CORS headers that let the dev server page read a response. The
   /// bundled web app is same-origin and needs none.
-  func corsHeaders(for request: URLRequest) -> [String: String] {
+  public func corsHeaders(for request: URLRequest) -> [String: String] {
     guard let devOrigin, trustedOrigin(of: request) == devOrigin else { return [:] }
     return [
       "Access-Control-Allow-Origin": devOrigin,
@@ -72,17 +82,6 @@ struct TrustedCallers: Sendable {
       "Access-Control-Expose-Headers": "x-reflect-response",
       "Vary": "Origin",
     ]
-  }
-
-  /// The origin of a URL string: scheme, host, and the port when it is not
-  /// the default of `http` or `https`.
-  private static func origin(ofURL string: String) -> String? {
-    guard let components = URLComponents(string: string), let scheme = components.scheme,
-      let host = components.host, !host.isEmpty
-    else { return nil }
-    let defaultPort = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
-    guard let port = components.port, port != defaultPort else { return "\(scheme)://\(host)" }
-    return "\(scheme)://\(host):\(port)"
   }
 }
 
@@ -105,17 +104,17 @@ struct TrustedCallers: Sendable {
 /// route then drops the reply; the command itself runs to its end, because a
 /// write must not stop halfway.
 @MainActor
-final class IPCRoute: SchemeRoute {
-  typealias Dispatch =
+public final class IPCRoute: SchemeRoute {
+  public typealias Dispatch =
     @Sendable (_ command: String, _ args: Data, _ headers: Data, _ body: Data) async -> CoreReply
 
-  let pathPrefix = "/__ipc/"
+  public let pathPrefix = "/__ipc/"
 
   private let dispatch: Dispatch
   private let shellCommands: [String: ShellCommand]
   private let callers: TrustedCallers
 
-  init(
+  public init(
     dispatch: @escaping Dispatch,
     shellCommands: [String: ShellCommand],
     callers: TrustedCallers = TrustedCallers()
@@ -125,7 +124,7 @@ final class IPCRoute: SchemeRoute {
     self.callers = callers
   }
 
-  func start(_ task: SchemeTask) {
+  public func start(_ task: SchemeTask) {
     let request = task.request
     let corsHeaders = callers.corsHeaders(for: request)
     guard callers.trustedOrigin(of: request) != nil else {

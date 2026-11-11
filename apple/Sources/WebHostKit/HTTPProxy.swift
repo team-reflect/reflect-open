@@ -1,22 +1,22 @@
-import Foundation
+public import Foundation
 
 /// Serves `reflect-app://localhost/__http?url=<target>`: it sends the request to
 /// the target from native code and streams the response back to the scheme task.
 /// The native request carries no `Origin`, so webview CORS does not apply to it.
 @MainActor
-final class HTTPProxy: SchemeRoute {
-  let pathPrefix = "/__http"
+public final class HTTPProxy: SchemeRoute {
+  public let pathPrefix = "/__http"
 
   /// Request headers that stay in the webview: browser context, cookies,
   /// headers that `URLSession` sets itself, and hop-by-hop headers.
-  static let droppedRequestHeaders: Set<String> = hopByHopHeaders.union([
+  public static let droppedRequestHeaders: Set<String> = hopByHopHeaders.union([
     "accept-encoding", "content-length", "cookie", "cookie2", "host", "origin", "referer",
     "user-agent",
   ])
 
   /// Response headers that stay in the proxy: cookies (the session keeps none),
   /// the target's own CORS policy, and hop-by-hop headers.
-  static let droppedResponseHeaders: Set<String> = hopByHopHeaders.union([
+  public static let droppedResponseHeaders: Set<String> = hopByHopHeaders.union([
     "access-control-allow-credentials", "access-control-allow-headers",
     "access-control-allow-methods", "access-control-allow-origin",
     "access-control-expose-headers", "access-control-max-age", "set-cookie", "set-cookie2",
@@ -29,7 +29,7 @@ final class HTTPProxy: SchemeRoute {
 
   /// The configuration of the shared session: no cookies, no cache, no waiting
   /// for a network, and 60 s without data fails a request.
-  static func makeConfiguration() -> URLSessionConfiguration {
+  public nonisolated static func makeConfiguration() -> URLSessionConfiguration {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.httpCookieAcceptPolicy = .never
     configuration.httpShouldSetCookies = false
@@ -49,7 +49,7 @@ final class HTTPProxy: SchemeRoute {
   /// Only a caller that `callers` trusts gets a request sent: any other
   /// page would use the route to reach hosts its own origin cannot read,
   /// such as servers on the local network.
-  init(
+  public init(
     callers: TrustedCallers = TrustedCallers(),
     configuration: URLSessionConfiguration = HTTPProxy.makeConfiguration()
   ) {
@@ -65,7 +65,7 @@ final class HTTPProxy: SchemeRoute {
 
   /// Starts the request of a `__http` scheme task. Answers a CORS preflight and
   /// an invalid target at once, without a network request.
-  func start(_ task: SchemeTask) {
+  public func start(_ task: SchemeTask) {
     let request = task.request
     guard let origin = callers.trustedOrigin(of: request) else {
       task.reply(SchemeReply(statusCode: 403, headers: [:], body: Data()))
@@ -197,18 +197,12 @@ final class HTTPProxy: SchemeRoute {
   ) -> URLRequest {
     guard let from = original?.url, let to = request.url,
       from.scheme != to.scheme || from.host != to.host
-        || effectivePort(of: from) != effectivePort(of: to)
+        || from.effectivePort != to.effectivePort
     else { return request }
     var request = request
     request.setValue(nil, forHTTPHeaderField: "Authorization")
     return request
   }
-}
-
-/// The port of an `http` or `https` URL, with the scheme's default for a URL
-/// that names none.
-private func effectivePort(of url: URL) -> Int? {
-  url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil)
 }
 
 /// One proxied request, from `start` until the request completes or WebKit

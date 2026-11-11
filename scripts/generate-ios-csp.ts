@@ -11,10 +11,9 @@ const ROOT_DIR = join(import.meta.dirname, '..')
 const TAURI_CONFIG_PATH = join(ROOT_DIR, 'apps', 'desktop', 'src-tauri', 'tauri.conf.json')
 const OUTPUT_PATH = join(
   ROOT_DIR,
-  'apps',
-  'ios',
+  'apple',
   'Sources',
-  'Web',
+  'WebHostKit',
   'ContentSecurityPolicy.gen.swift',
 )
 const TAURI_IPC_SOURCES = ['ipc:', 'http://ipc.localhost']

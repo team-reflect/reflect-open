@@ -1,24 +1,12 @@
 import Foundation
 import ReflectCoreFFI
+import WebHostKit
 
 /// The directories and user agent that the Rust core starts with.
 struct CoreConfig: Encodable, Sendable {
   var documentDir: String
   var dataDir: String
   var userAgent: String
-}
-
-/// The result of one command: a JSON value, raw bytes, or a `{kind, message}` error as JSON.
-enum CoreReply: Sendable, Equatable {
-  case json(Data)
-  case bytes(Data)
-  case error(Data)
-
-  /// An error reply with the wire shape of the core's `AppError`.
-  static func error(kind: String, message: String) -> CoreReply {
-    let json = try? JSONSerialization.data(withJSONObject: ["kind": kind, "message": message])
-    return .error(json ?? Data(#"{"kind":"unknown","message":""}"#.utf8))
-  }
 }
 
 /// One event that the core emitted: a name and a JSON payload.

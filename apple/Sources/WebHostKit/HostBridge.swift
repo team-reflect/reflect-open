@@ -1,5 +1,5 @@
-import Foundation
-import WebKit
+public import Foundation
+public import WebKit
 
 /// Delivers shell events to the page by evaluating
 /// `window.__reflectHost.dispatch(name, payload)`.
@@ -10,28 +10,28 @@ import WebKit
 /// each new document, which starts the wait again. The queue is bounded and
 /// drops its oldest events first.
 @MainActor
-final class HostBridge: NSObject, WKScriptMessageHandler {
+public final class HostBridge: NSObject, WKScriptMessageHandler {
   /// The name of the script message handler that the page posts to.
-  static let messageHandlerName = "reflectHost"
+  public static let messageHandlerName = "reflectHost"
 
   /// The most events that wait in the shell for the page.
-  static let queueLimit = 1024
+  public static let queueLimit = 1024
 
   /// Reports each new document of the main frame.
-  static let userScript = WKUserScript(
+  public static let userScript = WKUserScript(
     source: "window.webkit.messageHandlers.\(messageHandlerName).postMessage('document-start')",
     injectionTime: .atDocumentStart,
     forMainFrameOnly: true)
 
   /// Evaluates JavaScript in the page. The web view sets it.
-  var evaluate: (String) -> Void = { _ in }
+  public var evaluate: (String) -> Void = { _ in }
 
   /// Whether the current document posted `ready`.
-  private(set) var isPageReady = false
+  public private(set) var isPageReady = false
   private var queue: [String] = []
 
   /// Delivers an event with a JSON payload; empty data is `null`.
-  func emit(_ name: String, payload: Data) {
+  public func emit(_ name: String, payload: Data) {
     guard let nameJSON = try? JSONEncoder().encode(name) else { return }
     let payloadJSON = payload.isEmpty ? "null" : String(decoding: payload, as: UTF8.self)
     let script =
@@ -47,12 +47,12 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
   }
 
   /// A new document started to load: events wait for its `ready`.
-  func documentDidStart() {
+  public func documentDidStart() {
     isPageReady = false
   }
 
   /// The page takes events: sends the queue.
-  func pageDidBecomeReady() {
+  public func pageDidBecomeReady() {
     isPageReady = true
     let scripts = queue
     queue = []
@@ -61,7 +61,7 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
     }
   }
 
-  func userContentController(
+  public func userContentController(
     _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
   ) {
     guard message.frameInfo.isMainFrame else { return }

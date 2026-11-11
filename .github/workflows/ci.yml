@@ -156,7 +156,7 @@ jobs:
       - name: Verify the generated iOS CSP is current
         run: |
           pnpm gen:ios-csp
-          git diff --exit-code apps/ios/Sources/Web/ContentSecurityPolicy.gen.swift \
+          git diff --exit-code apple/Sources/WebHostKit/ContentSecurityPolicy.gen.swift \
             || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
 
       - name: Lint

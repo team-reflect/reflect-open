@@ -1,4 +1,5 @@
 import AuthenticationServices
+import WebHostKit
 
 /// The `plugin:web-auth` commands: the system web sign-in session.
 @MainActor

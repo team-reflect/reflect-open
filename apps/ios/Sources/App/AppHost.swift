@@ -1,5 +1,6 @@
 import AuthenticationServices
 import UIKit
+import WebHostKit
 import os
 
 /// Builds the parts of the shell and connects them: the Rust core, the
@@ -25,44 +26,48 @@ final class AppHost {
     let devURL = ProcessInfo.processInfo.environment["REFLECT_DEV_URL"].flatMap(URL.init(string:))
     startURL = devURL ?? URL(string: AppSchemeHandler.indexURL) ?? URL(fileURLWithPath: "/")
 
-    var shellCommands = HostCommands.all { url in
-      await UIApplication.shared.open(url)
-    }
-    // The web view exists only after the commands: the sign-in sheet reads its window later.
+    // The web view exists only after the capabilities: they read its window later.
     weak var presenter: UIView?
-    let webAuth = WebAuthCapability { presenter?.window ?? ASPresentationAnchor() }
-    self.webAuth = webAuth
-    shellCommands.merge(HapticsCapability.commands) { _, new in new }
-    shellCommands.merge(webAuth.commands) { _, new in new }
-    let store = StoreCapability(
-      scene: { presenter?.window?.windowScene },
-      emit: { [bridge] name, payload in bridge.emit(name, payload: payload) })
-    self.store = store
-    shellCommands.merge(store.commands) { _, new in new }
-    let recording = RecordingCapability { [bridge] name, payload in
+    let emit: @MainActor (String, Data) -> Void = { [bridge] name, payload in
       bridge.emit(name, payload: payload)
     }
+    let webAuth = WebAuthCapability { presenter?.window ?? ASPresentationAnchor() }
+    self.webAuth = webAuth
+    let store = StoreCapability(scene: { presenter?.window?.windowScene }, emit: emit)
+    self.store = store
+    let recording = RecordingCapability(emit: emit)
     self.recording = recording
-    shellCommands.merge(recording.commands) { _, new in new }
-    var routes: [any SchemeRoute] = []
-    let callers = TrustedCallers(devOrigin: devURL.flatMap(Self.origin(of:)))
-    routes.append(HTTPProxy(callers: callers))
-    routes.append(
+
+    var shellCommands: [String: ShellCommand] = [:]
+    for commands in [
+      HostCommands.all { url in await UIApplication.shared.open(url) },
+      HapticsCapability.commands, webAuth.commands, store.commands, recording.commands,
+    ] {
+      shellCommands.merge(commands) { _, _ in
+        preconditionFailure("two capabilities answer the same command")
+      }
+    }
+
+    let callers = TrustedCallers(devOrigin: devURL?.webOrigin)
+    let routes: [any SchemeRoute] = [
+      HTTPProxy(callers: callers),
       IPCRoute(
         dispatch: { [core] command, args, headers, body in
           await core.dispatch(command, args: args, headers: headers, body: body)
         },
         shellCommands: shellCommands,
-        callers: callers))
+        callers: callers),
+    ]
     let assets = AssetSchemeHandler { [core] requestPath, query, range in
       await core.resolveAsset(requestPath: requestPath, query: query, range: range)
     }
     webView = ReflectWebView(routes: routes, assets: assets, bridge: bridge)
     presenter = webView
 
-    navigation = ExternalNavigation(startURL: startURL) { url in
-      UIApplication.shared.open(url)
-    }
+    navigation = ExternalNavigation(
+      startURL: startURL,
+      openURL: { url in UIApplication.shared.open(url) },
+      warn: { message in ReflectCore.log(.warn, message) })
     webView.navigationDelegate = navigation
     webView.uiDelegate = navigation
 
@@ -126,16 +131,6 @@ final class AppHost {
     }
     done.wait()
     return opened.withLock { $0 }
-  }
-
-  /// The origin of a URL as the `Origin` header spells it, such as
-  /// `http://localhost:1420`: without the default port of the scheme.
-  static func origin(of url: URL) -> String? {
-    guard let scheme = url.scheme, let rawHost = url.host else { return nil }
-    let host = rawHost.contains(":") ? "[\(rawHost)]" : rawHost
-    let defaultPort = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
-    guard let port = url.port, port != defaultPort else { return "\(scheme)://\(host)" }
-    return "\(scheme)://\(host):\(port)"
   }
 }
 

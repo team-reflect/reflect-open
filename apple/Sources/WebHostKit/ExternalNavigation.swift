@@ -1,41 +1,41 @@
-import Foundation
-import WebKit
+public import Foundation
+public import WebKit
 
 /// Keeps the web view on the web app: a main-frame navigation to any other
 /// page opens with the system handler. A `target=_blank` link does the same,
 /// or loads in this web view when it stays in the web app. When the system
 /// ends the web content process, the page loads again.
 @MainActor
-final class ExternalNavigation: NSObject, WKNavigationDelegate, WKUIDelegate {
+public final class ExternalNavigation: NSObject, WKNavigationDelegate, WKUIDelegate {
   private let startURL: URL
   private let openURL: @MainActor (URL) -> Void
+  private let warn: @MainActor (String) -> Void
   private var terminations = 0
 
   /// `startURL` is the page of the web app: the bundled one or a dev server.
-  init(startURL: URL, openURL: @escaping @MainActor (URL) -> Void) {
+  /// `warn` gets a log line each time the web content process ends.
+  public init(
+    startURL: URL, openURL: @escaping @MainActor (URL) -> Void,
+    warn: @escaping @MainActor (String) -> Void
+  ) {
     self.startURL = startURL
     self.openURL = openURL
+    self.warn = warn
   }
 
   /// Whether a main-frame navigation to `url` leaves the web app. The app's
   /// own schemes, the origin of `startURL`, and document-local schemes stay.
-  static func isExternal(_ url: URL, startURL: URL) -> Bool {
+  public static func isExternal(_ url: URL, startURL: URL) -> Bool {
     switch url.scheme?.lowercased() {
     case AppSchemeHandler.scheme, "reflect-asset", "about", "blob", "data", nil:
       return false
     default:
       return url.scheme != startURL.scheme || url.host != startURL.host
-        || effectivePort(of: url) != effectivePort(of: startURL)
+        || url.effectivePort != startURL.effectivePort
     }
   }
 
-  /// The port of a URL, with the default of `http` and `https` for a URL
-  /// that names none.
-  private static func effectivePort(of url: URL) -> Int? {
-    url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil)
-  }
-
-  func webView(
+  public func webView(
     _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction
   ) async -> WKNavigationActionPolicy {
     guard let url = navigationAction.request.url,
@@ -46,7 +46,7 @@ final class ExternalNavigation: NSObject, WKNavigationDelegate, WKUIDelegate {
     return .cancel
   }
 
-  func webView(
+  public func webView(
     _ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures
   ) -> WKWebView? {
@@ -59,9 +59,9 @@ final class ExternalNavigation: NSObject, WKNavigationDelegate, WKUIDelegate {
     return nil
   }
 
-  func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+  public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
     terminations += 1
-    ReflectCore.log(.warn, "the web content process ended (\(terminations) in this launch)")
+    warn("the web content process ended (\(terminations) in this launch)")
     webView.reload()
   }
 }

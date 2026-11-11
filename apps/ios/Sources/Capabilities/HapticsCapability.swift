@@ -1,4 +1,5 @@
 import UIKit
+import WebHostKit
 
 /// The `plugin:mobile-haptics` commands. A web view has no `navigator.vibrate`,
 /// so the web app asks the shell for each haptic.

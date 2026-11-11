@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import Reflect
+@testable import WebHostKit
 
 @MainActor
 final class IPCRouteTests: XCTestCase {

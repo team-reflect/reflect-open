@@ -142,6 +142,10 @@
           "product-name": "RecordingShared",
           "build-phase": { "build-phase": "frameworks" },
         }, {
+          "package": "apple",
+          "product-name": "WebHostKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "sentry-cocoa",
           "product-name": "Sentry-Dynamic",
           "build-phase": { "build-phase": "frameworks" },

@@ -1,4 +1,5 @@
 import Foundation
+import WebHostKit
 import os
 
 /// The `host.` commands: services of the shell itself.

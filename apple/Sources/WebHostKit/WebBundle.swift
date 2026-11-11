@@ -1,19 +1,25 @@
-import Foundation
+public import Foundation
 import UniformTypeIdentifiers
 
 /// An HTTP response for a `reflect-app` request.
-struct SchemeReply: Sendable {
-  var statusCode: Int
-  var headers: [String: String]
-  var body: Data
+public struct SchemeReply: Sendable {
+  public var statusCode: Int
+  public var headers: [String: String]
+  public var body: Data
+
+  public init(statusCode: Int, headers: [String: String], body: Data) {
+    self.statusCode = statusCode
+    self.headers = headers
+    self.body = body
+  }
 }
 
 /// Reads files from the bundled `Web/` folder, the output of the desktop app's Vite build.
-enum WebBundle {
+public enum WebBundle {
   /// Reads the file at a URL path such as `/index.html` or `/assets/index-1a2b3c.js`.
   /// Returns 404 for a path outside `Web/` or a file that does not exist.
   @concurrent
-  static func reply(forPath path: String) async -> SchemeReply {
+  public static func reply(forPath path: String) async -> SchemeReply {
     let notFound = SchemeReply(
       statusCode: 404, headers: ["Content-Type": "text/plain"], body: Data("Not Found".utf8))
     let relativePath = path == "/" ? "index.html" : String(path.drop { $0 == "/" })

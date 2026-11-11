@@ -1,5 +1,6 @@
 import Foundation
 import RecordingKit
+import WebHostKit
 
 /// The `plugin:recording` commands and events: the shell's face of
 /// `RecordingEngine`. The engine lives as long as the app, so a recording

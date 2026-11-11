@@ -1,4 +1,5 @@
 import Foundation
+import WebHostKit
 
 extension ReflectCore {
   /// Resolves a `reflect-asset` request from its percent-decoded path, its

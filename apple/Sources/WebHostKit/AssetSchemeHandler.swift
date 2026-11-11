@@ -1,8 +1,8 @@
-import Foundation
-import WebKit
+public import Foundation
+public import WebKit
 
 /// The file that an asset request names, or the HTTP status to refuse it with.
-enum AssetResolution: Sendable, Equatable {
+public enum AssetResolution: Sendable, Equatable {
   /// `total` is the length of the file, and `range` the bytes that the
   /// request's `Range` header selects: nil for the whole file.
   case file(path: String, mime: String, total: UInt64, range: ClosedRange<UInt64>? = nil)
@@ -19,29 +19,23 @@ enum AssetResolution: Sendable, Equatable {
 /// `Range` header selects. The handler reads the file in chunks off the main
 /// thread.
 @MainActor
-final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
-  typealias Resolve =
+public final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
+  public typealias Resolve =
     @Sendable (_ requestPath: String, _ query: String?, _ range: String?) async
     -> AssetResolution
 
-  static let scheme = "reflect-asset"
-  static let chunkSize = 256 * 1024
+  public static let scheme = "reflect-asset"
+  public static let chunkSize = 256 * 1024
 
   private let resolve: Resolve
-  /// The tasks that WebKit started and that did not end yet.
-  private var tasks: [ObjectIdentifier: SchemeTask] = [:]
+  private let tasks = SchemeTasks()
 
-  init(resolve: @escaping Resolve) {
+  public init(resolve: @escaping Resolve) {
     self.resolve = resolve
   }
 
-  func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
-    let id = ObjectIdentifier(urlSchemeTask)
-    let task = SchemeTask(urlSchemeTask)
-    tasks[id] = task
-    task.onEnd { [weak self] in
-      self?.tasks[id] = nil
-    }
+  public func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
+    let task = tasks.start(urlSchemeTask)
 
     guard task.request.httpMethod == "GET" else {
       Self.refuse(task, status: 405)
@@ -67,8 +61,8 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
     }
   }
 
-  func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
-    tasks[ObjectIdentifier(urlSchemeTask)]?.stop()
+  public func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
+    tasks.stop(urlSchemeTask)
   }
 
   private static func refuse(_ task: SchemeTask, status: Int) {

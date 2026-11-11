@@ -1,5 +1,6 @@
 import ObjectiveC
 import UIKit
+import WebHostKit
 import WebKit
 
 /// The web view that renders the web app from the `reflect-app` scheme.

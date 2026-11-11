@@ -1,11 +1,10 @@
 import XCTest
 
-@testable import Reflect
+@testable import WebHostKit
 
-@MainActor
-final class AppHostTests: XCTestCase {
+final class URLOriginTests: XCTestCase {
   private func origin(_ url: String) -> String? {
-    URL(string: url).flatMap(AppHost.origin(of:))
+    URL(string: url)?.webOrigin
   }
 
   func testOriginOmitsTheDefaultPort() {
