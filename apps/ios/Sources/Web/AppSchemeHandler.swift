@@ -1,42 +1,41 @@
 import Foundation
 import WebKit
 
-/// Handles the `reflect-app` scheme, the origin of the web app. It serves the
-/// static files of `WebBundle`.
+/// Handles the `reflect-app` scheme, the origin of the web app. A request
+/// goes to the first route whose prefix matches its path. Every other path is
+/// a static file of `WebBundle`.
 @MainActor
 final class AppSchemeHandler: NSObject, WKURLSchemeHandler {
   static let scheme = "reflect-app"
   static let indexURL = "reflect-app://localhost/index.html"
 
-  /// The tasks that WebKit started and did not stop yet. A reply goes only to a live task.
-  private var liveTasks: Set<ObjectIdentifier> = []
+  private let routes: [any SchemeRoute]
+  /// The tasks that WebKit started and that did not end yet.
+  private var tasks: [ObjectIdentifier: SchemeTask] = [:]
+
+  init(routes: [any SchemeRoute] = []) {
+    self.routes = routes
+  }
 
   func webView(_ webView: WKWebView, start urlSchemeTask: any WKURLSchemeTask) {
     let id = ObjectIdentifier(urlSchemeTask)
-    liveTasks.insert(id)
-    let path = urlSchemeTask.request.url?.path ?? "/"
+    let task = SchemeTask(urlSchemeTask)
+    tasks[id] = task
+    task.onEnd { [weak self] in
+      self?.tasks[id] = nil
+    }
+
+    let path = task.request.url?.path ?? "/"
+    if let route = routes.first(where: { path.hasPrefix($0.pathPrefix) }) {
+      route.start(task)
+      return
+    }
     Task {
-      let reply = await WebBundle.reply(forPath: path)
-      guard liveTasks.remove(id) != nil else { return }
-      send(reply, to: urlSchemeTask)
+      task.reply(await WebBundle.reply(forPath: path))
     }
   }
 
   func webView(_ webView: WKWebView, stop urlSchemeTask: any WKURLSchemeTask) {
-    liveTasks.remove(ObjectIdentifier(urlSchemeTask))
-  }
-
-  private func send(_ reply: SchemeReply, to urlSchemeTask: any WKURLSchemeTask) {
-    guard let url = urlSchemeTask.request.url,
-      let response = HTTPURLResponse(
-        url: url, statusCode: reply.statusCode, httpVersion: "HTTP/1.1",
-        headerFields: reply.headers)
-    else {
-      urlSchemeTask.didFailWithError(URLError(.badURL))
-      return
-    }
-    urlSchemeTask.didReceive(response)
-    urlSchemeTask.didReceive(reply.body)
-    urlSchemeTask.didFinish()
+    tasks[ObjectIdentifier(urlSchemeTask)]?.stop()
   }
 }
