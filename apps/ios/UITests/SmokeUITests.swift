@@ -10,21 +10,6 @@ final class SmokeUITests: XCTestCase {
     continueAfterFailure = false
   }
 
-  /// Launches the app and returns the editor of today's note. A fresh
-  /// install shows onboarding first: this picks local storage.
-  private func launchIntoDailyNote() -> XCUIElement {
-    app.launch()
-    let webView = app.webViews.firstMatch
-    XCTAssertTrue(webView.waitForExistence(timeout: 30), "the web view exists")
-    let editor = webView.textViews.firstMatch
-    let useLocalStorage = webView.buttons["Or, use this device only"]
-    if !editor.waitForExistence(timeout: 10), useLocalStorage.exists {
-      useLocalStorage.tap()
-    }
-    XCTAssertTrue(editor.waitForExistence(timeout: 30), "today's note has an editor")
-    return editor
-  }
-
   private func waitForText(_ text: String, in editor: XCUIElement) {
     let hasText = NSPredicate { element, _ in
       ((element as? XCUIElement)?.value as? String)?.contains(text) ?? false
@@ -34,7 +19,7 @@ final class SmokeUITests: XCTestCase {
 
   func testTypedTextSurvivesARelaunch() {
     let token = "uitest\(Int(Date().timeIntervalSince1970))"
-    let editor = launchIntoDailyNote()
+    let editor = app.launchIntoDailyNote()
     editor.tap()
     editor.typeText("\(token) ")
     waitForText(token, in: editor)
@@ -42,11 +27,11 @@ final class SmokeUITests: XCTestCase {
     Thread.sleep(forTimeInterval: 2)
 
     app.terminate()
-    waitForText(token, in: launchIntoDailyNote())
+    waitForText(token, in: app.launchIntoDailyNote())
   }
 
   func testThePageSurvivesTheBackground() {
-    let editor = launchIntoDailyNote()
+    let editor = app.launchIntoDailyNote()
     XCUIDevice.shared.press(.home)
     XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
     app.activate()

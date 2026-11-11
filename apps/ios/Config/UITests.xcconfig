@@ -7,3 +7,6 @@ PRODUCT_BUNDLE_IDENTIFIER = $(REFLECT_BUNDLE_ID).uitests
 GENERATE_INFOPLIST_FILE = YES
 TEST_TARGET_NAME = Reflect
 LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
+
+// `XCUIApplication.open(_:)` needs iOS 16.4. The UI tests run on current simulators only.
+IPHONEOS_DEPLOYMENT_TARGET = 16.4
