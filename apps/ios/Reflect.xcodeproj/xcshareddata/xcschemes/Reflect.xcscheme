@@ -45,6 +45,28 @@
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C2F7A91E5B3D48A6B0E4D8F3"
+               BuildableName = "ReflectTests.xctest"
+               BlueprintName = "ReflectTests"
+               ReferencedContainer = "container:Reflect.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A9E3F6C17D524B08B6F1D4E7"
+               BuildableName = "ReflectUITests.xctest"
+               BlueprintName = "ReflectUITests"
+               ReferencedContainer = "container:Reflect.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug-Dev"

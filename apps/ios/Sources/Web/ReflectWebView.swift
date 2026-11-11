@@ -4,9 +4,12 @@ import WebKit
 /// The web view that renders the web app from the `reflect-app` scheme.
 @MainActor
 final class ReflectWebView: WKWebView {
-  init() {
+  init(routes: [any SchemeRoute] = [], bridge: HostBridge = HostBridge()) {
     let configuration = WKWebViewConfiguration()
-    configuration.setURLSchemeHandler(AppSchemeHandler(), forURLScheme: AppSchemeHandler.scheme)
+    configuration.setURLSchemeHandler(
+      AppSchemeHandler(routes: routes), forURLScheme: AppSchemeHandler.scheme)
+    configuration.userContentController.addUserScript(HostBridge.userScript)
+    configuration.userContentController.add(bridge, name: HostBridge.messageHandlerName)
     configuration.allowsInlineMediaPlayback = true
     configuration.allowsPictureInPictureMediaPlayback = true
     configuration.mediaTypesRequiringUserActionForPlayback = []
@@ -14,6 +17,9 @@ final class ReflectWebView: WKWebView {
     configuration.websiteDataStore = .default()
     super.init(frame: .zero, configuration: configuration)
 
+    bridge.evaluate = { [weak self] script in
+      self?.evaluateJavaScript(script)
+    }
     isOpaque = false
     backgroundColor = .systemBackground
     scrollView.bounces = false
