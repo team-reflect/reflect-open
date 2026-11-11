@@ -123,9 +123,11 @@ final class IPCRoute: SchemeRoute {
     for (name, value) in request.allHTTPHeaderFields ?? [:] {
       headers[name.lowercased()] = value
     }
-    let contentType = headers["content-type"]?.lowercased() ?? ""
-    let isBinary = contentType.hasPrefix("application/octet-stream")
-    guard isBinary || contentType.hasPrefix("application/json") else {
+    // The media type without its parameters, such as `; charset=utf-8`.
+    let mediaType = (headers["content-type"] ?? "").split(separator: ";").first
+      .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+    let isBinary = mediaType == "application/octet-stream"
+    guard isBinary || mediaType == "application/json" else {
       task.reply(SchemeReply(statusCode: 415, headers: corsHeaders, body: Data()))
       return
     }

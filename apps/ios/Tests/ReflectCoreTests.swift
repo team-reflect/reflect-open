@@ -36,13 +36,18 @@ final class ReflectCoreTests: XCTestCase {
     XCTAssertEqual(error?["kind"], "notFound")
   }
 
-  func testCloseAnswersWaitingAndLaterCalls() async throws {
+  func testEveryCallEndsWhenTheCoreCloses() async throws {
     let core = try makeCore()
     let calls = (0..<50).map { _ in
       Task { await core.dispatch("settings_load") }
     }
-    core.close()
-    core.close()
+    // The calls race with `close()`: some are answered, some are in flight,
+    // some start after it.
+    await withTaskGroup(of: Void.self) { group in
+      for _ in 0..<4 {
+        group.addTask { core.close() }
+      }
+    }
 
     let closed = CoreReply.error(kind: "io", message: "the core is closed")
     for call in calls {
@@ -53,6 +58,8 @@ final class ReflectCoreTests: XCTestCase {
     }
     let later = await core.dispatch("settings_load")
     XCTAssertEqual(later, closed)
+    let asset = await core.resolveAsset(requestPath: "1/assets/a.png", rasterOnly: false)
+    XCTAssertEqual(asset, .refused(status: 500))
     for await _ in core.events {}
   }
 

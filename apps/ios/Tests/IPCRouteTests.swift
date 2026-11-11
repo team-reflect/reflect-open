@@ -189,13 +189,21 @@ final class IPCRouteTests: XCTestCase {
 
   func testOnlyJSONAndBinaryBodiesRun() async {
     let route = route()
-    for contentType in ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data"] {
+    for contentType in [
+      "text/plain", "application/x-www-form-urlencoded", "multipart/form-data",
+      "application/jsonp", "application/octet-stream-x",
+    ] {
       let fake = await post(route, command: "settings_save", headers: ["Content-Type": contentType])
       XCTAssertEqual(fake.response?.statusCode, 415, contentType)
     }
     let missing = await post(route, command: "settings_save", headers: [:])
     XCTAssertEqual(missing.response?.statusCode, 415)
     XCTAssertEqual(calls, [])
+
+    let withParameter = await post(
+      route, command: "settings_save", headers: ["Content-Type": "application/json; charset=utf-8"])
+    XCTAssertEqual(withParameter.response?.statusCode, 200)
+    XCTAssertEqual(calls.count, 1)
   }
 
   func testTheDevOriginGetsCORSHeadersAndPreflight() async {
@@ -217,6 +225,11 @@ final class IPCRouteTests: XCTestCase {
     let app = await post(route, command: "graph_open")
     XCTAssertEqual(app.response?.statusCode, 200)
     XCTAssertNil(app.header("Access-Control-Allow-Origin"))
+
+    let appWithOrigin = await post(
+      route, command: "graph_open", origin: TrustedCallers.appOrigin, referer: nil)
+    XCTAssertEqual(appWithOrigin.response?.statusCode, 200)
+    XCTAssertEqual(calls.count, 3)
   }
 
   func testOtherMethodsAreRejected() async {
