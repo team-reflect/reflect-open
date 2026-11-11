@@ -125,11 +125,11 @@ function computeGate({
   if (active.isLoading || classic.isLoading || clock.isLoading) {
     return 'hidden'
   }
-  // An unknown channel keeps the paywall away, so a failed probe never blocks a paying user.
-  if (
-    override === null &&
-    (environment.isLoading || (environment.isError && environment.value === null))
-  ) {
+  if (override === null && environment.isLoading) {
+    return 'hidden'
+  }
+  // A failed probe keeps the paywall away, so it never blocks a paying user.
+  if (override === null && environment.isError && environment.value === null) {
     return requested ? 'skippable' : 'hidden'
   }
   const phase = override ?? clock.phase

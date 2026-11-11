@@ -58,6 +58,9 @@ export interface AppStoreEnvironmentServiceDeps {
   readonly appStore: AppStoreService
   readonly storage: StorageService
   readonly platform: PlatformFacts
+  /**
+   * Receives a warning for each failed probe.
+   */
   readonly logger: LoggerService
 }
 

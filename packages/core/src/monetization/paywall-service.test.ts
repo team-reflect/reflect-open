@@ -119,6 +119,24 @@ describe('PaywallService.gate', () => {
     expect(paywall.gate.get()).toBe('required')
   })
 
+  it('keeps a request from an earlier page load hidden while the probe is pending', () => {
+    installClock.setState({ phase: 'skippable' })
+    appStoreEnvironment.setState({ value: null, isLoading: true })
+    const paywall = service()
+    paywall.setRequested(true)
+    expect(paywall.gate.get()).toBe('hidden')
+
+    appStoreEnvironment.setState({ value: 'Sandbox', isLoading: false })
+    expect(paywall.gate.get()).toBe('skippable')
+  })
+
+  it('honors an explicit request after a failed probe', () => {
+    appStoreEnvironment.setState({ value: null, isError: true })
+    const paywall = service()
+    paywall.setRequested(true)
+    expect(paywall.gate.get()).toBe('skippable')
+  })
+
   it('stays hidden when a slow probe reports a TestFlight install', () => {
     installClock.setState({ phase: 'skippable' })
     appStoreEnvironment.setState({ value: null, isLoading: true })
