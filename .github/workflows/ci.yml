@@ -153,6 +153,12 @@ jobs:
           git diff --exit-code packages/db/src/schema.gen.ts \
             || (echo "::error::schema.gen.ts is stale — run 'pnpm --filter @reflect/db db:codegen' and commit the result." && exit 1)
 
+      - name: Verify the generated iOS CSP is current
+        run: |
+          pnpm gen:ios-csp
+          git diff --exit-code apps/ios/Sources/Web/ContentSecurityPolicy.gen.swift \
+            || (echo "::error::ContentSecurityPolicy.gen.swift is stale. Run 'pnpm gen:ios-csp' and commit the result." && exit 1)
+
       - name: Lint
         run: pnpm lint
 

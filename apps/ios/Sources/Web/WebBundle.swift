@@ -10,26 +10,6 @@ struct SchemeReply: Sendable {
 
 /// Reads files from the bundled `Web/` folder, the output of the desktop app's Vite build.
 enum WebBundle {
-  /// The CSP of `apps/desktop/src-tauri/tauri.conf.json`, with `reflect-app:`
-  /// in place of the Tauri IPC sources.
-  private static let contentSecurityPolicy = [
-    "default-src 'self' reflect-app:",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' blob: data: reflect-asset: http://reflect-asset.localhost"
-      + " https://reflect-asset.localhost https:",
-    "media-src 'self' https: reflect-asset: http://reflect-asset.localhost"
-      + " https://reflect-asset.localhost",
-    "font-src 'self' data:",
-    "frame-src 'self' https://platform.twitter.com https://platform.x.com"
-      + " https://syndication.twitter.com https://www.youtube-nocookie.com"
-      + " https://www.youtube.com https://youtube-relay-reflect.vercel.app",
-    "connect-src 'self' reflect-app: https://api.openai.com https://api.anthropic.com"
-      + " https://generativelanguage.googleapis.com https://openrouter.ai https://github.com"
-      + " https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io"
-      + " https://*.ingest.de.sentry.io",
-  ].joined(separator: "; ")
-
   /// Reads the file at a URL path such as `/index.html` or `/assets/index-1a2b3c.js`.
   /// Returns 404 for a path outside `Web/` or a file that does not exist.
   @concurrent
@@ -51,7 +31,7 @@ enum WebBundle {
       "Cache-Control": cacheControl(forPath: relativePath),
     ]
     if file.pathExtension == "html" {
-      headers["Content-Security-Policy"] = contentSecurityPolicy
+      headers["Content-Security-Policy"] = ContentSecurityPolicy.header
     }
     return SchemeReply(statusCode: 200, headers: headers, body: body)
   }

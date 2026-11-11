@@ -29,6 +29,7 @@
     "fix:oxlint": "oxlint --max-warnings 0 --fix apps packages",
     "fix:eslint": "eslint --cache --max-warnings 0 --fix",
     "check": "pnpm typecheck && pnpm lint",
+    "gen:ios-csp": "node scripts/generate-ios-csp.ts",
     "gen:licenses": "pnpm --filter @reflect/desktop gen:licenses",
     "gen:wxt": "pnpm --filter @reflect/extension gen:wxt",
     "tauri": "pnpm --filter @reflect/desktop tauri",
