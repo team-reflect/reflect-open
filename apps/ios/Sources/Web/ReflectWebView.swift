@@ -18,9 +18,11 @@ final class ReflectWebView: WKWebView {
     backgroundColor = .systemBackground
     scrollView.bounces = false
     scrollView.contentInsetAdjustmentBehavior = .never
+    #if DEBUG
     if #available(iOS 16.4, *) {
       isInspectable = true
     }
+    #endif
   }
 
   @available(*, unavailable)
