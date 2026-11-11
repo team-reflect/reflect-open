@@ -132,6 +132,16 @@ final class ReflectCore: Sendable {
       }
     }
   }
+
+  /// The JSON answer of `reflect_core_asset_resolve`: `{path, mime}` or
+  /// `{kind, message, status}`. It reads the file, so it can block.
+  func resolveAssetJSON(_ generation: UInt64, _ path: String, _ rasterOnly: Bool) -> Data {
+    guard let json = reflect_core_asset_resolve(handle, generation, path, rasterOnly) else {
+      return Data()
+    }
+    defer { reflect_core_string_free(json) }
+    return Data(bytes: json, count: strlen(json))
+  }
 }
 
 extension Data {
