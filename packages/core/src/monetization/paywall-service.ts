@@ -128,7 +128,7 @@ function computeGate({
   if (override === null && environment.isLoading) {
     return 'hidden'
   }
-  // A failed probe keeps the paywall away, so it never blocks a paying user.
+  // A failed probe opens the paywall only on an explicit request, so it never blocks a paying user.
   if (override === null && environment.isError && environment.value === null) {
     return requested ? 'skippable' : 'hidden'
   }

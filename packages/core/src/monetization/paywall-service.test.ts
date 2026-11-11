@@ -122,8 +122,8 @@ describe('PaywallService.gate', () => {
   it('keeps a request from an earlier page load hidden while the probe is pending', () => {
     installClock.setState({ phase: 'skippable' })
     appStoreEnvironment.setState({ value: null, isLoading: true })
+    storage.session.set(PAYWALL_REQUESTED_STORAGE_KEY, 'true')
     const paywall = service()
-    paywall.setRequested(true)
     expect(paywall.gate.get()).toBe('hidden')
 
     appStoreEnvironment.setState({ value: 'Sandbox', isLoading: false })
