@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["**/.wxt/**"],
   "plugins": ["typescript", "import"],
   "rules": {
     "typescript/no-explicit-any": "error",

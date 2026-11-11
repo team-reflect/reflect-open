@@ -9,6 +9,9 @@
       "ignoreDependencies": ["@sentry/cli"],
       "ignore": "src-tauri/gen/**"
     },
-    "apps/extension": { "ignoreUnresolved": ["#imports"] }
+    "apps/extension": {
+      "ignore": ".wxt/**",
+      "ignoreUnresolved": ["#imports"]
+    }
   }
 }
