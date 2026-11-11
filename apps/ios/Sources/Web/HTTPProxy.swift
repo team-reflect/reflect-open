@@ -44,15 +44,16 @@ final class HTTPProxy: SchemeRoute {
   private let session: URLSession
   private var exchanges: [Int: Exchange] = [:]
 
-  private let allowedOrigin: String?
+  private let callers: TrustedCallers
 
-  /// `allowedOrigin` is the origin of a dev server page that may call the
-  /// route across origins. No other origin gets CORS headers.
+  /// Only a caller that `callers` trusts gets a request sent: any other
+  /// page would use the route to reach hosts its own origin cannot read,
+  /// such as servers on the local network.
   init(
-    allowedOrigin: String? = nil,
+    callers: TrustedCallers = TrustedCallers(),
     configuration: URLSessionConfiguration = HTTPProxy.makeConfiguration()
   ) {
-    self.allowedOrigin = allowedOrigin
+    self.callers = callers
     let delegate = SessionDelegate()
     session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: .main)
     delegate.proxy = self
@@ -66,7 +67,11 @@ final class HTTPProxy: SchemeRoute {
   /// an invalid target at once, without a network request.
   func start(_ task: SchemeTask) {
     let request = task.request
-    let cors = corsHeaders(for: request)
+    guard let origin = callers.trustedOrigin(of: request) else {
+      task.reply(SchemeReply(statusCode: 403, headers: [:], body: Data()))
+      return
+    }
+    let cors = corsHeaders(forOrigin: origin)
 
     if request.httpMethod == "OPTIONS",
       let method = request.value(forHTTPHeaderField: "Access-Control-Request-Method")
@@ -127,12 +132,11 @@ final class HTTPProxy: SchemeRoute {
     }
   }
 
-  /// CORS headers for a request from the page at `allowedOrigin`, else none.
-  private func corsHeaders(for request: URLRequest) -> [String: String] {
-    guard let allowedOrigin, request.value(forHTTPHeaderField: "Origin") == allowedOrigin else {
-      return [:]
-    }
-    return ["Access-Control-Allow-Origin": allowedOrigin, "Access-Control-Expose-Headers": "*"]
+  /// CORS headers for a request from the dev server page. The bundled web
+  /// app is same-origin and gets none.
+  private func corsHeaders(forOrigin origin: String) -> [String: String] {
+    guard origin == callers.devOrigin else { return [:] }
+    return ["Access-Control-Allow-Origin": origin, "Access-Control-Expose-Headers": "*"]
   }
 
   /// The `url` query item, when it is an absolute `http` or `https` URL with a host.

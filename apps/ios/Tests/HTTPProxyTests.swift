@@ -11,7 +11,8 @@ final class HTTPProxyTests: XCTestCase {
     StubProtocol.reset()
     let configuration = HTTPProxy.makeConfiguration()
     configuration.protocolClasses = [StubProtocol.self]
-    proxy = HTTPProxy(allowedOrigin: "http://localhost:1420", configuration: configuration)
+    proxy = HTTPProxy(
+      callers: TrustedCallers(devOrigin: "http://localhost:1420"), configuration: configuration)
   }
 
   override func tearDown() async throws {
@@ -195,8 +196,7 @@ final class HTTPProxyTests: XCTestCase {
     }
     let devTask = RecordingSchemeTask(
       target: "https://api.example.com/", headers: ["Origin": "http://localhost:1420"])
-    let appTask = RecordingSchemeTask(
-      target: "https://api.example.com/", headers: ["Origin": "https://evil.example"])
+    let appTask = RecordingSchemeTask(target: "https://api.example.com/")
 
     start(devTask)
     start(appTask)
@@ -209,6 +209,24 @@ final class HTTPProxyTests: XCTestCase {
     XCTAssertEqual(devHead.value(forHTTPHeaderField: "Access-Control-Expose-Headers"), "*")
     let appHead = try XCTUnwrap(appTask.head)
     XCTAssertNil(appHead.value(forHTTPHeaderField: "Access-Control-Allow-Origin"))
+  }
+
+  func testUntrustedCallersSendNothing() {
+    let callers: [[String: String]] = [
+      ["Origin": "https://evil.example"],
+      ["Origin": "null"],
+      ["Referer": "https://platform.twitter.com/embed/Tweet.html"],
+      ["Origin": "https://evil.example", "Referer": "reflect-app://localhost/index.html"],
+    ]
+    for headers in callers {
+      let task = RecordingSchemeTask(target: "http://192.168.1.1/admin", headers: headers)
+      start(task)
+      XCTAssertEqual(task.events, [.head(403), .data(""), .finish], "\(headers)")
+    }
+    let anonymous = RecordingSchemeTask(target: "http://192.168.1.1/admin", referer: nil)
+    start(anonymous)
+    XCTAssertEqual(anonymous.events.first, .head(403))
+    XCTAssertTrue(StubProtocol.requests.isEmpty)
   }
 
   func testRedirectKeepsAuthorizationOnlyWithinTheOrigin() async throws {
@@ -260,11 +278,20 @@ private final class RecordingSchemeTask: NSObject, WKURLSchemeTask {
   private(set) var events: [Event] = []
   private(set) var head: HTTPURLResponse?
 
-  init(target: String?, method: String = "GET", headers: [String: String] = [:]) {
+  /// A request from the bundled web app, unless `headers` name another
+  /// caller or `referer` is nil.
+  init(
+    target: String?, method: String = "GET", headers: [String: String] = [:],
+    referer: String? = "reflect-app://localhost/index.html"
+  ) {
     var components = URLComponents(string: "reflect-app://localhost/__http")
     components?.queryItems = target.map { [URLQueryItem(name: "url", value: $0)] }
     urlRequest = URLRequest(url: components?.url ?? URL(fileURLWithPath: "/"))
     urlRequest.httpMethod = method
+    var headers = headers
+    if headers["Origin"] == nil, headers["Referer"] == nil {
+      headers["Referer"] = referer
+    }
     urlRequest.allHTTPHeaderFields = headers
   }
 

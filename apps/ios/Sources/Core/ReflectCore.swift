@@ -34,9 +34,11 @@ struct CoreStartError: Error, CustomStringConvertible {
 }
 
 /// The Rust core behind the C interface of `reflect_core.h`. Commands run on
-/// Rust threads; `dispatch` suspends until the reply arrives. Releasing the
-/// last reference frees the core and answers every waiting `dispatch` with an
-/// `io` error.
+/// Rust threads; `dispatch` suspends until the reply arrives.
+///
+/// `close()` frees the core: every `dispatch` that still waits, and every
+/// later one, gets an `io` error. Releasing the last reference closes the
+/// core too.
 final class ReflectCore: Sendable {
   /// The events of the core, in the order it emitted them.
   let events: AsyncStream<CoreEvent>
@@ -45,6 +47,7 @@ final class ReflectCore: Sendable {
   private nonisolated(unsafe) let handle: OpaquePointer
   private let callbacks: Unmanaged<CoreCallbacks>
   private let pending = PendingReplies()
+  private let lifetime = CoreLifetime()
 
   /// Starts a core. `openURL` receives each URL or absolute file path that a
   /// command opens with the system handler, on a Rust thread, and returns
@@ -90,10 +93,21 @@ final class ReflectCore: Sendable {
   }
 
   deinit {
-    reflect_core_free(handle)
-    pending.failAll()
-    callbacks.takeUnretainedValue().events.finish()
-    callbacks.release()
+    close()
+  }
+
+  /// Frees the core. It returns after every call into the core returned and
+  /// every running callback finished. Commands that run at that moment
+  /// finish, but their `dispatch` calls get an `io` error, like every later
+  /// call. `events` ends. Every call of `close()` returns only after the
+  /// shutdown is complete. Do not call it from a callback of the core.
+  func close() {
+    lifetime.close {
+      reflect_core_free(handle)
+      pending.failAll()
+      callbacks.takeUnretainedValue().events.finish()
+      callbacks.release()
+    }
   }
 
   /// Runs `command`. `args` is a JSON object of camelCase arguments, `headers`
@@ -104,30 +118,43 @@ final class ReflectCore: Sendable {
   ) async -> CoreReply {
     await withCheckedContinuation { continuation in
       let reply = PendingReply(continuation: continuation, owner: pending)
-      pending.add(reply)
-      args.withUnsafeBytes { args in
-        headers.withUnsafeBytes { headers in
-          body.withUnsafeBytes { body in
-            reflect_core_dispatch(
-              handle,
-              command,
-              args.bindMemory(to: UInt8.self).baseAddress, args.count,
-              headers.bindMemory(to: UInt8.self).baseAddress, headers.count,
-              body.bindMemory(to: UInt8.self).baseAddress, body.count,
-              { ctx, status, json, jsonLength, bytes, bytesLength in
-                guard let ctx else { return }
-                let reply = Unmanaged<PendingReply>.fromOpaque(ctx).takeUnretainedValue()
-                switch status {
-                case Int32(REFLECT_STATUS_JSON):
-                  reply.resume(.json(Data(bytes: json, count: jsonLength)))
-                case Int32(REFLECT_STATUS_BYTES):
-                  reply.resume(.bytes(Data(bytes: bytes, count: bytesLength)))
-                default:
-                  reply.resume(.error(Data(bytes: json, count: jsonLength)))
-                }
-              },
-              Unmanaged.passUnretained(reply).toOpaque())
-          }
+      let isOpen = lifetime.whileOpen {
+        pending.add(reply)
+        send(command, args: args, headers: headers, body: body, reply: reply)
+      }
+      if isOpen == nil {
+        continuation.resume(returning: PendingReplies.closedReply)
+      }
+    }
+  }
+
+  /// Hands one command to the core. The call returns at once; the reply
+  /// arrives on a Rust thread.
+  private func send(
+    _ command: String, args: Data, headers: Data, body: Data, reply: PendingReply
+  ) {
+    args.withUnsafeBytes { args in
+      headers.withUnsafeBytes { headers in
+        body.withUnsafeBytes { body in
+          reflect_core_dispatch(
+            handle,
+            command,
+            args.bindMemory(to: UInt8.self).baseAddress, args.count,
+            headers.bindMemory(to: UInt8.self).baseAddress, headers.count,
+            body.bindMemory(to: UInt8.self).baseAddress, body.count,
+            { ctx, status, json, jsonLength, bytes, bytesLength in
+              guard let ctx else { return }
+              let reply = Unmanaged<PendingReply>.fromOpaque(ctx).takeUnretainedValue()
+              switch status {
+              case Int32(REFLECT_STATUS_JSON):
+                reply.resume(.json(Data(bytes: json, count: jsonLength)))
+              case Int32(REFLECT_STATUS_BYTES):
+                reply.resume(.bytes(Data(bytes: bytes, count: bytesLength)))
+              default:
+                reply.resume(.error(Data(bytes: json, count: jsonLength)))
+              }
+            },
+            Unmanaged.passUnretained(reply).toOpaque())
         }
       }
     }
@@ -135,15 +162,19 @@ final class ReflectCore: Sendable {
 
   /// The JSON answer of `reflect_core_asset_resolve`: `{path, mime}` or
   /// `{kind, message, status}`. It reads the first bytes of the file, so it
-  /// blocks the calling thread while iCloud downloads the file.
+  /// blocks the calling thread while iCloud downloads the file. A closed core
+  /// answers empty data. `close()` waits for a call that runs.
   func resolveAssetJSONBlocking(_ generation: UInt64, _ path: String, _ rasterOnly: Bool)
     -> Data
   {
-    guard let json = reflect_core_asset_resolve(handle, generation, path, rasterOnly) else {
-      return Data()
+    let answer = lifetime.whileOpen { () -> Data in
+      guard let json = reflect_core_asset_resolve(handle, generation, path, rasterOnly) else {
+        return Data()
+      }
+      defer { reflect_core_string_free(json) }
+      return Data(bytes: json, count: strlen(json))
     }
-    defer { reflect_core_string_free(json) }
-    return Data(bytes: json, count: strlen(json))
+    return answer ?? Data()
   }
 }
 
@@ -155,6 +186,63 @@ extension Data {
     } else {
       self.init()
     }
+  }
+}
+
+/// Guards the handle of the core: calls into the core run only while it is
+/// open, and the core is freed only after every such call returned.
+private final class CoreLifetime: @unchecked Sendable {
+  private enum State {
+    case open
+    case closing
+    case closed
+  }
+
+  private let condition = NSCondition()
+  private var state = State.open
+  private var callsInFlight = 0
+
+  /// Runs `call` when the core is open and returns its value, else nil.
+  func whileOpen<T>(_ call: () -> T) -> T? {
+    condition.lock()
+    guard state == .open else {
+      condition.unlock()
+      return nil
+    }
+    callsInFlight += 1
+    condition.unlock()
+    defer {
+      condition.lock()
+      callsInFlight -= 1
+      condition.broadcast()
+      condition.unlock()
+    }
+    return call()
+  }
+
+  /// The first call waits for the calls in flight, then runs `free`. Every
+  /// call returns after `free` finished.
+  func close(_ free: () -> Void) {
+    condition.lock()
+    guard state == .open else {
+      while state != .closed {
+        condition.wait()
+      }
+      condition.unlock()
+      return
+    }
+    state = .closing
+    while callsInFlight > 0 {
+      condition.wait()
+    }
+    condition.unlock()
+
+    free()
+
+    condition.lock()
+    state = .closed
+    condition.broadcast()
+    condition.unlock()
   }
 }
 
@@ -206,7 +294,10 @@ private final class PendingReplies: Sendable {
   func failAll() {
     let waiting = replies.withLock { Array($0.values) }
     for reply in waiting {
-      reply.resume(.error(kind: "io", message: "the core is closed"))
+      reply.resume(Self.closedReply)
     }
   }
+
+  /// The reply of a call that the closed core does not answer.
+  static var closedReply: CoreReply { .error(kind: "io", message: "the core is closed") }
 }

@@ -32,15 +32,15 @@ final class AppHost {
     shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
     routes.append(SelfCheckRoute())
     #endif
-    routes.append(HTTPProxy(allowedOrigin: devURL.flatMap(Self.origin(of:))))
+    let callers = TrustedCallers(devOrigin: devURL.flatMap(Self.origin(of:)))
+    routes.append(HTTPProxy(callers: callers))
     routes.append(
       IPCRoute(
         dispatch: { [core] command, args, headers, body in
           await core.dispatch(command, args: args, headers: headers, body: body)
         },
         shellCommands: shellCommands,
-        allowedOrigin: devURL.flatMap(Self.origin(of:)),
-        onRequest: { [bridge] in bridge.markReady() }))
+        callers: callers))
     let assets = AssetSchemeHandler { [core] requestPath, rasterOnly in
       await core.resolveAsset(requestPath: requestPath, rasterOnly: rasterOnly)
     }
