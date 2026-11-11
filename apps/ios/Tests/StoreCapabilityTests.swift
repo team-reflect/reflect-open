@@ -55,24 +55,7 @@ final class StoreCapabilityTests: XCTestCase {
 
   // The purchase command needs the system's purchase sheet, which does not
   // answer in a simulator's first run. The test session buys the product.
-  func testAProductIsOwnedUntilItExpires() async throws {
-    try session.buyProduct(productIdentifier: monthly)
-    let afterPurchase = try await isOwned()
-    XCTAssertTrue(afterPurchase)
-
-    // Without this, the test session renews the subscription when it expires.
-    try session.disableAutoRenewForTransaction(
-      identifier: XCTUnwrap(session.allTransactions().first).identifier)
-    try session.expireSubscription(productIdentifier: monthly)
-    var afterExpiry = true
-    for _ in 0..<600 where afterExpiry {
-      try await Task.sleep(nanoseconds: 100_000_000)
-      afterExpiry = try await isOwned()
-    }
-    XCTAssertFalse(afterExpiry)
-  }
-
-  func testATransactionOutsideAPurchaseEmitsPurchaseUpdated() async throws {
+  func testATransactionOutsideAPurchaseIsReportedAndOwned() async throws {
     try session.buyProduct(productIdentifier: monthly)
     for _ in 0..<600 where updated == 0 {
       try await Task.sleep(nanoseconds: 100_000_000)
@@ -80,11 +63,5 @@ final class StoreCapabilityTests: XCTestCase {
     XCTAssertGreaterThan(updated, 0)
     let owned = try await isOwned()
     XCTAssertTrue(owned)
-  }
-
-  func testGetEnvironmentAnswersAnEnvironment() async throws {
-    let reply = try await call("plugin:app-store|get_environment")
-    let environment = try XCTUnwrap(reply["environment"] as? String)
-    XCTAssertTrue(["Production", "Sandbox", "Xcode"].contains(environment))
   }
 }

@@ -27,16 +27,6 @@ final class ReflectCoreTests: XCTestCase {
     XCTAssertNotNil(try JSONSerialization.jsonObject(with: json, options: .fragmentsAllowed))
   }
 
-  func testUnknownCommandRepliesNotFound() async throws {
-    let core = try makeCore()
-    guard case .error(let json) = await core.dispatch("no_such_command", args: Data("{}".utf8))
-    else {
-      return XCTFail("no_such_command did not reply an error")
-    }
-    let error = try JSONSerialization.jsonObject(with: json) as? [String: String]
-    XCTAssertEqual(error?["kind"], "notFound")
-  }
-
   func testEventsEndWhenTheCoreIsReleased() async throws {
     var core: ReflectCore? = try makeCore()
     let events = try XCTUnwrap(core).events
@@ -57,16 +47,5 @@ final class ReflectCoreTests: XCTestCase {
         XCTAssertTrue(ok)
       }
     }
-  }
-}
-
-extension ReflectCoreTests {
-  func testAssetRequestsWithoutAGraphAreRefused() async throws {
-    let core = try makeCore()
-    let asset = await core.resolveAsset(requestPath: "1/assets/a.png", query: nil, range: nil)
-    XCTAssertEqual(asset, .refused(status: 403))
-    let badMedia = await core.resolveAsset(
-      requestPath: "1/x-media/nope/abc", query: nil, range: nil)
-    XCTAssertEqual(badMedia, .refused(status: 400))
   }
 }

@@ -9,27 +9,13 @@ final class EntryPointUITests: XCTestCase {
     continueAfterFailure = false
   }
 
-  /// The search field of the Tasks screen.
-  private var tasksSearchField: XCUIElement {
-    app.webViews.searchFields["Search tasks"]
-  }
-
-  func testAURLNavigatesARunningApp() throws {
-    _ = app.launchIntoDailyNote()
-    app.open(try XCTUnwrap(URL(string: "reflect://tasks")))
-    XCTAssertTrue(tasksSearchField.waitForExistence(timeout: 60))
-  }
-
-  func testAURLNavigatesAtLaunch() throws {
+  func testURLsReachTheAppAtLaunchAndWhileItRuns() throws {
     // The first launch creates the graph; a URL then starts the app again.
     _ = app.launchIntoDailyNote()
     app.terminate()
     app.open(try XCTUnwrap(URL(string: "reflect://tasks")))
-    XCTAssertTrue(tasksSearchField.waitForExistence(timeout: 60))
-  }
+    XCTAssertTrue(app.webViews.searchFields["Search tasks"].waitForExistence(timeout: 60))
 
-  func testTheRecordAudioURLOpensTheRecorder() throws {
-    _ = app.launchIntoDailyNote()
     app.open(try XCTUnwrap(URL(string: "reflect://record-audio")))
     let recorder = app.webViews.descendants(matching: .any)["Audio memo"]
     XCTAssertTrue(recorder.waitForExistence(timeout: 60))
