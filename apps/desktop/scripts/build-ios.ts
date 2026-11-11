@@ -7,14 +7,15 @@
 //   --flavor=beta|stable      Required
 //   --no-sign                 Unsigned archive without credentials. It cannot be installed
 
-import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { exec } from 'tinyexec'
 import packageJson from '../package.json' with { type: 'json' }
 import {
   assertDsyms,
+  assertIpa,
   assertSentryDsn,
+  type IosIdentity,
   IOS_ARCHIVE_PATH,
   IOS_IPA_PATH,
   log,
@@ -24,9 +25,7 @@ import {
   TAURI_SRC_DIR,
 } from './helpers.ts'
 
-interface IosFlavor {
-  bundleIdentifier: string
-  appGroup: string
+interface IosFlavor extends IosIdentity {
   /** The app's entitlements file, relative to `gen/apple`. */
   appEntitlements: string
   /** `--config` arguments for `tauri ios build`, which writes `identifier` into the app target. */
@@ -82,61 +81,6 @@ const TAURI_APP_ENTITLEMENTS_PATH = join(
 )
 const APP_BINARY_PATH = join(IOS_ARCHIVE_PATH, 'Products', 'Applications', 'Reflect.app', 'Reflect')
 const DSYM_PATH = join(IOS_ARCHIVE_PATH, 'dSYMs', 'Reflect.app.dSYM')
-
-async function readInfoValue(app: string, key: string): Promise<string> {
-  const args = ['-extract', key, 'raw', '-o', '-', join(app, 'Info.plist')]
-  return (await exec('plutil', args, { throwOnError: true })).stdout.trim()
-}
-
-/**
- * Each app extension must sit under the app's bundle id and carry the
- * flavor's App Group. Export re-signs the extensions; without the App Group
- * entitlement the build installs and launches, but every share fails.
- */
-async function assertAppexes(app: string, flavor: IosFlavor): Promise<void> {
-  const plugInsDir = join(app, 'PlugIns')
-  const appexes = existsSync(plugInsDir) ? readdirSync(plugInsDir) : []
-  if (appexes.length === 0) {
-    throw new Error('the IPA contains no app extension')
-  }
-  for (const appex of appexes) {
-    const identifier = await readInfoValue(join(plugInsDir, appex), 'CFBundleIdentifier')
-    if (!identifier.startsWith(`${flavor.bundleIdentifier}.`)) {
-      throw new Error(
-        `${appex} bundle identifier is ${identifier}, expected a child of ${flavor.bundleIdentifier}`,
-      )
-    }
-    const display = ['-d', '--entitlements', ':-', join(plugInsDir, appex)]
-    const entitlements = (await exec('codesign', display, { throwOnError: true })).stdout
-    if (!entitlements.includes(`<string>${flavor.appGroup}</string>`)) {
-      throw new Error(`${appex} is signed without the ${flavor.appGroup} App Group entitlement`)
-    }
-  }
-}
-
-async function assertIpa(flavor: IosFlavor): Promise<void> {
-  await runWithTempDir(async (tempDir) => {
-    await exec('unzip', ['-q', IOS_IPA_PATH, 'Payload/*', '-d', tempDir], { throwOnError: true })
-    const payloadDir = join(tempDir, 'Payload')
-    const appName = readdirSync(payloadDir).find((name) => name.endsWith('.app'))
-    if (!appName) {
-      throw new Error('the IPA contains no app')
-    }
-    const app = join(payloadDir, appName)
-
-    const identifier = await readInfoValue(app, 'CFBundleIdentifier')
-    if (identifier !== flavor.bundleIdentifier) {
-      throw new Error(`IPA bundle identifier is ${identifier}, expected ${flavor.bundleIdentifier}`)
-    }
-    if ((await readInfoValue(app, 'ReflectAppGroup')) !== flavor.appGroup) {
-      throw new Error(`ReflectAppGroup must be ${flavor.appGroup}`)
-    }
-    if ((await readInfoValue(app, 'ITSAppUsesNonExemptEncryption')) !== 'false') {
-      throw new Error('ITSAppUsesNonExemptEncryption must be false')
-    }
-    await assertAppexes(app, flavor)
-  })
-}
 
 /**
  * Before export, `tauri ios build` re-signs the archived app with
@@ -201,7 +145,7 @@ async function main(): Promise<void> {
     await withAppEntitlements(flavor, () => runTauri(args, env))
   })
   if (!noSign) {
-    await assertIpa(flavor)
+    await assertIpa(IOS_IPA_PATH, flavor)
   }
   await assertDsyms(APP_BINARY_PATH, [DSYM_PATH], '_reflect_start_native_diagnostics')
   const output = noSign ? IOS_ARCHIVE_PATH : IOS_IPA_PATH

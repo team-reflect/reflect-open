@@ -2,8 +2,11 @@
 // Sentry. See docs/distribution.md.
 //
 //   pnpm upload:testflight
+//
+//   --swift   Upload what `pnpm build:ipa` made: the app of the Swift shell
 
 import { join } from 'node:path'
+import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
 import {
   APP_DIR,
@@ -12,9 +15,15 @@ import {
   IOS_IPA_PATH,
   resolveApiKey,
   runWithTempDir,
+  SWIFT_IOS_ARCHIVE_PATH,
+  SWIFT_IOS_IPA_PATH,
 } from './helpers.ts'
 
 async function main(): Promise<void> {
+  const { values } = parseArgs({ options: { swift: { type: 'boolean', default: false } } })
+  const ipaPath = values.swift ? SWIFT_IOS_IPA_PATH : IOS_IPA_PATH
+  const archivePath = values.swift ? SWIFT_IOS_ARCHIVE_PATH : IOS_ARCHIVE_PATH
+
   await runWithTempDir(async (tempDir) => {
     const apiKey = resolveApiKey(tempDir)
     if (!apiKey) {
@@ -24,7 +33,7 @@ async function main(): Promise<void> {
     const { keyId, issuer, keyPath } = apiKey
     const credentials = ['--api-key', keyId, '--api-issuer', issuer, '--p8-file-path', keyPath]
     // --wait blocks until App Store Connect has processed the build.
-    const upload = ['--upload-package', IOS_IPA_PATH, '--show-progress', '--wait']
+    const upload = ['--upload-package', ipaPath, '--show-progress', '--wait']
     await exec('xcrun', ['altool', ...upload, ...credentials, '--output-format', 'json'], {
       throwOnError: true,
       nodeOptions: { env: { APPLE_API_KEY_PATH: keyPath }, stdio: 'inherit' },
@@ -35,7 +44,7 @@ async function main(): Promise<void> {
     // workflow's xcarchive artifact either way.
     const sentryCli = join(APP_DIR, 'node_modules', '.bin', 'sentry-cli')
     const project = ['--org', 'reflect-64', '--project', 'reflect-open']
-    const dsyms = ['--type', 'dsym', '--no-sources', '--wait-for', '60', IOS_ARCHIVE_PATH]
+    const dsyms = ['--type', 'dsym', '--no-sources', '--wait-for', '60', archivePath]
     try {
       await exec(sentryCli, ['debug-files', 'upload', ...project, ...dsyms], INHERIT)
     } catch (error) {
