@@ -1,6 +1,6 @@
 import { observeXTweets } from '@post-embed/exporter/x'
 import { exposeXTweets } from '@post-embed/exporter/x/bridge'
-import { defineContentScript } from '#imports'
+import { defineContentScript } from 'wxt/utils/define-content-script'
 import { X_CAPTURE_CHANNEL } from '@/lib/x-capture-messages'
 
 declare global {

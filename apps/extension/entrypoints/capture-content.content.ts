@@ -1,5 +1,6 @@
 import Defuddle from 'defuddle'
 import { browser } from 'wxt/browser'
+import { defineContentScript } from 'wxt/utils/define-content-script'
 import {
   extractPageTextRequestSchema,
   formatParagraphs,

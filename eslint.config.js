@@ -337,6 +337,25 @@ export default defineESLintConfig(
     },
   },
 
+  // Rule: the extension imports WXT APIs from their real `wxt/*` paths. The
+  // `#imports` alias resolves only through WXT's Vite plugin.
+  {
+    files: [`apps/extension/**/*.${SOURCE_EXTENSIONS}`],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '#imports',
+              message: 'Import from the real `wxt/*` path, e.g. `wxt/utils/define-background`.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Rule: all diagnostics go through `LoggerService`, in the app and in tests.
   {
     files: [
