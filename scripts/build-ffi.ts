@@ -1,11 +1,13 @@
 // Builds `reflect-ffi` for the iOS device and simulator and packs both static
-// libraries with the C header into target/apple/ReflectCore.xcframework.
+// libraries with the C header into target/apple/ReflectCore.xcframework. It
+// regenerates the committed header crates/ffi/include/reflect_core.h, so a
+// stale header shows up as a git diff.
 //
 //   pnpm build:ffi [--debug]
 //
 //   --debug   Dev profile, simulator only
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { exec } from 'tinyexec'
@@ -19,6 +21,9 @@ const INCLUDE_DIR = join(APPLE_DIR, 'include')
 // libraries that Xcode copies into the same include directory.
 const MODULE_DIR = join(INCLUDE_DIR, 'ReflectCoreFFI')
 const XCFRAMEWORK_PATH = join(APPLE_DIR, 'ReflectCore.xcframework')
+const CRATE_DIR = join(ROOT_DIR, 'crates', 'ffi')
+// The committed C header and the module map that declares it.
+const CRATE_INCLUDE_DIR = join(CRATE_DIR, 'include')
 
 const CBINDGEN_VERSION = '0.29.4'
 const DEVICE_TARGET = 'aarch64-apple-ios'
@@ -26,23 +31,6 @@ const SIMULATOR_TARGET = 'aarch64-apple-ios-sim'
 
 /** `tinyexec` options for a command that prints straight to the terminal. */
 const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit' } } as const
-
-// The system libraries and frameworks that the static library links against,
-// from `cargo rustc -p reflect-ffi --target aarch64-apple-ios --lib
-// --crate-type staticlib -- --print native-static-libs`. The `link` lines let
-// Xcode link them with no list in the app target.
-const MODULE_MAP = `module ReflectCoreFFI {
-    header "reflect_core.h"
-    link "iconv"
-    link "objc"
-    link "z"
-    link framework "CoreFoundation"
-    link framework "Foundation"
-    link framework "Security"
-    link framework "UIKit"
-    export *
-}
-`
 
 function log(message: string): void {
   console.log(`[build-ffi] ${message}`)
@@ -96,21 +84,22 @@ async function main(): Promise<void> {
   })
 
   const cbindgen = await installCbindgen()
-  rmSync(INCLUDE_DIR, { recursive: true, force: true })
-  mkdirSync(MODULE_DIR, { recursive: true })
-  const crateDir = join(ROOT_DIR, 'crates', 'ffi')
   await exec(
     cbindgen,
     [
       '--config',
-      join(crateDir, 'cbindgen.toml'),
+      join(CRATE_DIR, 'cbindgen.toml'),
       '--output',
-      join(MODULE_DIR, 'reflect_core.h'),
-      crateDir,
+      join(CRATE_INCLUDE_DIR, 'reflect_core.h'),
+      CRATE_DIR,
     ],
     INHERIT,
   )
-  writeFileSync(join(MODULE_DIR, 'module.modulemap'), MODULE_MAP)
+  rmSync(INCLUDE_DIR, { recursive: true, force: true })
+  mkdirSync(MODULE_DIR, { recursive: true })
+  for (const file of ['reflect_core.h', 'module.modulemap']) {
+    copyFileSync(join(CRATE_INCLUDE_DIR, file), join(MODULE_DIR, file))
+  }
 
   rmSync(XCFRAMEWORK_PATH, { recursive: true, force: true })
   const libraries = targets.flatMap((target) => [
