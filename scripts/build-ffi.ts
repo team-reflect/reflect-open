@@ -66,7 +66,7 @@ async function installCbindgen(): Promise<string> {
   }
   await exec(
     'cargo',
-    // FIXME: do not use `cargo install` to install `cbindgen`. Use the root mise.toml instead.
+    // FIXME: do not use `cargo install` to install `cbindgen`. Use the root mise.toml instead. You probally want to assert that cbindgen is already installed and has the correct version. you do not need to install it in this script.
     ['install', 'cbindgen', '--version', CBINDGEN_VERSION, '--locked', '--root', TOOLS_DIR],
     INHERIT,
   )
