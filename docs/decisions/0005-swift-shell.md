@@ -38,8 +38,10 @@ implementation next to Tauri and the browser dev bridge.
   commands (windows, menus, calendar).
 - A new crate `reflect-ffi` (`staticlib`) exposes a small C ABI: create and
   free a core, dispatch a command by name with JSON arguments, request
-  headers, and an optional byte body, and register event and main-thread
-  callbacks. The app links it as `ReflectCore.xcframework`.
+  headers, and an optional byte body, resolve an asset request, and
+  register event and main-thread callbacks. The app links it as
+  `ReflectCore.xcframework`. The crate holds no logic of its own: it only
+  converts arguments and results.
 - **No UniFFI for now.** The caller of almost every command is the Web layer,
   so Swift should be a pipe: adding a command must need no Swift change.
   UniFFI generates Swift types, not TypeScript, so it adds a translation
@@ -55,9 +57,15 @@ implementation next to Tauri and the browser dev bridge.
   run in the shell, every other command goes to `reflect-core` on a
   background thread. The reply is JSON or raw bytes.
 - The same scheme proxies the app's HTTP requests (`__http`), and a second
-  scheme, `reflect-asset`, serves files of the graph.
-- The shell injects `window.__reflectHost` before any page script runs, and
-  delivers an event by evaluating a dispatch call on it.
+  scheme, `reflect-asset`, serves files of the graph. `reflect-core` decides
+  which file an asset request names and which bytes a `Range` header
+  selects; the shell reads the file.
+- The page defines `window.__reflectHost` when it boots and tells the shell
+  that it is ready. The shell keeps its events until then, and delivers an
+  event by evaluating a dispatch call on that object.
+- The request routing, the caller check and the HTTP proxy are Swift today.
+  They hold no Apple-specific logic, so they can move into `reflect-core`
+  when a second native shell needs them.
 - Command names and the wire format do not change: `plugin:<name>|<cmd>`
   names stay, arguments are camelCase JSON, and errors are
   `{ kind, message }`.
@@ -78,12 +86,17 @@ implementation next to Tauri and the browser dev bridge.
 
 ### Settled details
 
-- **Shared Swift code:** the shell depends on the `apple/` Swift package.
-  Recording and capture code exist only there; the Tauri plugin and the
-  Swift shell each add a thin adapter. The share extension, the widget, and
-  the App Intents are the same source files in both apps. The shell has its
-  own StoreKit code, because the Tauri app uses a third-party plugin for
-  purchases.
+- **Shared Swift code:** the `apple/` Swift package holds the Swift code
+  that depends on no app target, on no Rust binary and on no third-party
+  package: the web transport (`WebHostKit`), recording, capture, the
+  keyboard tuning, web sign-in, and the App Store environment probe. Its
+  tests run on macOS with `swift test`. The Swift shell and the Tauri
+  plugins each add a thin adapter that turns a command into a call of a
+  module. The app targets hold the entry points, the wrapper of the Rust
+  core, and the code that needs a third-party package (Sentry). The share
+  extension, the widget, and the App Intents are the same source files in
+  both apps. Purchases are the shell's own StoreKit code, because the Tauri
+  app uses a third-party plugin for them.
 - **Minimum iOS:** stays 16.0 (widget 16.2). The Vite target stays
   `safari16`.
 - **Identity and release:** the new shell ships first under the beta
