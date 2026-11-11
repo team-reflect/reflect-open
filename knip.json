@@ -8,10 +8,6 @@
     "apps/desktop": {
       "ignoreDependencies": ["@sentry/cli"],
       "ignore": "src-tauri/gen/**"
-    },
-    "apps/extension": {
-      "ignore": ".wxt/**",
-      "ignoreUnresolved": ["#imports"]
     }
   }
 }

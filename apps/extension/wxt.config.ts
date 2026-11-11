@@ -26,6 +26,8 @@ const isStoreBuild = process.env['WXT_STORE_BUILD'] === 'true'
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  // Every module imports what it uses from its real `wxt/*` path.
+  imports: false,
   vite: () => ({ plugins: [tailwindcss()] }),
   // Store artifact: `reflect-capture-<version>-chrome.zip`. The keyed build is
   // `reflect-capture-<version>-chrome-unpacked.zip` so the two never collide.
