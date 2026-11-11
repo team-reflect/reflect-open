@@ -47,10 +47,10 @@ extern "C" {
 
 // Creates a core. `config_json` is a NUL-terminated JSON object, or NULL
 // for an empty one, with the optional string keys `documentDir`,
-// `appDataDir` (or `dataDir`) and `userAgent`; other keys are ignored. `ctx` is passed to `on_event`, `on_main` and
-// `on_open_url`. On failure it returns NULL and, when `error_out` is not
-// NULL, stores an error JSON `{"kind":...,"message":...}` there for
-// `reflect_core_string_free`.
+// `appDataDir` (or `dataDir`) and `userAgent`; other keys are ignored. `ctx`
+// is passed to `on_event`, `on_main` and `on_open_url`. On failure it
+// returns NULL and, when `error_out` is not NULL, stores an error JSON
+// `{"kind":...,"message":...}` there for `reflect_core_string_free`.
 //
 // # Safety
 //
@@ -66,7 +66,8 @@ ReflectCore *reflect_core_new(const char *config_json,
 // Runs `command` and calls `reply` once with the result. `args_json` is a
 // JSON object of camelCase arguments; empty arguments are `{}`.
 // `headers_json` is a JSON object of lowercase request header names and
-// values; empty headers are `{}`. `body` is the raw request body, or NULL for none. Each pointer may be
+// values; empty headers are `{}`. `body` is the raw request body, or NULL for
+// none. Each pointer may be
 // NULL when its length is 0. The function copies every input before it
 // returns.
 //

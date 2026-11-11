@@ -81,10 +81,10 @@ type MainTask = Box<dyn FnOnce() + Send>;
 
 /// Creates a core. `config_json` is a NUL-terminated JSON object, or NULL
 /// for an empty one, with the optional string keys `documentDir`,
-/// `appDataDir` (or `dataDir`) and `userAgent`; other keys are ignored. `ctx` is passed to `on_event`, `on_main` and
-/// `on_open_url`. On failure it returns NULL and, when `error_out` is not
-/// NULL, stores an error JSON `{"kind":...,"message":...}` there for
-/// `reflect_core_string_free`.
+/// `appDataDir` (or `dataDir`) and `userAgent`; other keys are ignored. `ctx`
+/// is passed to `on_event`, `on_main` and `on_open_url`. On failure it
+/// returns NULL and, when `error_out` is not NULL, stores an error JSON
+/// `{"kind":...,"message":...}` there for `reflect_core_string_free`.
 ///
 /// # Safety
 ///
