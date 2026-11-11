@@ -13,6 +13,7 @@ import {
 import { useToday } from '@/lib/use-today.ts'
 import { effectiveDailyDate } from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
+import { noop } from '@ocavue/utils'
 
 /**
  * Which day in the daily stream currently holds the user's focus, so the
@@ -33,7 +34,7 @@ import { useRouterState } from '@/routing/router.tsx'
  */
 
 const FocusedDailyDateContext = createContext<string | null>(null)
-const SetFocusedDailyDateContext = createContext<(date: string | null) => void>(() => {})
+const SetFocusedDailyDateContext = createContext<(date: string | null) => void>(noop)
 
 /** Provides the focused-day state to the workspace shell and the daily stream. */
 export function FocusedDailyProvider({ children }: { children: ReactNode }): ReactElement {

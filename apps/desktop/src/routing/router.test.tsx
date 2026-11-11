@@ -6,6 +6,7 @@ import { renderHookInApp, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { Route } from '@reflect/app'
 import { RouterFreeze, useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
+import { noop } from '@ocavue/utils'
 
 /**
  * The router state, handlers, and actions under the app's `RouterProvider`, mounted on
@@ -112,7 +113,7 @@ describe('router', () => {
   })
 
   it('saves scroll on the entry on screen while a transition is pending', async () => {
-    let resolveTasks = (): void => {}
+    let resolveTasks: () => void = noop
     const tasksReady = new Promise<void>((resolve) => {
       resolveTasks = resolve
     })

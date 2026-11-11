@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { isModEvent } from '@meowdown/core'
 import type { ListSelection } from '@/lib/selection/use-list-selection.ts'
 import type { ModClickEvent } from '@/hooks/use-note-link-navigation.ts'
+import { noop } from '@ocavue/utils'
 
 export interface AllNotesKeyboardOptions {
   selection: ListSelection
@@ -49,7 +50,7 @@ export function useAllNotesKeyboard({
   rootRef,
   scrollToIndex,
 }: AllNotesKeyboardOptions): void {
-  const handlerRef = useRef<(event: KeyboardEvent) => void>(() => {})
+  const handlerRef = useRef<(event: KeyboardEvent) => void>(noop)
   useEffect(() => {
     handlerRef.current = (event) => {
       // Respect anything a focused widget already handled (e.g. the combobox's

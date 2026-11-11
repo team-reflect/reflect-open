@@ -5,6 +5,7 @@ import { parseXPostId } from '@post-embed/schema'
 import { queryClient, queryKeys } from '@/lib/query-client.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
+import { noop } from '@ocavue/utils'
 
 export const X_MEDIA_URL_PROTOCOLS = ['reflect-asset:']
 
@@ -35,7 +36,7 @@ export function createXPostResolver(embedMedia: EmbedMediaService, root: string)
 
 // One resolver per graph keeps the editor's `resolveXPost` prop stable.
 const resolvers = new WeakMap<GraphInfo, XPostResolver>()
-const emptyResolver: XPostResolver = () => undefined
+const emptyResolver: XPostResolver = noop
 
 export function getXPostResolver(
   embedMedia: EmbedMediaService,

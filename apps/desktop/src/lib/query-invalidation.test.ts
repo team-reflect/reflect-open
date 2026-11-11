@@ -17,6 +17,7 @@ import type { XPost } from '@post-embed/types'
 import { createXPostResolver, xPostQueryOptions } from '@/editor/use-x-post-resolver.ts'
 import { queryClient, queryKeys } from './query-client.ts'
 import { installQueryInvalidation } from './query-invalidation.ts'
+import { noop } from '@ocavue/utils'
 
 const app = {
   embedMedia: createTestCoreServices({ database: createNodeTestDatabaseService() }).embedMedia,
@@ -68,7 +69,7 @@ describe('installQueryInvalidation', () => {
 
     const next = resolveXPost(url)
     expect(next).toBeInstanceOf(Promise)
-    await Promise.resolve(next).catch(() => {})
+    await Promise.resolve(next).catch(noop)
     stop()
   })
 
@@ -134,7 +135,7 @@ describe('installQueryInvalidation for the index and the graph', () => {
     const core = createTestCoreServices({ database: createNodeTestDatabaseService() })
     vi.spyOn(core.chatSessions, 'onConversationsChanged').mockImplementation((listener) => {
       listeners.push(listener)
-      return () => {}
+      return noop
     })
     const { stop } = installApp(core)
 

@@ -13,6 +13,7 @@ import {
   shouldRecenter,
   type ReconcileInput,
 } from './use-day-carousel.ts'
+import { noop, sleep } from '@ocavue/utils'
 
 /**
  * The carousel's follow-the-route decision as pure logic, plus the real
@@ -132,8 +133,8 @@ describe('useDayCarousel', () => {
   async function mountCarousel() {
     const onSelect = vi.fn<(date: string) => void>()
     const onTarget = vi.fn<(date: string, navigationKey: string) => void>()
-    const navigate: { current: (route: Route) => void } = { current: () => {} }
-    const resize: { current: (width: number) => void } = { current: () => {} }
+    const navigate: { current: (route: Route) => void } = { current: noop }
+    const resize: { current: (width: number) => void } = { current: noop }
     let seq = 0
     // Stands in for the router: a settled day comes back as the new route.
     function Harness(): ReactElement {
@@ -149,7 +150,7 @@ describe('useDayCarousel', () => {
             today={DATE}
             scrollResetSeq={0}
             focusDate={null}
-            onFocusConsumed={() => {}}
+            onFocusConsumed={noop}
             onSelect={(day) => {
               onSelect(day)
               setRoute(routeTo(day, ++seq))
@@ -185,7 +186,7 @@ describe('useDayCarousel', () => {
 
     await touch(scroller, 'start')
     await act(() => scroller.scrollTo({ left: (CENTER + 1) * WIDTH, behavior: 'instant' }))
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(onSelect).not.toHaveBeenCalled()
 
     await touch(scroller, 'end')
@@ -252,7 +253,7 @@ describe('useDayCarousel', () => {
 
     expect(scroller.scrollLeft).toBe((CENTER + 8) * WIDTH)
     expect(slide('2026-06-20')).not.toBeNull()
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(onSelect).not.toHaveBeenCalled()
   })
 
@@ -268,7 +269,7 @@ describe('useDayCarousel', () => {
     expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
     expect(slide('2026-06-14')).toBeNull()
     await touch(scroller, 'end')
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(onSelect).not.toHaveBeenCalled()
   })
 
@@ -344,7 +345,7 @@ describe('useDayCarousel', () => {
 
     await touch(scroller, 'start')
     await resize(500)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await sleep(100)
 
     expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
     await touch(scroller, 'end')
@@ -371,7 +372,7 @@ describe('useDayCarousel', () => {
     await touch(editor, 'end')
     await act(() => editor.focus())
 
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    await sleep(500)
     expect(scroller.scrollLeft).toBe(CENTER * WIDTH)
     expect(onSelect).not.toHaveBeenCalled()
   })

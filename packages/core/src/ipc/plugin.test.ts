@@ -4,6 +4,7 @@ import { AppError, isAppError } from '../errors.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createIpcBridgeService, type IpcBridge } from './ipc-service.ts'
 import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.ts'
+import { noop } from '@ocavue/utils'
 
 const doThing = definePluginCommand<{ request: { value: number } }, { doubled: number }>(
   'demo',
@@ -23,7 +24,7 @@ function serviceOver(transport: IpcBridge) {
 describe('definePluginCommand', () => {
   it('composes the plugin command name and validates the response', async () => {
     const invoke = vi.fn().mockResolvedValue({ doubled: 4 })
-    const ipc = serviceOver({ invoke, listen: () => Promise.resolve(() => {}) })
+    const ipc = serviceOver({ invoke, listen: () => Promise.resolve(noop) })
 
     await expect(doThing(ipc, { request: { value: 2 } })).resolves.toEqual({ doubled: 4 })
     expect(invoke).toHaveBeenCalledWith('plugin:demo|do_thing', { request: { value: 2 } })
@@ -31,7 +32,7 @@ describe('definePluginCommand', () => {
 
   it('passes any fire-and-forget acknowledgement through unvalidated', async () => {
     const invoke = vi.fn().mockResolvedValue(true)
-    const ipc = serviceOver({ invoke, listen: () => Promise.resolve(() => {}) })
+    const ipc = serviceOver({ invoke, listen: () => Promise.resolve(noop) })
 
     await expect(fireAndForget(ipc, {})).resolves.toBe(true)
     expect(invoke).toHaveBeenCalledWith('plugin:demo|fire_and_forget', {})
@@ -40,7 +41,7 @@ describe('definePluginCommand', () => {
   it('turns a mismatched response into a parse AppError naming the command', async () => {
     const ipc = serviceOver({
       invoke: () => Promise.resolve({ wrong: true }),
-      listen: () => Promise.resolve(() => {}),
+      listen: () => Promise.resolve(noop),
     })
 
     const error = await doThing(ipc, { request: { value: 2 } }).catch((caught: unknown) => caught)
@@ -59,7 +60,7 @@ describe('definePluginCommand', () => {
           throw rejection
         })
       },
-      listen: () => Promise.resolve(() => {}),
+      listen: () => Promise.resolve(noop),
     })
 
     const error = await fireAndForget(ipc, {}).catch((caught: unknown) => caught)
@@ -74,7 +75,7 @@ describe('definePluginEvent', () => {
     const handlers = new Map<string, (payload: unknown) => void>()
     const ipc = serviceOver({
       invoke: () => Promise.resolve(null),
-      listen: () => Promise.resolve(() => {}),
+      listen: () => Promise.resolve(noop),
       listenPlugin: (plugin, event, handler) => {
         handlers.set(`${plugin}:${event}`, handler)
         return Promise.resolve()

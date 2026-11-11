@@ -14,6 +14,7 @@ import {
   createConnectGithubWizardService,
   type ConnectGithubWizardService,
 } from './connect-github-wizard-service.ts'
+import { sleep } from '@ocavue/utils'
 
 const ALEX = { login: 'alex', avatarUrl: null }
 const PAT: GithubAuth = { kind: 'pat', token: 'ghp_abc' }
@@ -80,7 +81,7 @@ function createWizard(auth: GithubAuth = PAT): ConnectGithubWizardService {
  * Let every promise chain that is already runnable settle.
  */
 async function flush(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await sleep(0)
 }
 
 /**

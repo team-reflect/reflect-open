@@ -3,13 +3,14 @@ import { AppError } from '../errors.ts'
 import { createTestIpcBridgeService } from '../testing/index.ts'
 
 import { createSecretStoreService } from './secret-store-service.ts'
+import { returnNull } from '@ocavue/utils'
 describe('createSecretStoreService', () => {
   it('reads, writes and deletes through the secret commands', async () => {
     const ipc = createTestIpcBridgeService({
       commands: {
         secret_get: () => 'value',
-        secret_set: () => null,
-        secret_delete: () => null,
+        secret_set: returnNull,
+        secret_delete: returnNull,
       },
     })
     const store = createSecretStoreService({ ipc })
@@ -26,7 +27,7 @@ describe('createSecretStoreService', () => {
   })
 
   it('reads a missing secret as null', async () => {
-    const ipc = createTestIpcBridgeService({ commands: { secret_get: () => null } })
+    const ipc = createTestIpcBridgeService({ commands: { secret_get: returnNull } })
     await expect(createSecretStoreService({ ipc }).get('a')).resolves.toBeNull()
   })
 

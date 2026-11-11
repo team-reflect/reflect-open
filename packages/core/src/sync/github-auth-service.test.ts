@@ -5,6 +5,7 @@ import {
   createTestSecretStoreService,
 } from '../testing/index.ts'
 import { createGithubAuthService, githubAppInstallUrl } from './github-auth-service.ts'
+import { noop } from '@ocavue/utils'
 
 const DEVICE_CODE_URL = 'https://github.com/login/device/code'
 const TOKEN_URL = 'https://github.com/login/oauth/access_token'
@@ -492,7 +493,7 @@ describe('GithubAuthService.runDeviceFlow', () => {
     const { auth, clock, secretStore, sleeping } = scripted([
       { access_token: 'ghu_t', refresh_token: 'ghr_r', expires_in: 28800 },
     ])
-    const flow = auth.runDeviceFlow({ clientId: 'test-app', onCode: () => {} })
+    const flow = auth.runDeviceFlow({ clientId: 'test-app', onCode: noop })
     await sleeping()
     await clock.advance(5_000)
     await flow
@@ -504,7 +505,7 @@ describe('GithubAuthService.runDeviceFlow', () => {
 
   it('throws an auth error when the user denies', async () => {
     const { auth, clock, sleeping } = scripted([{ error: 'access_denied' }])
-    const flow = auth.runDeviceFlow({ clientId: 'test-app', onCode: () => {} })
+    const flow = auth.runDeviceFlow({ clientId: 'test-app', onCode: noop })
     const rejection = expect(flow).rejects.toMatchObject({ kind: 'auth' })
     await sleeping()
     await clock.advance(5_000)
@@ -513,7 +514,7 @@ describe('GithubAuthService.runDeviceFlow', () => {
 
   it('throws an auth error when the code expires while still pending', async () => {
     const { auth, clock, sleeping } = scripted([])
-    const flow = auth.runDeviceFlow({ clientId: 'test-app', onCode: () => {} })
+    const flow = auth.runDeviceFlow({ clientId: 'test-app', onCode: noop })
     const rejection = expect(flow).rejects.toMatchObject({ kind: 'auth' })
     // Two jumps blow past the 900s deadline.
     while (clock.now() < 900_000) {
@@ -530,7 +531,7 @@ describe('GithubAuthService.runDeviceFlow', () => {
     const abort = new AbortController()
     const flow = auth.runDeviceFlow({
       clientId: 'test-app',
-      onCode: () => {},
+      onCode: noop,
       signal: abort.signal,
     })
     await sleeping()

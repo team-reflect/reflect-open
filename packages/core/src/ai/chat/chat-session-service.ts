@@ -25,7 +25,7 @@ import {
   type ChatAttachment,
   type ChatTurn,
 } from './transcript.ts'
-import { isDeepEqual, isShallowEqual } from '@ocavue/utils'
+import { isDeepEqual, isShallowEqual, noop } from '@ocavue/utils'
 
 /**
  * One chat session per open graph (Plan 10): the conversation lives here, not
@@ -306,7 +306,7 @@ class ChatSessionImpl implements ChatSession {
     }
     // Without a loaded embedding model the search tool must *say* it is
     // lexical, so the runtime status is kept fresh while the session lives.
-    const stopEmbed = embeddingRuntime.subscribe(() => {})
+    const stopEmbed = embeddingRuntime.subscribe(noop)
     void embeddingRuntime.status()
     return () => {
       stopEmbed()

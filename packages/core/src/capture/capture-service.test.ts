@@ -33,6 +33,7 @@ import {
   createTestXArchiveService,
 } from '../testing/index.ts'
 import { createCaptureService } from './capture-service.ts'
+import { sleep } from '@ocavue/utils'
 
 const CAPTURED_AT = new Date(2026, 5, 11, 15, 30, 22, 845)
 const DAILY = dailyPath(formatIsoDate(CAPTURED_AT))
@@ -56,7 +57,7 @@ const X_POST: XPostEnvelope = {
 }
 
 function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return sleep(0)
 }
 
 function setup(options: { mobile?: boolean; settings?: Partial<Settings> } = {}) {

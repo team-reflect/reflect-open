@@ -1,4 +1,4 @@
-import { isShallowEqual } from '@ocavue/utils'
+import { isShallowEqual, noop } from '@ocavue/utils'
 import {
   DEFAULT_GRAPH_NAME,
   errorMessage,
@@ -173,7 +173,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
   warm(): void {
     if (this.#warmed === null) {
       this.#warmed = this.#deps.mobileStorage.resolve()
-      this.#warmed.catch(() => {})
+      this.#warmed.catch(noop)
     }
   }
 
@@ -195,7 +195,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
       logger,
     } = this.#deps
     if (!isMobilePlatform(platform.appPlatform)) {
-      return () => {}
+      return noop
     }
     let active = true
     let retryTimer: TimerHandle | undefined
@@ -206,7 +206,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
     // Every consumer below attaches its own handlers; this catch only
     // silences the paths that never do.
     const storagePromise = this.#takeWarm() ?? mobileStorage.resolve()
-    storagePromise.catch(() => {})
+    storagePromise.catch(noop)
     // Fill the storage info once the container resolves — background only.
     // The early-started promise can hit a transient failure the old
     // call-at-this-point wouldn't have; one fresh retry covers that.
@@ -278,9 +278,8 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
                   })
                 }
               },
-              () => {
-                // Non-fatal: the full resolve below carries the local root too.
-              },
+              // Non-fatal: the full resolve below carries the local root too.
+              noop,
             )
             const resolveWithRetries = (
               attempt: number,

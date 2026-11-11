@@ -9,6 +9,7 @@ import {
   xPostSchema,
   type ResolvedArchivedPost,
 } from './x-archive-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 function serviceAnswering(command: string, answer: unknown) {
   const ipc = createTestIpcBridgeService({ commands: { [command]: () => answer } })
@@ -134,7 +135,7 @@ it('resolves an archived post and validates the answer', async () => {
     { command: 'x_archive_resolve', args: { generation: 7, postId: '123' } },
   ])
 
-  ipc.onCommand('x_archive_resolve', () => null)
+  ipc.onCommand('x_archive_resolve', returnNull)
   await expect(xArchive.resolve(7, '123')).resolves.toBeNull()
   ipc.onCommand('x_archive_resolve', () => ({ archive: {}, resources: [] }))
   await expect(xArchive.resolve(7, '123')).rejects.toMatchObject({ kind: 'parse' })

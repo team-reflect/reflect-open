@@ -20,6 +20,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyEventsSection } from './daily-events-section.tsx'
+import { sleep } from '@ocavue/utils'
 
 // The action itself is covered in @reflect/core; here it is the seam the
 // dialog submits through: the real `MeetingService` over an empty index and
@@ -166,7 +167,7 @@ describe('DailyEventsSection', () => {
     // WebKit fires compositionend before the confirming Enter's keydown.
     attendee.element().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
     await userEvent.keyboard('{Enter}')
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await sleep(100)
 
     expect(addMeetingToDaily).not.toHaveBeenCalled()
     await expect.element(page.getByLabelText('Meeting name')).toBeInTheDocument()

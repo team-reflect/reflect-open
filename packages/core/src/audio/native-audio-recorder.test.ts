@@ -3,6 +3,7 @@ import { createTestIpcBridgeService, type TestIpcBridgeService } from '../testin
 import { createTestLoggerService } from '../testing/logger.ts'
 import type { AudioRecorderState, AudioRecorderStopped } from './audio-recorder-service.ts'
 import { createNativeAudioRecorder } from './native-audio-recorder.ts'
+import { noop, returnNull } from '@ocavue/utils'
 
 const SESSION_STARTED_MS = 1_700_000_000_000
 const START_OPTIONS = { segmentMs: 20 * 60_000, reminderMs: 30 * 60_000 }
@@ -12,7 +13,7 @@ function setup(options?: { pluginEvents?: boolean }) {
   ipc.onCommand('plugin:recording|start_recording', () => ({
     sessionStartedMs: SESSION_STARTED_MS,
   }))
-  ipc.onCommand('plugin:recording|delete_staged', () => null)
+  ipc.onCommand('plugin:recording|delete_staged', returnNull)
   const logger = createTestLoggerService()
   const recorder = createNativeAudioRecorder({ ipc, logger })
   return { ipc, logger, recorder }
@@ -228,7 +229,7 @@ describe('createNativeAudioRecorder', () => {
     const { ipc, recorder } = setup()
     const pendingStart = Promise.withResolvers<{ sessionStartedMs: number }>()
     ipc.onCommand('plugin:recording|start_recording', () => pendingStart.promise)
-    recorder.subscribeStopped(() => {})
+    recorder.subscribeStopped(noop)
 
     const starting = recorder.start(START_OPTIONS)
     expect(recorder.state.get()).toBe('requesting')
@@ -248,7 +249,7 @@ describe('createNativeAudioRecorder', () => {
 
   it('state notifies only on a change, until unsubscribed', async () => {
     const { ipc, recorder } = setup()
-    ipc.onCommand('plugin:recording|cancel_recording', () => null)
+    ipc.onCommand('plugin:recording|cancel_recording', returnNull)
     let notified = 0
     const unsubscribe = recorder.state.subscribe(() => {
       notified++
@@ -268,7 +269,7 @@ describe('createNativeAudioRecorder', () => {
 
   it('cancel discards the session and returns to idle', async () => {
     const { ipc, recorder } = setup()
-    ipc.onCommand('plugin:recording|cancel_recording', () => null)
+    ipc.onCommand('plugin:recording|cancel_recording', returnNull)
     await recorder.start(START_OPTIONS)
 
     await recorder.cancel()
@@ -307,7 +308,7 @@ describe('createNativeAudioRecorder', () => {
       ipc.emitPlugin('recording', 'nativeAction', { action: 'recordAudio' })
       return null
     })
-    ipc.onCommand('plugin:recording|action_performed', () => null)
+    ipc.onCommand('plugin:recording|action_performed', returnNull)
     const actions: string[] = []
     recorder.subscribeNativeAction((event) => {
       actions.push(event.action)
@@ -325,7 +326,7 @@ describe('createNativeAudioRecorder', () => {
 
   it('actionsReady skips the handshake once its signal is aborted', async () => {
     const { ipc, recorder } = setup()
-    ipc.onCommand('plugin:recording|actions_ready', () => null)
+    ipc.onCommand('plugin:recording|actions_ready', returnNull)
     const stopped = new AbortController()
     stopped.abort()
 
@@ -336,7 +337,7 @@ describe('createNativeAudioRecorder', () => {
 
   it('logs plugin events the bridge cannot deliver', async () => {
     const { logger, recorder } = setup({ pluginEvents: false })
-    recorder.subscribeLevel(() => {})
+    recorder.subscribeLevel(noop)
 
     await expect.poll(() => logger.getErrors().length).toBe(1)
     expect(logger.getErrors()[0]?.message).toBe('recording plugin events unavailable')

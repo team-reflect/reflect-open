@@ -34,6 +34,7 @@ import {
   type AudioRecorderState,
   type AudioRecorderStopped,
 } from './audio-recorder-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * All native recordings are AAC in an `.m4a` container.
@@ -227,7 +228,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     const { ipc } = this.#deps
     // A queued action is delivered on this call, so the `nativeAction`
     // listener must be registered first.
-    const probe = recordingNativeActionEvent(ipc, () => {})
+    const probe = recordingNativeActionEvent(ipc, noop)
     try {
       await probe.ready
     } finally {
@@ -257,7 +258,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
 
   // The plugin schedules reminders as notifications itself.
   subscribeReminder(): Unlisten {
-    return () => {}
+    return noop
   }
 
   subscribeNativeAction(listener: (event: RecordingNativeActionEvent) => void): Unlisten {

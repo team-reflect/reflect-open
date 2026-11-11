@@ -10,6 +10,7 @@ import {
   type LifecycleDomAdapter,
   type LifecyclePageEvent,
 } from './lifecycle-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 function createFakeDom() {
   const pageListeners = new Map<LifecyclePageEvent, Set<() => void>>()
@@ -158,7 +159,7 @@ describe('page signals', () => {
 describe('shell handshakes', () => {
   it('delivers deferred quits and confirms them', async () => {
     const { lifecycle, ipc } = setup()
-    ipc.onCommand('quit_confirm', () => null)
+    ipc.onCommand('quit_confirm', returnNull)
     const quitRequested = vi.fn()
     const unlisten = lifecycle.subscribeQuitRequested(quitRequested)
     await settle()
@@ -175,7 +176,7 @@ describe('shell handshakes', () => {
   it('begins and ends background tasks', async () => {
     const { lifecycle, ipc } = setup()
     ipc.onCommand('background_task_begin', () => 'task-1')
-    ipc.onCommand('background_task_end', () => null)
+    ipc.onCommand('background_task_end', returnNull)
 
     const token = await lifecycle.beginBackgroundTask()
     expect(token).toBe('task-1')
@@ -189,7 +190,7 @@ describe('shell handshakes', () => {
 
   it('answers null when the shell has no background task', async () => {
     const { lifecycle, ipc } = setup()
-    ipc.onCommand('background_task_begin', () => null)
+    ipc.onCommand('background_task_begin', returnNull)
     await expect(lifecycle.beginBackgroundTask()).resolves.toBeNull()
   })
 })

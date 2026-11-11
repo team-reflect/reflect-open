@@ -6,6 +6,7 @@ import { createTestIndexStoreService } from '../testing/index-store.ts'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { buildIndexedNote, type IndexedNote } from './indexed-note.ts'
 import { createIndexStoreService, INDEX_APPLY_BATCH_SIZE } from './index-store-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 function note(path: string): IndexedNote {
   const source = `# ${path}\n`
@@ -23,7 +24,7 @@ function writeCommands(): Record<string, () => null> {
       'index_touch',
       'index_clear',
       'index_meta_set',
-    ].map((command) => [command, () => null]),
+    ].map((command) => [command, returnNull]),
   )
 }
 

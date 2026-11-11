@@ -9,6 +9,7 @@ import {
   reactErrorHandler,
 } from '@sentry/react'
 import type { BrowserOptions, ErrorEvent, Exception, StackFrame } from '@sentry/react'
+import { noop, returnNull } from '@ocavue/utils'
 
 const REDACTED_VALUE = '[redacted]'
 const MAX_EXCEPTION_COUNT = 3
@@ -253,7 +254,7 @@ function createExceptionTelemetryOptions(
       frameContextLines: 0,
     },
     maxBreadcrumbs: 0,
-    beforeBreadcrumb: () => null,
+    beforeBreadcrumb: returnNull,
     normalizeDepth: 1,
     normalizeMaxBreadth: 10,
     maxValueLength: 200,
@@ -317,8 +318,8 @@ class ExceptionTelemetryImpl implements ExceptionTelemetryService {
       return {}
     }
     return {
-      onCaughtError: adaptReactErrorHandler(sdk.reactErrorHandler(() => {})),
-      onRecoverableError: adaptReactErrorHandler(sdk.reactErrorHandler(() => {})),
+      onCaughtError: adaptReactErrorHandler(sdk.reactErrorHandler(noop)),
+      onRecoverableError: adaptReactErrorHandler(sdk.reactErrorHandler(noop)),
       onUncaughtError: adaptReactErrorHandler(sdk.reactErrorHandler()),
     }
   }

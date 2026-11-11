@@ -8,6 +8,7 @@ import {
   createPersistenceFlushService,
   type PersistenceFlushService,
 } from './persistence-flush-service.ts'
+import { sleep } from '@ocavue/utils'
 
 /**
  * A flusher that records its calls and can hold or fail the next one.
@@ -89,9 +90,7 @@ function setup(): Setup {
  * Let every pending promise continuation run.
  */
 async function settle(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 0)
-  })
+  await sleep(0)
 }
 
 afterEach(() => {

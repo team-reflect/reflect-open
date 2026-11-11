@@ -16,6 +16,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
+import { noop } from '@ocavue/utils'
 
 const NO_MATCHES: SearchStatus = { total: 0, active: 0 }
 
@@ -50,7 +51,7 @@ export interface NoteFindActions {
 const NoteFindContext = createContext<NoteFindValue | null>(null)
 const NoteFindActionsContext = createContext<NoteFindActions | null>(null)
 const NoteFindTargetContext = createContext<FindTarget | null>(null)
-const NoteFindReportContext = createContext<(path: string, status: SearchStatus) => void>(() => {})
+const NoteFindReportContext = createContext<(path: string, status: SearchStatus) => void>(noop)
 
 /** One note-local Find session for the current webview window. */
 export function NoteFindProvider({ children }: { children: ReactNode }): ReactElement {

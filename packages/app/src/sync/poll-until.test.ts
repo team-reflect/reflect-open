@@ -3,6 +3,7 @@ import { AppError } from '@reflect/core'
 import { createTestClockService, type TestClockService } from '@reflect/core/testing'
 import { createTestLifecycleService, type TestLifecycleService } from '../testing/lifecycle.ts'
 import { pollUntil } from './poll-until.ts'
+import { sleep } from '@ocavue/utils'
 
 const POLL_MS = 3000
 
@@ -20,7 +21,7 @@ beforeEach(() => {
  * Let every promise chain that is already runnable settle.
  */
 async function flush(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  await sleep(0)
 }
 
 /**

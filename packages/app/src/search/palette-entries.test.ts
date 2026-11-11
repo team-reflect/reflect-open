@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Command } from '../commands/command-service.ts'
 import type { WikiSuggestion } from '@reflect/core'
 import { buildPaletteSections, type PaletteHit } from './palette-entries.ts'
+import { noop } from '@ocavue/utils'
 
 function suggestion(path: string, title: string, date: string | null = null): WikiSuggestion {
   return { target: title, path, title, alias: null, date }
@@ -15,8 +16,8 @@ function hit(
   return { path, title, snippet, dailyDate }
 }
 const COMMANDS: Command[] = [
-  { id: 'nav.today', title: 'Go to today', keywords: ['daily'], run: () => {} },
-  { id: 'theme.toggle', title: 'Toggle theme', keywords: ['dark'], run: () => {} },
+  { id: 'nav.today', title: 'Go to today', keywords: ['daily'], run: noop },
+  { id: 'theme.toggle', title: 'Toggle theme', keywords: ['dark'], run: noop },
 ]
 
 /** Defaults for the common case; tests override what they exercise. */

@@ -13,6 +13,7 @@ import {
   type TestPlatformOptions,
 } from '@reflect/core/testing'
 import { createMobileOnboardingService } from './mobile-onboarding-service.ts'
+import { sleep, noop } from '@ocavue/utils'
 
 /**
  * The fixed mobile roots the test storage reports.
@@ -150,7 +151,7 @@ describe('MobileOnboardingService warm', () => {
     context.service.warm()
     // Settle the rejection with no taker attached; the service's internal
     // catch keeps it from escaping as an unhandled rejection.
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
   })
 })
 
@@ -182,7 +183,7 @@ describe('MobileOnboardingService boot', () => {
   })
 
   it('shows onboarding immediately while the iCloud container is still resolving', async () => {
-    let releaseStorage: () => void = () => {}
+    let releaseStorage: () => void = noop
     const context = setup({
       resolve: async () => {
         await new Promise<void>((resolve) => {

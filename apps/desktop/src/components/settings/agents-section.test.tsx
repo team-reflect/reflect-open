@@ -12,6 +12,7 @@ import { queryKeys } from '@/lib/query-client.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AgentsSection } from './agents-section.tsx'
+import { noop } from '@ocavue/utils'
 
 const GRAPH = { root: '/graphs/Personal', name: 'Personal', generation: 7 }
 
@@ -105,7 +106,7 @@ describe('AgentsSection', () => {
 
   it('disables all actions while one mutation is pending', async () => {
     installState = 'stale'
-    installResult = () => new Promise<AgentSkillStatus>(() => {})
+    installResult = () => new Promise<AgentSkillStatus>(noop)
     await renderSection()
 
     await page.getByRole('button', { name: 'Update skill' }).click()

@@ -9,6 +9,7 @@ import {
 } from '@reflect/core'
 import { useStore } from '@/lib/use-store.ts'
 import { useMaybeGraphServices } from '@/services/services-provider.tsx'
+import { noop } from '@ocavue/utils'
 
 type GitSyncActions = Pick<GitSyncService, 'disconnectGraph' | 'syncNow'> &
   Pick<GithubConnector, 'connectNewRepo' | 'connectExistingRepo'> &
@@ -20,7 +21,7 @@ const LOADING: GitSyncState = { phase: 'loading' }
  * What the surface reads where the graph runs no git sync service.
  */
 const NO_GIT_SYNC: Store<GitSyncState> = {
-  subscribe: () => () => {},
+  subscribe: () => noop,
   get: () => LOADING,
 }
 

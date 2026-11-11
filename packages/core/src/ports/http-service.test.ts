@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTestHttpService } from '../testing/index.ts'
 import { createBrowserHttpService } from './http-service.ts'
+import { returnTrue } from '@ocavue/utils'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -57,7 +58,7 @@ describe('createTestHttpService', () => {
 
   it('lets a later route win over an earlier one', async () => {
     const http = createTestHttpService()
-    http.on('GET', () => true, { status: 500 })
+    http.on('GET', returnTrue, { status: 500 })
     http.on('GET', 'https://example.com/a', { status: 200 })
 
     expect((await http.fetch('https://example.com/a')).status).toBe(200)

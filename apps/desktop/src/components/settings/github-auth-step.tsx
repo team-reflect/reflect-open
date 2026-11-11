@@ -1,3 +1,4 @@
+import { noop } from '@ocavue/utils'
 import { useEffect, useEffectEvent, useRef, useState, type ReactElement } from 'react'
 import type { GithubUser } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
@@ -70,9 +71,8 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
           reportStoredUser(user)
         }
       })
-      .catch(() => {
-        // Leave the step visible; the user signs in fresh.
-      })
+      // Leave the step visible; the user signs in fresh.
+      .catch(noop)
     return () => {
       cancelled = true
     }

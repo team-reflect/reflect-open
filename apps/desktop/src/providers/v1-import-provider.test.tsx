@@ -12,6 +12,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useStore } from '@/lib/use-store.ts'
 import { useV1Import, V1ImportProvider } from './v1-import-provider.tsx'
+import { noop, sleep, returnNull } from '@ocavue/utils'
 
 const GRAPH: GraphInfo = { root: '/graphs/notes', name: 'Notes', generation: 42 }
 
@@ -52,11 +53,11 @@ async function renderProvider(result?: GraphImportSummary | Error) {
         }
         return result ?? pendingImport.promise
       },
-      graph_import_cancel: () => null,
+      graph_import_cancel: returnNull,
     },
   })
   const session = createTestGraphSessionService({ state: { status: 'ready', graph: GRAPH } })
-  const refreshIndex = vi.spyOn(session, 'refreshIndex').mockImplementation(() => {})
+  const refreshIndex = vi.spyOn(session, 'refreshIndex').mockImplementation(noop)
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     ipc,
@@ -196,7 +197,7 @@ describe('V1ImportProvider', () => {
     expect(context.commands()).toEqual(['graph_import_reflect_v1_zip', 'graph_import_cancel'])
 
     context.pendingImport.resolve(summary())
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(context.ownWrites()).toEqual([])
     expect(context.refreshIndex).not.toHaveBeenCalled()
   })

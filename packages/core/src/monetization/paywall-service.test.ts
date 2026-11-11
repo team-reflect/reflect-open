@@ -25,6 +25,7 @@ import {
   createPaywallService,
   type PaywallService,
 } from './paywall-service.ts'
+import { noop } from '@ocavue/utils'
 
 const DAY_INDEX = 3
 
@@ -211,8 +212,8 @@ describe('PaywallService.gate', () => {
     paywall.gate.get()
     expect(watchers).toBe(0)
 
-    const first = paywall.gate.subscribe(() => {})
-    const second = paywall.gate.subscribe(() => {})
+    const first = paywall.gate.subscribe(noop)
+    const second = paywall.gate.subscribe(noop)
     expect(watchers).toBe(2)
 
     first()

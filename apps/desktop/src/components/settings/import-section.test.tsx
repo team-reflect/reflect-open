@@ -6,6 +6,7 @@ import { V1ImportProvider } from '@/providers/v1-import-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ImportSection } from './import-section.tsx'
+import { noop } from '@ocavue/utils'
 
 const IMPORT_COMMAND = 'graph_import_reflect_v1_zip'
 
@@ -20,7 +21,7 @@ beforeEach(() => {
  */
 async function renderSection(): Promise<TestCoreServices> {
   const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  core.ipc.onCommand(IMPORT_COMMAND, () => new Promise<never>(() => {}))
+  core.ipc.onCommand(IMPORT_COMMAND, () => new Promise<never>(noop))
   await renderInApp(<ImportSection />, {
     core,
     appServices: { dialog },

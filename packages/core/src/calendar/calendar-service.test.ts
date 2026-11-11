@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createCalendarService, type CalendarEvent } from './calendar-service.ts'
+import { noop, returnTrue } from '@ocavue/utils'
 
 function event(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
   return {
@@ -30,7 +31,7 @@ describe('createCalendarService', () => {
   it('reads the permission state and requests access', async () => {
     const { ipc, calendar } = setup()
     ipc.onCommand('calendar_authorization_status', () => 'denied')
-    ipc.onCommand('calendar_request_access', () => true)
+    ipc.onCommand('calendar_request_access', returnTrue)
 
     await expect(calendar.authorizationStatus()).resolves.toBe('denied')
     await expect(calendar.requestAccess()).resolves.toBe(true)
@@ -75,7 +76,7 @@ describe('createCalendarService', () => {
     const { ipc, logger } = setup()
     vi.spyOn(ipc, 'listen').mockRejectedValue(new Error('no events'))
     const calendar = createCalendarService({ ipc, logger })
-    calendar.subscribeChanged(() => {})
+    calendar.subscribeChanged(noop)
     await Promise.resolve()
     await Promise.resolve()
 

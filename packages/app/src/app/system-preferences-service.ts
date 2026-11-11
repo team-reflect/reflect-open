@@ -1,4 +1,5 @@
 import { deriveStore, type Store, type Unlisten } from '@reflect/core'
+import { noop } from '@ocavue/utils'
 
 export type ColorScheme = 'light' | 'dark'
 
@@ -49,7 +50,7 @@ function createMediaQueryStore(media: PlatformMedia | undefined, query: string):
     subscribe: (listener: VoidFunction): Unlisten => {
       const list = resolveMatchMedia(media)?.(query)
       if (typeof list?.addEventListener !== 'function') {
-        return () => {}
+        return noop
       }
       const controller = new AbortController()
       list.addEventListener('change', listener, { signal: controller.signal })

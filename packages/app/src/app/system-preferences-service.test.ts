@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createSystemPreferencesService } from './system-preferences-service.ts'
+import { noop } from '@ocavue/utils'
 
 interface FakeQuery {
   matches: boolean
@@ -95,7 +96,7 @@ describe('createSystemPreferencesService', () => {
       media: { matchMedia: () => list as unknown as MediaQueryList },
     })
     expect(preferences.reducedMotion.get()).toBe(true)
-    const unsubscribe = preferences.reducedMotion.subscribe(() => {})
+    const unsubscribe = preferences.reducedMotion.subscribe(noop)
     unsubscribe()
   })
 
@@ -103,7 +104,7 @@ describe('createSystemPreferencesService', () => {
     const preferences = createSystemPreferencesService({ media: {} })
     expect(preferences.reducedMotion.get()).toBe(false)
     expect(preferences.colorScheme.get()).toBe('light')
-    const unsubscribe = preferences.colorScheme.subscribe(() => {})
+    const unsubscribe = preferences.colorScheme.subscribe(noop)
     unsubscribe()
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createAppStoreService } from './app-store-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 describe('AppStoreService', () => {
   it('environment unwraps the environment field', async () => {
@@ -22,14 +23,14 @@ describe('AppStoreService', () => {
 
   it('sync invokes the command with no arguments', async () => {
     const ipc = createTestIpcBridgeService()
-    ipc.onCommand('plugin:app-store|sync', () => null)
+    ipc.onCommand('plugin:app-store|sync', returnNull)
     await expect(createAppStoreService({ ipc }).sync()).resolves.toBeUndefined()
     expect(ipc.calls()).toEqual([{ command: 'plugin:app-store|sync', args: {} }])
   })
 
   it('presentOfferCodeRedeemSheet invokes the command with no arguments', async () => {
     const ipc = createTestIpcBridgeService()
-    ipc.onCommand('plugin:app-store|present_offer_code_redeem_sheet', () => null)
+    ipc.onCommand('plugin:app-store|present_offer_code_redeem_sheet', returnNull)
     await expect(
       createAppStoreService({ ipc }).presentOfferCodeRedeemSheet(),
     ).resolves.toBeUndefined()

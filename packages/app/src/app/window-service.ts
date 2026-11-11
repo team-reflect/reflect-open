@@ -10,6 +10,7 @@ import {
   type WindowBootstrap,
 } from '@reflect/core'
 import { z } from 'zod'
+import { noop } from '@ocavue/utils'
 
 /**
  * The label of the window the app opens at launch.
@@ -249,11 +250,11 @@ class SingleWindowHostImpl implements WindowHost {
   emitTo(_label: string, _event: string, _payload: unknown): void {}
 
   listen(_event: string, _handler: (payload: unknown) => void): Unlisten {
-    return () => {}
+    return noop
   }
 
   onCloseRequested(_handler: CloseRequestedHandler): Unlisten {
-    return () => {}
+    return noop
   }
 
   hide(): void {}

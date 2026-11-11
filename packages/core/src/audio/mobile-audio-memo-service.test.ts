@@ -33,6 +33,7 @@ import {
 } from '../testing/index.ts'
 import type { AudioRecorderFinalSegment, AudioRecorderSegment } from './audio-recorder-service.ts'
 import type { StagedRecordingFile } from '../ipc/recording-plugin.ts'
+import { sleep } from '@ocavue/utils'
 
 const PROVIDERS: AiProvidersState = {
   providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
@@ -203,7 +204,7 @@ async function setup(options?: SetupOptions) {
  * Settle the promise chains a capture, a scan, or a pass runs on.
  */
 function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return sleep(0)
 }
 
 describe('MobileAudioMemoService.openSession', () => {

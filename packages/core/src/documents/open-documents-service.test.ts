@@ -8,6 +8,7 @@ import { createTestLoggerService } from '../testing/logger.ts'
 import { createNoteSessionService } from './note-session-service.ts'
 import type { NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
 import { createOpenDocumentsService, type OpenDocumentsService } from './open-documents-service.ts'
+import { sleep } from '@ocavue/utils'
 
 /**
  * A session that logs the calls the registry makes.
@@ -303,7 +304,7 @@ describe('reloadAll with live sessions', () => {
       const settled = snapshots.length
 
       openDocuments.reloadAll()
-      await new Promise((resolve) => setTimeout(resolve, 0)) // drain the reconcile read
+      await sleep(0) // drain the reconcile read
 
       expect(applied).toEqual([])
       expect(snapshots).toHaveLength(settled) // the echo guard emitted nothing

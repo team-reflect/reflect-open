@@ -17,6 +17,7 @@ import { WritableStore } from '../store.ts'
 import type { EmbeddingBackfillResult } from './embedding-index-service.ts'
 import type { EmbedStatus } from './embedding-runtime-service.ts'
 import type { RetrievalHit } from './retrieval-service.ts'
+import { sleep } from '@ocavue/utils'
 
 const MODEL = 'all-MiniLM-L6-v2'
 const READY: EmbedStatus = { status: 'ready', model: MODEL }
@@ -102,7 +103,7 @@ async function setup(options?: {
  * One macrotask — long enough for a would-be reaction to have started.
  */
 function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return sleep(0)
 }
 
 describe('start', () => {

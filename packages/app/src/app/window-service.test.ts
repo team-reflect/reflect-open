@@ -11,6 +11,7 @@ import {
   type CloseRequestedHandler,
   type WindowHost,
 } from './window-service.ts'
+import { noop, returnNull } from '@ocavue/utils'
 
 const BOOT = {
   graph: { root: '/g', name: 'g', generation: 3 },
@@ -93,7 +94,7 @@ describe('createWindowService', () => {
 
   it('closes note windows and logs a failure instead of rejecting', async () => {
     const { window, ipc, logger } = setup()
-    ipc.onCommand('close_note_windows', () => null)
+    ipc.onCommand('close_note_windows', returnNull)
     await window.closeSecondaryWindows()
     expect(ipc.calls().map((call) => call.command)).toEqual(['close_note_windows'])
 
@@ -109,7 +110,7 @@ describe('createWindowService', () => {
   it('bootstraps a note window and toggles devtools over IPC', async () => {
     const { window, ipc } = setup()
     ipc.onCommand('window_bootstrap', () => BOOT)
-    ipc.onCommand('toggle_devtools', () => null)
+    ipc.onCommand('toggle_devtools', returnNull)
 
     await expect(window.bootstrap()).resolves.toEqual(BOOT)
     await window.toggleDevtools()
@@ -158,7 +159,7 @@ describe('createWindowService', () => {
     ipc.transport.listen = () => Promise.reject(new Error('denied'))
     const { window, logger } = setup({ ipc })
 
-    window.subscribeIndexWritten(() => {})
+    window.subscribeIndexWritten(noop)
     await settle()
 
     expect(logger.getErrors()).toEqual([
@@ -190,7 +191,7 @@ describe('createWindowService', () => {
     const received = vi.fn()
 
     const unlistenEvent = window.subscribeWindowEvent('menu', received)
-    const unlistenClose = window.onCloseRequested(() => {})
+    const unlistenClose = window.onCloseRequested(noop)
     await settle()
     handlers.get('menu')?.('note.find')
     await window.emitTo('note-2', 'menu', 'note.find')

@@ -11,6 +11,7 @@ import {
 } from '@reflect/core/testing'
 import { createDeepLinkRouter, type DeepLinkSession } from './deep-link-router.ts'
 import type { Route } from './route.ts'
+import { returnFalse } from '@ocavue/utils'
 
 interface SetupOverrides {
   captureInbox?: CaptureInboxService
@@ -154,7 +155,7 @@ describe('DeepLinkRouter.serve', () => {
 
     context.service.serve({
       navigate: context.navigate,
-      beginNavigationIntent: () => () => false,
+      beginNavigationIntent: () => returnFalse,
     })
 
     expect(context.navigate).toHaveBeenCalledWith({ kind: 'tasks' })

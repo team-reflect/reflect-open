@@ -10,6 +10,7 @@ import {
   createSubscriptionService,
   type SubscriptionService,
 } from './subscription-service.ts'
+import { noop } from '@ocavue/utils'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const NOW = Date.UTC(2026, 9, 1)
@@ -25,7 +26,7 @@ let owned: (productId: string) => Promise<boolean>
 let lookups: string[]
 
 function never<T>(): Promise<T> {
-  return new Promise<T>(() => {})
+  return new Promise<T>(noop)
 }
 
 beforeEach(() => {
@@ -229,7 +230,7 @@ describe('SubscriptionService', () => {
     await subscription.activeSubscription()
     const listener = vi.fn()
     const unsubscribe = subscription.subscribe(listener)
-    const other = subscription.subscribe(() => {})
+    const other = subscription.subscribe(noop)
 
     unsubscribe()
     unsubscribe()

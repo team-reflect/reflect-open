@@ -12,6 +12,7 @@ import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DeepLinkProvider } from './deep-link-provider.tsx'
+import { sleep } from '@ocavue/utils'
 
 // The handler itself is covered in `@reflect/app`; these cover how the
 // provider ties it to the router and to the graph session.
@@ -66,7 +67,7 @@ function setup() {
       resolve: async () => {
         pending.resolve(`notes/${target}.md`)
         // Let the handler continue past the resolution.
-        await new Promise((resolve) => setTimeout(resolve, 0))
+        await sleep(0)
       },
     }
   }

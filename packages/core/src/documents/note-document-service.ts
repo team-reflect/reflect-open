@@ -4,6 +4,7 @@ import type { NoteFileService } from '../graph/note-file-service.ts'
 import { splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter.ts'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The single safe way to read and write a note from an in-app action (pin,
@@ -223,10 +224,7 @@ class NoteDocumentServiceImpl implements NoteDocumentService {
     // Run `op` whether the previous write resolved or rejected — one failure must
     // not wedge the chain for the note.
     const result = previous.then(op, op)
-    const settled = result.then(
-      () => {},
-      () => {},
-    )
+    const settled = result.then(noop, noop)
     this.#writeChains.set(path, settled)
     void settled.then(() => {
       // Drop the entry once the chain goes idle, so the map can't grow unbounded.
