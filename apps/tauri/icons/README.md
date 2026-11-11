@@ -44,10 +44,10 @@ appearances. Each `.icon` has six layers in three groups: `nodes`, `edges`, and
 
 Icon Composer uses one appearance key, `tinted`, for both Clear and Tinted.
 
-Preview any appearance without a simulator:
+Preview any appearance without a simulator (run from the repo root):
 
 ```bash
 "$(xcode-select -p)/../Applications/Icon Composer.app/Contents/Executables/ictool" \
-  AppIcon.icon --export-image --output-file out.png --platform macOS \
+  design-system/assets/app-icons/AppIcon.icon --export-image --output-file out.png --platform macOS \
   --rendition TintedDark --width 512 --height 512 --scale 1
 ```

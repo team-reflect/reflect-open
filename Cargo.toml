@@ -87,8 +87,8 @@ percent-encoding = "2.3.2"
 proptest = "1.12.0"
 pulldown-cmark = "0.13.4"
 reconcile-text = "0.14.1"
-# reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 regex = "1.13.1"
+# reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 rusqlite_migration = "2.6.0"

@@ -94,6 +94,10 @@ jobs:
             'apps/web/src/boot.ts'
             'apps/web/src/services/detect-platform.ts'
             'apps/web/vite.config.ts'
+            'apps/web/package.json'
+            'apps/web/index.html'
+            'apps/web/src/platform-root.mobile.tsx'
+            'apps/web/src/mobile/*'
           )
 
           changed() {

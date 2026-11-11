@@ -3,6 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["TAURI_ENV_PLATFORM"],
       "outputs": ["dist/**", ".output/**"]
     },
     "dev": {
