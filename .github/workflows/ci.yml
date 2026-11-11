@@ -298,6 +298,20 @@ jobs:
         if: matrix.name == 'Linux'
         run: cargo shear
 
+      # Keep the version equal to `CBINDGEN_VERSION` in `scripts/build-ffi.ts`.
+      - name: Install cbindgen
+        if: matrix.name == 'Linux'
+        uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
+        with:
+          tool: cbindgen@0.29.4
+
+      - name: Verify the generated C header is current
+        if: matrix.name == 'Linux'
+        run: |
+          cbindgen --config crates/ffi/cbindgen.toml --output crates/ffi/include/reflect_core.h crates/ffi
+          git diff --exit-code crates/ffi/include/reflect_core.h \
+            || (echo "::error::reflect_core.h is stale. Run 'pnpm build:ffi' and commit the result." && exit 1)
+
   test-rust:
     needs: classify
     if: needs.classify.outputs.test-rust == 'true'

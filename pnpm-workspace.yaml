@@ -2,9 +2,11 @@ packages:
   - apps/*
   - packages/*
   - design-system
+  - scripts
 
 allowBuilds:
   '@sentry/cli': true
+  appium-ios-tuntap: false
   better-sqlite3: true
   esbuild: true
   simple-git-hooks: false

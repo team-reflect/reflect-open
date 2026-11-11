@@ -13,14 +13,15 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex, MutexGuard, Once};
 
+use reflect_core::Core;
 use serde::Serialize;
 use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::db::{self, IndexState};
+use crate::db;
 use crate::error::{AppError, AppResult};
-use crate::fs::{self, GraphInfo, GraphState};
+use crate::fs::{self, GraphInfo};
 use crate::quit::QuitState;
 
 /// App-wide note-window registry.
@@ -436,7 +437,7 @@ pub async fn open_note_window(
     deep_link: String,
     window: tauri::WebviewWindow,
     app: tauri::AppHandle,
-    graph: State<'_, GraphState>,
+    core: State<'_, Arc<Core>>,
     init: State<'_, WindowInit>,
     quit: State<'_, QuitState>,
 ) -> AppResult<()> {
@@ -445,7 +446,7 @@ pub async fn open_note_window(
             "not a reflect:// link: {deep_link}"
         )));
     }
-    let issued_generation = fs::current_graph_info(&graph)?.generation;
+    let issued_generation = fs::current_graph_info(&core.graph)?.generation;
     // Tauri's internal label availability check and window-map insertion are
     // separate operations. Serialize the whole plan/focus/build transaction,
     // not just our registry mutation, so two webviews cannot both pass the
@@ -460,7 +461,7 @@ pub async fn open_note_window(
     if quit.armed() {
         return Err(AppError::io("the app is quitting"));
     }
-    fs::root_for_generation(&graph, issued_generation)?;
+    fs::root_for_generation(&core.graph, issued_generation)?;
 
     let invoking_label = window.label().to_owned();
     let label = loop {
@@ -557,12 +558,11 @@ pub struct WindowBootstrap {
 #[tauri::command]
 pub fn window_bootstrap(
     window: tauri::WebviewWindow,
-    graph: State<GraphState>,
-    index: State<IndexState>,
+    core: State<Arc<Core>>,
     init: State<WindowInit>,
 ) -> AppResult<WindowBootstrap> {
-    let graph = fs::current_graph_info(&graph)?;
-    let index_generation = db::current_generation(&index)?;
+    let graph = fs::current_graph_info(&core.graph)?;
+    let index_generation = db::current_generation(&core.index)?;
     let initial_deep_link = lock_registry(&init)?
         .pending_bootstraps
         .remove(window.label());

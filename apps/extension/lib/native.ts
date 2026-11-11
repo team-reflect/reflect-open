@@ -10,7 +10,7 @@ import type { HoldReason } from './messages.ts'
  * observes the desktop app draining).
  */
 
-/** Must match the host manifest name written by `src-tauri/src/capture.rs`. */
+/** Must match the host manifest name written by `crates/core/src/capture.rs`. */
 export const HOST_NAME = 'app.reflect.capture'
 
 export type SendOutcome =

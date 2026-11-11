@@ -11,24 +11,24 @@
 //! would tear that subscription down and cut the in-process event path off
 //! from the indexer. Succeeding with nothing to do is the honest answer.
 
-use tauri::State;
+use reflect_types::AppResult;
 
-use crate::error::AppResult;
+use crate::Core;
 
-/// Empty stand-in for the desktop watcher state, so `lib.rs` manages the same
+/// Empty stand-in for the desktop watcher state, so [`Core`] holds the same
 /// type name on every platform.
 #[derive(Default)]
 pub struct WatcherState {}
 
-/// No-op: mobile has no platform watcher to start. `index:changed` events
-/// never come from the shell here — local writes notify in-process instead.
-#[tauri::command]
-pub fn watch_start(_watcher: State<WatcherState>) -> AppResult<()> {
-    Ok(())
-}
+impl Core {
+    /// No-op: mobile has no platform watcher to start. `index:changed` events
+    /// never come from the shell here — local writes notify in-process instead.
+    pub fn watch_start(&self) -> AppResult<()> {
+        Ok(())
+    }
 
-/// No-op: stopping a watcher that never runs is trivially true.
-#[tauri::command]
-pub fn watch_stop(_watcher: State<WatcherState>) -> AppResult<()> {
-    Ok(())
+    /// No-op: stopping a watcher that never runs is trivially true.
+    pub fn watch_stop(&self) -> AppResult<()> {
+        Ok(())
+    }
 }
