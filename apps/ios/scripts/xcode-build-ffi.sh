@@ -20,6 +20,8 @@ cd "$(dirname "$0")/../../.."
 if [ -f apps/desktop/src-tauri/.xcode.env.local ]; then
   . apps/desktop/src-tauri/.xcode.env.local
 fi
+
+# FIXME: move the following logic into generate-xcode-env.mjs, so that we can use these PATH shims in differnt scripts.
 PATH="$HOME/.local/share/mise/shims:$PATH:$HOME/.cargo/bin"
 
 if ! command -v node >/dev/null 2>&1; then
