@@ -52,7 +52,7 @@ dist-ssr
 __screenshots__/
 
 # Xcode build-phase toolchain paths, generated per machine (see
-# apps/desktop/src-tauri/xcode-scripts/generate-xcode-env.mjs)
+# scripts/generate-xcode-env.mjs)
 .xcode.env.local
 
 # Tauri mobile plugins (plugins/*): `.tauri` is the vendored copy of tauri's
