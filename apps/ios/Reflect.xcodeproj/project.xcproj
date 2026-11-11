@@ -15,6 +15,12 @@
     {
       "kind": "local",
       "path": "../../apple",
+    }, {
+      "kind": "remote",
+      "repository": "https://github.com/getsentry/sentry-cocoa",
+      "version": {
+        "version": "9.31.0",
+      },
     },
   ],
   "files": [
@@ -71,6 +77,13 @@
         "compile-sources",
         "resources",
         "frameworks",
+      ],
+      "package-product-members": [
+        {
+          "package": "sentry-cocoa",
+          "product-name": "Sentry-Dynamic",
+          "build-phase": { "build-phase": "frameworks" },
+        },
       ],
     }, {
       "name": "ReflectTests",
