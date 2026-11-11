@@ -29,6 +29,7 @@
     "fix:eslint": "eslint --cache --max-warnings 0 --fix",
     "check": "pnpm typecheck && pnpm lint",
     "gen:licenses": "pnpm --filter @reflect/desktop gen:licenses",
+    "gen:wxt": "pnpm --filter @reflect/extension gen:wxt",
     "tauri": "pnpm --filter @reflect/desktop tauri",
     "upload:testflight": "pnpm --filter @reflect/desktop upload:testflight",
     "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
