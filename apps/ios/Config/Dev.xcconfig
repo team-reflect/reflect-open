@@ -1,4 +1,6 @@
-// Configuration Debug-Dev: the dev flavor. It has its own App Group and no iCloud container.
+// Configuration Debug-Dev: the dev flavor. It has its own App Group and
+// shares the iCloud container with stable, so a dev build opens the same
+// iCloud graphs as the Mac app.
 
 #include "Shared.xcconfig"
 #include "Debug.xcconfig"
