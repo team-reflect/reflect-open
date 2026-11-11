@@ -288,9 +288,10 @@ jobs:
 
       - name: Install cargo-shear
         if: matrix.name == 'Linux'
-        uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
-          tool: cargo-shear@1.14.0
+          version: 2026.11.5
+          install_args: github:Boshen/cargo-shear
 
       # Fails on a dependency that no code uses, in a member or in the root
       # `[workspace.dependencies]`.
