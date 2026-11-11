@@ -299,13 +299,22 @@ jobs:
       - name: Build the web app
         run: pnpm --filter @reflect/ios build:web
 
+      # A simulator that still does its first-boot work launches the app
+      # slowly, or not at all.
+      - name: Boot the simulator
+        run: |
+          udid=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
+          xcrun simctl bootstatus "$udid" -b
+          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+
       - name: Test
         run: |
           xcodebuild test \
             -project apps/ios/Reflect.xcodeproj \
             -scheme Reflect \
             -configuration Debug-Dev \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData"
 
   lint-rust:
