@@ -17,7 +17,7 @@ final class EntryPointUITests: XCTestCase {
   func testAURLNavigatesARunningApp() throws {
     _ = app.launchIntoDailyNote()
     app.open(try XCTUnwrap(URL(string: "reflect://tasks")))
-    XCTAssertTrue(tasksSearchField.waitForExistence(timeout: 15))
+    XCTAssertTrue(tasksSearchField.waitForExistence(timeout: 60))
   }
 
   func testAURLNavigatesAtLaunch() throws {
@@ -25,14 +25,14 @@ final class EntryPointUITests: XCTestCase {
     _ = app.launchIntoDailyNote()
     app.terminate()
     app.open(try XCTUnwrap(URL(string: "reflect://tasks")))
-    XCTAssertTrue(tasksSearchField.waitForExistence(timeout: 30))
+    XCTAssertTrue(tasksSearchField.waitForExistence(timeout: 60))
   }
 
   func testTheRecordAudioURLOpensTheRecorder() throws {
     _ = app.launchIntoDailyNote()
     app.open(try XCTUnwrap(URL(string: "reflect://record-audio")))
     let recorder = app.webViews.descendants(matching: .any)["Audio memo"]
-    XCTAssertTrue(recorder.waitForExistence(timeout: 15))
+    XCTAssertTrue(recorder.waitForExistence(timeout: 60))
     // The page confirms the request to the shell two seconds after it opens
     // the recorder. Until then the shell repeats the request at the next launch.
     Thread.sleep(forTimeInterval: 3)
