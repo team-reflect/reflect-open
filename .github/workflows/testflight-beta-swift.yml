@@ -9,6 +9,8 @@ name: TestFlight beta (Swift shell)
 # build number. App Store Connect takes one build per number, so run only one
 # of the two workflows for a commit.
 
+# FIXME: just remove the old testflight-beta.yml and rename testflight-beta-swift.yml into testflight-beta.yml. Also make the comment in this file much shorter and simpler.
+
 on:
   workflow_dispatch:
 
