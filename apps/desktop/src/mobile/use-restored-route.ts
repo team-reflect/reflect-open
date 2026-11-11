@@ -22,6 +22,7 @@ const storedRouteSchema = z.object({ graphRoot: z.string(), route: routeSchema }
 export function useRestoredRoute(graphRoot: string): Route | undefined {
   const { navigation } = useAppServices()
   const { storage } = useCoreServices()
+  // FIXME: do not use "[enabled] = useState(() => detectHostKind(window) === 'swift')". use the isSwiftMobile fact instead. const enabled = whateverService.platformFacts.isSwiftMobile something like this.
   const [enabled] = useState(() => detectHostKind(window) === 'swift')
 
   const [restored] = useState(() => {
