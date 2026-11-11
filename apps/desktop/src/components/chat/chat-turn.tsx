@@ -58,7 +58,7 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
             <ChatAssistantPart key={index} part={part} onWikiLinkClick={navigateWikiLink} />
           ))}
           {replyMarkdown !== null ? (
-            <MessageFooter className="pointer-events-none -mt-1 opacity-0 transition-opacity duration-100 group-hover/assistant-response:pointer-events-auto group-hover/assistant-response:opacity-100 group-focus-within/assistant-response:pointer-events-auto group-focus-within/assistant-response:opacity-100">
+            <MessageFooter className="pointer-events-none -mt-1 opacity-0 transition-opacity duration-100 group-hover/assistant-response:pointer-events-auto group-hover/assistant-response:opacity-100 group-focus-within/assistant-response:pointer-events-auto group-focus-within/assistant-response:opacity-100 touch-app:pointer-events-auto touch-app:opacity-100">
               <ChatCopyButton text={replyMarkdown} />
             </MessageFooter>
           ) : null}

@@ -47,6 +47,12 @@ export const MOBILE_PLATFORM: TestPlatformOptions = {
   surface: { mobileApp: true, touchEditor: true },
 }
 
+/**
+ * The platform facts of the iOS app on an iPad: the mobile app's services
+ * under the desktop-class workspace.
+ */
+export const IPAD_PLATFORM: TestPlatformOptions = { ...MOBILE_PLATFORM, isTablet: true }
+
 export interface RenderInAppOptions {
   /**
    * The open graph, reported through `core.graphSession.setGraph()`. Left out,

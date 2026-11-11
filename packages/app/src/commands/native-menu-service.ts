@@ -52,6 +52,11 @@ export type NativeMenuItem =
       text: string
       accelerator?: string
       /**
+       * The keymap-registry binding behind `accelerator`, for hosts whose
+       * menus take another key grammar (the iPadOS menu bar).
+       */
+      binding?: string
+      /**
        * Invoked with the item id when the item is activated.
        */
       action: (id: string) => void
@@ -76,6 +81,12 @@ export interface NativeAppMenu {
    * Give each submenu its `nsAppRole`. Call it after {@link setAsAppMenu}.
    */
   assignNsAppRoles(): MaybePromise<void>
+  /**
+   * Show or withdraw the command items while a workspace can (or cannot) run
+   * them. Hosts whose menu stays up regardless (macOS, where items without a
+   * dispatcher are simply inert) leave it out.
+   */
+  setCommandsAvailable?(available: boolean): MaybePromise<void>
 }
 
 export interface NativeContextMenuItem {
@@ -89,11 +100,25 @@ export interface NativeContextMenuItem {
   action: () => void
 }
 
+/**
+ * A point in the webview's viewport, in CSS pixels.
+ */
+export interface NativeMenuPoint {
+  readonly x: number
+  readonly y: number
+}
+
 export interface NativeContextMenuOptions {
   /**
    * Menu items to render in order.
    */
   items: readonly NativeContextMenuItem[]
+  /**
+   * Where the menu points: the event's client coordinates. Hosts whose menus
+   * open at the pointer on their own (macOS) ignore it; the iPad, where a
+   * touch has no lasting pointer, needs it.
+   */
+  at?: NativeMenuPoint
 }
 
 /**
@@ -102,9 +127,9 @@ export interface NativeContextMenuOptions {
 export interface NativeMenuHost {
   buildAppMenu(submenus: readonly NativeSubmenu[]): MaybePromise<NativeAppMenu>
   /**
-   * Open a context menu at the pointer.
+   * Open a context menu at the pointer, or at `at` where the host needs a point.
    */
-  popup(items: readonly NativeContextMenuItem[]): MaybePromise<void>
+  popup(items: readonly NativeContextMenuItem[], at?: NativeMenuPoint): MaybePromise<void>
 }
 
 /**
@@ -129,7 +154,8 @@ export type FocusedNoteMenuCommand = z.infer<typeof FocusedNoteMenuCommandSchema
 const FOCUSED_NOTE_MENU_EVENT = 'reflect://focused-note-menu-command'
 
 /**
- * The native macOS application menu and native context menus. Command items
+ * The native application menu (the macOS app menu, the iPadOS menu bar) and
+ * native context menus. Command items
  * derive from the command registry — id, label, and accelerator come from the
  * one command definition — so the menu cannot drift from the bindings that
  * fire.
@@ -145,9 +171,9 @@ export interface NativeMenuService {
    * host's default. Call once at startup — the menu holds command ids, not
    * state, so it never needs rebuilding.
    *
-   * macOS-only, and only in the main window: menu actions use channels owned
-   * by the webview that created them, so a note window must not replace the
-   * app-wide menu with an inert copy.
+   * The macOS app menu and the iPadOS menu bar, and only in the main window:
+   * menu actions use channels owned by the webview that created them, so a
+   * note window must not replace the app-wide menu with an inert copy.
    */
   install(layout: readonly AppSubmenuLayout[]): Promise<void>
   /**
@@ -187,7 +213,12 @@ export interface NativeMenuServiceDeps {
 class NativeMenuServiceImpl implements NativeMenuService {
   readonly #deps: NativeMenuServiceDeps
   #installed = false
+  #menu: NativeAppMenu | null = null
   #current: MenuCommandDispatch | null = null
+  /** The tail of the queued availability updates; see `#publishAvailability`. */
+  #availability: Promise<void> = Promise.resolve()
+  /** What the menu last showed: `null` until the first update lands. */
+  #publishedAvailable: boolean | null = null
   readonly #mainWindow: boolean
 
   constructor(deps: NativeMenuServiceDeps) {
@@ -197,7 +228,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
 
   async install(layout: readonly AppSubmenuLayout[]): Promise<void> {
     const { platform, ipc, logger, host } = this.#deps
-    if (!platform.isMacosDesktop || !this.#mainWindow) {
+    if (!(platform.isMacosDesktop || platform.isTablet) || !this.#mainWindow) {
       return
     }
     const menu = await host.buildAppMenu(
@@ -209,6 +240,12 @@ class NativeMenuServiceImpl implements NativeMenuService {
     )
     await menu.setAsAppMenu()
     this.#installed = true
+    this.#menu = menu
+    // A workspace may have published its dispatcher while the menu was building.
+    await this.#publishAvailability()
+    if (!platform.isMacosDesktop) {
+      return
+    }
     // NSApp roles must be assigned after setAsAppMenu: attaching the menu
     // clones each submenu's NSMenu, and muda resolves the role against the
     // instance inside the installed main menu — assigned earlier, the role
@@ -235,11 +272,37 @@ class NativeMenuServiceImpl implements NativeMenuService {
 
   setCommandDispatch(dispatch: MenuCommandDispatch | null): void {
     this.#current = dispatch
+    void this.#publishAvailability()
+  }
+
+  /**
+   * Tell the menu whether a workspace can run its commands. Updates run one
+   * at a time and each reads the dispatcher when it runs, so the menu never
+   * ends on a stale state, and a dispatcher swapped within one tick (an
+   * effect's cleanup, then its re-run) publishes nothing.
+   */
+  #publishAvailability(): Promise<void> {
+    this.#availability = this.#availability
+      .then(async () => {
+        const menu = this.#menu
+        const available = this.#current !== null
+        if (menu?.setCommandsAvailable === undefined || available === this.#publishedAvailable) {
+          return
+        }
+        await menu.setCommandsAvailable(available)
+        this.#publishedAvailable = available
+      })
+      .catch((error: unknown) => {
+        this.#deps.logger.warn('failed to update the menu commands:', error)
+      })
+    return this.#availability
   }
 
   readonly dispatchCommand = (commandId: string): void => {
     const focusedNoteCommand = FocusedNoteMenuCommandSchema.safeParse(commandId)
-    if (this.#deps.platform.isNativeShell && focusedNoteCommand.success) {
+    // Only the macOS app has note windows a Find command could belong to.
+    const { platform } = this.#deps
+    if (platform.isNativeShell && platform.isMacosDesktop && focusedNoteCommand.success) {
       void this.#dispatchToFocusedWindow(focusedNoteCommand.data)
       return
     }
@@ -259,7 +322,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     if (!this.#deps.platform.isNativeShell) {
       return
     }
-    await this.#deps.host.popup(options.items)
+    await this.#deps.host.popup(options.items, options.at)
   }
 
   async #dispatchToFocusedWindow(commandId: FocusedNoteMenuCommand): Promise<void> {
@@ -304,12 +367,12 @@ class NativeMenuServiceImpl implements NativeMenuService {
     if (!command) {
       throw new Error(`native menu references unknown command: ${entry.commandId}`)
     }
-    const accelerator = command.keybinding ? bindingToAccelerator(command.keybinding) : undefined
+    const binding = command.keybinding
     return {
       kind: 'command',
       id: command.id,
       text: entry.text ?? command.title,
-      ...(accelerator !== undefined ? { accelerator } : {}),
+      ...(binding ? { accelerator: bindingToAccelerator(binding), binding } : {}),
       action: this.dispatchCommand,
     }
   }

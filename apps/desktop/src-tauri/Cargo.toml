@@ -125,6 +125,8 @@ objc2-ui-kit = { workspace = true, features = ["std", "UIApplication", "block2"]
 tauri-plugin-iap = { workspace = true }
 tauri-plugin-app-store = { workspace = true }
 tauri-plugin-web-auth = { workspace = true }
+tauri-plugin-scene = { workspace = true }
+tauri-plugin-native-menu = { workspace = true }
 apple-native-keyring-store = { workspace = true, features = ["protected"] }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through

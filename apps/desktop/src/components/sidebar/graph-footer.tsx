@@ -22,7 +22,7 @@ import { useSelector } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import { useGraphActions, useGraphIndexing, useGraphRecents } from '@/providers/graph-provider.tsx'
 import { useGitSyncStore } from '@/providers/sync-provider.tsx'
-import { useRouterState } from '@/routing/router.tsx'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 const MENU_ITEM_CLASS = 'h-8 gap-2 px-2 py-0 text-[13px] text-text-secondary'
@@ -81,13 +81,15 @@ interface GraphFooterProps {
 export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement {
   const [appsOpen, setAppsOpen] = useState(false)
   const graphTriggerRef = useRef<HTMLButtonElement>(null)
-  const { logger } = useCoreServices()
+  const { logger, platform } = useCoreServices()
   const { opener, window: appWindow } = useAppServices()
   const recents = useGraphRecents()
   const indexing = useGraphIndexing()
   const { openRecent, chooseGraph } = useGraphActions()
   const { colorFor } = useGraphColors()
   const { route } = useRouterState()
+  const { navigate } = useRouterActions()
+  const ios = platform.appPlatform === 'ios'
   const settingsActive = route.kind === 'settings'
 
   return (
@@ -140,19 +142,32 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
             />
           ))}
           {recents.length > 0 ? <DropdownMenuSeparator /> : null}
-          <DropdownMenuItem
-            onClick={() => {
-              void opener.revealInFileManager(graph.root).catch((cause: unknown) => {
-                logger.error('open graph folder failed:', cause)
-              })
-            }}
-            className={MENU_ITEM_CLASS}
-          >
-            <LocateFixed aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">Reveal graph in Finder</span>
-          </DropdownMenuItem>
+          {/* The iOS app (the iPad's desktop workspace) keeps its graphs in
+              fixed roots: no folder to reveal or pick, so switching goes
+              through the iOS graph list instead. */}
+          {ios ? (
+            <DropdownMenuItem
+              onClick={() => navigate({ kind: 'graphs' })}
+              className={MENU_ITEM_CLASS}
+            >
+              <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Switch graph…</span>
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onClick={() => {
+                void opener.revealInFileManager(graph.root).catch((cause: unknown) => {
+                  logger.error('open graph folder failed:', cause)
+                })
+              }}
+              className={MENU_ITEM_CLASS}
+            >
+              <LocateFixed aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Reveal graph in Finder</span>
+            </DropdownMenuItem>
+          )}
           {/* Graph switching re-roots every window; note windows hide it. */}
-          {appWindow.isMainWindow() ? (
+          {appWindow.isMainWindow() && !ios ? (
             <DropdownMenuItem onClick={() => void chooseGraph()} className={MENU_ITEM_CLASS}>
               <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate">Open another graph…</span>

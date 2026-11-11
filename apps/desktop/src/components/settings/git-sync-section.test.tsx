@@ -8,12 +8,14 @@ import {
   createTestCoreServices,
   createTestGitSyncService,
   createTestGitHostConnector,
+  createTestPlatformService,
   type TestGitSyncService,
+  type TestPlatformOptions,
   type TestCoreServices,
   type TestGitHostConnector,
 } from '@reflect/core/testing'
 import '@/test-utils/locator.ts'
-import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { MOBILE_PLATFORM, renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GitSyncSettingsField } from './git-sync-section.tsx'
 
@@ -37,12 +39,14 @@ beforeEach(() => {
 async function renderSection(
   state: GitSyncState,
   graph?: TestOpenGraph,
+  platform?: TestPlatformOptions,
 ): Promise<TestCoreServices> {
   gitSync.setState(state)
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     gitSync,
     gitHostConnector,
+    ...(platform === undefined ? {} : { platform: createTestPlatformService(platform) }),
   })
   await renderInApp(<GitSyncSettingsField />, {
     core,
@@ -106,6 +110,17 @@ describe('GitSyncSettingsField', () => {
   it('explains the quiet window on a disconnected iCloud graph', async () => {
     await renderSection({ phase: 'disconnected' }, ICLOUD_GRAPH)
     await expect.element(page.getByText(/This graph syncs through iCloud Drive/)).toBeVisible()
+  })
+
+  it('offers no repository to an iCloud graph in the iOS app', async () => {
+    await renderSection({ phase: 'disconnected' }, ICLOUD_GRAPH, MOBILE_PLATFORM)
+
+    await expect
+      .element(
+        page.getByText(/To sync through a repository instead, use a graph kept on this device/),
+      )
+      .toBeVisible()
+    expect(page.getByRole('button', { name: 'Connect a repository…' }).query()).toBeNull()
   })
 
   it('describes the history role when iCloud is the channel', async () => {

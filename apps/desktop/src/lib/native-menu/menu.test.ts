@@ -55,6 +55,22 @@ describe('appMenuLayout', () => {
     })
     expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
   })
+  it('keeps the iPad menu bar to commands an iPad can run', () => {
+    const ipad = appMenuLayout({ tablet: true }).flatMap((submenu) => {
+      return submenu.entries
+        .map((entry) => (entry.kind === 'command' ? entry.commandId : null))
+        .filter(isNotNullish)
+    })
+    expect(ipad).not.toContain('note.openInNewWindow')
+    expect(ipad).not.toContain('dev.toggleDevtools')
+    // Everything else matches the macOS menu, so the two cannot drift.
+    expect(ipad).toEqual(
+      referencedCommandIds().filter(
+        (commandId) => commandId !== 'note.openInNewWindow' && commandId !== 'dev.toggleDevtools',
+      ),
+    )
+  })
+
   it('puts note Find commands and their browser-standard shortcuts in Edit', () => {
     const editMenu = appMenuLayout().find((submenu) => submenu.text === 'Edit')
     expect(editMenu?.entries).toEqual(
