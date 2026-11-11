@@ -1,0 +1,13 @@
+// Target-level settings of the share extension, the same for every configuration.
+
+PRODUCT_NAME = ShareExtension
+PRODUCT_BUNDLE_IDENTIFIER = $(REFLECT_BUNDLE_ID).share
+INFOPLIST_FILE = Config/ShareExtension-Info.plist
+CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements
+APPLICATION_EXTENSION_API_ONLY = YES
+SKIP_INSTALL = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
+
+// The sources come from the Tauri iOS project unchanged; they were not written
+// for complete concurrency checking.
+SWIFT_STRICT_CONCURRENCY = minimal
