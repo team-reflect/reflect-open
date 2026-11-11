@@ -38,7 +38,7 @@ final class StoreCapabilityTests: XCTestCase {
     let status = try await call(
       "plugin:iap|get_product_status",
       #"{"payload":{"productId":"\#(monthly)","productType":"subs"}}"#)
-    return status["isOwned"] as? Bool ?? false
+    return try XCTUnwrap(status["isOwned"] as? Bool)
   }
 
   func testGetProductsAnswersIDsAndPrices() async throws {
@@ -82,6 +82,7 @@ final class StoreCapabilityTests: XCTestCase {
 
   func testGetEnvironmentAnswersAnEnvironment() async throws {
     let reply = try await call("plugin:app-store|get_environment")
-    XCTAssertNotNil(reply["environment"] as? String)
+    let environment = try XCTUnwrap(reply["environment"] as? String)
+    XCTAssertTrue(["Production", "Sandbox", "Xcode"].contains(environment))
   }
 }
