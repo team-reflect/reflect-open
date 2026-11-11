@@ -25,6 +25,7 @@ final class AppHost {
     shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
     routes.append(SelfCheckRoute())
     #endif
+    routes.append(HTTPProxy(allowedOrigin: devURL.flatMap(Self.origin(of:))))
     routes.append(
       IPCRoute(
         dispatch: { [core] command, args, headers, body in
@@ -49,11 +50,14 @@ final class AppHost {
     eventPump?.cancel()
   }
 
-  /// The origin of a URL as the `Origin` header spells it, such as `http://localhost:1420`.
-  private static func origin(of url: URL) -> String? {
+  /// The origin of a URL as the `Origin` header spells it, such as
+  /// `http://localhost:1420`: without the default port of the scheme.
+  static func origin(of url: URL) -> String? {
     guard let scheme = url.scheme, let rawHost = url.host else { return nil }
     let host = rawHost.contains(":") ? "[\(rawHost)]" : rawHost
-    return url.port.map { "\(scheme)://\(host):\($0)" } ?? "\(scheme)://\(host)"
+    let defaultPort = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
+    guard let port = url.port, port != defaultPort else { return "\(scheme)://\(host)" }
+    return "\(scheme)://\(host):\(port)"
   }
 }
 
