@@ -36,6 +36,26 @@ final class ReflectCoreTests: XCTestCase {
     XCTAssertEqual(error?["kind"], "notFound")
   }
 
+  func testCloseAnswersWaitingAndLaterCalls() async throws {
+    let core = try makeCore()
+    let calls = (0..<50).map { _ in
+      Task { await core.dispatch("settings_load") }
+    }
+    core.close()
+    core.close()
+
+    let closed = CoreReply.error(kind: "io", message: "the core is closed")
+    for call in calls {
+      // Each call ends: with its reply, or with the error of the closed core.
+      let reply = await call.value
+      if case .json = reply { continue }
+      XCTAssertEqual(reply, closed)
+    }
+    let later = await core.dispatch("settings_load")
+    XCTAssertEqual(later, closed)
+    for await _ in core.events {}
+  }
+
   func testManyCallsEachGetTheirReply() async throws {
     let core = try makeCore()
     await withTaskGroup(of: Bool.self) { group in

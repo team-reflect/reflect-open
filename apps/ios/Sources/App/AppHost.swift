@@ -32,8 +32,7 @@ final class AppHost {
           await core.dispatch(command, args: args, headers: headers, body: body)
         },
         shellCommands: shellCommands,
-        allowedOrigin: devURL.flatMap(Self.origin(of:)),
-        onRequest: { [bridge] in bridge.markReady() }))
+        callers: TrustedCallers(devOrigin: devURL.flatMap(Self.origin(of:)))))
     let assets = AssetSchemeHandler { [core] requestPath, rasterOnly in
       await core.resolveAsset(requestPath: requestPath, rasterOnly: rasterOnly)
     }

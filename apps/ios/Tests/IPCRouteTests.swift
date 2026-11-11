@@ -23,7 +23,7 @@ final class IPCRouteTests: XCTestCase {
   private func route(
     reply: CoreReply = .json(Data("1".utf8)),
     shellCommands: [String: ShellCommand] = [:],
-    allowedOrigin: String? = nil,
+    devOrigin: String? = nil,
     gate: Gate? = nil
   ) -> IPCRoute {
     IPCRoute(
@@ -37,13 +37,18 @@ final class IPCRouteTests: XCTestCase {
         return reply
       },
       shellCommands: shellCommands,
-      allowedOrigin: allowedOrigin)
+      callers: TrustedCallers(devOrigin: devOrigin))
   }
 
+  /// Sends a request as the bundled web app does, unless `origin` says otherwise.
   private func post(
     _ route: IPCRoute, command: String, body: String = "{}",
-    headers: [String: String] = ["Content-Type": "application/json"]
+    headers: [String: String] = ["Content-Type": "application/json"],
+    origin: String? = nil, referer: String? = "reflect-app://localhost/index.html"
   ) async -> FakeSchemeTask {
+    var headers = headers
+    headers["Origin"] = origin
+    headers["Referer"] = referer
     let fake = FakeSchemeTask(
       path: "/__ipc/\(command)", method: "POST", headers: headers, body: Data(body.utf8))
     route.start(SchemeTask(fake))
@@ -114,7 +119,10 @@ final class IPCRouteTests: XCTestCase {
   func testReplyAfterStopIsDropped() async {
     let gate = Gate()
     let fake = FakeSchemeTask(
-      path: "/__ipc/slow", method: "POST", headers: ["Content-Type": "application/json"],
+      path: "/__ipc/slow", method: "POST",
+      headers: [
+        "Content-Type": "application/json", "Referer": "reflect-app://localhost/index.html",
+      ],
       body: Data("{}".utf8))
     let task = SchemeTask(fake)
     route(gate: gate).start(task)
@@ -133,36 +141,92 @@ final class IPCRouteTests: XCTestCase {
     XCTAssertTrue(fake.isUntouched)
   }
 
-  func testDevOriginGetsCORSHeadersAndPreflight() async {
-    var requests = 0
-    let route = IPCRoute(
-      dispatch: { _, _, _, _ in .json(Data("1".utf8)) }, shellCommands: [:],
-      allowedOrigin: "http://localhost:1420", onRequest: { requests += 1 })
-    let preflight = FakeSchemeTask(path: "/__ipc/graph_open", method: "OPTIONS")
-    route.start(SchemeTask(preflight))
-    XCTAssertEqual(requests, 0)
-    XCTAssertEqual(preflight.response?.statusCode, 204)
-    XCTAssertEqual(preflight.header("Access-Control-Allow-Origin"), "http://localhost:1420")
-
-    let fake = await post(route, command: "graph_open")
-    XCTAssertEqual(fake.header("Access-Control-Allow-Origin"), "http://localhost:1420")
-    XCTAssertEqual(fake.header("Access-Control-Expose-Headers"), "x-reflect-response")
+  func testUntrustedCallersRunNothing() async {
+    var shellRuns = 0
+    let route = route(shellCommands: [
+      "host.log": { _ in
+        shellRuns += 1
+        return .json(Data("null".utf8))
+      }
+    ])
+    // (Origin, Referer): no header at all, an opaque origin, other pages,
+    // and a foreign origin that also shows the app as its referrer.
+    let app = "reflect-app://localhost/index.html"
+    let callers: [(origin: String?, referer: String?)] = [
+      (nil, nil),
+      ("null", nil),
+      ("null", app),
+      ("http://untrusted.example", nil),
+      ("http://untrusted.example", app),
+      (nil, "http://untrusted.example/page"),
+      (nil, "https://platform.twitter.com/embed/Tweet.html"),
+      (nil, "reflect-app://other/index.html"),
+      (nil, "not a url"),
+    ]
+    for caller in callers {
+      for contentType in ["text/plain", "application/json", "application/octet-stream"] {
+        for command in ["settings_save", "host.log"] {
+          let fake = await post(
+            route, command: command, headers: ["Content-Type": contentType],
+            origin: caller.origin, referer: caller.referer)
+          XCTAssertEqual(fake.response?.statusCode, 403, "\(caller) \(contentType)")
+          XCTAssertNil(fake.header("Access-Control-Allow-Origin"))
+          XCTAssertTrue(fake.body.isEmpty)
+        }
+      }
+    }
+    XCTAssertEqual(calls, [])
+    XCTAssertEqual(shellRuns, 0)
   }
 
-  func testOtherMethodsAreRejected() async {
-    let fake = FakeSchemeTask(path: "/__ipc/graph_open", method: "GET")
-    route().start(SchemeTask(fake))
-    XCTAssertEqual(fake.response?.statusCode, 400)
+  func testUntrustedPreflightIsRefused() {
+    let preflight = FakeSchemeTask(
+      path: "/__ipc/graph_open", method: "OPTIONS", headers: ["Origin": "http://untrusted.example"])
+    route(devOrigin: "http://localhost:1420").start(SchemeTask(preflight))
+    XCTAssertEqual(preflight.response?.statusCode, 403)
+    XCTAssertNil(preflight.header("Access-Control-Allow-Origin"))
+  }
+
+  func testOnlyJSONAndBinaryBodiesRun() async {
+    let route = route()
+    for contentType in ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data"] {
+      let fake = await post(route, command: "settings_save", headers: ["Content-Type": contentType])
+      XCTAssertEqual(fake.response?.statusCode, 415, contentType)
+    }
+    let missing = await post(route, command: "settings_save", headers: [:])
+    XCTAssertEqual(missing.response?.statusCode, 415)
     XCTAssertEqual(calls, [])
   }
 
-  func testEveryRequestRunsOnRequest() async {
-    var requests = 0
-    let route = IPCRoute(
-      dispatch: { _, _, _, _ in .json(Data("1".utf8)) }, shellCommands: [:],
-      onRequest: { requests += 1 })
-    _ = await post(route, command: "a")
-    _ = await post(route, command: "b")
-    XCTAssertEqual(requests, 2)
+  func testTheDevOriginGetsCORSHeadersAndPreflight() async {
+    let dev = "http://localhost:1420"
+    let route = route(devOrigin: dev)
+    let preflight = FakeSchemeTask(
+      path: "/__ipc/graph_open", method: "OPTIONS", headers: ["Origin": dev])
+    route.start(SchemeTask(preflight))
+    XCTAssertEqual(preflight.response?.statusCode, 204)
+    XCTAssertEqual(preflight.header("Access-Control-Allow-Origin"), dev)
+    XCTAssertEqual(calls, [])
+
+    let fake = await post(route, command: "graph_open", origin: dev, referer: "\(dev)/")
+    XCTAssertEqual(fake.response?.statusCode, 200)
+    XCTAssertEqual(fake.header("Access-Control-Allow-Origin"), dev)
+    XCTAssertEqual(fake.header("Access-Control-Expose-Headers"), "x-reflect-response")
+    XCTAssertEqual(calls.count, 1)
+
+    let app = await post(route, command: "graph_open")
+    XCTAssertEqual(app.response?.statusCode, 200)
+    XCTAssertNil(app.header("Access-Control-Allow-Origin"))
+  }
+
+  func testOtherMethodsAreRejected() async {
+    let fake = FakeSchemeTask(
+      path: "/__ipc/graph_open", method: "GET",
+      headers: [
+        "Referer": "reflect-app://localhost/index.html", "Content-Type": "application/json",
+      ])
+    route().start(SchemeTask(fake))
+    XCTAssertEqual(fake.response?.statusCode, 400)
+    XCTAssertEqual(calls, [])
   }
 }

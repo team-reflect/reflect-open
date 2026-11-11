@@ -34,9 +34,11 @@ struct CoreStartError: Error, CustomStringConvertible {
 }
 
 /// The Rust core behind the C interface of `reflect_core.h`. Commands run on
-/// Rust threads; `dispatch` suspends until the reply arrives. Releasing the
-/// last reference frees the core and answers every waiting `dispatch` with an
-/// `io` error.
+/// Rust threads; `dispatch` suspends until the reply arrives.
+///
+/// `close()` frees the core: every `dispatch` that still waits, and every
+/// later one, gets an `io` error. Releasing the last reference closes the
+/// core too.
 final class ReflectCore: Sendable {
   /// The events of the core, in the order it emitted them.
   let events: AsyncStream<CoreEvent>
@@ -45,6 +47,9 @@ final class ReflectCore: Sendable {
   private nonisolated(unsafe) let handle: OpaquePointer
   private let callbacks: Unmanaged<CoreCallbacks>
   private let pending = PendingReplies()
+  /// Whether `close()` ran. `dispatch` calls into the core under this lock,
+  /// so the core is never freed during a call.
+  private let isClosed = OSAllocatedUnfairLock(initialState: false)
 
   /// Starts a core. `openURL` receives each URL or absolute file path that a
   /// command opens with the system handler, on a Rust thread, and returns
@@ -90,6 +95,19 @@ final class ReflectCore: Sendable {
   }
 
   deinit {
+    close()
+  }
+
+  /// Frees the core. It returns after every running callback finished.
+  /// Commands that run at that moment finish, but their `dispatch` calls get
+  /// an `io` error, like every later call. `events` ends. A second call does
+  /// nothing. Do not call it from a callback of the core.
+  func close() {
+    let wasOpen = isClosed.withLock { isClosed in
+      defer { isClosed = true }
+      return !isClosed
+    }
+    guard wasOpen else { return }
     reflect_core_free(handle)
     pending.failAll()
     callbacks.takeUnretainedValue().events.finish()
@@ -104,30 +122,45 @@ final class ReflectCore: Sendable {
   ) async -> CoreReply {
     await withCheckedContinuation { continuation in
       let reply = PendingReply(continuation: continuation, owner: pending)
-      pending.add(reply)
-      args.withUnsafeBytes { args in
-        headers.withUnsafeBytes { headers in
-          body.withUnsafeBytes { body in
-            reflect_core_dispatch(
-              handle,
-              command,
-              args.bindMemory(to: UInt8.self).baseAddress, args.count,
-              headers.bindMemory(to: UInt8.self).baseAddress, headers.count,
-              body.bindMemory(to: UInt8.self).baseAddress, body.count,
-              { ctx, status, json, jsonLength, bytes, bytesLength in
-                guard let ctx else { return }
-                let reply = Unmanaged<PendingReply>.fromOpaque(ctx).takeUnretainedValue()
-                switch status {
-                case Int32(REFLECT_STATUS_JSON):
-                  reply.resume(.json(Data(bytes: json, count: jsonLength)))
-                case Int32(REFLECT_STATUS_BYTES):
-                  reply.resume(.bytes(Data(bytes: bytes, count: bytesLength)))
-                default:
-                  reply.resume(.error(Data(bytes: json, count: jsonLength)))
-                }
-              },
-              Unmanaged.passUnretained(reply).toOpaque())
-          }
+      let isOpen = isClosed.withLockUnchecked { isClosed in
+        guard !isClosed else { return false }
+        pending.add(reply)
+        send(command, args: args, headers: headers, body: body, reply: reply)
+        return true
+      }
+      if !isOpen {
+        continuation.resume(returning: PendingReplies.closedReply)
+      }
+    }
+  }
+
+  /// Hands one command to the core. The call returns at once; the reply
+  /// arrives on a Rust thread.
+  private func send(
+    _ command: String, args: Data, headers: Data, body: Data, reply: PendingReply
+  ) {
+    args.withUnsafeBytes { args in
+      headers.withUnsafeBytes { headers in
+        body.withUnsafeBytes { body in
+          reflect_core_dispatch(
+            handle,
+            command,
+            args.bindMemory(to: UInt8.self).baseAddress, args.count,
+            headers.bindMemory(to: UInt8.self).baseAddress, headers.count,
+            body.bindMemory(to: UInt8.self).baseAddress, body.count,
+            { ctx, status, json, jsonLength, bytes, bytesLength in
+              guard let ctx else { return }
+              let reply = Unmanaged<PendingReply>.fromOpaque(ctx).takeUnretainedValue()
+              switch status {
+              case Int32(REFLECT_STATUS_JSON):
+                reply.resume(.json(Data(bytes: json, count: jsonLength)))
+              case Int32(REFLECT_STATUS_BYTES):
+                reply.resume(.bytes(Data(bytes: bytes, count: bytesLength)))
+              default:
+                reply.resume(.error(Data(bytes: json, count: jsonLength)))
+              }
+            },
+            Unmanaged.passUnretained(reply).toOpaque())
         }
       }
     }
@@ -206,7 +239,10 @@ private final class PendingReplies: Sendable {
   func failAll() {
     let waiting = replies.withLock { Array($0.values) }
     for reply in waiting {
-      reply.resume(.error(kind: "io", message: "the core is closed"))
+      reply.resume(Self.closedReply)
     }
   }
+
+  /// The reply of a call that the closed core does not answer.
+  static var closedReply: CoreReply { .error(kind: "io", message: "the core is closed") }
 }

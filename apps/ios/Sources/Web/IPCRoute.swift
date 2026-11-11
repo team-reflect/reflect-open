@@ -14,6 +14,60 @@ struct ShellRequest: Sendable {
 /// `plugin:<name>|<command>` capability.
 typealias ShellCommand = @MainActor (ShellRequest) async -> CoreReply
 
+/// The pages that may call the privileged routes of the `reflect-app` scheme.
+///
+/// A web view also runs documents that are not the web app: embeds in
+/// subframes, and any page a navigation reaches. Their requests arrive at the
+/// scheme handler like the app's own, so each request is checked by the
+/// headers that WebKit sets and page script cannot change:
+///
+/// - A cross-origin request carries `Origin`. It must be the bundled app's
+///   origin or the dev server's. An opaque origin (`null`) is refused.
+/// - A same-origin request from the bundled app carries no `Origin`. It is
+///   trusted only by its `Referer`, which must be a URL of the bundled app
+///   or the dev server.
+/// - A request with neither header is refused.
+struct TrustedCallers: Sendable {
+  /// The origin of the bundled web app.
+  static let appOrigin = "reflect-app://localhost"
+
+  /// The origin of a dev server page that hosts the web app, if any.
+  var devOrigin: String?
+
+  /// The origin of the caller when it is trusted, else nil.
+  func trustedOrigin(of request: URLRequest) -> String? {
+    let origin =
+      request.value(forHTTPHeaderField: "Origin")
+      ?? request.value(forHTTPHeaderField: "Referer").flatMap(Self.origin(ofURL:))
+    guard let origin, origin == Self.appOrigin || origin == devOrigin else { return nil }
+    return origin
+  }
+
+  /// The CORS headers that let the dev server page read a response. The
+  /// bundled web app is same-origin and needs none.
+  func corsHeaders(for request: URLRequest) -> [String: String] {
+    guard let devOrigin, trustedOrigin(of: request) == devOrigin else { return [:] }
+    return [
+      "Access-Control-Allow-Origin": devOrigin,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+      "Access-Control-Expose-Headers": "x-reflect-response",
+      "Vary": "Origin",
+    ]
+  }
+
+  /// The origin of a URL string: scheme, host, and the port when it is not
+  /// the default of `http` or `https`.
+  private static func origin(ofURL string: String) -> String? {
+    guard let components = URLComponents(string: string), let scheme = components.scheme,
+      let host = components.host, !host.isEmpty
+    else { return nil }
+    let defaultPort = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
+    guard let port = components.port, port != defaultPort else { return "\(scheme)://\(host)" }
+    return "\(scheme)://\(host):\(port)"
+  }
+}
+
 /// Answers `POST reflect-app://localhost/__ipc/<command>`. A command in
 /// `shellCommands` runs in the shell; any other `host.` or `plugin:` command
 /// is unknown; the rest goes to the core.
@@ -23,6 +77,15 @@ typealias ShellCommand = @MainActor (ShellRequest) async -> CoreReply
 /// reach the command. The reply is JSON, `application/octet-stream` bytes, or
 /// a `{kind, message}` body with `x-reflect-response: error`, always with
 /// status 200.
+///
+/// Only a trusted caller runs a command: any other request answers 403
+/// before the route reads the body. The body must be `application/json` or
+/// `application/octet-stream`, which no cross-origin page can send without a
+/// preflight.
+///
+/// WebKit stops a task when the page aborts the request or goes away. The
+/// route then drops the reply; the command itself runs to its end, because a
+/// write must not stop halfway.
 @MainActor
 final class IPCRoute: SchemeRoute {
   typealias Dispatch =
@@ -32,35 +95,27 @@ final class IPCRoute: SchemeRoute {
 
   private let dispatch: Dispatch
   private let shellCommands: [String: ShellCommand]
-  private let allowedOrigin: String?
-  private let onRequest: () -> Void
+  private let callers: TrustedCallers
 
-  /// `allowedOrigin` is the origin of a dev server page that may call the
-  /// route across origins. `onRequest` runs at the start of every request
-  /// except a preflight.
   init(
     dispatch: @escaping Dispatch,
     shellCommands: [String: ShellCommand],
-    allowedOrigin: String? = nil,
-    onRequest: @escaping () -> Void = {}
+    callers: TrustedCallers = TrustedCallers()
   ) {
     self.dispatch = dispatch
     self.shellCommands = shellCommands
-    self.allowedOrigin = allowedOrigin
-    self.onRequest = onRequest
+    self.callers = callers
   }
 
   func start(_ task: SchemeTask) {
     let request = task.request
-    if request.httpMethod == "OPTIONS" {
-      task.reply(SchemeReply(statusCode: 204, headers: corsHeaders, body: Data()))
+    let corsHeaders = callers.corsHeaders(for: request)
+    guard callers.trustedOrigin(of: request) != nil else {
+      task.reply(SchemeReply(statusCode: 403, headers: [:], body: Data()))
       return
     }
-    onRequest()
-    guard request.httpMethod == "POST", let command = command(of: request),
-      let body = task.body
-    else {
-      task.reply(SchemeReply(statusCode: 400, headers: corsHeaders, body: Data()))
+    if request.httpMethod == "OPTIONS" {
+      task.reply(SchemeReply(statusCode: 204, headers: corsHeaders, body: Data()))
       return
     }
 
@@ -68,14 +123,25 @@ final class IPCRoute: SchemeRoute {
     for (name, value) in request.allHTTPHeaderFields ?? [:] {
       headers[name.lowercased()] = value
     }
-    let isBinary =
-      headers["content-type"]?.lowercased().hasPrefix("application/octet-stream") ?? false
+    let contentType = headers["content-type"]?.lowercased() ?? ""
+    let isBinary = contentType.hasPrefix("application/octet-stream")
+    guard isBinary || contentType.hasPrefix("application/json") else {
+      task.reply(SchemeReply(statusCode: 415, headers: corsHeaders, body: Data()))
+      return
+    }
+    guard request.httpMethod == "POST", let command = command(of: request),
+      let body = task.body
+    else {
+      task.reply(SchemeReply(statusCode: 400, headers: corsHeaders, body: Data()))
+      return
+    }
+
     let shellRequest = ShellRequest(
       args: isBinary ? Data() : body, headers: headers, body: isBinary ? body : Data())
 
     Task {
       let reply = await run(command, shellRequest)
-      task.reply(schemeReply(for: reply))
+      task.reply(schemeReply(for: reply, corsHeaders: corsHeaders))
     }
   }
 
@@ -101,7 +167,7 @@ final class IPCRoute: SchemeRoute {
     return command
   }
 
-  private func schemeReply(for reply: CoreReply) -> SchemeReply {
+  private func schemeReply(for reply: CoreReply, corsHeaders: [String: String]) -> SchemeReply {
     var headers = corsHeaders
     headers["Cache-Control"] = "no-store"
     let body: Data
@@ -119,15 +185,5 @@ final class IPCRoute: SchemeRoute {
     }
     headers["Content-Length"] = String(body.count)
     return SchemeReply(statusCode: 200, headers: headers, body: body)
-  }
-
-  private var corsHeaders: [String: String] {
-    guard let allowedOrigin else { return [:] }
-    return [
-      "Access-Control-Allow-Origin": allowedOrigin,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "*",
-      "Access-Control-Expose-Headers": "x-reflect-response",
-    ]
   }
 }
