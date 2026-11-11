@@ -286,7 +286,7 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
-      - name: Install cargo-shear
+      - name: Install cargo-shear # FIXME: remove the "name: Install cargo-shear" line
         if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise
 
