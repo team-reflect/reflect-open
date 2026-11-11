@@ -288,9 +288,7 @@ jobs:
 
       - name: Install cargo-shear
         if: matrix.name == 'Linux'
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-        with:
-          version: 2026.11.5
+        uses: ./.github/actions/setup-mise
 
       # Fails on a dependency that no code uses, in a member or in the root
       # `[workspace.dependencies]`.

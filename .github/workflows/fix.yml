@@ -62,9 +62,7 @@ jobs:
 
       - name: Install cargo-about
         if: steps.changes.outputs.licenses == 'true'
-        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-        with:
-          version: 2026.11.5
+        uses: ./.github/actions/setup-mise
 
       - name: Generate licenses
         if: steps.changes.outputs.licenses == 'true'
