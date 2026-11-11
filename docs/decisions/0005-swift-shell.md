@@ -135,7 +135,7 @@ implementation next to Tauri and the browser dev bridge.
 - **Long-lived integration branch.** The work lands on a `swift` branch
   that merges back to `master` once, after pre-merge validation. The core
   extraction moves code that changes on `master`, so we merge `master` into
-  `swift` often.
+  `swift` often.// FIXME: I do not think you need to meantion the `swift` branch here. This is just a detail of the implementation and it's useless for the decision record. Review the whole doc and cleanup any other implementation details that are not relevant to the decision record. The decision record should focus on the "what" and "why", not the "how".
 - **Yearly Xcode and iOS updates** are now ours. We no longer wait for tao
   and wry to adapt.
 
