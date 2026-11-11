@@ -26,6 +26,8 @@ import {
   SWIFT_IOS_IPA_PATH,
 } from './helpers.ts'
 
+// The identifiers repeat the values of `apps/ios/Config/*.xcconfig` on
+// purpose: the IPA check compares the built app with them.
 const FLAVORS = {
   stable: {
     configuration: 'Release-Stable',
