@@ -21,7 +21,7 @@ beforeEach(() => {
 
 describe('createTauriWindowHost', () => {
   it('reads the label of the current window', () => {
-    const host = createTauriWindowHost({ multiWindow: true, logger: createTestLoggerService() })
+    const host = createTauriWindowHost({ logger: createTestLoggerService() })
     expect(host.label).toBe('note-1')
   })
 
@@ -30,7 +30,7 @@ describe('createTauriWindowHost', () => {
       throw new Error('no metadata')
     })
     const logger = createTestLoggerService()
-    const host = createTauriWindowHost({ multiWindow: true, logger })
+    const host = createTauriWindowHost({ logger })
     expect(host.label).toBe('main')
     expect(logger.getWarnings()).toEqual([
       {
@@ -46,7 +46,7 @@ describe('createTauriWindowHost', () => {
       { label: 'main', isFocused: vi.fn(() => Promise.resolve(false)) },
       { label: 'note-2', isFocused: vi.fn(() => Promise.resolve(true)) },
     ])
-    const host = createTauriWindowHost({ multiWindow: true, logger: createTestLoggerService() })
+    const host = createTauriWindowHost({ logger: createTestLoggerService() })
     await expect(host.focusedWindowLabel()).resolves.toBe('note-2')
 
     getAllWebviewWindows.mockResolvedValue([
@@ -56,7 +56,7 @@ describe('createTauriWindowHost', () => {
   })
 
   it('addresses events to a webview window', async () => {
-    const host = createTauriWindowHost({ multiWindow: true, logger: createTestLoggerService() })
+    const host = createTauriWindowHost({ logger: createTestLoggerService() })
     await host.emitTo('note-2', 'menu', 'note.find')
     expect(emitTo).toHaveBeenCalledWith(
       { kind: 'WebviewWindow', label: 'note-2' },

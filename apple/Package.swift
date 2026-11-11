@@ -1,18 +1,18 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-// The Swift code that the iOS apps share: it depends on no app target, on no
-// Rust binary and on no third-party package, and `swift test` runs its tests
-// on macOS. App and extension entry points, the adapters that turn a command
-// into a call of a module here, and the code that needs the Rust core live in
-// the app targets (`apps/ios`, the Tauri plugins).
+// The Swift code that the iOS app and its extensions share: it depends on no
+// app target, on no Rust binary and on no third-party package, and
+// `swift test` runs its tests on macOS. App and extension entry points, the
+// adapters that turn a command into a call of a module here, and the code
+// that needs the Rust core live in the app targets (`apps/ios`).
 
 // MARK: - Layer rules (checked when SwiftPM loads this manifest)
 
 enum Layer {
   /// Data types and small helpers shared across processes.
   case shared
-  /// Platform logic driven by a host: the Swift shell or a Tauri plugin.
+  /// Platform logic driven by a host: a capability of the Swift shell.
   case engine
 
   /// Every module name ends with its layer's suffix.
@@ -70,9 +70,8 @@ let swiftSettings: [SwiftSetting] = [
 
 let package = Package(
   name: "ReflectApple",
-  // swift-rs builds the Tauri plugins, and the modules they use, with the
-  // triple `arm64-apple-ios15.0-simulator` (`-ios15.0` on device): the
-  // objects get `minos 15.0` whatever floor a manifest declares.
+  // The floor is below the deployment targets of `apps/ios/Config`, so the
+  // compiler checks every `#available`.
   platforms: [.iOS(.v15), .macOS(.v13)],
   products: modules.map { .library(name: $0.name, targets: [$0.name]) },
   targets:

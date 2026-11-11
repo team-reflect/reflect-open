@@ -68,7 +68,7 @@ jobs:
 
       # The Rust build of the Swift shell runs cbindgen.
       - uses: ./.github/actions/setup-mise
-        if: matrix.name == 'ios-swift'
+        if: matrix.name == 'ios'
 
       # The universal build also compiles the x86_64 slice on this arm64 runner.
       - name: Add the x86_64 macOS target

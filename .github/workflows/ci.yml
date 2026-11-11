@@ -86,6 +86,7 @@ jobs:
             'apple/*'
             'apps/ios/*'
             'crates/*'
+            'design-system/assets/app-icons/*'
             'Cargo.toml'
             'Cargo.lock'
             'scripts/build-ffi.ts'

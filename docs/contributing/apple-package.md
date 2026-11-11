@@ -1,11 +1,12 @@
 # The `apple/` Swift package
 
 `apple/` is a local Swift package (`ReflectApple`) for the Swift code of the
-iOS app (`apps/ios`) and its extensions. A module
-depends on no app target, on no Rust binary and on no third-party package, so
-`swift test` runs its tests on macOS. The adapters that turn a command into a
-call of a module stay in the app: `apps/ios/Sources/Capabilities`. App entry points, App Intents, and the code that needs the Rust
-core or a third-party package stay in the Xcode targets.
+iOS app (`apps/ios`) and its extensions. A module depends on no app target, on
+no Rust binary and on no third-party package, so `swift test` runs its tests
+on macOS. The adapters that turn a command into a call of a module stay in the
+app (`apps/ios/Sources/Capabilities`). App entry points, App Intents, and the
+code that needs the Rust core or a third-party package stay in the Xcode
+targets.
 
 | Module | Layer | Used by |
 | --- | --- | --- |
@@ -41,26 +42,19 @@ app, so it does not replace a full iOS app build.
 
 ## Rules
 
-- **Plugins rebuild through cargo.** A plugin's Swift is built by `swift-rs` in
-  the plugin's cargo build script, which reruns only for listed paths. A plugin
-  that depends on `apple/` lists `../../apple/Package.swift` and
-  `../../apple/Sources` with `cargo:rerun-if-changed` in its `build.rs`;
-  without them an edit in `apple/` links stale Swift.
-- **App target and plugins talk through `NotificationCenter`.** The app target
-  cannot import a plugin module, so shared names live in a `.shared` module
-  that both link (`RecordingNotifications.swift`). Linking a module that
-  `libapp.a` also contains works.
+- **Intents and engines talk through `NotificationCenter`.** App Intents run
+  in a different module from the engine they drive, so shared names live in a
+  `.shared` module that both link (`RecordingNotifications.swift`).
 - **App Intents stay in the target.** Their metadata is extracted from the
   target's own sources, so intent files are in `apps/ios/Shared/`, and each
   target that exposes them compiles them. The extensions' sources are in
-  `apps/ios/Extensions/`. Both Xcode projects reference these folders.
+  `apps/ios/Extensions/`.
 - **Swift 5 language mode.** Moving code does not change its concurrency shape:
   no new `@MainActor`, `async`, or `Task {}`.
 - **`InternalImportsByDefault` is on.** A module used in a `public` signature
   needs `public import`.
-- **iOS 15 is the floor.** `swift-rs` compiles plugins and their `apple/`
-  modules for iOS 15 (Xcode 27 clamps Tauri's iOS 13 to 15), so the package
-  declares `.iOS(.v15)` and the compiler checks every `#available`.
+- **iOS 15 is the floor.** The package declares `.iOS(.v15)`, below the app's
+  deployment targets, so the compiler checks every `#available`.
 - **Wrap iOS-only files in `#if os(iOS)`.** `swift build` and `swift test`
   compile every target for macOS too, and `canImport(ActivityKit)` is true
   there. Keep logic you want to test on the Mac in a separate, unwrapped file.

@@ -9,7 +9,6 @@ import {
   createBrowserHttpService,
   createNoDeepLinkSource,
   createPosixPathTransport,
-  isMobilePlatform,
   reachWebStorage,
   type ClockService,
   type CoreAdapters,
@@ -111,9 +110,7 @@ export function createDesktopHost(
 ): AppHost {
   const lifecycle = createLifecycleService({ ipc, dom: createDomLifecycleAdapter(), clock, logger })
   const windowHost =
-    hostKind === 'tauri'
-      ? createTauriWindowHost({ multiWindow: !isMobilePlatform(facts.appPlatform), logger })
-      : createSingleWindowHost()
+    hostKind === 'tauri' ? createTauriWindowHost({ logger }) : createSingleWindowHost()
   const common = {
     window: createWindowService({ ipc, host: windowHost, logger }),
     lifecycle,

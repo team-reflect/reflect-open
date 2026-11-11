@@ -32,17 +32,15 @@ async function focusedLabel(): Promise<string | null> {
 }
 
 export interface TauriWindowHostDeps {
-  readonly multiWindow: boolean
   readonly logger: LoggerService
 }
 
 class TauriWindowHostImpl implements WindowHost {
   readonly label: string
-  readonly multiWindow: boolean
+  readonly multiWindow = true
 
   constructor(deps: TauriWindowHostDeps) {
     this.label = currentLabel(deps.logger)
-    this.multiWindow = deps.multiWindow
   }
 
   async setTitle(title: string): Promise<void> {

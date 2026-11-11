@@ -115,7 +115,7 @@ by a **Tauri 2** desktop shell and a Swift iOS shell. The Rust crates form one
 - `apps/web/`: the React frontend. `TAURI_ENV_PLATFORM` selects the platform root and
   the output directory, `dist/<desktop|mobile|unknown>/`.
 - `apps/tauri/`: the Tauri 2 desktop shell (Rust crate `reflect-open`) and its build
-  scripts. It serves `apps/web/dist/desktop`. Never hand-edit `gen/`.
+  scripts. It serves `apps/web/dist/desktop`.
 - `apps/ios/`: the Swift iOS shell. It serves `apps/web/dist/mobile` and links the
   Rust core through `crates/ffi`. It never references `apps/tauri/`.
 - `apps/cli/`: `reflect`, the Rust read/discovery CLI ([docs/cli.md](docs/cli.md)).

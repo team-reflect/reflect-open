@@ -29,7 +29,7 @@ and on WebKit, because the Tauri webview is WebKit.
 ## Console output fails tests
 
 `vitest-fail-on-console` fails a test on any `console.warn` or `console.error`,
-in the core, app and desktop projects.
+in the core, app and web projects.
 
 - Fix the warning. Do not add to `apps/web/src/test-utils/allowed-console.ts`
   without a measured reason in that file.

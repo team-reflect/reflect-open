@@ -4734,6 +4734,7 @@ dependencies = [
  "reflect-graph-io",
  "reflect-index",
  "reflect-types",
+ "regex",
  "serde",
  "serde_json",
  "tauri",
@@ -4750,6 +4751,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "urlpattern",
 ]
 
 [[package]]

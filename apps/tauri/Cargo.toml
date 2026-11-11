@@ -101,3 +101,6 @@ tauri-build = { workspace = true }
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 reflect-graph-io = { workspace = true, features = ["test-support"] }
+# `capability_tests` match the `http:default` scope the way tauri-plugin-http does.
+regex = { workspace = true }
+urlpattern = { workspace = true }

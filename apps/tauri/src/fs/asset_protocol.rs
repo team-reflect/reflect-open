@@ -5,9 +5,8 @@
 //!
 //! WebKit delivers custom-scheme requests on the main thread and wry invokes
 //! the handler inline, so Tauri's built-in synchronous `asset:` protocol
-//! froze the app for the duration of every uncached image read. On iOS that
-//! was seconds: a first read can also wait for iCloud to materialize a
-//! dataless file. This handler does the blocking file IO on the async
+//! freezes the app for the duration of every uncached image read, and a first
+//! read can wait for iCloud to materialize a dataless file. This handler does the blocking file IO on the async
 //! runtime's blocking pool and responds when the bytes are ready, so a slow
 //! read costs the image a pop-in, never the app a freeze.
 //!

@@ -55,20 +55,93 @@ mod app_metadata_tests {
 
 #[cfg(test)]
 mod capability_tests {
-    #[test]
-    fn desktop_capability_allows_main_window_hide() {
+    use urlpattern::{UrlPattern, UrlPatternInit, UrlPatternMatchInput};
+
+    fn default_permissions() -> Vec<serde_json::Value> {
         let capability: serde_json::Value =
             serde_json::from_str(include_str!("../capabilities/default.json"))
                 .expect("valid default capability");
-        let permissions = capability["permissions"]
+        capability["permissions"]
             .as_array()
-            .expect("capability permissions");
+            .expect("capability permissions")
+            .clone()
+    }
 
+    #[test]
+    fn desktop_capability_allows_main_window_hide() {
         assert!(
-            permissions
+            default_permissions()
                 .iter()
                 .any(|permission| permission.as_str() == Some("core:window:allow-hide"))
         );
+    }
+
+    // Copied from tauri-plugin-http, which keeps its scope type private:
+    // https://github.com/tauri-apps/plugins-workspace/blob/http-v2.8.3/plugins/http/src/scope.rs#L17-L34
+    fn parse_url_pattern(s: &str) -> UrlPattern {
+        let mut init = UrlPatternInit::parse_constructor_string::<regex::Regex>(s, None)
+            .expect("valid URL pattern");
+        if init.search.as_ref().map(|p| p.is_empty()).unwrap_or(true) {
+            init.search.replace("*".to_string());
+        }
+        if init.hash.as_ref().map(|p| p.is_empty()).unwrap_or(true) {
+            init.hash.replace("*".to_string());
+        }
+        if init
+            .pathname
+            .as_ref()
+            .map(|p| p.is_empty() || p == "/")
+            .unwrap_or(true)
+        {
+            init.pathname.replace("*".to_string());
+        }
+        UrlPattern::parse(init, Default::default()).expect("valid URL pattern")
+    }
+
+    /// Whether the `http:default` scope allows `url`. A pattern that omits
+    /// the port matches only the scheme's default port, so the wildcard
+    /// entries must stay spelled `https://*:*` / `http://*:*`.
+    fn http_allows(url: &str) -> bool {
+        let url = tauri::Url::parse(url).expect("valid URL");
+        default_permissions()
+            .iter()
+            .filter(|permission| permission["identifier"] == "http:default")
+            .flat_map(|permission| permission["allow"].as_array().cloned().unwrap_or_default())
+            .any(|entry| {
+                parse_url_pattern(entry["url"].as_str().expect("scope url"))
+                    .test(UrlPatternMatchInput::Url(url.clone()))
+                    .unwrap_or_default()
+            })
+    }
+
+    #[test]
+    fn http_scope_reaches_endpoints_on_custom_ports_and_hosts() {
+        for url in [
+            "http://localhost:1234/v1/chat/completions",
+            "http://127.0.0.1:11434/v1/models",
+            "http://192.168.1.10:8000/v1/models",
+            "https://llm.example.com/v1/chat/completions",
+            "https://llm.example.com:8443/v1/chat/completions",
+            "https://api.openai.com/v1/responses",
+            "https://api.anthropic.com/v1/messages",
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            "https://openrouter.ai/api/v1/chat/completions",
+            "https://github.com/login/device/code",
+            "https://api.github.com/user",
+        ] {
+            assert!(http_allows(url), "{url}");
+        }
+    }
+
+    #[test]
+    fn http_scope_does_not_open_non_http_schemes() {
+        for url in [
+            "file:///etc/passwd",
+            "ftp://example.com/file",
+            "ws://localhost:1234/socket",
+        ] {
+            assert!(!http_allows(url), "{url}");
+        }
     }
 }
 
@@ -129,9 +202,9 @@ pub fn run() {
 
     // Auto-update verifies against the minisign pubkey in tauri.conf.json
     // (`plugins.updater`), and `process` provides the post-install relaunch.
-    // The main window starts hidden
-    // (`visible: false` in tauri.conf.json) so this plugin can restore its
-    // geometry before first paint — avoiding a visible jump. Visibility is
+    // The main window starts hidden (`visible: false` in tauri.conf.json) so
+    // the window-state plugin can restore its geometry before first paint,
+    // which avoids a visible jump. Visibility is
     // deliberately not persistent: shutdown and updater relaunches can observe
     // a transiently hidden window, which must not suppress every later launch.
     // The page-load hook below reveals it once the webview paints its first

@@ -12,7 +12,7 @@ packages/core/src/documents/note-move-service.test.ts  the real service over tes
 packages/core/src/testing/documents.ts                 createTestNoteMoveService
 packages/core/src/create-core-services.ts              CoreServices.noteMove
 packages/core/src/testing/services.ts                  the test factory table
-apps/web/src/routing/router.tsx                    useCoreServices().noteMove
+apps/web/src/routing/router.tsx                        useCoreServices().noteMove
 ```
 
 ## Do you need a service?
