@@ -28,7 +28,6 @@ import { exec } from 'tinyexec'
 const ROOT_DIR = join(import.meta.dirname, '..')
 const TARGET_DIR = join(ROOT_DIR, 'target')
 const APPLE_DIR = join(TARGET_DIR, 'apple')
-const TOOLS_DIR = join(APPLE_DIR, 'tools')
 const INCLUDE_DIR = join(APPLE_DIR, 'include')
 // A subdirectory keeps this `module.modulemap` apart from the ones of other
 // libraries that Xcode copies into the same include directory.
@@ -40,7 +39,6 @@ const CRATE_DIR = join(ROOT_DIR, 'crates', 'ffi')
 // The committed C header and the module map that declares it.
 const CRATE_INCLUDE_DIR = join(CRATE_DIR, 'include')
 
-const CBINDGEN_VERSION = '0.29.4'
 const DEVICE_TARGET = 'aarch64-apple-ios'
 const SIMULATOR_TARGET = 'aarch64-apple-ios-sim'
 const TARGET_BY_SDK: Record<string, string> = {
@@ -53,24 +51,6 @@ const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit' } } as con
 
 function log(message: string): void {
   console.log(`[build-ffi] ${message}`)
-}
-
-/** Installs the pinned cbindgen into target/apple/tools and returns its path. */
-async function installCbindgen(): Promise<string> {
-  const binary = join(TOOLS_DIR, 'bin', 'cbindgen')
-  if (existsSync(binary)) {
-    const { stdout } = await exec(binary, ['--version'], { throwOnError: true })
-    if (stdout.trim() === `cbindgen ${CBINDGEN_VERSION}`) {
-      return binary
-    }
-  }
-  await exec(
-    'cargo',
-    // FIXME: do not use `cargo install` to install `cbindgen`. Use the root mise.toml instead. You probally want to assert that cbindgen is already installed and has the correct version. you do not need to install it in this script.
-    ['install', 'cbindgen', '--version', CBINDGEN_VERSION, '--locked', '--root', TOOLS_DIR],
-    INHERIT,
-  )
-  return binary
 }
 
 /** The Rust targets to build for the `--debug` and `--sdk` options. */
@@ -133,9 +113,8 @@ async function main(): Promise<void> {
     },
   })
 
-  const cbindgen = await installCbindgen()
   await exec(
-    cbindgen,
+    'cbindgen',
     [
       '--config',
       join(CRATE_DIR, 'cbindgen.toml'),
