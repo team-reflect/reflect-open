@@ -5,13 +5,12 @@
 //
 //   pnpm build:ffi [--debug] [--sdk <sdk>]
 //
-//   --debug   Dev profile, simulator only
+//   --debug   Dev profile
 //   --sdk     Build one slice only: `iphoneos` or `iphonesimulator`
 //
 // The xcframework is packed again only when a library, a header or the set of
-// slices changed.
+// slices changed, so an unchanged build leaves Xcode nothing to relink.
 
-import { createHash } from 'node:crypto'
 import {
   copyFileSync,
   existsSync,
@@ -39,11 +38,9 @@ const CRATE_DIR = join(ROOT_DIR, 'crates', 'ffi')
 // The committed C header and the module map that declares it.
 const CRATE_INCLUDE_DIR = join(CRATE_DIR, 'include')
 
-const DEVICE_TARGET = 'aarch64-apple-ios'
-const SIMULATOR_TARGET = 'aarch64-apple-ios-sim'
 const TARGET_BY_SDK: Record<string, string> = {
-  iphoneos: DEVICE_TARGET,
-  iphonesimulator: SIMULATOR_TARGET,
+  iphoneos: 'aarch64-apple-ios',
+  iphonesimulator: 'aarch64-apple-ios-sim',
 }
 
 /** `tinyexec` options for a command that prints straight to the terminal. */
@@ -53,32 +50,21 @@ function log(message: string): void {
   console.log(`[build-ffi] ${message}`)
 }
 
-/** The Rust targets to build for the `--debug` and `--sdk` options. */
-function selectTargets(debug: boolean, sdk: string | undefined): string[] {
+/** The Rust targets to build: the one of `sdk`, or every target. */
+function selectTargets(sdk: string | undefined): string[] {
   if (sdk === undefined) {
-    return debug ? [SIMULATOR_TARGET] : [DEVICE_TARGET, SIMULATOR_TARGET]
+    return Object.values(TARGET_BY_SDK)
   }
   const target = Object.hasOwn(TARGET_BY_SDK, sdk) ? TARGET_BY_SDK[sdk] : undefined
   if (target === undefined) {
     throw new Error(`--sdk must be one of: ${Object.keys(TARGET_BY_SDK).join(', ')}`)
   }
-  if (debug && target !== SIMULATOR_TARGET) {
-    throw new Error('--debug builds the simulator only')
-  }
   return [target]
 }
 
-/** A digest of the libraries and headers that go into the xcframework. */
-function stampOf(libraries: string[], headers: string[]): string {
-  const hash = createHash('sha256')
-  for (const library of libraries) {
-    const { size, mtimeMs } = statSync(library)
-    hash.update(`${library}\0${size}\0${mtimeMs}\0`)
-  }
-  for (const header of headers) {
-    hash.update(readFileSync(header))
-  }
-  return hash.digest('hex')
+/** The paths and modification times of the files that go into the xcframework. */
+function stampOf(files: string[]): string {
+  return files.map((file) => `${file} ${statSync(file).mtimeMs}`).join('\n')
 }
 
 async function main(): Promise<void> {
@@ -86,7 +72,7 @@ async function main(): Promise<void> {
     options: { debug: { type: 'boolean', default: false }, sdk: { type: 'string' } },
   })
   const profile = values.debug ? 'debug' : 'release'
-  const targets = selectTargets(values.debug, values.sdk)
+  const targets = selectTargets(values.sdk)
 
   const cargoArgs = [
     'build',
@@ -130,7 +116,7 @@ async function main(): Promise<void> {
   const headerPaths = ['reflect_core.h', 'module.modulemap'].map((file) => {
     return join(CRATE_INCLUDE_DIR, file)
   })
-  const stamp = stampOf(libraryPaths, headerPaths)
+  const stamp = stampOf([...libraryPaths, ...headerPaths])
   const isFresh =
     existsSync(XCFRAMEWORK_PATH) &&
     existsSync(STAMP_PATH) &&
