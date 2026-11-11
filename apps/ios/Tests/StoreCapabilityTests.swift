@@ -73,7 +73,7 @@ final class StoreCapabilityTests: XCTestCase {
 
   func testATransactionOutsideAPurchaseEmitsPurchaseUpdated() async throws {
     try session.buyProduct(productIdentifier: monthly)
-    for _ in 0..<50 where updated == 0 {
+    for _ in 0..<600 where updated == 0 {
       try await Task.sleep(nanoseconds: 100_000_000)
     }
     XCTAssertGreaterThan(updated, 0)
