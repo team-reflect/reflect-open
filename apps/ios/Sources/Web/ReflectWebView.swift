@@ -66,17 +66,15 @@ final class ReflectWebView: WKWebView {
 
   /// Makes a `focus()` outside a user gesture open the keyboard.
   ///
-  /// WebKit opens the keyboard only when its content view's private focus
-  /// method gets `userIsInteracting` as true. This replaces that method once
-  /// with one that always passes true. When the class or the method is
-  /// missing, it changes nothing and the keyboard opens on user taps only.
+  /// WebKit opens the keyboard only when the private focus method of its
+  /// content view gets `userIsInteracting` as true. This replaces that method
+  /// once with one that always passes true, for every web view of the
+  /// process. When the class or the method is missing, it changes nothing and
+  /// the keyboard opens on user taps only.
   private static let allowProgrammaticFocus: Void = {
-    guard let contentClass = NSClassFromString(["WK", "Content", "View"].joined()) else { return }
+    guard let contentClass = NSClassFromString("WKContentView") else { return }
     let selector = NSSelectorFromString(
-      [
-        "_element", "Did", "Focus:", "user", "Is", "Interacting:", "blur", "Previous", "Node:",
-        "activity", "State", "Changes:", "user", "Object:",
-      ].joined())
+      "_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:")
     guard let method = class_getInstanceMethod(contentClass, selector) else { return }
     typealias ElementDidFocus =
       @convention(c) (AnyObject, Selector, UnsafeRawPointer, Bool, Bool, UInt, AnyObject?) -> Void
