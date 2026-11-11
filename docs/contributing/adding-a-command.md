@@ -5,8 +5,8 @@ things: the Rust command, and a method on the core service that owns the
 domain.** This guide walks the path with a hypothetical `note_stat` command.
 
 The Rust command is a method on `Core` in `crates/core` (crate `reflect-core`,
-no Tauri). Two shells call it: the Tauri app through a `#[tauri::command]`
-that forwards, and the Swift iOS shell through `Core::dispatch` by name.
+no Tauri). Two shells call it by name through `Core::dispatch`: the Tauri app
+and the Swift iOS shell.
 
 ```text
 React component / hook        useCoreServices()
@@ -14,8 +14,6 @@ React component / hook        useCoreServices()
        └─ ipc.call            packages/core/src/ipc/ipc-service.ts  (zod validation)
             └─ transport.invoke   the `IpcBridge` given to `createCoreServices`
                  ├─ Tauri IPC apps/desktop/src/services/tauri-ipc.ts
-                 │    └─ #[tauri::command]  apps/desktop/src-tauri/src/<module>.rs
-                 │         └─ Core method   crates/core/src/<module>.rs
                  └─ Swift IPC apps/desktop/src/services/swift-ipc.ts
                       └─ Core::dispatch     crates/core/src/lib.rs
                            └─ Core method   crates/core/src/<module>.rs
@@ -53,25 +51,20 @@ impl Core {
 }
 ```
 
-Then wire it up for both shells:
+Then add its row. Both shells get the command from it:
 
 ```rust
-// crates/core/src/lib.rs, in `Core::dispatch`: one row per command.
+// crates/core/src/lib.rs, in `dispatch_table!`: one row per command.
 // The argument names are the camelCase keys of the JSON arguments.
 "note_stat" => note_stat(path: String),
-
-// apps/desktop/src-tauri/src/fs/mod.rs: the Tauri command only forwards.
-#[tauri::command]
-pub fn note_stat(core: tauri::State<'_, Arc<Core>>, path: String) -> AppResult<NoteStat> {
-    core.note_stat(path)
-}
 ```
 
 A row for an `async` method ends in `.await`. A row for a method that returns
-its value without `AppResult` ends in `infallible`. A sync
-`#[tauri::command]` runs on the main thread, so make the forwarding function
-`async` when the method can block. A command that exists only on the desktop
-(windows, menus) stays in the Tauri crate and gets no `dispatch` row.
+its value without `AppResult` ends in `infallible`. Every command runs on a
+blocking-pool thread, never on the main thread. A command that exists only on
+the desktop (windows, menus) is a `#[tauri::command]` in the Tauri crate,
+registered in `generate_handler!` in `apps/desktop/src-tauri/src/lib.rs`, and
+gets no row.
 
 - **Errors are the shared contract.** Return `AppError` (from `reflect-types`,
   `crates/types/src/error.rs`). It serializes as `{ kind, message }`, and the
@@ -91,11 +84,6 @@ its value without `AppResult` ends in `infallible`. A sync
   `fs::note_read`/`asset_read`.
 - **No product policy.** A command exposes a primitive. "What to do when X"
   belongs in `@reflect/core`.
-
-Register the Tauri command in `tauri::generate_handler![...]` in
-`apps/desktop/src-tauri/src/lib.rs`. A missing registration compiles fine and
-fails at runtime with "command not found". A missing `dispatch` row fails the
-same way in the Swift shell, with a `notFound` error.
 
 Test the pure helper with `#[cfg(test)]`, not the command wrapper.
 `crates/core/src/settings.rs` is the model: `settings_load`/`settings_save`
@@ -190,8 +178,7 @@ behavior in the module that consumes it. See [testing.md](testing.md).
 - [ ] Rust: `Core` method in the owning `crates/core` module, `AppResult<T>`,
       camelCase serde, `resolve()`d paths, generation-pinned if mutating or a
       background read
-- [ ] Rust: a row in `Core::dispatch`, a forwarding `#[tauri::command]`, and
-      its registration in `lib.rs` `generate_handler!`
+- [ ] Rust: a row in `dispatch_table!` (`crates/core/src/lib.rs`)
 - [ ] Rust: `#[cfg(test)]` tests on the pure helper; `cargo test -p reflect-core`
 - [ ] TS: zod schema + method through `ipc.call()` on the owning service;
       `generation` parameter if mutating

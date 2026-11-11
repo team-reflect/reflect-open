@@ -3,50 +3,29 @@
 //! Per the architecture conventions, Rust owns *capabilities* (file IO, SQLite,
 //! watching, recents) and TypeScript (`@reflect/core`) owns *policy and
 //! composition* — a command here never encodes product rules beyond the
-//! primitive it exposes. Each module wires one capability:
-//! [`fs`] (graph file IO), [`db`] (SQLite index), [`watcher`] (file events),
-//! [`recents`] (recent-graphs store), [`settings`] (user settings store),
-//! [`secrets`] (OS keychain), [`git`] (backup/sync primitives),
-//! [`capture`] (link-capture inbox + native-messaging host plumbing),
-//! [`skill`] (per-graph agent-skill install under `~/.agents/skills/`),
-//! [`calendar`] (read-only Apple Calendar access),
-//! [`contacts`] (live Apple Contacts lookups),
-//! [`menu`] (the macOS app menu, incl. Paste and Match Style),
-//! [`error`] (the shared error contract).
+//! primitive it exposes. The commands shared with the Swift iOS shell live in
+//! `reflect-core`; [`core_commands`] answers their invokes through
+//! `Core::dispatch`. The modules here wire the desktop-only capabilities:
+//! [`windows`] (note windows), [`menu`] (the macOS app menu, incl. Paste and
+//! Match Style), [`skill`] (per-graph agent-skill install under
+//! `~/.agents/skills/`), [`calendar`] (read-only Apple Calendar access),
+//! [`fs`] (the asset protocols), [`error`] (the shared error contract).
 
-mod background_task;
-mod blocking;
 mod calendar;
 mod capture;
-mod contacts;
+mod core_commands;
 mod db;
 mod devtools;
-mod editor_link_preview;
 mod error;
 mod fs;
-mod git;
 mod host;
-mod icloud;
 mod logging;
 mod menu;
 mod quit;
-mod recents;
-mod secrets;
-mod settings;
 mod skill;
 #[cfg(target_os = "macos")]
 mod wake;
-mod watcher;
 mod windows;
-
-// Intel macOS and mobile have no embedding runtime: their stand-in commands
-// keep the identical command surface, so the `invoke_handler` list below
-// needs no platform branches.
-#[cfg(all(desktop, not(all(target_os = "macos", target_arch = "x86_64"))))]
-mod embed;
-#[cfg(any(mobile, all(target_os = "macos", target_arch = "x86_64")))]
-#[path = "embed_unsupported.rs"]
-mod embed;
 
 use std::sync::Arc;
 
@@ -258,121 +237,31 @@ pub fn run() {
         )
         .manage(quit::QuitState::default())
         .manage(windows::WindowInit::default())
-        .invoke_handler(tauri::generate_handler![
-            fs::x_archive::x_archive_write,
-            fs::x_archive::x_archive_resolve,
-            fs::x_archive::x_archive_owners,
-            fs::x_syndication::x_syndication_fetch,
-            background_task::background_task_begin,
-            background_task::background_task_end,
-            icloud::storage::mobile_storage,
-            icloud::storage::mobile_storage_local,
-            icloud::storage::icloud_download_pending,
-            icloud::storage::icloud_pending_count,
-            icloud::storage::icloud_request_downloads,
-            icloud::storage::icloud_status,
-            icloud::storage::icloud_adopt_graph,
-            icloud::sweep::icloud_conflicts_scan,
-            icloud::watch::icloud_watch_start,
-            icloud::watch::icloud_watch_stop,
-            fs::graph_open,
-            fs::graph_create,
-            fs::graph_delete,
-            fs::graph_import_reflect_v1_zip,
-            fs::graph_import_cancel,
-            fs::note_read,
-            fs::note_read_local,
-            fs::note_create,
-            fs::note_write,
-            fs::asset_write,
-            fs::asset_read,
-            fs::asset_read_binary,
-            fs::audio_memo_delete,
-            fs::transcript_cache_read,
-            fs::transcript_cache_write,
-            fs::asset_open,
-            fs::asset_reveal,
-            fs::assets::asset_upload_begin,
-            fs::assets::asset_upload_append,
-            fs::assets::asset_upload_commit,
-            fs::assets::asset_upload_commit_path,
-            fs::assets::asset_upload_abort,
-            fs::assets::asset_import,
-            fs::assets::audio_memo_import,
-            fs::dir_list,
-            fs::note_exists,
-            fs::note_delete,
-            fs::list_files,
-            fs::list_attachments,
-            fs::vault_scan_stats,
-            recents::recent_graphs,
-            recents::forget_recent,
-            settings::settings_load,
-            settings::settings_save,
+        .invoke_handler({
+            let desktop_commands: fn(tauri::ipc::Invoke) -> bool = tauri::generate_handler![
             skill::skill_status,
             skill::skill_install,
             skill::skill_uninstall,
-            secrets::secret_set,
-            secrets::secret_get,
-            secrets::secret_delete,
-            db::index_open,
-            db::index_apply,
-            db::index_apply_batch,
-            db::index_remove,
-            db::index_clear,
-            db::index_move,
-            db::index_reconcile_scan,
-            db::index_touch,
-            db::note_move_indexed,
-            db::index_meta_set,
-            db::db_query,
-            db::chat_message_save,
-            db::chat_conversation_delete,
-            db::embed_apply,
-            db::embed_remove,
-            embed::embed_status,
-            embed::embed_ensure,
-            embed::embed_texts,
-            watcher::watch_start,
-            watcher::watch_stop,
             menu::menu_install_paste_and_match_style,
             calendar::calendar_authorization_status,
             calendar::calendar_request_access,
             calendar::calendar_list_calendars,
             calendar::calendar_list_events,
-            contacts::contacts_authorization_status,
-            contacts::contacts_request_access,
-            contacts::contacts_lookup_by_email,
-            contacts::contacts_lookup_by_name,
-            capture::capture_host_register,
-            capture::capture_inbox_list,
-            capture::capture_inbox_spool,
-            capture::capture_inbox_read,
-            capture::capture_inbox_remove,
-            capture::capture_inbox_reject,
-            capture::capture_shared_inbox_relay,
-            capture::capture_quick_note_defaults_write,
-            capture::capture_screenshot_promote,
-            capture::capture_link_preview,
-            capture::capture_meta_fetch,
-            capture::capture_oembed_fetch,
-            editor_link_preview::link_preview_fetch_html,
-            editor_link_preview::link_preview_fetch_icon,
-            git::git_status,
-            git::git_setup,
-            git::git_disconnect,
-            git::git_clone,
-            git::git_commit_all,
-            git::git_fetch,
-            git::git_remote_head,
-            git::git_pull,
-            git::git_push,
             quit::quit_confirm,
             windows::open_note_window,
             windows::window_bootstrap,
             windows::close_note_windows,
             devtools::toggle_devtools,
-        ])
+        ];
+            move |invoke| {
+                if Core::has_command(invoke.message.command()) {
+                    core_commands::handle(invoke);
+                    true
+                } else {
+                    desktop_commands(invoke)
+                }
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(move |app, event| match &event {

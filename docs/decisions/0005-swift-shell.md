@@ -33,9 +33,9 @@ implementation next to Tauri and the browser dev bridge.
   the Tauri crate today. It has no Tauri dependency. A `Host` trait gives it
   the few things the host must supply: events, main-thread work, opening
   URLs, and paths and version info passed in at startup.
-- Each `#[tauri::command]` in `apps/desktop/src-tauri` becomes a one-line
-  call into `reflect-core`. Desktop keeps typed commands and pays no JSON
-  round trip.
+- Both shells call these commands by name through `Core::dispatch`, so a
+  command is registered once. The Tauri crate keeps only the desktop-only
+  commands (windows, menus, calendar).
 - A new crate `reflect-ffi` (`staticlib`) exposes a small C ABI: create and
   free a core, dispatch a command by name with JSON arguments, request
   headers, and an optional byte body, and register event and main-thread

@@ -177,8 +177,7 @@ The short version:
 
 **Frontend ↔ Rust**
 
-- Define commands with `#[tauri::command]` in `apps/desktop/src-tauri/src/` and
-  register them in `lib.rs`'s `invoke_handler`.
+- Define commands as `Core` methods in `crates/core` with a row in `dispatch_table!`. Desktop-only commands are `#[tauri::command]`s in `apps/desktop/src-tauri/src/`.
 - Bind each command as a method of the core service that owns the domain, through `ipc.call(command, args, zodSchema)`. Components never call `invoke`. See [docs/contributing/adding-a-command.md](docs/contributing/adding-a-command.md).
 - Add Tauri plugins in `apps/desktop/src-tauri/Cargo.toml` (Rust) and grant permissions in `apps/desktop/src-tauri/capabilities/`.
 

@@ -4730,7 +4730,6 @@ dependencies = [
  "objc2-foundation",
  "percent-encoding",
  "reflect-core",
- "reflect-git",
  "reflect-graph-io",
  "reflect-index",
  "reflect-types",
