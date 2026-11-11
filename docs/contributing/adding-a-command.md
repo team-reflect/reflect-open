@@ -32,7 +32,7 @@ Put the method in the `crates/core` module that owns the capability (`fs/`,
 `db.rs`, `git.rs`, `capture.rs`, `embed.rs`, …) or a new one. State that
 commands share (the graph session, the index session, the background
 assertions) is a field of `Core`. Commands are snake_case, return
-`AppResult<T>`, and serialize camelCase:
+`AppResult<T>` unless they cannot fail, and serialize camelCase:
 
 ```rust
 // crates/core/src/fs/mod.rs
