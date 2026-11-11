@@ -7,10 +7,6 @@ import Foundation
 final class HTTPProxy: SchemeRoute {
   let pathPrefix = "/__http"
 
-  /// The origin of the bundled web app. Requests from any other origin (the Vite
-  /// dev server) get CORS headers.
-  static let pageOrigin = "reflect-app://localhost"
-
   /// Request headers that stay in the webview: browser context, cookies,
   /// headers that `URLSession` sets itself, and hop-by-hop headers.
   static let droppedRequestHeaders: Set<String> = hopByHopHeaders.union([
@@ -48,7 +44,15 @@ final class HTTPProxy: SchemeRoute {
   private let session: URLSession
   private var exchanges: [Int: Exchange] = [:]
 
-  init(configuration: URLSessionConfiguration = HTTPProxy.makeConfiguration()) {
+  private let allowedOrigin: String?
+
+  /// `allowedOrigin` is the origin of a dev server page that may call the
+  /// route across origins. No other origin gets CORS headers.
+  init(
+    allowedOrigin: String? = nil,
+    configuration: URLSessionConfiguration = HTTPProxy.makeConfiguration()
+  ) {
+    self.allowedOrigin = allowedOrigin
     let delegate = SessionDelegate()
     session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: .main)
     delegate.proxy = self
@@ -62,7 +66,7 @@ final class HTTPProxy: SchemeRoute {
   /// an invalid target at once, without a network request.
   func start(_ task: SchemeTask) {
     let request = task.request
-    let cors = Self.corsHeaders(for: request)
+    let cors = corsHeaders(for: request)
 
     if request.httpMethod == "OPTIONS",
       let method = request.value(forHTTPHeaderField: "Access-Control-Request-Method")
@@ -123,12 +127,12 @@ final class HTTPProxy: SchemeRoute {
     }
   }
 
-  /// CORS headers for a request from a page outside `pageOrigin`, else none.
-  private static func corsHeaders(for request: URLRequest) -> [String: String] {
-    guard let origin = request.value(forHTTPHeaderField: "Origin"), origin != pageOrigin else {
+  /// CORS headers for a request from the page at `allowedOrigin`, else none.
+  private func corsHeaders(for request: URLRequest) -> [String: String] {
+    guard let allowedOrigin, request.value(forHTTPHeaderField: "Origin") == allowedOrigin else {
       return [:]
     }
-    return ["Access-Control-Allow-Origin": origin, "Access-Control-Expose-Headers": "*"]
+    return ["Access-Control-Allow-Origin": allowedOrigin, "Access-Control-Expose-Headers": "*"]
   }
 
   /// The `url` query item, when it is an absolute `http` or `https` URL with a host.
@@ -188,12 +192,19 @@ final class HTTPProxy: SchemeRoute {
     _ request: URLRequest, from original: URLRequest?
   ) -> URLRequest {
     guard let from = original?.url, let to = request.url,
-      from.scheme != to.scheme || from.host != to.host || from.port != to.port
+      from.scheme != to.scheme || from.host != to.host
+        || effectivePort(of: from) != effectivePort(of: to)
     else { return request }
     var request = request
     request.setValue(nil, forHTTPHeaderField: "Authorization")
     return request
   }
+}
+
+/// The port of an `http` or `https` URL, with the scheme's default for a URL
+/// that names none.
+private func effectivePort(of url: URL) -> Int? {
+  url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil)
 }
 
 /// One proxied request, from `start` until the request completes or WebKit

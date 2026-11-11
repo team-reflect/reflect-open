@@ -11,7 +11,7 @@ final class HTTPProxyTests: XCTestCase {
     StubProtocol.reset()
     let configuration = HTTPProxy.makeConfiguration()
     configuration.protocolClasses = [StubProtocol.self]
-    proxy = HTTPProxy(configuration: configuration)
+    proxy = HTTPProxy(allowedOrigin: "http://localhost:1420", configuration: configuration)
   }
 
   override func tearDown() async throws {
@@ -37,7 +37,7 @@ final class HTTPProxyTests: XCTestCase {
         "Authorization": "Bearer sk-test",
         "Content-Type": "application/json",
         "X-Upload-Id": "42",
-        "Origin": HTTPProxy.pageOrigin,
+        "Origin": "reflect-app://localhost",
         "Referer": "reflect-app://localhost/index.html",
         "Cookie": "a=1",
         "User-Agent": "Mozilla/5.0",
@@ -187,7 +187,7 @@ final class HTTPProxyTests: XCTestCase {
     XCTAssertTrue(StubProtocol.requests.isEmpty)
   }
 
-  func testAddsCORSHeadersOnlyForAnotherPageOrigin() async throws {
+  func testAddsCORSHeadersOnlyForTheAllowedOrigin() async throws {
     StubProtocol.respond { stub in
       stub.sendHead(
         status: 200, headers: ["Access-Control-Allow-Origin": "https://upstream.example"])
@@ -196,7 +196,7 @@ final class HTTPProxyTests: XCTestCase {
     let devTask = RecordingSchemeTask(
       target: "https://api.example.com/", headers: ["Origin": "http://localhost:1420"])
     let appTask = RecordingSchemeTask(
-      target: "https://api.example.com/", headers: ["Origin": HTTPProxy.pageOrigin])
+      target: "https://api.example.com/", headers: ["Origin": "https://evil.example"])
 
     start(devTask)
     start(appTask)
@@ -217,6 +217,8 @@ final class HTTPProxyTests: XCTestCase {
       case "/start":
         stub.redirect(to: "https://api.example.com/same")
       case "/same":
+        stub.redirect(to: "https://api.example.com:443/port")
+      case "/port":
         stub.redirect(to: "https://other.example.com/final")
       default:
         stub.sendHead(status: 200, headers: [:])
@@ -238,6 +240,7 @@ final class HTTPProxyTests: XCTestCase {
       [
         ["https://api.example.com/start", "Bearer sk-test"],
         ["https://api.example.com/same", "Bearer sk-test"],
+        ["https://api.example.com:443/port", "Bearer sk-test"],
         ["https://other.example.com/final", "none"],
       ])
   }

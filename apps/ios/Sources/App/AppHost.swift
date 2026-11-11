@@ -25,7 +25,7 @@ final class AppHost {
     shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
     routes.append(SelfCheckRoute())
     #endif
-    routes.append(HTTPProxy())
+    routes.append(HTTPProxy(allowedOrigin: devURL.flatMap(Self.origin(of:))))
     routes.append(
       IPCRoute(
         dispatch: { [core] command, args, headers, body in
