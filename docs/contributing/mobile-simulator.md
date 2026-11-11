@@ -4,12 +4,13 @@ The iOS app is the Swift shell in `apps/ios`. It loads the web app from
 `apps/ios/Web`, a link to `apps/web/dist/mobile`.
 
 ```bash
+mise install                                   # cbindgen and other tools from mise.toml
 pnpm --filter @reflect/ios build:web           # apps/web/dist/mobile
 pnpm build:ffi --debug --sdk iphonesimulator   # the Rust core
 open apps/ios/Reflect.xcodeproj                # run the Reflect scheme
 ```
 
-The Debug configuration is the dev flavor (`app.reflect.ios.dev`, "Reflect Dev"). For hot
+The `Debug-Dev` configuration is the dev flavor (`app.reflect.ios.dev`, "Reflect Dev"). For hot
 reload, run `pnpm --filter @reflect/ios dev:web` and enable `REFLECT_DEV_URL` in the scheme's
 environment variables.
 On a physical device, run `pnpm --filter @reflect/ios dev:web --host` and point
