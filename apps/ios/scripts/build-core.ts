@@ -5,6 +5,11 @@
 //
 //   --debug   Dev profile, simulator only
 
+// FIXME: 1. move this script into reflect-open/scripts/
+// FIXME: 2. add a new reflect-open/scripts/tsconfig.json and link it to the root reflect-open/tsconfig.json
+// FIXME: 3. check if apps/ios/tsconfig.json is still needed. If not, remove it.
+// FIXME: 4. rename this script to build-ffi.ts
+
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
