@@ -9,8 +9,8 @@
          <ExecutionAction
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
-               title = "Build Rust core if missing"
-               scriptText = "[ -d &quot;${SRCROOT}/../../target/apple/ReflectCore.xcframework&quot; ] || &quot;${SRCROOT}/scripts/xcode-build-ffi.sh&quot;&#10;">
+               title = "Build Rust core if its slice is missing"
+               scriptText = "# Xcode checks that the xcframework has a library for the SDK before any&#10;# build phase runs. The xcframework holds only the slice of the last build.&#10;slice=ios-arm64&#10;[ &quot;$PLATFORM_NAME&quot; = iphonesimulator ] &amp;&amp; slice=ios-arm64-simulator&#10;[ -d &quot;${SRCROOT}/../../target/apple/ReflectCore.xcframework/$slice&quot; ] || &quot;${SRCROOT}/scripts/xcode-build-ffi.sh&quot;&#10;">
                <EnvironmentBuildable>
                <BuildableReference
                   BuildableIdentifier = "primary"
