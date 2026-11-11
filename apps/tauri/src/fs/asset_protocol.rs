@@ -6,9 +6,10 @@
 //! WebKit delivers custom-scheme requests on the main thread and wry invokes
 //! the handler inline, so Tauri's built-in synchronous `asset:` protocol
 //! freezes the app for the duration of every uncached image read, and a first
-//! read can wait for iCloud to materialize a dataless file. This handler does the blocking file IO on the async
-//! runtime's blocking pool and responds when the bytes are ready, so a slow
-//! read costs the image a pop-in, never the app a freeze.
+//! read can wait for iCloud to materialize a dataless file. This handler does
+//! the blocking file IO on the async runtime's blocking pool and responds when
+//! the bytes are ready, so a slow read costs the image a pop-in, never the app
+//! a freeze.
 //!
 //! URL shape: `reflect-asset://localhost/<generation>/<graph-relative path>`,
 //! built by `convertFileSrc(…, 'reflect-asset')` in the frontend (which

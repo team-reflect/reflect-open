@@ -25,6 +25,7 @@ const platform: 'mobile' | 'desktop' | 'unknown' = (() => {
       return 'desktop'
   }
 
+  // The Tauri CLI sets only the values above, so any other value is a typo.
   throw new Error(`Unknown environment variable TAURI_ENV_PLATFORM: ${env}`)
 })()
 

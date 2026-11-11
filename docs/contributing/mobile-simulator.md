@@ -12,6 +12,8 @@ open apps/ios/Reflect.xcodeproj                # run the Reflect scheme
 The Debug configuration is the dev flavor (`app.reflect.ios.dev`, "Reflect Dev"). For hot
 reload, run `pnpm --filter @reflect/ios dev:web` and enable `REFLECT_DEV_URL` in the scheme's
 environment variables.
+On a physical device, run `pnpm --filter @reflect/ios dev:web --host` and point
+`REFLECT_DEV_URL` at the Mac's LAN address.
 
 With "Connect Hardware Keyboard" on (I/O → Keyboard, ⇧⌘K), the simulator shows no software
 keyboard and `--keyboard-height` stays 0. Turn it off to test keyboard avoidance.

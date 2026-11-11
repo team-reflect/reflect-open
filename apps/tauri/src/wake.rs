@@ -2,8 +2,8 @@
 //!
 //! On desktop the `notify` FSEvents watcher is the *only* live source of
 //! external content changes: the iCloud metadata watch
-//! (`crates/core/src/icloud/watch.rs`) runs only on iOS, and the resume/focus triggers only run conflict
-//! sweeps. A file that iCloud downloads while the
+//! (`crates/core/src/icloud/watch.rs`) runs only on iOS, and the resume/focus
+//! triggers only run conflict sweeps. A file that iCloud downloads while the
 //! machine sleeps (Power Nap) or during the wake transition can miss FSEvents
 //! delivery entirely — the process is suspended when the write lands — and
 //! with no backstop the note stays stale until the next full reconcile, which
