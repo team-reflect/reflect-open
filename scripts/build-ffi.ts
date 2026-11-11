@@ -77,7 +77,7 @@ function selectTargets(debug: boolean, sdk: string | undefined): string[] {
   if (sdk === undefined) {
     return debug ? [SIMULATOR_TARGET] : [DEVICE_TARGET, SIMULATOR_TARGET]
   }
-  const target = TARGET_BY_SDK[sdk]
+  const target = Object.hasOwn(TARGET_BY_SDK, sdk) ? TARGET_BY_SDK[sdk] : undefined
   if (target === undefined) {
     throw new Error(`--sdk must be one of: ${Object.keys(TARGET_BY_SDK).join(', ')}`)
   }
