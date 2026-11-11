@@ -1,3 +1,4 @@
+import AppStoreKit
 import StoreKit
 import UIKit
 import WebHostKit
@@ -120,24 +121,10 @@ final class StoreCapability {
     struct Response: Encodable {
       var environment: String
     }
-    if let result = try? await AppTransaction.shared {
-      // An unverified payload names the same environment as a verified one.
-      switch result {
-      case .verified(let transaction), .unverified(let transaction, _):
-        return .value(Response(environment: transaction.environment.rawValue))
-      }
-    }
-    // Without an app transaction, the receipt name still tells a sandbox
-    // install from an App Store one. A simulator is always a development install.
-    #if targetEnvironment(simulator)
-    let isSandboxInstall = true
-    #else
-    let isSandboxInstall = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-    #endif
-    guard isSandboxInstall else {
+    guard let environment = await AppStoreEnvironment.current() else {
       return .error(kind: "io", message: "the app transaction is unavailable")
     }
-    return .value(Response(environment: "Sandbox"))
+    return .value(Response(environment: environment))
   }
 
   /// `sync` fetches transactions and subscription status from the App Store

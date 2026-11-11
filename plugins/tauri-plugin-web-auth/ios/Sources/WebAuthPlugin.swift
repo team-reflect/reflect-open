@@ -1,6 +1,7 @@
 import AuthenticationServices
 import Tauri
 import UIKit
+import WebAuthKit
 
 class StartArgs: Decodable {
   /// The page to open, usually an OAuth authorize URL.
@@ -16,9 +17,14 @@ struct StartResponse: Encodable {
   let url: String?
 }
 
-class WebAuthPlugin: Plugin, ASWebAuthenticationPresentationContextProviding {
-  // ASWebAuthenticationSession cancels itself when deallocated.
-  private var session: ASWebAuthenticationSession?
+class WebAuthPlugin: Plugin {
+  @MainActor
+  private lazy var session = WebAuthSession {
+    UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+      .first(where: \.isKeyWindow) ?? ASPresentationAnchor()
+  }
 
   /// Resolves the callback URL, or no URL when the user cancels.
   ///
@@ -31,42 +37,13 @@ class WebAuthPlugin: Plugin, ASWebAuthenticationPresentationContextProviding {
       invoke.reject("invalid authentication URL")
       return
     }
-    let result: Result<URL?, Error> = await withCheckedContinuation { continuation in
-      let session = ASWebAuthenticationSession(
-        url: url,
-        callbackURLScheme: args.callbackScheme
-      ) { callbackURL, error in
-        if let callbackURL {
-          continuation.resume(returning: .success(callbackURL))
-        } else if let error = error as? ASWebAuthenticationSessionError,
-          error.code == .canceledLogin
-        {
-          continuation.resume(returning: .success(nil))
-        } else {
-          continuation.resume(returning: .failure(error ?? URLError(.unknown)))
-        }
-      }
-      session.presentationContextProvider = self
-      session.prefersEphemeralWebBrowserSession = args.ephemeral
-      self.session = session
-      if !session.start() {
-        continuation.resume(returning: .failure(URLError(.cannotLoadFromNetwork)))
-      }
-    }
-    session = nil
-    switch result {
-    case .success(let callbackURL):
+    do {
+      let callbackURL = try await session.start(
+        url: url, callbackScheme: args.callbackScheme, ephemeral: args.ephemeral)
       invoke.resolve(StartResponse(url: callbackURL?.absoluteString))
-    case .failure(let error):
+    } catch {
       invoke.reject("web authentication failed: \(error.localizedDescription)")
     }
-  }
-
-  func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-    UIApplication.shared.connectedScenes
-      .compactMap { $0 as? UIWindowScene }
-      .flatMap(\.windows)
-      .first(where: \.isKeyWindow) ?? ASPresentationAnchor()
   }
 }
 

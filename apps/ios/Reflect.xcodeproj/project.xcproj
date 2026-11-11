@@ -131,7 +131,15 @@
       "package-product-members": [
         {
           "package": "apple",
+          "product-name": "AppStoreKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
           "product-name": "CaptureShared",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "KeyboardKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "apple",
@@ -140,6 +148,10 @@
         }, {
           "package": "apple",
           "product-name": "RecordingShared",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
+          "product-name": "WebAuthKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "apple",

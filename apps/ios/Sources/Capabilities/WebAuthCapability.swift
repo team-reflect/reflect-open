@@ -1,16 +1,15 @@
 import AuthenticationServices
+import WebAuthKit
 import WebHostKit
 
 /// The `plugin:web-auth` commands: the system web sign-in session.
 @MainActor
-final class WebAuthCapability: NSObject, ASWebAuthenticationPresentationContextProviding {
-  private let anchor: () -> ASPresentationAnchor
-  /// A session cancels itself when it is deallocated.
-  private var session: ASWebAuthenticationSession?
+final class WebAuthCapability {
+  private let session: WebAuthSession
 
   /// `anchor` returns the window that presents the sign-in sheet.
-  init(anchor: @escaping () -> ASPresentationAnchor) {
-    self.anchor = anchor
+  init(anchor: @escaping @MainActor () -> ASPresentationAnchor) {
+    session = WebAuthSession(anchor: anchor)
   }
 
   var commands: [String: ShellCommand] {
@@ -35,34 +34,13 @@ final class WebAuthCapability: NSObject, ASWebAuthenticationPresentationContextP
       return .error(
         kind: "parse", message: "web-auth start takes {payload: {url, callbackScheme, ephemeral}}")
     }
-    let result: Result<URL?, Error> = await withCheckedContinuation { continuation in
-      let session = ASWebAuthenticationSession(
-        url: payload.url, callbackURLScheme: payload.callbackScheme
-      ) { callbackURL, error in
-        if let error, (error as? ASWebAuthenticationSessionError)?.code != .canceledLogin {
-          continuation.resume(returning: .failure(error))
-        } else {
-          continuation.resume(returning: .success(callbackURL))
-        }
-      }
-      session.presentationContextProvider = self
-      session.prefersEphemeralWebBrowserSession = payload.ephemeral
-      self.session = session
-      if !session.start() {
-        continuation.resume(returning: .failure(URLError(.cannotLoadFromNetwork)))
-      }
-    }
-    session = nil
-    switch result {
-    case .success(let callbackURL):
+    do {
+      let callbackURL = try await session.start(
+        url: payload.url, callbackScheme: payload.callbackScheme, ephemeral: payload.ephemeral)
       return .value(Response(url: callbackURL?.absoluteString))
-    case .failure(let error):
+    } catch {
       return .error(
         kind: "io", message: "web authentication failed: \(error.localizedDescription)")
     }
-  }
-
-  func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-    anchor()
   }
 }
