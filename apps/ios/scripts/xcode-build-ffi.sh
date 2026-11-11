@@ -18,6 +18,7 @@ set -eu
 
 cd "$(dirname "$0")/../../.."
 
+# FIXME: 1. in generate-xcode-env.mjs, also genenrate a .xcode.env.local file under apps/ios/; 2. use that .xcode.env.local here instead of apps/desktop/src-tauri/.xcode.env.local
 if [ -f apps/desktop/src-tauri/.xcode.env.local ]; then
   . apps/desktop/src-tauri/.xcode.env.local
 fi
