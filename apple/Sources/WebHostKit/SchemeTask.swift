@@ -115,13 +115,6 @@ public final class SchemeTask {
   }
 }
 
-/// Handles the requests of `reflect-app` paths that start with `pathPrefix`.
-@MainActor
-public protocol SchemeRoute {
-  var pathPrefix: String { get }
-  func start(_ task: SchemeTask)
-}
-
 /// The tasks of one scheme handler that WebKit started and that did not end yet.
 @MainActor
 final class SchemeTasks {

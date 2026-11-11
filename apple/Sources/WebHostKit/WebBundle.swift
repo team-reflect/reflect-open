@@ -1,19 +1,6 @@
 public import Foundation
 import UniformTypeIdentifiers
 
-/// An HTTP response for a `reflect-app` request.
-public struct SchemeReply: Sendable {
-  public var statusCode: Int
-  public var headers: [String: String]
-  public var body: Data
-
-  public init(statusCode: Int, headers: [String: String], body: Data) {
-    self.statusCode = statusCode
-    self.headers = headers
-    self.body = body
-  }
-}
-
 /// Reads files from the bundled `Web/` folder, the output of the desktop app's Vite build.
 public enum WebBundle {
   /// Reads the file at a URL path such as `/index.html` or `/assets/index-1a2b3c.js`.

@@ -11,4 +11,15 @@ public enum CoreReply: Sendable, Equatable {
     let json = try? JSONSerialization.data(withJSONObject: ["kind": kind, "message": message])
     return .error(json ?? Data(#"{"kind":"unknown","message":""}"#.utf8))
   }
+
+  /// The JSON reply `null`: the answer of a command that returns nothing.
+  public static let null = CoreReply.json(Data("null".utf8))
+
+  /// A JSON reply that encodes `value`.
+  public static func value(_ value: some Encodable) -> CoreReply {
+    guard let json = try? JSONEncoder().encode(value) else {
+      return .error(kind: "unknown", message: "the shell could not encode a reply")
+    }
+    return .json(json)
+  }
 }
