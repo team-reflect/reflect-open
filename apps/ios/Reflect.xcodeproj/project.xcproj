@@ -27,6 +27,7 @@
     { "kind": "folder", "path": "Sources", "target-membership": [ "Reflect" ] },
     { "kind": "folder", "path": "Resources", "target-membership": [ "Reflect" ] },
     { "kind": "folder", "path": "Tests", "target-membership": [ "ReflectTests" ] },
+    { "path": "../desktop/src-tauri/gen/apple/reflect-open-storekit.storekit", "target-membership": [ "ReflectTests/resources" ] },
     { "kind": "folder", "path": "UITests", "target-membership": [ "ReflectUITests" ] },
     { "kind": "folder", "path": "Config" },
     { "kind": "folder", "path": "scripts" },
