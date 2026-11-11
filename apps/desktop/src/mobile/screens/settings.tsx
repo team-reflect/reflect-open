@@ -609,10 +609,7 @@ export function MobileSettings(): ReactElement {
           </SettingsGroup>
 
           {debugUnlocked ? (
-            <SettingsGroup
-              header="Debug"
-              footer="Production is an App Store install; Sandbox is TestFlight or a development install."
-            >
+            <SettingsGroup header="Debug">
               {isIos ? (
                 <SettingsValueRow
                   label="Environment"
