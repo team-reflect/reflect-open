@@ -45,7 +45,10 @@ export interface PlatformFacts {
    * The macOS desktop shell (not iPadOS, not browser dev).
    */
   readonly isMacosDesktop: boolean
-  // FIXME: add a new isSwiftMobile: boolean;
+  /**
+   * The Swift iOS shell hosts the mobile app.
+   */
+  readonly isSwiftMobile: boolean
   /**
    * Mod renders as ⌘ rather than Ctrl.
    */

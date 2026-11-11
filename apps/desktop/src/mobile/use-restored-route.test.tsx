@@ -1,6 +1,10 @@
-import { createTestCoreServices, createTestStorageService } from '@reflect/core/testing'
+import {
+  createTestCoreServices,
+  createTestPlatformService,
+  createTestStorageService,
+} from '@reflect/core/testing'
 import type { Route } from '@reflect/app'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useRestoredRoute } from './use-restored-route.ts'
@@ -8,13 +12,14 @@ import { useRestoredRoute } from './use-restored-route.ts'
 const STORAGE_KEY = 'reflect.mobile.route'
 
 /** Renders the hook for the graph `/graph`, with `stored` in session storage. */
-async function renderRestoredRoute(stored: unknown, host: 'swift' | 'tauri' = 'swift') {
-  if (host === 'swift') {
-    window.__reflectHost = { on: () => () => {} }
-  }
+async function renderRestoredRoute(stored: unknown, isSwiftMobile = true) {
   const storage = createTestStorageService()
   storage.session.set(STORAGE_KEY, JSON.stringify(stored))
-  const core = createTestCoreServices({ storage, database: createWasmTestDatabaseService() })
+  const core = createTestCoreServices({
+    storage,
+    database: createWasmTestDatabaseService(),
+    platform: createTestPlatformService({ isSwiftMobile }),
+  })
   const view = await renderHookInApp(() => useRestoredRoute('/graph'), { core })
   return { view, storage }
 }
@@ -22,10 +27,6 @@ async function renderRestoredRoute(stored: unknown, host: 'swift' | 'tauri' = 's
 function storedRoute(graphRoot: string, route: Route | { kind: 'nowhere' }): unknown {
   return { graphRoot, route }
 }
-
-afterEach(() => {
-  delete window.__reflectHost
-})
 
 describe('useRestoredRoute', () => {
   it('returns the route stored for the graph and removes it', async () => {
@@ -54,7 +55,7 @@ describe('useRestoredRoute', () => {
 
   it('does nothing outside the Swift shell', async () => {
     const stored = storedRoute('/graph', { kind: 'tasks' })
-    const { view, storage } = await renderRestoredRoute(stored, 'tauri')
+    const { view, storage } = await renderRestoredRoute(stored, false)
     expect(view.result.current).toBeUndefined()
     view.appServices.navigation.navigate({ kind: 'settings' })
     expect(storage.session.get(STORAGE_KEY)).toBe(JSON.stringify(stored))

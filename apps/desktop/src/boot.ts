@@ -17,7 +17,7 @@ import {
 } from '@reflect/core'
 
 const hostKind = detectHostKind(window)
-const facts = detectPlatformFacts(hostKind !== 'browser')
+const facts = detectPlatformFacts(hostKind)
 
 /**
  * Plain-browser dev (`pnpm dev` without the shell) has no transport yet: the

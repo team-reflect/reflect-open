@@ -74,7 +74,9 @@ export function detectHostKind(globals: HostGlobals): HostKind {
   if (globals.isTauri === true) {
     return 'tauri'
   }
-  // DO we need to do this at runtime? Cannot we just use some kind of `import.meta.env.XXXXX` to detect? Fix this if you think use import.meta.env is btter. Leave a comment if you think globals.__reflectHost is btter. FIXME
+  // The shell is known only at runtime: one build, and one dev server, serves
+  // a browser tab, a Tauri window and the Swift shell. Each shell names
+  // itself with a global that exists before any page script runs.
   if (globals.__reflectHost !== undefined) {
     return 'swift'
   }
@@ -83,13 +85,14 @@ export function detectHostKind(globals: HostGlobals): HostKind {
 
 /**
  * Detect the host's platform facts from the user agent and the build env.
- * `nativeShell` is true when Tauri or the Swift shell hosts the webview.
+ * `hostKind` is the shell that hosts the webview.
  *
  * The surface facets follow `appPlatform`, which is also what selects the
  * mobile root (`@platform-root` in `vite.config.ts`, `platform-root.unknown.tsx`
  * in plain-browser dev): the mobile tree and the mobile surface cannot disagree.
  */
-export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
+export function detectPlatformFacts(hostKind: HostKind): PlatformFacts {
+  const nativeShell = hostKind !== 'browser'
   const env = import.meta.env.TAURI_ENV_PLATFORM || ''
   const hasNavigator = typeof navigator !== 'undefined'
   // iPadOS masquerades as macOS in the user agent; the touch-point check excludes it.
@@ -106,6 +109,7 @@ export function detectPlatformFacts(nativeShell: boolean): PlatformFacts {
   return {
     appPlatform,
     isNativeShell: nativeShell,
+    isSwiftMobile: hostKind === 'swift',
     buildPlatform: buildPlatformFromEnv(env),
     isMacosDesktop: macosDesktop,
     isApplePlatform:
