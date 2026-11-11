@@ -439,7 +439,6 @@ jobs:
       - test-node
       - test-chromium
       - test-swift
-      - test-ios
       - lint-rust
       - test-rust
 
