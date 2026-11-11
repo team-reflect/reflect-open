@@ -1,4 +1,4 @@
-//! Chrome native-messaging framing: a 4-byte native-byte-order length prefix
+//! Native-messaging framing (identical in Chrome and Firefox): a 4-byte native-byte-order length prefix
 //! followed by that many bytes of UTF-8 JSON, in both directions. Stdout must
 //! stay protocol-pure — nothing else in this process writes to it.
 

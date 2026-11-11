@@ -22,10 +22,12 @@ export type SendOutcome =
   | { kind: 'held'; reason: HoldReason; message: string }
 
 /**
- * Chrome rejects with these strings when the host manifest is missing or
+ * The browser rejects with these strings when the host manifest is missing or
  * doesn't allowlist this extension — the "install / launch Reflect" state.
+ * Chrome says "not found" / "forbidden"; Firefox says "No such native
+ * application" or "... (or the application is not installed)".
  */
-const NO_HOST_PATTERN = /not found|forbidden|not installed/i
+const NO_HOST_PATTERN = /not found|forbidden|not installed|no such native application/i
 
 export async function sendToHost(wire: ExtensionCaptureWire): Promise<SendOutcome> {
   let raw: unknown

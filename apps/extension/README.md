@@ -1,9 +1,9 @@
-# Reflect Capture (Chrome and Safari extension)
+# Reflect Capture (Chrome, Safari, and Firefox extension)
 
 Save the page you're reading into Reflect: ⌘⇧K saves immediately with default
 settings, including the stored page-text preference, while the toolbar button
 opens the capture popup for an optional note. Captures include the page URL,
-title, selection, screenshot, and optional page text when Chrome allows them,
+title, selection, screenshot, and optional page text when the browser allows them,
 then hand off to the **installed desktop app** through a local native-messaging
 host. No Reflect-hosted services are involved, and capture works even while the
 app is closed: the host spools into the graph's capture inbox
@@ -14,7 +14,8 @@ Install the published extension from the
 [Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd),
 or load the `-unpacked.zip` from the latest
 [`extension-v*` release](https://github.com/team-reflect/reflect-open/releases?q=extension-v)
-before store review finishes.
+before store review finishes. Firefox is not published yet; side-load it as
+described in [Firefox](#firefox).
 
 On Safari the same code ships inside the macOS desktop app and versions with it.
 Turn it on in Safari Settings → Extensions. Safari reaches a sandboxed app
@@ -24,7 +25,7 @@ graph the next time it opens or comes to the front. See
 
 ## Architecture in one breath
 
-popup → `chrome.storage` queue → background `sendNativeMessage` →
+popup → `browser.storage` queue → background `sendNativeMessage` →
 `reflect-capture-host` (Tauri sidecar, registered by the desktop app on every
 launch) → capture inbox → desktop drain (`@reflect/core` `CaptureService`):
 raw note + daily `## [[Links]]` entry now (resolving or creating that category
@@ -71,11 +72,35 @@ allowlisted by) the native-messaging host. Check, in order:
 The capture is never lost while held — it stays queued and retries automatically
 once the host is reachable.
 
+### Firefox
+
+The same source builds a Firefox MV3 add-on (Firefox 140+, macOS host
+registration only, like Chrome). Firefox reads the add-on ID from
+`browser_specific_settings.gecko.id` (`capture@reflect.app`), so every build
+loads under the ID the host allowlists; there is no `key` dance.
+
+- **Develop:** `pnpm dev:firefox` launches a scratch Firefox profile with the
+  add-on loaded and hot-reloading.
+- **Side-load a build:** `pnpm build:firefox`, then `about:debugging` → This
+  Firefox → **Load Temporary Add-on…** → pick
+  `.output/firefox-mv3/manifest.json`. Temporary add-ons are removed when
+  Firefox quits.
+- **Keep it installed:** release Firefox only installs signed add-ons. Either
+  sign the `pnpm zip:firefox` artifact as an unlisted add-on on
+  addons.mozilla.org (`web-ext sign --channel=unlisted`), or use Developer
+  Edition / Nightly with `xpinstall.signatures.required` set to `false` in
+  `about:config` and install the zip (renamed to `.xpi`) from `about:addons` →
+  gear → **Install Add-on From File…**.
+
+The desktop app writes the Firefox host manifest to
+`~/Library/Application Support/Mozilla/NativeMessagingHosts/app.reflect.capture.json`
+when it detects `~/Library/Application Support/Firefox/`.
+
 ## The unpacked ID is pinned, and the store ID is different
 
 `wxt.config.ts` explains the two IDs: a public `key` pins the unpacked ID, and
 the store rejects `key` and minted its own ID, so `pnpm zip` drops it.
-`EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs` must keep both
+`CHROMIUM_EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs` must keep both
 IDs, or the native hop fails for one of the two install modes. Changing the key
 without updating that constant silently breaks unpacked loads.
 

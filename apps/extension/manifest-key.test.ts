@@ -5,11 +5,13 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Drift guard for the pinned extension identity. The manifest `key` in
- * `wxt.config.ts` determines the extension ID everywhere (unpacked dev, CI,
- * but not the Chrome Web Store), and the desktop app's native-messaging manifests
- * (`apps/desktop/src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`) must
- * allowlist that ID for development alongside the published store ID. They
- * are coupled only by convention, so this test recomputes the derivation
+ * `wxt.config.ts` determines the Chromium extension ID everywhere (unpacked
+ * dev, CI, but not the Chrome Web Store), and the desktop app's
+ * native-messaging manifests (`apps/desktop/src-tauri/src/capture.rs`,
+ * `CHROMIUM_EXTENSION_ORIGINS`) must allowlist that ID for development
+ * alongside the published store ID. Firefox reads its ID straight from
+ * `FIREFOX_ID`, which `FIREFOX_EXTENSION_IDS` must allowlist. They are coupled
+ * only by convention, so this test recomputes the Chromium derivation
  * (SHA-256 of the DER key, first 16 bytes, hex mapped onto a-p) and pins the
  * two files together.
  */
@@ -38,5 +40,18 @@ describe('pinned extension identity', () => {
     // The dev/unpacked ID derived from the committed key must stay among the
     // allowlisted origins even though the Chrome Web Store listing has its own ID.
     expect(originMatches).toContain(extensionIdFromKey(keyMatch![1]!))
+  })
+
+  it('the Firefox add-on ID is the one the desktop host manifests allowlist', () => {
+    const wxtConfig = readFileSync(resolve(here, 'wxt.config.ts'), 'utf8')
+    const idMatch = /const FIREFOX_ID = '([^']+)'/.exec(wxtConfig)
+    expect(idMatch, 'FIREFOX_ID not found in wxt.config.ts').not.toBeNull()
+
+    const captureRs = readFileSync(resolve(here, '../desktop/src-tauri/src/capture.rs'), 'utf8')
+    const allowlist = /const FIREFOX_EXTENSION_IDS: \[&str; \d+\] = \[([^\]]*)\]/.exec(captureRs)
+    expect(allowlist, 'FIREFOX_EXTENSION_IDS not found in capture.rs').not.toBeNull()
+    const ids = [...allowlist![1]!.matchAll(/"([^"]+)"/g)].map((match) => match[1])
+
+    expect(ids).toContain(idMatch![1])
   })
 })

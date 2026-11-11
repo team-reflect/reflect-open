@@ -1,5 +1,5 @@
-//! The Chrome native-messaging host (Plan 11). Chrome spawns this binary per
-//! capture (`runtime.sendNativeMessage`); it validates the wire message and
+//! The browser native-messaging host (Plan 11). Chrome and Firefox spawn this
+//! binary per capture (`runtime.sendNativeMessage`); it validates the wire message and
 //! **spools** it into the active graph's capture inbox
 //! (`<graph>/.reflect/inbox/`), then acks `queued` and exits. It is a spooler,
 //! not a relay: it never talks to the running app — the inbox *is* the IPC,
