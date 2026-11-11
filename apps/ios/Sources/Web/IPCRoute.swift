@@ -8,6 +8,24 @@ struct ShellRequest: Sendable {
   var headers: [String: String]
   /// The raw body of a binary request; empty otherwise.
   var body: Data
+
+  /// The arguments decoded as `T`, or nil when they do not match it.
+  func decodeArgs<T: Decodable>(_ type: T.Type) -> T? {
+    try? JSONDecoder().decode(type, from: args)
+  }
+}
+
+extension CoreReply {
+  /// The JSON reply `null`: the answer of a command that returns nothing.
+  static let null = CoreReply.json(Data("null".utf8))
+
+  /// A JSON reply that encodes `value`.
+  static func value(_ value: some Encodable) -> CoreReply {
+    guard let json = try? JSONEncoder().encode(value) else {
+      return .error(kind: "unknown", message: "the shell could not encode a reply")
+    }
+    return .json(json)
+  }
 }
 
 /// A command that the shell answers itself: a `host.` command or a
