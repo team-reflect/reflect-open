@@ -10,18 +10,10 @@ enum HostCommands {
   private static let logQueue = DispatchQueue(label: "app.reflect.host-log", qos: .utility)
 
   /// `openURL` hands a URL to the system and returns whether an app opened it.
-  static func all(deepLinks: DeepLinks, openURL: @escaping @MainActor (URL) async -> Bool)
-    -> [String: ShellCommand]
-  {
+  static func all(openURL: @escaping @MainActor (URL) async -> Bool) -> [String: ShellCommand] {
     [
       "host.log": log,
       "host.open_url": { request in await open(request, with: openURL) },
-      "host.deep_link_pending": { _ in
-        guard let urls = deepLinks.takePending(),
-          let json = try? JSONSerialization.data(withJSONObject: urls)
-        else { return .null }
-        return .json(json)
-      },
     ]
   }
 

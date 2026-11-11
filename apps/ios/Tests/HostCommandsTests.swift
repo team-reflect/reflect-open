@@ -7,9 +7,7 @@ final class HostCommandsTests: XCTestCase {
   private var opened: [URL] = []
 
   private func run(_ command: String, _ args: String, canOpen: Bool = true) async -> CoreReply {
-    let deepLinks = DeepLinks { _, _ in }
-    deepLinks.open([URL(string: "reflect://note/a") ?? URL(fileURLWithPath: "/")])
-    let commands = HostCommands.all(deepLinks: deepLinks) { [weak self] url in
+    let commands = HostCommands.all { [weak self] url in
       self?.opened.append(url)
       return canOpen
     }
@@ -36,11 +34,6 @@ final class HostCommandsTests: XCTestCase {
     let relative = await run("host.open_url", #"{"url":"not a url"}"#)
     XCTAssertEqual(kind(relative), "parse")
     XCTAssertEqual(opened.count, 1)
-  }
-
-  func testDeepLinkPendingAnswersTheLaunchURLs() async {
-    let reply = await run("host.deep_link_pending", "{}")
-    XCTAssertEqual(reply, .json(Data(#"["reflect:\/\/note\/a"]"#.utf8)))
   }
 
   func testLogChecksItsArguments() async {

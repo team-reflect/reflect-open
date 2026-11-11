@@ -3,6 +3,7 @@ import { installUncaughtErrorLogging } from '@/lib/uncaught-errors.ts'
 import { createDesktopAdapters, createDesktopHost } from '@/services/create-desktop-services.ts'
 import { createDeferredIpcTransport } from '@/services/deferred-ipc.ts'
 import { detectHostKind, detectPlatformFacts } from '@/services/detect-platform.ts'
+import { installHostEvents } from '@/services/swift-events.ts'
 import { createSwiftIpcTransport } from '@/services/swift-ipc.ts'
 import { createSwiftLogger } from '@/services/swift-logger.ts'
 import { createTauriIpcTransport } from '@/services/tauri-ipc.ts'
@@ -43,6 +44,9 @@ function createLogger(): LoggerService {
 }
 
 const logger = createLogger()
+if (hostKind === 'swift') {
+  installHostEvents(window, logger)
+}
 const clock = createSystemClock()
 const ipc = createIpcBridgeService({ transport, logger })
 

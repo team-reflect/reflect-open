@@ -12,7 +12,6 @@ final class AppHost {
 
   private let core: ReflectCore
   private let bridge = HostBridge()
-  private let deepLinks: DeepLinks
   private let navigation: ExternalNavigation
   private let webAuth: WebAuthCapability
   private let store: StoreCapability
@@ -22,13 +21,11 @@ final class AppHost {
   init() throws {
     let core = try ReflectCore(config: .current(), openURL: Self.openFromCore)
     self.core = core
-    let deepLinks = DeepLinks { [bridge] name, payload in bridge.emit(name, payload: payload) }
-    self.deepLinks = deepLinks
 
     let devURL = ProcessInfo.processInfo.environment["REFLECT_DEV_URL"].flatMap(URL.init(string:))
     startURL = devURL ?? URL(string: AppSchemeHandler.indexURL) ?? URL(fileURLWithPath: "/")
 
-    var shellCommands = HostCommands.all(deepLinks: deepLinks) { url in
+    var shellCommands = HostCommands.all { url in
       await UIApplication.shared.open(url)
     }
     // The web view exists only after the commands: the sign-in sheet reads its window later.
@@ -48,10 +45,6 @@ final class AppHost {
     self.recording = recording
     shellCommands.merge(recording.commands) { _, new in new }
     var routes: [any SchemeRoute] = []
-    #if DEBUG
-    shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
-    routes.append(SelfCheckRoute())
-    #endif
     let callers = TrustedCallers(devOrigin: devURL.flatMap(Self.origin(of:)))
     routes.append(HTTPProxy(callers: callers))
     routes.append(
@@ -85,13 +78,18 @@ final class AppHost {
   }
 
   /// The system opened the app with `urls`. `reflect://record-audio` asks for
-  /// a recording; the page gets every other URL.
+  /// a recording; the page gets every other URL as a `host:open-url` event
+  /// with a `string[]` payload.
   func open(_ urls: [URL]) {
     let links = urls.filter { !($0.scheme == "reflect" && $0.host == "record-audio") }
     if links.count < urls.count {
       recording.requestRecording()
     }
-    deepLinks.open(links)
+    if !links.isEmpty,
+      let payload = try? JSONSerialization.data(withJSONObject: links.map(\.absoluteString))
+    {
+      bridge.emit("host:open-url", payload: payload)
+    }
   }
 
   /// The user chose a quick action of the app icon. Returns whether the app has that action.

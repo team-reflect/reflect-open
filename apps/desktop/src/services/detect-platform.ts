@@ -1,5 +1,5 @@
 import type { AppPlatform, BuildPlatform, PlatformFacts } from '@reflect/core'
-import type { ReflectHost } from '@/services/swift-events.ts'
+import type { SwiftMessageHandler } from '@/services/swift-events.ts'
 import { version } from '../../package.json' with { type: 'json' }
 
 function buildPlatformFromEnv(env: string): BuildPlatform | null {
@@ -60,11 +60,13 @@ export type HostKind = 'tauri' | 'swift' | 'browser'
 
 /**
  * The globals that tell the shells apart: Tauri sets `isTauri`, the Swift
- * shell injects `__reflectHost`.
+ * shell adds the `reflectHost` script message handler.
  */
 export interface HostGlobals {
   readonly isTauri?: boolean | undefined
-  readonly __reflectHost?: ReflectHost | undefined
+  readonly webkit?:
+    | { messageHandlers?: { reflectHost?: SwiftMessageHandler | undefined } | undefined }
+    | undefined
 }
 
 /**
@@ -77,7 +79,7 @@ export function detectHostKind(globals: HostGlobals): HostKind {
   // The shell is known only at runtime: one build, and one dev server, serves
   // a browser tab, a Tauri window and the Swift shell. Each shell names
   // itself with a global that exists before any page script runs.
-  if (globals.__reflectHost !== undefined) {
+  if (globals.webkit?.messageHandlers?.reflectHost !== undefined) {
     return 'swift'
   }
   return 'browser'

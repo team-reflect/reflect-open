@@ -75,8 +75,9 @@ describe('detectHostKind', () => {
     expect(detectHostKind({ isTauri: true })).toBe('tauri')
   })
 
-  it('is Swift when the Swift shell injects `__reflectHost`', () => {
-    expect(detectHostKind({ __reflectHost: { on: () => () => {} } })).toBe('swift')
+  it('is Swift when the Swift shell adds its script message handler', () => {
+    const reflectHost = { postMessage: () => {} }
+    expect(detectHostKind({ webkit: { messageHandlers: { reflectHost } } })).toBe('swift')
   })
 
   it('is the browser without either global', () => {

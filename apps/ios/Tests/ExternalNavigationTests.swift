@@ -11,7 +11,7 @@ final class ExternalNavigationTests: XCTestCase {
 
   func testTheWebAppStaysInTheWebView() {
     XCTAssertFalse(isExternal("reflect-app://localhost/index.html"))
-    XCTAssertFalse(isExternal("reflect-app://localhost/__host/selfcheck"))
+    XCTAssertFalse(isExternal("reflect-app://localhost/assets/index.js"))
     XCTAssertFalse(isExternal("about:blank"))
     XCTAssertFalse(isExternal("blob:reflect-app://localhost/1"))
     XCTAssertFalse(isExternal("http://localhost:1420/src/x", start: "http://localhost:1420"))

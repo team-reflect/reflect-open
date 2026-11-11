@@ -4,9 +4,8 @@ import { z } from 'zod'
 const urlsSchema = z.array(z.string())
 
 /**
- * `reflect://` delivery through the Swift shell: the launch URLs come from
- * the `host.deep_link_pending` command, later URLs from the `host:open-url`
- * event.
+ * `reflect://` delivery through the Swift shell: every URL, the launch URLs
+ * included, arrives as a `host:open-url` event.
  */
 export function createSwiftDeepLinkSource(
   ipc: IpcBridgeService,
@@ -23,6 +22,6 @@ export function createSwiftDeepLinkSource(
         listener(urls.data)
       })
     },
-    getCurrent: () => ipc.call('host.deep_link_pending', {}, urlsSchema.nullable()),
+    getCurrent: () => Promise.resolve(null),
   }
 }
