@@ -36,7 +36,8 @@ final class IPCRoute: SchemeRoute {
   private let onRequest: () -> Void
 
   /// `allowedOrigin` is the origin of a dev server page that may call the
-  /// route across origins. `onRequest` runs at the start of every request.
+  /// route across origins. `onRequest` runs at the start of every request
+  /// except a preflight.
   init(
     dispatch: @escaping Dispatch,
     shellCommands: [String: ShellCommand],
@@ -50,12 +51,12 @@ final class IPCRoute: SchemeRoute {
   }
 
   func start(_ task: SchemeTask) {
-    onRequest()
     let request = task.request
     if request.httpMethod == "OPTIONS" {
       task.reply(SchemeReply(statusCode: 204, headers: corsHeaders, body: Data()))
       return
     }
+    onRequest()
     guard request.httpMethod == "POST", let command = command(of: request),
       let body = task.body
     else {
@@ -67,7 +68,8 @@ final class IPCRoute: SchemeRoute {
     for (name, value) in request.allHTTPHeaderFields ?? [:] {
       headers[name.lowercased()] = value
     }
-    let isBinary = headers["content-type"]?.hasPrefix("application/octet-stream") ?? false
+    let isBinary =
+      headers["content-type"]?.lowercased().hasPrefix("application/octet-stream") ?? false
     let shellRequest = ShellRequest(
       args: isBinary ? Data() : body, headers: headers, body: isBinary ? body : Data())
 
