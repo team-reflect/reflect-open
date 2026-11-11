@@ -162,7 +162,7 @@ enum SelfCheck {
       })
       await invoke('host.selfcheck_emit', { name: 'selfcheck:ping', payload })
       const value = await received
-      return assert(JSON.stringify(value) === JSON.stringify(payload), value)
+      return assert(value.n === payload.n && value.text === payload.text, value)
     })
 
     window.__selfcheckDone = true
