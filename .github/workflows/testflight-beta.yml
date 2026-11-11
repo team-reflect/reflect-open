@@ -1,8 +1,6 @@
 name: TestFlight beta
 
-# Builds the current master commit as the beta flavor and uploads it to the
-# Reflect Beta TestFlight app, without a release. The build keeps the version
-# of the last release; its build number (the commit count) tells it apart.
+# Uploads the current master commit to the Reflect Beta TestFlight app.
 
 on:
   workflow_dispatch:
@@ -16,7 +14,7 @@ jobs:
     if: github.ref == 'refs/heads/master'
     permissions:
       contents: read
-    uses: ./.github/workflows/publish-testflight.yml
+    uses: ./.github/workflows/publish-ios.yml
     with:
       commit: ${{ github.sha }}
       flavor: beta
