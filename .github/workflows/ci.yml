@@ -299,6 +299,7 @@ jobs:
       # Keep the version equal to `CBINDGEN_VERSION` in `scripts/build-ffi.ts`.
       - name: Install cbindgen
         if: matrix.name == 'Linux'
+        # FIXME: do not use `taiki-e/install-action` to install `cbindgen`. Use the root mise.toml instead. See other CI tasks that use `mise` for examples.
         uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
         with:
           tool: cbindgen@0.29.4
