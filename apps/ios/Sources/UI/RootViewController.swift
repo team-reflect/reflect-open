@@ -4,7 +4,7 @@ import UIKit
 /// shell that did not start.
 @MainActor
 final class RootViewController: UIViewController {
-  private var host: AppHost?
+  private(set) var host: AppHost?
 
   override func loadView() {
     do {

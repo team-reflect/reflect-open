@@ -16,6 +16,15 @@
 // The reply status of an error: `json` is `{"kind":...,"message":...}`.
 #define REFLECT_STATUS_ERROR 2
 
+// The `level` of an error line for `reflect_core_log`.
+#define REFLECT_LOG_ERROR 1
+
+// The `level` of a warning line for `reflect_core_log`.
+#define REFLECT_LOG_WARN 2
+
+// The `level` of an info line for `reflect_core_log`.
+#define REFLECT_LOG_INFO 3
+
 // A core created by `reflect_core_new`.
 typedef struct ReflectCore ReflectCore;
 
@@ -106,6 +115,16 @@ char *reflect_core_asset_resolve(const ReflectCore *core,
                                  uint64_t generation,
                                  const char *path,
                                  bool raster_only);
+
+// Writes one line of the host or the web app to the log: stderr and
+// `<appDataDir>/logs/reflect.log`. `level` is one of the `REFLECT_LOG_*`
+// values; any other value is an info line. A line before the first
+// `reflect_core_new` is dropped.
+//
+// # Safety
+//
+// `message` is NULL or a NUL-terminated string.
+void reflect_core_log(int32_t level, const char *message);
 
 // Runs a task that `on_main` received. NULL does nothing.
 //
