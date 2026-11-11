@@ -1,8 +1,9 @@
 #!/bin/sh
 # The "Build Rust core" phase of Reflect.xcodeproj: builds
 # target/apple/ReflectCore.xcframework through scripts/build-ffi.ts for the current
-# configuration and SDK. A Debug simulator build compiles only the simulator
-# slice with the dev profile; every other build compiles the release profile.
+# configuration and SDK. Every build compiles only the slice of its SDK. A
+# Debug simulator build uses the dev profile; every other build the release
+# profile.
 #
 # The Reflect scheme also runs this script as a build pre-action when the
 # xcframework is missing: Xcode looks for it while it plans the build, before
@@ -29,9 +30,9 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 
-args=""
-if [ "${CONFIGURATION:?}" = "Debug-Dev" ] && [ "${PLATFORM_NAME:?}" = "iphonesimulator" ]; then
-  args="--debug"
+args="--sdk ${PLATFORM_NAME:?}"
+if [ "${CONFIGURATION:?}" = "Debug-Dev" ] && [ "$PLATFORM_NAME" = "iphonesimulator" ]; then
+  args="$args --debug"
 fi
 
 # A clean environment: Xcode's SDKROOT and deployment target variables would
