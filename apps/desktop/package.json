@@ -13,7 +13,6 @@
     "build:windows": "node scripts/build-installers.ts",
     "preview": "vite preview",
     "sidecar": "node scripts/build-sidecar.ts",
-    "postinstall": "node src-tauri/xcode-scripts/generate-xcode-env.mjs",
     "gen:icons": "node scripts/generate-icons.ts",
     "gen:licenses": "node scripts/generate-licenses.ts",
     "upload:testflight": "node scripts/upload-testflight.ts",
