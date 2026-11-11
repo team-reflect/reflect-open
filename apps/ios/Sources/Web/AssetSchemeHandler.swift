@@ -2,24 +2,27 @@ import Foundation
 import WebKit
 
 /// The file that an asset request names, or the HTTP status to refuse it with.
-/// `length` is the length the file must have, when the resolver knows it.
 enum AssetResolution: Sendable, Equatable {
-  case file(path: String, mime: String, length: UInt64? = nil)
-  case refused(status: Int)
+  /// `total` is the length of the file, and `range` the bytes that the
+  /// request's `Range` header selects: nil for the whole file.
+  case file(path: String, mime: String, total: UInt64, range: ClosedRange<UInt64>? = nil)
+  /// `total` is the length of the file when the status is 416.
+  case refused(status: Int, total: UInt64? = nil)
 }
 
 /// Handles the `reflect-asset` scheme: the files of the open graph's `assets/`
-/// folder. The URL is `reflect-asset://localhost/<generation>/<path>` with the
-/// part after the host percent-encoded as one segment.
-/// `?reflect-preview=raster` asks for raster images only.
+/// folder and archived X media. The URL is
+/// `reflect-asset://localhost/<generation>/<path>` with the part after the
+/// host percent-encoded as one segment.
 ///
-/// The resolver decides which file a request names. The handler reads the
-/// file in chunks off the main thread and answers a single-range `Range`
-/// request with 206.
+/// The resolver decides which file a request names and which bytes its
+/// `Range` header selects. The handler reads the file in chunks off the main
+/// thread.
 @MainActor
 final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
   typealias Resolve =
-    @Sendable (_ requestPath: String, _ rasterOnly: Bool) async -> AssetResolution
+    @Sendable (_ requestPath: String, _ query: String?, _ range: String?) async
+    -> AssetResolution
 
   static let scheme = "reflect-asset"
   static let chunkSize = 256 * 1024
@@ -51,16 +54,15 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
       Self.refuse(task, status: 400)
       return
     }
-    let rasterOnly = (components.percentEncodedQuery ?? "").split(separator: "&")
-      .contains("reflect-preview=raster")
     let range = task.request.value(forHTTPHeaderField: "Range")
 
     Task {
-      switch await resolve(requestPath, rasterOnly) {
-      case .refused(let status):
-        Self.refuse(task, status: status)
-      case .file(let path, let mime, let length):
-        await Self.serve(path: path, mime: mime, length: length, rangeHeader: range, to: task)
+      switch await resolve(requestPath, components.percentEncodedQuery, range) {
+      case .refused(let status, let total):
+        let headers = total.map { ["Content-Range": "bytes */\($0)"] } ?? [:]
+        task.reply(SchemeReply(statusCode: status, headers: headers, body: Data()))
+      case .file(let path, let mime, let total, let range):
+        await Self.serve(path: path, mime: mime, total: total, range: range, to: task)
       }
     }
   }
@@ -69,72 +71,28 @@ final class AssetSchemeHandler: NSObject, WKURLSchemeHandler {
     tasks[ObjectIdentifier(urlSchemeTask)]?.stop()
   }
 
-  /// The bytes that a `Range` header selects from a file of `length` bytes.
-  enum ByteRange: Equatable {
-    /// No header, or one this handler ignores: the whole file.
-    case whole
-    case partial(ClosedRange<UInt64>)
-    case unsatisfiable
-  }
-
-  /// Parses `bytes=<first>-<last>`, `bytes=<first>-` and `bytes=-<suffix>`. A
-  /// header with several ranges or another unit selects the whole file.
-  static func byteRange(header: String?, length: UInt64) -> ByteRange {
-    guard let header, header.hasPrefix("bytes="), !header.contains(",") else { return .whole }
-    let parts = header.dropFirst("bytes=".count).split(
-      separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
-    guard parts.count == 2 else { return .whole }
-    let first = parts[0].trimmingCharacters(in: .whitespaces)
-    let last = parts[1].trimmingCharacters(in: .whitespaces)
-
-    if first.isEmpty {
-      guard let suffix = UInt64(last) else { return .whole }
-      guard suffix > 0, length > 0 else { return .unsatisfiable }
-      return .partial((length - min(suffix, length))...(length - 1))
-    }
-    guard let start = UInt64(first) else { return .whole }
-    guard start < length else { return .unsatisfiable }
-    if last.isEmpty {
-      return .partial(start...(length - 1))
-    }
-    guard let end = UInt64(last) else { return .whole }
-    guard end >= start else { return .unsatisfiable }
-    return .partial(start...min(end, length - 1))
-  }
-
   private static func refuse(_ task: SchemeTask, status: Int) {
     task.reply(SchemeReply(statusCode: status, headers: [:], body: Data()))
   }
 
   private static func serve(
-    path: String, mime: String, length: UInt64?, rangeHeader: String?, to task: SchemeTask
+    path: String, mime: String, total: UInt64, range: ClosedRange<UInt64>?, to task: SchemeTask
   ) async {
     guard let file = await AssetFile.open(path: path) else {
       refuse(task, status: 404)
       return
     }
-    if let length, file.length != length {
+    guard file.length == total else {
       refuse(task, status: 500)
       return
     }
     var headers = ["Content-Type": mime, "Accept-Ranges": "bytes"]
-    let selected: ClosedRange<UInt64>?
-    switch byteRange(header: rangeHeader, length: file.length) {
-    case .unsatisfiable:
-      task.reply(
-        SchemeReply(
-          statusCode: 416, headers: ["Content-Range": "bytes */\(file.length)"], body: Data()))
-      return
-    case .whole:
-      selected = file.length > 0 ? 0...(file.length - 1) : nil
-      headers["Content-Length"] = String(file.length)
-      task.respond(status: 200, headers: headers)
-    case .partial(let range):
-      selected = range
-      headers["Content-Length"] = String(range.count)
-      headers["Content-Range"] = "bytes \(range.lowerBound)-\(range.upperBound)/\(file.length)"
-      task.respond(status: 206, headers: headers)
+    let selected = range ?? (total > 0 ? 0...(total - 1) : nil)
+    headers["Content-Length"] = String(selected?.count ?? 0)
+    if let range {
+      headers["Content-Range"] = "bytes \(range.lowerBound)-\(range.upperBound)/\(total)"
     }
+    task.respond(status: range == nil ? 200 : 206, headers: headers)
 
     if let selected {
       var offset = selected.lowerBound

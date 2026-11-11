@@ -22,7 +22,6 @@ mod logging;
 
 use std::any::Any;
 use std::ffi::{CStr, CString, c_char, c_void};
-use std::io::Read;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -30,10 +29,6 @@ use std::ptr;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::task::{Context, Poll};
 
-use reflect_core::fs::asset_protocol::{
-    STATUS_BAD_REQUEST, STATUS_FORBIDDEN, asset_mime, is_preview_safe_raster_mime,
-    resolve_asset_path,
-};
 use reflect_core::{Core, CoreConfig, Host, Reply};
 use reflect_types::{AppError, AppResult};
 
@@ -200,100 +195,61 @@ pub unsafe extern "C" fn reflect_core_dispatch(
     }
 }
 
-/// Resolves the file that `reflect-asset://localhost/<generation>/<path>`
-/// names, with the checks the desktop scheme handler makes. `path` is the
-/// percent-decoded graph-relative path. With `raster_only`, only PNG, JPEG,
-/// GIF and WebP content is served. It returns a JSON string for
-/// `reflect_core_string_free`: `{"path":...,"mime":...}` with the absolute
-/// file path and the `Content-Type` to serve, or
-/// `{"kind":...,"message":...,"status":...}` with the HTTP status the desktop
-/// handler answers with. It reads the first bytes of the file to sniff the
-/// MIME type, so it can block while iCloud downloads the file: do not call it
-/// on the main thread.
+/// Resolves a `reflect-asset` request and calls `reply` once with a JSON
+/// object. `path` is the percent-decoded request path, `query` the query
+/// string and `range` the `Range` header; `query` and `range` may be NULL. The
+/// reply is `{"path":...,"mime":...,"total":...,"range":[first,last]}` with
+/// the absolute file path, the `Content-Type`, the file length and the
+/// selected bytes (`null` for the whole file), or
+/// `{"status":...,"total":...}` with the HTTP status to refuse the request
+/// with. The function copies every input before it returns.
 ///
 /// # Safety
 ///
-/// `core` comes from `reflect_core_new` and is not freed. `path` is NULL or a
-/// NUL-terminated string.
+/// `core` comes from `reflect_core_new` and is not freed. `path` is a
+/// NUL-terminated string; `query` and `range` are NULL or NUL-terminated
+/// strings. `reply_ctx` stays valid until `reply` runs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn reflect_core_asset_resolve(
     core: *const ReflectCore,
-    generation: u64,
     path: *const c_char,
-    raster_only: bool,
-) -> *mut c_char {
-    let json = catch_unwind(AssertUnwindSafe(|| {
-        let ffi = unsafe { core.as_ref() }
-            .ok_or_else(|| (AppError::io("core is NULL"), STATUS_INTERNAL_ERROR))?;
-        let path = unsafe { read_str(path) }.map_err(|err| (err, STATUS_BAD_REQUEST))?;
-        resolve_asset(ffi.core.arc(), generation, &path, raster_only)
+    query: *const c_char,
+    range: *const c_char,
+    reply: ReflectReplyFn,
+    reply_ctx: *mut c_void,
+) {
+    let target = ReplyTarget {
+        reply,
+        ctx: Ctx(reply_ctx),
+    };
+    let started = catch_unwind(AssertUnwindSafe(|| -> AppResult<()> {
+        let ffi = unsafe { core.as_ref() }.ok_or_else(|| AppError::io("core is NULL"))?;
+        let path = unsafe { read_str(path) }?;
+        let query = unsafe { read_optional_str(query) }?;
+        let range = unsafe { read_optional_str(range) }?;
+        let core = ffi.core.clone();
+        spawn_reply(
+            ffi,
+            async move {
+                let answer = core
+                    .arc()
+                    .asset_resolve(&path, query.as_deref(), range.as_deref())
+                    .await;
+                let json = match answer {
+                    Ok(file) => serde_json::to_string(&file),
+                    Err(refusal) => serde_json::to_string(&refusal),
+                };
+                json.map(Reply::Json)
+                    .map_err(|err| AppError::io(err.to_string()))
+            },
+            target,
+        );
+        Ok(())
     }))
-    .unwrap_or_else(|payload| Err((panic_error(payload), STATUS_INTERNAL_ERROR)))
-    .map_or_else(
-        |(error, status)| {
-            let mut json = serde_json::to_value(&error).unwrap_or_default();
-            if let Some(object) = json.as_object_mut() {
-                object.insert("status".into(), status.into());
-            }
-            json.to_string()
-        },
-        |asset| asset.to_string(),
-    );
-    CString::new(json).unwrap_or_default().into_raw()
-}
-
-/// The HTTP status for an unreadable asset.
-const STATUS_INTERNAL_ERROR: u16 = 500;
-/// The HTTP status for a missing asset.
-const STATUS_NOT_FOUND: u16 = 404;
-/// The HTTP status for a non-raster file in a raster-only preview.
-const STATUS_UNSUPPORTED_MEDIA_TYPE: u16 = 415;
-/// How many leading bytes [`resolve_asset`] reads to sniff the MIME type.
-const MIME_SNIFF_LEN: u64 = 64 * 1024;
-
-/// The `{path, mime}` object of [`reflect_core_asset_resolve`], or the error
-/// and HTTP status to refuse the request with.
-fn resolve_asset(
-    core: &Core,
-    generation: u64,
-    path: &str,
-    raster_only: bool,
-) -> Result<serde_json::Value, (AppError, u16)> {
-    let asset =
-        resolve_asset_path(&core.graph, &format!("{generation}/{path}")).map_err(|status| {
-            match status {
-                STATUS_BAD_REQUEST => (AppError::parse(format!("bad asset path: {path}")), status),
-                STATUS_FORBIDDEN => (
-                    AppError::traversal(format!("forbidden asset: {path}")),
-                    status,
-                ),
-                _ => (AppError::io(format!("asset refused: {path}")), status),
-            }
-        })?;
-    let mut head = Vec::new();
-    std::fs::File::open(&asset.path)
-        .and_then(|file| file.take(MIME_SNIFF_LEN).read_to_end(&mut head))
-        .map_err(|err| {
-            let status = match err.kind() {
-                std::io::ErrorKind::NotFound => STATUS_NOT_FOUND,
-                std::io::ErrorKind::PermissionDenied => STATUS_FORBIDDEN,
-                _ => STATUS_INTERNAL_ERROR,
-            };
-            let error = if status == STATUS_NOT_FOUND {
-                AppError::not_found(format!("no asset at {path}"))
-            } else {
-                AppError::io(format!("cannot read {path}: {err}"))
-            };
-            (error, status)
-        })?;
-    let mime = asset_mime(&head, &asset.relative_path);
-    if raster_only && !is_preview_safe_raster_mime(&mime) {
-        return Err((
-            AppError::parse(format!("{path} is {mime}, not a raster image")),
-            STATUS_UNSUPPORTED_MEDIA_TYPE,
-        ));
+    .unwrap_or_else(|payload| Err(panic_error(payload)));
+    if let Err(error) = started {
+        target.send(Err(error));
     }
-    Ok(serde_json::json!({ "path": asset.path, "mime": mime }))
 }
 
 /// Writes one line of the host or the web app to the log: stderr and, when
@@ -607,6 +563,14 @@ unsafe fn read_config(config_json: *const c_char) -> AppResult<CoreConfig> {
     })
 }
 
+/// Reads a NUL-terminated string that may be NULL.
+unsafe fn read_optional_str(string: *const c_char) -> AppResult<Option<String>> {
+    if string.is_null() {
+        return Ok(None);
+    }
+    unsafe { read_str(string) }.map(Some)
+}
+
 unsafe fn read_str(string: *const c_char) -> AppResult<String> {
     if string.is_null() {
         return Err(AppError::parse("command is NULL"));
@@ -842,40 +806,46 @@ mod tests {
         assert_eq!(empty.user_agent, "");
     }
 
-    fn asset_resolve(core: *mut ReflectCore, generation: u64, path: &str, raster: bool) -> Value {
-        let path = CString::new(path).unwrap();
-        let json = unsafe { reflect_core_asset_resolve(core, generation, path.as_ptr(), raster) };
-        let value = serde_json::from_slice(unsafe { CStr::from_ptr(json) }.to_bytes()).unwrap();
-        unsafe { reflect_core_string_free(json) };
-        value
-    }
-
     #[test]
-    fn asset_resolve_returns_path_and_mime_or_status() {
+    fn asset_resolve_replies_the_file_or_the_status() {
         let events = Recorder::default();
         let core = new_core(&events);
         let graph = tempfile::tempdir().unwrap();
         std::fs::create_dir(graph.path().join("assets")).unwrap();
         let png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
         std::fs::write(graph.path().join("assets/cat.png"), png).unwrap();
-        std::fs::write(graph.path().join("assets/fake.png"), "<svg/>").unwrap();
         let generation =
             reflect_graph_io::activate(&unsafe { &*core }.core.arc().graph, graph.path())
                 .unwrap()
                 .generation;
+        let resolve = |path: String, range: Option<&str>| -> Value {
+            let replies = Recorder::default();
+            let path = CString::new(path).unwrap();
+            let range = range.map(|range| CString::new(range).unwrap());
+            unsafe {
+                reflect_core_asset_resolve(
+                    core,
+                    path.as_ptr(),
+                    ptr::null(),
+                    range.as_ref().map_or(ptr::null(), |range| range.as_ptr()),
+                    Some(record_reply),
+                    replies.ctx(),
+                );
+            }
+            let (status, json) = replies.first(WAIT).expect("a reply");
+            assert_eq!(status, REFLECT_STATUS_JSON.to_string());
+            serde_json::from_slice(&json).unwrap()
+        };
 
-        let ok = asset_resolve(core, generation, "assets/cat.png", true);
-        assert_eq!(ok["mime"], "image/png");
-        let served = PathBuf::from(ok["path"].as_str().unwrap());
+        let file = resolve(format!("{generation}/assets/cat.png"), Some("bytes=2-5"));
+        assert_eq!(file["mime"], "image/png");
+        assert_eq!(file["total"], png.len());
+        assert_eq!(file["range"], json!([2, 5]));
+        let served = PathBuf::from(file["path"].as_str().unwrap());
         assert_eq!(std::fs::read(served).unwrap(), png);
 
-        let status = |generation, path, raster| {
-            asset_resolve(core, generation, path, raster)["status"].clone()
-        };
-        assert_eq!(status(generation, "assets/fake.png", true), 415);
-        assert_eq!(status(generation, "assets/missing.png", false), 404);
-        assert_eq!(status(generation, "../outside.png", false), 403);
-        assert_eq!(status(generation + 1, "assets/cat.png", false), 403);
+        let missing = resolve(format!("{generation}/assets/missing.png"), None);
+        assert_eq!(missing, json!({ "status": 404, "total": null }));
         unsafe { reflect_core_free(core) };
     }
 

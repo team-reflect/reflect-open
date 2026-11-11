@@ -36,31 +36,11 @@ final class ReflectCoreTests: XCTestCase {
     XCTAssertEqual(error?["kind"], "notFound")
   }
 
-  func testEveryCallEndsWhenTheCoreCloses() async throws {
-    let core = try makeCore()
-    let calls = (0..<50).map { _ in
-      Task { await core.dispatch("settings_load") }
-    }
-    // The calls race with `close()`: some are answered, some are in flight,
-    // some start after it.
-    await withTaskGroup(of: Void.self) { group in
-      for _ in 0..<4 {
-        group.addTask { core.close() }
-      }
-    }
-
-    let closed = CoreReply.error(kind: "io", message: "the core is closed")
-    for call in calls {
-      // Each call ends: with its reply, or with the error of the closed core.
-      let reply = await call.value
-      if case .json = reply { continue }
-      XCTAssertEqual(reply, closed)
-    }
-    let later = await core.dispatch("settings_load")
-    XCTAssertEqual(later, closed)
-    let asset = await core.resolveAsset(requestPath: "1/assets/a.png", rasterOnly: false)
-    XCTAssertEqual(asset, .refused(status: 500))
-    for await _ in core.events {}
+  func testEventsEndWhenTheCoreIsReleased() async throws {
+    var core: ReflectCore? = try makeCore()
+    let events = try XCTUnwrap(core).events
+    core = nil
+    for await _ in events {}
   }
 
   func testManyCallsEachGetTheirReply() async throws {
@@ -82,14 +62,10 @@ final class ReflectCoreTests: XCTestCase {
 extension ReflectCoreTests {
   func testAssetRequestsWithoutAGraphAreRefused() async throws {
     let core = try makeCore()
-    let asset = await core.resolveAsset(requestPath: "1/assets/a.png", rasterOnly: false)
+    let asset = await core.resolveAsset(requestPath: "1/assets/a.png", query: nil, range: nil)
     XCTAssertEqual(asset, .refused(status: 403))
-    let hash = String(repeating: "a", count: 64)
-    let media = await core.resolveAsset(requestPath: "1/x-media/123/\(hash)", rasterOnly: false)
-    XCTAssertEqual(media, .refused(status: 403))
-    let badMedia = await core.resolveAsset(requestPath: "1/x-media/nope/abc", rasterOnly: false)
+    let badMedia = await core.resolveAsset(
+      requestPath: "1/x-media/nope/abc", query: nil, range: nil)
     XCTAssertEqual(badMedia, .refused(status: 400))
-    let malformed = await core.resolveAsset(requestPath: "assets/a.png", rasterOnly: false)
-    XCTAssertEqual(malformed, .refused(status: 400))
   }
 }

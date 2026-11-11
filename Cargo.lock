@@ -4606,6 +4606,7 @@ dependencies = [
  "fastembed",
  "file-id",
  "hf-hub",
+ "http-range-header",
  "image",
  "infer",
  "keyring-core",
@@ -4722,7 +4723,6 @@ version = "0.0.0"
 dependencies = [
  "block2",
  "dirs 7.0.0",
- "http-range-header",
  "log",
  "objc2",
  "objc2-app-kit",

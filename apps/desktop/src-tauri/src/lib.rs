@@ -9,7 +9,7 @@
 //! [`windows`] (note windows), [`menu`] (the macOS app menu, incl. Paste and
 //! Match Style), [`skill`] (per-graph agent-skill install under
 //! `~/.agents/skills/`), [`calendar`] (read-only Apple Calendar access),
-//! [`fs`] (the asset protocols), [`error`] (the shared error contract).
+//! [`fs`] (the asset protocol), [`error`] (the shared error contract).
 
 mod calendar;
 mod capture;

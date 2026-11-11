@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 base64 = { workspace = true }
+http-range-header = { workspace = true }
 infer = { workspace = true }
 reflect-graph-paths = { workspace = true }
 tracing = { workspace = true }

@@ -20,7 +20,6 @@ name = "reflect_open_lib"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-http-range-header = { workspace = true }
 
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.

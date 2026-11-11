@@ -364,7 +364,6 @@ dispatch_table! {
     "x_archive_write" => x_archive_write(generation: u64, value: serde_json::Value).await,
     "x_archive_resolve" => x_archive_resolve(generation: u64, post_id: String).await,
     "x_archive_owners" => x_archive_owners(asset_path: String, generation: Option<u64>).await,
-    "x_media_resolve" => x_media_resolve(path: String).await infallible,
     "x_syndication_fetch" => x_syndication_fetch(post_id: String).await,
 }
 

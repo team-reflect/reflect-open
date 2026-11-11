@@ -7,6 +7,7 @@
 //! [`io`]) and deletes go to the OS trash. Parsing/indexing live in later plans.
 
 pub mod asset_protocol;
+pub mod asset_request;
 pub mod assets;
 pub mod x_archive;
 mod x_download;

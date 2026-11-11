@@ -8,8 +8,6 @@ use std::path::PathBuf;
 use reflect_graph_io::root_for_generation;
 use reflect_graph_io::x_archive_store as archive;
 
-use reflect_types::AppError;
-
 use crate::Core;
 
 /// HTTP status for a malformed request path.
@@ -61,54 +59,7 @@ pub fn parse_x_media_path(path: &str) -> Result<XMediaRequest, u16> {
     })
 }
 
-/// The answer of the `x_media_resolve` command: the file to serve, or the HTTP
-/// status to refuse the request with.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-#[serde(untagged)]
-pub enum XMediaResolved {
-    File {
-        path: PathBuf,
-        mime: String,
-        bytes: u64,
-    },
-    Refused {
-        status: u16,
-    },
-}
-
 impl Core {
-    /// Resolves the percent-decoded request path `<generation>/x-media/<post>/<hash>`
-    /// for a shell that reads the file itself. It waits like [`Core::x_media_file`].
-    /// `bytes` is the length of the complete file: a file of another length
-    /// changed after the download.
-    pub async fn x_media_resolve(&self, path: String) -> XMediaResolved {
-        let request = match parse_x_media_path(&path) {
-            Ok(request) => request,
-            Err(status) => return XMediaResolved::Refused { status },
-        };
-        let XMediaFile { root, receipt } = match self.x_media_file(request).await {
-            Ok(file) => file,
-            Err(status) => return XMediaResolved::Refused { status },
-        };
-        let relative = format!("assets/x/{}", receipt.name);
-        let path = self
-            .spawn_blocking(move || reflect_graph_io::resolve(&root, &relative))
-            .await;
-        match path {
-            Ok(path) => XMediaResolved::File {
-                path,
-                mime: receipt.mime,
-                bytes: receipt.bytes,
-            },
-            Err(AppError::Traversal { .. }) => XMediaResolved::Refused {
-                status: STATUS_FORBIDDEN,
-            },
-            Err(_) => XMediaResolved::Refused {
-                status: STATUS_INTERNAL_ERROR,
-            },
-        }
-    }
-
     /// Finds the archived media `request` names and waits until its shared
     /// download publishes a complete file, or returns the HTTP status to
     /// refuse it with.
@@ -133,31 +84,5 @@ impl Core {
             return Err(STATUS_BAD_GATEWAY);
         };
         Ok(XMediaFile { root, receipt })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::test_support::core;
-
-    #[test]
-    fn x_media_resolve_answers_the_refusal_status() {
-        let core = core();
-        let reply = |path: &str| {
-            let args = serde_json::json!({ "path": path }).to_string();
-            let reply = core
-                .runtime
-                .block_on(core.dispatch("x_media_resolve", args.as_bytes(), b"{}", None))
-                .unwrap();
-            match reply {
-                crate::Reply::Json(json) => json,
-                crate::Reply::Bytes(_) => panic!("expected JSON"),
-            }
-        };
-        assert_eq!(reply("1/x-media/not-a-post/abc"), r#"{"status":400}"#);
-        assert_eq!(
-            reply(&format!("1/x-media/123/{}", "a".repeat(64))),
-            r#"{"status":403}"#
-        );
     }
 }

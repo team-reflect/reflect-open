@@ -61,8 +61,8 @@ final class AppHost {
         },
         shellCommands: shellCommands,
         callers: callers))
-    let assets = AssetSchemeHandler { [core] requestPath, rasterOnly in
-      await core.resolveAsset(requestPath: requestPath, rasterOnly: rasterOnly)
+    let assets = AssetSchemeHandler { [core] requestPath, query, range in
+      await core.resolveAsset(requestPath: requestPath, query: query, range: range)
     }
     webView = ReflectWebView(routes: routes, assets: assets, bridge: bridge)
     presenter = webView
