@@ -277,7 +277,7 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
       '@wxt-dev/module-react':
         specifier: ^1.2.2
-        version: 1.2.2(oxc-transform-react@0.156.0)(vite@8.3.5)(wxt@0.21.4)
+        version: 1.2.2(oxc-transform-react@0.156.0)(vite@8.3.5)(wxt@0.21.5)
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -294,8 +294,8 @@ importers:
         specifier: ^0.10.1
         version: 0.10.1(@vitest/utils@5.1.0)(vite@8.3.5)(vitest@5.1.0)
       wxt:
-        specifier: ^0.21.4
-        version: 0.21.4(esbuild@0.27.7)(eslint@10.14.0)(oxc-parser@0.155.0)(rolldown@1.2.14)(typescript@6.0.3)(vite@8.3.5)
+        specifier: ^0.21.5
+        version: 0.21.5(esbuild@0.27.7)(eslint@10.14.0)(oxc-parser@0.155.0)(rolldown@1.2.14)(typescript@6.0.3)(vite@8.3.5)
 
   design-system:
     devDependencies:
@@ -478,8 +478,8 @@ importers:
 
 packages:
 
-  '@1natsu/wait-element@4.2.0':
-    resolution: {integrity: sha512-Om0Q+WE9mNrpY4AwMTvkFiYHv8VM7TML3PvOqXy+w6kAjLjKhGYHYX+305+a6J8RVpds9s7IF2Z5aOPYwULFNw==}
+  '@1natsu/wait-element@5.0.0':
+    resolution: {integrity: sha512-OY5MEgiBNTfpNJvLn1yVYil2HcSfiJfSh3T3urmO96/mlxvm+frDZxZ1ngT0HO3F9usoyNPd0SnEE0SqrVaaEQ==}
 
   '@ai-sdk/anthropic@4.0.97':
     resolution: {integrity: sha512-LqCxnaKd4FsKChgBiS26Dgu1kC35jVeuH9OclhRJ6/Hg56kmJSbKlwu6Om6cfCmLgDUiIbn2r3w4um6bz7BivQ==}
@@ -3359,10 +3359,6 @@ packages:
     resolution: {integrity: sha512-uc47g4b+4k/M/SeaW1y4OApx+mtLWl92l5LMPP0GNXctZqELk+YGgOPIIC5elYmUH4OuoK3JLhuRUYegeySiFA==}
     engines: {node: '>=12'}
 
-  dotenv-expand@13.0.0:
-    resolution: {integrity: sha512-aBfBS8eYIeXmpHI9ThIlA7/WLq+SLt18iXUZhb52rW89QLKQFoIpPG1bPeewoPZsTyjSSO3T7234FBVUM1V2rA==}
-    engines: {node: '>=12'}
-
   dotenv@16.6.1:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
@@ -6007,8 +6003,8 @@ packages:
     resolution: {integrity: sha512-c16PKLIRxBYpR3jSWsdS7SFp0COm5SOQdiFjY818dYFHJbMGuLBszpF07LBWmOS1uzrHa9VGdynsEgoeKy0oOQ==}
     engines: {node: '>=20'}
 
-  wxt@0.21.4:
-    resolution: {integrity: sha512-iyVMTXb37BQAbsPHCuPzrK3ZxnO9pZmvbKl7VJWIHe3RG40On2NyP2FOjArtOITO96plEYnh3o+iUlRp9qE90w==}
+  wxt@0.21.5:
+    resolution: {integrity: sha512-naPKDK3LlU0M2LFJO3udw8ZEAB7DVQCGo26wllvSJQRVd3VaL9kiChjP8zWiVqm851uYkQ5pVI51hA5wjssO4g==}
     engines: {bun: '>=1.2.0', node: '>=22'}
     hasBin: true
     peerDependencies:
@@ -6077,7 +6073,7 @@ packages:
 
 snapshots:
 
-  '@1natsu/wait-element@4.2.0':
+  '@1natsu/wait-element@5.0.0':
     dependencies:
       defu: 6.1.7
       many-keys-map: 3.0.3
@@ -8511,11 +8507,11 @@ snapshots:
       '@types/filesystem': 0.0.36
       '@types/har-format': 1.2.16
 
-  '@wxt-dev/module-react@1.2.2(oxc-transform-react@0.156.0)(vite@8.3.5)(wxt@0.21.4)':
+  '@wxt-dev/module-react@1.2.2(oxc-transform-react@0.156.0)(vite@8.3.5)(wxt@0.21.5)':
     dependencies:
       '@vitejs/plugin-react': 6.2.1(oxc-transform-react@0.156.0)(vite@8.3.5)
       vite: 8.3.5(@types/node@24.13.4)(esbuild@0.27.7)(jiti@2.7.0)(yaml@2.9.1)
-      wxt: 0.21.4(esbuild@0.27.7)(eslint@10.14.0)(oxc-parser@0.155.0)(rolldown@1.2.14)(typescript@6.0.3)(vite@8.3.5)
+      wxt: 0.21.5(esbuild@0.27.7)(eslint@10.14.0)(oxc-parser@0.155.0)(rolldown@1.2.14)(typescript@6.0.3)(vite@8.3.5)
     transitivePeerDependencies:
       - '@rolldown/plugin-babel'
       - babel-plugin-react-compiler
@@ -8965,10 +8961,6 @@ snapshots:
   dotenv-expand@12.0.3:
     dependencies:
       dotenv: 16.6.1
-
-  dotenv-expand@13.0.0:
-    dependencies:
-      dotenv: 17.4.2
 
   dotenv@16.6.1: {}
 
@@ -11873,9 +11865,9 @@ snapshots:
       is-wsl: 3.1.1
       powershell-utils: 0.2.1
 
-  wxt@0.21.4(esbuild@0.27.7)(eslint@10.14.0)(oxc-parser@0.155.0)(rolldown@1.2.14)(typescript@6.0.3)(vite@8.3.5):
+  wxt@0.21.5(esbuild@0.27.7)(eslint@10.14.0)(oxc-parser@0.155.0)(rolldown@1.2.14)(typescript@6.0.3)(vite@8.3.5):
     dependencies:
-      '@1natsu/wait-element': 4.2.0
+      '@1natsu/wait-element': 5.0.0
       '@aklinker1/rollup-plugin-visualizer': 5.12.0
       '@aklinker1/zero-zip': 1.0.1
       '@topcli/prompts': 4.0.0
@@ -11889,7 +11881,6 @@ snapshots:
       chokidar: 5.0.0
       consola: 3.4.2
       defu: 6.1.7
-      dotenv-expand: 13.0.0
       filesize: 11.0.22
       giget: 3.3.0
       hookable: 6.1.1
