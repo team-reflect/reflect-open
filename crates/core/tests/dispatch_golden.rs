@@ -179,7 +179,7 @@ fn commands_reply_their_pinned_json() {
         json!({}),
         None,
     );
-    assert!(matches!(bytes, Ok(Reply::Bytes(bytes)) if bytes == b"hi"));
+    assert_eq!(bytes.unwrap(), Reply::Bytes(b"hi".to_vec()));
     ok(
         "list_attachments",
         json!({}),
@@ -202,7 +202,7 @@ fn commands_reply_their_pinned_json() {
         json!({"x-upload-id": "upload-1"}),
         Some(b"bytes"),
     );
-    assert!(matches!(appended, Ok(Reply::Json(json)) if json == "null"));
+    assert_eq!(appended.unwrap(), Reply::Json("null".to_owned()));
     ok(
         "asset_upload_commit",
         json!({"id": "upload-1", "desiredName": "up.bin", "generation": 1}),
