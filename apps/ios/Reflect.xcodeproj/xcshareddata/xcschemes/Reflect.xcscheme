@@ -105,6 +105,9 @@
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
+   <StoreKitConfigurationFileReference
+         identifier = "../../../desktop/src-tauri/gen/apple/reflect-open-storekit.storekit">
+      </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release-Stable"

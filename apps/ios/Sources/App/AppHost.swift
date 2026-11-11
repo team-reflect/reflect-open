@@ -15,6 +15,7 @@ final class AppHost {
   private let deepLinks: DeepLinks
   private let navigation: ExternalNavigation
   private let webAuth: WebAuthCapability
+  private let store: StoreCapability
   private var eventPump: Task<Void, Never>?
 
   init() throws {
@@ -35,6 +36,11 @@ final class AppHost {
     self.webAuth = webAuth
     shellCommands.merge(HapticsCapability.commands) { _, new in new }
     shellCommands.merge(webAuth.commands) { _, new in new }
+    let store = StoreCapability(
+      scene: { presenter?.window?.windowScene },
+      emit: { [bridge] name, payload in bridge.emit(name, payload: payload) })
+    self.store = store
+    shellCommands.merge(store.commands) { _, new in new }
     var routes: [any SchemeRoute] = []
     #if DEBUG
     shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
