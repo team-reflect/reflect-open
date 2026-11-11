@@ -1,0 +1,18 @@
+// Target-level settings of the Reflect app, the same for every configuration.
+// The flavor values (REFLECT_*) come from the configuration's xcconfig.
+
+PRODUCT_NAME = Reflect
+PRODUCT_BUNDLE_IDENTIFIER = $(REFLECT_BUNDLE_ID)
+INFOPLIST_FILE = Config/Info.plist
+CODE_SIGN_ENTITLEMENTS = Config/Reflect.$(REFLECT_FLAVOR).entitlements
+// Picks one of the three Icon Composer documents in the Icons group.
+ASSETCATALOG_COMPILER_APPICON_NAME = $(REFLECT_APP_ICON)
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks
+
+// The "Build Rust core" phase runs cargo, which reads and writes outside any
+// declared paths (target/, ~/.cargo, ~/.rustup). So the user script sandbox
+// is off for this target instead of declaring inputs and outputs.
+ENABLE_USER_SCRIPT_SANDBOXING = NO
+
+// Info.plist also reads REFLECT_SENTRY_DSN (ReflectSentryDSN). It is set only
+// on the release command line or in the environment; empty disables native Sentry.
