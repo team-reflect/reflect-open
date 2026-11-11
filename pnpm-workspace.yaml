@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - design-system
+  - scripts
 
 allowBuilds:
   '@sentry/cli': true
