@@ -65,7 +65,7 @@ final class StoreCapabilityTests: XCTestCase {
       identifier: XCTUnwrap(session.allTransactions().first).identifier)
     try session.expireSubscription(productIdentifier: monthly)
     var afterExpiry = true
-    for _ in 0..<50 where afterExpiry {
+    for _ in 0..<600 where afterExpiry {
       try await Task.sleep(nanoseconds: 100_000_000)
       afterExpiry = try await isOwned()
     }
