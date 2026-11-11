@@ -94,7 +94,7 @@ fn encode_uri_component(value: &str) -> String {
 /// failures loud (exit 1) — the opener itself returns as soon as the URL is
 /// dispatched, it does not wait on the app.
 fn launch(url: &str) -> Result<(), CliError> {
-    let status = launcher(url)
+    let status = launcher(url)?
         .status()
         .map_err(|err| CliError::Runtime(format!("could not run the OS URL opener: {err}")))?;
     if !status.success() {
@@ -106,26 +106,33 @@ fn launch(url: &str) -> Result<(), CliError> {
 }
 
 #[cfg(target_os = "macos")]
-fn launcher(url: &str) -> Command {
+fn launcher(url: &str) -> Result<Command, CliError> {
     let mut command = Command::new("open");
     command.arg(url);
-    command
+    Ok(command)
 }
 
 #[cfg(target_os = "linux")]
-fn launcher(url: &str) -> Command {
+fn launcher(url: &str) -> Result<Command, CliError> {
     let mut command = Command::new("xdg-open");
     command.arg(url);
-    command
+    Ok(command)
 }
 
 #[cfg(windows)]
-fn launcher(url: &str) -> Command {
+fn launcher(url: &str) -> Result<Command, CliError> {
     let mut command = Command::new("cmd");
     // The empty string is `start`'s window-title slot; without it the URL
     // itself would be consumed as the title.
     command.args(["/C", "start", "", url]);
-    command
+    Ok(command)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+fn launcher(url: &str) -> Result<Command, CliError> {
+    Err(CliError::Runtime(format!(
+        "no OS URL opener on this platform for {url}"
+    )))
 }
 
 #[cfg(test)]

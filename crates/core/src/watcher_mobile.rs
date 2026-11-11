@@ -15,10 +15,10 @@ use reflect_types::AppResult;
 
 use crate::Core;
 
-/// Unit stand-in for the desktop watcher state, so [`Core`] holds the same
+/// Empty stand-in for the desktop watcher state, so [`Core`] holds the same
 /// type name on every platform.
 #[derive(Default)]
-pub struct WatcherState;
+pub struct WatcherState {}
 
 impl Core {
     /// No-op: mobile has no platform watcher to start. `index:changed` events
