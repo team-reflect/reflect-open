@@ -55,10 +55,11 @@ function selectTargets(sdk: string | undefined): string[] {
   if (sdk === undefined) {
     return Object.values(TARGET_BY_SDK)
   }
-  if (!Object.hasOwn(TARGET_BY_SDK, sdk)) {
+  const target = Object.hasOwn(TARGET_BY_SDK, sdk) ? TARGET_BY_SDK[sdk] : undefined
+  if (target === undefined) {
     throw new Error(`--sdk must be one of: ${Object.keys(TARGET_BY_SDK).join(', ')}`)
   }
-  return [TARGET_BY_SDK[sdk]]
+  return [target]
 }
 
 /** The paths and modification times of the files that go into the xcframework. */
