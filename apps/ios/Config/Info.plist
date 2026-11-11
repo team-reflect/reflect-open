@@ -52,6 +52,8 @@
 	<string>Reflect reads your contacts to suggest details for person notes. Nothing is stored or sent anywhere.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Reflect uses the microphone to record audio memos that are transcribed into your daily note.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.app.reflect</key>
@@ -68,6 +70,17 @@
 	<string>$(REFLECT_APP_GROUP)</string>
 	<key>ReflectSentryDSN</key>
 	<string>$(REFLECT_SENTRY_DSN)</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeAudio</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Record audio</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.reflect.record-audio</string>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -81,6 +81,10 @@
       ],
       "package-product-members": [
         {
+          "package": "apple",
+          "product-name": "RecordingKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
           "package": "sentry-cocoa",
           "product-name": "Sentry-Dynamic",
           "build-phase": { "build-phase": "frameworks" },

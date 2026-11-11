@@ -16,6 +16,7 @@ final class AppHost {
   private let navigation: ExternalNavigation
   private let webAuth: WebAuthCapability
   private let store: StoreCapability
+  private let recording: RecordingCapability
   private var eventPump: Task<Void, Never>?
 
   init() throws {
@@ -41,6 +42,11 @@ final class AppHost {
       emit: { [bridge] name, payload in bridge.emit(name, payload: payload) })
     self.store = store
     shellCommands.merge(store.commands) { _, new in new }
+    let recording = RecordingCapability { [bridge] name, payload in
+      bridge.emit(name, payload: payload)
+    }
+    self.recording = recording
+    shellCommands.merge(recording.commands) { _, new in new }
     var routes: [any SchemeRoute] = []
     #if DEBUG
     shellCommands.merge(SelfCheck.commands(bridge: bridge)) { _, new in new }
@@ -78,9 +84,21 @@ final class AppHost {
     eventPump?.cancel()
   }
 
-  /// The system opened the app with `urls`.
+  /// The system opened the app with `urls`. `reflect://record-audio` asks for
+  /// a recording; the page gets every other URL.
   func open(_ urls: [URL]) {
-    deepLinks.open(urls)
+    let links = urls.filter { !($0.scheme == "reflect" && $0.host == "record-audio") }
+    if links.count < urls.count {
+      recording.requestRecording()
+    }
+    deepLinks.open(links)
+  }
+
+  /// The user chose a quick action of the app icon. Returns whether the app has that action.
+  func perform(_ shortcut: UIApplicationShortcutItem) -> Bool {
+    guard shortcut.type == "app.reflect.record-audio" else { return false }
+    recording.requestRecording()
+    return true
   }
 
   /// The scene came to the foreground: emits `host:foreground`.
