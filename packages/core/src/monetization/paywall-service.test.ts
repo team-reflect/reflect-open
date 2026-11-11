@@ -100,14 +100,33 @@ describe('PaywallService.gate', () => {
     expect(service().gate.get()).toBe('hidden')
   })
 
-  it('treats an unknown channel as an App Store install', () => {
+  it('stays hidden after a failed probe', () => {
     appStoreEnvironment.setState({ value: null, isError: true })
+    expect(service().gate.get()).toBe('hidden')
+  })
+
+  it('treats an unrecognized channel as an App Store install', () => {
+    appStoreEnvironment.setState({ value: null })
     expect(service().gate.get()).toBe('required')
   })
 
-  it('never waits for the probe', () => {
+  it('waits for the probe', () => {
     appStoreEnvironment.setState({ value: null, isLoading: true })
-    expect(service().gate.get()).toBe('required')
+    const paywall = service()
+    expect(paywall.gate.get()).toBe('hidden')
+
+    appStoreEnvironment.setState({ value: 'Production', isLoading: false })
+    expect(paywall.gate.get()).toBe('required')
+  })
+
+  it('stays hidden when a slow probe reports a TestFlight install', () => {
+    installClock.setState({ phase: 'skippable' })
+    appStoreEnvironment.setState({ value: null, isLoading: true })
+    const paywall = service()
+    expect(paywall.gate.get()).toBe('hidden')
+
+    appStoreEnvironment.setState({ value: 'Sandbox', isLoading: false })
+    expect(paywall.gate.get()).toBe('hidden')
   })
 
   it('honors an explicit request outside the App Store with a skippable paywall', () => {

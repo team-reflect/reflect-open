@@ -906,7 +906,7 @@ export function composeCoreServices(
     const iap = create.iap({ ipc, logger })
     const appStore = create.appStore({ ipc })
     const subscription = create.subscription({ iap, storage, clock, platform, logger })
-    const appStoreEnvironment = create.appStoreEnvironment({ appStore, storage, platform })
+    const appStoreEnvironment = create.appStoreEnvironment({ appStore, storage, platform, logger })
     const installClock = create.installClock({ secretStore, clock, activity, platform, logger })
     const haptics = create.haptics({ ipc, logger })
     const nativeAction = create.nativeAction({ audioRecorder, clock, platform, logger })

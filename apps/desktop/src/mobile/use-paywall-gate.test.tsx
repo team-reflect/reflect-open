@@ -135,6 +135,7 @@ describe('usePaywallGate', () => {
         appStore,
         storage: base.storage,
         platform: base.platform,
+        logger: base.logger,
       })
       const paywall = createPaywallService({
         subscription,
