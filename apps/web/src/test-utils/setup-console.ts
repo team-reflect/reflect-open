@@ -1,5 +1,8 @@
 import failOnConsole from 'vitest-fail-on-console'
-import { ALLOWED_CONSOLE_PATTERNS } from './allowed-console.ts'
+
+const ALLOWED_CONSOLE_PATTERNS: RegExp[] = [
+  /^(?:Error: )?ResizeObserver loop completed with undelivered notifications/,
+]
 
 failOnConsole({
   shouldFailOnWarn: true,
