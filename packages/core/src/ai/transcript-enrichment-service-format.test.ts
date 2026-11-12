@@ -16,7 +16,7 @@ const USAGE: LanguageModelV3Usage = {
 const CONFIG: AiProviderConfig = {
   id: 'cfg-openai',
   provider: 'openai',
-  model: 'gpt-5.5',
+  model: 'gpt-6-luna',
   keyHint: 'wxyz1',
 }
 
@@ -57,14 +57,15 @@ function modelAnswering(
 }
 
 function request(transcript: string) {
-  return enrichment.formatTranscript({
-    credentials: { config: CONFIG, apiKey: 'sk-live-key' },
+  return enrichment.enrich({
     transcript,
+    enrichmentCredentials: { config: CONFIG, apiKey: 'sk-live-key' },
+    formatTranscript: true,
     fallbackTitle: FALLBACK_TITLE,
   })
 }
 
-describe('TranscriptEnrichmentService.formatTranscript', () => {
+describe('TranscriptEnrichmentService.enrich formatting', () => {
   it('returns readable Markdown and a sanitized title from one small-model call', async () => {
     modelAnswering({
       title: '  Launch planning!  ',
@@ -84,7 +85,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
 
   it('frames the complete transcript as untrusted data and forbids meaning changes', async () => {
     const tail = 'TAIL_MARKER_AFTER_A_LONG_TRANSCRIPT'
-    const transcript = `${'word '.repeat(10_000)}${tail}`
+    const transcript = `${'word '.repeat(4_000)}${tail}`
     const model = modelAnswering({ title: 'Long memo', body: 'Formatted memo' })
 
     const result = await request(transcript)
@@ -145,6 +146,32 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
       body: transcript,
     })
     expect(model.doGenerateCalls).toHaveLength(2)
+  })
+
+  it('names the memo with a separate title call when the formatting call fails', async () => {
+    let calls = 0
+    languageModelService.setModel(
+      new MockLanguageModelV3({
+        doGenerate: () => {
+          calls += 1
+          if (calls === 1) {
+            return Promise.reject(new Error('formatting timed out'))
+          }
+          return Promise.resolve({
+            content: [{ type: 'text', text: JSON.stringify({ title: 'Launch review' }) }],
+            finishReason: { unified: 'stop' as const, raw: undefined },
+            usage: USAGE,
+            warnings: [],
+          })
+        },
+      }),
+    )
+
+    await expect(request('review the launch')).resolves.toEqual({
+      title: 'Launch review',
+      body: 'review the launch',
+    })
+    expect(calls).toBe(2)
   })
 
   it('falls back when a response repeats transcript content', async () => {
