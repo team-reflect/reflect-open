@@ -3,9 +3,8 @@
 //
 //   pnpm dev:ios
 //
-// It starts the dev server (or uses the one on port 1420), boots the
-// simulator, builds the Debug-Dev app, installs it and launches it with
-// `REFLECT_DEV_URL`. A change to Swift or Rust code needs a new run.
+// It starts the dev server on port 1420, boots the simulator, builds the
+// Debug-Dev app, installs it and launches it with `REFLECT_DEV_URL`. A change to Swift or Rust code needs a new run.
 //
 // The build goes to a directory in the system's temporary directory, which
 // macOS removes after some days without access.
@@ -16,6 +15,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { exec } from 'tinyexec'
+import { z } from 'zod'
 
 const ROOT_DIR = join(import.meta.dirname, '..')
 const DERIVED_DATA_DIR = join(tmpdir(), 'reflect-dev-ios', 'DerivedData')
@@ -39,7 +39,7 @@ async function run(command: string, args: string[], env?: Record<string, string>
 
 async function isServing(): Promise<boolean> {
   try {
-    const response = await fetch(DEV_URL)
+    const response = await fetch(DEV_URL, { signal: AbortSignal.timeout(1_000) })
     return response.ok
   } catch {
     return false
@@ -52,11 +52,27 @@ async function waitForServer(): Promise<void> {
   }
 }
 
-interface SimDevice {
-  udid: string
-  name: string
-  state: string
+/**
+ * Starts the iOS dev server. The returned promise rejects when the server
+ * exits, for example when another server holds port 1420.
+ */
+function startDevServer(): Promise<never> {
+  const server = exec('pnpm', ['--filter', '@reflect/ios', 'dev:web'], {
+    nodeOptions: { cwd: ROOT_DIR, stdio: 'inherit' },
+  })
+  process.on('exit', () => server.kill())
+  return (async () => {
+    await server
+    throw new Error(`the dev server exited; check that no other server uses ${DEV_URL}`)
+  })()
 }
+
+const SimctlDevices = z.object({
+  devices: z.record(
+    z.string(),
+    z.array(z.object({ udid: z.string(), name: z.string(), state: z.string() })),
+  ),
+})
 
 /**
  * Returns the UDID of the simulator named `DEVICE_NAME`: the booted one, else
@@ -66,9 +82,9 @@ async function findSimulator(): Promise<string> {
   const list = await exec('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], {
     throwOnError: true,
   })
-  const { devices } = JSON.parse(list.stdout) as { devices: Record<string, SimDevice[]> }
+  const { devices } = SimctlDevices.parse(JSON.parse(list.stdout))
   const matches = Object.entries(devices)
-    .sort(([a], [b]) => b.localeCompare(a, 'en', { numeric: true }))
+    .sort(([runtimeA], [runtimeB]) => runtimeB.localeCompare(runtimeA, 'en', { numeric: true }))
     .flatMap(([, runtimeDevices]) => runtimeDevices.filter((device) => device.name === DEVICE_NAME))
   const device = matches.find((match) => match.state === 'Booted') ?? matches[0]
   if (!device) {
@@ -92,17 +108,7 @@ async function openSimulatorWindow(): Promise<void> {
   console.log('[dev-ios] found no app that shows the simulator; it runs without a window')
 }
 
-async function main(): Promise<void> {
-  if (await isServing()) {
-    console.log(`[dev-ios] using the dev server on ${DEV_URL}`)
-  } else {
-    console.log('[dev-ios] starting the dev server')
-    const server = exec('pnpm', ['--filter', '@reflect/ios', 'dev:web'], {
-      nodeOptions: { cwd: ROOT_DIR, stdio: 'inherit' },
-    })
-    process.on('exit', () => server.kill())
-  }
-
+async function buildAndLaunch(): Promise<void> {
   const simulator = await findSimulator()
   console.log(`[dev-ios] booting ${DEVICE_NAME} (${simulator})`)
   await run('xcrun', ['simctl', 'bootstatus', simulator, '-b'])
@@ -134,6 +140,15 @@ async function main(): Promise<void> {
     SIMCTL_CHILD_REFLECT_DEV_URL: DEV_URL,
   })
   console.log(`[dev-ios] the app loads ${DEV_URL}; press Ctrl-C to stop`)
+}
+
+async function main(): Promise<void> {
+  // Always a server of its own: a server on port 1420 that this script did not
+  // start can serve the desktop build.
+  console.log('[dev-ios] starting the dev server')
+  const serverExit = startDevServer()
+  await Promise.race([buildAndLaunch(), serverExit])
+  await serverExit
 }
 
 await main()
