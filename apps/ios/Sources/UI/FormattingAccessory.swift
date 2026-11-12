@@ -5,11 +5,15 @@ import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
 import WebKit
+import os
 
 /// Puts the ``FormattingStrip`` above the keyboard while an editor of the page
 /// has focus, and sends its taps to the page.
 @MainActor
 final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
+  private static let logger = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "app.reflect.ios", category: "chrome")
+
   /// Sends an intent to the page.
   var send: (ChromeIntent) -> Void = { _ in }
   /// The controller that presents the photo picker.
@@ -26,6 +30,9 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private var relayout = false
   /// Loads the picked images; a new document cancels it.
   private var loading: Task<Void, Never>?
+  /// Whether the on-screen keyboard is up, from its last frame. Before the
+  /// first frame, a connected hardware keyboard means no on-screen keyboard.
+  private var softwareKeyboard: Bool?
   /// The presented photo picker; a new document closes it.
   private weak var picker: PHPickerViewController?
 
@@ -39,12 +46,31 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
       NotificationCenter.default.addObserver(
         self, selector: #selector(keyboardDidChange), name: name, object: nil)
     }
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(keyboardFrameWillChange(_:)),
+      name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
   }
 
   /// A hardware keyboard came or went: the strip shows only with the
   /// on-screen keyboard.
   @objc private func keyboardDidChange() {
-    contentView?.reloadInputViews()
+    softwareKeyboard = nil
+    reloadIfNeeded()
+  }
+
+  /// The tallest keyboard frame, without the strip, that is only the
+  /// shortcut bar of a hardware keyboard.
+  private static let shortcutBarHeight: CGFloat = 120
+
+  /// The keyboard moved: it is the on-screen keyboard when it is taller than
+  /// the shortcut bar of a hardware keyboard.
+  @objc private func keyboardFrameWillChange(_ notification: Notification) {
+    guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+      let screen = webView.window?.screen
+    else { return }
+    let height = frame.intersection(screen.bounds).height - (shown ? strip.bounds.height : 0)
+    softwareKeyboard = height > 0 ? height > Self.shortcutBarHeight : nil
+    reloadIfNeeded()
   }
 
   /// Follows the page's toolbar. The keyboard reloads its accessory only when
@@ -54,6 +80,11 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     if let toolbar {
       strip.update(toolbar)
     }
+    reloadIfNeeded()
+  }
+
+  /// The keyboard reloads its accessory only when the strip comes or goes.
+  private func reloadIfNeeded() {
     if wantsStrip != shown, !relayout {
       contentView?.reloadInputViews()
     }
@@ -61,7 +92,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
 
   /// The strip shows only with the on-screen keyboard.
   private var wantsStrip: Bool {
-    toolbar != nil && GCKeyboard.coalesced == nil
+    toolbar != nil && (softwareKeyboard ?? (GCKeyboard.coalesced == nil))
   }
 
   /// A new document: the images of an earlier pick never reach it.
@@ -102,6 +133,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     var configuration = PHPickerConfiguration()
     configuration.filter = .images
     configuration.selectionLimit = Self.imageLimit
+    // HEIC and RAW photos come as JPEG.
+    configuration.preferredAssetRepresentationMode = .compatible
     let picker = PHPickerViewController(configuration: configuration)
     picker.delegate = self
     self.picker = picker
@@ -121,6 +154,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
         guard !Task.isCancelled else { return }
         if let file {
           self?.send(.files([file]))
+        } else {
+          Self.logger.error("picked image did not load: \(provider.registeredContentTypes)")
         }
       }
     }
