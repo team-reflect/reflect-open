@@ -77,7 +77,7 @@ jobs:
             '.swift-format'
             'apple/*'
             'apps/ios/*'
-            'apps/tauri/safari-extension/*'
+            'apps/safari-extension/*'
             'scripts/build-ffi.ts'
           )
 

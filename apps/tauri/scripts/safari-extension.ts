@@ -16,7 +16,7 @@ export const REFLECT_TEAM_ID = '789ULN5MZB'
 export const APP_GROUPS_KEY = 'com.apple.security.application-groups'
 /** Must match `SAFARI_APPEX` in `crates/core/src/capture.rs`. */
 const APPEX = 'SafariExtension.appex'
-const PROJECT_DIR = join(APP_DIR, 'safari-extension')
+const PROJECT_DIR = join(APP_DIR, '..', 'safari-extension')
 const WEB_EXTENSION_DIR = join(APP_DIR, '..', 'extension', '.output', 'safari-mv3')
 
 /** A value from the Info.plist of a built app. */

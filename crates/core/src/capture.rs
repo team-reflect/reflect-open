@@ -324,7 +324,7 @@ impl Core {
 const APP_GROUP_KEY: &str = "ReflectAppGroup";
 
 /// The Safari app extension's bundle inside `Contents/PlugIns/`
-/// (`safari-extension/project.yml`).
+/// (`apps/safari-extension/ReflectSafari.xcodeproj`).
 #[cfg(target_os = "macos")]
 const SAFARI_APPEX: &str = "SafariExtension.appex";
 
