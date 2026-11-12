@@ -6,14 +6,13 @@ public import UIKit
 public enum MenuBuilder {
   /// A menu of `items`. A tap on an action calls `onSelect` with it.
   public static func menu(
-    _ items: [MenuItem], title: String = "",
-    onSelect: @escaping @MainActor (MenuAction) -> Void
+    _ items: [MenuItem], onSelect: @escaping @MainActor (MenuAction) -> Void
   ) -> UIMenu {
-    UIMenu(title: title, children: elements(items, onSelect: onSelect))
+    UIMenu(children: elements(items, onSelect: onSelect))
   }
 
   /// The menu elements of `items`: a section is an inline submenu.
-  public static func elements(
+  private static func elements(
     _ items: [MenuItem], onSelect: @escaping @MainActor (MenuAction) -> Void
   ) -> [UIMenuElement] {
     items.map { item in

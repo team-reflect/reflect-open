@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import type { ShareService } from '@reflect/app'
 import {
   frontmatterPatchToYaml,
@@ -18,6 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NoteActionsMenu, useNoteActions } from './note-actions-menu.tsx'
 import { noop } from '@ocavue/utils'
+import {
+  createTestToastController,
+  withToastController,
+  type TestToastController,
+} from '@/test-utils/toast.tsx'
 
 // What the app's fakes answer; each test sets them before `mount`.
 const getNote = vi.fn<IndexQueryService['getNote']>()
@@ -34,6 +39,9 @@ let noteContent: MockInstance<ShareService['noteContent']>
 
 let currentNoteRow: NoteRow | null
 let currentNoteRowSettled: boolean
+let toasts: TestToastController
+// The `runAction` of the rendered actions, the path a native menu takes.
+let runNoteAction: (id: string) => void = noop
 
 function noteRow(path: string, isPrivate: boolean, title = 'Meeting'): NoteRow {
   return {
@@ -81,7 +89,9 @@ async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
   vi.spyOn(created.indexQuery, 'getNote').mockImplementation(getNote)
   vi.spyOn(created.indexQuery, 'getPinnedNotes').mockResolvedValue([])
   trash = vi.spyOn(created.noteActions, 'trashOne').mockResolvedValue()
+  toasts = createTestToastController()
   const view = await renderInApp(<NoteActions path={path} onDeleted={onDeleted} />, {
+    wrapper: withToastController(toasts),
     core: created,
     graph: { root: '/g', name: 'g', generation: 7 },
   })
@@ -91,9 +101,11 @@ async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
 }
 
 function NoteActions({ path, onDeleted }: { path: string; onDeleted: () => void }): ReactElement {
-  return (
-    <NoteActionsMenu path={path} onDeleted={onDeleted} actions={useNoteActions(path, onDeleted)} />
-  )
+  const actions = useNoteActions(path, onDeleted)
+  useEffect(() => {
+    runNoteAction = actions.runAction
+  })
+  return <NoteActionsMenu path={path} onDeleted={onDeleted} actions={actions} />
 }
 
 async function openActions(): Promise<void> {
@@ -266,6 +278,24 @@ describe('NoteActionsMenu', () => {
 
     await vi.waitFor(() => expect(trash).toHaveBeenCalledWith('notes/meeting.md'))
     expect(onDeleted).toHaveBeenCalledOnce()
+  })
+
+  it('shows a toast when a delete from the native menu fails', async () => {
+    const { onDeleted } = await mount()
+    trash.mockRejectedValue(new Error('disk full'))
+
+    runNoteAction('delete')
+
+    await vi.waitFor(() => {
+      expect(toasts.open()).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          title: 'Could not delete the note',
+          description: 'disk full',
+        }),
+      ])
+    })
+    expect(onDeleted).not.toHaveBeenCalled()
   })
 
   it('reports when the graph disappears before delete confirmation', async () => {

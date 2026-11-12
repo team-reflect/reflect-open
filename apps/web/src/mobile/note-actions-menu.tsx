@@ -10,6 +10,7 @@ import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
 import type { NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
 import { shareNote } from '@/mobile/share.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import { useToastController } from '@/lib/use-toasts.ts'
 
 interface NoteActionsMenuProps {
   /** Graph-relative path of the note the actions operate on. */
@@ -42,6 +43,7 @@ export interface NoteActions {
 export function useNoteActions(path: string, onDeleted: () => void): NoteActions {
   const { noteActions, logger } = useCoreServices()
   const { share: shareService } = useAppServices()
+  const toastController = useToastController()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const { row: noteRow, settled: privacyReady } = useNoteRowState(path)
   const isPrivate = noteRow?.isPrivate ?? false
@@ -79,6 +81,12 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
       case 'delete':
         void noteActions.trashOne(path).then(onDeleted, (cause: unknown) => {
           logger.error('delete failed:', errorMessage(cause))
+          // The native confirmation has closed, so the error shows as a toast.
+          toastController.add({
+            type: 'error',
+            title: 'Could not delete the note',
+            description: errorMessage(cause),
+          })
         })
         return
     }
