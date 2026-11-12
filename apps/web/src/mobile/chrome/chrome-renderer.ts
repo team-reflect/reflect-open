@@ -51,7 +51,7 @@ export interface ChromeRenderer {
    */
   readonly ShellBars: ComponentType<ShellBarsProps>
   /**
-   * Marks a surface outside the shell: onboarding, loading, the crash card.
+   * Marks a surface outside the routed shell, which shows no shell bars.
    */
   readonly NoChrome: ComponentType
   /**
@@ -113,8 +113,8 @@ export function useScreenChrome(chrome: ScreenChrome): void {
   })
   const key = JSON.stringify([chrome.leading, chrome.trailing, chrome.back !== undefined])
 
-  // Layout effects, so the chrome is registered before the shell bars post
-  // the state of the new screen from their passive effect.
+  // Layout effects, so the chrome is registered before the passive effects
+  // of the same commit run.
 
   useLayoutEffect(() => {
     if (onTop) {

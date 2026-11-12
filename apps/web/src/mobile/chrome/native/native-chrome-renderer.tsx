@@ -36,6 +36,7 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * shell's intents.
  */
 class NativeChromeRenderer implements ChromeRenderer {
+  readonly #nativeChrome: NativeChromeService
   readonly TopBarCorner = NativeTopBarCorner
   readonly ShellBars = NativeShellBars
   readonly NoChrome = NativeNoChrome
@@ -55,7 +56,6 @@ class NativeChromeRenderer implements ChromeRenderer {
    */
   readonly cornersInHeaderRow = new WritableStore(true)
   readonly attachFiles = createAttachQueue()
-  readonly #nativeChrome: NativeChromeService
 
   constructor(nativeChrome: NativeChromeService) {
     this.#nativeChrome = nativeChrome

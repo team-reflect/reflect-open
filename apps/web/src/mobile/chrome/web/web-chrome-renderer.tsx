@@ -6,11 +6,9 @@ import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import { MobileTabBar } from '@/mobile/mobile-tab-bar.tsx'
 
 /**
- * The tab bar, or the formatting toolbar while the keyboard is up. V1 lets
- * the keyboard cover the tab bar; the shell root ends at the keyboard's top,
- * so the bar would ride above the keyboard instead, and it hides while
- * typing. The toolbar takes its slot at the bottom of the root, exactly on
- * the keyboard edge with no fixed positioning.
+ * The tab bar, or the formatting toolbar while the keyboard is up. The shell
+ * root ends at the keyboard's top, so the toolbar takes the tab bar's slot at
+ * the bottom of the root, on the keyboard edge, with no fixed positioning.
  */
 function WebShellBars({ tab, onSelectTab, keyboardVisible }: ShellBarsProps): ReactElement {
   return keyboardVisible ? (

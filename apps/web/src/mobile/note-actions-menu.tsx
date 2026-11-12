@@ -20,7 +20,7 @@ export interface NoteActions {
  * The note actions of `path`: pin, lock or unlock, share, and delete to the
  * graph's trash. Pin and privacy read the note row with the overlay merged
  * over the index, so a menu reopened during a write shows the new state.
- * `runAction` runs Delete without asking: the menu confirms first.
+ * `runAction` runs Delete at once; the Delete item carries its confirmation.
  */
 export function useNoteActions(path: string, onDeleted: () => void): NoteActions {
   const { noteActions, logger } = useCoreServices()
@@ -82,7 +82,7 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
 
 /**
  * The note actions as menu items. Delete, when the note can go to the
- * trash, asks first, with the same words as `NoteDeleteDrawer`.
+ * trash, carries `NOTE_DELETE_CONFIRM`.
  */
 export function noteActionItems({
   isPinned,
