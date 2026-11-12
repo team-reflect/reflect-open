@@ -11,6 +11,10 @@
 //   --keep-simulator  Leave the simulator in place after the run
 //
 // The Xcode build makes the Rust core when its slice is missing.
+//
+// Runs share the default DerivedData directory, so a second run builds only
+// what changed. Give two runs at the same time their own `--output` and
+// `--derived-data`.
 
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -204,7 +208,13 @@ async function main(): Promise<void> {
     if (values['keep-simulator']) {
       log(`kept the simulator ${simulator}`)
     } else {
-      await exec('xcrun', ['simctl', 'delete', simulator], { nodeOptions: { stdio: 'inherit' } })
+      await exec('xcrun', ['simctl', 'shutdown', simulator])
+      const deleted = await exec('xcrun', ['simctl', 'delete', simulator], {
+        nodeOptions: { stdio: 'inherit' },
+      })
+      if (deleted.exitCode !== 0) {
+        log(`the simulator ${simulator} is still there; remove it with \`xcrun simctl delete\``)
+      }
     }
     printSummary()
   }

@@ -7,7 +7,9 @@ import WebKit
 /// A UI test gives each of its sessions its own places (Debug builds only).
 /// It launches the app with the environment variable `REFLECT_UITEST_SESSION`
 /// set to a UUID. The app then starts as an install that finished onboarding
-/// with storage on this device, and reads and writes only inside that session.
+/// with storage on this device, and keeps its graph, its settings and the
+/// data of the web view inside that session. Other data of the app, such as
+/// staged recordings and the keychain, stays in the app's own places.
 /// A second launch with the same UUID opens the same data.
 struct AppDirectories {
   /// The directory of the on-device graph.
@@ -20,8 +22,11 @@ struct AppDirectories {
   @MainActor
   static func current(fileManager: FileManager = .default) throws -> AppDirectories {
     #if DEBUG
-    let name = ProcessInfo.processInfo.environment["REFLECT_UITEST_SESSION"]
-    if let session = name.flatMap(UUID.init(uuidString:)) {
+    if let name = ProcessInfo.processInfo.environment["REFLECT_UITEST_SESSION"] {
+      // The data of the developer is not a fallback for a test.
+      guard let session = UUID(uuidString: name) else {
+        throw InvalidUITestSession(name: name)
+      }
       return try uiTestSession(session, fileManager: fileManager)
     }
     #endif
@@ -76,3 +81,14 @@ struct AppDirectories {
   }
   #endif
 }
+
+#if DEBUG
+/// `REFLECT_UITEST_SESSION` has a value that is not a UUID.
+struct InvalidUITestSession: Error, CustomStringConvertible {
+  var name: String
+
+  var description: String {
+    "REFLECT_UITEST_SESSION must be a UUID, but it is \"\(name)\""
+  }
+}
+#endif

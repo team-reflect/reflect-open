@@ -28,7 +28,9 @@ final class GoldenPathUITests: XCTestCase {
     editor.typeText("\(token) ")
     waitForText(token, in: editor)
 
-    // The app goes to the background before the system ends it.
+    // The page saves 0.8 s after the last key, and again when the app goes to
+    // the background. The app shows no sign of a finished save, so the test
+    // has none to wait for.
     XCUIDevice.shared.press(.home)
     XCTAssertTrue(app.wait(for: .runningBackground, timeout: XCUIApplication.patience))
     app.terminate()

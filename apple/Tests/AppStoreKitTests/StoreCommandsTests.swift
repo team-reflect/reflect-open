@@ -13,6 +13,8 @@ private final class FakeStoreClient: StoreClient, @unchecked Sendable {
   var entitled: Set<String> = []
   var environmentName: String? = "Xcode"
   var fails = false
+  /// The number of `updates()` calls.
+  private(set) var listeners = 0
 
   private let stream: AsyncStream<StoreUpdate>
   private let continuation: AsyncStream<StoreUpdate>.Continuation
@@ -48,7 +50,8 @@ private final class FakeStoreClient: StoreClient, @unchecked Sendable {
   }
 
   func updates() -> AsyncStream<StoreUpdate> {
-    stream
+    listeners += 1
+    return stream
   }
 }
 
@@ -216,9 +219,16 @@ func getProductStatusAnswersWhetherTheUserOwnsTheProduct(owned: Bool) async thro
     client.send(StoreUpdate { finished.resume() })
     #expect(log.entries.isEmpty)
     commands.start()
-    // A second call starts no second listener.
-    commands.start()
   }
 
   #expect(log.entries == ["emit"])
+}
+
+@MainActor
+@Test func aSecondStartAddsNoListener() {
+  let client = FakeStoreClient()
+  let commands = StoreCommands(client: client, emit: { _, _ in })
+  commands.start()
+  commands.start()
+  #expect(client.listeners == 1)
 }

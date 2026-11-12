@@ -47,7 +47,8 @@ public protocol StoreClient: Sendable {
   func environment() async -> String?
   /// Fetches transactions and subscription status from the App Store again.
   func sync() async throws
-  /// The verified transactions that arrive outside a purchase. The stream
-  /// starts to listen when this function returns.
+  /// The verified transactions that arrive outside a purchase. The client
+  /// starts to listen during or soon after this call, and the stream keeps
+  /// each update until its reader takes it.
   func updates() -> AsyncStream<StoreUpdate>
 }

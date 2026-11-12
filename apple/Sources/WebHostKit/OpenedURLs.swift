@@ -4,9 +4,9 @@ public import Foundation
 /// does with them.
 public struct OpenedURLs: Sendable, Equatable {
   /// Whether a URL asks for a recording: `reflect://record-audio`.
-  public var requestsRecording: Bool
+  public let requestsRecording: Bool
   /// The other URLs, in their order. The page gets them.
-  public var links: [URL]
+  public let links: [URL]
 
   public init(_ urls: [URL]) {
     links = urls.filter { !($0.scheme == "reflect" && $0.host == "record-audio") }
