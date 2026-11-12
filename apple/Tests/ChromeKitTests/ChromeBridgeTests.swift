@@ -39,13 +39,18 @@ final class ChromeBridgeTests: XCTestCase {
       [.transition(started: true), .transition(started: false), .chromeReady])
   }
 
+  func testNamesTheFormattingCommandsOfThePage() throws {
+    let ids = try JSONDecoder().decode([String].self, from: try fixture("commands"))
+    XCTAssertEqual(FormattingCommand.allCases.map(\.rawValue), ids)
+  }
+
   func testEncodesEveryIntentAsTheFixtureThePageParses() throws {
     let intents: [ChromeIntent] = [
       .back(entryId: 3),
       .tab(.all),
       .action(entryId: 3, id: "gear"),
       .menu(entryId: 3, menuId: "note-actions", id: "pin"),
-      .command("indent"),
+      .command(.indent),
       .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))

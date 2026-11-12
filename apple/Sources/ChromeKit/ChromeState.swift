@@ -186,13 +186,18 @@ public struct IntentFile: Encodable, Equatable, Sendable {
   }
 }
 
+/// A command of the page's formatting toolbar.
+public enum FormattingCommand: String, CaseIterable, Encodable, Sendable {
+  case slash, list, todo, link, tag, dedent, indent, up, down, dismiss
+}
+
 /// What a native control asks the page to do.
 public enum ChromeIntent: Encodable, Equatable, Sendable {
   case back(entryId: Int)
   case tab(ChromeTab)
   case action(entryId: Int, id: String)
   case menu(entryId: Int, menuId: String, id: String)
-  case command(String)
+  case command(FormattingCommand)
   case files([IntentFile])
 
   private enum CodingKeys: String, CodingKey {

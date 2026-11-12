@@ -14,6 +14,7 @@ import {
 } from '@/mobile/native-chrome/native-chrome-state.ts'
 import {
   parseNativeIntent,
+  type FormattingCommandId,
   type NativeChromeMessage,
   type NativeIntent,
 } from '@/mobile/native-chrome/protocol.ts'
@@ -40,49 +41,36 @@ export interface IntentContext {
   back: () => void
   navigate: (route: Route, options?: NavigateOptions) => void
   selectTab: (tab: MobileTab) => void
-  /** The commands of the last focused editor that can attach files. */
+  /**
+   * The commands of the last focused editor that can attach files, while
+   * the page still shows its entry.
+   */
   attachCommands: FormattingToolbarCommands | null
+}
+
+const FORMATTING_RUNNERS: Record<
+  FormattingCommandId,
+  (commands: FormattingToolbarCommands) => void
+> = {
+  slash: (commands) => commands.insertTrigger('/'),
+  list: (commands) => commands.cycleBulletOrderedList(),
+  todo: (commands) => commands.cycleCheckableList(),
+  link: (commands) => commands.insertTrigger('[['),
+  tag: (commands) => commands.insertTrigger('#'),
+  dedent: (commands) => commands.dedent(),
+  indent: (commands) => commands.indent(),
+  up: (commands) => commands.moveUp(),
+  down: (commands) => commands.moveDown(),
+  dismiss: (commands) => commands.dismissKeyboard(),
 }
 
 /**
  * Run a formatting command on the focused editor.
  */
-function runFormattingCommand(id: string): void {
+function runFormattingCommand(id: FormattingCommandId): void {
   const commands = focusedEditorCommands()
-  if (commands === null) {
-    return
-  }
-  switch (id) {
-    case 'slash':
-      commands.insertTrigger('/')
-      return
-    case 'list':
-      commands.cycleBulletOrderedList()
-      return
-    case 'todo':
-      commands.cycleCheckableList()
-      return
-    case 'link':
-      commands.insertTrigger('[[')
-      return
-    case 'tag':
-      commands.insertTrigger('#')
-      return
-    case 'dedent':
-      commands.dedent()
-      return
-    case 'indent':
-      commands.indent()
-      return
-    case 'up':
-      commands.moveUp()
-      return
-    case 'down':
-      commands.moveDown()
-      return
-    case 'dismiss':
-      commands.dismissKeyboard()
-      return
+  if (commands !== null) {
+    FORMATTING_RUNNERS[id](commands)
   }
 }
 
@@ -206,12 +194,13 @@ export function NativeChromeProjection({
     )
   }, [enabled, route, entryId, tab, bars, keyboardVisible, modalCount, toolbar, theme])
 
-  const attachCommandsRef = useRef<FormattingToolbarCommands | null>(null)
+  // Kept while the photo picker holds focus, so the editor's toolbar is gone.
+  const attachRef = useRef<{ commands: FormattingToolbarCommands; entryId: number } | null>(null)
   useLayoutEffect(() => {
     if (toolbar?.capabilities.canAttachFiles === true) {
-      attachCommandsRef.current = toolbar.commands
+      attachRef.current = { commands: toolbar.commands, entryId }
     }
-  }, [toolbar])
+  }, [toolbar, entryId])
 
   const contextRef = useRef<Omit<IntentContext, 'attachCommands'>>({
     entryId,
@@ -231,9 +220,11 @@ export function NativeChromeProjection({
     const unlisten = listenNativeIntent((payload) => {
       const intent = parseNativeIntent(payload)
       if (intent !== null) {
+        const attach = attachRef.current
+        const context = contextRef.current
         runNativeIntent(intent, {
-          ...contextRef.current,
-          attachCommands: attachCommandsRef.current,
+          ...context,
+          attachCommands: attach?.entryId === context.entryId ? attach.commands : null,
         })
       }
     })

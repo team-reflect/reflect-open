@@ -104,8 +104,10 @@ final class MenuPresenter {
       self.send(intent)
     }
     confirmation = alert
-    // The menu dismisses as the tap lands; the alert waits for it.
-    DispatchQueue.main.async {
+    // The menu dismisses as the tap lands; the alert waits for it, and
+    // shows only while the page still shows its entry.
+    DispatchQueue.main.async { [weak self] in
+      guard self?.openEntryId == entryId else { return }
       presenter.present(alert, animated: true)
     }
   }

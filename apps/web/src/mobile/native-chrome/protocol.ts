@@ -122,6 +122,24 @@ export type NativeChromeMessage =
   | { type: 'transition'; phase: 'start' | 'end' }
   | { type: 'chromeReady' }
 
+/**
+ * The commands of the formatting toolbar that the shell draws.
+ */
+export const FORMATTING_COMMANDS = [
+  'slash',
+  'list',
+  'todo',
+  'link',
+  'tag',
+  'dedent',
+  'indent',
+  'up',
+  'down',
+  'dismiss',
+] as const
+
+export type FormattingCommandId = (typeof FORMATTING_COMMANDS)[number]
+
 const tabSchema = z.enum(['daily', 'all', 'tasks'])
 
 const fileSchema = z.object({ name: z.string(), type: z.string(), data: z.string() })
@@ -131,7 +149,7 @@ const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('tab'), tab: tabSchema }),
   z.object({ type: z.literal('action'), entryId: z.number(), id: z.string() }),
   z.object({ type: z.literal('menu'), entryId: z.number(), menuId: z.string(), id: z.string() }),
-  z.object({ type: z.literal('command'), id: z.string() }),
+  z.object({ type: z.literal('command'), id: z.enum(FORMATTING_COMMANDS) }),
   z.object({ type: z.literal('files'), files: z.array(fileSchema) }),
 ])
 

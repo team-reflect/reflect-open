@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { noop } from '@ocavue/utils'
 import { describe, expect, it, vi } from 'vitest'
@@ -7,7 +7,7 @@ import {
   type IntentContext,
 } from '@/mobile/native-chrome/native-chrome-projection.tsx'
 import type { FormattingToolbarCommands } from '@/editor/formatting-toolbar-store.ts'
-import { parseNativeIntent } from '@/mobile/native-chrome/protocol.ts'
+import { FORMATTING_COMMANDS, parseNativeIntent } from '@/mobile/native-chrome/protocol.ts'
 import { nativeMenuHandler, rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
 
 function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContext {
@@ -28,6 +28,20 @@ describe('parseNativeIntent', () => {
     expect(parseNativeIntent({ type: 'back', entryId: 1 })).toEqual({ type: 'back', entryId: 1 })
     expect(parseNativeIntent({ type: 'tab', tab: 'chat' })).toBeNull()
     expect(parseNativeIntent('back')).toBeNull()
+  })
+
+  it('names the formatting commands of the Swift shell', () => {
+    // `ChromeKitTests` checks that `FormattingCommand` has exactly these.
+    const path = join(
+      import.meta.dirname,
+      '../../../../../apple/Tests/ChromeKitTests/Fixtures/commands.json',
+    )
+    const json = `${JSON.stringify(FORMATTING_COMMANDS, null, 2)}\n`
+    if (process.env.UPDATE_CHROME_FIXTURES === '1') {
+      writeFileSync(path, json)
+    }
+    expect(readFileSync(path, 'utf8')).toBe(json)
+    expect(parseNativeIntent({ type: 'command', id: 'bold' })).toBeNull()
   })
 
   it('reads every intent the Swift shell encodes', () => {

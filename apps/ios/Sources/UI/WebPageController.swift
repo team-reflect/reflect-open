@@ -42,9 +42,11 @@ final class WebPageController: UIViewController {
     webView.superview === view
   }
 
-  /// Moves the web view into this page, under every other subview.
+  /// Moves the web view into this page, under every other subview. A web
+  /// view that had the focus gets it back, as leaving the window resigns it.
   func attach(_ webView: WKWebView) {
     guard !holds(webView) else { return }
+    let focused = Self.holdsFirstResponder(webView)
     webView.removeFromSuperview()
     webView.translatesAutoresizingMaskIntoConstraints = false
     view.insertSubview(webView, at: 0)
@@ -54,6 +56,13 @@ final class WebPageController: UIViewController {
       webView.topAnchor.constraint(equalTo: view.topAnchor),
       webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
     ])
+    if focused {
+      _ = webView.becomeFirstResponder()
+    }
+  }
+
+  private static func holdsFirstResponder(_ view: UIView) -> Bool {
+    view.isFirstResponder || view.subviews.contains { holdsFirstResponder($0) }
   }
 
   /// Shows the bar of `state` in the navigation bar of this page. Bar
