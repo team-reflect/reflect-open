@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { exec } from 'tinyexec'
+import ms from 'pretty-ms'
 
 const ROOT_DIR = join(import.meta.dirname, '..')
 const BUILD_DIR = join(ROOT_DIR, 'apps', 'ios', 'build')
@@ -40,8 +41,8 @@ async function step<T>(name: string, body: () => Promise<T>): Promise<T> {
     if (IN_GITHUB_ACTIONS) {
       console.log('::endgroup::')
     }
-    const seconds = ((Date.now() - start) / 1000).toFixed(1)
-    console.log(`[test-ios] ${name}: ${seconds} s`)
+    const duration = Date.now() - start
+    console.log(`[test-ios] ${name}: ${ms(duration)} s`)
   }
 }
 
@@ -104,7 +105,6 @@ async function main(): Promise<void> {
       await sleep(10_000)
     })
 
-    // The first launch of an app is the slowest one: Safari takes it.
     await step('Launch Safari', async () => {
       await run('xcrun', ['simctl', 'launch', simulator, 'com.apple.mobilesafari'])
     })
