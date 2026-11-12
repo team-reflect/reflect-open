@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
 import { NativeBarLayerContext } from '@/mobile/native-chrome/registrations.ts'
+import type { NativeChromeMessage } from '@/mobile/native-chrome/protocol.ts'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { hasNativeChrome, postNativeChrome } from '@/services/native-chrome-transport.ts'
@@ -309,7 +310,10 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const sliding = transition.kind !== 'none'
   useLayoutEffect(() => {
     if (hasNativeChrome('navbar')) {
-      postNativeChrome({ type: 'transition', phase: sliding ? 'start' : 'end' })
+      postNativeChrome({
+        type: 'transition',
+        phase: sliding ? 'start' : 'end',
+      } satisfies NativeChromeMessage)
     }
   }, [sliding])
 

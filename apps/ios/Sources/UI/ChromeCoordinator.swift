@@ -20,7 +20,8 @@ final class ChromeCoordinator {
   private let page: WebPageController?
   private let menus = MenuPresenter()
   private let formatting: FormattingAccessory?
-  /// Set during a web slide: the bar keeps the old page until the slide ends.
+  /// Set during a web slide: a bar shown on both pages keeps the old page
+  /// until the slide ends.
   private var barFrozen = false
   /// Bumped on every slide start, so an old timeout never thaws a newer slide.
   private var slide = 0
@@ -64,7 +65,9 @@ final class ChromeCoordinator {
     #endif
     applyTheme(state.theme)
     tabs?.apply(state)
-    if !barFrozen {
+    // A bar that comes or goes changes the page's top safe area, so it
+    // changes as the slide starts, not as the new page lands.
+    if !barFrozen || tabs?.page(for: state.tab)?.barVisibilityChanges(for: state) == true {
       showBar(state)
     }
     if features.contains(.navbar) {
@@ -88,8 +91,9 @@ final class ChromeCoordinator {
     page.showBar(state, menus: menus) { [weak self] intent in self?.send(intent) }
   }
 
-  /// A web push or pop slide starts or ends. During the slide the bar keeps
-  /// the old page; at the end it cross-fades to the latest state. A lost end
+  /// A web push or pop slide starts or ends. During the slide a bar shown
+  /// on both pages keeps the old page; at the end it cross-fades to the
+  /// latest state. A lost end
   /// thaws the bar after one second.
   private func transition(started: Bool) {
     guard features.contains(.navbar) else { return }

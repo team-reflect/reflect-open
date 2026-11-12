@@ -62,8 +62,7 @@ final class WebPageController: UIViewController {
   func showBar(
     _ state: ChromeState, menus: MenuPresenter, send: @escaping (ChromeIntent) -> Void
   ) {
-    navigationController?.setNavigationBarHidden(
-      state.chrome == .none || !state.showsBar, animated: false)
+    navigationController?.setNavigationBarHidden(Self.hidesBar(state), animated: false)
     navigationItem.title = state.title ?? ""
     let entryId = state.entryId
     let newEntry = entryId != shownEntryId
@@ -100,6 +99,16 @@ final class WebPageController: UIViewController {
         barItem($0, entryId: entryId, menus: menus, send: send)
       }
     }
+  }
+
+  /// Whether `state` hides the navigation bar.
+  static func hidesBar(_ state: ChromeState) -> Bool {
+    state.chrome == .none || !state.showsBar
+  }
+
+  /// Whether showing `state` would show or hide the navigation bar.
+  func barVisibilityChanges(for state: ChromeState) -> Bool {
+    (navigationController?.isNavigationBarHidden ?? true) != Self.hidesBar(state)
   }
 
   /// Hides the navigation bar and forgets its items, so nothing of an old

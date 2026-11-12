@@ -7,6 +7,7 @@ import {
   buildShellChromeState,
   type ShellChromeInput,
 } from '@/mobile/native-chrome/native-chrome-state.ts'
+import type { NativeChromeMessage } from '@/mobile/native-chrome/protocol.ts'
 
 /**
  * The Swift tests decode the same files (`ChromeKitTests`), so a field that
@@ -25,8 +26,12 @@ const BASE: Omit<ShellChromeInput, 'route' | 'tab'> = {
 }
 
 function checkFixture(name: string, state: object): void {
+  checkJSONFixture(name, { ...state, generation: 1 })
+}
+
+function checkJSONFixture(name: string, value: unknown): void {
   const path = join(FIXTURES, `${name}.json`)
-  const json = `${JSON.stringify({ ...state, generation: 1 }, null, 2)}\n`
+  const json = `${JSON.stringify(value, null, 2)}\n`
   if (process.env.UPDATE_CHROME_FIXTURES === '1') {
     writeFileSync(path, json)
   }
@@ -126,5 +131,23 @@ describe('buildNoChromeState', () => {
     const state = buildNoChromeState('light')
     expect(state).toMatchObject({ chrome: 'none', showsBar: false, routeKind: null })
     checkFixture('none', state)
+  })
+})
+
+describe('page messages', () => {
+  it('matches the messages the Swift shell decodes', () => {
+    const messages: NativeChromeMessage[] = [
+      {
+        type: 'presentMenu',
+        entryId: 4,
+        menuId: 'filters',
+        rect: { x: 10, y: 20, width: 30, height: 40 },
+        items: [{ type: 'action', id: 'pinned', title: 'Pinned', checked: true }],
+      },
+      { type: 'transition', phase: 'start' },
+      { type: 'transition', phase: 'end' },
+      { type: 'chromeReady' },
+    ]
+    checkJSONFixture('messages', messages)
   })
 })

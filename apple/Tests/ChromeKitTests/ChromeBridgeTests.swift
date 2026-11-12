@@ -24,6 +24,21 @@ final class ChromeBridgeTests: XCTestCase {
     }
   }
 
+  func testDecodesEveryOtherMessageOfThePage() throws {
+    let messages = try JSONDecoder().decode([ChromeMessage].self, from: try fixture("messages"))
+    XCTAssertEqual(messages.count, 4)
+    guard case .presentMenu(let request) = messages.first else {
+      return XCTFail("no menu request")
+    }
+    XCTAssertEqual(request.entryId, 4)
+    XCTAssertEqual(request.menuId, "filters")
+    XCTAssertEqual(request.rect.height, 40)
+    XCTAssertEqual(request.items.count, 1)
+    XCTAssertEqual(
+      Array(messages.dropFirst()),
+      [.transition(started: true), .transition(started: false), .chromeReady])
+  }
+
   func testEncodesEveryIntentAsTheFixtureThePageParses() throws {
     let intents: [ChromeIntent] = [
       .back(entryId: 3),

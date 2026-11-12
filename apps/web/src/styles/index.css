@@ -37,6 +37,15 @@ Cascade layer order, low to high priority.
       --value(integer)
   );
 }
+/* Clears the bottom safe area (home indicator, native tab bar) while the
+   keyboard is down. With the keyboard up the shell root already ends at the
+   keyboard's top, and the safe area keeps its size. */
+@utility pb-safe-unless-keyboard-offset-* {
+  padding-bottom: calc(
+    max(env(safe-area-inset-bottom, 0px) - var(--keyboard-height, 0px), 0px) + var(--spacing) *
+      --value(integer)
+  );
+}
 @utility bottom-above-tab-bar-offset-* {
   bottom: calc(
     var(--mobile-tab-bar-height, env(safe-area-inset-bottom, 0px)) + var(--spacing) *

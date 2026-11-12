@@ -19,6 +19,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   private var tabFollow = TabFollow()
   /// The picture of the old tab over the new page until the page shows the new tab.
   private var cover: UIView?
+  /// Counts tab moves, so the timeout of an earlier move does nothing.
+  private var moves = 0
   /// The last state's reasons to hide the tab bar.
   private var hidesForState = true
   private var hidesForKeyboard = false
@@ -156,13 +158,16 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     // The page's bar shows its last visit until the first state of the tab.
     page.navigationController?.setNavigationBarHidden(true, animated: false)
     page.attach(webView)
-    guard let picture else { return }
-    picture.frame = page.view.bounds
-    picture.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    page.view.addSubview(picture)
-    cover = picture
+    moves += 1
+    let move = moves
+    if let picture {
+      picture.frame = page.view.bounds
+      picture.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      page.view.addSubview(picture)
+      cover = picture
+    }
     DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak page] in
-      guard let self, let page else { return }
+      guard let self, let page, self.moves == move else { return }
       self.removeCover(from: page)
       // The page did not show the tapped tab: follow the tab it shows.
       if let pageTab = page.chromeTab, let tab = self.tabFollow.timeOut(pageTab) {

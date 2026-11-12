@@ -24,19 +24,10 @@ export function MobileNote({ path }: { path: string }): ReactElement {
   const { back, navigate } = useRouterActions()
   const untitled = isUntitledNotePath(path)
   const close = (): void => (canBack ? back() : navigate({ kind: 'today' }))
-  const actions = useNoteActions(path, close)
 
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileScreenHeader
-        title={untitled ? 'New note' : 'Edit note'}
-        onBack={close}
-        trailing={<NoteActionsMenu path={path} onDeleted={close} actions={actions} />}
-        nativeTrailing={[
-          { id: 'note-actions', title: 'Note actions', icon: 'ellipsis', menu: actions.items },
-        ]}
-        onNativeAction={actions.runAction}
-      />
+      <MobileNoteHeader path={path} untitled={untitled} close={close} />
       <main
         // Keyboard avoidance is the shell root's job (it ends at the
         // keyboard's top); `pb-safe` only clears the home indicator when the
@@ -70,5 +61,32 @@ export function MobileNote({ path }: { path: string }): ReactElement {
         </div>
       </main>
     </div>
+  )
+}
+
+/**
+ * The note's header and its actions. The note's pin and row state live here,
+ * so a save re-renders the header, not the editor.
+ */
+function MobileNoteHeader({
+  path,
+  untitled,
+  close,
+}: {
+  path: string
+  untitled: boolean
+  close: () => void
+}): ReactElement {
+  const actions = useNoteActions(path, close)
+  return (
+    <MobileScreenHeader
+      title={untitled ? 'New note' : 'Edit note'}
+      onBack={close}
+      trailing={<NoteActionsMenu path={path} onDeleted={close} actions={actions} />}
+      nativeTrailing={[
+        { id: 'note-actions', title: 'Note actions', icon: 'ellipsis', menu: actions.items },
+      ]}
+      onNativeAction={actions.runAction}
+    />
   )
 }

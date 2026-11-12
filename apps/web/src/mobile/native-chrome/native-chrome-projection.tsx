@@ -12,7 +12,11 @@ import {
   buildShellChromeState,
   postChromeState,
 } from '@/mobile/native-chrome/native-chrome-state.ts'
-import { parseNativeIntent, type NativeIntent } from '@/mobile/native-chrome/protocol.ts'
+import {
+  parseNativeIntent,
+  type NativeChromeMessage,
+  type NativeIntent,
+} from '@/mobile/native-chrome/protocol.ts'
 import {
   nativeBarHandlers,
   nativeBars,
@@ -233,7 +237,7 @@ export function NativeChromeProjection({
         })
       }
     })
-    postNativeChrome({ type: 'chromeReady' })
+    postNativeChrome({ type: 'chromeReady' } satisfies NativeChromeMessage)
     return unlisten
   }, [enabled])
 

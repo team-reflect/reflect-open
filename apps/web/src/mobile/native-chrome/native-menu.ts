@@ -1,5 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { NO_ENTRY, type NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
+import {
+  NO_ENTRY,
+  type NativeChromeMessage,
+  type NativeMenuItem,
+} from '@/mobile/native-chrome/protocol.ts'
 import { forgetNativeMenu, rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
 import { useOptionalRouterState } from '@/routing/router.tsx'
 import { hasNativeChrome, postNativeChrome } from '@/services/native-chrome-transport.ts'
@@ -75,7 +79,7 @@ export function presentNativeMenu({
     menuId,
     rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
     items,
-  })
+  } satisfies NativeChromeMessage)
 }
 
 interface NativeMenuDrawerOptions {
