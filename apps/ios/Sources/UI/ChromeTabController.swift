@@ -140,12 +140,29 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     let natural = UIEdgeInsets(
       top: max(0, safe.minY - frame.minY), left: max(0, safe.minX - frame.minX),
       bottom: max(0, frame.maxY - safe.maxY), right: max(0, frame.maxX - safe.maxX))
-    let want = placeholder.view.safeAreaInsets
+    var want = placeholder.view.safeAreaInsets
+    // On iPad the floating tab bar sits at the top. UIKit puts the bar of a
+    // navigation controller in the selected tab in the same row, under the
+    // tab bar, without a title. The stage does the same.
+    let windowTop = view.window?.safeAreaInsets.top ?? want.top
+    let sharesTopRow = want.top > windowTop + 1
+    if sharesTopRow {
+      want.top = windowTop
+    }
+    if sharesTopRow != (page.navigationItem.titleView != nil) {
+      page.navigationItem.titleView = sharesTopRow ? UIView() : nil
+    }
     let extra = UIEdgeInsets(
       top: max(0, want.top - natural.top), left: max(0, want.left - natural.left),
       bottom: max(0, want.bottom - natural.bottom), right: max(0, want.right - natural.right))
     if extra != stage.additionalSafeAreaInsets {
       stage.additionalSafeAreaInsets = extra
+      // The page keeps its old top inset after a sidebar toggle unless it
+      // lays out again on the next run loop.
+      DispatchQueue.main.async { [weak self] in
+        self?.page.view.setNeedsLayout()
+        self?.page.view.layoutIfNeeded()
+      }
     }
   }
 
