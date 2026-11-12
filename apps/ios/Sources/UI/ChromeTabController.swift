@@ -2,25 +2,31 @@ import ChromeKit
 import UIKit
 import WebKit
 
-/// The native tab bar: one navigation controller per tab, each with a
-/// ``WebPageController`` root. The one web view moves into the page of the
-/// selected tab. The page owns navigation: a tap sends a `tab` intent, and the
-/// selection follows the tab of each state.
+/// The native tab bar. Each tab holds an empty placeholder; one stage (a
+/// navigation controller whose root page holds the web view) sits over the
+/// selected placeholder, under the tab bar and the sidebar. A tab tap only
+/// moves the selection and sends a `tab` intent: the web view never moves,
+/// and the page draws the new tab in place. The selection follows the tab of
+/// each state.
 @MainActor
 final class ChromeTabController: UITabBarController, UITabBarControllerDelegate {
   /// Sends an intent to the page.
   var send: (ChromeIntent) -> Void = { _ in }
 
   private let webView: WKWebView
-  private var pages: [ChromeTab: WebPageController] = [:]
+  /// The one page: it holds the web view for every tab.
+  private let page = WebPageController(tab: .daily)
+  /// The navigation controller of the page. It stays in place for every tab.
+  private let stage: UINavigationController
+  private var placeholders: [ChromeTab: TabPlaceholder] = [:]
+  private var stagePins: [NSLayoutConstraint] = []
+  private weak var pinnedTo: UIView?
   /// Set while the selection follows a state, so it sends no intent.
   private var following = false
   /// The tab to select, with a tap that waits for the page (at most 2 s).
   private var tabFollow = TabFollow()
-  /// The picture of the old tab over the new page until the page shows the new tab.
-  private var cover: UIView?
-  /// Counts tab moves, so the timeout of an earlier move does nothing.
-  private var moves = 0
+  /// Counts taps, so the timeout of an earlier tap does nothing.
+  private var taps = 0
   /// The last state's reasons to hide the tab bar.
   private var hidesForState = true
   private var hidesForKeyboard = false
@@ -30,7 +36,16 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   init(webView: WKWebView) {
     self.webView = webView
+    stage = UINavigationController(rootViewController: page)
     super.init(nibName: nil, bundle: nil)
+    stage.setNavigationBarHidden(true, animated: false)
+    // The page scrolls inside the web view, never under the bar, so the bar
+    // shows the page's own background.
+    let appearance = UINavigationBarAppearance()
+    appearance.configureWithTransparentBackground()
+    stage.navigationBar.standardAppearance = appearance
+    stage.navigationBar.scrollEdgeAppearance = appearance
+    stage.navigationBar.compactAppearance = appearance
     tabs = [
       makeTab(.daily, title: "Daily", image: UIImage(systemName: "square.and.pencil")),
       makeTab(.all, title: "All", image: UIImage(systemName: "doc.on.doc")),
@@ -50,7 +65,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
     // The launch look: no bars before the first state.
     isTabBarHidden = true
-    pages[.daily]?.attach(webView)
+    page.attach(webView)
     registerForTraitChanges([UITraitHorizontalSizeClass.self]) {
       (self: Self, _: UITraitCollection) in
       self.updateTabBarHidden()
@@ -62,9 +77,76 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     fatalError("init(coder:) is not supported")
   }
 
-  /// The page of `tab`.
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    addChild(stage)
+    stage.view.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(stage.view)
+    stage.didMove(toParent: self)
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    placeStage()
+  }
+
+  /// The page of `tab`: the one page holds every tab.
   func page(for tab: ChromeTab) -> WebPageController? {
-    pages[tab]
+    page
+  }
+
+  private var selectedPlaceholder: TabPlaceholder? {
+    selectedTab?.viewController as? TabPlaceholder
+  }
+
+  /// Puts the stage right above the view that holds the selected
+  /// placeholder (so under the tab bar and the sidebar), over the
+  /// placeholder's frame, with the placeholder's safe area.
+  private func placeStage() {
+    guard let placeholder = selectedPlaceholder, placeholder.isViewLoaded,
+      placeholder.view.window != nil
+    else { return }
+    var holder: UIView = placeholder.view
+    while let parent = holder.superview, parent !== view {
+      holder = parent
+    }
+    guard holder.superview === view else { return }
+    if let stageIndex = view.subviews.firstIndex(of: stage.view),
+      let holderIndex = view.subviews.firstIndex(of: holder), stageIndex != holderIndex + 1
+    {
+      view.insertSubview(stage.view, aboveSubview: holder)
+    }
+    if pinnedTo !== placeholder.view {
+      NSLayoutConstraint.deactivate(stagePins)
+      stagePins = [
+        stage.view.leadingAnchor.constraint(equalTo: placeholder.view.leadingAnchor),
+        stage.view.trailingAnchor.constraint(equalTo: placeholder.view.trailingAnchor),
+        stage.view.topAnchor.constraint(equalTo: placeholder.view.topAnchor),
+        stage.view.bottomAnchor.constraint(equalTo: placeholder.view.bottomAnchor),
+      ]
+      NSLayoutConstraint.activate(stagePins)
+      pinnedTo = placeholder.view
+    }
+    syncSafeArea(with: placeholder)
+  }
+
+  /// Gives the stage the safe area of the placeholder: the tab bar and the
+  /// sidebar inset the placeholder, but not a sibling view of it.
+  private func syncSafeArea(with placeholder: TabPlaceholder) {
+    guard placeholder === selectedPlaceholder, let parent = stage.view.superview else { return }
+    // The insets the stage gets from its parent alone.
+    let safe = parent.bounds.inset(by: parent.safeAreaInsets)
+    let frame = stage.view.frame
+    let natural = UIEdgeInsets(
+      top: max(0, safe.minY - frame.minY), left: max(0, safe.minX - frame.minX),
+      bottom: max(0, frame.maxY - safe.maxY), right: max(0, frame.maxX - safe.maxX))
+    let want = placeholder.view.safeAreaInsets
+    let extra = UIEdgeInsets(
+      top: max(0, want.top - natural.top), left: max(0, want.left - natural.left),
+      bottom: max(0, want.bottom - natural.bottom), right: max(0, want.right - natural.right))
+    if extra != stage.additionalSafeAreaInsets {
+      stage.additionalSafeAreaInsets = extra
+    }
   }
 
   /// A template image of a symbol at the tab bar's 23 pt symbol size. The tab
@@ -81,19 +163,14 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   }
 
   private func makeTab(_ tab: ChromeTab, title: String, image: UIImage?) -> UITab {
-    let page = WebPageController(tab: tab)
-    pages[tab] = page
-    let navigation = UINavigationController(rootViewController: page)
-    navigation.setNavigationBarHidden(true, animated: false)
-    // The page scrolls inside the web view, never under the bar, so the bar
-    // shows the page's own background.
-    let appearance = UINavigationBarAppearance()
-    appearance.configureWithTransparentBackground()
-    navigation.navigationBar.standardAppearance = appearance
-    navigation.navigationBar.scrollEdgeAppearance = appearance
-    navigation.navigationBar.compactAppearance = appearance
+    let placeholder = TabPlaceholder()
+    placeholder.onLayout = { [weak self, weak placeholder] in
+      guard let self, let placeholder, placeholder === self.selectedPlaceholder else { return }
+      self.placeStage()
+    }
+    placeholders[tab] = placeholder
     return UITab(title: title, image: image, identifier: tab.rawValue) { _ in
-      navigation
+      placeholder
     }
   }
 
@@ -126,10 +203,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       following = true
       selectedTab = tab
       following = false
-    }
-    if let page = pages[chromeTab] {
-      page.attach(webView)
-      removeCover(from: page)
+      placeStage()
     }
   }
 
@@ -139,13 +213,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     hidesForState = true
     hidesForKeyboard = false
     showsShell = false
-    for page in pages.values {
-      page.clearBar()
-    }
-    if let cover {
-      cover.removeFromSuperview()
-      self.cover = nil
-    }
+    page.clearBar()
     setTabBarHidden(true, animated: false)
   }
 
@@ -154,51 +222,51 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     guard !following, let next = ChromeTab(rawValue: tab.identifier) else { return true }
     guard showsShell else { return false }
     send(.tab(next))
-    if tab !== selectedTab, let page = pages[next] {
+    if tab !== selectedTab {
       tabFollow.tap(next)
-      move(to: page)
+      taps += 1
+      let tap = taps
+      // The page did not show the tapped tab in 2 s: follow the tab it shows.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+        guard let self, self.taps == tap, let tab = self.tabFollow.timeOut(next) else { return }
+        self.follow(tab)
+      }
     }
     return true
   }
 
-  /// Moves the web view into `page` behind a picture of the old tab, so the
-  /// old tab's content never shows in the new tab for a frame. The picture
-  /// fades out when the page shows the new tab, or after 2 s (a first visit
-  /// can wait for a lazy screen). If the page never shows the new tab (it
-  /// dropped the tap), the selection follows the tab of the last state.
-  private func move(to page: WebPageController) {
-    cover?.removeFromSuperview()
-    cover = nil
-    let picture = webView.snapshotView(afterScreenUpdates: false)
-    page.loadViewIfNeeded()
-    // The page's bar shows its last visit until the first state of the tab.
-    page.navigationController?.setNavigationBarHidden(true, animated: false)
-    page.attach(webView)
-    moves += 1
-    let move = moves
-    if let picture {
-      picture.frame = page.view.bounds
-      picture.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-      page.view.addSubview(picture)
-      cover = picture
-    }
-    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak page] in
-      guard let self, let page, self.moves == move else { return }
-      self.removeCover(from: page)
-      // The page did not show the tapped tab: follow the tab it shows.
-      if let tab = self.tabFollow.timeOut(page.chromeTab) {
-        self.follow(tab)
-      }
-    }
+  func tabBarController(
+    _ tabBarController: UITabBarController, didSelectTab selectedTab: UITab, previousTab: UITab?
+  ) {
+    placeStage()
+  }
+}
+
+/// The empty content of one tab. Its frame and safe area tell where the
+/// stage goes.
+@MainActor
+final class TabPlaceholder: UIViewController {
+  /// Called when the frame or the safe area changes.
+  var onLayout: () -> Void = {}
+
+  override func loadView() {
+    let view = UIView()
+    view.backgroundColor = .clear
+    self.view = view
   }
 
-  private func removeCover(from page: WebPageController) {
-    guard let cover, cover.superview === page.view else { return }
-    self.cover = nil
-    UIView.animate(withDuration: 0.1) {
-      cover.alpha = 0
-    } completion: { _ in
-      cover.removeFromSuperview()
-    }
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    onLayout()
+  }
+
+  override func viewSafeAreaInsetsDidChange() {
+    super.viewSafeAreaInsetsDidChange()
+    onLayout()
+  }
+
+  override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    onLayout()
   }
 }
