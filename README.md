@@ -120,10 +120,16 @@ reflect-open/
 ├── apps/native-host/      # Browser capture helper
 ├── apple/                 # Shared Swift package
 ├── packages/core/         # Shared TypeScript logic
-├── packages/app/          # FIXME: add this line
+├── packages/app/          # App layer: windows, routes, commands, menus
 ├── packages/db/           # Database types and helpers
+├── crates/core/           # Rust commands shared by both shells
+├── crates/ffi/            # C ABI over the Rust core for the iOS app
+├── crates/git/            # Git backup and sync
+├── crates/graph-io/       # Graph file IO
+├── crates/graph-paths/    # Graph-relative path classification
+├── crates/index/          # SQLite index of a graph
 ├── crates/index-schema/   # Shared index schema
-├── crates/index-schema/   # FIXME: there are at lot of missing crates. fix them.
+├── crates/types/          # Wire types shared by Rust and TypeScript
 ├── design-system/         # Tokens and UI primitives
 └── docs/                  # Product, architecture, and contributor docs
 ```
