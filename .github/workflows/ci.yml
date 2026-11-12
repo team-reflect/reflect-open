@@ -258,6 +258,10 @@ jobs:
         working-directory: apple
         run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS Simulator' -quiet
 
+      - name: Build apple/ for iOS devices
+        working-directory: apple
+        run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS' -quiet
+
   # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
   test-ios:
     needs: classify
