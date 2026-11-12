@@ -7,7 +7,7 @@ export default defineConfig({
     slowTestThreshold: 10_000,
     isolate: false,
     projects: [
-      './apps/desktop/vitest.*.config.ts',
+      './apps/web/vitest.*.config.ts',
       './apps/extension/vitest.config.ts',
       './design-system/vitest.config.ts',
       './packages/*/vitest.config.ts',

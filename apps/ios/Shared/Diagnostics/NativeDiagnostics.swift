@@ -4,7 +4,7 @@ import Sentry
 /// Native crash/hang reporting for the iOS host process.
 ///
 /// The JavaScript layer already reports webview exceptions
-/// (`apps/desktop/src/lib/exception-telemetry.ts`), but a Rust panic, a Swift
+/// (`apps/web/src/lib/exception-telemetry.ts`), but a Rust panic, a Swift
 /// crash, an OS watchdog kill, or a WebKit content-process death never reaches
 /// it. Those are exactly the terminations that arrive in TestFlight without a
 /// usable report, so the host starts Sentry Cocoa purely to capture the native

@@ -37,9 +37,8 @@ export interface IpcBridge {
     headers: Record<string, string>,
   ) => Promise<unknown>
   /**
-   * Attach a handler to a plugin's event stream, Tauri's
-   * `addPluginListener` channel (`recordingLevel`, ...), which is distinct
-   * from the global event bus behind {@link listen}.
+   * Attach a handler to a plugin's event stream (`recordingLevel`, ...),
+   * which is distinct from the global event bus behind {@link listen}.
    */
   listenPlugin?: (
     plugin: string,

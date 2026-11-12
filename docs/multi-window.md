@@ -57,7 +57,7 @@ backs them all. Navigation goes through `LinkNavigationService`
 - A declined or failed open falls back to in-window navigation, unless a newer
   navigation has happened, so a late fallback never pulls the source window
   somewhere stale.
-- `open_note_window` (`src-tauri/src/windows.rs`) refuses without an open
+- `open_note_window` (`apps/tauri/src/windows.rs`) refuses without an open
   graph, after a graph switch, or during a quit. An app-wide gate serializes
   target selection and Tauri's non-atomic window build.
 - Reopening a target focuses its preferred window. The invoking window is never

@@ -41,9 +41,9 @@
       "kind": "group",
       "name": "Icons",
       "children": [
-        { "path": "../desktop/src-tauri/icons/AppIcon.icon", "target-membership": [ "Reflect/resources" ] },
-        { "path": "../desktop/src-tauri/icons-beta/AppIcon-Beta.icon", "target-membership": [ "Reflect/resources" ] },
-        { "path": "../desktop/src-tauri/icons-dev/AppIcon-Dev.icon", "target-membership": [ "Reflect/resources" ] },
+        { "path": "../../design-system/assets/app-icons/AppIcon.icon", "target-membership": [ "Reflect/resources" ] },
+        { "path": "../../design-system/assets/app-icons/AppIcon-Beta.icon", "target-membership": [ "Reflect/resources" ] },
+        { "path": "../../design-system/assets/app-icons/AppIcon-Dev.icon", "target-membership": [ "Reflect/resources" ] },
       ],
     }, {
       "kind": "group",

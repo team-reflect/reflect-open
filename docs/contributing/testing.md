@@ -11,31 +11,31 @@ The root `vitest.config.ts` collects every app and package into one workspace.
 | --- | --- | --- | --- |
 | `core` | `packages/core/vitest.config.ts` | `src/**/*.test.ts` | node |
 | `app` | `packages/app/vitest.config.ts` | `src/**/*.test.ts` | node |
-| `desktop-node` | `apps/desktop/vitest.node.config.ts` | `src/**/*.test.ts` | node |
-| `desktop-browser` | `apps/desktop/vitest.browser.config.ts` | `src/**/*.test.tsx` | Playwright browser |
+| `web-node` | `apps/web/vitest.node.config.ts` | `src/**/*.test.ts` | node |
+| `web-browser` | `apps/web/vitest.browser.config.ts` | `src/**/*.test.tsx` | Playwright browser |
 
 Every other app and package has its own `vitest.config.ts`, a node project named after the directory.
 
 The file extension decides the environment: `.test.ts` runs in node,
 `.test.tsx` runs in a real browser. There is no jsdom. A test that needs a DOM
-therefore lives in `apps/desktop`, never in `packages/core` or `packages/app`.
+therefore lives in `apps/web`, never in `packages/core` or `packages/app`.
 
 Browser test files run in parallel. Each Vitest worker has its own Playwright
 page, and Playwright emulates focus per page. CI runs the browser project on Chromium
 and on WebKit, because the Tauri webview is WebKit.
-`pnpm --filter @reflect/desktop test:install` downloads both browsers.
+`pnpm --filter @reflect/web test:install` downloads both browsers.
 `REFLECT_TEST_BROWSER=webkit` selects WebKit, and `DEBUG=1` opens a headed browser.
 
 ## Console output fails tests
 
 `vitest-fail-on-console` fails a test on any `console.warn` or `console.error`,
-in the core, app and desktop projects.
+in the core, app and web projects.
 
-- Fix the warning. Do not add to `apps/desktop/src/test-utils/allowed-console.ts`
-  without a measured reason in that file.
+- Fix the warning. Do not add to `ALLOWED_CONSOLE_PATTERNS` in
+  `apps/web/src/test-utils/setup-console.ts` without a measured reason next to it.
 - Code logs through `LoggerService`. A test of an error path passes
   `createTestLoggerService()` and asserts `logger.getErrors()`.
-- In desktop tests, import `act` from `@/test-utils/act.ts`, not from `react`,
+- In web tests, import `act` from `@/test-utils/act.ts`, not from `react`,
   and always await it, so no act warning prints.
 
 ## Testing a service
@@ -77,9 +77,9 @@ builds `AppServices` over `core`, sharing its platform and ports.
 ## Testing React code
 
 Components read `useCoreServices()` and `useAppServices()`, which throw
-outside their providers. Every desktop test that renders goes through
+outside their providers. Every web test that renders goes through
 `renderInApp(ui, options)` or `renderHookInApp(hook, options)`
-(`apps/desktop/src/test-utils/render-in-app.tsx`), which mount the app's
+(`apps/web/src/test-utils/render-in-app.tsx`), which mount the app's
 providers as `main.tsx` does. The options are documented on
 `RenderInAppOptions`.
 
@@ -122,7 +122,7 @@ builds the app itself.
 ## `vi.mock`
 
 `eslint.config.js` allows `vi.mock` only for the specifiers in
-`DESKTOP_VI_MOCK_ALLOW` and `DESKTOP_VI_MOCK_ALLOW_BY_FILE`: pure UI children,
+`WEB_VI_MOCK_ALLOW` and `WEB_VI_MOCK_ALLOW_BY_FILE`: pure UI children,
 heavy children, and `@tauri-apps/*` in adapter tests. `packages/` allows none.
 Never mock `@reflect/core`, `@reflect/app`, a service, or a provider that
 reads a service. Seed or spy on `core` instead. A new entry needs a reason next

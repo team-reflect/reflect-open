@@ -116,26 +116,26 @@ const architecturePlugin = {
 // `vi.mock` allowlists
 // ---------------------------------------------------------------------------
 
-/** Mocked in any desktop test: pure UI children and heavy children. */
-const DESKTOP_VI_MOCK_ALLOW = [
+/** Mocked in any web test: pure UI children and heavy children. */
+const WEB_VI_MOCK_ALLOW = [
   // The ProseKit editor: a test of a screen around it uses a probe.
   '@/editor/note-editor.tsx',
   // The read-only Markdown renderer loads the same editor stack.
   '@/editor/markdown-preview.tsx',
 ]
 
-/** Extra specifiers for one desktop test file, each with its reason. */
-const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
+/** Extra specifiers for one web test file, each with its reason. */
+const WEB_VI_MOCK_ALLOW_BY_FILE = {
   // Platform adapters: the test stands in for the Tauri API under the adapter.
-  'apps/desktop/src/services/*.test.ts': ['@tauri-apps/*'],
+  'apps/web/src/services/*.test.ts': ['@tauri-apps/*'],
 
   // Heavy children: the pane and the task row mount the editor.
-  'apps/desktop/src/components/daily-stream.focus.test.tsx': ['@/components/note-pane.tsx'],
-  'apps/desktop/src/components/tasks/tasks-screen.test.tsx': ['./task-editor'],
+  'apps/web/src/components/daily-stream.focus.test.tsx': ['@/components/note-pane.tsx'],
+  'apps/web/src/components/tasks/tasks-screen.test.tsx': ['./task-editor'],
 
   // The real resolver only lets `reflect-asset:` media through, which no test
   // browser can load; the mock also widens `X_MEDIA_URL_PROTOCOLS`.
-  'apps/desktop/src/editor/note-editor.test.tsx': ['@/editor/use-x-post-resolver.ts'],
+  'apps/web/src/editor/note-editor.test.tsx': ['@/editor/use-x-post-resolver.ts'],
 }
 
 /**
@@ -170,7 +170,7 @@ function viMockBlock(files, allow) {
 // ---------------------------------------------------------------------------
 
 const TAURI_IMPORT_MESSAGE =
-  'Only the platform adapters in `apps/desktop/src/services/` (and `boot.ts`, `main.tsx`) import `@tauri-apps/*`. Read the service from `useCoreServices()` or take it in `ctx`.'
+  'Only the platform adapters in `apps/web/src/services/` (and `boot.ts`, `main.tsx`) import `@tauri-apps/*`. Read the service from `useCoreServices()` or take it in `ctx`.'
 
 // A selector, not `no-restricted-imports`: that rule also reports
 // `import * as React from 'react'`.
@@ -249,7 +249,7 @@ export default defineESLintConfig(
     react: {
       version: '19.3',
       reactCompiler: true,
-      files: ['**/*.tsx', './apps/desktop/src/**/*.ts'],
+      files: ['**/*.tsx', './apps/web/src/**/*.ts'],
     },
     markdown: false,
     packageJson: false,
@@ -279,7 +279,7 @@ export default defineESLintConfig(
           object: 'AbortSignal',
           property: 'any',
           message:
-            'Use `anySignal` (`apps/desktop/src/lib/any-signal.ts`): WebKit can collect an `AbortSignal.any` result that only listener options hold.',
+            'Use `anySignal` (`apps/web/src/lib/any-signal.ts`): WebKit can collect an `AbortSignal.any` result that only listener options hold.',
         },
       ],
     },
@@ -305,8 +305,8 @@ export default defineESLintConfig(
   // `services/`. Everything else gets a service from `useCoreServices()` / `ctx`.
   // Also: tests use the `act` of `test-utils/act.ts`.
   {
-    files: [`apps/desktop/src/**/*.${SOURCE_EXTENSIONS}`],
-    ignores: ['apps/desktop/src/test-utils/act.ts'],
+    files: [`apps/web/src/**/*.${SOURCE_EXTENSIONS}`],
+    ignores: ['apps/web/src/test-utils/act.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -324,12 +324,12 @@ export default defineESLintConfig(
   {
     files: [
       // The adapters.
-      `apps/desktop/src/services/**/*.${SOURCE_EXTENSIONS}`,
+      `apps/web/src/services/**/*.${SOURCE_EXTENSIONS}`,
       // The composition roots: `boot.ts` picks the shell's adapters before
       // any service exists; `main.tsx` is listed with it. Neither imports
       // from Tauri today.
-      'apps/desktop/src/boot.ts',
-      'apps/desktop/src/main.tsx',
+      'apps/web/src/boot.ts',
+      'apps/web/src/main.tsx',
     ],
     rules: {
       'no-restricted-imports': 'off',
@@ -358,20 +358,17 @@ export default defineESLintConfig(
 
   // Rule: all diagnostics go through `LoggerService`, in the app and in tests.
   {
-    files: [
-      `apps/desktop/src/**/*.${SOURCE_EXTENSIONS}`,
-      `packages/*/src/**/*.${SOURCE_EXTENSIONS}`,
-    ],
+    files: [`apps/web/src/**/*.${SOURCE_EXTENSIONS}`, `packages/*/src/**/*.${SOURCE_EXTENSIONS}`],
     ignores: [
       // The console implementation of `LoggerService`, and its test.
       'packages/core/src/ports/logger-service.ts',
       'packages/core/src/ports/logger-service.test.ts',
       // Boot-time: the platform facts are read before any service exists
       // (they decide which services to build).
-      'apps/desktop/src/services/detect-platform.ts',
+      'apps/web/src/services/detect-platform.ts',
       // The in-memory backend of browser dev. It stands in for the Rust side
       // of the IPC bridge and has no services.
-      'apps/desktop/src/dev/**',
+      'apps/web/src/dev/**',
     ],
     rules: { 'no-restricted-globals': NO_CONSOLE },
   },
@@ -381,9 +378,9 @@ export default defineESLintConfig(
   // children only; `@reflect/core`, `@/lib/*` and the providers that are a
   // thin shell over a service are never on the list.
   viMockBlock([`packages/**/*.${SOURCE_EXTENSIONS}`], []),
-  viMockBlock([`apps/desktop/**/*.${SOURCE_EXTENSIONS}`], DESKTOP_VI_MOCK_ALLOW),
-  ...Object.entries(DESKTOP_VI_MOCK_ALLOW_BY_FILE).map(([file, allow]) => {
-    return viMockBlock([file], [...DESKTOP_VI_MOCK_ALLOW, ...allow])
+  viMockBlock([`apps/web/**/*.${SOURCE_EXTENSIONS}`], WEB_VI_MOCK_ALLOW),
+  ...Object.entries(WEB_VI_MOCK_ALLOW_BY_FILE).map(([file, allow]) => {
+    return viMockBlock([file], [...WEB_VI_MOCK_ALLOW, ...allow])
   }),
   viMockBlock([`apps/extension/**/*.${SOURCE_EXTENSIONS}`], EXTENSION_VI_MOCK_ALLOW),
 )

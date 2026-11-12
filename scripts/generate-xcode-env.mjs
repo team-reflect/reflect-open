@@ -1,5 +1,5 @@
-// Generates a gitignored `.xcode.env.local` for each Xcode project
-// (apps/desktop/src-tauri and apps/ios). The Xcode build phases source it:
+// Generates a gitignored `.xcode.env.local` for the Xcode project in
+// apps/ios. The Xcode build phases source it:
 // Xcode launched from the Dock runs script phases with the minimal launchd
 // PATH, so they cannot find node, cargo or the mise tools on their own. The
 // file records the node toolchain of the environment that ran `pnpm install`
@@ -12,10 +12,7 @@ import process from 'node:process'
 
 if (process.platform === 'darwin') {
   const rootDir = join(import.meta.dirname, '..')
-  const targets = [
-    join(rootDir, 'apps', 'desktop', 'src-tauri', '.xcode.env.local'),
-    join(rootDir, 'apps', 'ios', '.xcode.env.local'),
-  ]
+  const target = join(rootDir, 'apps', 'ios', '.xcode.env.local')
 
   const nodeBinary = process.execPath
   const nodeDir = dirname(nodeBinary)
@@ -29,8 +26,6 @@ export NODE_BINARY="${nodeBinary}"
 export PATH="${nodeDir}:$HOME/.local/share/mise/shims:$PATH:$HOME/.cargo/bin"
 `
 
-  for (const target of targets) {
-    writeFileSync(target, content)
-    console.log(`generate-xcode-env: wrote ${target} (node ${process.version})`)
-  }
+  writeFileSync(target, content)
+  console.log(`generate-xcode-env: wrote ${target} (node ${process.version})`)
 }

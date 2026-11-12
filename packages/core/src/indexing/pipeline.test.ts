@@ -719,7 +719,7 @@ describe('reconcile over the native scan delta', () => {
 describe('iCloud eviction placeholders (Plan 21)', () => {
   // Reconcile-side placeholder rules (never a candidate, never an orphan)
   // now live in the Rust scan — `reconcile_scan_classifies_candidates_orphans_and_skips`
-  // in src-tauri covers them. Only the rebuild path still walks the listing here.
+  // in crates/index/src/tests.rs covers them. Only the rebuild path still walks the listing here.
   it('rebuild indexes readable files and skips evicted ones', async () => {
     const { indexer, store, reads } = setup({
       files: {

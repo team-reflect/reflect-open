@@ -1,7 +1,7 @@
 # Distribution
 
 How Reflect ships: macOS (signed and notarized), iOS (TestFlight), Windows, and Linux. The steps
-live in `apps/desktop/scripts/` and the `publish-*.yml` workflows. This file holds what they
+live in `apps/tauri/scripts/`, `apps/ios/scripts/` and the `publish-*.yml` workflows. This file holds what they
 cannot say.
 
 ## Cutting a release
@@ -35,7 +35,7 @@ builds read the same names from environment variables. No PAT is needed.
 | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | Export the certificate and its key as `.p12` from Keychain Access, then `base64 -i certificate.p12`. The password is the export password. |
 | `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_CONTENT` | An App Store Connect API key. The content is the `.p8` file, raw or base64. |
 | `TAURI_SIGNING_PRIVATE_KEY` | The updater key (no password). **Losing it strands every installed app.** To rotate, generate a pair with `pnpm tauri signer generate` and ship the new pubkey in a release signed with the old key. |
-| `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | The production Sentry project. Local builds read the DSN as `VITE_SENTRY_DSN`, and iOS also as `TAURI_REFLECT_SENTRY_DSN` (`tauri ios build` passes only `TAURI_*` variables on to Xcode). Never give the token a `VITE_` prefix: it must not enter an app bundle. |
+| `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | The production Sentry project. Local builds read the DSN as `VITE_SENTRY_DSN`; `pnpm build:ipa` also passes it to Xcode as `REFLECT_SENTRY_DSN`. Never give the token a `VITE_` prefix: it must not enter an app bundle. |
 
 ## macOS
 
@@ -77,7 +77,7 @@ it with your own certificate. `--team` is that certificate's Team ID (its `OU`):
 
 ```bash
 pnpm tauri:build:dev --bundles app
-pnpm --filter @reflect/desktop safari:embed --app="$PWD/target/release/bundle/macos/Reflect Dev.app" --identity="<identity>" --team=<team>
+pnpm --filter @reflect/tauri safari:embed --app="$PWD/target/release/bundle/macos/Reflect Dev.app" --identity="<identity>" --team=<team>
 ```
 
 ### Requirements
@@ -109,17 +109,18 @@ Apple Silicon, or Intel with the universal build.
 ### Build
 
 ```bash
-pnpm build:ios --build-number=<number> --flavor=beta|stable
+pnpm build:ipa --build-number=<number> --flavor=beta|stable
 pnpm upload:testflight
 ```
+
+`build:ipa` builds the Swift shell in `apps/ios`. `upload:testflight` uploads that IPA and its dSYMs.
 
 `--flavor` is required. A release (beta or stable) uploads the stable flavor to Reflect.
 `upload:testflight` finds the App Store Connect app from the IPA's bundle id.
 
 To ship the current `master` to Reflect Beta without a release, run the **TestFlight beta**
 workflow from the Actions tab. The build keeps the last release's version; its build number (the
-commit count) tells it apart. This workflow builds the Swift shell (`apps/ios`) with
-`pnpm build:ipa` and uploads it with `pnpm upload:testflight --swift`.
+commit count) tells it apart.
 
 ### Install
 
@@ -134,8 +135,8 @@ suffix.
 
 ### Requirements
 
-iPhone or iPad. The minimum iOS version is `deploymentTarget` in
-`apps/desktop/src-tauri/gen/apple/project.yml`.
+iPhone or iPad. The minimum iOS version is `IPHONEOS_DEPLOYMENT_TARGET` in
+`apps/ios/Config/Shared.xcconfig`.
 
 ### Troubleshooting
 
@@ -144,9 +145,8 @@ iPhone or iPad. The minimum iOS version is `deploymentTarget` in
   from a Mac signed into the team, then rerun:
 
   ```bash
-  cd apps/desktop/src-tauri/gen/apple
-  xcodebuild -project reflect-open.xcodeproj -target <NewExtension> \
-    -sdk iphoneos -configuration release -allowProvisioningUpdates build
+  xcodebuild -project apps/ios/Reflect.xcodeproj -target <NewExtension> \
+    -sdk iphoneos -configuration Release-Stable -allowProvisioningUpdates build
   ```
 
 - **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`** (or `.beta`): create the

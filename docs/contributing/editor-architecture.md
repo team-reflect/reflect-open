@@ -1,6 +1,6 @@
 # Editor architecture
 
-A map of the editor: the React side in `apps/desktop/src/editor/` and the
+A map of the editor: the React side in `apps/web/src/editor/` and the
 document logic in `packages/core/src/documents/`. The design docs are Plans
 05/05b (editor + fidelity), 06 (daily notes), and 07/07b (backlinks, renames).
 
@@ -83,7 +83,7 @@ Invariants the loop maintains:
 Every drag interaction in the editor rides the browser's HTML5 drag-and-drop
 events, which Tauri's webview swallows by default. The window sets
 `dragDropEnabled: false`
-([`tauri.conf.json`](../../apps/desktop/src-tauri/tauri.conf.json)); without it,
+([`tauri.conf.json`](../../apps/tauri/tauri.conf.json)); without it,
 none of these work:
 
 - **meowdown's block-handle reorder.** The drag handle is a native `draggable`
@@ -158,7 +158,7 @@ App, `packages/app/src/`:
 | `navigation/link-navigation-service.ts` | what a clicked wiki link, Markdown link or deep link does |
 | `commands/keymap-service.ts` | the shortcut registry (rejects duplicate bindings) |
 
-Desktop, `apps/desktop/src/editor/`:
+Desktop, `apps/web/src/editor/`:
 
 | File | Owns |
 |---|---|

@@ -15,7 +15,7 @@ export interface FileSrcSource {
 }
 
 /**
- * The custom-scheme URL shape Tauri uses on macOS and iOS.
+ * The custom-scheme URL shape of Tauri on macOS and of the Swift shell.
  */
 export function appleFileSrc(filePath: string, protocol: string): string {
   return `${protocol}://localhost/${encodeURIComponent(filePath)}`

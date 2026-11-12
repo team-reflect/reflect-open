@@ -5,16 +5,16 @@ things: the Rust command, and a method on the core service that owns the
 domain.** This guide walks the path with a hypothetical `note_stat` command.
 
 The Rust command is a method on `Core` in `crates/core` (crate `reflect-core`,
-no Tauri). Two shells call it by name through `Core::dispatch`: the Tauri app
-and the Swift iOS shell.
+no Tauri). Two shells call it by name through `Core::dispatch`: the Tauri desktop
+app and the Swift iOS shell.
 
 ```text
 React component / hook        useCoreServices()
   └─ service method           packages/core/src/<domain>/<name>-service.ts
        └─ ipc.call            packages/core/src/ipc/ipc-service.ts  (zod validation)
             └─ transport.invoke   the `IpcBridge` given to `createCoreServices`
-                 ├─ Tauri IPC apps/desktop/src/services/tauri-ipc.ts
-                 └─ Swift IPC apps/desktop/src/services/swift-ipc.ts
+                 ├─ Tauri IPC apps/web/src/services/tauri-ipc.ts
+                 └─ Swift IPC apps/web/src/services/swift-ipc.ts
                       └─ Core::dispatch     crates/core/src/lib.rs
                            └─ Core method   crates/core/src/<module>.rs
 ```
@@ -63,7 +63,7 @@ A row for an `async` method ends in `.await`. A row for a method that returns
 its value without `AppResult` ends in `infallible`. Every command runs on a
 blocking-pool thread, never on the main thread. A command that exists only on
 the desktop (windows, menus) is a `#[tauri::command]` in the Tauri crate,
-registered in `generate_handler!` in `apps/desktop/src-tauri/src/lib.rs`, and
+registered in `generate_handler!` in `apps/tauri/src/lib.rs`, and
 gets no row.
 
 - **Errors are the shared contract.** Return `AppError` (from `reflect-types`,
@@ -94,7 +94,7 @@ cargo test -p reflect-core
 ```
 
 Stage the sidecars once before compiling the desktop crate
-(`pnpm --filter @reflect/desktop sidecar`).
+(`pnpm --filter @reflect/tauri sidecar`).
 
 ## 2. The service method
 
@@ -139,7 +139,7 @@ class NoteFileServiceImpl implements NoteFileService {
   it needs `stat` too, or `pnpm typecheck` fails.
 
 Plain-browser dev (`pnpm dev` without the shell) answers commands from
-`apps/desktop/src/dev/dev-bridge.ts` and throws on unknown ones. Add a `case`
+`apps/web/src/dev/dev-bridge.ts` and throws on unknown ones. Add a `case`
 there if the feature must work in that mode.
 
 If no service owns the capability, add one: see [services.md](services.md).

@@ -8,6 +8,5 @@ APPLICATION_EXTENSION_API_ONLY = YES
 SKIP_INSTALL = YES
 LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
 
-// The Tauri iOS project compiles the same sources; they were not written for
-// complete concurrency checking.
+// The extension sources were not written for complete concurrency checking.
 SWIFT_STRICT_CONCURRENCY = minimal

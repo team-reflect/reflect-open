@@ -18,7 +18,7 @@ pnpm dev          # frontend only, no native shell
 pnpm typecheck
 pnpm test --run <paths you touched>
 pnpm lint
-cargo test        # from apps/desktop/src-tauri, if you touched Rust
+cargo test        # from apps/tauri, if you touched Rust
 ```
 
 ## PR titles
@@ -37,9 +37,6 @@ message and, for `feat`/`fix`, the user-facing changelog entry.
   `1.0.0-beta.N` and `1.0.0`, then drop it once both have merged.
 - Write the title as user-visible behavior (`fix: keep the daily caret in view
   on long iOS notes`), not implementation detail.
-- The changelog is scoped to `apps/desktop/`: a change that should appear in it
-  must touch that directory. A pure `packages/core` fix still ships in the next
-  release, but gets no changelog line.
 - A change users will notice also adds an item to the in-app What's New list
   (`packages/app/src/whats-new/whats-new-content.ts`). See
   [AGENTS.md](AGENTS.md#development-workflow).
@@ -50,7 +47,7 @@ message and, for `feat`/`fix`, the user-facing changelog entry.
 - **Business logic → `packages/core`.** No file/DB/AI logic in React
   components, hooks, or Tauri command handlers. Desktop components call
   `@reflect/core` and `@reflect/app` services
-  (`apps/desktop/src/services/services-provider.tsx`); Rust commands are
+  (`apps/web/src/services/services-provider.tsx`); Rust commands are
   thin wrappers over native primitives.
 - **Rust owns capabilities, TypeScript owns policy.** A Rust command never
   encodes a product rule beyond the primitive it exposes (e.g. the watcher

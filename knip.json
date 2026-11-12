@@ -5,9 +5,9 @@
   "workspaces": {
     ".": { "entry": ["fixtures/*.mjs"] },
     "design-system": { "ignore": "./**/*" },
-    "apps/desktop": {
+    "apps/ios": {
+      "ignore": "Extensions/**",
       "ignoreDependencies": ["@sentry/cli"]
-    },
-    "apps/ios": { "ignore": "Extensions/**" }
+    }
   }
 }

@@ -1,12 +1,12 @@
 # Workspace for all Rust crates: the Tauri desktop shell, the `reflect` CLI,
-# the shared index-schema crate, and first-party mobile plugins. One lockfile
+# the shared core crates, and the FFI library of the iOS app. One lockfile
 # pins one SQLite everywhere — the desktop writer and the CLI reader can
 # never skew.
 [workspace]
 resolver = "3"
 members = [
   "apps/cli",
-  "apps/desktop/src-tauri",
+  "apps/tauri",
   "apps/native-host",
   "crates/core",
   "crates/ffi",
@@ -16,11 +16,6 @@ members = [
   "crates/index",
   "crates/index-schema",
   "crates/types",
-  "plugins/tauri-plugin-app-store",
-  "plugins/tauri-plugin-keyboard",
-  "plugins/tauri-plugin-mobile-haptics",
-  "plugins/tauri-plugin-recording",
-  "plugins/tauri-plugin-web-auth",
 ]
 
 [workspace.package]
@@ -43,11 +38,6 @@ reflect-git = { path = "crates/git" }
 reflect-index = { path = "crates/index" }
 reflect-index-schema = { path = "crates/index-schema", default-features = false }
 reflect-types = { path = "crates/types" }
-tauri-plugin-app-store = { path = "plugins/tauri-plugin-app-store" }
-tauri-plugin-keyboard = { path = "plugins/tauri-plugin-keyboard" }
-tauri-plugin-mobile-haptics = { path = "plugins/tauri-plugin-mobile-haptics" }
-tauri-plugin-recording = { path = "plugins/tauri-plugin-recording" }
-tauri-plugin-web-auth = { path = "plugins/tauri-plugin-web-auth" }
 
 # Third-party crates
 apple-native-keyring-store = "1.0.2"
@@ -97,6 +87,7 @@ percent-encoding = "2.3.2"
 proptest = "1.12.0"
 pulldown-cmark = "0.13.4"
 reconcile-text = "0.14.1"
+regex = "1.13.1"
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
@@ -108,11 +99,9 @@ sha2 = "0.11.1"
 sqlite-vec = "0.1.9"
 tauri = "2.12.5"
 tauri-build = "2.7.4"
-tauri-plugin = { version = "2.7.2", features = ["build"] }
 tauri-plugin-deep-link = "2.6.3"
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-http = "2.8.3"
-tauri-plugin-iap = "0.9.1"
 tauri-plugin-log = "2.10.1"
 tauri-plugin-opener = "2.7.2"
 tauri-plugin-process = "2.4.0"
@@ -120,11 +109,11 @@ tauri-plugin-single-instance = "2.5.5"
 tauri-plugin-updater = "2.14.1"
 tauri-plugin-window-state = "2.5.0"
 tempfile = "3.27.0"
-thiserror = "2.0.21"
 tokio = "1.53.3"
 tracing = "0.1.44"
 trash = "5.2.9"
 unicode-normalization = "0.1.26"
+urlpattern = "0.6.0"
 walkdir = "2.5.0"
 windows-native-keyring-store = "1.1.0"
 xattr = "1.6.1"

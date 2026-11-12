@@ -60,14 +60,14 @@ CI). The title becomes the squash-commit message, drives the version bump, and, 
 implementation. Do not use `feat!:` or `BREAKING CHANGE:` footers. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-release-please owns the app version in `apps/desktop/package.json`. Never hand-edit
-that version, the changelogs (`apps/desktop/CHANGELOG.md`,
-`apps/desktop/CHANGELOG.beta.md`), or the manifests under `.github/release-please/`.
+release-please owns the app version in `apps/web/package.json`. Never hand-edit
+that version, the changelogs (`apps/web/CHANGELOG.md`,
+`apps/web/CHANGELOG.beta.md`), or the manifests under `.github/release-please/`.
 
 What's New is the in-app list of changes shown after an update. When a PR adds a
 feature or a change users will notice, add an item to `WHATS_NEW` in
 `packages/app/src/whats-new/whats-new-content.ts` in the same PR. Key it by the next
-marketing version (the version in `apps/desktop/package.json` without the prerelease
+marketing version (the version in `apps/web/package.json` without the prerelease
 suffix). Give it an `id` that no other item, in any version, uses. Write a short
 title and a one-sentence body for users, and set `platforms` to where the change
 shows. Each update shows only the items the user has not seen, so change the `id`
@@ -79,25 +79,25 @@ near-duplicate. Skip internal changes, refactors, and small fixes.
 There are too many tests to run them all. Run only the ones for the logic you wrote:
 `pnpm test --run path/to/test`.
 
-Desktop JS tests are split into Vitest projects (details in
+Web JS tests are split into Vitest projects (details in
 `docs/contributing/testing.md`):
 
 - `*.test.tsx` files run in a real browser (Vitest browser mode + Playwright).
   Chromium by default; `REFLECT_TEST_BROWSER=webkit` runs WebKit (the engine of the
   production Tauri webview); `DEBUG=1` opens a headed window. One-time setup:
-  `pnpm --filter @reflect/desktop test:install`.
+  `pnpm --filter @reflect/web test:install`.
 - `*.test.ts` files are pure logic and run in node. A logic test that drives the DOM
   is named `.test.tsx` so it lands in the browser project.
-- `console.warn` / `console.error` fail tests in the core, app and desktop projects.
-  A new entry in the allowlist `apps/desktop/src/test-utils/allowed-console.ts` needs
-  a measured reason in that file.
+- `console.warn` / `console.error` fail tests in the core, app and web projects.
+  A new entry in `ALLOWED_CONSOLE_PATTERNS` (`apps/web/src/test-utils/setup-console.ts`)
+  needs a measured reason next to it.
 
 Rust tests: prefer per-crate runs (`cargo test -p reflect-cli`,
 `cargo test -p reflect-open`); `cargo test --workspace` also works.
 
 **Before any cargo build/check/test that compiles the desktop crate** (including
 `--workspace` commands and clippy), stage the sidecars once per checkout:
-`pnpm --filter @reflect/desktop sidecar`. Otherwise tauri-build fails with
+`pnpm --filter @reflect/tauri sidecar`. Otherwise tauri-build fails with
 `resource path binaries/<name>-<triple> doesn't exist` (`pnpm tauri dev`/`build`
 stage them automatically; see [docs/cli.md](docs/cli.md)). Clippy and the tests never
 run the sidecars, so they can skip them, as CI does:
@@ -108,18 +108,21 @@ Rust lint warnings fail the build (`.cargo/config.toml`). Use
 
 ### Repo layout
 
-A **Turborepo + pnpm monorepo** around a **Tauri 2** desktop/mobile app: a React +
-TypeScript frontend bundled by Vite, in a Rust native shell. The Rust crates form one
+A **Turborepo + pnpm monorepo**: a React + TypeScript web app bundled by Vite, shown
+by a **Tauri 2** desktop shell and a Swift iOS shell. The Rust crates form one
 **Cargo workspace** at the repository root.
 
-- `apps/desktop/`: the Tauri 2 app (`src/` React frontend, `src-tauri/` Rust crate
-  `reflect-open`). Never hand-edit `src-tauri/gen/`.
+- `apps/web/`: the React frontend. `TAURI_ENV_PLATFORM` selects the platform root and
+  the output directory, `dist/<desktop|mobile|unknown>/`.
+- `apps/tauri/`: the Tauri 2 desktop shell (Rust crate `reflect-open`) and its build
+  scripts. It serves `apps/web/dist/desktop`.
+- `apps/ios/`: the Swift iOS shell. It serves `apps/web/dist/mobile` and links the
+  Rust core through `crates/ffi`. It never references `apps/tauri/`.
 - `apps/cli/`: `reflect`, the Rust read/discovery CLI ([docs/cli.md](docs/cli.md)).
 - `apps/extension/`: the Chrome and Safari capture extension;
   `apps/native-host/`: its Chrome native-messaging sidecar `reflect-capture-host`
   (Plan 11).
-- `apple/`: the local Swift package with iOS code shared between targets and
-  plugins ([docs/contributing/apple-package.md](docs/contributing/apple-package.md)).
+- `apple/`: the local Swift package with iOS code shared between targets ([docs/contributing/apple-package.md](docs/contributing/apple-package.md)).
 - `packages/core/`, `packages/app/`, `packages/db/`: see Services below and each
   package's README.
 - `crates/index-schema/`: the SQLite migrations shared by the desktop writer and the
@@ -156,13 +159,13 @@ The short version:
 
 - Three packages: `@reflect/core` (business logic, platform primitive interfaces),
   `@reflect/app` (windows, routes, commands, menus, update, theme, boot flows),
-  `apps/desktop` (React, Tauri adapters). A product rule every client needs goes in
-  core; windows, routes, menus and pixels go in app; React goes in desktop. Lint keeps
+  `apps/web` (React, platform adapters). A product rule every client needs goes in
+  core; windows, routes, menus and pixels go in app; React goes in web. Lint keeps
   React, TanStack and Tauri out of both packages.
 - A service is `createXxxService(deps)` in `<package>/src/<domain>/<name>-service.ts`;
   it gets other services only through `deps`.
 - Two roots: `createCoreServices(adapters)` and `createAppServices(core, host)`, both
-  built in `apps/desktop/src/boot.ts`. Never import from `boot.ts` outside `main.tsx`
+  built in `apps/web/src/boot.ts`. Never import from `boot.ts` outside `main.tsx`
   and the platform roots.
 - React reads `useCoreServices()` and `useAppServices()`; commands read
   `CommandContext.services` and `.app`.
@@ -172,14 +175,14 @@ The short version:
 - Rust-boundary wrappers (`NoteFileService`) take an explicit `generation`. User-facing
   services read the `GraphSession` once at method entry and pass its generations down.
 - Tests build services over `@reflect/core/testing` and `@reflect/app/testing`;
-  desktop tests render with `renderInApp`. `vi.mock` only for the allowlist in
+  web tests render with `renderInApp`. `vi.mock` only for the allowlist in
   `eslint.config.js`. See [docs/contributing/testing.md](docs/contributing/testing.md).
 
 **Frontend ↔ Rust**
 
-- Define commands as `Core` methods in `crates/core` with a row in `dispatch_table!`. Desktop-only commands are `#[tauri::command]`s in `apps/desktop/src-tauri/src/`.
+- Define commands as `Core` methods in `crates/core` with a row in `dispatch_table!`. Desktop-only commands are `#[tauri::command]`s in `apps/tauri/src/`.
 - Bind each command as a method of the core service that owns the domain, through `ipc.call(command, args, zodSchema)`. Components never call `invoke`. See [docs/contributing/adding-a-command.md](docs/contributing/adding-a-command.md).
-- Add Tauri plugins in `apps/desktop/src-tauri/Cargo.toml` (Rust) and grant permissions in `apps/desktop/src-tauri/capabilities/`.
+- Add Tauri plugins in `apps/tauri/Cargo.toml` (Rust) and grant permissions in `apps/tauri/capabilities/`.
 
 **Common commands** (run from the repo root; the rest are in `package.json`)
 
@@ -188,13 +191,11 @@ pnpm dev              # Vite on http://localhost:1420; add ?platform=ios to prev
                       #   MOBILE tree in a plain browser (in-memory IPC + seeded demo graph)
 pnpm tauri dev        # Full Tauri app with hot reload
 pnpm tauri:dev        # The "Reflect Dev" flavor (green icon, own identifier; coexists with Reflect / Reflect Beta)
-pnpm tauri:ios:dev "iPhone 17 Pro"  # The iOS target in the simulator
 ```
 
-The mobile app is the Tauri iOS target of `apps/desktop`. Read
-`docs/contributing/mobile-simulator.md` before committing changes under
-`apps/desktop/src-tauri/gen/apple/`, and `docs/distribution.md` for macOS builds and
-TestFlight.
+The mobile app is the Swift shell in `apps/ios`. Read
+`docs/contributing/mobile-simulator.md` to run it, and `docs/distribution.md` for
+macOS builds and TestFlight.
 
 # Code Conventions
 
@@ -258,8 +259,8 @@ and the existing local patterns over new abstractions.
 - Use Tailwind CSS, React, shadcn/ui components, Radix, Tailwind Aria, and
   Lucide React icons.
 - Make designs responsive and give reusable React components default props.
-- Always check `apps/desktop/src/components/ui/` before building custom UI.
+- Always check `apps/web/src/components/ui/` before building custom UI.
 - For overlays (popups, popovers, dropdowns, dialogs, tooltips, menus, comboboxes),
-  use the shadcn component in `apps/desktop/src/components/ui/`. If it is missing
+  use the shadcn component in `apps/web/src/components/ui/`. If it is missing
   there, install or generate it there. Never hand-roll an overlay primitive that
   shadcn covers.

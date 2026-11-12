@@ -10,8 +10,8 @@ across graphs and must survive graph deletion.
   (`packages/core/src/settings/schema.ts`) and the runtime document
   (`SettingsService`, `CoreServices.settings`).
 - **The desktop app** reads each setting through its own hook, such as
-  `useTimeFormat()` (`apps/desktop/src/providers/settings-provider.tsx`), and renders controls in
-  `apps/desktop/src/components/settings/`.
+  `useTimeFormat()` (`apps/web/src/providers/settings-provider.tsx`), and renders controls in
+  `apps/web/src/components/settings/`.
 
 ## 1. Declare the key in the schema
 
@@ -98,7 +98,7 @@ navigator and section DOM ids, and its component rendered from
 Build sections from the shared primitives: `SettingsSection` (`section.tsx`),
 `SettingsField` (`field.tsx`) and `SettingsOptionCard` (`option-card.tsx`). For
 controls and overlays, use the shadcn primitives in
-`apps/desktop/src/components/ui/` (`Switch`, `Select`, `Dialog`, …).
+`apps/web/src/components/ui/` (`Switch`, `Select`, `Dialog`, …).
 
 `onChange` calls `settingsService.update` or `settingsService.updateWith` directly (see
 `appearance-section.tsx`, `editor-section.tsx`, `all-notes-section.tsx`). Test

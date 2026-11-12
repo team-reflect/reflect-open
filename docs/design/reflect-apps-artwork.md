@@ -1,6 +1,6 @@
 # Reflect apps modal artwork
 
-- Asset: `apps/desktop/src/assets/reflect-apps-hero.png`
+- Asset: `apps/web/src/assets/reflect-apps-hero.png`
 - Generation mode: built-in `image_gen` tool, new image generation, September 6, 2026.
 - Original output: 1774 × 887 pixels (the tool returned a 2:1 image despite the requested 3:1 framing).
 - References: `design-system/readme.md`; no input images.

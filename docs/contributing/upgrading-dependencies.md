@@ -20,17 +20,16 @@ routine updates; follow this when doing the bump yourself.
 
 ## Tauri alignment
 
-Bump Rust + npm together: workspace `tauri` / `tauri-plugin`,
-`apps/desktop/src-tauri` `tauri-build` + `tauri-plugin-*`, and
-`apps/desktop` `@tauri-apps/api`, `@tauri-apps/cli`, `@tauri-apps/plugin-*`.
-Keep majors aligned; path plugins under `plugins/` pick up workspace pins.
+Bump Rust + npm together: workspace `tauri`, `tauri-build` and
+`tauri-plugin-*`, `apps/tauri` `@tauri-apps/cli`, and `apps/web`
+`@tauri-apps/api` and `@tauri-apps/plugin-*`. Keep majors aligned.
 
 ## Local checks
 
 ```bash
 pnpm install && pnpm dedupe && pnpm typecheck && pnpm lint && pnpm build
 
-node apps/desktop/scripts/build-sidecar.ts
+node apps/tauri/scripts/build-sidecar.ts
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets
 cargo build --workspace
