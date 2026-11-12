@@ -1,11 +1,7 @@
 // swift-tools-version: 6.2
 import PackageDescription
 
-// The Swift code that the iOS app and its extensions share: it depends on no
-// app target, on no Rust binary and on no third-party package, and
-// `swift test` runs its tests on macOS. App and extension entry points, the
-// adapters that turn a command into a call of a module here, and the code
-// that needs the Rust core live in the app targets (`apps/ios`).
+// The Swift code that the iOS app and its extensions share.
 
 // MARK: - Layer rules (checked when SwiftPM loads this manifest)
 
