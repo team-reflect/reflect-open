@@ -1,7 +1,10 @@
-// Runs the iOS app in apps/ios in the "iPhone 17" simulator with the web app
-// from the Vite dev server, so changes to the web app reload in place.
+// Runs the iOS app in apps/ios in a simulator with the web app from the Vite
+// dev server, so changes to the web app reload in place.
 //
 //   pnpm dev:ios
+//   pnpm dev:ios --device "iPhone 17 Pro"
+//
+// The simulator is "iPhone 17" unless `--device` names another one.
 //
 // It starts the dev server on port 1420, boots the simulator, builds the
 // Debug-Dev app, installs it and launches it with `REFLECT_DEV_URL`. A change to Swift or Rust code needs a new run.
@@ -13,6 +16,7 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { parseArgs } from 'node:util'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { exec } from 'tinyexec'
 import { z } from 'zod'
@@ -27,7 +31,6 @@ const APP_PATH = join(
   'Reflect.app',
 )
 const BUNDLE_ID = 'app.reflect.ios.dev'
-const DEVICE_NAME = 'iPhone 17'
 const DEV_URL = 'http://localhost:1420'
 
 async function run(command: string, args: string[], env?: Record<string, string>): Promise<void> {
@@ -75,20 +78,28 @@ const SimctlDevices = z.object({
 })
 
 /**
- * Returns the UDID of the simulator named `DEVICE_NAME`: the booted one, else
+ * Returns the UDID of the simulator named `deviceName`: the booted one, else
  * the one on the newest runtime.
  */
-async function findSimulator(): Promise<string> {
+async function findSimulator(deviceName: string): Promise<string> {
   const list = await exec('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], {
     throwOnError: true,
   })
   const { devices } = SimctlDevices.parse(JSON.parse(list.stdout))
-  const matches = Object.entries(devices)
+  const available = Object.entries(devices)
     .sort(([runtimeA], [runtimeB]) => runtimeB.localeCompare(runtimeA, 'en', { numeric: true }))
-    .flatMap(([, runtimeDevices]) => runtimeDevices.filter((device) => device.name === DEVICE_NAME))
+    .flatMap(([, runtimeDevices]) => runtimeDevices)
+  if (available.length === 0) {
+    throw new Error('this Mac has no available simulators; add a simulator runtime in Xcode')
+  }
+  const matches = available.filter((device) => device.name === deviceName)
   const device = matches.find((match) => match.state === 'Booted') ?? matches[0]
   if (!device) {
-    throw new Error(`no available simulator named "${DEVICE_NAME}"; create one in Xcode`)
+    const names = [...new Set(available.map((simulator) => simulator.name))].sort()
+    throw new Error(
+      `no available simulator named "${deviceName}"; the available simulators are:\n` +
+        names.map((name) => `  ${name}`).join('\n'),
+    )
   }
   return device.udid
 }
@@ -115,9 +126,8 @@ async function openSimulatorWindow(simulator: string): Promise<void> {
   }
 }
 
-async function buildAndLaunch(): Promise<void> {
-  const simulator = await findSimulator()
-  console.log(`[dev-ios] booting ${DEVICE_NAME} (${simulator})`)
+async function buildAndLaunch(simulator: string, deviceName: string): Promise<void> {
+  console.log(`[dev-ios] booting ${deviceName} (${simulator})`)
   await run('xcrun', ['simctl', 'bootstatus', simulator, '-b'])
   await openSimulatorWindow(simulator)
 
@@ -150,11 +160,15 @@ async function buildAndLaunch(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const { values } = parseArgs({
+    options: { device: { type: 'string', default: 'iPhone 17' } },
+  })
+  const simulator = await findSimulator(values.device)
   // Always a server of its own: a server on port 1420 that this script did not
   // start can serve the desktop build.
   console.log('[dev-ios] starting the dev server')
   const serverExit = startDevServer()
-  await Promise.race([buildAndLaunch(), serverExit])
+  await Promise.race([buildAndLaunch(simulator, values.device), serverExit])
   await serverExit
 }
 

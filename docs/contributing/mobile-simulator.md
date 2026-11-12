@@ -16,7 +16,8 @@ reload, run `pnpm --filter @reflect/ios dev:web` and enable `REFLECT_DEV_URL` in
 environment variables.
 
 `pnpm dev:ios` does the same without Xcode: it starts its own dev server on port 1420 (stop any other server there first), builds the app, and launches
-it in the "iPhone 17" simulator with `REFLECT_DEV_URL`.
+it in the "iPhone 17" simulator with `REFLECT_DEV_URL`. Pass `--device "<name>"`
+to use another simulator.
 On a physical device, run `pnpm --filter @reflect/ios dev:web --host` and point
 `REFLECT_DEV_URL` at the Mac's LAN address.
 
