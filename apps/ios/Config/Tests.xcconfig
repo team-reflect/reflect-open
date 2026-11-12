@@ -8,6 +8,3 @@ GENERATE_INFOPLIST_FILE = YES
 TEST_HOST = $(BUILT_PRODUCTS_DIR)/Reflect.app/Reflect
 BUNDLE_LOADER = $(TEST_HOST)
 LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
-// The SDK's StoreKitTest header uses `SKPaymentTransactionState`, deprecated
-// in iOS 18. The deprecation stays a warning, not an error.
-OTHER_SWIFT_FLAGS = $(inherited) -Xcc -Wno-error=deprecated-declarations
