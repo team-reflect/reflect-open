@@ -34,9 +34,7 @@ final class ReflectWebView: WKWebView {
     backgroundColor = .systemBackground
     scrollView.bounces = false
     #if DEBUG
-    if #available(iOS 16.4, *) {
-      isInspectable = true
-    }
+    isInspectable = true
     #endif
 
     keyboardTuning = KeyboardTuning.apply(to: self)

@@ -14,7 +14,7 @@ here until you verify that the fact changed on every engine we ship to.
 | Safari            | Safari 27.0.1 on macOS                                   |
 | iOS               | Safari on iOS 26.4 (iPhone 17 Pro simulator, real touch) |
 
-The minimum iOS target is 16.0 (`IPHONEOS_DEPLOYMENT_TARGET` in
+The minimum iOS target is 18.0 (`IPHONEOS_DEPLOYMENT_TARGET` in
 `apps/ios/Config/Shared.xcconfig`). Engines in the supported range can be older
 than the ones above.
 

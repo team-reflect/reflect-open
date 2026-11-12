@@ -179,9 +179,10 @@ public final class RecordingEngine: NSObject {
   /// True once the webview called `actionsReady` — queued native actions
   /// deliver immediately from then on.
   private var webviewReadyForActions = false
-  /// The live recording's Live Activity (`Activity<RecordingActivityAttributes>`,
-  /// type-erased: stored properties can't be availability-restricted).
-  private var liveActivity: Any?
+  #if canImport(ActivityKit)
+  /// The live recording's Live Activity.
+  private var liveActivity: Activity<RecordingActivityAttributes>?
+  #endif
   /// The staging directory the recorder writes into.
   private let stagingDirectory: () throws -> URL
 
@@ -726,50 +727,44 @@ public final class RecordingEngine: NSObject {
   // MARK: - Live Activity
 
   /// Show the recording on the lock screen / Dynamic Island: elapsed timer
-  /// plus (iOS 17+) a stop button. Requires iOS 16.2 and the user not having
-  /// disabled Live Activities — both degrade to "no activity", never an error.
+  /// plus a stop button. Requires the user not having disabled Live
+  /// Activities; otherwise it degrades to "no activity", never an error.
   private func startLiveActivity() {
     #if canImport(ActivityKit)
-    if #available(iOS 16.2, *) {
-      guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-      let content = ActivityContent(
-        state: RecordingActivityAttributes.ContentState(startedAt: Date()),
-        staleDate: nil
+    guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+    let content = ActivityContent(
+      state: RecordingActivityAttributes.ContentState(startedAt: Date()),
+      staleDate: nil
+    )
+    do {
+      liveActivity = try Activity.request(
+        attributes: RecordingActivityAttributes(),
+        content: content,
+        pushType: nil
       )
-      do {
-        liveActivity = try Activity.request(
-          attributes: RecordingActivityAttributes(),
-          content: content,
-          pushType: nil
-        )
-      } catch {
-        self.log?("recording Live Activity failed to start: \(error)")
-      }
+    } catch {
+      self.log?("recording Live Activity failed to start: \(error)")
     }
     #endif
   }
 
   private func endLiveActivity() {
     #if canImport(ActivityKit)
-    if #available(iOS 16.2, *) {
-      guard let activity = liveActivity as? Activity<RecordingActivityAttributes> else {
-        return
-      }
-      liveActivity = nil
-      Task {
-        await activity.end(nil, dismissalPolicy: .immediate)
-      }
+    guard let activity = liveActivity else {
+      return
+    }
+    liveActivity = nil
+    Task {
+      await activity.end(nil, dismissalPolicy: .immediate)
     }
     #endif
   }
 
   private func endStaleLiveActivities() {
     #if canImport(ActivityKit)
-    if #available(iOS 16.2, *) {
-      Task {
-        for activity in Activity<RecordingActivityAttributes>.activities {
-          await activity.end(nil, dismissalPolicy: .immediate)
-        }
+    Task {
+      for activity in Activity<RecordingActivityAttributes>.activities {
+        await activity.end(nil, dismissalPolicy: .immediate)
       }
     }
     #endif

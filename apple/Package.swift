@@ -66,9 +66,7 @@ let swiftSettings: [SwiftSetting] = [
 
 let package = Package(
   name: "ReflectApple",
-  // The floor is below the deployment targets of `apps/ios/Config`, so the
-  // compiler checks every `#available`.
-  platforms: [.iOS(.v15), .macOS(.v13)],
+  platforms: [.iOS(.v18), .macOS(.v13)],
   products: modules.map { .library(name: $0.name, targets: [$0.name]) },
   targets:
     modules.map { module in

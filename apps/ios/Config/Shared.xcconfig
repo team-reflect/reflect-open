@@ -8,7 +8,7 @@ SUPPORTED_PLATFORMS = iphoneos iphonesimulator
 // iPhone and iPad.
 TARGETED_DEVICE_FAMILY = 1,2
 // The app's minimum iOS. scripts/build-ffi.ts builds the Rust core for the same version.
-IPHONEOS_DEPLOYMENT_TARGET = 16.0
+IPHONEOS_DEPLOYMENT_TARGET = 18.0
 
 // Swift 5 language mode, like the apple/ package. Shell types are marked
 // @MainActor one by one; there is no target-wide default actor isolation.

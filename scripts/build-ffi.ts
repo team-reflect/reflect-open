@@ -94,7 +94,7 @@ async function main(): Promise<void> {
         CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
         // The app's minimum iOS. rustc, the cc crate, and the vendored
         // OpenSSL build otherwise target the SDK version.
-        IPHONEOS_DEPLOYMENT_TARGET: '16.0',
+        IPHONEOS_DEPLOYMENT_TARGET: '18.0',
       },
     },
   })

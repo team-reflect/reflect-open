@@ -17,7 +17,6 @@ import AppIntents
 /// and the App Group container, and never waits on the webview or graph.
 /// Deliberately not `@MainActor`: the file write must not queue behind
 /// app-boot main-thread work.
-@available(iOS 16.0, *)
 struct QuickNoteIntent: AppIntent {
   static var title: LocalizedStringResource = "Add quick note"
   static var description = IntentDescription(

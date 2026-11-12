@@ -30,7 +30,7 @@ struct RecordAudioWidget: Widget {
     StaticConfiguration(kind: "app.reflect.record-audio", provider: RecordProvider()) { _ in
       RecordAudioWidgetView()
         .widgetURL(URL(string: "reflect://record-audio"))
-        .widgetBackgroundCompat()
+        .containerBackground(.background, for: .widget)
     }
     .configurationDisplayName("Record audio memo")
     .description("Start recording an audio memo in Reflect.")
@@ -59,20 +59,6 @@ struct RecordAudioWidgetView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-    }
-  }
-}
-
-extension View {
-  /// iOS 17 requires `containerBackground` on widget views (older widgets
-  /// render an adoption error); the deployment target is 16.2, so apply it
-  /// conditionally.
-  @ViewBuilder
-  func widgetBackgroundCompat() -> some View {
-    if #available(iOS 17.0, *) {
-      containerBackground(.background, for: .widget)
-    } else {
-      self
     }
   }
 }
