@@ -5,7 +5,6 @@ import type { TaskFilters } from '@reflect/core'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
 
 interface TaskFiltersDrawerProps {
   open: boolean
@@ -35,40 +34,8 @@ export function TaskFiltersDrawer({
   filters,
   toggle,
 }: TaskFiltersDrawerProps): ReactElement {
-  const nativeMenu = useNativeMenuDrawer({
-    open,
-    onOpenChange,
-    menuId: 'task-filters',
-    items: [
-      ...BUCKETS.map(({ key, label }) => ({
-        type: 'action' as const,
-        id: key,
-        title: label,
-        checked: filters[key],
-        keepsMenuPresented: true,
-      })),
-      {
-        type: 'section',
-        items: [
-          {
-            type: 'action',
-            id: 'archived',
-            title: 'Show archived',
-            checked: filters.archived,
-            keepsMenuPresented: true,
-          },
-        ],
-      },
-    ],
-    onSelect: (id) => {
-      const key = [...BUCKETS.map((bucket) => bucket.key), 'archived'].find((k) => k === id)
-      if (key !== undefined) {
-        toggle(key as keyof TaskFilters)
-      }
-    },
-  })
   return (
-    <Drawer open={open && !nativeMenu} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Task filters">
         <DrawerTitle>Task filters</DrawerTitle>
         <DrawerBody className="px-4">

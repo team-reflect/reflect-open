@@ -16,8 +16,8 @@ final class ChromeFeaturesTests: XCTestCase {
 
   func testReadsTheListedParts() {
     let features = ChromeFeatures.enabled(
-      listed: "menus toolbar,unknown", defaults: nil, allowOverrides: false)
-    XCTAssertEqual(features, [.menus, .toolbar])
+      listed: "toolbar tabbar,unknown", defaults: nil, allowOverrides: false)
+    XCTAssertEqual(features, [.toolbar, .tabbar])
   }
 
   func testNavbarNeedsTabbar() {
@@ -29,13 +29,13 @@ final class ChromeFeaturesTests: XCTestCase {
   }
 
   func testOverridesApplyOnlyWhenAllowed() {
-    let overrides = defaults(["chrome.menus": false, "chrome.tabbar": true])
+    let overrides = defaults(["chrome.toolbar": false, "chrome.tabbar": true])
     XCTAssertEqual(
-      ChromeFeatures.enabled(listed: "menus", defaults: overrides, allowOverrides: true),
+      ChromeFeatures.enabled(listed: "toolbar", defaults: overrides, allowOverrides: true),
       [.tabbar])
     XCTAssertEqual(
-      ChromeFeatures.enabled(listed: "menus", defaults: overrides, allowOverrides: false),
-      [.menus])
+      ChromeFeatures.enabled(listed: "toolbar", defaults: overrides, allowOverrides: false),
+      [.toolbar])
   }
 
   func testEmptyListDrawsNothing() {

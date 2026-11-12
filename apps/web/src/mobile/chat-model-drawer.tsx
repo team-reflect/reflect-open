@@ -3,7 +3,6 @@ import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { groupModelOptions } from '@/lib/chat-model-groups.ts'
 import { SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useChatActions, useChatModels } from '@/providers/chat-provider.tsx'
-import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
 
 interface ChatModelDrawerProps {
   open: boolean
@@ -23,37 +22,9 @@ export function ChatModelDrawer({ open, onOpenChange }: ChatModelDrawerProps): R
     () => groupModelOptions(modelOptions, providers),
     [modelOptions, providers],
   )
-  const isActive = (option: { configId: string; modelId: string }): boolean => {
-    return (
-      activeModel !== null &&
-      option.configId === activeModel.id &&
-      option.modelId === activeModel.model
-    )
-  }
-  const nativeMenu = useNativeMenuDrawer({
-    open,
-    onOpenChange,
-    menuId: 'chat-model',
-    items: groups.map((group) => ({
-      type: 'section',
-      title: group.label,
-      items: group.options.map(({ option, value }) => ({
-        type: 'action',
-        id: value,
-        title: option.label,
-        checked: isActive(option),
-      })),
-    })),
-    onSelect: (id) => {
-      const picked = groups.flatMap((group) => group.options).find(({ value }) => value === id)
-      if (picked !== undefined) {
-        selectModel({ configId: picked.option.configId, modelId: picked.option.modelId })
-      }
-    },
-  })
 
   return (
-    <Drawer open={open && !nativeMenu} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Choose a model">
         <DrawerTitle>Model</DrawerTitle>
         <div className="flex max-h-[60dvh] flex-col gap-6 overflow-y-auto px-4 pb-8 pt-4">
@@ -63,7 +34,11 @@ export function ChatModelDrawer({ open, onOpenChange }: ChatModelDrawerProps): R
                 <SettingsSelectRow
                   key={value}
                   label={option.label}
-                  selected={isActive(option)}
+                  selected={
+                    activeModel !== null &&
+                    option.configId === activeModel.id &&
+                    option.modelId === activeModel.model
+                  }
                   onPress={() => {
                     selectModel({ configId: option.configId, modelId: option.modelId })
                     onOpenChange(false)

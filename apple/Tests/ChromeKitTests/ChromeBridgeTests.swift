@@ -26,17 +26,8 @@ final class ChromeBridgeTests: XCTestCase {
 
   func testDecodesEveryOtherMessageOfThePage() throws {
     let messages = try JSONDecoder().decode([ChromeMessage].self, from: try fixture("messages"))
-    XCTAssertEqual(messages.count, 4)
-    guard case .presentMenu(let request) = messages.first else {
-      return XCTFail("no menu request")
-    }
-    XCTAssertEqual(request.entryId, 4)
-    XCTAssertEqual(request.menuId, "filters")
-    XCTAssertEqual(request.rect.height, 40)
-    XCTAssertEqual(request.items.count, 1)
     XCTAssertEqual(
-      Array(messages.dropFirst()),
-      [.transition(started: true), .transition(started: false), .chromeReady])
+      messages, [.transition(started: true), .transition(started: false), .chromeReady])
   }
 
   func testNamesTheFormattingCommandsOfThePage() throws {
@@ -49,7 +40,6 @@ final class ChromeBridgeTests: XCTestCase {
       .back(entryId: 3),
       .tab(.all),
       .action(entryId: 3, id: "gear"),
-      .menu(entryId: 3, menuId: "note-actions", id: "pin"),
       .command(.indent),
       .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
     ]
@@ -135,24 +125,15 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(sent, 0)
   }
 
-  func testReportsTransitionsAndMenus() throws {
+  func testReportsTransitions() throws {
     let bridge = ChromeBridge()
     var transitions: [Bool] = []
-    var menus: [String] = []
     bridge.onTransition = { transitions.append($0) }
-    bridge.onPresentMenu = { menus.append($0.menuId) }
 
     bridge.receive(try message(["type": "transition", "phase": "start"]))
     bridge.receive(try message(["type": "transition", "phase": "end"]))
-    bridge.receive(
-      try message([
-        "type": "presentMenu", "entryId": 1, "menuId": "filters",
-        "rect": ["x": 1, "y": 2, "width": 3, "height": 4.5],
-        "items": [["type": "action", "id": "a", "title": "A", "keepsMenuPresented": true]],
-      ]))
 
     XCTAssertEqual(transitions, [true, false])
-    XCTAssertEqual(menus, ["filters"])
   }
 
   func testReportsAMessageItCannotDecode() throws {

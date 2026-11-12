@@ -137,13 +137,6 @@ describe('buildNoChromeState', () => {
 describe('page messages', () => {
   it('matches the messages the Swift shell decodes', () => {
     const messages: NativeChromeMessage[] = [
-      {
-        type: 'presentMenu',
-        entryId: 4,
-        menuId: 'filters',
-        rect: { x: 10, y: 20, width: 30, height: 40 },
-        items: [{ type: 'action', id: 'pinned', title: 'Pinned', checked: true }],
-      },
       { type: 'transition', phase: 'start' },
       { type: 'transition', phase: 'end' },
       { type: 'chromeReady' },

@@ -104,37 +104,6 @@ export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): 
   }, [enabled, entryId, specJSON])
 }
 
-interface OpenMenu {
-  entryId: number
-  onSelect: (id: string) => void
-}
-
-const openMenus = new Map<string, OpenMenu>()
-
-/**
- * Remember the handler of a menu the page asked the shell to show.
- */
-export function rememberNativeMenu(menuId: string, menu: OpenMenu): void {
-  openMenus.set(menuId, menu)
-}
-
-/**
- * Forget the menu `menuId` when `onSelect` is still its handler.
- */
-export function forgetNativeMenu(menuId: string, onSelect: (id: string) => void): void {
-  if (openMenus.get(menuId)?.onSelect === onSelect) {
-    openMenus.delete(menuId)
-  }
-}
-
-/**
- * The handler of the menu `menuId`, when it was opened for `entryId`.
- */
-export function nativeMenuHandler(menuId: string, entryId: number): ((id: string) => void) | null {
-  const menu = openMenus.get(menuId)
-  return menu !== undefined && menu.entryId === entryId ? menu.onSelect : null
-}
-
 /**
  * How many web drawers are open. The shell hides its bars while one is.
  */

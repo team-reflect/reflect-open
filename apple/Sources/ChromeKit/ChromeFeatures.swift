@@ -3,7 +3,6 @@ public import WebKit
 
 /// A part of the mobile chrome that the shell can draw natively.
 public enum ChromeFeature: String, CaseIterable, Sendable {
-  case menus
   case toolbar
   case tabbar
   case navbar
@@ -12,7 +11,7 @@ public enum ChromeFeature: String, CaseIterable, Sendable {
   public var needs: [ChromeFeature] {
     switch self {
     case .navbar: [.tabbar]
-    case .menus, .toolbar, .tabbar: []
+    case .toolbar, .tabbar: []
     }
   }
 }

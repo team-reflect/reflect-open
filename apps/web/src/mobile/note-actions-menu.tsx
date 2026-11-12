@@ -6,7 +6,6 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scro
 import { useNoteRowState } from '@/hooks/use-note-row.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { NOTE_DELETE_CONFIRM, NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
-import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
 import type { NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
 import { shareNote } from '@/mobile/share.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
@@ -115,31 +114,14 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
  * `NoteActionsService.trashOne` so the open session is discarded rather than flushed.
  */
 export function NoteActionsMenu({ path, onDeleted, actions }: NoteActionsMenuProps): ReactElement {
-  const {
-    isPinned,
-    isPrivate,
-    privacyReady,
-    privacyActionLabel,
-    items,
-    pin,
-    togglePrivate,
-    share,
-    runAction,
-  } = actions
+  const { isPinned, isPrivate, privacyReady, privacyActionLabel, pin, togglePrivate, share } =
+    actions
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  const nativeMenu = useNativeMenuDrawer({
-    open: actionsOpen,
-    onOpenChange: setActionsOpen,
-    menuId: 'note-actions',
-    items,
-    onSelect: runAction,
-  })
-
   return (
     <>
-      <Drawer open={actionsOpen && !nativeMenu} onOpenChange={setActionsOpen}>
+      <Drawer open={actionsOpen} onOpenChange={setActionsOpen}>
         <DrawerTrigger
           render={
             <Button variant="ghost" size="icon" className="size-10" aria-label="Note actions" />

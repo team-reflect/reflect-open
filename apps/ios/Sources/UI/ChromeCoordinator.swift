@@ -52,7 +52,6 @@ final class ChromeCoordinator {
     formatting?.presenter = { [weak self] in self?.container }
     bridge.onState = { [weak self] state in self?.apply(state) }
     bridge.onReset = { [weak self] in self?.reset() }
-    bridge.onPresentMenu = { [weak self] request in self?.presentMenu(request) }
     bridge.onTransition = { [weak self] started in self?.transition(started: started) }
     bridge.onError = { message in Self.logger.error("\(message, privacy: .public)") }
   }
@@ -113,13 +112,6 @@ final class ChromeCoordinator {
     UIView.transition(with: bar, duration: 0.2, options: .transitionCrossDissolve) {
       self.showBar(state)
     }
-  }
-
-  /// The page asks for a menu at one of its elements, for the entry on screen.
-  private func presentMenu(_ request: MenuRequest) {
-    guard features.contains(.menus), host.chrome.state?.entryId == request.entryId else { return }
-    guard let view = (tabs?.currentPage ?? page)?.view else { return }
-    menus.present(request, webView: host.webView, in: view)
   }
 
   /// The window changed size (rotation, iPhone Duo posture, iPad split).

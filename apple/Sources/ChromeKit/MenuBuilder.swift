@@ -25,7 +25,6 @@ public enum MenuBuilder {
         var attributes: UIMenuElement.Attributes = []
         if action.destructive { attributes.insert(.destructive) }
         if action.disabled { attributes.insert(.disabled) }
-        if action.keepsMenuPresented { attributes.insert(.keepsMenuPresented) }
         return UIAction(
           title: action.title,
           image: action.icon.flatMap { UIImage(systemName: $0) },

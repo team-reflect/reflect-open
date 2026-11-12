@@ -8,7 +8,6 @@ import {
 } from '@/mobile/native-chrome/native-chrome-projection.tsx'
 import type { FormattingToolbarCommands } from '@/editor/formatting-toolbar-store.ts'
 import { FORMATTING_COMMANDS, parseNativeIntent } from '@/mobile/native-chrome/protocol.ts'
-import { nativeMenuHandler, rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
 
 function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContext {
   return {
@@ -50,7 +49,7 @@ describe('parseNativeIntent', () => {
       '../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
-    expect(intents).toHaveLength(6)
+    expect(intents).toHaveLength(5)
     for (const intent of intents) {
       expect(parseNativeIntent(intent)).toEqual(intent)
     }
@@ -80,16 +79,6 @@ describe('runNativeIntent', () => {
     const ctx = makeIntentContext()
     runNativeIntent({ type: 'tab', tab: 'tasks' }, ctx)
     expect(ctx.selectTab).toHaveBeenCalledWith('tasks')
-  })
-
-  it('runs a menu item only for the entry that opened the menu', () => {
-    const onSelect = vi.fn()
-    rememberNativeMenu('filters', { entryId: 5, onSelect })
-    runNativeIntent({ type: 'menu', entryId: 6, menuId: 'filters', id: 'a' }, makeIntentContext())
-    expect(onSelect).not.toHaveBeenCalled()
-    runNativeIntent({ type: 'menu', entryId: 5, menuId: 'filters', id: 'a' }, makeIntentContext())
-    expect(onSelect).toHaveBeenCalledWith('a')
-    expect(nativeMenuHandler('filters', 4)).toBeNull()
   })
 
   it('inserts the images of one pick in the picked order', async () => {

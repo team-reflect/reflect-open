@@ -23,8 +23,6 @@ public final class ChromeBridge: NSObject, WKScriptMessageHandler {
   public var send: (Data) -> Void = { _ in }
   /// Called with every state newer than the last one.
   public var onState: (ChromeState) -> Void = { _ in }
-  /// Called when the page asks for a menu at one of its elements.
-  public var onPresentMenu: (MenuRequest) -> Void = { _ in }
   /// Called when a web push or pop slide starts (`true`) or ends (`false`).
   public var onTransition: (Bool) -> Void = { _ in }
   /// Called when a new document starts: the shell drops what it shows for the old one.
@@ -51,8 +49,6 @@ public final class ChromeBridge: NSObject, WKScriptMessageHandler {
       if let state, next.generation <= state.generation { return }
       state = next
       onState(next)
-    case .presentMenu(let request):
-      onPresentMenu(request)
     case .transition(let started):
       onTransition(started)
     case .chromeReady:
