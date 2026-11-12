@@ -34,6 +34,15 @@ final class RootViewController: UIViewController {
     }
   }
 
+  override func viewWillTransition(
+    to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator
+  ) {
+    super.viewWillTransition(to: size, with: coordinator)
+    coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+      self?.chrome?.sizeDidChange()
+    }
+  }
+
   override var childForStatusBarStyle: UIViewController? {
     children.first
   }

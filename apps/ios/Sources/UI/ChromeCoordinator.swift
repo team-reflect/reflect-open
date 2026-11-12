@@ -115,6 +115,11 @@ final class ChromeCoordinator {
     menus.present(request, webView: host.webView, in: view)
   }
 
+  /// The window changed size (rotation, iPhone Duo posture, iPad split).
+  func sizeDidChange() {
+    formatting?.sizeDidChange()
+  }
+
   /// A new document started: nothing of the old page stays on screen.
   private func reset() {
     menus.closeAll()

@@ -21,6 +21,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private weak var contentView: UIView?
   /// Whether the strip was the last accessory of `contentView`.
   private var shown = false
+  /// Set while the strip is off for a keyboard relayout.
+  private var relayout = false
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -37,7 +39,22 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     if let toolbar {
       strip.update(toolbar)
     }
-    if (toolbar != nil) != shown {
+    if (toolbar != nil) != shown, !relayout {
+      contentView?.reloadInputViews()
+    }
+  }
+
+  /// Lays the keyboard out again after the window changed size: the strip
+  /// goes away for 0.1 s and comes back. With the strip up through a resize
+  /// (iPhone Duo posture), UIKit reports keyboard frames in the old
+  /// orientation, and WebKit sizes the page's visual viewport from them.
+  func sizeDidChange() {
+    guard shown, let contentView else { return }
+    relayout = true
+    contentView.reloadInputViews()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self, weak contentView] in
+      guard let self else { return }
+      self.relayout = false
       contentView?.reloadInputViews()
     }
   }
@@ -45,7 +62,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private func accessory(for view: UIView) -> UIView? {
     guard view.isDescendant(of: webView) else { return nil }
     contentView = view
-    shown = toolbar != nil
+    shown = toolbar != nil && !relayout
     return shown ? strip : nil
   }
 
