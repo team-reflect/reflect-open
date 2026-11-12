@@ -89,8 +89,6 @@ jobs:
           js=false
           rust=false
           swift=false
-          # A draft PR skips the slow jobs. release-please opens some
-          # Release PRs as drafts, and the branch below runs every job.
           skip_slow=$PR_IS_DRAFT
 
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
@@ -113,13 +111,20 @@ jobs:
             fi
           fi
 
+          webkit=$js
+          ios=$swift
+          if [[ $skip_slow == true ]]; then
+            webkit=false
+            ios=false
+          fi
+
           {
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
-            echo "test-webkit=$([[ $js == true && $skip_slow == false ]] && echo true || echo false)"
+            echo "test-webkit=$webkit"
             echo "test-swift=$swift"
-            echo "test-ios=$([[ $swift == true && $skip_slow == false ]] && echo true || echo false)"
+            echo "test-ios=$ios"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
