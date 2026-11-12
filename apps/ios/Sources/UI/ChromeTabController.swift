@@ -36,6 +36,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         ? UIColor(red: 0x63 / 255, green: 0x66 / 255, blue: 0xF1 / 255, alpha: 1)
         : UIColor(red: 0x4F / 255, green: 0x46 / 255, blue: 0xE5 / 255, alpha: 1)
     }
+    // The page scrolls inside its own elements, so the edge effect of the web
+    // view's scroll view would only draw a band under the navigation bar.
+    if #available(iOS 26, *) {
+      webView.scrollView.topEdgeEffect.isHidden = true
+    }
     // The launch look: no bars before the first state.
     isTabBarHidden = true
     pages[.daily]?.attach(webView)
@@ -61,6 +66,13 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     pages[tab] = page
     let navigation = UINavigationController(rootViewController: page)
     navigation.setNavigationBarHidden(true, animated: false)
+    // The page scrolls inside the web view, never under the bar, so the bar
+    // shows the page's own background.
+    let appearance = UINavigationBarAppearance()
+    appearance.configureWithTransparentBackground()
+    navigation.navigationBar.standardAppearance = appearance
+    navigation.navigationBar.scrollEdgeAppearance = appearance
+    navigation.navigationBar.compactAppearance = appearance
     return UITab(title: title, image: UIImage(systemName: icon), identifier: tab.rawValue) { _ in
       navigation
     }
