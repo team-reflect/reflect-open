@@ -1,4 +1,5 @@
 import AuthenticationServices
+import ChromeKit
 import UIKit
 import WebHostKit
 import os
@@ -10,6 +11,10 @@ final class AppHost {
   let webView: ReflectWebView
   /// The page to load: the dev server in `REFLECT_DEV_URL`, or the bundled web app.
   let startURL: URL
+  /// The native chrome parts of this build.
+  let chromeFeatures: Set<ChromeFeature>
+  /// The page's chrome state and the native intents.
+  let chrome = ChromeBridge()
 
   private let core: ReflectCore
   private let bridge = HostBridge()
@@ -61,7 +66,19 @@ final class AppHost {
     let assets = AssetSchemeHandler { [core] requestPath, query, range in
       await core.resolveAsset(requestPath: requestPath, query: query, range: range)
     }
-    webView = ReflectWebView(routes: routes, assets: assets, bridge: bridge)
+    #if DEBUG
+    let allowOverrides = true
+    #else
+    let allowOverrides = false
+    #endif
+    chromeFeatures = ChromeFeatures.enabled(
+      bundle: .main, defaults: .standard, allowOverrides: allowOverrides)
+    chrome.send = { [bridge] intent in
+      bridge.emit("chrome:intent", payload: intent)
+    }
+    webView = ReflectWebView(
+      routes: routes, assets: assets, bridge: bridge, chrome: chrome,
+      chromeFeatures: chromeFeatures)
     presenter = webView
 
     navigation = ExternalNavigation(

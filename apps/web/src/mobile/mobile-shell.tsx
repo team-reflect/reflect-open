@@ -13,6 +13,8 @@ import {
   type Route,
 } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
+import { NativeChromeProjection } from '@/mobile/native-chrome/native-chrome-projection.tsx'
+import '@/mobile/native-chrome/native-chrome.css'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
@@ -116,6 +118,11 @@ export function MobileShell(): ReactElement {
 
   return (
     <SafeAreaBoundary>
+      <NativeChromeProjection
+        tab={tab}
+        keyboardVisible={keyboardVisible}
+        onSelectTab={handleTabSelect}
+      />
       {/* The shell yields to the software keyboard by height (Plan 19,
           decision 8): the root ends at the keyboard's top, so every screen's
           layout sees the true visible viewport. Only `position: fixed`

@@ -1,0 +1,49 @@
+{
+  "type": "state",
+  "entryId": 7,
+  "chrome": "shell",
+  "route": {
+    "kind": "today"
+  },
+  "tab": "daily",
+  "isTabRoot": true,
+  "canBack": false,
+  "title": "November 2026",
+  "titleMenu": [
+    {
+      "type": "action",
+      "id": "month:2026-11",
+      "title": "November 2026",
+      "checked": true
+    },
+    {
+      "type": "section",
+      "items": [
+        {
+          "type": "action",
+          "id": "monthPicker",
+          "title": "Choose Month…"
+        }
+      ]
+    }
+  ],
+  "showsBar": true,
+  "leading": [
+    {
+      "id": "today",
+      "title": "Today"
+    }
+  ],
+  "trailing": [
+    {
+      "id": "settings",
+      "title": "Settings",
+      "icon": "gearshape"
+    }
+  ],
+  "keyboardVisible": false,
+  "modal": false,
+  "toolbar": null,
+  "theme": "system",
+  "generation": 1
+}

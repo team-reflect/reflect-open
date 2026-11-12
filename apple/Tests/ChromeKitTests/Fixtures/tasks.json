@@ -1,0 +1,21 @@
+{
+  "type": "state",
+  "entryId": 7,
+  "chrome": "shell",
+  "route": {
+    "kind": "tasks"
+  },
+  "tab": "tasks",
+  "isTabRoot": true,
+  "canBack": false,
+  "title": "Tasks",
+  "titleMenu": null,
+  "showsBar": false,
+  "leading": [],
+  "trailing": [],
+  "keyboardVisible": false,
+  "modal": false,
+  "toolbar": null,
+  "theme": "system",
+  "generation": 1
+}

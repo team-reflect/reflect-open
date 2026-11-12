@@ -1,16 +1,22 @@
 import UIKit
 
-/// Shows one full-screen `ReflectWebView` with the web app, or the error of a
+/// Shows the web app in the native chrome containers, or the error of a
 /// shell that did not start.
 @MainActor
 final class RootViewController: UIViewController {
   private(set) var host: AppHost?
+  private var chrome: ChromeCoordinator?
 
   override func loadView() {
     do {
       let host = try AppHost()
       self.host = host
-      view = host.webView
+      let view = UIView()
+      view.backgroundColor = .systemBackground
+      self.view = view
+      let chrome = ChromeCoordinator(host: host)
+      self.chrome = chrome
+      embed(chrome.container)
     } catch {
       let label = UILabel()
       label.text = "Reflect could not start.\n\(error)"
@@ -26,5 +32,18 @@ final class RootViewController: UIViewController {
     if let host {
       host.webView.load(URLRequest(url: host.startURL))
     }
+  }
+
+  override var childForStatusBarStyle: UIViewController? {
+    children.first
+  }
+
+  /// Adds `child` edge to edge.
+  private func embed(_ child: UIViewController) {
+    addChild(child)
+    child.view.frame = view.bounds
+    child.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    view.addSubview(child.view)
+    child.didMove(toParent: self)
   }
 }

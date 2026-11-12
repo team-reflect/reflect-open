@@ -6,6 +6,7 @@ import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
 import { PaywallDrawer } from '@/mobile/paywall-drawer.tsx'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
+import { NativeChromeOff } from '@/mobile/native-chrome/native-chrome-projection.tsx'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
 import { WhatsNewDrawer } from '@/mobile/whats-new-drawer.tsx'
@@ -140,19 +141,30 @@ function MobileSurface(): ReactElement {
   // until the user chooses how to start (Plan 19, step 6). Checked before the
   // 'choosing' error branch — onboarding parks at 'choosing' deliberately.
   if (needsOnboarding) {
-    return <MobileOnboardingScreen />
+    return (
+      <>
+        <NativeChromeOff />
+        <MobileOnboardingScreen />
+      </>
+    )
   }
 
   if (status === 'choosing') {
     return (
       <div className="flex h-dvh w-screen flex-col items-center justify-center gap-2 px-safe-offset-8 text-center">
+        <NativeChromeOff />
         <p className="text-sm font-medium">Couldn’t open your notes</p>
         <p className="text-sm text-text-muted">{error ?? 'Unknown error'}</p>
       </div>
     )
   }
 
-  return <LoadingScreen />
+  return (
+    <>
+      <NativeChromeOff />
+      <LoadingScreen />
+    </>
+  )
 }
 
 function LoadingScreen(): ReactElement {
