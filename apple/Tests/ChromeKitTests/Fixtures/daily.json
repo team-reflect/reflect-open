@@ -27,15 +27,15 @@
   "showsBar": true,
   "leading": [
     {
-      "id": "today",
-      "title": "Today"
+      "id": "settings",
+      "title": "Settings",
+      "icon": "gearshape"
     }
   ],
   "trailing": [
     {
-      "id": "settings",
-      "title": "Settings",
-      "icon": "gearshape"
+      "id": "today",
+      "title": "Today"
     }
   ],
   "keyboardVisible": false,

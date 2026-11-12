@@ -16,6 +16,9 @@ public final class ChromeBridge {
   public var onState: (ChromeState) -> Void = { _ in }
   /// Called when a web push or pop slide starts (`true`) or ends (`false`).
   public var onTransition: (Bool) -> Void = { _ in }
+  /// Called when a user back swipe starts to move the page (`true`), or
+  /// settles back without a pop (`false`).
+  public var onBackSwipe: (Bool) -> Void = { _ in }
   /// Called when a new document starts: the shell drops what it shows for the old one.
   public var onReset: () -> Void = {}
   /// Called with a message the bridge could not decode.
@@ -42,6 +45,8 @@ public final class ChromeBridge {
       onState(next)
     case .transition(let started):
       onTransition(started)
+    case .backSwipe(let started):
+      onBackSwipe(started)
     case .chromeReady:
       isReady = true
     }

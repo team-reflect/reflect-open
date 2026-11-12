@@ -22,6 +22,10 @@ final class ChromeCoordinator {
   private var barFrozen = false
   /// Bumped on every slide start, so an old timeout never thaws a newer slide.
   private var slide = 0
+  /// The tab of the last state, so bar buttons cross-fade only within one page.
+  private var shownTab: ChromeTab?
+  /// The page whose bar a back swipe faded out, and the entry it showed.
+  private var swipe: (page: WebPageController, entryId: Int)?
 
   init(host: AppHost) {
     self.host = host
@@ -37,6 +41,7 @@ final class ChromeCoordinator {
     bridge.onState = { [weak self] state in self?.apply(state) }
     bridge.onReset = { [weak self] in self?.reset() }
     bridge.onTransition = { [weak self] started in self?.transition(started: started) }
+    bridge.onBackSwipe = { [weak self] started in self?.backSwipe(started: started) }
     bridge.onError = { message in Self.logger.error("\(message, privacy: .public)") }
   }
 
@@ -51,7 +56,12 @@ final class ChromeCoordinator {
     // A bar that comes or goes changes the page's top safe area, so it
     // changes as the slide starts, not as the new page lands.
     if !barFrozen || tabs.page(for: state.tab)?.barVisibilityChanges(for: state) == true {
-      showBar(state)
+      showBar(state, animated: !barFrozen && state.tab == shownTab)
+    }
+    shownTab = state.tab
+    // The pop of a back swipe brings a new entry: its bar fades back in.
+    if let swipe, swipe.entryId != state.entryId {
+      endBackSwipe(animated: true)
     }
     tabs.page(for: state.tab)?.setBarDimmed(state.modal)
     menus.pageDidShow(entryId: state.entryId)
@@ -67,9 +77,30 @@ final class ChromeCoordinator {
   }
 
   /// Shows the navigation bar of `state` in the page of its tab.
-  private func showBar(_ state: ChromeState) {
+  private func showBar(_ state: ChromeState, animated: Bool) {
     guard let page = tabs.page(for: state.tab) else { return }
-    page.showBar(state, menus: menus) { [weak self] intent in self?.send(intent) }
+    page.showBar(state, animated: animated, menus: menus) { [weak self] intent in
+      self?.send(intent)
+    }
+  }
+
+  /// A user back swipe starts to move the page, or settles back without a
+  /// pop. The bar of the page fades out as the swipe starts, and back in as
+  /// it settles back or as the next entry arrives.
+  private func backSwipe(started: Bool) {
+    guard started else {
+      endBackSwipe(animated: true)
+      return
+    }
+    guard swipe == nil, let state = host.chrome.state, let page = tabs.page(for: state.tab)
+    else { return }
+    swipe = (page, state.entryId)
+    page.setBarFaded(true, animated: true)
+  }
+
+  private func endBackSwipe(animated: Bool) {
+    swipe?.page.setBarFaded(false, animated: animated)
+    swipe = nil
   }
 
   /// A web push or pop slide starts or ends. During the slide a bar shown
@@ -93,7 +124,7 @@ final class ChromeCoordinator {
       let bar = tabs.page(for: state.tab)?.navigationController?.navigationBar
     else { return }
     UIView.transition(with: bar, duration: 0.2, options: .transitionCrossDissolve) {
-      self.showBar(state)
+      self.showBar(state, animated: false)
     }
   }
 
@@ -107,6 +138,8 @@ final class ChromeCoordinator {
   private func reset() {
     menus.closeAll()
     barFrozen = false
+    shownTab = nil
+    endBackSwipe(animated: false)
     formatting.update(nil)
     formatting.reset()
     tabs.reset()

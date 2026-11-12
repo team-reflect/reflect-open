@@ -277,6 +277,16 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     }
   }, [canBack, back, navigate])
 
+  // The native navigation bar fades out while a back swipe moves the page.
+  const reportSwipe = useCallback(
+    (phase: 'start' | 'cancel'): void => {
+      if (nativeChrome.enabled) {
+        nativeChrome.post({ type: 'backSwipe', phase } satisfies NativeChromeMessage)
+      }
+    },
+    [nativeChrome],
+  )
+
   const finishTransition = useCallback((): void => {
     setTransition((current) => (current.kind === 'none' ? current : { kind: 'none' }))
   }, [])
@@ -347,6 +357,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     pagesKey: layers.map((layer) => layer.key).join('|'),
     enabled: swipeEnabled,
     onPop: popByGesture,
+    onSwipe: reportSwipe,
   })
 
   const transitionScrim = transition.kind === 'none' ? null : presentScrim(transition)

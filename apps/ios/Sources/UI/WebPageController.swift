@@ -67,11 +67,15 @@ final class WebPageController: UIViewController {
 
   /// Shows the bar of `state` in the navigation bar of this page. Bar
   /// buttons send `action` intents, menus come from `menus`, and the back
-  /// chevron sends `back`.
+  /// chevron sends `back`. With `animated`, buttons that change cross-fade
+  /// when the bar was on screen and its back button stays as it was.
   func showBar(
-    _ state: ChromeState, menus: MenuPresenter, send: @escaping (ChromeIntent) -> Void
+    _ state: ChromeState, animated: Bool, menus: MenuPresenter,
+    send: @escaping (ChromeIntent) -> Void
   ) {
+    let wasShown = shownEntryId != nil && navigationController?.isNavigationBarHidden == false
     navigationController?.setNavigationBarHidden(Self.hidesBar(state), animated: false)
+    let fades = animated && wasShown && state.canBack == shownCanBack
     navigationItem.title = state.title ?? ""
     let entryId = state.entryId
     let newEntry = entryId != shownEntryId
@@ -103,7 +107,8 @@ final class WebPageController: UIViewController {
           items.append(item)
         }
         items += state.leading.map { barItem($0, entryId: entryId, menus: menus, send: send) }
-        navigationItem.leftBarButtonItems = items
+        navigationItem.setLeftBarButtonItems(
+          items, animated: fades && state.leading != shownLeading)
       }
       shownLeading = state.leading
       shownCanBack = state.canBack
@@ -116,9 +121,11 @@ final class WebPageController: UIViewController {
       {
         setMenus(of: items, to: state.trailing.reversed(), entryId: entryId, menus: menus)
       } else {
-        navigationItem.rightBarButtonItems = state.trailing.reversed().map {
+        let items = state.trailing.reversed().map {
           barItem($0, entryId: entryId, menus: menus, send: send)
         }
+        navigationItem.setRightBarButtonItems(
+          items, animated: fades && state.trailing != shownTrailing)
       }
       shownTrailing = state.trailing
     }
@@ -170,6 +177,22 @@ final class WebPageController: UIViewController {
     shownTitleMenu = nil
     shownEntryId = nil
     setBarDimmed(false)
+    setBarFaded(false, animated: false)
+  }
+
+  /// Fades the navigation bar out or back in, as a back swipe drags the
+  /// page away or lets it settle back.
+  func setBarFaded(_ faded: Bool, animated: Bool) {
+    guard let bar = navigationController?.navigationBar else { return }
+    let alpha: CGFloat = faded ? 0 : 1
+    guard animated else {
+      bar.layer.removeAnimation(forKey: "opacity")
+      bar.alpha = alpha
+      return
+    }
+    UIView.animate(withDuration: 0.15, delay: 0, options: .beginFromCurrentState) {
+      bar.alpha = alpha
+    }
   }
 
   /// Dims the navigation bar and ignores its touches while a web drawer is

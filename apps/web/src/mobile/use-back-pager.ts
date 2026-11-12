@@ -32,6 +32,11 @@ export interface BackPagerOptions {
    * Commits the pop. Runs once a user swipe settles on the lower page.
    */
   onPop: () => void
+  /**
+   * Runs with `start` when a user swipe starts to move the current page, and
+   * with `cancel` when that swipe settles back on it without a pop.
+   */
+  onSwipe?: ((phase: 'start' | 'cancel') => void) | undefined
 }
 
 /**
@@ -64,8 +69,10 @@ export function useBackPager({
   pagesKey,
   enabled,
   onPop,
+  onSwipe,
 }: BackPagerOptions): void {
   const pop = useEffectEvent(onPop)
+  const reportSwipe = useEffectEvent((phase: 'start' | 'cancel') => onSwipe?.(phase))
 
   // Before paint, so a changed page list never shows the lower page for a frame.
   useLayoutEffect(() => {
@@ -83,6 +90,8 @@ export function useBackPager({
     const controller = new AbortController()
     const { signal } = controller
     let popped = false
+    // A user swipe has moved the page and has not settled yet.
+    let swiping = false
 
     // Only a gesture since the pager last rested on its page may pop it: a
     // scroll that code or the engine started is pinned back.
@@ -95,6 +104,10 @@ export function useBackPager({
         }
         if (scroller.scrollLeft > REVEALED_PX) {
           gesturesAtRest = watch.gestures()
+          if (swiping) {
+            swiping = false
+            reportSwipe('cancel')
+          }
           return
         }
         if (watch.gestures() === gesturesAtRest) {
@@ -109,6 +122,23 @@ export function useBackPager({
       isSettled: () => scroller.scrollLeft <= REVEALED_PX,
       dragHandle: edgeRef.current ?? undefined,
     })
+
+    // A scroll off the last page that a gesture since the last rest made
+    // starts a user swipe.
+    const startSwipe = (): void => {
+      const rest = scroller.scrollWidth - scroller.clientWidth
+      if (
+        swiping ||
+        popped ||
+        watch.gestures() === gesturesAtRest ||
+        scroller.scrollLeft >= rest - REVEALED_PX
+      ) {
+        return
+      }
+      swiping = true
+      reportSwipe('start')
+    }
+    scroller.addEventListener('scroll', startSwipe, { passive: true, signal: controller.signal })
 
     const scrim = scrimRef.current
     if (scrim) {
@@ -127,6 +157,9 @@ export function useBackPager({
     return () => {
       controller.abort()
       resize.disconnect()
+      if (swiping && !popped) {
+        reportSwipe('cancel')
+      }
     }
   }, [enabled, scrollerRef, scrimRef, edgeRef, pagesKey])
 }

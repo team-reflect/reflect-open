@@ -53,8 +53,8 @@ describe('buildShellChromeState', () => {
             items: [{ type: 'action', id: 'monthPicker', title: 'Choose Month…' }],
           },
         ],
-        leading: [{ id: 'today', title: 'Today' }],
-        trailing: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
+        leading: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
+        trailing: [{ id: 'today', title: 'Today' }],
       },
     })
     expect(state).toMatchObject({ canBack: false, showsBar: true })
@@ -139,6 +139,8 @@ describe('page messages', () => {
     const messages: NativeChromeMessage[] = [
       { type: 'transition', phase: 'start' },
       { type: 'transition', phase: 'end' },
+      { type: 'backSwipe', phase: 'start' },
+      { type: 'backSwipe', phase: 'cancel' },
       { type: 'chromeReady' },
     ]
     checkJSONFixture('messages', messages)

@@ -133,6 +133,9 @@ public enum ChromeMessage: Decodable, Equatable, Sendable {
   case state(ChromeState)
   /// A web push or pop slide starts (`true`) or ends (`false`).
   case transition(started: Bool)
+  /// A user back swipe starts to move the page (`true`), or settles back
+  /// without a pop (`false`).
+  case backSwipe(started: Bool)
   /// The page listens for intents.
   case chromeReady
 
@@ -152,6 +155,14 @@ public enum ChromeMessage: Decodable, Equatable, Sendable {
       case let phase:
         throw DecodingError.dataCorruptedError(
           forKey: .phase, in: container, debugDescription: "unknown transition phase \(phase)")
+      }
+    case "backSwipe":
+      switch try container.decode(String.self, forKey: .phase) {
+      case "start": self = .backSwipe(started: true)
+      case "cancel": self = .backSwipe(started: false)
+      case let phase:
+        throw DecodingError.dataCorruptedError(
+          forKey: .phase, in: container, debugDescription: "unknown back swipe phase \(phase)")
       }
     case "chromeReady": self = .chromeReady
     default:

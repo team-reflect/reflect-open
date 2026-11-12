@@ -8,6 +8,14 @@
     "phase": "end"
   },
   {
+    "type": "backSwipe",
+    "phase": "start"
+  },
+  {
+    "type": "backSwipe",
+    "phase": "cancel"
+  },
+  {
     "type": "chromeReady"
   }
 ]

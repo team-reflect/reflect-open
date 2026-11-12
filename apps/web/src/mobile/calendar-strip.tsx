@@ -100,8 +100,8 @@ export function CalendarStrip({
     {
       title: formatMonthLabel(shownMonth),
       titleMenu: recentMonthItems(getYearMonth(today), shownMonth),
-      leading: showToday ? [{ id: 'today', title: 'Today' }] : [],
-      trailing: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
+      leading: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
+      trailing: showToday ? [{ id: 'today', title: 'Today' }] : [],
     },
     {
       onAction: (id) => {

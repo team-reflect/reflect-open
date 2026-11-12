@@ -27,7 +27,11 @@ final class ChromeBridgeTests: XCTestCase {
   func testDecodesEveryOtherMessageOfThePage() throws {
     let messages = try JSONDecoder().decode([ChromeMessage].self, from: try fixture("messages"))
     XCTAssertEqual(
-      messages, [.transition(started: true), .transition(started: false), .chromeReady])
+      messages,
+      [
+        .transition(started: true), .transition(started: false), .backSwipe(started: true),
+        .backSwipe(started: false), .chromeReady,
+      ])
   }
 
   func testNamesTheFormattingCommandsOfThePage() throws {
@@ -52,8 +56,8 @@ final class ChromeBridgeTests: XCTestCase {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("daily"))
     XCTAssertEqual(state.title, "November 2026")
     XCTAssertEqual(state.routeKind, "today")
-    XCTAssertEqual(state.leading.map(\.id), ["today"])
-    XCTAssertEqual(state.trailing.first?.icon, "gearshape")
+    XCTAssertEqual(state.leading.first?.icon, "gearshape")
+    XCTAssertEqual(state.trailing.map(\.id), ["today"])
     guard case .action(let current) = state.titleMenu?.first else {
       return XCTFail("no month item")
     }
@@ -145,6 +149,17 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.receive(try message(["type": "transition", "phase": "end"]))
 
     XCTAssertEqual(transitions, [true, false])
+  }
+
+  func testReportsBackSwipes() throws {
+    let bridge = ChromeBridge()
+    var swipes: [Bool] = []
+    bridge.onBackSwipe = { swipes.append($0) }
+
+    bridge.receive(try message(["type": "backSwipe", "phase": "start"]))
+    bridge.receive(try message(["type": "backSwipe", "phase": "cancel"]))
+
+    XCTAssertEqual(swipes, [true, false])
   }
 
   func testReportsAMessageItCannotDecode() throws {

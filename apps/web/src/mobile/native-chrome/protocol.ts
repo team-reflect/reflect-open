@@ -101,6 +101,8 @@ export interface NativeChromeState {
 export type NativeChromeMessage =
   | NativeChromeState
   | { type: 'transition'; phase: 'start' | 'end' }
+  /** A user back swipe starts to move the page, or settles back without a pop. */
+  | { type: 'backSwipe'; phase: 'start' | 'cancel' }
   | { type: 'chromeReady' }
 
 /**
