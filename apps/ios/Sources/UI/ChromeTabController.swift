@@ -59,11 +59,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     fatalError("init(coder:) is not supported")
   }
 
-  /// The page that holds the web view.
-  var currentPage: WebPageController? {
-    pages.values.first { $0.holds(webView) }
-  }
-
   /// The page of `tab`.
   func page(for tab: ChromeTab) -> WebPageController? {
     pages[tab]

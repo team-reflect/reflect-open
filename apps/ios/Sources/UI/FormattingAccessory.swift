@@ -24,6 +24,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private var shown = false
   /// Set while the strip is off for a keyboard relayout.
   private var relayout = false
+  /// Loads the picked images; a new document cancels it.
+  private var loading: Task<Void, Never>?
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -50,9 +52,20 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     if let toolbar {
       strip.update(toolbar)
     }
-    if (toolbar != nil) != shown, !relayout {
+    if wantsStrip != shown, !relayout {
       contentView?.reloadInputViews()
     }
+  }
+
+  /// The strip shows only with the on-screen keyboard.
+  private var wantsStrip: Bool {
+    toolbar != nil && GCKeyboard.coalesced == nil
+  }
+
+  /// A new document: the images of an earlier pick never reach it.
+  func reset() {
+    loading?.cancel()
+    loading = nil
   }
 
   /// Lays the keyboard out again after the window changed size: the strip
@@ -73,7 +86,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private func accessory(for view: UIView) -> UIView? {
     guard view.isDescendant(of: webView) else { return nil }
     contentView = view
-    shown = toolbar != nil && !relayout && GCKeyboard.coalesced == nil
+    shown = wantsStrip && !relayout
     return shown ? strip : nil
   }
 
@@ -93,10 +106,13 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
     picker.dismiss(animated: true)
     let providers = results.map(\.itemProvider)
-    Task { [weak self] in
+    loading?.cancel()
+    loading = Task { [weak self] in
       // One intent per image, in the picked order, keeps each script small.
       for provider in providers {
-        if let file = await Self.loadImage(provider) {
+        let file = await Self.loadImage(provider)
+        guard !Task.isCancelled else { return }
+        if let file {
           self?.send(.files([file]))
         }
       }

@@ -306,16 +306,16 @@ export function MobileStack(props: MobileStackProps): ReactElement {
 
   // The native navigation bar keeps the old page's items during a slide. A
   // layout effect, so the start reaches the shell before the state of the
-  // new page, which the chrome projection posts from a passive effect.
-  const sliding = transition.kind !== 'none'
+  // new page, which the chrome projection posts from a passive effect. Each
+  // new slide posts its own start, so the shell's timeout follows the last one.
   useLayoutEffect(() => {
     if (hasNativeChrome('navbar')) {
       postNativeChrome({
         type: 'transition',
-        phase: sliding ? 'start' : 'end',
+        phase: transition.kind === 'none' ? 'end' : 'start',
       } satisfies NativeChromeMessage)
     }
-  }, [sliding])
+  }, [transition])
 
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below

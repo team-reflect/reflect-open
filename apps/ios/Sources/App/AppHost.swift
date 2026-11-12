@@ -73,8 +73,12 @@ final class AppHost {
     #endif
     chromeFeatures = ChromeFeatures.enabled(
       bundle: .main, defaults: .standard, allowOverrides: allowOverrides)
+    // An intent never waits in the queue: one sent while a new document
+    // loads would reach that document.
     chrome.send = { [bridge] intent in
-      bridge.emit("chrome:intent", payload: intent)
+      if bridge.isPageReady {
+        bridge.emit("chrome:intent", payload: intent)
+      }
     }
     webView = ReflectWebView(
       routes: routes, assets: assets, bridge: bridge, chrome: chrome,

@@ -125,6 +125,7 @@ final class ChromeCoordinator {
     menus.closeAll()
     barFrozen = false
     formatting?.update(nil)
+    formatting?.reset()
     tabs?.reset()
   }
 

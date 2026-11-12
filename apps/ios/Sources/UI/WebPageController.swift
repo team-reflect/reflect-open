@@ -103,11 +103,34 @@ final class WebPageController: UIViewController {
     }
 
     if newEntry || state.trailing != shownTrailing {
-      shownTrailing = state.trailing
-      navigationItem.rightBarButtonItems = state.trailing.reversed().map {
-        barItem($0, entryId: entryId, menus: menus, send: send)
+      let items = navigationItem.rightBarButtonItems ?? []
+      if !newEntry, let shownTrailing, Self.differInMenusOnly(state.trailing, shownTrailing),
+        items.count == state.trailing.count
+      {
+        // Only menus changed: the same items take the new menus, so an open
+        // menu stays open and a confirmation keeps its anchor.
+        for (item, button) in zip(items, state.trailing.reversed()) {
+          if let menu = button.menu {
+            item.menu = menus.barMenu(menu, entryId: entryId) { [weak item] in item }
+          }
+        }
+      } else {
+        navigationItem.rightBarButtonItems = state.trailing.reversed().map {
+          barItem($0, entryId: entryId, menus: menus, send: send)
+        }
       }
+      shownTrailing = state.trailing
     }
+  }
+
+  /// Whether `a` and `b` show the same buttons and differ only in the
+  /// items of their menus.
+  private static func differInMenusOnly(_ a: [BarButton], _ b: [BarButton]) -> Bool {
+    a.count == b.count
+      && zip(a, b).allSatisfy { next, shown in
+        next.id == shown.id && next.title == shown.title && next.icon == shown.icon
+          && (next.menu == nil) == (shown.menu == nil)
+      }
   }
 
   /// Whether `state` hides the navigation bar.
