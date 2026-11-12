@@ -13,11 +13,13 @@
 //
 // The Xcode build makes the Rust core when its slice is missing.
 //
-// Each run has its own default output directory. Runs share the default
-// DerivedData directory, so a second run builds only what changed; give two
-// runs at the same time their own `--derived-data`.
+// Each run has its own default output directory under the temporary
+// directory of the system; macOS removes files there that nothing opened for
+// some days. Runs share the default DerivedData directory, so a second run
+// builds only what changed; give two runs at the same time their own
+// `--derived-data`.
 
-import { appendFileSync, mkdirSync, rmSync } from 'node:fs'
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -117,17 +119,17 @@ function printSummary(): void {
 
 async function main(): Promise<void> {
   const defaultDir = join(tmpdir(), 'reflect-test-ios')
-  // The name of the simulator and of the default output directory of this run.
-  const runName = `reflect-test-${Date.now()}`
   const { values } = parseArgs({
     options: {
-      output: { type: 'string', default: join(defaultDir, 'results', runName) },
+      output: { type: 'string' },
       'derived-data': { type: 'string', default: join(defaultDir, 'DerivedData') },
       'skip-web': { type: 'boolean', default: false },
       'keep-simulator': { type: 'boolean', default: false },
     },
   })
-  const outputDir = values.output
+  const resultsDir = join(defaultDir, 'results')
+  mkdirSync(resultsDir, { recursive: true })
+  const outputDir = values.output ?? mkdtempSync(join(resultsDir, 'run-'))
   const resultBundle = join(outputDir, 'Reflect.xcresult')
   const logArchive = join(outputDir, 'simulator.logarchive')
   mkdirSync(outputDir, { recursive: true })
@@ -142,12 +144,13 @@ async function main(): Promise<void> {
   }
 
   const simulator = await step('Create the simulator', async () => {
+    const name = `reflect-test-${Date.now()}`
     const runtime = await newestRuntime()
-    const created = await exec('xcrun', ['simctl', 'create', runName, DEVICE_TYPE, runtime], {
+    const created = await exec('xcrun', ['simctl', 'create', name, DEVICE_TYPE, runtime], {
       throwOnError: true,
     })
     const udid = created.stdout.trim()
-    log(`created ${runName} (${udid}) on ${runtime}`)
+    log(`created ${name} (${udid}) on ${runtime}`)
     return udid
   })
 
