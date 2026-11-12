@@ -1,2 +1,6 @@
 /* The Swift shell draws these parts. The web versions stay mounted, so their
    state keeps running, but they take no space. */
+
+:root[data-native-chrome~='toolbar'] [role='toolbar'][aria-label='Formatting'] {
+  display: none;
+}

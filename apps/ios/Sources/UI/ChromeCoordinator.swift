@@ -16,6 +16,7 @@ final class ChromeCoordinator {
   let container: UIViewController
   private let page: WebPageController
   private let menus = MenuPresenter()
+  private let formatting: FormattingAccessory?
 
   init(host: AppHost) {
     self.host = host
@@ -24,10 +25,13 @@ final class ChromeCoordinator {
     container = page
     page.loadViewIfNeeded()
     page.attach(host.webView)
+    formatting = features.contains(.toolbar) ? FormattingAccessory(webView: host.webView) : nil
 
     let bridge = host.chrome
     menus.send = { [weak bridge] intent in bridge?.send(intent) }
     menus.presenter = { [weak self] in self?.container }
+    formatting?.send = { [weak bridge] intent in bridge?.send(intent) }
+    formatting?.presenter = { [weak self] in self?.container }
     bridge.onState = { [weak self] state in self?.apply(state) }
     bridge.onReset = { [weak self] in self?.reset() }
     bridge.onPresentMenu = { [weak self] request in self?.presentMenu(request) }
@@ -42,6 +46,7 @@ final class ChromeCoordinator {
     #endif
     applyTheme(state.theme)
     menus.pageDidShow(entryId: state.entryId)
+    formatting?.update(state.toolbar)
   }
 
   /// The page asks for a menu at one of its elements, for the entry on screen.
@@ -53,6 +58,7 @@ final class ChromeCoordinator {
   /// A new document started: nothing of the old page stays on screen.
   private func reset() {
     menus.closeAll()
+    formatting?.update(nil)
     applyTheme(.system)
   }
 
