@@ -89,6 +89,7 @@ jobs:
           js=false
           rust=false
           swift=false
+          skip_slow=$PR_IS_DRAFT
 
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
@@ -96,6 +97,7 @@ jobs:
             js=true
             rust=true
             swift=true
+            skip_slow=false
           else
             git diff --name-only --no-renames HEAD^1 HEAD
             if changed "${js_files[@]}"; then
@@ -109,13 +111,20 @@ jobs:
             fi
           fi
 
+          webkit=$js
+          ios=$swift
+          if [[ $skip_slow == true ]]; then
+            webkit=false
+            ios=false
+          fi
+
           {
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
-            echo "test-webkit=$([[ $js == true && $PR_IS_DRAFT == false ]] && echo true || echo false)"
+            echo "test-webkit=$webkit"
             echo "test-swift=$swift"
-            echo "test-ios=$swift"
+            echo "test-ios=$ios"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
@@ -284,27 +293,9 @@ jobs:
 
       - uses: ./.github/actions/setup-mise
 
-      # The steps are separate so that the job page shows the time of each.
-      - name: Build the web app
-        run: pnpm --filter @reflect/ios build:web
-
-      - name: Build the Rust core
-        run: pnpm build:ffi --debug --sdk iphonesimulator
-
-      - name: Resolve the Swift packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData"
-
-      # The job summary shows the time of each step of the script.
+      # The script prints the time of each of its steps.
       - name: Build and run the tests
-        run: |
-          pnpm test:ios \
-            --skip-web \
-            --derived-data "$RUNNER_TEMP/DerivedData" \
-            --output "$RUNNER_TEMP/test-ios"
+        run: pnpm test:ios
 
       # The result bundle has the screenshots and the steps of each failed test.
       - name: Upload the result bundle and the logs
@@ -312,7 +303,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-ios-results
-          path: ${{ runner.temp }}/test-ios
+          path: apps/ios/build/test-ios
           retention-days: 7
 
   lint-rust:
