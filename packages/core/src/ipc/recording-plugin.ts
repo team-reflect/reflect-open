@@ -5,9 +5,9 @@ import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.
  * Typed bindings for the `plugin:recording` commands, the native audio-memo
  * recorder (`apps/ios/Sources/Capabilities/RecordingCapability.swift`). Each
  * schema and args type mirrors that capability's request and reply shapes
- * (commands) or an `Encodable` struct in
- * `apple/Sources/RecordingKit/RecordingEngine.swift` (events);
- * a field change there must land here in the same review.
+ * (commands) or an `Encodable` struct in `apple/Sources/RecordingKit/`
+ * (replies and events). A field change there must land here in the same
+ * review.
  */
 
 /** Mirrors `StartResponse`: the identity every segment of a session shares. */

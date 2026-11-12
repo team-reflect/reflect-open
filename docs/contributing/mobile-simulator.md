@@ -5,6 +5,7 @@ The iOS app is the Swift shell in `apps/ios`. It loads the web app from
 
 ```bash
 mise install                                   # cbindgen and other tools from mise.toml
+pnpm install                                   # also writes apps/ios/.xcode.env.local
 pnpm --filter @reflect/ios build:web           # apps/web/dist/mobile
 pnpm build:ffi --debug --sdk iphonesimulator   # the Rust core
 open apps/ios/Reflect.xcodeproj                # run the Reflect scheme

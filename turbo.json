@@ -7,6 +7,7 @@
       "outputs": ["dist/**", ".output/**"]
     },
     "dev": {
+      "env": ["TAURI_ENV_PLATFORM"],
       "cache": false,
       "persistent": true
     },

@@ -33,6 +33,13 @@ describe('detectPlatformFacts', () => {
     expect(facts.surface).toEqual(MOBILE_SURFACE)
   })
 
+  it('is the mobile surface in an android build', () => {
+    vi.stubEnv('TAURI_ENV_PLATFORM', 'android')
+    const facts = detectPlatformFacts('tauri')
+    expect(facts.appPlatform).toBe('android')
+    expect(facts.surface).toEqual(MOBILE_SURFACE)
+  })
+
   it('is the desktop surface in plain-browser dev', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', '')
     const facts = detectPlatformFacts('browser')

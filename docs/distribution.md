@@ -113,7 +113,7 @@ pnpm build:ipa --build-number=<number> --flavor=beta|stable
 pnpm upload:testflight
 ```
 
-Both build the Swift shell in `apps/ios`.
+`build:ipa` builds the Swift shell in `apps/ios`. `upload:testflight` uploads that IPA and its dSYMs.
 
 `--flavor` is required. A release (beta or stable) uploads the stable flavor to Reflect.
 `upload:testflight` finds the App Store Connect app from the IPA's bundle id.

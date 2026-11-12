@@ -117,7 +117,7 @@ const architecturePlugin = {
 // ---------------------------------------------------------------------------
 
 /** Mocked in any desktop test: pure UI children and heavy children. */
-const DESKTOP_VI_MOCK_ALLOW = [
+const WEB_VI_MOCK_ALLOW = [
   // The ProseKit editor: a test of a screen around it uses a probe.
   '@/editor/note-editor.tsx',
   // The read-only Markdown renderer loads the same editor stack.
@@ -125,7 +125,7 @@ const DESKTOP_VI_MOCK_ALLOW = [
 ]
 
 /** Extra specifiers for one desktop test file, each with its reason. */
-const DESKTOP_VI_MOCK_ALLOW_BY_FILE = {
+const WEB_VI_MOCK_ALLOW_BY_FILE = {
   // Platform adapters: the test stands in for the Tauri API under the adapter.
   'apps/web/src/services/*.test.ts': ['@tauri-apps/*'],
 
@@ -378,9 +378,9 @@ export default defineESLintConfig(
   // children only; `@reflect/core`, `@/lib/*` and the providers that are a
   // thin shell over a service are never on the list.
   viMockBlock([`packages/**/*.${SOURCE_EXTENSIONS}`], []),
-  viMockBlock([`apps/web/**/*.${SOURCE_EXTENSIONS}`], DESKTOP_VI_MOCK_ALLOW),
-  ...Object.entries(DESKTOP_VI_MOCK_ALLOW_BY_FILE).map(([file, allow]) => {
-    return viMockBlock([file], [...DESKTOP_VI_MOCK_ALLOW, ...allow])
+  viMockBlock([`apps/web/**/*.${SOURCE_EXTENSIONS}`], WEB_VI_MOCK_ALLOW),
+  ...Object.entries(WEB_VI_MOCK_ALLOW_BY_FILE).map(([file, allow]) => {
+    return viMockBlock([file], [...WEB_VI_MOCK_ALLOW, ...allow])
   }),
   viMockBlock([`apps/extension/**/*.${SOURCE_EXTENSIONS}`], EXTENSION_VI_MOCK_ALLOW),
 )

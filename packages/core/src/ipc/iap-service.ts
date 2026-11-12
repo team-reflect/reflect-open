@@ -11,7 +11,8 @@ import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.
  * the permalinks below show.
  * TS shapes (hand-written, no runtime guarantee):
  * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts
- * iOS ground truth (hand-built dictionaries; fields vary by code path):
+ * Plugin iOS replies (hand-built dictionaries; fields vary by code path).
+ * `StoreCapability.swift` builds the shipped replies in the same shape:
  * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift
  * Rust request/response models (serde camelCase):
  * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/src/models.rs
