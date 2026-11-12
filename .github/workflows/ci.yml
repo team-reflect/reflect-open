@@ -276,6 +276,8 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/test-ios
+        with:
+          plan: Nightly
 
   lint-rust:
     needs: classify
