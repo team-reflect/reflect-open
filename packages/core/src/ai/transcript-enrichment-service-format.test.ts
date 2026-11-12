@@ -98,7 +98,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
     expect(result.title).not.toBe('Long memo')
   })
 
-  it('falls back to the untouched transcript and a local title when the call fails', async () => {
+  it('falls back to the untouched transcript and the timestamp title when the call fails', async () => {
     languageModelService.setModel(
       new MockLanguageModelV3({
         doGenerate: () => Promise.reject(new Error('model unavailable')),
@@ -106,7 +106,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
     )
 
     await expect(request('review launch checklist and beta feedback')).resolves.toEqual({
-      title: 'Review launch checklist and beta feedback',
+      title: FALLBACK_TITLE,
       body: 'review launch checklist and beta feedback',
     })
   })
@@ -115,7 +115,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
     modelAnswering({ title: 'Ignored', body: '   ' })
 
     await expect(request('first idea. second idea')).resolves.toEqual({
-      title: 'First idea',
+      title: FALLBACK_TITLE,
       body: 'first idea. second idea',
     })
   })
@@ -128,7 +128,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
     })
 
     await expect(request(transcript)).resolves.toEqual({
-      title: 'Review the launch timeline and invite the beta',
+      title: FALLBACK_TITLE,
       body: transcript,
     })
   })
@@ -155,7 +155,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
     })
 
     await expect(request(transcript)).resolves.toEqual({
-      title: 'Review the launch timeline tomorrow',
+      title: FALLBACK_TITLE,
       body: transcript,
     })
   })
@@ -168,7 +168,7 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
     })
 
     await expect(request(transcript)).resolves.toEqual({
-      title: 'Alice will send the draft, and bob will',
+      title: FALLBACK_TITLE,
       body: transcript,
     })
   })

@@ -39,8 +39,9 @@ touches a Reflect server, because there isn't one.
   small-model pass adds punctuation, paragraphs, light Markdown, and a
   title without changing meaning. With `Transcription auto-format` off, the
   pass makes only the title and the note keeps the raw transcript.
-  Formatting failures fall back to raw text and a local title instead of
-  retrying speech-to-text. The reconciler
+  Formatting failures fall back to raw text and a separate title call, and a
+  failed title call falls back to the timestamp title, instead of retrying
+  speech-to-text. The reconciler
   (`packages/core/src/audio/audio-memo-transcription-service.ts`) writes a
   transcript note, resolves or creates the `Audio memos` category note, and
   backlinks both from the daily note under `## [[Audio memos]]`. Pending

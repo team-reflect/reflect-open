@@ -9,7 +9,6 @@ const TITLE_TIMEOUT_MS = 30_000
 const FORMAT_TIMEOUT_MS = 60_000
 const MAX_TRANSCRIPT_CHARS = 4_000
 const MAX_TITLE_CHARS = 80
-const MAX_FALLBACK_WORDS = 8
 const OPENAI_AUDIO_MEMO_ENRICHMENT_MODEL = 'gpt-6-luna'
 const ANTHROPIC_AUDIO_MEMO_ENRICHMENT_MODEL = 'claude-haiku-5-5'
 const GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL = 'gemini-3.5-flash-lite'
@@ -31,7 +30,7 @@ export interface AudioMemoEnrichmentCredentials {
 
 export interface GenerateAudioMemoTitleRequest {
   /**
-   * Optional title-generation credentials; omitted means local fallback only.
+   * Optional title-generation credentials; omitted means the timestamp title.
    */
   readonly credentials?: AudioMemoEnrichmentCredentials | undefined
   /**
@@ -102,31 +101,6 @@ export function normalizedAudioMemoTitle(candidate: string): string | null {
     .trim()
   const clipped = clipAtWordBoundary(safe, MAX_TITLE_CHARS)
   return clipped === '' ? null : clipped
-}
-
-function titleCaseFallback(text: string): string {
-  return text
-    .split(/\s+/)
-    .filter((word) => word !== '')
-    .slice(0, MAX_FALLBACK_WORDS)
-    .map((word, index) => {
-      const lower = word.toLocaleLowerCase()
-      return index === 0 ? lower.charAt(0).toLocaleUpperCase() + lower.slice(1) : lower
-    })
-    .join(' ')
-}
-
-// A sentence ends at `.`, `!` or `?` before whitespace or the end of the line,
-// except after a dotted abbreviation such as "a.m." or "e.g.".
-const SENTENCE_END_PATTERN = /(?<!(?:^|[\s(])(?:\p{L}\.)+\p{L})[.!?](?=\s|$)/u
-
-/**
- * Derive a short local title from the transcript without making a provider call.
- */
-export function transcriptFallbackTitle(transcript: string, fallbackTitle: string): string {
-  const firstSentence = firstContentLine(transcript).split(SENTENCE_END_PATTERN)[0] ?? ''
-  const normalized = normalizedAudioMemoTitle(titleCaseFallback(firstSentence))
-  return normalized ?? fallbackTitle
 }
 
 function titlePrompt(transcript: string): string {
@@ -273,16 +247,16 @@ export interface TranscriptEnrichmentService {
   enrich(input: EnrichSessionTranscriptInput): Promise<EnrichedSessionTranscript>
   /**
    * Generate a concise, content-derived memo title. Provider failures are
-   * non-fatal because the transcript is already durable; callers still get a
-   * deterministic title from the transcript before falling back to the timestamp.
+   * non-fatal because the transcript is already durable; callers get the
+   * timestamp title instead.
    */
   generateTitle(request: GenerateAudioMemoTitleRequest): Promise<string>
   /**
    * Best-effort transcript cleanup and naming in one small-model call. Formatting
    * is optional enrichment: a validation failure returns the raw transcript with
    * a title from a separate title call, and any model or timeout failure returns
-   * the raw transcript and a deterministic local title, so successful
-   * transcription is never repeated or billed twice.
+   * the raw transcript and the timestamp title, so successful transcription is
+   * never repeated or billed twice.
    */
   formatTranscript(request: FormatAudioMemoTranscriptRequest): Promise<FormattedAudioMemoTranscript>
 }
@@ -318,16 +292,12 @@ class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
   }
 
   async generateTitle(request: GenerateAudioMemoTitleRequest): Promise<string> {
-    const fallback = transcriptFallbackTitle(request.transcript, request.fallbackTitle)
-    if (request.transcript.trim() === '') {
+    if (request.transcript.trim() === '' || request.credentials === undefined) {
       return request.fallbackTitle
-    }
-    if (request.credentials === undefined) {
-      return fallback
     }
     const titleConfig = audioMemoEnrichmentConfig(request.credentials.config)
     if (titleConfig === null) {
-      return fallback
+      return request.fallbackTitle
     }
     try {
       const { generateText, Output } = await import('@reflect/modules/ai')
@@ -338,19 +308,18 @@ class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
         abortSignal: AbortSignal.timeout(TITLE_TIMEOUT_MS),
         maxRetries: 0,
       })
-      return normalizedAudioMemoTitle(result.output.title) ?? fallback
+      return normalizedAudioMemoTitle(result.output.title) ?? request.fallbackTitle
     } catch {
-      return fallback
+      return request.fallbackTitle
     }
   }
 
   async formatTranscript(
     request: FormatAudioMemoTranscriptRequest,
   ): Promise<FormattedAudioMemoTranscript> {
-    const fallbackTitle = transcriptFallbackTitle(request.transcript, request.fallbackTitle)
     const config = audioMemoEnrichmentConfig(request.credentials.config)
     if (request.transcript.trim() === '' || config === null) {
-      return { title: fallbackTitle, body: request.transcript }
+      return { title: request.fallbackTitle, body: request.transcript }
     }
 
     try {
@@ -374,11 +343,11 @@ class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
         return { title, body: request.transcript }
       }
       return {
-        title: normalizedAudioMemoTitle(result.output.title) ?? fallbackTitle,
+        title: normalizedAudioMemoTitle(result.output.title) ?? request.fallbackTitle,
         body,
       }
     } catch {
-      return { title: fallbackTitle, body: request.transcript }
+      return { title: request.fallbackTitle, body: request.transcript }
     }
   }
 }

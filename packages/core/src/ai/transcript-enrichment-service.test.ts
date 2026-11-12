@@ -122,17 +122,17 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
     })
   })
 
-  it('falls back to the transcript when the provider returns nothing useful', async () => {
+  it('falls back to the timestamp when the provider returns nothing useful', async () => {
     modelAnswering('[]')
 
-    await expect(request('first idea. second idea')).resolves.toBe('First idea')
+    await expect(request('first idea. second idea')).resolves.toBe('Audio memo 2026-06-11 15:30:22')
   })
 
-  it('falls back to the transcript when the provider call fails', async () => {
+  it('falls back to the timestamp when the provider call fails', async () => {
     modelThrowing(new Error('model unavailable'))
 
     await expect(request('review launch checklist and beta feedback')).resolves.toBe(
-      'Review launch checklist and beta feedback',
+      'Audio memo 2026-06-11 15:30:22',
     )
   })
 
@@ -143,7 +143,7 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
     expect(languageModelService.calls()).toEqual([])
   })
 
-  it('uses the transcript fallback when title credentials are absent', async () => {
+  it('uses the timestamp fallback when title credentials are absent', async () => {
     modelAnswering('Ignored')
 
     await expect(
@@ -151,21 +151,9 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
         transcript: 'review launch checklist',
         fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
       }),
-    ).resolves.toBe('Review launch checklist')
+    ).resolves.toBe('Audio memo 2026-06-11 15:30:22')
     expect(languageModelService.calls()).toEqual([])
   })
-
-  it.each([
-    ['It is 8:46 a.m. and I need to call the dentist. Then lunch', 'It is 8:46 a.m. and i need to'],
-    ['The price is 3.5 dollars today. More later', 'The price is 3.5 dollars today'],
-  ])(
-    'keeps abbreviations and decimals in the transcript fallback for %j',
-    async (transcript, title) => {
-      await expect(
-        enrichment.generateTitle({ transcript, fallbackTitle: 'Audio memo 2026-06-11 15:30:22' }),
-      ).resolves.toBe(title)
-    },
-  )
 
   it('prefers the default supported provider for title generation', () => {
     expect(
@@ -272,7 +260,7 @@ describe('TranscriptEnrichmentService.enrich', () => {
     expect(promptText(calls[0]!)).not.toContain('b')
   })
 
-  it('names the transcript locally when there are no credentials', async () => {
+  it('uses the timestamp title when there are no credentials', async () => {
     modelAnsweringObject({ title: 'Ignored' })
 
     await expect(
@@ -282,7 +270,7 @@ describe('TranscriptEnrichmentService.enrich', () => {
         formatTranscript: true,
         fallbackTitle: FALLBACK_TITLE,
       }),
-    ).resolves.toEqual({ title: 'Review launch checklist', body: 'review launch checklist' })
+    ).resolves.toEqual({ title: FALLBACK_TITLE, body: 'review launch checklist' })
     expect(languageModelService.calls()).toEqual([])
   })
 })
