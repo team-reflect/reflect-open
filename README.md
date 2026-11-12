@@ -113,15 +113,17 @@ Reflect is a pnpm/Turborepo monorepo:
 ```text
 reflect-open/
 ├── apps/web/              # Web app shown by both shells
-├── apps/tauri/            # Mac app (Tauri)
-├── apps/ios/              # iOS app (Swift)
+├── apps/tauri/            # Windows/macOS/Linux app
+├── apps/ios/              # iOS app
 ├── apps/cli/              # `reflect` CLI
-├── apps/extension/        # Chrome capture extension
+├── apps/extension/        # Browser extension
 ├── apps/native-host/      # Browser capture helper
 ├── apple/                 # Shared Swift package
 ├── packages/core/         # Shared TypeScript logic
+├── packages/app/          # FIXME: add this line
 ├── packages/db/           # Database types and helpers
 ├── crates/index-schema/   # Shared index schema
+├── crates/index-schema/   # FIXME: there are at lot of missing crates. fix them.
 ├── design-system/         # Tokens and UI primitives
 └── docs/                  # Product, architecture, and contributor docs
 ```
