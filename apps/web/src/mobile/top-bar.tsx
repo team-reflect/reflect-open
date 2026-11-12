@@ -2,23 +2,6 @@ import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import { cn } from '@/lib/utils.ts'
 
-/**
- * The header of a mobile screen.
- */
-export function MobileTopBar({ children }: { children: ReactNode }): ReactElement {
-  return <header className="shrink-0 border-b border-border px-safe">{children}</header>
-}
-
-export function MobileTopBarRow({
-  className,
-  children,
-}: {
-  className?: string
-  children: ReactNode
-}): ReactElement {
-  return <div className={cn('flex h-12 items-center gap-1 px-4', className)}>{children}</div>
-}
-
 export function MobileTopBarIconButton({
   edge,
   className,
