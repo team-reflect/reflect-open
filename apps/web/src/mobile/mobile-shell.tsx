@@ -13,7 +13,6 @@ import {
 } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
-import '@/mobile/native-chrome/native-chrome.css'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 

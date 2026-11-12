@@ -1,6 +1,0 @@
-/* The Swift shell draws a native button over each of these controls. They
-   keep their space, so the web header lays out the same around them. */
-
-:root[data-native-chrome] [data-native-slot] {
-  visibility: hidden;
-}

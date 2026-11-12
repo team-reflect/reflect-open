@@ -1,3 +1,5 @@
+import type { MaybePromise } from '@reflect/utils'
+
 /**
  * An icon that every chrome renderer can draw.
  */
@@ -81,7 +83,8 @@ export interface ScreenChrome {
   leading?: ChromeButton[] | undefined
   trailing?: ChromeButton[] | undefined
   /**
-   * Runs a button or a menu item by id.
+   * Runs a button or a menu item by id. The renderer shows a rejection to
+   * the user; its message is the text the user reads.
    */
-  onAction?: ((id: string) => void) | undefined
+  onAction?: ((id: string) => MaybePromise<void>) | undefined
 }

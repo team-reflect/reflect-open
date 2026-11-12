@@ -1,9 +1,12 @@
 import type { ReactElement } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
+import { useToastController } from '@/lib/use-toasts.ts'
 import { cn } from '@/lib/utils.ts'
+import { runChromeAction } from '@/mobile/chrome/chrome-action.ts'
 import type { TopBarCornerProps } from '@/mobile/chrome/chrome-renderer.ts'
 import type { ChromeButton, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import { ChromeMenuDrawer } from '@/mobile/chrome/web/chrome-menu-drawer.tsx'
 import { WEB_ICONS } from '@/mobile/chrome/web/web-icons.ts'
 import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 
@@ -69,6 +72,7 @@ function CornerButton({
   chrome: ScreenChrome
   edge: 'leading' | 'trailing' | undefined
 }): ReactElement {
+  const toasts = useToastController()
   const hidden = button.hidden === true
   const hiddenProps = {
     'aria-hidden': hidden || undefined,
@@ -77,7 +81,12 @@ function CornerButton({
       'transition-opacity duration-150 motion-reduce:transition-none',
       hidden ? 'pointer-events-none opacity-0' : 'opacity-100',
     ),
-    onClick: () => chrome.onAction?.(button.id),
+    onClick: () => void runChromeAction(chrome, button.id, toasts),
+  }
+  if (button.menu !== undefined) {
+    return (
+      <ChromeMenuDrawer button={{ ...button, menu: button.menu }} chrome={chrome} edge={edge} />
+    )
   }
   if (button.icon === undefined) {
     return (

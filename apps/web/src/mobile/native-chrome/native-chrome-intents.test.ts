@@ -17,6 +17,7 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     screen: { back: vi.fn(), onAction: vi.fn() },
     attachCommands: null,
     attachFiles: createAttachQueue(),
+    toasts: { add: vi.fn(), close: vi.fn() },
     ...overrides,
   }
 }

@@ -2,6 +2,8 @@ import {
   focusedEditorCommands,
   type FormattingToolbarCommands,
 } from '@/editor/formatting-toolbar-store.ts'
+import type { ToastController } from '@/lib/use-toasts.ts'
+import { runChromeAction } from '@/mobile/chrome/chrome-action.ts'
 import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import type { FormattingCommandId, NativeIntent } from '@/mobile/native-chrome/protocol.ts'
@@ -27,6 +29,10 @@ export interface IntentContext {
    */
   attachCommands: FormattingToolbarCommands | null
   attachFiles: AttachFiles
+  /**
+   * Shows the rejection of an action.
+   */
+  toasts: ToastController
 }
 
 const FORMATTING_RUNNERS: Record<
@@ -81,7 +87,7 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
       return
     case 'action':
       if (intent.entryId === context.entryId) {
-        context.screen?.onAction?.(intent.id)
+        void runChromeAction(context.screen, intent.id, context.toasts)
       }
       return
     case 'command':

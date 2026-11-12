@@ -3,8 +3,8 @@ import { isUntitledNotePath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane.tsx'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks.tsx'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'
-import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
-import { NoteActionsMenu, useNoteActions } from '@/mobile/note-actions-menu.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
+import { useNoteActions } from '@/mobile/note-actions-menu.tsx'
 import { cn } from '@/lib/utils.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
@@ -79,14 +79,16 @@ function MobileNoteHeader({
 }): ReactElement {
   const actions = useNoteActions(path, close)
   return (
-    <MobileScreenHeader
-      title={untitled ? 'New note' : 'Edit note'}
-      onBack={close}
-      trailing={<NoteActionsMenu path={path} onDeleted={close} actions={actions} />}
-      nativeTrailing={[
+    <ChromeTopBar
+      align="center"
+      back={close}
+      trailing={[
         { id: 'note-actions', title: 'Note actions', icon: 'ellipsis', menu: actions.items },
       ]}
-      onNativeAction={actions.runAction}
+      onAction={actions.runAction}
+      title={
+        <h1 className="truncate text-base font-semibold">{untitled ? 'New note' : 'Edit note'}</h1>
+      }
     />
   )
 }

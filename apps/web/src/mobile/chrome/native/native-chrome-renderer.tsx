@@ -6,6 +6,7 @@ import {
   type FormattingToolbarCommands,
 } from '@/editor/formatting-toolbar-store.ts'
 import { useStore } from '@/lib/use-store.ts'
+import { useToastController } from '@/lib/use-toasts.ts'
 import {
   useChromeRenderer,
   type ChromeRenderer,
@@ -115,6 +116,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
+  const toasts = useToastController()
 
   useEffect(() => {
     nativeChrome.postState(
@@ -171,12 +173,13 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           screen: renderer.screens.chrome(context.entryId),
           attachCommands: attach?.entryId === context.entryId ? attach.commands : null,
           attachFiles: renderer.attachFiles,
+          toasts,
         })
       }
     })
     nativeChrome.post({ type: 'chromeReady' } satisfies NativeChromeMessage)
     return unlisten
-  }, [nativeChrome, renderer])
+  }, [nativeChrome, renderer, toasts])
 
   return null
 }

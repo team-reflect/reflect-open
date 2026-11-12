@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { createTestNativeChromeHost } from '@reflect/app/testing'
 import { describe, expect, it, vi } from 'vitest'
+import { ChromeLayerContext } from '@/mobile/chrome/chrome-renderer.ts'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
@@ -86,5 +87,26 @@ describe('ChromeTopBar', () => {
     host.sendIntent({ type: 'action', entryId, id: 'more' })
     expect(back).toHaveBeenCalledOnce()
     expect(onAction).toHaveBeenCalledWith('more')
+  })
+
+  it('registers no bar from a hidden stack layer and keeps a bar it does not own', async () => {
+    // Three screens of one history entry: the later one owns its bar.
+    const host = createTestNativeChromeHost()
+    const header = (id: string): ReactElement => (
+      <ChromeTopBar back={vi.fn()} trailing={[{ id, title: id }]} title={<h1>{id}</h1>} />
+    )
+    const screens = (withOlder: boolean): ReactElement => (
+      <>
+        {withOlder && header('older')}
+        {header('top')}
+        <ChromeLayerContext value={false}>{header('below')}</ChromeLayerContext>
+      </>
+    )
+    const view = await renderInApp(screens(true), nativeChromeOptions(host))
+    await vi.waitFor(() => {
+      expect(lastChromeState(host)?.trailing.map((button) => button.id)).toEqual(['top'])
+    })
+    await view.rerender(screens(false))
+    expect(lastChromeState(host)?.trailing.map((button) => button.id)).toEqual(['top'])
   })
 })

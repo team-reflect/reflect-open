@@ -82,8 +82,4 @@ export const appServices = createAppServices(coreServices, host)
 appServices.exceptionTelemetry.install()
 installUncaughtErrorLogging(window, logger)
 installQueryInvalidation(coreServices, appServices)
-// Before the first paint, so CSS hides the web chrome that the shell draws.
-if (appServices.nativeChrome.enabled) {
-  document.documentElement.dataset.nativeChrome = ''
-}
 void coreServices.contacts.refresh()
