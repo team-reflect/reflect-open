@@ -23,7 +23,6 @@ const LOG_ARCHIVE = join(OUTPUT_DIR, 'simulator.logarchive')
 
 const IN_GITHUB_ACTIONS = process.env.GITHUB_ACTIONS === 'true'
 
-/** Runs a command that prints straight to the terminal and throws when it fails. */
 async function run(command: string, args: string[]): Promise<void> {
   await exec(command, args, {
     throwOnError: true,
@@ -31,7 +30,6 @@ async function run(command: string, args: string[]): Promise<void> {
   })
 }
 
-/** Runs one step and prints its time when it ends. */
 async function step<T>(name: string, body: () => Promise<T>): Promise<T> {
   console.log(IN_GITHUB_ACTIONS ? `::group::${name}` : `\n[test-ios] ${name}`)
   const start = Date.now()
@@ -46,7 +44,6 @@ async function step<T>(name: string, body: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Runs `xcodebuild`, through `xcbeautify` when it is installed. */
 async function xcodebuild(args: string[]): Promise<void> {
   const renderer = IN_GITHUB_ACTIONS ? '--renderer github-actions' : ''
   const script = `
