@@ -39,32 +39,24 @@ function checkJSONFixture(name: string, value: unknown): void {
 }
 
 describe('buildShellChromeState', () => {
-  it('shows the month menu and the gear of Daily', () => {
+  it('shows the gear and the Today button of Daily', () => {
     const state = buildShellChromeState({
       ...BASE,
       route: { kind: 'today' },
       tab: 'daily',
       bar: {
-        title: 'November 2026',
-        titleMenu: [
-          { type: 'action', id: 'month:2026-11', title: 'November 2026', checked: true },
-          {
-            type: 'section',
-            items: [{ type: 'action', id: 'monthPicker', title: 'Choose Month…' }],
-          },
-        ],
         leading: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
         trailing: [{ id: 'today', title: 'Today' }],
       },
     })
-    expect(state).toMatchObject({ canBack: false, showsBar: true })
+    expect(state).toMatchObject({ canBack: false })
     checkFixture('daily', state)
   })
 
-  it('has no title for a note until its screen names it', () => {
+  it('shows the back button on a pushed screen', () => {
     const route: Route = { kind: 'note', path: 'ideas.md' }
     const state = buildShellChromeState({ ...BASE, route, tab: 'all' })
-    expect(state).toMatchObject({ title: null, canBack: true })
+    expect(state).toMatchObject({ canBack: true, leading: [], trailing: [] })
   })
 
   it('carries the note menu and a confirmation', () => {
@@ -73,7 +65,6 @@ describe('buildShellChromeState', () => {
       route: { kind: 'note', path: 'ideas.md' },
       tab: 'daily',
       bar: {
-        title: 'Ideas',
         trailing: [
           {
             id: 'actions',
@@ -111,13 +102,17 @@ describe('buildShellChromeState', () => {
     checkFixture('note', state)
   })
 
-  it('leaves All and Tasks to their web search header', () => {
+  it('shows no corner buttons on All and Tasks', () => {
     for (const route of [
       { kind: 'allNotes', tag: null },
       { kind: 'search', query: 'x' },
       { kind: 'tasks' },
     ] satisfies Route[]) {
-      expect(buildShellChromeState({ ...BASE, route, tab: 'all' }).showsBar).toBe(false)
+      expect(buildShellChromeState({ ...BASE, route, tab: 'all' })).toMatchObject({
+        canBack: false,
+        leading: [],
+        trailing: [],
+      })
     }
     checkFixture(
       'tasks',
@@ -129,7 +124,7 @@ describe('buildShellChromeState', () => {
 describe('buildNoChromeState', () => {
   it('shows no bars', () => {
     const state = buildNoChromeState('light')
-    expect(state).toMatchObject({ chrome: 'none', showsBar: false, routeKind: null })
+    expect(state).toMatchObject({ chrome: 'none', routeKind: null })
     checkFixture('none', state)
   })
 })

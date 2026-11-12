@@ -5,26 +5,6 @@
   "routeKind": "today",
   "tab": "daily",
   "canBack": false,
-  "title": "November 2026",
-  "titleMenu": [
-    {
-      "type": "action",
-      "id": "month:2026-11",
-      "title": "November 2026",
-      "checked": true
-    },
-    {
-      "type": "section",
-      "items": [
-        {
-          "type": "action",
-          "id": "monthPicker",
-          "title": "Choose Month…"
-        }
-      ]
-    }
-  ],
-  "showsBar": true,
   "leading": [
     {
       "id": "settings",

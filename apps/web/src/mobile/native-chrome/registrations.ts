@@ -1,17 +1,14 @@
 import { createContext, use, useEffect, useLayoutEffect, useRef } from 'react'
 import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
-import type { NativeBarButton, NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
+import type { NativeBarButton } from '@/mobile/native-chrome/protocol.ts'
 import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
- * What one screen shows in the native navigation bar.
+ * The native corner buttons of one screen. The screen draws its own title.
  */
 export interface NativeBarSpec {
-  /** `null` while the title is not known yet (a note before its row loads). */
-  title: string | null
-  titleMenu?: NativeMenuItem[] | undefined
   leading?: NativeBarButton[] | undefined
   trailing?: NativeBarButton[] | undefined
 }

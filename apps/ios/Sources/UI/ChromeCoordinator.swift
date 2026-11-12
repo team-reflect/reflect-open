@@ -17,14 +17,16 @@ final class ChromeCoordinator {
   var container: UIViewController { tabs }
   private let menus = MenuPresenter()
   private let formatting: FormattingAccessory
-  /// Set during a web slide: a bar shown on both pages keeps the old page
-  /// until the slide ends.
+  /// Set during a web slide: the corner buttons keep the old page until the
+  /// slide ends.
   private var barFrozen = false
   /// Bumped on every slide start, so an old timeout never thaws a newer slide.
   private var slide = 0
-  /// The tab of the last state, so bar buttons cross-fade only within one page.
+  /// The tab of the last state, so corner buttons cross-fade only within one
+  /// page.
   private var shownTab: ChromeTab?
-  /// The page whose bar a back swipe faded out, and the entry it showed.
+  /// The page whose corner buttons a back swipe faded out, and the entry it
+  /// showed.
   private var swipe: (page: WebPageController, entryId: Int)?
 
   init(host: AppHost) {
@@ -53,13 +55,11 @@ final class ChromeCoordinator {
     #endif
     applyTheme(state.theme)
     tabs.apply(state)
-    // A bar that comes or goes changes the page's top safe area, so it
-    // changes as the slide starts, not as the new page lands.
-    if !barFrozen || tabs.page(for: state.tab)?.barVisibilityChanges(for: state) == true {
-      showBar(state, animated: !barFrozen && state.tab == shownTab)
+    if !barFrozen {
+      showBar(state, animated: state.tab == shownTab)
     }
     shownTab = state.tab
-    // The pop of a back swipe brings a new entry: its bar fades back in.
+    // The pop of a back swipe brings a new entry: its buttons fade back in.
     if let swipe, swipe.entryId != state.entryId {
       endBackSwipe(animated: true)
     }
@@ -70,13 +70,13 @@ final class ChromeCoordinator {
 
   /// Sends a native tap to the page. The web view becomes first responder
   /// first: WebKit raises the keyboard for a focus only in the first
-  /// responder, and a tap on a native bar leaves the web view without it.
+  /// responder, and a tap on a native button leaves the web view without it.
   private func send(_ intent: ChromeIntent) {
     _ = host.webView.becomeFirstResponder()
     host.chrome.send(intent)
   }
 
-  /// Shows the navigation bar of `state` in the page of its tab.
+  /// Shows the corner buttons of `state` in the page of its tab.
   private func showBar(_ state: ChromeState, animated: Bool) {
     guard let page = tabs.page(for: state.tab) else { return }
     page.showBar(state, animated: animated, menus: menus) { [weak self] intent in
@@ -85,8 +85,8 @@ final class ChromeCoordinator {
   }
 
   /// A user back swipe starts to move the page, or settles back without a
-  /// pop. The bar of the page fades out as the swipe starts, and back in as
-  /// it settles back or as the next entry arrives.
+  /// pop. The corner buttons of the page fade out as the swipe starts, and
+  /// back in as it settles back or as the next entry arrives.
   private func backSwipe(started: Bool) {
     guard started else {
       endBackSwipe(animated: true)
@@ -103,10 +103,9 @@ final class ChromeCoordinator {
     swipe = nil
   }
 
-  /// A web push or pop slide starts or ends. During the slide a bar shown
-  /// on both pages keeps the old page; at the end it cross-fades to the
-  /// latest state. A lost end
-  /// thaws the bar after one second.
+  /// A web push or pop slide starts or ends. During the slide the corner
+  /// buttons keep the old page; at the end they cross-fade to the latest
+  /// state. A lost end thaws them after one second.
   private func transition(started: Bool) {
     // An end without a slide (a tab switch, the first mount) changes nothing.
     guard started || barFrozen else { return }
@@ -120,10 +119,8 @@ final class ChromeCoordinator {
       }
       return
     }
-    guard let state = host.chrome.state,
-      let bar = tabs.page(for: state.tab)?.navigationController?.navigationBar
-    else { return }
-    UIView.transition(with: bar, duration: 0.2, options: .transitionCrossDissolve) {
+    guard let state = host.chrome.state, let page = tabs.page(for: state.tab) else { return }
+    UIView.transition(with: page.cornerButtons, duration: 0.2, options: .transitionCrossDissolve) {
       self.showBar(state, animated: false)
     }
   }

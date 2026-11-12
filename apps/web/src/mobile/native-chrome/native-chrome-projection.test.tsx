@@ -7,7 +7,7 @@ import { useNativeBar } from '@/mobile/native-chrome/registrations.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 
 function Screen(): ReactElement {
-  useNativeBar({ title: 'Roadmap', trailing: [{ id: 'more', title: 'More' }] }, { onAction: noop })
+  useNativeBar({ trailing: [{ id: 'more', title: 'More' }] }, { onAction: noop })
   return <p>screen</p>
 }
 
@@ -27,8 +27,8 @@ describe('NativeChromeProjection', () => {
       expect(host.posted).toContainEqual(expect.objectContaining({ type: 'state' }))
     })
     const first = host.posted
-      .map((message) => message as { type: string; title?: string | null })
+      .map((message) => message as { type: string; trailing?: { id: string }[] })
       .find((message) => message.type === 'state')
-    expect(first?.title).toBe('Roadmap')
+    expect(first?.trailing?.map((button) => button.id)).toEqual(['more'])
   })
 })

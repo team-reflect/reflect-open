@@ -4,26 +4,46 @@ import WebKit
 
 /// One page of the native chrome. It holds the web view while its tab is
 /// selected, edge to edge, so the system bars float over the page and reach
-/// the web layout through the safe area. Its navigation item is the native
-/// navigation bar of the page.
+/// the web layout through the safe area. Native corner buttons float over
+/// the top row of the page; the page draws the rest of that row.
 @MainActor
 final class WebPageController: UIViewController {
   /// The tab of this page.
   let chromeTab: ChromeTab
 
-  /// The bar buttons on screen, so a state with the same buttons keeps the
-  /// items, and an open menu stays open.
+  /// Holds the corner buttons over the web view. Touches between the
+  /// buttons reach the web view.
+  let cornerButtons = PassthroughView()
+  /// The back button and the `leading` buttons, in the top-left corner.
+  private let leadingGroup = UIStackView()
+  /// The `trailing` buttons, in the top-right corner.
+  private let trailingGroup = UIStackView()
+  private var rowCenters: [NSLayoutConstraint] = []
+
+  /// The center of the row of the corner buttons, from the top of the view.
+  /// `nil` centers them on the page's header row, right under the top safe
+  /// area.
+  var topRowCenter: CGFloat? {
+    didSet { updateRowCenter() }
+  }
+
+  /// The buttons on screen, so a state with the same buttons keeps them,
+  /// and an open menu stays open.
   private var shownLeading: [BarButton]?
   private var shownTrailing: [BarButton]?
   private var shownCanBack = false
-  private var shownTitleMenu: [MenuItem]?
-  /// The history entry the bar items send their intents for.
+  /// The history entry the buttons send their intents for.
   private var shownEntryId: Int?
+
+  /// The height of the page's header row and of each corner button.
+  private static let rowHeight: CGFloat = 48
+  private static let buttonSize: CGFloat = 44
+  /// The space between a corner group and the edge of the safe area.
+  private static let margin: CGFloat = 8
 
   init(tab: ChromeTab) {
     self.chromeTab = tab
     super.init(nibName: nil, bundle: nil)
-    navigationItem.largeTitleDisplayMode = .never
   }
 
   @available(*, unavailable)
@@ -35,6 +55,47 @@ final class WebPageController: UIViewController {
     let view = UIView()
     view.backgroundColor = .systemBackground
     self.view = view
+    cornerButtons.translatesAutoresizingMaskIntoConstraints = false
+    cornerButtons.isHidden = true
+    view.addSubview(cornerButtons)
+    for group in [leadingGroup, trailingGroup] {
+      group.axis = .horizontal
+      group.spacing = 8
+      group.alignment = .center
+      group.translatesAutoresizingMaskIntoConstraints = false
+      cornerButtons.addSubview(group)
+    }
+    let safe = view.safeAreaLayoutGuide
+    rowCenters = [
+      leadingGroup.centerYAnchor.constraint(equalTo: view.topAnchor),
+      trailingGroup.centerYAnchor.constraint(equalTo: view.topAnchor),
+    ]
+    NSLayoutConstraint.activate(
+      rowCenters + [
+        cornerButtons.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+        cornerButtons.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        cornerButtons.topAnchor.constraint(equalTo: view.topAnchor),
+        cornerButtons.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        leadingGroup.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: Self.margin),
+        trailingGroup.trailingAnchor.constraint(
+          equalTo: safe.trailingAnchor, constant: -Self.margin),
+        leadingGroup.trailingAnchor.constraint(
+          lessThanOrEqualTo: trailingGroup.leadingAnchor, constant: -Self.margin),
+      ])
+    updateRowCenter()
+  }
+
+  override func viewSafeAreaInsetsDidChange() {
+    super.viewSafeAreaInsetsDidChange()
+    updateRowCenter()
+  }
+
+  private func updateRowCenter() {
+    guard isViewLoaded else { return }
+    let center = topRowCenter ?? view.safeAreaInsets.top + Self.rowHeight / 2
+    for constraint in rowCenters where constraint.constant != center {
+      constraint.constant = center
+    }
   }
 
   /// Whether the web view is in this page.
@@ -65,81 +126,91 @@ final class WebPageController: UIViewController {
     view.isFirstResponder || view.subviews.contains { holdsFirstResponder($0) }
   }
 
-  /// Shows the bar of `state` in the navigation bar of this page. Bar
-  /// buttons send `action` intents, menus come from `menus`, and the back
-  /// chevron sends `back`. With `animated`, buttons that change cross-fade
-  /// when the bar was on screen and its back button stays as it was.
+  /// Shows the corner buttons of `state`. Buttons send `action` intents,
+  /// menus come from `menus`, and the back button sends `back`. With
+  /// `animated`, a group that changes cross-fades when the buttons were on
+  /// screen and the back button stays as it was.
   func showBar(
     _ state: ChromeState, animated: Bool, menus: MenuPresenter,
     send: @escaping (ChromeIntent) -> Void
   ) {
-    let wasShown = shownEntryId != nil && navigationController?.isNavigationBarHidden == false
-    navigationController?.setNavigationBarHidden(Self.hidesBar(state), animated: false)
+    let wasShown = shownEntryId != nil && !cornerButtons.isHidden
+    cornerButtons.isHidden = Self.hidesBar(state)
     let fades = animated && wasShown && state.canBack == shownCanBack
-    navigationItem.title = state.title ?? ""
     let entryId = state.entryId
     let newEntry = entryId != shownEntryId
     shownEntryId = entryId
 
-    if newEntry || state.titleMenu != shownTitleMenu {
-      shownTitleMenu = state.titleMenu
-      navigationItem.titleMenuProvider = state.titleMenu.map { items in
-        { [weak menus, weak self] _ in
-          menus?.barMenu(items, entryId: entryId) { self?.navigationController?.navigationBar }
-        }
-      }
-    }
-
     if newEntry || state.leading != shownLeading || state.canBack != shownCanBack {
-      let items = (navigationItem.leftBarButtonItems ?? []).dropFirst(state.canBack ? 1 : 0)
+      let shown = leadingGroup.arrangedSubviews.dropFirst(state.canBack ? 1 : 0)
       if !newEntry, state.canBack == shownCanBack, let shownLeading,
-        Self.differInMenusOnly(state.leading, shownLeading), items.count == state.leading.count
+        Self.differInMenusOnly(state.leading, shownLeading), shown.count == state.leading.count
       {
-        setMenus(of: Array(items), to: state.leading, entryId: entryId, menus: menus)
+        setMenus(of: Array(shown), to: state.leading, entryId: entryId, menus: menus)
       } else {
-        var items: [UIBarButtonItem] = []
+        var buttons: [UIButton] = []
         if state.canBack {
-          let item = UIBarButtonItem(
-            image: UIImage(systemName: "chevron.backward"),
-            primaryAction: UIAction { _ in send(.back(entryId: entryId)) })
-          item.accessibilityLabel = Bundle(for: UIButton.self).localizedString(
-            forKey: "Back", value: "Back", table: nil)
-          items.append(item)
+          let button = Self.makeButton(
+            image: UIImage(systemName: "chevron.backward"), title: nil,
+            label: Bundle(for: UIButton.self).localizedString(
+              forKey: "Back", value: "Back", table: nil))
+          button.addAction(
+            UIAction { _ in send(.back(entryId: entryId)) }, for: .primaryActionTriggered)
+          buttons.append(button)
         }
-        items += state.leading.map { barItem($0, entryId: entryId, menus: menus, send: send) }
-        navigationItem.setLeftBarButtonItems(
-          items, animated: fades && state.leading != shownLeading)
+        buttons += state.leading.map {
+          cornerButton($0, entryId: entryId, menus: menus, send: send)
+        }
+        setButtons(buttons, in: leadingGroup, fades: fades && state.leading != shownLeading)
       }
       shownLeading = state.leading
       shownCanBack = state.canBack
     }
 
     if newEntry || state.trailing != shownTrailing {
-      let items = navigationItem.rightBarButtonItems ?? []
+      let shown = trailingGroup.arrangedSubviews
       if !newEntry, let shownTrailing, Self.differInMenusOnly(state.trailing, shownTrailing),
-        items.count == state.trailing.count
+        shown.count == state.trailing.count
       {
-        setMenus(of: items, to: state.trailing.reversed(), entryId: entryId, menus: menus)
+        setMenus(of: shown, to: state.trailing, entryId: entryId, menus: menus)
       } else {
-        let items = state.trailing.reversed().map {
-          barItem($0, entryId: entryId, menus: menus, send: send)
+        let buttons = state.trailing.map {
+          cornerButton($0, entryId: entryId, menus: menus, send: send)
         }
-        navigationItem.setRightBarButtonItems(
-          items, animated: fades && state.trailing != shownTrailing)
+        setButtons(buttons, in: trailingGroup, fades: fades && state.trailing != shownTrailing)
       }
       shownTrailing = state.trailing
     }
   }
 
-  /// Only menus changed: the same items take the new menus, so an open menu
-  /// stays open and a confirmation keeps its anchor.
-  private func setMenus(
-    of items: [UIBarButtonItem], to buttons: [BarButton], entryId: Int, menus: MenuPresenter
-  ) {
-    for (item, button) in zip(items, buttons) {
-      if let menu = button.menu {
-        item.menu = menus.barMenu(menu, entryId: entryId) { [weak item] in item }
+  /// Puts `buttons` in `group`, with a cross-fade when `fades`.
+  private func setButtons(_ buttons: [UIButton], in group: UIStackView, fades: Bool) {
+    let swap = {
+      for view in group.arrangedSubviews {
+        view.removeFromSuperview()
       }
+      for button in buttons {
+        group.addArrangedSubview(button)
+      }
+    }
+    guard fades else {
+      swap()
+      return
+    }
+    UIView.transition(
+      with: group, duration: 0.2, options: .transitionCrossDissolve, animations: swap)
+  }
+
+  /// Only menus changed: the same buttons take the new menus, so an open
+  /// menu stays open and a confirmation keeps its anchor.
+  private func setMenus(
+    of views: [UIView], to buttons: [BarButton], entryId: Int, menus: MenuPresenter
+  ) {
+    for (view, button) in zip(views, buttons) {
+      guard let control = view as? UIButton, let items = button.menu else { continue }
+      let menu = menus.barMenu(items, entryId: entryId) { [weak control] in control }
+      control.menu = menu
+      control.contextMenuInteraction?.updateVisibleMenu { _ in menu }
     }
   }
 
@@ -153,71 +224,95 @@ final class WebPageController: UIViewController {
       }
   }
 
-  /// Whether `state` hides the navigation bar.
+  /// Whether `state` hides the corner buttons.
   static func hidesBar(_ state: ChromeState) -> Bool {
-    state.chrome == .none || !state.showsBar
+    state.chrome == .none
   }
 
-  /// Whether showing `state` would show or hide the navigation bar.
-  func barVisibilityChanges(for state: ChromeState) -> Bool {
-    (navigationController?.isNavigationBarHidden ?? true) != Self.hidesBar(state)
-  }
-
-  /// Hides the navigation bar and forgets its items, so nothing of an old
+  /// Hides the corner buttons and forgets them, so nothing of an old
   /// document stays on screen.
   func clearBar() {
-    navigationController?.setNavigationBarHidden(true, animated: false)
-    navigationItem.title = nil
-    navigationItem.titleMenuProvider = nil
-    navigationItem.leftBarButtonItems = nil
-    navigationItem.rightBarButtonItems = nil
+    cornerButtons.isHidden = true
+    setButtons([], in: leadingGroup, fades: false)
+    setButtons([], in: trailingGroup, fades: false)
     shownLeading = nil
     shownTrailing = nil
     shownCanBack = false
-    shownTitleMenu = nil
     shownEntryId = nil
     setBarDimmed(false)
     setBarFaded(false, animated: false)
   }
 
-  /// Fades the navigation bar out or back in, as a back swipe drags the
+  /// Fades the corner buttons out or back in, as a back swipe drags the
   /// page away or lets it settle back.
   func setBarFaded(_ faded: Bool, animated: Bool) {
-    guard let bar = navigationController?.navigationBar else { return }
     let alpha: CGFloat = faded ? 0 : 1
     guard animated else {
-      bar.layer.removeAnimation(forKey: "opacity")
-      bar.alpha = alpha
+      cornerButtons.layer.removeAnimation(forKey: "opacity")
+      cornerButtons.alpha = alpha
       return
     }
     UIView.animate(withDuration: 0.15, delay: 0, options: .beginFromCurrentState) {
-      bar.alpha = alpha
+      self.cornerButtons.alpha = alpha
     }
   }
 
-  /// Dims the navigation bar and ignores its touches while a web drawer is
-  /// open, as the system bars do behind a sheet.
+  /// Dims the corner buttons and ignores their touches while a web drawer
+  /// is open, as the system bars do behind a sheet.
   func setBarDimmed(_ dimmed: Bool) {
-    guard let bar = navigationController?.navigationBar else { return }
-    bar.isUserInteractionEnabled = !dimmed
-    bar.tintAdjustmentMode = dimmed ? .dimmed : .automatic
+    cornerButtons.isUserInteractionEnabled = !dimmed
+    cornerButtons.tintAdjustmentMode = dimmed ? .dimmed : .automatic
   }
 
-  private func barItem(
+  private func cornerButton(
     _ button: BarButton, entryId: Int, menus: MenuPresenter,
     send: @escaping (ChromeIntent) -> Void
-  ) -> UIBarButtonItem {
-    let item: UIBarButtonItem
-    if let menu = button.menu {
-      item = UIBarButtonItem(title: button.title, image: nil, primaryAction: nil, menu: nil)
-      item.menu = menus.barMenu(menu, entryId: entryId) { [weak item] in item }
+  ) -> UIButton {
+    let control = Self.makeButton(
+      image: button.icon.flatMap { UIImage(systemName: $0) }, title: button.title,
+      label: button.title)
+    if let items = button.menu {
+      control.menu = menus.barMenu(items, entryId: entryId) { [weak control] in control }
+      control.showsMenuAsPrimaryAction = true
     } else {
-      item = UIBarButtonItem(
-        title: button.title, image: nil,
-        primaryAction: UIAction { _ in send(.action(entryId: entryId, id: button.id)) })
+      control.addAction(
+        UIAction { _ in send(.action(entryId: entryId, id: button.id)) },
+        for: .primaryActionTriggered)
     }
-    item.image = button.icon.flatMap { UIImage(systemName: $0) }
-    item.accessibilityLabel = button.title
-    return item
+    return control
+  }
+
+  /// A round glass button with `image`, or a capsule with `title` when it
+  /// has no image.
+  private static func makeButton(image: UIImage?, title: String?, label: String) -> UIButton {
+    var configuration: UIButton.Configuration
+    if #available(iOS 26, *) {
+      configuration = .glass()
+    } else {
+      configuration = .gray()
+      configuration.cornerStyle = .capsule
+    }
+    configuration.image = image
+    configuration.title = image == nil ? title : nil
+    let button = UIButton(configuration: configuration)
+    button.accessibilityLabel = label
+    button.translatesAutoresizingMaskIntoConstraints = false
+    let width =
+      image == nil
+      ? button.widthAnchor.constraint(greaterThanOrEqualToConstant: buttonSize)
+      : button.widthAnchor.constraint(equalToConstant: buttonSize)
+    NSLayoutConstraint.activate([
+      button.heightAnchor.constraint(equalToConstant: buttonSize), width,
+    ])
+    return button
+  }
+}
+
+/// A view that takes touches only on its subviews, so the views under it
+/// get every other touch.
+final class PassthroughView: UIView {
+  override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+    let hit = super.hitTest(point, with: event)
+    return hit === self ? nil : hit
   }
 }

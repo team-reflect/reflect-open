@@ -32,7 +32,6 @@ export function MobileChat(): ReactElement {
 
   useNativeBar(
     {
-      title: 'Chat',
       trailing: hasProvider
         ? [
             ...(hasTurns ? [{ id: 'new', title: 'New chat', icon: 'plus' }] : []),
@@ -54,22 +53,31 @@ export function MobileChat(): ReactElement {
 
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileTopBar screenHeader>
+      <MobileTopBar>
         <MobileTopBarRow>
-          <MobileTopBarIconButton edge="leading" aria-label="Back" onClick={goBack}>
+          {/* The native back button is wider than this one, so the title
+              moves clear of it. */}
+          <MobileTopBarIconButton
+            edge="leading"
+            aria-label="Back"
+            data-native-slot
+            className="native-chrome:mr-2"
+            onClick={goBack}
+          >
             <ChevronLeft aria-hidden />
           </MobileTopBarIconButton>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>
           {hasProvider ? (
             <>
               {hasTurns ? (
-                <MobileTopBarIconButton aria-label="New chat" onClick={newChat}>
+                <MobileTopBarIconButton aria-label="New chat" data-native-slot onClick={newChat}>
                   <Plus aria-hidden />
                 </MobileTopBarIconButton>
               ) : null}
               <MobileTopBarIconButton
                 edge="trailing"
                 aria-label="Chat history"
+                data-native-slot
                 onClick={() => setHistoryOpen(true)}
               >
                 <History aria-hidden />

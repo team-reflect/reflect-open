@@ -26,15 +26,12 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   public var routeKind: String?
   /// The tab the page shows. The tab bar selects it.
   public var tab: ChromeTab
-  /// Whether the page can go back. The navigation bar shows a back button.
+  /// Whether the page can go back. The shell shows a back button before
+  /// the `leading` buttons.
   public var canBack: Bool
-  /// The navigation bar title, or `nil` while the page does not know it.
-  public var title: String?
-  /// A menu on the title.
-  public var titleMenu: [MenuItem]?
-  /// Whether the page wants the native navigation bar.
-  public var showsBar: Bool
+  /// The buttons in the top-left corner, after the back button.
   public var leading: [BarButton]
+  /// The buttons in the top-right corner.
   public var trailing: [BarButton]
   public var keyboardVisible: Bool
   /// A web drawer is open.

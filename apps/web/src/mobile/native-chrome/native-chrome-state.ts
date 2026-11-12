@@ -10,32 +10,6 @@ import type { NativeBarSpec } from '@/mobile/native-chrome/registrations.ts'
  */
 export type UnnumberedChromeState = Omit<NativeChromeState, 'generation'>
 
-/**
- * The title of a route whose screen registers no bar.
- */
-function defaultTitle(route: Route): string | null {
-  switch (route.kind) {
-    case 'today':
-    case 'daily':
-      return ''
-    case 'allNotes':
-    case 'search':
-      return 'All notes'
-    case 'tasks':
-      return 'Tasks'
-    case 'chat':
-      return 'Chat'
-    case 'settings':
-      return 'Settings'
-    case 'graphs':
-      return 'Graphs'
-    case 'licenses':
-      return 'Licenses'
-    case 'note':
-      return null
-  }
-}
-
 export interface ShellChromeInput {
   route: Route
   entryId: number
@@ -48,8 +22,7 @@ export interface ShellChromeInput {
 }
 
 /**
- * The chrome state of the routed shell. All and Tasks keep their web search
- * header, so they ask for no navigation bar.
+ * The chrome state of the routed shell.
  */
 export function buildShellChromeState(input: ShellChromeInput): UnnumberedChromeState {
   const { route, bar } = input
@@ -60,9 +33,6 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     routeKind: route.kind,
     tab: input.tab,
     canBack: tabRootFor(route) === null,
-    title: bar === undefined ? defaultTitle(route) : bar.title,
-    titleMenu: bar?.titleMenu ?? null,
-    showsBar: route.kind !== 'allNotes' && route.kind !== 'search' && route.kind !== 'tasks',
     leading: bar?.leading ?? [],
     trailing: bar?.trailing ?? [],
     keyboardVisible: input.keyboardVisible,
@@ -84,9 +54,6 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     routeKind: null,
     tab: 'daily',
     canBack: false,
-    title: null,
-    titleMenu: null,
-    showsBar: false,
     leading: [],
     trailing: [],
     keyboardVisible: false,

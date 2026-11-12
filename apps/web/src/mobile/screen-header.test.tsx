@@ -79,7 +79,7 @@ describe('MobileScreenHeader', () => {
     }
   })
 
-  it('gives the native bar its title, trailing buttons, and back', async () => {
+  it('gives the native corner buttons their trailing buttons and back', async () => {
     const onBack = vi.fn()
     const onNativeAction = vi.fn()
     await renderInApp(
@@ -94,7 +94,6 @@ describe('MobileScreenHeader', () => {
 
     await vi.waitFor(() => {
       expect(nativeBars.get().get(onlyBarEntry())).toEqual({
-        title: 'Roadmap',
         trailing: [{ id: 'more', title: 'More', icon: 'ellipsis' }],
       })
     })
@@ -107,20 +106,26 @@ describe('MobileScreenHeader', () => {
 
   it('registers no bar from a hidden stack layer and keeps a bar it does not own', async () => {
     // Three screens of one history entry: the later one owns its bar.
+    const header = (id: string): ReactElement => (
+      <MobileScreenHeader
+        title={id}
+        onBack={vi.fn()}
+        nativeTrailing={[{ id, title: id }]}
+        onNativeAction={vi.fn()}
+      />
+    )
     const screens = (withOlder: boolean): ReactElement => (
       <>
-        {withOlder && <MobileScreenHeader title="Older" onBack={vi.fn()} />}
-        <MobileScreenHeader title="On top" onBack={vi.fn()} />
-        <NativeBarLayerContext value={false}>
-          <MobileScreenHeader title="Below" onBack={vi.fn()} />
-        </NativeBarLayerContext>
+        {withOlder && header('older')}
+        {header('top')}
+        <NativeBarLayerContext value={false}>{header('below')}</NativeBarLayerContext>
       </>
     )
     const view = await renderInApp(screens(true), nativeChromeOptions())
     await vi.waitFor(() => {
-      expect(nativeBars.get().get(onlyBarEntry())?.title).toBe('On top')
+      expect(nativeBars.get().get(onlyBarEntry())?.trailing?.[0]?.id).toBe('top')
     })
     await view.rerender(screens(false))
-    expect(nativeBars.get().get(onlyBarEntry())?.title).toBe('On top')
+    expect(nativeBars.get().get(onlyBarEntry())?.trailing?.[0]?.id).toBe('top')
   })
 })

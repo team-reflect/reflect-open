@@ -5,9 +5,6 @@
   "routeKind": "note",
   "tab": "daily",
   "canBack": true,
-  "title": "Ideas",
-  "titleMenu": null,
-  "showsBar": true,
   "leading": [],
   "trailing": [
     {

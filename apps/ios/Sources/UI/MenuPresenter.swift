@@ -1,7 +1,7 @@
 import ChromeKit
 import UIKit
 
-/// Builds the menus of the navigation bar as `UIMenu`s and asks before
+/// Builds the menus of the corner buttons as `UIMenu`s and asks before
 /// destructive items. A confirmation that is still open when the page moves
 /// to another history entry closes, and its tap never reaches the new page.
 @MainActor
@@ -16,7 +16,7 @@ final class MenuPresenter {
   /// The open confirmation.
   private weak var confirmation: UIAlertController?
 
-  /// The menu of a bar button or title: its taps send `action` intents for
+  /// The menu of a corner button: its taps send `action` intents for
   /// `entryId`, and a confirmation opens from `source`.
   func barMenu(
     _ items: [MenuItem], entryId: Int,
@@ -24,7 +24,7 @@ final class MenuPresenter {
   ) -> UIMenu {
     MenuBuilder.menu(items) { [weak self] action in
       guard let self else { return }
-      // The next state rebuilds a bar menu with the new checkmarks.
+      // The next state rebuilds a button's menu with the new checkmarks.
       self.select(
         action, intent: .action(entryId: entryId, id: action.id), entryId: entryId, source: source)
     }

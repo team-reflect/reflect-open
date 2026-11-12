@@ -3,7 +3,8 @@ import UIKit
 import WebKit
 
 /// The native tab bar. Each tab holds an empty placeholder; one stage (a
-/// navigation controller whose root page holds the web view) sits over the
+/// navigation controller with a hidden bar, whose root page holds the web
+/// view) sits over the
 /// selected placeholder, under the tab bar and the sidebar. A tab tap only
 /// moves the selection and sends a `tab` intent: the web view never moves,
 /// and the page draws the new tab in place. The selection follows the tab of
@@ -38,14 +39,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     self.webView = webView
     stage = UINavigationController(rootViewController: page)
     super.init(nibName: nil, bundle: nil)
+    // The page draws its own top row, under the native corner buttons.
     stage.setNavigationBarHidden(true, animated: false)
-    // The page scrolls inside the web view, never under the bar, so the bar
-    // shows the page's own background.
-    let appearance = UINavigationBarAppearance()
-    appearance.configureWithTransparentBackground()
-    stage.navigationBar.standardAppearance = appearance
-    stage.navigationBar.scrollEdgeAppearance = appearance
-    stage.navigationBar.compactAppearance = appearance
     tabs = [
       makeTab(.daily, title: "Daily", image: UIImage(systemName: "square.and.pencil")),
       makeTab(.all, title: "All", image: UIImage(systemName: "doc.on.doc")),
@@ -59,7 +54,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         : UIColor(red: 0x4F / 255, green: 0x46 / 255, blue: 0xE5 / 255, alpha: 1)
     }
     // The page scrolls inside its own elements, so the edge effect of the web
-    // view's scroll view would only draw a band under the navigation bar.
+    // view's scroll view would only draw a band at the top.
     if #available(iOS 26, *) {
       webView.scrollView.topEdgeEffect.isHidden = true
     }
@@ -140,17 +135,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     let natural = UIEdgeInsets(
       top: max(0, safe.minY - frame.minY), left: max(0, safe.minX - frame.minX),
       bottom: max(0, frame.maxY - safe.maxY), right: max(0, frame.maxX - safe.maxX))
-    var want = placeholder.view.safeAreaInsets
-    // On iPad the floating tab bar sits at the top. UIKit puts the bar of a
-    // navigation controller in the selected tab in the same row, under the
-    // tab bar, without a title. The stage does the same.
+    let want = placeholder.view.safeAreaInsets
+    // On iPad the floating tab bar sits at the top, under the status bar.
+    // The corner buttons share its row, as the bar buttons of a navigation
+    // controller in the selected tab do.
     let windowTop = view.window?.safeAreaInsets.top ?? want.top
-    let sharesTopRow = want.top > windowTop + 1
-    if sharesTopRow {
-      want.top = windowTop
-    }
-    if sharesTopRow != (page.navigationItem.titleView != nil) {
-      page.navigationItem.titleView = sharesTopRow ? UIView() : nil
+    let rowCenter: CGFloat? =
+      want.top > windowTop + 1 ? (windowTop + want.top) / 2 - frame.minY : nil
+    if page.topRowCenter != rowCenter {
+      page.topRowCenter = rowCenter
     }
     let extra = UIEdgeInsets(
       top: max(0, want.top - natural.top), left: max(0, want.left - natural.left),

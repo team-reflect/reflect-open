@@ -42,8 +42,8 @@ export type NativeMenuItem =
     }
 
 /**
- * A button of the native navigation bar. A tap opens `menu` when it has
- * one, and sends an `action` intent with `id` otherwise.
+ * A native button that floats in a top corner of the page. A tap opens
+ * `menu` when it has one, and sends an `action` intent with `id` otherwise.
  */
 export interface NativeBarButton {
   id: string
@@ -79,14 +79,11 @@ export interface NativeChromeState {
   /** The kind of the route on screen, for the shell's logs. */
   routeKind: Route['kind'] | null
   tab: MobileTab
+  /** The shell shows a back button before the `leading` buttons. */
   canBack: boolean
-  /** The navigation bar title, or `null` while it is not known yet. */
-  title: string | null
-  /** A menu on the title (the Daily month menu). */
-  titleMenu: NativeMenuItem[] | null
-  /** Whether the page wants the native navigation bar. */
-  showsBar: boolean
+  /** The buttons in the top-left corner, after the back button. */
   leading: NativeBarButton[]
+  /** The buttons in the top-right corner. */
   trailing: NativeBarButton[]
   keyboardVisible: boolean
   /** A web drawer is open: the shell hides its bars. */

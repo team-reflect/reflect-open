@@ -52,17 +52,11 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(encoded as? NSArray, expected as? NSArray)
   }
 
-  func testDailyFixtureHasTheMonthMenuAndTheGear() throws {
+  func testDailyFixtureHasTheGearAndTheTodayButton() throws {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("daily"))
-    XCTAssertEqual(state.title, "November 2026")
     XCTAssertEqual(state.routeKind, "today")
     XCTAssertEqual(state.leading.first?.icon, "gearshape")
     XCTAssertEqual(state.trailing.map(\.id), ["today"])
-    guard case .action(let current) = state.titleMenu?.first else {
-      return XCTFail("no month item")
-    }
-    XCTAssertTrue(current.checked)
-    XCTAssertFalse(current.destructive)
   }
 
   func testNoteFixtureCarriesTheConfirmationAndTheToolbar() throws {
@@ -80,19 +74,19 @@ final class ChromeBridgeTests: XCTestCase {
 
   func testIgnoresAStateOlderThanTheLatest() throws {
     let bridge = ChromeBridge()
-    var titles: [String?] = []
-    bridge.onState = { titles.append($0.title) }
+    var entries: [Int] = []
+    bridge.onState = { entries.append($0.entryId) }
     var newer = try JSONSerialization.jsonObject(with: try fixture("tasks")) as! [String: Any]
     newer["generation"] = 3
-    newer["title"] = "new"
+    newer["entryId"] = 30
     var older = newer
     older["generation"] = 2
-    older["title"] = "old"
+    older["entryId"] = 20
 
     bridge.receive(try message(newer))
     bridge.receive(try message(older))
 
-    XCTAssertEqual(titles, ["new"])
+    XCTAssertEqual(entries, [30])
     XCTAssertEqual(bridge.state?.generation, 3)
   }
 

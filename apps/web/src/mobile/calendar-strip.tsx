@@ -1,15 +1,14 @@
 import { useEffect, useRef, type ReactElement } from 'react'
 import { ChevronDown, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
-import { addDaysToIsoDate, addMonthsToYearMonth, getYearMonth } from '@reflect/utils'
+import { addDaysToIsoDate, getYearMonth } from '@reflect/utils'
 import { getUserWeekStart } from '@reflect/core'
-import { formatMonthLabel, monthPickTarget, weekAtIndex } from '@reflect/app'
+import { monthPickTarget, weekAtIndex } from '@reflect/app'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import { MonthPicker, type MonthPickerHandle } from '@/mobile/month-picker.tsx'
+import { MonthPicker } from '@/mobile/month-picker.tsx'
 import { MonthTitle } from '@/mobile/month-title.tsx'
-import type { NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
 import { useNativeBar } from '@/mobile/native-chrome/registrations.ts'
 import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
@@ -94,12 +93,8 @@ export function CalendarStrip({
     showWeekOf(target)
   }
 
-  const pickerRef = useRef<MonthPickerHandle | null>(null)
-  const shownMonth = getYearMonth(headerDate)
   useNativeBar(
     {
-      title: formatMonthLabel(shownMonth),
-      titleMenu: recentMonthItems(getYearMonth(today), shownMonth),
       leading: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
       trailing: showToday ? [{ id: 'today', title: 'Today' }] : [],
     },
@@ -109,10 +104,6 @@ export function CalendarStrip({
           jumpToToday()
         } else if (id === 'settings') {
           openSettings()
-        } else if (id === 'monthPicker') {
-          pickerRef.current?.open()
-        } else if (id.startsWith('month:')) {
-          pickMonth(id.slice('month:'.length))
         }
       },
     },
@@ -132,14 +123,17 @@ export function CalendarStrip({
   return (
     <header className="shrink-0 border-b border-border px-safe-offset-2 pt-safe pb-1">
       {/* Three equal-flanked columns so the month sits at the screen's center
-          regardless of the gear (left) and the fading Today button (right). */}
-      <div data-daily-header className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1">
+          regardless of the gear (left) and the fading Today button (right).
+          Under the native chrome the row is as tall as a screen header row,
+          so the native corner buttons center on it. */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1 native-chrome:h-12 native-chrome:py-0">
         <div className="justify-self-start">
           <Button
             variant="ghost"
             size="icon"
             className="size-9"
             aria-label="Settings"
+            data-native-slot
             onClick={openSettings}
           >
             <Settings />
@@ -147,7 +141,6 @@ export function CalendarStrip({
         </div>
         <h1 className="min-w-0 text-center text-base font-semibold">
           <MonthPicker
-            ref={pickerRef}
             month={getYearMonth(headerDate)}
             selected={getYearMonth(date)}
             today={getYearMonth(today)}
@@ -163,6 +156,7 @@ export function CalendarStrip({
             size="sm"
             aria-hidden={!showToday || undefined}
             inert={!showToday}
+            data-native-slot
             className={cn(
               'transition-opacity duration-150 motion-reduce:transition-none',
               showToday ? 'opacity-100' : 'pointer-events-none opacity-0',
@@ -192,29 +186,4 @@ export function CalendarStrip({
       </div>
     </header>
   )
-}
-
-/**
- * The month menu of the native Daily title: today's month and the five
- * before it, newest first, with a check on `shown` (added first when it is
- * not one of them), then the full picker.
- */
-function recentMonthItems(todayMonth: string, shown: string): NativeMenuItem[] {
-  const months = Array.from({ length: 6 }, (_, index) => addMonthsToYearMonth(todayMonth, -index))
-  // A month outside the recent ones (a far date) still shows with its check.
-  if (!months.includes(shown)) {
-    months.unshift(shown)
-  }
-  return [
-    ...months.map((month): NativeMenuItem => ({
-      type: 'action',
-      id: `month:${month}`,
-      title: formatMonthLabel(month),
-      checked: month === shown,
-    })),
-    {
-      type: 'section',
-      items: [{ type: 'action', id: 'monthPicker', title: 'Choose Month…', icon: 'calendar' }],
-    },
-  ]
 }
