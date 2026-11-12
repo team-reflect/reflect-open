@@ -46,6 +46,19 @@ async function step<T>(name: string, body: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Runs `xcodebuild`, through `xcbeautify` when it is installed. */
+async function xcodebuild(args: string[]): Promise<void> {
+  const renderer = IN_GITHUB_ACTIONS ? '--renderer github-actions' : ''
+  const script = `
+    set -o pipefail
+    if command -v xcbeautify >/dev/null; then
+      xcodebuild "$@" 2>&1 | xcbeautify ${renderer}
+    else
+      xcodebuild "$@"
+    fi`
+  await run('bash', ['-c', script, 'bash', ...args])
+}
+
 async function main(): Promise<void> {
   // xcodebuild and `log collect` refuse to write over an existing bundle.
   rmSync(OUTPUT_DIR, { recursive: true, force: true })
@@ -68,7 +81,7 @@ async function main(): Promise<void> {
   ]
 
   await step('Resolve the Swift packages', async () => {
-    await run('xcodebuild', ['-resolvePackageDependencies', ...projectArgs])
+    await xcodebuild(['-resolvePackageDependencies', ...projectArgs])
   })
 
   const simulator = await step('Create the simulator', async () => {
@@ -93,7 +106,7 @@ async function main(): Promise<void> {
     // The build comes before the boot: a booted simulator takes CPU time
     // from the compiler.
     await step('Build the app and the tests', async () => {
-      await run('xcodebuild', ['build-for-testing', ...xcodebuildArgs])
+      await xcodebuild(['build-for-testing', ...xcodebuildArgs])
     })
 
     await step('Boot the simulator', async () => {
@@ -115,7 +128,7 @@ async function main(): Promise<void> {
 
     try {
       await step('Run the tests', async () => {
-        await run('xcodebuild', [
+        await xcodebuild([
           'test-without-building',
           ...xcodebuildArgs,
           '-resultBundlePath',
