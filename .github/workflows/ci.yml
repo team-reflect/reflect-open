@@ -90,6 +90,13 @@ jobs:
           rust=false
           swift=false
 
+          # A draft PR skips the slow jobs. release-please opens some
+          # Release PRs as drafts, and those run every job.
+          skip_slow=false
+          if [[ $EVENT_NAME == pull_request && $PR_IS_DRAFT == true && $HEAD_REF != release-please--* ]]; then
+            skip_slow=true
+          fi
+
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
           elif [[ $EVENT_NAME != pull_request || $HEAD_REF == release-please--* ]]; then
@@ -113,9 +120,9 @@ jobs:
             echo "lint-node=$js"
             echo "test-node=$js"
             echo "test-chromium=$js"
-            echo "test-webkit=$([[ $js == true && $PR_IS_DRAFT == false ]] && echo true || echo false)"
+            echo "test-webkit=$([[ $js == true && $skip_slow == false ]] && echo true || echo false)"
             echo "test-swift=$swift"
-            echo "test-ios=$swift"
+            echo "test-ios=$([[ $swift == true && $skip_slow == false ]] && echo true || echo false)"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
