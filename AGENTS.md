@@ -89,8 +89,8 @@ Web JS tests are split into Vitest projects (details in
 - `*.test.ts` files are pure logic and run in node. A logic test that drives the DOM
   is named `.test.tsx` so it lands in the browser project.
 - `console.warn` / `console.error` fail tests in the core, app and web projects.
-  A new entry in the allowlist `apps/web/src/test-utils/allowed-console.ts` needs
-  a measured reason in that file.
+  A new entry in `ALLOWED_CONSOLE_PATTERNS` (`apps/web/src/test-utils/setup-console.ts`)
+  needs a measured reason next to it.
 
 Rust tests: prefer per-crate runs (`cargo test -p reflect-cli`,
 `cargo test -p reflect-open`); `cargo test --workspace` also works.

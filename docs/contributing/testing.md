@@ -31,8 +31,8 @@ and on WebKit, because the Tauri webview is WebKit.
 `vitest-fail-on-console` fails a test on any `console.warn` or `console.error`,
 in the core, app and web projects.
 
-- Fix the warning. Do not add to `apps/web/src/test-utils/allowed-console.ts`
-  without a measured reason in that file.
+- Fix the warning. Do not add to `ALLOWED_CONSOLE_PATTERNS` in
+  `apps/web/src/test-utils/setup-console.ts` without a measured reason next to it.
 - Code logs through `LoggerService`. A test of an error path passes
   `createTestLoggerService()` and asserts `logger.getErrors()`.
 - In web tests, import `act` from `@/test-utils/act.ts`, not from `react`,
