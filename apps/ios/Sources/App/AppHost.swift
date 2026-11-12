@@ -20,7 +20,8 @@ final class AppHost {
   private var eventPump: Task<Void, Never>?
 
   init() throws {
-    let core = try ReflectCore(config: .current(), openURL: Self.openFromCore)
+    let directories = try AppDirectories.current()
+    let core = try ReflectCore(config: .current(directories), openURL: Self.openFromCore)
     self.core = core
 
     let devURL = ProcessInfo.processInfo.environment["REFLECT_DEV_URL"].flatMap(URL.init(string:))
@@ -35,6 +36,8 @@ final class AppHost {
     self.webAuth = webAuth
     let store = StoreCapability(scene: { presenter?.window?.windowScene }, emit: emit)
     self.store = store
+    // Apple asks an app to listen for transactions from its launch.
+    store.start()
     let recording = RecordingCapability(emit: emit)
     self.recording = recording
 
@@ -61,7 +64,8 @@ final class AppHost {
     let assets = AssetSchemeHandler { [core] requestPath, query, range in
       await core.resolveAsset(requestPath: requestPath, query: query, range: range)
     }
-    webView = ReflectWebView(routes: routes, assets: assets, bridge: bridge)
+    webView = ReflectWebView(
+      routes: routes, assets: assets, bridge: bridge, dataStore: directories.websiteDataStore)
     presenter = webView
 
     navigation = ExternalNavigation(
@@ -137,17 +141,15 @@ final class AppHost {
 extension CoreConfig {
   /// The config of this app: the Documents directory, `Application Support/<bundle id>`
   /// (created when missing) and `Reflect/<version>`, the same values as the Tauri shell.
-  static func current(fileManager: FileManager = .default, bundle: Bundle = .main) throws
-    -> CoreConfig
-  {
-    let documents = try fileManager.url(
-      for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let support = try fileManager.url(
-      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let data = support.appendingPathComponent(bundle.bundleIdentifier ?? "app.reflect.ios")
+  static func current(
+    _ directories: AppDirectories, fileManager: FileManager = .default, bundle: Bundle = .main
+  ) throws -> CoreConfig {
+    let data = directories.applicationSupport
+      .appendingPathComponent(bundle.bundleIdentifier ?? "app.reflect.ios")
     try fileManager.createDirectory(at: data, withIntermediateDirectories: true)
     let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     return CoreConfig(
-      documentDir: documents.path, dataDir: data.path, userAgent: "Reflect/\(version ?? "0.0.0")")
+      documentDir: directories.documents.path, dataDir: data.path,
+      userAgent: "Reflect/\(version ?? "0.0.0")")
   }
 }

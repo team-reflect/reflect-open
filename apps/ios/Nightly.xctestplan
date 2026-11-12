@@ -1,0 +1,41 @@
+{
+  "configurations": [
+    {
+      "id": "2F9D4A7C-8E1B-4C36-B5A0-6D3E9F1C7B28",
+      "name": "Default",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "defaultTestExecutionTimeAllowance": 900,
+    "environmentVariableEntries": [
+      {
+        "key": "RUST_BACKTRACE",
+        "value": "full"
+      },
+      {
+        "key": "RUST_LOG",
+        "value": "info"
+      }
+    ],
+    "maximumTestExecutionTimeAllowance": 1200,
+    "testTimeoutsEnabled": true
+  },
+  "testTargets": [
+    {
+      "target": {
+        "containerPath": "container:Reflect.xcodeproj",
+        "identifier": "C2F7A91E5B3D48A6B0E4D8F3",
+        "name": "ReflectTests"
+      }
+    },
+    {
+      "target": {
+        "containerPath": "container:Reflect.xcodeproj",
+        "identifier": "A9E3F6C17D524B08B6F1D4E7",
+        "name": "ReflectUITests"
+      }
+    }
+  ],
+  "version": 1
+}

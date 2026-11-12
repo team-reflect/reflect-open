@@ -17,6 +17,7 @@
     "test": "vitest",
     "test:browser": "vitest run --project '*browser*'",
     "test:node": "vitest run --project '!*browser*'",
+    "test:ios": "node scripts/test-ios.ts",
     "test:swift": "swift test --package-path apple",
     "lint": "pnpm run lint:oxfmt && pnpm run lint:oxlint && pnpm run lint:eslint && pnpm run lint:knip",
     "lint:oxfmt": "oxfmt --check",

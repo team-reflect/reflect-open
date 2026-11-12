@@ -1,0 +1,31 @@
+name: Test iOS nightly
+
+# Runs the Nightly test plan of the iOS app: every test of the Reflect plan
+# and the tests that depend on system services of a new simulator (the
+# StoreKit test session, `reflect://` URLs that start the app).
+
+on:
+  schedule:
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: test-ios-nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-ios-nightly:
+    if: github.repository == 'team-reflect/reflect-open'
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/test-ios
+        with:
+          plan: Nightly
