@@ -94,25 +94,32 @@ async function findSimulator(): Promise<string> {
 }
 
 /**
- * Opens the app that shows the simulator: Device Hub (Xcode 27 and later),
- * else Simulator.app. It opens by bundle id, so the location of Xcode does not
- * matter. The simulator runs without the window.
+ * Shows the window of the simulator. The simulator runs without it.
  */
-async function openSimulatorWindow(): Promise<void> {
-  for (const bundleId of ['com.apple.dt.Devices', 'com.apple.iphonesimulator']) {
-    const opened = await exec('open', ['-b', bundleId])
-    if (opened.exitCode === 0) {
-      return
-    }
+async function openSimulatorWindow(simulator: string): Promise<void> {
+  // Device Hub replaces Simulator.app in Xcode 27. It opens the window of a
+  // device for this URL; `open` fails where no app handles the scheme.
+  const deviceHub = await exec('open', [`devices://device/open?id=${simulator}`])
+  if (deviceHub.exitCode === 0) {
+    return
   }
-  console.log('[dev-ios] found no app that shows the simulator; it runs without a window')
+  const simulatorApp = await exec('open', [
+    '-b',
+    'com.apple.iphonesimulator',
+    '--args',
+    '-CurrentDeviceUDID',
+    simulator,
+  ])
+  if (simulatorApp.exitCode !== 0) {
+    console.log('[dev-ios] found no app that shows the simulator; it runs without a window')
+  }
 }
 
 async function buildAndLaunch(): Promise<void> {
   const simulator = await findSimulator()
   console.log(`[dev-ios] booting ${DEVICE_NAME} (${simulator})`)
   await run('xcrun', ['simctl', 'bootstatus', simulator, '-b'])
-  await openSimulatorWindow()
+  await openSimulatorWindow(simulator)
 
   // The app bundles apps/ios/Web (a link to apps/web/dist/mobile). The build
   // needs the folder, but this run loads the dev server.
