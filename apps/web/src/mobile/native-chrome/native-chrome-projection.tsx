@@ -21,6 +21,7 @@ import {
 import {
   nativeBarHandlers,
   nativeBars,
+  nativeMenuHandler,
   nativeModalCount,
 } from '@/mobile/native-chrome/registrations.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
@@ -109,6 +110,11 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'action':
       if (intent.entryId === context.entryId) {
         nativeBarHandlers(intent.entryId)?.onAction(intent.id)
+      }
+      return
+    case 'menu':
+      if (intent.entryId === context.entryId) {
+        nativeMenuHandler(intent.menuId, intent.entryId)?.(intent.id)
       }
       return
     case 'command':

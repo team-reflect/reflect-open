@@ -33,6 +33,8 @@ export type NativeMenuItem =
       disabled?: boolean | undefined
       /** Shows a checkmark. */
       checked?: boolean | undefined
+      /** The menu stays open after a tap, for several toggles in a row. */
+      keepsMenuPresented?: boolean | undefined
       confirm?: NativeConfirm | undefined
     }
   | {
@@ -96,10 +98,27 @@ export interface NativeChromeState {
 }
 
 /**
+ * A rectangle in CSS pixels of the web view.
+ */
+export interface NativeRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
  * Every message the page posts to the shell.
  */
 export type NativeChromeMessage =
   | NativeChromeState
+  | {
+      type: 'presentMenu'
+      entryId: number
+      menuId: string
+      rect: NativeRect
+      items: NativeMenuItem[]
+    }
   | { type: 'transition'; phase: 'start' | 'end' }
   | { type: 'chromeReady' }
 
@@ -129,6 +148,7 @@ const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('back'), entryId: z.number() }),
   z.object({ type: z.literal('tab'), tab: tabSchema }),
   z.object({ type: z.literal('action'), entryId: z.number(), id: z.string() }),
+  z.object({ type: z.literal('menu'), entryId: z.number(), menuId: z.string(), id: z.string() }),
   z.object({ type: z.literal('command'), id: z.enum(FORMATTING_COMMANDS) }),
   z.object({ type: z.literal('files'), files: z.array(fileSchema) }),
 ])

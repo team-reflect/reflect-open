@@ -4,7 +4,7 @@ import { listenHostEvent, type SwiftMessageHandler } from '@/services/swift-even
 /**
  * The parts of the mobile chrome that the Swift shell can draw natively.
  */
-export const NATIVE_CHROME_FEATURES = ['toolbar', 'tabbar', 'navbar'] as const
+export const NATIVE_CHROME_FEATURES = ['menus', 'toolbar', 'tabbar', 'navbar'] as const
 
 export type NativeChromeFeature = (typeof NATIVE_CHROME_FEATURES)[number]
 
