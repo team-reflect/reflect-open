@@ -103,8 +103,9 @@ export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): 
     if (!enabled || barHandlers.get(entryId) !== handlersRef) {
       return
     }
+    // A snapshot, so an in-place change of the caller's spec is a change.
     updateBars((bars) => {
-      bars.set(entryId, specRef.current)
+      bars.set(entryId, structuredClone(specRef.current))
     })
   }, [enabled, entryId, specJSON])
 }
