@@ -10,7 +10,6 @@ import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import {
   buildNoChromeState,
   buildShellChromeState,
-  postChromeState,
 } from '@/mobile/native-chrome/native-chrome-state.ts'
 import {
   parseNativeIntent,
@@ -25,11 +24,7 @@ import {
 } from '@/mobile/native-chrome/registrations.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
 import { useRouterActions, useRouterState } from '@/routing/router.tsx'
-import {
-  hasNativeChrome,
-  listenNativeIntent,
-  postNativeChrome,
-} from '@/services/native-chrome-transport.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
  * What an intent needs from the page when it runs.
@@ -167,13 +162,14 @@ export function NativeChromeProjection({
   const modalCount = useStore(nativeModalCount)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
-  const enabled = hasNativeChrome()
+  const { nativeChrome } = useAppServices()
+  const enabled = nativeChrome.enabled
 
   useEffect(() => {
     if (!enabled) {
       return
     }
-    postChromeState(
+    nativeChrome.postState(
       buildShellChromeState({
         route,
         entryId,
@@ -187,7 +183,18 @@ export function NativeChromeProjection({
         theme,
       }),
     )
-  }, [enabled, route, entryId, tab, bars, keyboardVisible, modalCount, toolbar, theme])
+  }, [
+    enabled,
+    nativeChrome,
+    route,
+    entryId,
+    tab,
+    bars,
+    keyboardVisible,
+    modalCount,
+    toolbar,
+    theme,
+  ])
 
   // Kept while the photo picker holds focus, so the editor's toolbar is gone.
   const attachRef = useRef<{ commands: FormattingToolbarCommands; entryId: number } | null>(null)
@@ -212,7 +219,7 @@ export function NativeChromeProjection({
     if (!enabled) {
       return
     }
-    const unlisten = listenNativeIntent((payload) => {
+    const unlisten = nativeChrome.listenIntent((payload) => {
       const intent = parseNativeIntent(payload)
       if (intent !== null) {
         const attach = attachRef.current
@@ -223,9 +230,9 @@ export function NativeChromeProjection({
         })
       }
     })
-    postNativeChrome({ type: 'chromeReady' } satisfies NativeChromeMessage)
+    nativeChrome.post({ type: 'chromeReady' } satisfies NativeChromeMessage)
     return unlisten
-  }, [enabled])
+  }, [enabled, nativeChrome])
 
   return null
 }
@@ -236,10 +243,11 @@ export function NativeChromeProjection({
  */
 export function NativeChromeOff(): null {
   const theme = useThemeSetting()
+  const { nativeChrome } = useAppServices()
   useEffect(() => {
-    if (hasNativeChrome()) {
-      postChromeState(buildNoChromeState(theme))
+    if (nativeChrome.enabled) {
+      nativeChrome.postState(buildNoChromeState(theme))
     }
-  }, [theme])
+  }, [nativeChrome, theme])
   return null
 }

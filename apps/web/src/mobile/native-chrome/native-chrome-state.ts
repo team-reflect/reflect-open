@@ -2,13 +2,8 @@ import type { Route } from '@reflect/app'
 import type { ThemePreference } from '@reflect/core'
 import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
 import { tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
-import {
-  NO_ENTRY,
-  type NativeChromeMessage,
-  type NativeChromeState,
-} from '@/mobile/native-chrome/protocol.ts'
+import { NO_ENTRY, type NativeChromeState } from '@/mobile/native-chrome/protocol.ts'
 import type { NativeBarSpec } from '@/mobile/native-chrome/registrations.ts'
-import { postNativeChrome } from '@/services/native-chrome-transport.ts'
 
 /**
  * A chrome state before the transport numbers it.
@@ -99,23 +94,4 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     toolbar: null,
     theme,
   }
-}
-
-// Starts at the load time, so the states of a reloaded module (Vite HMR)
-// stay newer than the ones the shell saw before.
-let generation = Date.now()
-let lastStateJSON = ''
-
-/**
- * Post `state` when it differs from the last one, numbered with the next
- * generation.
- */
-export function postChromeState(state: UnnumberedChromeState): void {
-  const json = JSON.stringify(state)
-  if (json === lastStateJSON) {
-    return
-  }
-  lastStateJSON = json
-  generation += 1
-  postNativeChrome({ ...state, generation } satisfies NativeChromeMessage)
 }

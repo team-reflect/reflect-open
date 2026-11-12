@@ -45,6 +45,7 @@ export {
   type SystemSettingsPane,
 } from './app/opener-service.ts'
 export { type KeyboardService } from './mobile/keyboard-service.ts'
+export { type NativeChromeHost, type NativeChromeService } from './mobile/native-chrome-service.ts'
 export { type ShareService } from './mobile/share-service.ts'
 export {
   getMobileSyncStatus,

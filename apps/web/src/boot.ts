@@ -3,7 +3,6 @@ import { installUncaughtErrorLogging } from '@/lib/uncaught-errors.ts'
 import { createDesktopAdapters, createDesktopHost } from '@/services/create-desktop-services.ts'
 import { createDeferredIpcTransport } from '@/services/deferred-ipc.ts'
 import { detectHostKind, detectPlatformFacts } from '@/services/detect-platform.ts'
-import { installNativeChrome } from '@/services/native-chrome-transport.ts'
 import { installHostEvents } from '@/services/swift-events.ts'
 import { createSwiftIpcTransport } from '@/services/swift-ipc.ts'
 import { createSwiftLogger } from '@/services/swift-logger.ts'
@@ -47,7 +46,6 @@ function createLogger(): LoggerService {
 const logger = createLogger()
 if (hostKind === 'swift') {
   installHostEvents(window, logger)
-  installNativeChrome(window, document.documentElement)
 }
 const clock = createSystemClock()
 const ipc = createIpcBridgeService({ transport, logger })
@@ -84,4 +82,8 @@ export const appServices = createAppServices(coreServices, host)
 appServices.exceptionTelemetry.install()
 installUncaughtErrorLogging(window, logger)
 installQueryInvalidation(coreServices, appServices)
+// Before the first paint, so CSS hides the web chrome that the shell draws.
+if (appServices.nativeChrome.enabled) {
+  document.documentElement.dataset.nativeChrome = ''
+}
 void coreServices.contacts.refresh()

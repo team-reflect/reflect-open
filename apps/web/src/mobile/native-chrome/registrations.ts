@@ -3,7 +3,7 @@ import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
 import type { NativeBarButton, NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
 import { useRouterState } from '@/routing/router.tsx'
-import { hasNativeChrome } from '@/services/native-chrome-transport.ts'
+import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
  * What one screen shows in the native navigation bar.
@@ -63,7 +63,7 @@ export function nativeBarHandlers(entryId: number): NativeBarHandlers | undefine
  */
 export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): void {
   const { entryId } = useRouterState()
-  const enabled = hasNativeChrome() && use(NativeBarLayerContext)
+  const enabled = useAppServices().nativeChrome.enabled && use(NativeBarLayerContext)
   const handlersRef = useRef(handlers)
   useLayoutEffect(() => {
     handlersRef.current = handlers
@@ -115,13 +115,14 @@ export const nativeModalCount = new WritableStore(0)
  * Count an open web drawer while `open` is true.
  */
 export function useNativeModal(open: boolean): void {
+  const enabled = useAppServices().nativeChrome.enabled
   useEffect(() => {
-    if (!open || !hasNativeChrome()) {
+    if (!open || !enabled) {
       return
     }
     nativeModalCount.set(nativeModalCount.get() + 1)
     return () => {
       nativeModalCount.set(nativeModalCount.get() - 1)
     }
-  }, [open])
+  }, [open, enabled])
 }
