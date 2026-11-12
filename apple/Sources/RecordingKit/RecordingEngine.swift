@@ -264,8 +264,7 @@ public final class RecordingEngine: NSObject {
       return
     }
     let session = self.startSession
-    let audioSession = AVAudioSession.sharedInstance()
-    audioSession.requestRecordPermission { granted in
+    AVAudioApplication.requestRecordPermission { granted in
       DispatchQueue.main.async {
         guard self.startSession == session, self.recorder == nil else {
           // Cancelled while the permission prompt was up, or a retry beat
