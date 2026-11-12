@@ -5,7 +5,7 @@ import {
   useFormattingToolbar,
   type FormattingToolbarCommands,
 } from '@/editor/formatting-toolbar-store.ts'
-import { useStore } from '@/lib/use-store.ts'
+import { useSelector, useStore } from '@/lib/use-store.ts'
 import { useToastController } from '@/lib/use-toasts.ts'
 import {
   useChromeRenderer,
@@ -105,6 +105,13 @@ function NativeTopBarCorner(props: TopBarCornerProps): ReactElement {
 }
 
 /**
+ * Returns whether `count` is above zero.
+ */
+function isPositive(count: number): boolean {
+  return count > 0
+}
+
+/**
  * Posts the routed shell's chrome state to the Swift shell after every change
  * and runs the shell's intents. Renders nothing.
  */
@@ -112,7 +119,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const renderer = useNativeChromeRenderer()
   const { route, entryId } = useRouterState()
   const bars = useStore(renderer.screens.bars)
-  const modalCount = useStore(renderer.modalCount)
+  const modal = useSelector(renderer.modalCount, isPositive)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
@@ -128,23 +135,12 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         // in a layout effect of this commit, after this component rendered.
         bar: renderer.screens.bars.get().get(entryId),
         keyboardVisible,
-        modal: modalCount > 0, // FIXME: If we have models come in, like two or four, we would call this useEffect multiple times, right? Maybe we can use a variable like 'hasModel', which is true or false. We only monitor this 'hasModel' variable in this useEffect, and we can avoid some kind of re-rendering.
+        modal,
         toolbar: toolbar?.capabilities ?? null,
         theme,
       }),
     )
-  }, [
-    nativeChrome,
-    renderer,
-    route,
-    entryId,
-    tab,
-    bars,
-    keyboardVisible,
-    modalCount,
-    toolbar,
-    theme,
-  ])
+  }, [nativeChrome, renderer, route, entryId, tab, bars, keyboardVisible, modal, toolbar, theme])
 
   // Kept while the photo picker holds focus, so the editor's toolbar is gone.
   const attachRef = useRef<{ commands: FormattingToolbarCommands; entryId: number } | null>(null)
