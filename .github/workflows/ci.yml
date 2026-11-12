@@ -299,15 +299,27 @@ jobs:
             | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
           echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
 
+      - name: Print the xcbeautify version
+        run: xcbeautify --version
+
       - name: Build the app and the tests
         run: |
+          set -o pipefail
           xcodebuild build-for-testing \
             -project apps/ios/Reflect.xcodeproj \
             -scheme Reflect \
             -configuration Debug-Dev \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -showBuildTimingSummary
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" 2>&1 \
+            | tee "$RUNNER_TEMP/ios-build.log" \
+            | xcbeautify --renderer github-actions
+
+      - name: Upload the full build log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-build-log
+          path: ${{ runner.temp }}/ios-build.log
 
       - name: Boot the simulator
         run: xcrun simctl bootstatus "$SIMULATOR_UDID" -b
@@ -323,23 +335,27 @@ jobs:
 
       - name: Run the unit tests
         run: |
+          set -o pipefail
           xcodebuild test-without-building \
             -project apps/ios/Reflect.xcodeproj \
             -scheme Reflect \
             -configuration Debug-Dev \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectTests
+            -only-testing:ReflectTests 2>&1 \
+            | xcbeautify --renderer github-actions
 
       - name: Run the UI tests
         run: |
+          set -o pipefail
           xcodebuild test-without-building \
             -project apps/ios/Reflect.xcodeproj \
             -scheme Reflect \
             -configuration Debug-Dev \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectUITests
+            -only-testing:ReflectUITests 2>&1 \
+            | xcbeautify --renderer github-actions
 
   lint-rust:
     needs: classify
