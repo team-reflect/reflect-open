@@ -35,6 +35,9 @@ export {
   type ThemeService,
   type ThemeState,
 } from './settings/theme-service.ts'
+export { type WhatsNewItem } from './whats-new/whats-new-content.ts'
+export { type WhatsNewPhase, type WhatsNewService } from './whats-new/whats-new-service.ts'
+export { type FeedbackChannel, type ReviewService } from './review/review-service.ts'
 export { type ClipboardService } from './app/clipboard-service.ts'
 export {
   type OpenerService,
@@ -57,6 +60,8 @@ export {
   type ConnectGithubWizardDeps,
   type ConnectGithubWizardOptions,
   type ConnectGithubWizardService,
+  type ConnectGithubWizardState,
+  type ConnectRepoChoice,
   type ConnectWizardStep,
 } from './sync/connect-github-wizard-service.ts'
 export {
@@ -142,6 +147,7 @@ export {
 export {
   type NavigateOptions,
   type NavigationService,
+  type NavigationState,
   type ScrollPosition,
 } from './navigation/navigation-service.ts'
 export {
@@ -150,6 +156,7 @@ export {
   normalizeRoute,
   notePathForRoute,
   routeForPath,
+  routeSchema,
   routesEqual,
   type NoteRoute,
   type Route,

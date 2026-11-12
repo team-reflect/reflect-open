@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { createTestHttpService, type TestHttpReply } from '../testing/index.ts'
 import { createGistService } from './gist-service.ts'
 import { isAppError } from '../errors.ts'
+import { returnTrue } from '@ocavue/utils'
 
 const GIST = { id: 'g1', html_url: 'https://gist.github.com/alex/g1' }
 
 function github(reply: TestHttpReply) {
-  return createTestHttpService([{ method: '*', url: () => true, reply }])
+  return createTestHttpService([{ method: '*', url: returnTrue, reply }])
 }
 
 describe('GistService.create', () => {

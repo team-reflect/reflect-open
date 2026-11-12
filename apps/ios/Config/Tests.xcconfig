@@ -1,0 +1,10 @@
+// Target-level settings of the ReflectTests unit test bundle, the same for
+// every configuration. The bundle runs inside the app (TEST_HOST) so tests can
+// use the app's types through `@testable import Reflect`.
+
+PRODUCT_NAME = ReflectTests
+PRODUCT_BUNDLE_IDENTIFIER = $(REFLECT_BUNDLE_ID).tests
+GENERATE_INFOPLIST_FILE = YES
+TEST_HOST = $(BUILT_PRODUCTS_DIR)/Reflect.app/Reflect
+BUNDLE_LOADER = $(TEST_HOST)
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks

@@ -1,0 +1,24 @@
+[package]
+name = "reflect-ffi"
+version = "0.0.0"
+description = "A C ABI over `reflect-core`: create and free a core, dispatch a command by name, and receive events and main-thread work through callbacks."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# `staticlib` is what the iOS app links. `rlib` lets `cargo test` link the tests.
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+futures-util = { workspace = true }
+log = { workspace = true, features = ["std"] }
+reflect-core = { workspace = true }
+reflect-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+reflect-graph-io = { workspace = true }
+tempfile = { workspace = true }

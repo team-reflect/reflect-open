@@ -27,6 +27,7 @@ import {
 import { createIndexQueryService } from './index-query-service.ts'
 import { PROJECTION_VERSION } from './indexed-note.ts'
 import { PROJECTION_VERSION_KEY } from './indexer.ts'
+import { sleep, noop, returnFalse } from '@ocavue/utils'
 
 const databases: { close(): void }[] = []
 
@@ -164,8 +165,8 @@ function setup(options?: {
   const fileProgress: Array<IndexFileProgress | null> = []
   const stalePlaceholders: string[][] = []
   const order: string[] = []
-  index.onProgress((stage) => {
-    progress.push(stage)
+  index.progress.subscribe(() => {
+    progress.push(index.progress.get())
   })
   index.onApplied((event) => {
     applied.push(event)
@@ -532,7 +533,7 @@ describe('createIndexLifecycleService', () => {
     await vi.waitFor(() => expect(held.settles).toHaveLength(2))
     held.settles[1]!()
     // …and nothing further runs once the queue drains.
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(passes()).toBe(2)
   })
 
@@ -540,7 +541,7 @@ describe('createIndexLifecycleService', () => {
     const { index, passes } = setup()
     index.refresh(endedSessionAt(5)) // a newer open owns the lifecycle
     await index.settled()
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(passes()).toBe(0)
   })
 
@@ -597,7 +598,7 @@ describe('createIndexLifecycleService', () => {
     // A batch that arrives while suspended is not applied.
     files.set('notes/a.md', '# A, edited')
     fileChanges.emit({ changes: [{ path: 'notes/a.md', kind: 'upsert' }], source: 'external' })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(store.applied()).toEqual([])
 
     hold = true
@@ -609,7 +610,7 @@ describe('createIndexLifecycleService', () => {
     settles[0]!()
     await vi.waitFor(() => expect(settles).toHaveLength(2))
     settles[1]!()
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     // One foreground catch-up plus one coalesced queued rerun, not one pass
     // for every simultaneous resume/iCloud trigger.
     expect(passes()).toBe(3)
@@ -665,8 +666,8 @@ describe('file progress', () => {
     const { index, fileProgress } = setupLargePass()
     expect(index.fileProgress.get()).toBeNull()
     const atLive: Array<ReturnType<typeof index.fileProgress.get>> = []
-    index.onProgress((progress) => {
-      if (progress === 'live') {
+    index.progress.subscribe(() => {
+      if (index.progress.get() === 'live') {
         atLive.push(index.fileProgress.get())
       }
     })
@@ -817,7 +818,7 @@ describe('rebuildVisibly', () => {
 
     const first = index.rebuildVisibly()
     await vi.waitFor(() => expect(steps).toContain('clear'))
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     // The wipe and the re-index are done, the follower (a re-embed) is not:
     // a second request still joins the same pass.
     expect(index.rebuildVisibly()).toBe(first)
@@ -877,7 +878,7 @@ describe('rebuildVisibly', () => {
   it('a test lifecycle records the requested generations', async () => {
     const session = sessionAt(7)
     const index = createTestIndexLifecycleService({
-      graphSession: { get: () => ({ session }), subscribe: () => () => {} },
+      graphSession: { get: () => ({ session }), subscribe: () => noop },
     })
     await index.rebuildVisibly()
     expect(index.rebuilds()).toEqual([7])
@@ -923,7 +924,7 @@ describe('applyChanges', () => {
       [{ path: 'notes/pulled.md', kind: 'upsert', modifiedMs: 5 }],
       4,
       FILE_GENERATION,
-      () => false,
+      returnFalse,
     )
 
     expect(mutations).toBe(0)

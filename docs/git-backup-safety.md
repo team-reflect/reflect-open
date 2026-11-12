@@ -1,7 +1,7 @@
 # Git backup safety invariants
 
 The rules every change to the sync path must keep. "The sync path" is
-`apps/desktop/src-tauri/src/git/`, `packages/core/src/sync/`, the backup
+`crates/git/src/`, `packages/core/src/sync/`, the backup
 flusher in `packages/core/src/graph/persistence-flush-service.ts`, and the
 external-change handling in
 `packages/core/src/documents/note-session-service.ts`.

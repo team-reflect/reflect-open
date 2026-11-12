@@ -219,7 +219,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     // Edit > "Paste and Match Style" (⌘⇧V) item to the menu that was just
     // installed. The menu API cannot create that item (it needs a native macOS
     // action selector), so a Rust command does it with direct AppKit calls;
-    // see `src-tauri/src/menu.rs` for the full explanation with source links.
+    // see `apps/tauri/src/menu.rs` for the full explanation with source links.
     // Best-effort: the menu works without the item, so a failed call must
     // not make the whole install look failed.
     try {

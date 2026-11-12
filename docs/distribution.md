@@ -1,7 +1,7 @@
 # Distribution
 
 How Reflect ships: macOS (signed and notarized), iOS (TestFlight), Windows, and Linux. The steps
-live in `apps/desktop/scripts/` and the `publish-*.yml` workflows. This file holds what they
+live in `apps/tauri/scripts/`, `apps/ios/scripts/` and the `publish-*.yml` workflows. This file holds what they
 cannot say.
 
 ## Cutting a release
@@ -35,7 +35,7 @@ builds read the same names from environment variables. No PAT is needed.
 | `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD` | Export the certificate and its key as `.p12` from Keychain Access, then `base64 -i certificate.p12`. The password is the export password. |
 | `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_CONTENT` | An App Store Connect API key. The content is the `.p8` file, raw or base64. |
 | `TAURI_SIGNING_PRIVATE_KEY` | The updater key (no password). **Losing it strands every installed app.** To rotate, generate a pair with `pnpm tauri signer generate` and ship the new pubkey in a release signed with the old key. |
-| `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | The production Sentry project. Local builds read the DSN as `VITE_SENTRY_DSN`, and iOS also as `REFLECT_SENTRY_DSN`. Never give the token a `VITE_` prefix: it must not enter an app bundle. |
+| `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` | The production Sentry project. Local builds read the DSN as `VITE_SENTRY_DSN`; `pnpm build:ipa` also passes it to Xcode as `REFLECT_SENTRY_DSN`. Never give the token a `VITE_` prefix: it must not enter an app bundle. |
 
 ## macOS
 
@@ -58,12 +58,36 @@ Each release attaches `Reflect_aarch64.dmg` and `Reflect_universal.dmg`. Beta us
 - Reflect and Reflect Beta are separate apps, but they **share** settings, recent graphs, and
   keychain secrets.
 
+### Safari extension
+
+Tauri's bundler cannot build app extensions, so `build:macos` builds the capture extension for
+Safari and embeds it at `Contents/PlugIns/SafariExtension.appex`. It versions with the app, not
+with `extension-v*` tags. It needs macOS 13.5 or later. Users turn it on in Safari Settings →
+Extensions.
+
+The extension is sandboxed, so it saves captures to an App Group, and the app moves them into
+the graph. The group is `<team>.<app bundle id>`, one per flavor. The app must claim it, and the
+stable and beta Developer ID profiles must authorize that claim or the build stops. To set that
+up, enable App Groups on the `app.reflect.desktop` and `app.reflect.desktop.beta` App IDs, then
+regenerate and commit both profiles. Apple adds `TEAM_ID.*` to a Mac profile for an App ID with
+that capability, so no group needs registering.
+
+To try it without the team's credentials, build the dev flavor, which has no profile, and sign
+it with your own certificate. `--team` is that certificate's Team ID (its `OU`):
+
+```bash
+pnpm tauri:build:dev --bundles app
+pnpm --filter @reflect/tauri safari:embed --app="$PWD/target/release/bundle/macos/Reflect Dev.app" --identity="<identity>" --team=<team>
+```
+
 ### Requirements
 
 Apple Silicon, or Intel with the universal build.
 
 ### Troubleshooting
 
+- **`does not authorize the App Group`**: the profile predates the App Groups capability. See
+  [Safari extension](#safari-extension).
 - **`codesign` cannot find the identity**: the certificate is not in your *login* keychain, or
   it is the wrong type.
 - **Notarization `status: Invalid`**: read the notary log the script prints (often a binary
@@ -85,19 +109,34 @@ Apple Silicon, or Intel with the universal build.
 ### Build
 
 ```bash
-pnpm build:ios --build-number=<number>
+pnpm build:ipa --build-number=<number> --flavor=beta|stable
 pnpm upload:testflight
 ```
 
+`build:ipa` builds the Swift shell in `apps/ios`. `upload:testflight` uploads that IPA and its dSYMs.
+
+`--flavor` is required. A release (beta or stable) uploads the stable flavor to Reflect.
+`upload:testflight` finds the App Store Connect app from the IPA's bundle id.
+
+To ship the current `master` to Reflect Beta without a release, run the **TestFlight beta**
+workflow from the Actions tab. The build keeps the last release's version; its build number (the
+commit count) tells it apart.
+
 ### Install
 
-Testers join the [TestFlight beta](https://testflight.apple.com/join/j2eEz43d). Beta and stable
-upload to the same marketing version, without the `-beta.N` suffix.
+| | Stable | Beta |
+| --- | --- | --- |
+| App | Reflect, `app.reflect.ios` | Reflect Beta, `app.reflect.ios.beta` |
+| Ships to | App Store, and TestFlight for the team | TestFlight only |
+
+The two apps install side by side. They open the same iCloud notes, but local notes, keychain
+secrets, and settings are separate. Each uploads its marketing version without the `-beta.N`
+suffix.
 
 ### Requirements
 
-iPhone or iPad. The minimum iOS version is `deploymentTarget` in
-`apps/desktop/src-tauri/ios.project.yml`.
+iPhone or iPad. The minimum iOS version is `IPHONEOS_DEPLOYMENT_TARGET` in
+`apps/ios/Config/Shared.xcconfig`.
 
 ### Troubleshooting
 
@@ -106,13 +145,12 @@ iPhone or iPad. The minimum iOS version is `deploymentTarget` in
   from a Mac signed into the team, then rerun:
 
   ```bash
-  cd apps/desktop/src-tauri/gen/apple
-  xcodebuild -project reflect-open.xcodeproj -target <NewExtension> \
-    -sdk iphoneos -configuration release -allowProvisioningUpdates build
+  xcodebuild -project apps/ios/Reflect.xcodeproj -target <NewExtension> \
+    -sdk iphoneos -configuration Release-Stable -allowProvisioningUpdates build
   ```
 
-- **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`**: create the App Store
-  Connect app record. Do not reuse the old Capacitor app (`app.reflect.ReflectMobile`).
+- **`Cannot determine the Apple ID from Bundle ID 'app.reflect.ios'`** (or `.beta`): create the
+  App Store Connect app record. Do not reuse the old Capacitor app (`app.reflect.ReflectMobile`).
 - **Duplicate build number, or an older build shows as latest**: build numbers must be unique,
   and should increase, within one marketing version.
 - **A TestFlight feedback ZIP has no stack**: expected. Read Sentry, or ask for the `.ips`

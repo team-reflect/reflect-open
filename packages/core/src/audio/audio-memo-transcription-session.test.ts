@@ -11,6 +11,7 @@ import {
   type AudioMemoTestKitOptions,
 } from './audio-memo-test-kit.ts'
 import type { AudioMemoTranscriptionSession } from './audio-memo-transcription-service.ts'
+import { sleep } from '@ocavue/utils'
 
 const LATER = audioMemoIdentity(new Date(2026, 5, 12, 9, 0, 0, 0), 'audio/mp4')
 
@@ -35,7 +36,7 @@ async function open(options?: AudioMemoTestKitOptions): Promise<{
  * Settle the microtask chain a resolved pass runs on.
  */
 function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return sleep(0)
 }
 
 afterEach(() => {

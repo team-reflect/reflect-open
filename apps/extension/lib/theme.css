@@ -1,6 +1,6 @@
 /* Design-system tokens (the same `:root` / `.dark` variables the desktop app
    themes with), then Tailwind v4. The extension pages bridge only the tokens
-   they use; the full mapping lives in apps/desktop/src/styles/index.css. */
+   they use; the full mapping lives in apps/web/src/styles/index.css. */
 @import '@reflect/design-system/styles.css';
 @import 'tailwindcss';
 

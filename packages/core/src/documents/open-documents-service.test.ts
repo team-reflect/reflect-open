@@ -8,6 +8,7 @@ import { createTestLoggerService } from '../testing/logger.ts'
 import { createNoteSessionService } from './note-session-service.ts'
 import type { NoteSession, NoteSessionSnapshot } from './note-session-types.ts'
 import { createOpenDocumentsService, type OpenDocumentsService } from './open-documents-service.ts'
+import { sleep } from '@ocavue/utils'
 
 /**
  * A session that logs the calls the registry makes.
@@ -68,6 +69,26 @@ describe('open documents', () => {
       expect(log).toEqual(['flush:notes/a.md', 'settle', 'settled'])
     } finally {
       unregister()
+    }
+  })
+
+  it('settleAll flushes every document and settles each one after its flush', async () => {
+    const log: string[] = []
+    const unregisterA = openDocuments.register({
+      session: fakeSession('notes/a.md', log),
+      settle: () => {
+        log.push('settle:notes/a.md')
+      },
+    })
+    const unregisterB = openDocuments.register({ session: fakeSession('notes/b.md', log) })
+    try {
+      openDocuments.settleAll()
+      expect(log).toEqual(['flush:notes/a.md', 'flush:notes/b.md'])
+      await Promise.resolve()
+      expect(log).toEqual(['flush:notes/a.md', 'flush:notes/b.md', 'settle:notes/a.md'])
+    } finally {
+      unregisterA()
+      unregisterB()
     }
   })
 
@@ -202,7 +223,7 @@ describe('reloadAll with live sessions', () => {
     snapshots: NoteSessionSnapshot[],
     options?: { readOnly?: boolean },
   ): NoteSession {
-    return createNoteSessionService({
+    const session = createNoteSessionService({
       noteFile,
       clock: createTestClockService(),
       logger: createTestLoggerService(),
@@ -216,10 +237,14 @@ describe('reloadAll with live sessions', () => {
       onSnapshot: (snapshot) => {
         snapshots.push(snapshot)
       },
-      applyContent: (markdown) => {
+    })
+    session.attachEditor({
+      getMarkdown: () => '',
+      setMarkdown: (markdown) => {
         applied.push(markdown)
       },
     })
+    return session
   }
 
   it('a clean open note adopts the new disk content silently', async () => {
@@ -279,7 +304,7 @@ describe('reloadAll with live sessions', () => {
       const settled = snapshots.length
 
       openDocuments.reloadAll()
-      await new Promise((resolve) => setTimeout(resolve, 0)) // drain the reconcile read
+      await sleep(0) // drain the reconcile read
 
       expect(applied).toEqual([])
       expect(snapshots).toHaveLength(settled) // the echo guard emitted nothing

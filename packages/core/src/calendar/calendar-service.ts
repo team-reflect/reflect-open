@@ -6,7 +6,7 @@ import type { Unlisten } from '../unlisten.ts'
 
 /**
  * The Rust calendar capability (read-only EventKit,
- * `apps/desktop/src-tauri/src/calendar.rs`). Events are fetched live and
+ * `apps/tauri/src/calendar.rs`). Events are fetched live and
  * never persisted: nothing here touches the index, and no calendar data
  * leaves the machine (docs/porting/calendar-meetings-integration.md).
  */

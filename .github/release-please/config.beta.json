@@ -18,12 +18,12 @@
     ".": {
       "package-name": "reflect-open",
       "component": "reflect-open-beta",
-      "changelog-path": "apps/desktop/CHANGELOG.beta.md",
+      "changelog-path": "apps/web/CHANGELOG.beta.md",
       "exclude-paths": ["docs", "fixtures", ".github", "apps/extension"],
       "extra-files": [
         {
           "type": "json",
-          "path": "apps/desktop/package.json",
+          "path": "apps/web/package.json",
           "jsonpath": "$.version"
         }
       ]

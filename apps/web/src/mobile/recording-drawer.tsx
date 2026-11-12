@@ -1,0 +1,163 @@
+import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { Square, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button.tsx'
+import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
+import { formatElapsed } from '@reflect/utils'
+import { useStore } from '@/lib/use-store.ts'
+import {
+  useMobileAudioMemo,
+  useMobileAudioMemoCanRetry,
+  useMobileAudioMemoDrawerOpen,
+  useMobileAudioMemoError,
+  useMobileAudioMemoHasTranscriptionConfig,
+  useMobileAudioMemoPhase,
+} from '@/mobile/audio-memo-provider.tsx'
+import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
+
+/**
+ * The recording sheet (V1's recording modal as a bottom drawer): waveform +
+ * elapsed time with a stop control while recording, and the capture-failure
+ * state with Retry/Discard. Dragging the sheet down mid-recording
+ * stops-and-saves — dismissal must never silently drop audio; discarding is
+ * explicit and requires a second tap. The provider owns open state and the
+ * stop/discard semantics behind `onDrawerOpenChange`.
+ *
+ * Without an OpenAI/Gemini model the sheet shows key-setup guidance instead
+ * of recording controls: the capture menu's mic action stays discoverable,
+ * but recording never starts until transcription has a key to run on.
+ */
+export function RecordingDrawer(): ReactElement {
+  const memo = useMobileAudioMemo()
+  const drawerOpen = useMobileAudioMemoDrawerOpen()
+  const error = useMobileAudioMemoError()
+  const canRetry = useMobileAudioMemoCanRetry()
+  const hasTranscriptionConfig = useMobileAudioMemoHasTranscriptionConfig()
+
+  return (
+    <Drawer open={drawerOpen} onOpenChange={memo.onDrawerOpenChange}>
+      <DrawerContent aria-label="Audio memo">
+        <DrawerTitle className="sr-only">Audio memo</DrawerTitle>
+        {error !== null ? (
+          <div className="flex flex-col gap-3 px-2 pb-2">
+            <p className="text-sm text-destructive">{error}</p>
+            <div className="flex gap-2">
+              {canRetry ? (
+                <Button variant="secondary" onClick={() => memo.retry()}>
+                  Retry
+                </Button>
+              ) : null}
+              <Button variant="ghost" onClick={() => memo.discard()}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        ) : !hasTranscriptionConfig ? (
+          <KeySetupControls memo={memo} />
+        ) : (
+          <LiveRecordingControls key={drawerOpen ? 'open' : 'closed'} memo={memo} />
+        )}
+      </DrawerContent>
+    </Drawer>
+  )
+}
+
+type MobileAudioMemo = ReturnType<typeof useMobileAudioMemo>
+
+interface LiveRecordingControlsProps {
+  memo: MobileAudioMemo
+}
+
+function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
+  const { navigate } = useRouterActions()
+
+  return (
+    <div className="flex flex-col items-center gap-4 px-4 pb-2 text-center">
+      <p className="text-sm text-text-muted">
+        Audio memos send the recording to OpenAI or Google Gemini for transcription into your notes,
+        using your own API key. Add one in Settings to start recording.
+      </p>
+      <Button
+        onClick={() => {
+          memo.onDrawerOpenChange(false)
+          navigate({ kind: 'settings' })
+        }}
+      >
+        Open Settings
+      </Button>
+    </div>
+  )
+}
+
+function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {
+  const phase = useMobileAudioMemoPhase()
+  const level = useStore(memo.session.level)
+  const elapsedMs = useStore(memo.session.elapsedMs)
+  const [discardArmed, setDiscardArmed] = useState(false)
+  const discardResetTimerRef = useRef<number | null>(null)
+
+  const clearDiscardReset = (): void => {
+    if (discardResetTimerRef.current !== null) {
+      window.clearTimeout(discardResetTimerRef.current)
+      discardResetTimerRef.current = null
+    }
+  }
+
+  useEffect(
+    () => () => {
+      if (discardResetTimerRef.current !== null) {
+        window.clearTimeout(discardResetTimerRef.current)
+      }
+    },
+    [],
+  )
+
+  const confirmDiscard = (): void => {
+    if (!discardArmed) {
+      setDiscardArmed(true)
+      clearDiscardReset()
+      discardResetTimerRef.current = window.setTimeout(() => {
+        setDiscardArmed(false)
+        discardResetTimerRef.current = null
+      }, 3000)
+      return
+    }
+    clearDiscardReset()
+    void memo.cancelRecording()
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4 pb-2">
+      <div className="flex h-7 items-center justify-center">
+        {phase === 'recording' ? (
+          <RecordingLevelWaveform level={level} />
+        ) : (
+          <p className="text-sm text-text-muted">Waiting for the microphone…</p>
+        )}
+      </div>
+      <span className="text-lg font-medium tabular-nums">{formatElapsed(elapsedMs)}</span>
+      <div className="flex w-full flex-col items-center gap-3">
+        <Button
+          variant="destructive"
+          size="icon"
+          aria-label="Stop recording"
+          className="size-14 rounded-full"
+          disabled={phase !== 'recording'}
+          onClick={() => memo.stopAndSave()}
+        >
+          <Square aria-hidden fill="currentColor" className="size-5" />
+        </Button>
+        <Button
+          variant={discardArmed ? 'destructive' : 'ghost'}
+          size="sm"
+          className={discardArmed ? undefined : 'text-text-muted'}
+          aria-label={discardArmed ? 'Confirm discard recording' : 'Discard recording'}
+          onClick={confirmDiscard}
+        >
+          <Trash2 aria-hidden className="size-3.5" />
+          {discardArmed ? 'Tap again to discard' : 'Discard'}
+        </Button>
+      </div>
+    </div>
+  )
+}

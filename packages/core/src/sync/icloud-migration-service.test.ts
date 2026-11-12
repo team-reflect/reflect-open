@@ -3,6 +3,7 @@ import { AppError } from '../errors.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestICloudNativeService } from '../testing/sync.ts'
 import { createICloudMigrationService } from './icloud-migration-service.ts'
+import { returnFalse } from '@ocavue/utils'
 
 const DISCONNECT_FAILURE =
   'The graph moved to iCloud, but GitHub sync could not be disconnected from the original folder: remote locked'
@@ -84,13 +85,13 @@ describe('createICloudMigrationService', () => {
     await expect(
       migration.moveGraph({
         disconnectGitSync: () => Promise.reject(new AppError('io', 'remote locked')),
-        openGraph: () => false,
+        openGraph: returnFalse,
         onCopied,
       }),
     ).resolves.toBe(`${DISCONNECT_FAILURE} ${OPEN_FAILURE}`)
 
     await expect(
-      migration.moveGraph({ disconnectGitSync: null, openGraph: () => false }),
+      migration.moveGraph({ disconnectGitSync: null, openGraph: returnFalse }),
     ).resolves.toBe(OPEN_FAILURE)
   })
 

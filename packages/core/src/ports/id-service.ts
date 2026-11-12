@@ -1,4 +1,5 @@
 import { ulid } from 'ulid'
+import { v4 } from 'uuid'
 
 /**
  * Fresh random identifiers.
@@ -16,7 +17,7 @@ export interface IdService {
 
 class SystemIdServiceImpl implements IdService {
   uuid(): string {
-    return crypto.randomUUID()
+    return v4()
   }
 
   noteId(): string {

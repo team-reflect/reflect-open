@@ -18,6 +18,7 @@ export type TestPlatformService = PlatformFacts & FileSrcSource
 class TestPlatformServiceImpl implements TestPlatformService {
   readonly appPlatform: AppPlatform
   readonly isNativeShell: boolean
+  readonly isSwiftMobile: boolean
   readonly buildPlatform: BuildPlatform | null
   readonly isMacosDesktop: boolean
   readonly isApplePlatform: boolean
@@ -29,6 +30,7 @@ class TestPlatformServiceImpl implements TestPlatformService {
   constructor(options: TestPlatformOptions) {
     this.appPlatform = options.appPlatform ?? 'desktop'
     this.isNativeShell = options.isNativeShell ?? true
+    this.isSwiftMobile = options.isSwiftMobile ?? false
     this.buildPlatform = options.buildPlatform ?? 'darwin'
     this.isMacosDesktop = options.isMacosDesktop ?? true
     this.isApplePlatform = options.isApplePlatform ?? true

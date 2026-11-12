@@ -1,0 +1,82 @@
+import { createContext, use, useEffect, useMemo, type ReactElement, type ReactNode } from 'react'
+import type { UpdateService, UpdateState } from '@reflect/app'
+import { UpdateToasts } from '@/components/update-toasts.ts'
+import { useStore } from '@/lib/use-store.ts'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+
+type UpdateContextValue = Pick<
+  UpdateService,
+  'supported' | 'checkNow' | 'install' | 'restart' | 'retryAction'
+>
+
+const UpdateContext = createContext<UpdateContextValue | null>(null)
+
+interface UpdateProviderProps {
+  children: ReactNode
+  /**
+   * Override the launch + periodic check. Defaults to on in the packaged app
+   * and off in dev: `tauri dev` builds would otherwise prompt to "update" to
+   * the released version.
+   */
+  autoCheck?: boolean
+}
+
+/**
+ * Thin React shim over the app's `UpdateService`. Mounted above the graph gate so update checks run
+ * from first launch, before any graph is open.
+ */
+export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): ReactElement {
+  const { update } = useAppServices()
+  const { platform } = useCoreServices()
+  const supported = update.supported
+  const resolvedAutoCheck = autoCheck ?? !platform.isDev
+
+  // One checker per app: `start` does nothing in a secondary note window.
+  useEffect(() => {
+    if (!supported) {
+      return
+    }
+    if (resolvedAutoCheck) {
+      update.start()
+    }
+    return () => {
+      update.dispose()
+    }
+  }, [update, supported, resolvedAutoCheck])
+
+  const value = useMemo<UpdateContextValue>(
+    () => ({
+      supported: update.supported,
+      checkNow: () => update.checkNow(),
+      install: () => update.install(),
+      restart: () => update.restart(),
+      retryAction: () => update.retryAction(),
+    }),
+    [update],
+  )
+
+  return (
+    <UpdateContext value={value}>
+      {supported ? <UpdateToasts /> : null}
+      {children}
+    </UpdateContext>
+  )
+}
+
+/**
+ * Update actions; must be used under an {@link UpdateProvider}.
+ */
+export function useUpdate(): UpdateContextValue {
+  const value = use(UpdateContext)
+  if (value === null) {
+    throw new Error('useUpdate must be used within an UpdateProvider')
+  }
+  return value
+}
+
+/**
+ * The update lifecycle state.
+ */
+export function useUpdateState(): UpdateState {
+  return useStore(useAppServices().update)
+}

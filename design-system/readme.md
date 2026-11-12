@@ -112,7 +112,7 @@ headings (`40–72px`).
 
 **Color.**
 - **App:** near-white canvas (`#fff` surfaces on a `#f8fafa` app bg) or deep-navy dark
-  mode (`hsl(224 49% 8%)` ≈ `#0a0f1e`). Neutrals are **cool greys** (the "coolgray"
+  mode (`hsl(224 49% 8%)` ≈ `#0a0f1e` canvas, lighter `#161d30` cards and popovers). Neutrals are **cool greys** (the "coolgray"
   ramp). **Indigo `#4F46E5` is the only saturated accent** — solid buttons, selected
   state, focus. Secondary actions use soft indigo (`#e0e7ff` bg / `#4338ca` text).
   Destructive is red-500. That's the whole palette — restraint is the point.
@@ -241,8 +241,8 @@ that matches Reflect's weight and style almost exactly (`search`, `pencil`, `lis
 1:1). **⚠️ Flagged substitution** — swap in the real `components/icons` SVGs if you
 need pixel-exact brand icons. Set `stroke-width: 1.75` to match.
 
-> **Update (V1 parity pass):** the desktop app now vendors the real V1 SVGs in
-> `apps/desktop/src/components/icons/`. Prefer these over Lucide in product chrome;
+> **Update (V1 parity pass):** the web app now vendors the real V1 SVGs in
+> `apps/web/src/components/icons/`. Prefer these over Lucide in product chrome;
 > Lucide remains the stand-in for glyphs without a V1 equivalent (e.g. `square-pen`
 > for New note, `settings`), sized 16px inside a 24px box.
 
@@ -255,8 +255,8 @@ The file map is in `SKILL.md`.
 > **Consuming this package:** `@reflect/design-system` exports **only**
 > `styles.css`, `tokens/*`, and `assets/*` (see `package.json`). The `.jsx`
 > components here are *spec artifacts* — reference implementations for fidelity,
-> not importable modules. Product apps (e.g. `apps/desktop`) build their own
-> primitives on the tokens; the desktop app additionally maps the tokens into
+> not importable modules. Product apps (e.g. `apps/web`) build their own
+> primitives on the tokens; the web app additionally maps the tokens into
 > Tailwind theme keys (`@theme inline` in its `styles/index.css`), so product
 > code writes `text-text-muted` / `bg-surface-hover` instead of raw `var(--…)`
 > escapes.

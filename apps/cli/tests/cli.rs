@@ -1,7 +1,7 @@
 //! End-to-end tests: run the real `reflect` binary against fixture graphs.
 //! Index fixtures are built with the shared `reflect-index-schema` migrations
 //! plus direct row inserts that mirror the desktop's `apply_note` write path
-//! (`apps/desktop/src-tauri/src/db/write.rs`), so the CLI is tested against
+//! (`crates/index/src/write.rs`), so the CLI is tested against
 //! the schema the app actually writes.
 
 use std::fs;

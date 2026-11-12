@@ -230,7 +230,9 @@ class SubscriptionServiceImpl implements SubscriptionService {
         },
       ),
       this.#withEntitlementTimeout(this.#lookupEntitlement(IAP_PRODUCT_IDS.monthly)).then(
-        (owned) => (owned ? 'monthly' : null),
+        (owned) => {
+          return owned ? 'monthly' : null
+        },
       ),
     ])
   }

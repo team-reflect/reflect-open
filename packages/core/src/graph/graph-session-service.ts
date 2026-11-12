@@ -46,10 +46,6 @@ export interface GraphSessionState<Services = unknown> {
    * independent in Rust. Null when the index failed to open.
    */
   readonly indexGeneration: number | null
-  /**
-   * True while the background index reconcile is running (Plan 06b).
-   */
-  readonly indexing: boolean
   readonly error: string | null
   readonly recents: RecentGraph[]
   /**
@@ -72,9 +68,9 @@ export interface GraphSessionService<Services = unknown> extends Store<
   GraphSessionState<Services>
 > {
   /**
-   * Follow the index lifecycle: the indexing flag, reconcile demands, the
-   * reloads, moves and downloads that its passes call for, and the app
-   * activity that suspends it. The returned function stops the following.
+   * Follow the index lifecycle: reconcile demands, the reloads, moves and
+   * downloads that its passes call for, and the app activity that suspends
+   * it. The returned function stops the following.
    */
   attach(): Unlisten
   /**
@@ -179,7 +175,6 @@ function isGraphSessionStateEqual<Services>(
     a.status === b.status &&
     a.graph === b.graph &&
     a.indexGeneration === b.indexGeneration &&
-    a.indexing === b.indexing &&
     a.error === b.error &&
     isDeepEqual(a.recents, b.recents) &&
     a.session === b.session &&
@@ -196,7 +191,6 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
       status: 'loading',
       graph: null,
       indexGeneration: null,
-      indexing: false,
       error: null,
       recents: [],
       session: null,
@@ -415,6 +409,7 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
         if (seq !== this.#openSeq) {
           return false
         }
+        this.#deps.logger.warn('graph open failed:', err)
         this.#setState({ error: errorMessage(err), status: 'choosing' })
       }
       if (seq === this.#openSeq) {
@@ -455,7 +450,6 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
     this.#setState({
       graph: null,
       indexGeneration: null,
-      indexing: false,
       error: null,
       status: 'choosing',
       session: null,
@@ -537,9 +531,6 @@ class GraphSessionServiceImpl<Services = unknown> implements GraphSessionService
 
   attach(): Unlisten {
     const unlisteners = [
-      this.#deps.indexLifecycle.onProgress((progress) => {
-        this.#setState({ indexing: progress === 'reconciling' })
-      }),
       // A structural vault change (folder created, renamed, or removed) cannot
       // be expressed as per-file events; the watcher asks for one full
       // reconcile instead, and `refresh` coalesces bursts into a single queued

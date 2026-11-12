@@ -10,6 +10,7 @@ import {
   type Unlisten,
 } from '@reflect/core'
 import type { WindowService } from './window-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The auto-update lifecycle, as plain-language phases the UI renders
@@ -281,7 +282,7 @@ class UnsupportedUpdateService implements UpdateService {
 
   readonly get = (): UpdateState => IDLE
 
-  readonly subscribe = (): Unlisten => () => {}
+  readonly subscribe = (): Unlisten => noop
 
   start(): void {}
 

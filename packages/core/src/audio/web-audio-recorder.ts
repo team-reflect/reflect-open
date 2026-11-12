@@ -15,6 +15,7 @@ import {
   type AudioRecorderService,
   type AudioRecorderState,
 } from './audio-recorder-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The part of a `MediaRecorder` the web recorder drives.
@@ -321,7 +322,7 @@ class WebAudioRecorderImpl implements AudioRecorderService {
   }
 
   subscribeStopped(): Unlisten {
-    return () => {}
+    return noop
   }
 
   subscribeReminder(listener: (elapsedMs: number) => void): Unlisten {
@@ -329,7 +330,7 @@ class WebAudioRecorderImpl implements AudioRecorderService {
   }
 
   subscribeNativeAction(): Unlisten {
-    return () => {}
+    return noop
   }
 
   #recorderClass(): WebMediaRecorderConstructor | undefined {

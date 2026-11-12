@@ -1,11 +1,11 @@
 # Porting the share extension
 
 **v2 status: implemented.** The `ShareExtension` target
-(`gen/apple/ShareExtension/`, declared in `ios.project.yml`) accepts URLs,
+(`gen/apple/ShareExtension/`, declared in `gen/apple/project.yml`) accepts URLs,
 web pages, and text from the share sheet and spools Plan 11 capture
 envelopes into the App Group inbox (`group.app.reflect/inbox/`), offline,
 with no graph access. The app relays them into `.reflect/inbox/`
-(`capture_shared_inbox_relay`, `src-tauri/src/capture.rs`) and the shared
+(`capture_shared_inbox_relay`, `crates/core/src/capture.rs`) and the shared
 drain/enrich pipeline materializes them; the mobile tree mounts
 `CaptureProvider`, which relays + drains on graph open and every foreground
 (`visibilitychange`). Safari captures carry title, selection, and the meta
@@ -92,7 +92,7 @@ launch*:
 - **Entitlements are hand-maintained per flavor** (superseding the
   spec-driven `entitlements.properties` approach): each target commits a
   release `.entitlements` and a dev `.dev.entitlements`, and
-  `ios.project.yml` picks one per configuration via
+  `gen/apple/project.yml` picks one per configuration via
   `CODE_SIGN_ENTITLEMENTS`. With no xcodegen `entitlements:` block, regens
   (including `tauri ios init`) never touch the files, so the old
   wipe-to-empty-dict failure cannot recur, and the dev flavor

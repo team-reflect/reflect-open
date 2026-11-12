@@ -33,6 +33,7 @@ import {
 } from '../testing/index.ts'
 import type { AudioRecorderFinalSegment, AudioRecorderSegment } from './audio-recorder-service.ts'
 import type { StagedRecordingFile } from '../ipc/recording-plugin.ts'
+import { sleep } from '@ocavue/utils'
 
 const PROVIDERS: AiProvidersState = {
   providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
@@ -203,7 +204,7 @@ async function setup(options?: SetupOptions) {
  * Settle the promise chains a capture, a scan, or a pass runs on.
  */
 function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return sleep(0)
 }
 
 describe('MobileAudioMemoService.openSession', () => {
@@ -290,6 +291,28 @@ describe('MobileAudioMemoService.openSession', () => {
 
     expect(deleteMock).toHaveBeenCalledWith(landed, 3)
     expect(kit.assetStore.assets().size).toBe(0)
+  })
+
+  it('logs a segment that a discard fails to delete', async () => {
+    const kit = await setup()
+    const landed = audioMemoPartPath(MEMO, 1, false)
+    kit.noteFile.set(landed, 'x')
+    const cause = new Error('disk busy')
+    vi.spyOn(kit.assetStore, 'deleteAudioMemo').mockRejectedValue(cause)
+    const session = await kit.open()
+
+    session.toggle()
+    await flush()
+    kit.recorder.emitSegment(ROTATED)
+    await flush()
+
+    await session.cancelRecording()
+    await flush()
+
+    expect(kit.logger.getWarnings()).toContainEqual({
+      message: 'deleting an audio memo segment failed:',
+      cause,
+    })
   })
 
   it('a straggler segment from a discarded session is dropped, not resurrected', async () => {

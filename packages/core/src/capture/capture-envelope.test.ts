@@ -7,6 +7,7 @@ import {
   textCaptureEnvelopeSchema,
   TEXT_CAPTURE_MAX_LENGTH,
 } from './capture-envelope.ts'
+import { TEXT_CAPTURE_PARENT_MAX_LENGTH } from './text-capture-limits.ts'
 
 const VALID = {
   version: 1,
@@ -125,7 +126,16 @@ describe('textCaptureEnvelopeSchema', () => {
     ).toBe(true)
   })
 
+  it('accepts a parent bullet', () => {
+    expect(textCaptureEnvelopeSchema.parse({ ...VALID_TEXT, parent: ' [[Inbox]] ' }).parent).toBe(
+      '[[Inbox]]',
+    )
+  })
+
   it.each([
+    ['empty parent', { ...VALID_TEXT, parent: ' ' }],
+    ['multi-line parent', { ...VALID_TEXT, parent: 'In\nbox' }],
+    ['over-cap parent', { ...VALID_TEXT, parent: 'a'.repeat(TEXT_CAPTURE_PARENT_MAX_LENGTH + 1) }],
     ['empty text', { ...VALID_TEXT, text: '' }],
     ['whitespace-only text', { ...VALID_TEXT, text: '  \t ' }],
     ['multi-line text', { ...VALID_TEXT, text: 'one\ntwo' }],
@@ -149,10 +159,11 @@ describe('inboxEnvelopeSchema', () => {
   })
 
   // Literal producer output from the iOS share extension's Swift structs
-  // (`gen/apple/ShareExtension/CaptureInbox.swift` — JSONEncoder, lowercased
-  // UUID, ISO-8601 with fractional seconds). The Swift side has no test
-  // harness, so this is what pins the third producer to the zod contract;
-  // update BOTH sides together.
+  // (`apple/Sources/CaptureShared/CaptureInbox.swift` — JSONEncoder,
+  // lowercased UUID, ISO-8601 with fractional seconds). The Swift test
+  // `swiftProducerShapes` (`apple/Tests/CaptureSharedTests`) checks that the
+  // encoder writes these same strings, and this test checks them against the
+  // zod schema. Update BOTH sides together.
   it('accepts the Swift producer shapes verbatim', () => {
     const swiftLink = JSON.parse(
       '{"capturedAt":"2026-07-05T07:12:30.123Z","id":"7c9e6679-7425-40de-944b-e07fc1f90ae7",' +

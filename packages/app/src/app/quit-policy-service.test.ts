@@ -14,6 +14,7 @@ import { createTestWindowService } from '../testing/window.ts'
 import type { WindowService } from './window-service.ts'
 import type { AppLifecycleService } from './lifecycle-service.ts'
 import { createQuitPolicyService, type QuitPolicyService } from './quit-policy-service.ts'
+import { noop, sleep, returnNull } from '@ocavue/utils'
 
 type CloseRequestedHandler = Parameters<WindowService['onCloseRequested']>[0]
 
@@ -169,7 +170,7 @@ function setup(options?: {
         [...closeHandlers].map(async (handler) => {
           await handler(event)
         }),
-      ).then(() => {})
+      ).then(noop)
       return { completed, prevented: () => prevented }
     },
   }
@@ -183,9 +184,7 @@ function install(uninstall: Unlisten): void {
  * Let every pending promise continuation run.
  */
 async function settle(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 0)
-  })
+  await sleep(0)
 }
 
 afterEach(() => {
@@ -428,7 +427,7 @@ describe('installMobileBackgroundPolicy', () => {
     let ends = 0
     const { service, lifecycle, documents, gitSync } = setup({
       lifecycle: () => ({
-        beginBackgroundTask: () => null,
+        beginBackgroundTask: returnNull,
         endBackgroundTask: () => {
           ends += 1
         },

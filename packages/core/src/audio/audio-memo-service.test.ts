@@ -30,6 +30,7 @@ import {
 } from '../testing/index.ts'
 import { createAudioMemoService, type AudioMemoSurface } from './audio-memo-service.ts'
 import type { AudioRecorderFinalSegment } from './audio-recorder-service.ts'
+import { sleep, returnTrue } from '@ocavue/utils'
 
 const PROVIDERS: AiProvidersState = {
   providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
@@ -159,7 +160,7 @@ async function openSession(options?: SetupOptions) {
  * Settle the promise chains a capture or a pass runs on.
  */
 function flush(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0))
+  return sleep(0)
 }
 
 function blobText(bytes: Uint8Array | undefined): string {
@@ -169,7 +170,7 @@ function blobText(bytes: Uint8Array | undefined): string {
 describe('AudioMemoPipeline.listSegments', () => {
   it('lists every segment of one session and nothing else', async () => {
     const { service, noteFile } = await setup()
-    const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
+    const pipeline = service.openPipeline({ isErrorSurfaceVisible: returnTrue })
     const other = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
     noteFile.set(audioMemoPartPath(MEMO, 1, false), 'x')
     noteFile.set(audioMemoPartPath(MEMO, 2, true), 'x')
@@ -188,14 +189,14 @@ describe('AudioMemoService.openPipeline', () => {
     const { service, graphSession } = await setup()
     graphSession.setGraph(null)
 
-    expect(() => service.openPipeline({ isErrorSurfaceVisible: () => true })).toThrow(
+    expect(() => service.openPipeline({ isErrorSurfaceVisible: returnTrue })).toThrow(
       'No graph is open.',
     )
   })
 
   it('keeps writing to the graph it opened for after a graph switch', async () => {
     const { service, graphSession, assetStore } = await setup()
-    const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
+    const pipeline = service.openPipeline({ isErrorSurfaceVisible: returnTrue })
     graphSession.setGraph({ generation: 4 })
 
     pipeline.enqueue({
@@ -212,7 +213,7 @@ describe('AudioMemoService.openPipeline', () => {
 
   it('a note window gets the capture queue but no transcription lifecycle', async () => {
     const { service, assetStore, passes } = await setup({ role: 'note-window' })
-    const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
+    const pipeline = service.openPipeline({ isErrorSurfaceVisible: returnTrue })
     await flush()
 
     pipeline.enqueue({
@@ -230,7 +231,7 @@ describe('AudioMemoService.openPipeline', () => {
 
   it('a failing post-capture cleanup is logged, never parked', async () => {
     const { service, logger } = await setup()
-    const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
+    const pipeline = service.openPipeline({ isErrorSurfaceVisible: returnTrue })
     const cause = new Error('staged file is gone')
 
     pipeline.enqueue({
@@ -253,7 +254,7 @@ describe('AudioMemoService.openPipeline', () => {
   it('discarding a parked capture runs its discard cleanup', async () => {
     const { service, assetStore } = await setup()
     vi.spyOn(assetStore, 'uploadToPath').mockRejectedValue(new AppError('io', 'disk full'))
-    const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
+    const pipeline = service.openPipeline({ isErrorSurfaceVisible: returnTrue })
     const onDiscarded = vi.fn()
 
     pipeline.enqueue({
@@ -275,7 +276,7 @@ describe('AudioMemoService.openPipeline', () => {
 
   it('keeps one state object until a field changes, and notifies until unsubscribed', async () => {
     const { service, settings, passes } = await setup()
-    const pipeline = service.openPipeline({ isErrorSurfaceVisible: () => true })
+    const pipeline = service.openPipeline({ isErrorSurfaceVisible: returnTrue })
     await flush()
     const listener = vi.fn()
     const unsubscribe = pipeline.subscribe(listener)

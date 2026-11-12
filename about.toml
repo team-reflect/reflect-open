@@ -1,6 +1,6 @@
 # Configuration for cargo-about (https://github.com/EmbarkStudios/cargo-about).
 # `cargo about generate --format json` reads it; that command runs from
-# apps/desktop/scripts/generate-licenses.ts.
+# apps/web/scripts/generate-licenses.ts.
 accepted = [
   "MIT",
   "Apache-2.0",

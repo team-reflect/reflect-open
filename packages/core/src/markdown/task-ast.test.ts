@@ -540,6 +540,45 @@ describe('appendListItem', () => {
     )
   })
 
+  it.each([
+    ['', '- Inbox\n  - hello\n'],
+    ['- Inbox\n', '- Inbox\n  - hello\n'],
+    ['- Inbox\n  - first\n', '- Inbox\n  - first\n  - hello\n'],
+    ['- [[Inbox]]\n  - first\n', '- [[Inbox]]\n  - first\n  - hello\n'],
+    ['- **inbox**\n', '- **inbox**\n  - hello\n'],
+    ['- [[Inbox|My inbox]]\n', '- [[Inbox|My inbox]]\n  - hello\n'],
+    ['+ Inbox\n  - first\n', '+ Inbox\n  - first\n  - hello\n'],
+    ['- Inbox\n- Other\n- Inbox\n', '- Inbox\n  - hello\n- Other\n- Inbox\n'],
+    ['## Today\n\n- Inbox\n\nprose\n', '## Today\n\n- Inbox\n  - hello\n\nprose\n'],
+    ['- Inbox 2026\n', '- Inbox 2026\n- Inbox\n  - hello\n'],
+    ['- [ ] Inbox\n', '- [ ] Inbox\n- Inbox\n  - hello\n'],
+    ['- Work\n  - Inbox\n', '- Work\n  - Inbox\n- Inbox\n  - hello\n'],
+    ['# Inbox\n', '# Inbox\n\n- Inbox\n  - hello\n'],
+    ['notes\n\n\n', 'notes\n\n- Inbox\n  - hello\n\n\n'],
+  ])('nests a bullet under the Inbox parent of %j', (source, expected) => {
+    expect(appendListItem(source, { kind: 'bullet', markdown: 'hello', parent: 'Inbox' })).toBe(
+      expected,
+    )
+  })
+
+  it('creates a missing parent as the user typed it', () => {
+    expect(
+      appendListItem('- a\n', { kind: 'bullet', markdown: 'hello', parent: '[[Inbox]]' }),
+    ).toBe('- a\n- [[Inbox]]\n  - hello\n')
+  })
+
+  it('creates a missing parent unfolded after a folded bullet', () => {
+    expect(
+      appendListItem('+ folded\n', { kind: 'bullet', markdown: 'hello', parent: 'Inbox' }),
+    ).toBe('+ folded\n- Inbox\n  - hello\n')
+  })
+
+  it('ignores a blank parent', () => {
+    expect(appendListItem('- a\n', { kind: 'bullet', markdown: 'hello', parent: '  ' })).toBe(
+      '- a\n- hello\n',
+    )
+  })
+
   it('keeps a task round, so it joins only a + list', () => {
     expect(appendListItem('+ [ ] buy milk\n', { kind: 'task', markdown: 'water plants' })).toBe(
       '+ [ ] buy milk\n+ [ ] water plants\n',

@@ -14,6 +14,7 @@ import {
   type SnippetTask,
   type SourceTaskLocate,
 } from './snippet-tasks.ts'
+import { noop } from '@ocavue/utils'
 
 export type Backlink = Pick<
   Selectable<Database['backlinks']>,
@@ -267,7 +268,7 @@ class BacklinkServiceImpl implements BacklinkService {
         }
       }),
     )
-    const noLocator: SourceTaskLocate = () => undefined
+    const noLocator: SourceTaskLocate = noop
 
     const results: BacklinkContext[] = []
     for (const pageSource of pageSources) {

@@ -34,6 +34,7 @@ import {
   type AudioRecorderState,
   type AudioRecorderStopped,
 } from './audio-recorder-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * All native recordings are AAC in an `.m4a` container.
@@ -227,7 +228,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
     const { ipc } = this.#deps
     // A queued action is delivered on this call, so the `nativeAction`
     // listener must be registered first.
-    const probe = recordingNativeActionEvent(ipc, () => {})
+    const probe = recordingNativeActionEvent(ipc, noop)
     try {
       await probe.ready
     } finally {
@@ -257,7 +258,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
 
   // The plugin schedules reminders as notifications itself.
   subscribeReminder(): Unlisten {
-    return () => {}
+    return noop
   }
 
   subscribeNativeAction(listener: (event: RecordingNativeActionEvent) => void): Unlisten {
@@ -272,7 +273,7 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
   #claimFinal(stop: RecordingStopResponse): AudioRecorderFinalSegment | null {
     this.#claimed.add(stop.path)
     if (stop.part === 1 && stop.durationMs < MIN_RECORDING_DURATION_MS) {
-      void deleteStagedCommand(this.#deps.ipc, { request: { path: stop.path } }).catch(() => {})
+      void this.#deleteMisclick(stop.path)
       this.#claimed.delete(stop.path)
       return null
     }
@@ -285,11 +286,22 @@ class NativeAudioRecorderImpl implements AudioRecorderService {
       durationMs: stop.durationMs,
     }
   }
+
+  /**
+   * Delete the staged file of a misclick. A failure is logged and the file stays.
+   */
+  async #deleteMisclick(path: string): Promise<void> {
+    try {
+      await this.deleteStaged(path)
+    } catch (cause) {
+      this.#deps.logger.warn('deleting a misclick recording failed:', cause)
+    }
+  }
 }
 
 /**
- * The recorder over `plugins/tauri-plugin-recording`. Capture is native:
- * the plugin writes straight into a staging directory it owns, rotates
+ * The recorder over the `plugin:recording` commands. Capture is native:
+ * the iOS app writes straight into a staging directory it owns, rotates
  * segments and schedules reminders itself, and finalizes the file on
  * interruptions without JS. This service presents that state and claims the
  * staged files it hands out.

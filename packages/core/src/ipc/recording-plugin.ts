@@ -2,12 +2,12 @@ import { z } from 'zod'
 import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.ts'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-recording` — the native audio-memo
- * recorder (the desktop half currently rejects every command with
- * `UnsupportedPlatform`, see the plugin's `desktop.rs`). Each schema and
- * args type mirrors a serde model in the plugin's `src/models.rs` (commands)
- * or an `Encodable` struct in `ios/Sources/RecordingPlugin.swift` (events);
- * a field change there must land here in the same review.
+ * Typed bindings for the `plugin:recording` commands, the native audio-memo
+ * recorder (`apps/ios/Sources/Capabilities/RecordingCapability.swift`). Each
+ * schema and args type mirrors that capability's request and reply shapes
+ * (commands) or an `Encodable` struct in `apple/Sources/RecordingKit/`
+ * (replies and events). A field change there must land here in the same
+ * review.
  */
 
 /** Mirrors `StartResponse`: the identity every segment of a session shares. */

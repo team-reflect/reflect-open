@@ -11,6 +11,7 @@ import type { Unlisten } from '../unlisten.ts'
 import { parseNote } from '../markdown/index.ts'
 import { chunkAssetDescriptions, chunkNote } from './chunk.ts'
 import type { EmbeddingRuntimeService } from './embedding-runtime-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The incremental embedding pass (Plan 09): chunk a note, diff chunk hashes
@@ -290,7 +291,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
           fileGeneration,
           modelId,
           signal: stopped.signal,
-        }).then(() => {})
+        }).then(noop)
       })
       .catch((cause: unknown) => {
         // A rejection here must not poison the queue (later change items
@@ -314,7 +315,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
             return change.kind === 'remove'
               ? this.removeNote(change.path, generation)
               : this.embedNote({ path: change.path, generation, fileGeneration, modelId }).then(
-                  () => {},
+                  noop,
                 )
           })
           .catch((cause: unknown) => {

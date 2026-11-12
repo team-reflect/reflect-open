@@ -58,7 +58,7 @@ another git remote are connected directly by the user.
 
 You can also build from source (below).
 
-See [CHANGELOG.md](apps/desktop/CHANGELOG.md) for release notes.
+See [CHANGELOG.md](apps/web/CHANGELOG.md) for release notes.
 
 ## Your Notes Are Files
 
@@ -112,13 +112,24 @@ Reflect is a pnpm/Turborepo monorepo:
 
 ```text
 reflect-open/
-├── apps/desktop/          # Mac and iOS app
+├── apps/web/              # Web app shown by both shells
+├── apps/tauri/            # Windows/macOS/Linux app
+├── apps/ios/              # iOS app
 ├── apps/cli/              # `reflect` CLI
-├── apps/extension/        # Chrome capture extension
+├── apps/extension/        # Browser extension
 ├── apps/native-host/      # Browser capture helper
+├── apple/                 # Shared Swift package
 ├── packages/core/         # Shared TypeScript logic
+├── packages/app/          # App layer: windows, routes, commands, menus
 ├── packages/db/           # Database types and helpers
+├── crates/core/           # Rust commands shared by both shells
+├── crates/ffi/            # C ABI over the Rust core for the iOS app
+├── crates/git/            # Git backup and sync
+├── crates/graph-io/       # Graph file IO
+├── crates/graph-paths/    # Graph-relative path classification
+├── crates/index/          # SQLite index of a graph
 ├── crates/index-schema/   # Shared index schema
+├── crates/types/          # Wire types shared by Rust and TypeScript
 ├── design-system/         # Tokens and UI primitives
 └── docs/                  # Product, architecture, and contributor docs
 ```
@@ -136,11 +147,12 @@ pnpm check            # typecheck + lint
 pnpm test --run path/to/test
 
 # Rust tests that compile the desktop crate need sidecars staged first
-pnpm --filter @reflect/desktop sidecar
+pnpm --filter @reflect/tauri sidecar
 cargo test --workspace
-
-pnpm tauri:ios:dev "iPhone 17 Pro"   # iOS simulator
 ```
+
+The iOS simulator setup is in
+[docs/contributing/mobile-simulator.md](docs/contributing/mobile-simulator.md).
 
 Release and TestFlight builds are in [docs/distribution.md](docs/distribution.md).
 

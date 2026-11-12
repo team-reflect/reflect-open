@@ -10,6 +10,7 @@ import { createTestProgressPort } from '../testing/ports.ts'
 import { createOpenDocumentsService } from './open-documents-service.ts'
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTemplateService, type TemplateInsertTarget } from './template-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 function setup(options?: { files?: Record<string, string>; indexed?: readonly TestNote[] }) {
   const noteFile = createTestNoteFileService({ files: options?.files ?? {} })
@@ -121,7 +122,7 @@ describe('slashItems', () => {
 
   it('lists every template A→Z under the shared "template" keyword', async () => {
     const { templates } = setup({ files })
-    const items = await templates.slashItems(() => null)
+    const items = await templates.slashItems(returnNull)
     expect(items.map(({ id, label, keywords }) => ({ id, label, keywords }))).toEqual([
       // The shared "template" keyword is the v1 `/template` affordance.
       { id: 'templates/journal.md', label: 'Journal', keywords: ['template'] },

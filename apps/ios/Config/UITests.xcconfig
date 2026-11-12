@@ -1,0 +1,12 @@
+// Target-level settings of the ReflectUITests UI test bundle, the same for
+// every configuration. The bundle runs in its own runner app and drives the
+// Reflect app from outside (TEST_TARGET_NAME).
+
+PRODUCT_NAME = ReflectUITests
+PRODUCT_BUNDLE_IDENTIFIER = $(REFLECT_BUNDLE_ID).uitests
+GENERATE_INFOPLIST_FILE = YES
+TEST_TARGET_NAME = Reflect
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
+
+// `XCUIApplication.open(_:)` needs iOS 16.4. The UI tests run on current simulators only.
+IPHONEOS_DEPLOYMENT_TARGET = 16.4

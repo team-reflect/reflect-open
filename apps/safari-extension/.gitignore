@@ -1,0 +1,3 @@
+# Local Xcode builds without SYMROOT, and per-user Xcode state.
+/build/
+xcuserdata/

@@ -11,6 +11,7 @@ import type { Unlisten } from '../unlisten.ts'
 import type { FileChange, FileChangeService } from './file-change-service.ts'
 import { createNoteIndexer, type IndexingDeps, type NoteIndexer } from './indexer.ts'
 import { createLiveIndex, type LiveIndex } from './live.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * Stage of the index lifecycle that failed.
@@ -165,10 +166,10 @@ export interface IndexLifecycleService {
    */
   followActivity(): Unlisten
   /**
-   * Listen as the sync pass progresses. Bailed (superseded) passes emit
+   * How far the sync pass has progressed. A bailed (superseded) pass changes
    * nothing further: the newer open's pass owns the indicator.
    */
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten
+  readonly progress: Store<IndexLifecycleProgress>
   /**
    * Listen for changes the index applied: once when a sync pass commits
    * (`changes: null`), then per watcher batch (notes and asset files, even
@@ -221,7 +222,7 @@ export interface IndexLifecycleService {
   onStalePlaceholders(listener: (paths: readonly string[]) => void): Unlisten
   /**
    * The running sync pass's file progress, or `null` when no pass is
-   * reconciling. Published apart from {@link IndexLifecycleService.onProgress}
+   * reconciling. Published apart from {@link IndexLifecycleService.progress}
    * on purpose: ticks arrive several times a second during a first index, and
    * only the status pill should re-render per tick.
    */
@@ -284,7 +285,6 @@ export interface IndexLifecycleDeps extends IndexingDeps {
 
 class IndexLifecycleServiceImpl implements IndexLifecycleService {
   readonly #deps: IndexLifecycleDeps
-  readonly #progressListeners = new Set<(progress: IndexLifecycleProgress) => void>()
   readonly #appliedListeners = new Set<(event: IndexAppliedEvent) => void>()
   readonly #reconciledListeners = new Set<(event: IndexReconciledEvent) => MaybePromise<void>>()
   readonly #movedListeners = new Set<(from: string, to: string) => void>()
@@ -296,6 +296,8 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     (a, b) => a?.done === b?.done && a?.total === b?.total && a?.worked === b?.worked,
   )
   readonly fileProgress: Store<IndexFileProgress | null> = this.#fileProgress
+  readonly #progress = new WritableStore<IndexLifecycleProgress>('idle')
+  readonly progress: Store<IndexLifecycleProgress> = this.#progress
   #abort: AbortController | null = null
   #done: Promise<void> = Promise.resolve()
   #suspended = false
@@ -460,11 +462,11 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
 
   async stop(): Promise<void> {
     this.#abort?.abort()
-    await this.#done.catch(() => {})
+    await this.#done.catch(noop)
   }
 
   async settled(): Promise<void> {
-    await this.#done.catch(() => {})
+    await this.#done.catch(noop)
   }
 
   async close(): Promise<void> {
@@ -506,7 +508,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
   followActivity(): Unlisten {
     const { graphSession, activity, platform, role } = this.#deps
     if (!isMobilePlatform(platform.appPlatform) || role !== 'main') {
-      return () => {}
+      return noop
     }
     // The lifecycle events perform the active teardown; this dynamic guard
     // also closes the launch race where the first sync is scheduled after iOS
@@ -544,10 +546,6 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
       stopVisible()
       this.setSuspendGuard(null)
     }
-  }
-
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten {
-    return attach(this.#progressListeners, listener)
   }
 
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten {
@@ -636,9 +634,7 @@ class IndexLifecycleServiceImpl implements IndexLifecycleService {
     if (progress !== 'reconciling') {
       this.#fileProgress.set(null) // the pass finished (or went idle): clear the pill
     }
-    for (const listener of this.#progressListeners) {
-      listener(progress)
-    }
+    this.#progress.set(progress)
   }
 
   #emitMoved(from: string, to: string): void {

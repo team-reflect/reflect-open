@@ -1,0 +1,733 @@
+import { useId, useState, type ReactElement, type ReactNode } from 'react'
+import appIcon from '@/assets/app-icon.png'
+import { useQuery } from '@tanstack/react-query'
+import { useAiPrompts } from '@/hooks/use-ai-prompts.ts'
+import { useAiProviders } from '@/hooks/use-ai-providers.ts'
+import { useGithubConnected } from '@/hooks/use-github-connected.ts'
+import { useAsyncAction } from '@/hooks/use-async-action.ts'
+import { useCrashTest, useDebugUnlockTap } from '@/hooks/use-debug-unlock.ts'
+import { queryKeys } from '@/lib/query-client.ts'
+import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer.tsx'
+import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer.tsx'
+import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer.tsx'
+import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer.tsx'
+import { ConnectGitHostDrawer } from '@/mobile/connect-git-host-drawer.tsx'
+import { ConnectRepositoryDrawer } from '@/mobile/connect-repository-drawer.tsx'
+import { GithubSignInDrawer } from '@/mobile/github-sign-in-drawer.tsx'
+import { PRIVACY_POLICY_URL } from '@/mobile/legal-urls.ts'
+import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
+import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
+import {
+  SettingsActionRow,
+  SettingsGroup,
+  SettingsHeroRow,
+  SettingsNavRow,
+  SettingsMenuRow,
+  SettingsSelectRow,
+  SettingsSwitchRow,
+  SettingsValueRow,
+  type SettingsMenuOption,
+} from '@/mobile/settings-list.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { useMobileServices } from '@/mobile/mobile-services.ts'
+import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
+import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
+import { setPerfHudEnabled, usePerfHudEnabled } from '@/perf-hud/flag.ts'
+import { useGraphActions, useGraphInfo } from '@/providers/graph-provider.tsx'
+import { useMobileStorageKind } from '@/providers/use-mobile-graph-boot.ts'
+import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+import {
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  marketingVersion,
+  CHAT_SYSTEM_PROMPT_MAX_LENGTH,
+  TEXT_CAPTURE_PARENT_MAX_LENGTH,
+  TRANSCRIPTION_PROMPT_MAX_LENGTH,
+  normalizeChatSystemPrompt,
+  normalizeQuickNoteParent,
+  normalizeTranscriptionPrompt,
+  type AiPrompt,
+  type AiProviderConfig,
+  type EditorTextSize,
+  type PaywallPhase,
+  type ThemePreference,
+  type TimeFormat,
+  type WeekStartDay,
+  DATE_FORMATS,
+  formatFullDate,
+} from '@reflect/core'
+import { getMobileSyncStatus, remoteLabel, type MobileSyncDetail } from '@reflect/app'
+import {
+  useChatSystemPrompt,
+  useDateFormat,
+  useEditorBulletAfterHeading,
+  useEditorDefaultBullet,
+  useEditorSmoothCaretAnimation,
+  useEditorTextSize,
+  useQuickNoteParent,
+  useSettingsService,
+  useThemeSetting,
+  useTimeFormat,
+  useTranscriptionFormat,
+  useTranscriptionPrompt,
+  useWeekStartDay,
+} from '@/providers/settings-provider.tsx'
+import { CountdownText } from '@/components/countdown-text.tsx'
+import { useGitSyncActions, useGitSyncState } from '@/providers/sync-provider.tsx'
+import { useRouterState, useRouterActions } from '@/routing/router.tsx'
+
+const PAYWALL_PHASE_OPTIONS: readonly SettingsMenuOption<PaywallPhase | 'off'>[] = [
+  { value: 'off', label: 'Off' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'skippable', label: 'Skippable' },
+  { value: 'required', label: 'Required' },
+]
+
+/**
+ * Shows What's New again in this session.
+ */
+function WhatsNewRow(): ReactElement {
+  const { whatsNew } = useAppServices()
+  const override = useStore(whatsNew.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate What’s New"
+      checked={override}
+      onCheckedChange={whatsNew.setOverride}
+    />
+  )
+}
+
+/**
+ * Shows the review page after What's New in this session.
+ */
+function ReviewRow(): ReactElement {
+  const { review } = useAppServices()
+  const override = useStore(review.override)
+  return (
+    <SettingsSwitchRow
+      label="Simulate review page"
+      checked={override}
+      onCheckedChange={review.setOverride}
+    />
+  )
+}
+
+/**
+ * Simulates a paywall phase for this session, so a TestFlight build can walk
+ * through every phase.
+ */
+function PaywallPhaseRow(): ReactElement {
+  const { paywall } = useMobileServices()
+  const override = useStore(paywall.phaseOverride)
+  return (
+    <SettingsMenuRow
+      label="Paywall"
+      value={override ?? 'off'}
+      options={PAYWALL_PHASE_OPTIONS}
+      onChange={(next) => paywall.setPhaseOverride(next === 'off' ? null : next)}
+    />
+  )
+}
+
+const THEME_OPTIONS: readonly SettingsMenuOption<ThemePreference>[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+]
+
+function aiProviderValue(provider: AiProviderConfig, defaultProviderId: string | null): string {
+  const credential =
+    aiProviderRequiresApiKey(provider.provider) || provider.keyHint !== ''
+      ? `·····${provider.keyHint}`
+      : 'No API key'
+  return provider.id === defaultProviderId ? `${credential} · Default` : credential
+}
+
+const TEXT_SIZE_OPTIONS: readonly SettingsMenuOption<EditorTextSize>[] = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+]
+
+const WEEK_START_OPTIONS: readonly SettingsMenuOption<WeekStartDay>[] = [
+  { value: 'sunday', label: 'Sunday' },
+  { value: 'monday', label: 'Monday' },
+  { value: 'saturday', label: 'Saturday' },
+]
+
+const TIME_FORMAT_OPTIONS: readonly SettingsMenuOption<TimeFormat>[] = [
+  { value: '12h', label: '12-hour' },
+  { value: '24h', label: '24-hour' },
+]
+
+function SyncDetail({ detail }: { detail: MobileSyncDetail }): ReactNode {
+  if (detail.kind === 'message') {
+    return detail.text
+  }
+  return (
+    <>
+      Syncs in <CountdownText until={detail.until} />
+    </>
+  )
+}
+
+/**
+ * The mobile Settings screen — a pushed card (route kind `settings`) in the
+ * iOS inset-grouped idiom, replacing the old bottom-sheet hodgepodge. The
+ * graph row discloses into the Graphs switcher screen; appearance and editor
+ * preferences edit the shared settings document (the same keys desktop
+ * exposes); the Git repository group mirrors the status pill's engine state,
+ * connects a repository for the local graph through one door (the
+ * {@link ConnectRepositoryDrawer} choice, then the {@link ConnectGithubDrawer}
+ * or {@link ConnectGitHostDrawer} sheet — iCloud graphs sync through the
+ * container instead, Plan 21), and can stop. The Accounts group is the
+ * device's GitHub sign-in, independent of the graph.
+ */
+export function MobileSettings(): ReactElement {
+  const { canBack } = useRouterState()
+  const { back, navigate } = useRouterActions()
+  const graph = useGraphInfo()
+  const { platform } = useGraphActions()
+  const mobileStorageKind = useMobileStorageKind()
+  const isIos = platform === 'ios'
+  const subscriptionControls = useSubscriptionControls()
+  const { opener, review } = useAppServices()
+  const { githubAuth, platform: platformService, noteList, logger } = useCoreServices()
+  const theme = useThemeSetting()
+  const editorTextSize = useEditorTextSize()
+  const selectedDateFormat = useDateFormat()
+  const weekStartDay = useWeekStartDay()
+  const timeFormat = useTimeFormat()
+  const editorSmoothCaretAnimation = useEditorSmoothCaretAnimation()
+  const editorDefaultBullet = useEditorDefaultBullet()
+  const editorBulletAfterHeading = useEditorBulletAfterHeading()
+  const chatSystemPrompt = useChatSystemPrompt()
+  const transcriptionFormat = useTranscriptionFormat()
+  const transcriptionPrompt = useTranscriptionPrompt()
+  const quickNoteParent = useQuickNoteParent()
+  const settingsService = useSettingsService()
+  const [today] = useState(() => new Date())
+  const { unlocked: debugUnlocked, tap: versionTap } = useDebugUnlockTap()
+  const crashTest = useCrashTest()
+  const perfHudEnabled = usePerfHudEnabled()
+  const environment = useAppStoreEnvironment()
+  // Development and TestFlight installs show the prerelease tag; anything else hides it.
+  const showPrerelease =
+    platformService.isDev || environment.value === 'Sandbox' || environment.value === 'Xcode'
+  const versionLabel = showPrerelease
+    ? platformService.appVersion
+    : marketingVersion(platformService.appVersion)
+  const gitSync = useGitSyncState()
+  const { disconnectGraph } = useGitSyncActions()
+  const githubConnected = useGithubConnected()
+  const disconnectAction = useAsyncAction()
+  const signOutAction = useAsyncAction()
+  const [signInOpen, setSignInOpen] = useState(false)
+  // Which connect sheet is open: the host choice, or one host's own flow.
+  // `remoteUrl` prefills the host form for a remote that is already set.
+  const [sheet, setSheet] = useState<
+    { kind: 'choose' } | { kind: 'github' } | { kind: 'host'; remoteUrl?: string } | null
+  >(null)
+  const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
+    useAiProviders()
+  const [addProviderOpen, setAddProviderOpen] = useState(false)
+  const [systemPromptOpen, setSystemPromptOpen] = useState(false)
+  const [transcriptionPromptOpen, setTranscriptionPromptOpen] = useState(false)
+  const [quickNoteParentOpen, setQuickNoteParentOpen] = useState(false)
+  const { prompts, addPrompt, updatePrompt, removePrompt } = useAiPrompts()
+  // The edited prompt sticks around after close so the exit animation has
+  // content; `promptOpen` alone drives visibility (the edit-sheet pattern).
+  const [editingPrompt, setEditingPrompt] = useState<AiPrompt | 'new' | null>(null)
+  const [promptOpen, setPromptOpen] = useState(false)
+  const audioMemoDescriptionId = useId()
+  // The managed provider sticks around after close so the exit animation has
+  // content; `manageOpen` alone drives visibility (the edit-sheet pattern).
+  const [managedProvider, setManagedProvider] = useState<AiProviderConfig | null>(null)
+  const [manageOpen, setManageOpen] = useState(false)
+
+  const { data: notes } = useQuery({
+    queryKey: queryKeys.index.mobileNoteCount(graph?.root),
+    queryFn: () => noteList.listNotes(),
+    enabled: graph !== null,
+  })
+
+  const status = getMobileSyncStatus(gitSync)
+  // A graph with a remote, connected or waiting for its sign-in.
+  const remote =
+    gitSync.phase === 'connected' || gitSync.phase === 'needsCredential' ? gitSync : null
+  // A host remote that waits for its sign-in can get one here. Plain HTTP
+  // cannot: the resolver never sends a sign-in in the clear.
+  const canAddSignIn =
+    remote?.phase === 'needsCredential' &&
+    remote.remote.kind === 'https' &&
+    !remote.remote.origin.startsWith('http:')
+  // A host remote whose sign-in the host refused gets a new one here.
+  const canUpdateSignIn =
+    remote?.phase === 'connected' &&
+    remote.remote.kind === 'https' &&
+    remote.status.state === 'error' &&
+    remote.status.errorKind === 'auth'
+  // The connect entry points are local-graph-only (iCloud sync and a Git remote
+  // are mutually exclusive per graph, Plan 21) and wait out the controller's
+  // `loading` phase so the rows never flash on a graph that turns out to be
+  // connected.
+  const canConnect = mobileStorageKind === 'local' && gitSync.phase === 'disconnected'
+
+  // Stop syncing this graph: drop its remote. The local clone and every
+  // sign-in stay; the controller restarts into its disconnected state.
+  async function disconnect(): Promise<void> {
+    await disconnectAction.run(async () => {
+      try {
+        await disconnectGraph()
+      } catch (err) {
+        logger.error('stop syncing failed:', errorMessage(err))
+      }
+    })
+  }
+
+  // Forget the GitHub sign-in of this device; every GitHub repository stops
+  // syncing until the next sign-in.
+  async function signOut(): Promise<void> {
+    await signOutAction.run(async () => {
+      try {
+        await githubAuth.clear()
+      } catch (err) {
+        logger.error('GitHub sign-out failed:', errorMessage(err))
+        // Rethrown so `signOutAction.error` shows it in the Accounts footer.
+        throw err
+      }
+    })
+  }
+
+  const storageLabel =
+    mobileStorageKind === 'icloud'
+      ? 'Stored in iCloud Drive'
+      : mobileStorageKind === 'local'
+        ? 'Stored on this device'
+        : undefined
+
+  return (
+    <div className="flex h-full w-screen flex-col pt-safe">
+      <MobileScreenHeader
+        title="Settings"
+        onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
+      />
+      <main className="min-h-0 flex-1 overflow-y-auto bg-surface-app px-safe pb-safe">
+        <div className="flex flex-col gap-8 px-4 py-5">
+          <SettingsGroup>
+            <SettingsHeroRow
+              title={graph?.name ?? '—'}
+              subtitle={storageLabel}
+              media={<img src={appIcon} alt="" className="size-full object-cover" />}
+              onPress={() => navigate({ kind: 'graphs' })}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup header="Appearance">
+            <SettingsMenuRow
+              label="Theme"
+              value={theme}
+              options={THEME_OPTIONS}
+              onChange={(theme) => settingsService.update({ theme })}
+            />
+            <SettingsMenuRow
+              label="Text size"
+              value={editorTextSize}
+              options={TEXT_SIZE_OPTIONS}
+              onChange={(editorTextSize) => settingsService.update({ editorTextSize })}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup
+            header="Date format"
+            footer="The style for dates shown throughout Reflect, including daily note titles."
+          >
+            {DATE_FORMATS.map((dateFormat) => (
+              <SettingsSelectRow
+                key={dateFormat}
+                label={formatFullDate(today, dateFormat)}
+                selected={selectedDateFormat === dateFormat}
+                onPress={() => settingsService.update({ dateFormat })}
+              />
+            ))}
+          </SettingsGroup>
+
+          <SettingsGroup header="Week and time">
+            <SettingsMenuRow
+              label="Week start"
+              value={weekStartDay}
+              options={WEEK_START_OPTIONS}
+              onChange={(weekStartDay) => settingsService.update({ weekStartDay })}
+            />
+            <SettingsMenuRow
+              label="Time format"
+              value={timeFormat}
+              options={TIME_FORMAT_OPTIONS}
+              onChange={(timeFormat) => settingsService.update({ timeFormat })}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup header="Editor">
+            <SettingsSwitchRow
+              label="Smooth caret animation"
+              checked={editorSmoothCaretAnimation}
+              onCheckedChange={(editorSmoothCaretAnimation) => {
+                settingsService.update({ editorSmoothCaretAnimation })
+              }}
+            />
+            <SettingsSwitchRow
+              label="Start with a bullet"
+              checked={editorDefaultBullet}
+              onCheckedChange={(editorDefaultBullet) => {
+                return settingsService.update({ editorDefaultBullet })
+              }}
+            />
+            <SettingsSwitchRow
+              label="Bullet after a heading"
+              checked={editorBulletAfterHeading}
+              onCheckedChange={(editorBulletAfterHeading) => {
+                settingsService.update({ editorBulletAfterHeading })
+              }}
+            />
+          </SettingsGroup>
+
+          {isIos ? (
+            <SettingsGroup
+              header="Quick notes"
+              footer="Where Siri and Shortcuts notes go in today’s note."
+            >
+              <SettingsNavRow
+                label="Add under"
+                value={quickNoteParent === '' ? 'End of note' : quickNoteParent}
+                onPress={() => setQuickNoteParentOpen(true)}
+              />
+            </SettingsGroup>
+          ) : null}
+
+          <SettingsGroup
+            header="AI"
+            footer="Keys stay in this device’s keychain and are never synced."
+          >
+            {providers.map((provider) => (
+              <SettingsNavRow
+                key={provider.id}
+                label={aiProvider(provider.provider).label}
+                value={aiProviderValue(provider, defaultProvider?.id ?? null)}
+                onPress={() => {
+                  setManagedProvider(provider)
+                  setManageOpen(true)
+                }}
+              />
+            ))}
+            <SettingsActionRow label="Add AI provider" onPress={() => setAddProviderOpen(true)} />
+            <SettingsNavRow
+              label="System prompt"
+              value={normalizeChatSystemPrompt(chatSystemPrompt) === '' ? 'Default' : 'Custom'}
+              onPress={() => setSystemPromptOpen(true)}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup
+            header="AI prompts"
+            footer="Prompts run on text you select in a note, after the built-in set. They stay on this device and aren’t synced."
+          >
+            {prompts.map((prompt) => (
+              <SettingsNavRow
+                key={prompt.id}
+                label={prompt.label}
+                onPress={() => {
+                  setEditingPrompt(prompt)
+                  setPromptOpen(true)
+                }}
+              />
+            ))}
+            <SettingsActionRow
+              label="Add prompt"
+              onPress={() => {
+                setEditingPrompt('new')
+                setPromptOpen(true)
+              }}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup
+            header="Audio memos"
+            footer="Uses AI to add punctuation, paragraphs, and light Markdown. Helper text is sent to your transcription provider with every memo."
+            footerId={audioMemoDescriptionId}
+          >
+            <SettingsSwitchRow
+              label="Transcription auto-format"
+              checked={transcriptionFormat}
+              descriptionId={audioMemoDescriptionId}
+              onCheckedChange={(transcriptionFormat) => {
+                return settingsService.update({ transcriptionFormat })
+              }}
+            />
+            <SettingsNavRow
+              label="Helper text"
+              value={normalizeTranscriptionPrompt(transcriptionPrompt) === '' ? 'None' : 'Custom'}
+              onPress={() => setTranscriptionPromptOpen(true)}
+            />
+          </SettingsGroup>
+
+          {remote !== null || canConnect ? (
+            <SettingsGroup
+              header="Git repository"
+              footer={
+                canConnect ? (
+                  'Sync notes with Reflect on your other devices.'
+                ) : status === null || status.detail === null ? null : (
+                  <SyncDetail detail={status.detail} />
+                )
+              }
+            >
+              {remote !== null ? (
+                <SettingsValueRow
+                  label="Remote"
+                  value={remoteLabel(remote.remote, remote.remoteUrl)}
+                />
+              ) : null}
+              {status !== null ? <SettingsValueRow label="Status" value={status.label} /> : null}
+              {canAddSignIn ? (
+                <SettingsActionRow
+                  label="Add sign-in"
+                  onPress={() => setSheet({ kind: 'host', remoteUrl: remote.remoteUrl })}
+                />
+              ) : null}
+              {canUpdateSignIn ? (
+                <SettingsActionRow
+                  label="Update sign-in"
+                  onPress={() => setSheet({ kind: 'host', remoteUrl: remote.remoteUrl })}
+                />
+              ) : null}
+              {canConnect ? (
+                <SettingsActionRow
+                  label="Connect a repository"
+                  onPress={() => setSheet({ kind: 'choose' })}
+                />
+              ) : null}
+              {remote !== null ? (
+                <SettingsActionRow
+                  label="Stop syncing"
+                  tone="destructive"
+                  pending={disconnectAction.pending}
+                  onPress={() => void disconnect()}
+                />
+              ) : null}
+            </SettingsGroup>
+          ) : null}
+
+          <SettingsGroup
+            header="Accounts"
+            footer={
+              signOutAction.error ??
+              'GitHub is used for GitHub repositories and for sharing notes as gists.'
+            }
+          >
+            {githubConnected ? (
+              <SettingsActionRow
+                label="Sign out of GitHub"
+                tone="destructive"
+                pending={signOutAction.pending}
+                onPress={() => void signOut()}
+              />
+            ) : (
+              <SettingsActionRow label="Sign in to GitHub" onPress={() => setSignInOpen(true)} />
+            )}
+          </SettingsGroup>
+
+          {isIos ? (
+            <SettingsGroup header="Subscription" footer={subscriptionControls.message}>
+              <SettingsValueRow label="Plan" value={subscriptionControls.planLabel} />
+              {subscriptionControls.canSubscribe ? (
+                <SettingsActionRow label="Subscribe" onPress={subscriptionControls.subscribe} />
+              ) : subscriptionControls.canManage ? (
+                <SettingsActionRow
+                  label="Manage Subscription"
+                  onPress={subscriptionControls.manage}
+                />
+              ) : null}
+              {subscriptionControls.classicAccount !== null ? (
+                <>
+                  <SettingsValueRow
+                    label="Verified Account"
+                    value={subscriptionControls.classicAccount}
+                  />
+                  <SettingsActionRow
+                    label="Remove Reflect Classic Verification"
+                    tone="destructive"
+                    pending={subscriptionControls.removeClassicVerificationPending}
+                    onPress={subscriptionControls.removeClassicVerification}
+                  />
+                </>
+              ) : null}
+              <SettingsActionRow
+                label="Redeem Code"
+                pending={subscriptionControls.redeemPending}
+                onPress={subscriptionControls.redeem}
+              />
+              <SettingsActionRow
+                label="Restore Purchases"
+                pending={subscriptionControls.restorePending}
+                onPress={subscriptionControls.restore}
+              />
+              <SettingsActionRow label="Terms of Use" onPress={subscriptionControls.openTerms} />
+            </SettingsGroup>
+          ) : null}
+
+          <SettingsGroup header="Feedback">
+            {isIos ? <SettingsActionRow label="Rate Reflect" onPress={review.writeReview} /> : null}
+            <SettingsActionRow
+              label="Join the Discord community"
+              onPress={() => review.sendFeedback('discord')}
+            />
+            <SettingsActionRow
+              label="Report a bug on GitHub"
+              onPress={() => review.sendFeedback('github')}
+            />
+            <SettingsActionRow label="Email support" onPress={() => review.sendFeedback('email')} />
+          </SettingsGroup>
+
+          <SettingsGroup header="About">
+            <SettingsValueRow label="Version" value={versionLabel} onPress={versionTap} />
+            <SettingsValueRow
+              label="Notes"
+              value={notes === undefined ? '…' : String(notes.length)}
+            />
+            <SettingsNavRow
+              label="Open Source Licenses"
+              onPress={() => navigate({ kind: 'licenses' })}
+            />
+            <SettingsActionRow
+              label="Privacy Policy"
+              onPress={() => {
+                opener.openUrlSync(PRIVACY_POLICY_URL)
+              }}
+            />
+          </SettingsGroup>
+
+          {debugUnlocked ? (
+            <SettingsGroup header="Debug">
+              {isIos ? (
+                <SettingsValueRow
+                  label="Environment"
+                  value={environment.value ?? (environment.isError ? 'Unknown' : 'Loading…')}
+                />
+              ) : null}
+              {isIos && (environment.value === 'Sandbox' || environment.value === 'Xcode') ? (
+                <PaywallPhaseRow />
+              ) : null}
+              <WhatsNewRow />
+              <ReviewRow />
+              <SettingsSwitchRow
+                label="Performance HUD"
+                checked={perfHudEnabled}
+                onCheckedChange={setPerfHudEnabled}
+              />
+              <SettingsActionRow
+                label="Trigger test error"
+                tone="destructive"
+                onPress={crashTest}
+              />
+            </SettingsGroup>
+          ) : null}
+        </div>
+      </main>
+      <ConnectRepositoryDrawer
+        open={sheet?.kind === 'choose'}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSheet(null)
+          }
+        }}
+        onChoose={(host) => setSheet(host === 'github' ? { kind: 'github' } : { kind: 'host' })}
+      />
+      <ConnectGithubDrawer
+        open={sheet?.kind === 'github'}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSheet(null)
+          }
+        }}
+      />
+      <ConnectGitHostDrawer
+        open={sheet?.kind === 'host'}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSheet(null)
+          }
+        }}
+        remoteUrl={sheet?.kind === 'host' ? sheet.remoteUrl : undefined}
+      />
+      <GithubSignInDrawer open={signInOpen} onOpenChange={setSignInOpen} />
+      <AddAiProviderDrawer
+        open={addProviderOpen}
+        onOpenChange={setAddProviderOpen}
+        onAdd={addProvider}
+      />
+      <AiProviderActionsDrawer
+        provider={managedProvider}
+        isDefault={managedProvider !== null && managedProvider.id === defaultProvider?.id}
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        onMakeDefault={makeDefault}
+        onSetDefaultModel={setDefaultModel}
+        onRemove={removeProvider}
+      />
+      <TextSettingDrawer
+        title="System prompt"
+        description="Additional instructions sent with every AI chat. Reflect’s note-search, citation, and privacy rules still apply."
+        ariaLabel="System prompt instructions"
+        placeholder="Be concise. Challenge my assumptions and ask clarifying questions."
+        maxLength={CHAT_SYSTEM_PROMPT_MAX_LENGTH}
+        rows={8}
+        normalize={normalizeChatSystemPrompt}
+        value={chatSystemPrompt}
+        open={systemPromptOpen}
+        onOpenChange={setSystemPromptOpen}
+        onSave={(chatSystemPrompt) => settingsService.update({ chatSystemPrompt })}
+      />
+      <TextSettingDrawer
+        title="Transcription helper text"
+        description="Context sent to your transcription provider with every audio memo, such as names it tends to misspell."
+        ariaLabel="Transcription helper text"
+        placeholder="This transcription mentions the following names:"
+        maxLength={TRANSCRIPTION_PROMPT_MAX_LENGTH}
+        rows={3}
+        normalize={normalizeTranscriptionPrompt}
+        value={transcriptionPrompt}
+        open={transcriptionPromptOpen}
+        onOpenChange={setTranscriptionPromptOpen}
+        onSave={(transcriptionPrompt) => settingsService.update({ transcriptionPrompt })}
+      />
+      <TextSettingDrawer
+        title="Add quick notes under"
+        description="Quick notes go under this bullet. Leave empty to add them at the end."
+        ariaLabel="Parent bullet for quick notes"
+        placeholder="Inbox"
+        maxLength={TEXT_CAPTURE_PARENT_MAX_LENGTH}
+        rows={1}
+        normalize={normalizeQuickNoteParent}
+        value={quickNoteParent}
+        open={quickNoteParentOpen}
+        onOpenChange={setQuickNoteParentOpen}
+        onSave={(quickNoteParent) => settingsService.update({ quickNoteParent })}
+      />
+      <AiPromptDrawer
+        prompt={editingPrompt}
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        onSave={(draft) => {
+          if (editingPrompt === 'new') {
+            addPrompt(draft)
+          } else if (editingPrompt !== null) {
+            updatePrompt(editingPrompt.id, draft)
+          }
+        }}
+        onRemove={removePrompt}
+      />
+    </div>
+  )
+}

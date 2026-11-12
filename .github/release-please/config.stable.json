@@ -14,12 +14,12 @@
   "packages": {
     ".": {
       "package-name": "reflect-open",
-      "changelog-path": "apps/desktop/CHANGELOG.md",
+      "changelog-path": "apps/web/CHANGELOG.md",
       "exclude-paths": ["docs", "fixtures", ".github", "apps/extension"],
       "extra-files": [
         {
           "type": "json",
-          "path": "apps/desktop/package.json",
+          "path": "apps/web/package.json",
           "jsonpath": "$.version"
         },
         {

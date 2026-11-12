@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestLoggerService, createTestPlatformService } from '@reflect/core/testing'
 import { createCommandService, type CommandKeyEvent } from './command-service.ts'
+import { noop } from '@ocavue/utils'
 
 function setup(options?: { isApplePlatform?: boolean }) {
   const logger = createTestLoggerService()
@@ -39,18 +40,18 @@ describe('createCommandService', () => {
 
   it('throws on a duplicate id (a programmer error, not a runtime state)', () => {
     const { commands } = setup()
-    commands.register([{ id: 'a', title: 'A', run: () => {} }])
-    expect(() => commands.register([{ id: 'a', title: 'again', run: () => {} }])).toThrow(
+    commands.register([{ id: 'a', title: 'A', run: noop }])
+    expect(() => commands.register([{ id: 'a', title: 'again', run: noop }])).toThrow(
       /already registered/,
     )
   })
 
   it('throws on a blank id or title', () => {
     const { commands } = setup()
-    expect(() => commands.register([{ id: ' ', title: 'A', run: () => {} }])).toThrow(
+    expect(() => commands.register([{ id: ' ', title: 'A', run: noop }])).toThrow(
       'command id cannot be empty',
     )
-    expect(() => commands.register([{ id: 'a', title: '', run: () => {} }])).toThrow(
+    expect(() => commands.register([{ id: 'a', title: '', run: noop }])).toThrow(
       'command title cannot be empty: a',
     )
   })
@@ -63,7 +64,7 @@ describe('createCommandService', () => {
 
   it('keeps each registry separate', () => {
     const { commands } = setup()
-    commands.register([{ id: 'a', title: 'A', run: () => {} }])
+    commands.register([{ id: 'a', title: 'A', run: noop }])
     expect(setup().commands.list()).toEqual([])
   })
 })
@@ -72,12 +73,12 @@ describe('commandForKeyDown', () => {
   function bound(options?: { isApplePlatform?: boolean }) {
     const { commands } = setup(options)
     commands.register([
-      { id: 'today', title: 'Today', keybinding: 'Mod-d', run: () => {} },
-      { id: 'all', title: 'All notes', keybinding: 'Mod-Shift-a', run: () => {} },
-      { id: 'back', title: 'Back', keybinding: 'Mod-[', run: () => {} },
-      { id: 'link', title: 'Copy link', keybinding: 'Alt-Mod-l', run: () => {} },
-      { id: 'graph2', title: 'Graph 2', keybinding: 'Mod-2', run: () => {} },
-      { id: 'unbound', title: 'Unbound', run: () => {} },
+      { id: 'today', title: 'Today', keybinding: 'Mod-d', run: noop },
+      { id: 'all', title: 'All notes', keybinding: 'Mod-Shift-a', run: noop },
+      { id: 'back', title: 'Back', keybinding: 'Mod-[', run: noop },
+      { id: 'link', title: 'Copy link', keybinding: 'Alt-Mod-l', run: noop },
+      { id: 'graph2', title: 'Graph 2', keybinding: 'Mod-2', run: noop },
+      { id: 'unbound', title: 'Unbound', run: noop },
     ])
     return commands
   }

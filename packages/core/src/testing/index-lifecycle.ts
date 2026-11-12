@@ -8,7 +8,7 @@ import type { ProgressPort } from '../ports/progress-port.ts'
 import type { NoteFileService } from '../graph/note-file-service.ts'
 import type { DatabaseService } from '../indexing/database-service.ts'
 import type { FileChange, FileChangeService } from '../indexing/file-change-service.ts'
-import { WritableStore, type Store } from '../store.ts'
+import { combineStores, WritableStore, type Store } from '../store.ts'
 import {
   createIndexLifecycleService,
   type IndexAppliedEvent,
@@ -32,6 +32,7 @@ import { createTestLoggerService } from './logger.ts'
 import { createTestPlatformService } from './platform.ts'
 import { createTestProgressPort } from './ports.ts'
 import { createTestActivityPort } from './shell.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The services a test lifecycle runs on; each defaults to a fresh test double.
@@ -73,6 +74,10 @@ export interface TestIndexLifecycleService extends IndexLifecycleService {
    */
   setFileProgress(progress: IndexFileProgress | null): void
   /**
+   * Report `progress` over the real one; `null` follows the real one again.
+   */
+  setProgress(progress: IndexLifecycleProgress | null): void
+  /**
    * The index generation of every `rebuildVisibly` request with an open index, in order.
    */
   rebuilds(): readonly number[]
@@ -82,6 +87,13 @@ export interface TestIndexLifecycleService extends IndexLifecycleService {
    * sync pass) does.
    */
   emitApplied(changes: readonly FileChange[] | null, generation: number): void
+}
+
+function selectSeededProgress(
+  real: IndexLifecycleProgress,
+  seed: IndexLifecycleProgress | null,
+): IndexLifecycleProgress {
+  return seed ?? real
 }
 
 class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
@@ -94,9 +106,12 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
    */
   readonly #fileProgress: WritableStore<IndexFileProgress | null>
   readonly fileProgress: Store<IndexFileProgress | null>
+  readonly #progressSeed = new WritableStore<IndexLifecycleProgress | null>(null)
+  readonly progress: Store<IndexLifecycleProgress>
 
   constructor(inner: IndexLifecycleService, graphSession: IndexLifecycleDeps['graphSession']) {
     this.#inner = inner
+    this.progress = combineStores([inner.progress, this.#progressSeed], selectSeededProgress)
     this.#graphSession = graphSession
     this.#fileProgress = new WritableStore(inner.fileProgress.get())
     this.fileProgress = this.#fileProgress
@@ -143,10 +158,6 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
 
   followActivity(): Unlisten {
     return this.#inner.followActivity()
-  }
-
-  onProgress(listener: (progress: IndexLifecycleProgress) => void): Unlisten {
-    return this.#inner.onProgress(listener)
   }
 
   onApplied(listener: (event: IndexAppliedEvent) => void): Unlisten {
@@ -210,6 +221,10 @@ class TestIndexLifecycleServiceImpl implements TestIndexLifecycleService {
     this.#fileProgress.set(progress)
   }
 
+  setProgress(progress: IndexLifecycleProgress | null): void {
+    this.#progressSeed.set(progress)
+  }
+
   rebuilds(): readonly number[] {
     return [...this.#rebuildLog]
   }
@@ -231,7 +246,7 @@ export function createTestIndexLifecycleService(
   const clock = options?.clock ?? createTestClockService()
   const graphSession = options?.graphSession ?? {
     get: () => ({ session: null }),
-    subscribe: () => () => {},
+    subscribe: () => noop,
   }
   const inner = createIndexLifecycleService({
     indexStore: options?.indexStore ?? createTestIndexStoreService(),

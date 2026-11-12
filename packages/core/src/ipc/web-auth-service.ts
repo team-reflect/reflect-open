@@ -3,8 +3,8 @@ import type { IpcBridgeService } from './ipc-service.ts'
 import { definePluginCommand } from './plugin.ts'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-web-auth`, the system web sign-in
- * session.
+ * Typed bindings for the `plugin:web-auth` commands, the system web sign-in
+ * session (`apps/ios/Sources/Capabilities/WebAuthCapability.swift`).
  */
 
 export interface WebAuthOptions {

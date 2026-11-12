@@ -14,6 +14,10 @@ import type {
   AppStoreEnvironmentState,
 } from '../monetization/app-store-environment-service.ts'
 import type {
+  InstallClockService,
+  InstallClockState,
+} from '../monetization/install-clock-service.ts'
+import type {
   ActiveSubscription,
   SubscriptionService,
   SubscriptionState,
@@ -230,4 +234,42 @@ export function createTestAppStoreEnvironmentService(
   env: AppStoreEnvironment = 'Production',
 ): TestAppStoreEnvironmentService {
   return new TestAppStoreEnvironmentServiceImpl(env)
+}
+
+/**
+ * A settable {@link InstallClockService}.
+ */
+export interface TestInstallClockService extends InstallClockService {
+  /**
+   * Replaces part of the state and notifies subscribers.
+   */
+  setState(patch: Partial<InstallClockState>): void
+}
+
+class TestInstallClockServiceImpl implements TestInstallClockService {
+  readonly #state: WritableStore<InstallClockState>
+  readonly get: () => InstallClockState
+  readonly subscribe: (listener: VoidFunction) => Unlisten
+
+  constructor(state?: Partial<InstallClockState>) {
+    this.#state = new WritableStore<InstallClockState>(
+      { phase: 'hidden', firstLaunchAt: null, dayIndex: 0, isLoading: false, ...state },
+      isDeepEqual,
+    )
+    this.get = this.#state.get
+    this.subscribe = this.#state.subscribe
+  }
+
+  setState(patch: Partial<InstallClockState>): void {
+    this.#state.set({ ...this.get(), ...patch })
+  }
+}
+
+/**
+ * An {@link InstallClockService} over a settable state, `hidden` by default.
+ */
+export function createTestInstallClockService(
+  state?: Partial<InstallClockState>,
+): TestInstallClockService {
+  return new TestInstallClockServiceImpl(state)
 }

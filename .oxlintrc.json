@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["**/.wxt/**", "apps/ios/Web"],
   "plugins": ["typescript", "import"],
   "rules": {
     "typescript/no-explicit-any": "error",
@@ -15,7 +16,7 @@
       }
     },
     {
-      "files": ["apps/desktop/src/components/ui/**", "**/scripts/**"],
+      "files": ["apps/web/src/components/ui/**", "**/scripts/**"],
       "rules": {
         "import/no-namespace": "off"
       }

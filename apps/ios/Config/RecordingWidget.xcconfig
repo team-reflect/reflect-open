@@ -1,0 +1,15 @@
+// Target-level settings of the widget extension (the record widget and the
+// recording Live Activity), the same for every configuration.
+
+PRODUCT_NAME = RecordingWidget
+PRODUCT_BUNDLE_IDENTIFIER = $(REFLECT_BUNDLE_ID).widgets
+INFOPLIST_FILE = Config/RecordingWidget-Info.plist
+CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements
+// Live Activities need iOS 16.2.
+IPHONEOS_DEPLOYMENT_TARGET = 16.2
+APPLICATION_EXTENSION_API_ONLY = YES
+SKIP_INSTALL = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
+
+// The extension sources were not written for complete concurrency checking.
+SWIFT_STRICT_CONCURRENCY = minimal

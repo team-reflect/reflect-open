@@ -1,6 +1,7 @@
 import type { SecretStoreService } from '../secrets/secret-store-service.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import { aiProviderRequiresApiKey } from './provider-catalog.ts'
+import { returnNull } from '@ocavue/utils'
 
 /**
  * The AI domain's keychain policy: which entries hold BYOK provider keys.
@@ -83,7 +84,7 @@ class AiCredentialServiceImpl implements AiCredentialService {
     return (configId) => {
       let key = keys.get(configId)
       if (key === undefined) {
-        key = secretStore.get(aiKeySecretName(configId)).catch(() => null)
+        key = secretStore.get(aiKeySecretName(configId)).catch(returnNull)
         keys.set(configId, key)
       }
       return key

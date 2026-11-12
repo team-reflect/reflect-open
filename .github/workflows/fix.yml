@@ -45,6 +45,9 @@ jobs:
         if: steps.changes.outputs.rust == 'true' || steps.changes.outputs.licenses == 'true'
         run: rustup toolchain install --no-self-update
 
+      - name: Generate WXT types
+        run: pnpm gen:wxt
+
       - name: Fix (TypeScript)
         run: pnpm run fix
 
@@ -52,11 +55,14 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: cargo fmt --all
 
+      - name: Fix (Swift)
+        run: |
+          swift format --version
+          git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
+
       - name: Install cargo-about
         if: steps.changes.outputs.licenses == 'true'
-        uses: taiki-e/install-action@861a07ce7084f55488e375df125cdc99bba60eb7 # v2.87.23
-        with:
-          tool: cargo-about@0.9.2
+        uses: ./.github/actions/setup-mise
 
       - name: Generate licenses
         if: steps.changes.outputs.licenses == 'true'

@@ -1,0 +1,70 @@
+import type { ReactElement } from 'react'
+import { MessageSquare } from 'lucide-react'
+import { Button } from '@/components/ui/button.tsx'
+import { imageFilesFrom } from '@/lib/chat-attachments.ts'
+import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
+import { useRouterActions } from '@/routing/router.tsx'
+import { ChatInput } from './chat-input.tsx'
+import { ChatTurnList } from './chat-turn-list.tsx'
+
+/**
+ * The dedicated chat view (Plan 10, revised: a full route, not a side panel).
+ * Read-only first wave: the assistant answers questions grounded in the
+ * graph via search/read tools and cites notes as wiki links — it never
+ * writes. With no AI provider configured the view is one call-to-action into
+ * Settings; the conversation itself lives in the graph's `ChatSession`, so
+ * navigating away and back keeps it.
+ *
+ * The whole view accepts dropped images — aiming for the composer exactly
+ * shouldn't be required — and queues them as the next message's attachments.
+ */
+export function ChatScreen(): ReactElement {
+  const providers = useChatProviders()
+  const { attachImages } = useChatActions()
+  const { navigate } = useRouterActions()
+
+  if (providers.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center px-6" data-testid="chat-screen">
+        <div className="flex max-w-sm flex-col items-center text-center">
+          <MessageSquare aria-hidden strokeWidth={1.5} className="size-8 text-text-muted" />
+          <h2 className="mt-4 text-lg font-semibold text-text">Chat with your notes</h2>
+          <p className="mt-2 text-sm text-text-muted">
+            Add an AI provider to start chatting. Reflect calls the provider directly with your own
+            key — it stays in the system keychain, and private notes are never sent.
+          </p>
+          <Button className="mt-5" onClick={() => navigate({ kind: 'settings' })}>
+            Add an AI provider
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="flex h-full min-h-0 flex-col"
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes('Files')) {
+          event.preventDefault()
+        }
+      }}
+      onDrop={(event) => {
+        if (event.dataTransfer.files.length === 0) {
+          return
+        }
+        // Claim every file drop, matching or not: the webview's default for
+        // an unhandled file is to navigate to it, replacing the app.
+        event.preventDefault()
+        const files = imageFilesFrom(event.dataTransfer)
+        if (files.length > 0) {
+          void attachImages(files)
+        }
+      }}
+      data-testid="chat-screen"
+    >
+      <ChatTurnList />
+      <ChatInput />
+    </div>
+  )
+}

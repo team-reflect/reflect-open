@@ -1,4 +1,4 @@
-# Reflect Capture (Chrome extension)
+# Reflect Capture (Chrome and Safari extension)
 
 Save the page you're reading into Reflect: ⌘⇧K saves immediately with default
 settings, including the stored page-text preference, while the toolbar button
@@ -15,6 +15,12 @@ Install the published extension from the
 or load the `-unpacked.zip` from the latest
 [`extension-v*` release](https://github.com/team-reflect/reflect-open/releases?q=extension-v)
 before store review finishes.
+
+On Safari the same code ships inside the macOS desktop app and versions with it.
+Turn it on in Safari Settings → Extensions. Safari reaches a sandboxed app
+extension instead of the native host, and the app moves its captures into the
+graph the next time it opens or comes to the front. See
+[Safari extension](../../docs/distribution.md#safari-extension).
 
 ## Architecture in one breath
 
@@ -69,7 +75,7 @@ once the host is reachable.
 
 `wxt.config.ts` explains the two IDs: a public `key` pins the unpacked ID, and
 the store rejects `key` and minted its own ID, so `pnpm zip` drops it.
-`EXTENSION_ORIGINS` in `apps/desktop/src-tauri/src/capture.rs` must keep both
+`EXTENSION_ORIGINS` in `crates/core/src/capture.rs` must keep both
 IDs, or the native hop fails for one of the two install modes. Changing the key
 without updating that constant silently breaks unpacked loads.
 

@@ -1,8 +1,0 @@
-{
-  "$schema": "../gen/schemas/mobile-schema.json",
-  "identifier": "mobile",
-  "description": "Mobile-only capabilities: the light impact haptic and the native audio-memo recorder",
-  "platforms": ["iOS", "android"],
-  "windows": ["main"],
-  "permissions": ["mobile-haptics:default", "recording:default"]
-}

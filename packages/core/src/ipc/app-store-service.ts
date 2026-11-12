@@ -4,8 +4,8 @@ import type { IpcBridgeService } from './ipc-service.ts'
 import { definePluginCommand, ignoredResult } from './plugin.ts'
 
 /**
- * Typed bindings for `plugins/tauri-plugin-app-store`, the install-channel
- * probe.
+ * Typed bindings for the `plugin:app-store` commands, the install-channel
+ * probe (`apps/ios/Sources/Capabilities/StoreCapability.swift`).
  */
 
 const appStoreEnvironmentSchema = z.object({ environment: z.string() })
@@ -25,6 +25,12 @@ const syncCommand = definePluginCommand<Record<string, never>, unknown>(
 const presentOfferCodeRedeemSheetCommand = definePluginCommand<Record<string, never>, unknown>(
   'app-store',
   'present_offer_code_redeem_sheet',
+  ignoredResult,
+)
+
+const requestReviewCommand = definePluginCommand<Record<string, never>, unknown>(
+  'app-store',
+  'request_review',
   ignoredResult,
 )
 
@@ -52,6 +58,13 @@ export interface AppStoreService {
    * result, which resolves as soon as the sheet is presented.
    */
   presentOfferCodeRedeemSheet(): MaybePromise<void>
+  /**
+   * Ask StoreKit for its review prompt. The system decides whether it shows:
+   * at most three times in 365 days on an App Store install, every time in a
+   * development build, and never in TestFlight. Nothing reports whether it
+   * showed or what the user chose.
+   */
+  requestReview(): MaybePromise<void>
 }
 
 export interface AppStoreServiceDeps {
@@ -75,6 +88,10 @@ class AppStoreServiceImpl implements AppStoreService {
 
   async presentOfferCodeRedeemSheet(): Promise<void> {
     await presentOfferCodeRedeemSheetCommand(this.#deps.ipc, {})
+  }
+
+  async requestReview(): Promise<void> {
+    await requestReviewCommand(this.#deps.ipc, {})
   }
 }
 

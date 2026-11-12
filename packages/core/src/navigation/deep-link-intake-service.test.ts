@@ -10,6 +10,7 @@ import { createTestDeepLinkIntakeService, createTestDeepLinkSource } from '../te
 import { createTestGraphSessionService } from '../testing/graph-session.ts'
 import { createTestProgressPort } from '../testing/ports.ts'
 import type { DeepLinkIntakeServiceDeps } from './deep-link-intake-service.ts'
+import { noop } from '@ocavue/utils'
 
 function setup(overrides?: Partial<DeepLinkIntakeServiceDeps>) {
   const progress = createTestProgressPort()
@@ -70,7 +71,7 @@ describe('DeepLinkIntakeService.resolve', () => {
 
   it('drops a resolution failure that arrives after the link became stale', async () => {
     const { service, resolveNoteTarget, progress } = setup()
-    let rejectResolve: (cause: Error) => void = () => {}
+    let rejectResolve: (cause: Error) => void = noop
     resolveNoteTarget.mockReturnValue(
       new Promise((_resolve, reject) => {
         rejectResolve = reject

@@ -1,5 +1,6 @@
 import { isDeepEqual } from '@ocavue/utils'
 import { z } from 'zod'
+import type { LoggerService } from '../ports/logger-service.ts'
 import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { getJson, setJson, type StorageService } from '../ports/storage-service.ts'
 import type { AppStoreService } from '../ipc/app-store-service.ts'
@@ -57,6 +58,10 @@ export interface AppStoreEnvironmentServiceDeps {
   readonly appStore: AppStoreService
   readonly storage: StorageService
   readonly platform: PlatformFacts
+  /**
+   * Receives a warning for each failed probe.
+   */
+  readonly logger: LoggerService
 }
 
 class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
@@ -150,7 +155,8 @@ class AppStoreEnvironmentServiceImpl implements AppStoreEnvironmentService {
       this.#answered = true
       this.#failed = false
       this.#remember(this.#value)
-    } catch {
+    } catch (error) {
+      this.#deps.logger.warn('Probing the App Store environment failed', error)
       this.#failed = true
     } finally {
       this.#probing = false

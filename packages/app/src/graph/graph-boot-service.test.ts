@@ -23,6 +23,7 @@ import type { Route } from '../navigation/route.ts'
 import { createTestDialogService } from '../testing/dialog.ts'
 import { createTestWindowService } from '../testing/window.ts'
 import { createGraphBootService } from './graph-boot-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 const BOOT: WindowBootstrap = {
   graph: { root: '/g', name: 'g', generation: 3 },
@@ -74,7 +75,7 @@ function setup(options?: SetupOptions) {
         generation += 1
         return { root, name: root.split('/').findLast(Boolean) ?? '', generation }
       },
-      graph_delete: () => null,
+      graph_delete: returnNull,
     },
   })
   const noteFile = createTestNoteFileService()
@@ -346,7 +347,6 @@ describe('GraphBootService note windows', () => {
       status: 'choosing',
       graph: null,
       indexGeneration: null,
-      indexing: false,
       recents,
     })
     expect(context.window.closeSecondaryWindowsCalls()).toBe(2)

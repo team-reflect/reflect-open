@@ -6,7 +6,7 @@ import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands.ts'
  * Pins the extension ID (`dlbliojklpickgimjdmjjdnbjdiomjik`) for **unpacked**
  * loads — `wxt dev` and a `wxt build` loaded by hand — so it matches the
  * native-messaging host manifests the desktop app writes
- * (`src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`). The ID is the SHA-256 of
+ * (`crates/core/src/capture.rs`, `EXTENSION_ORIGINS`). The ID is the SHA-256 of
  * this public key; the private half is deliberately not kept.
  *
  * The Chrome Web Store is different: it **rejects** a `key` in the uploaded
@@ -26,6 +26,8 @@ const isStoreBuild = process.env['WXT_STORE_BUILD'] === 'true'
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  // Every module imports what it uses from its real `wxt/*` path.
+  imports: false,
   vite: () => ({ plugins: [tailwindcss()] }),
   // Store artifact: `reflect-capture-<version>-chrome.zip`. The keyed build is
   // `reflect-capture-<version>-chrome-unpacked.zip` so the two never collide.
@@ -35,12 +37,13 @@ export default defineConfig({
       ? {}
       : { artifactTemplate: '{{name}}-{{packageVersion}}-{{browser}}-unpacked{{modeSuffix}}.zip' }),
   },
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Reflect Capture',
     description: 'Save the page you are reading into Reflect.',
     homepage_url: 'https://github.com/team-reflect/reflect-open',
-    // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it there.
-    ...(isStoreBuild ? {} : { key: PUBLIC_KEY }),
+    // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it
+    // there. Safari ignores it: the containing app identifies the extension.
+    ...(isStoreBuild || browser === 'safari' ? {} : { key: PUBLIC_KEY }),
     // `activeTab` (granted by the action click / shortcut) covers the
     // screenshot and the selection grab; `webRequest` on x.com only observes
     // bookmark and like requests.
@@ -60,5 +63,5 @@ export default defineConfig({
         description: 'Save the current page to Reflect',
       },
     },
-  },
+  }),
 })

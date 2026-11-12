@@ -1,0 +1,15 @@
+{
+  "name": "@reflect/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "node generate-xcode-env.mjs"
+  },
+  "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
+    "@types/node": "^24.0.0",
+    "appium-remote-debugger": "^18.1.0",
+    "tinyexec": "^1.3.1"
+  }
+}

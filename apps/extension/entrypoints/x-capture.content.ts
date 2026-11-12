@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser'
-import { defineContentScript } from '#imports'
+import { defineContentScript } from 'wxt/utils/define-content-script'
 import { xPostSchema } from '@reflect/core/x-archive'
 import { requestXTweet } from '@post-embed/exporter/x/bridge'
 import {

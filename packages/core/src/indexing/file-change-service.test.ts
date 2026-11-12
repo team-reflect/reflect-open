@@ -7,6 +7,7 @@ import {
   type FileChange,
   type FileChangeBatch,
 } from './file-change-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 function setup(echoOwnWrites = false) {
   const ipc = createTestIpcBridgeService()
@@ -194,8 +195,8 @@ describe('createFileChangeService', () => {
 
   it('starts and stops the native watcher', async () => {
     const { ipc, fileChanges } = setup()
-    ipc.onCommand('watch_start', () => null)
-    ipc.onCommand('watch_stop', () => null)
+    ipc.onCommand('watch_start', returnNull)
+    ipc.onCommand('watch_stop', returnNull)
 
     await fileChanges.startWatcher()
     await fileChanges.stopWatcher()

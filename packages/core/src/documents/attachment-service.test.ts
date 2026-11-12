@@ -9,6 +9,7 @@ import {
   createTestClockService,
   createTestFileChangeService,
   createTestGraphSessionService,
+  createTestLoggerService,
   createTestNoteFileService,
   createTestProgressPort,
   createTestPlatformService,
@@ -18,6 +19,7 @@ import {
   createAttachmentService,
   type AttachmentInsertTarget,
 } from './attachment-service.ts'
+import { sleep, returnNull } from '@ocavue/utils'
 
 interface Listing {
   path: string
@@ -48,6 +50,7 @@ function setup(options?: { assetStore?: AssetStoreService; noteFile?: NoteFileSe
   const fileChanges = createTestFileChangeService()
   const progress = createTestProgressPort()
   const graph = createTestGraphSessionService({ graph: { generation: 3 } })
+  const logger = createTestLoggerService()
   const attachments = createAttachmentService({
     assetStore,
     noteFile,
@@ -56,8 +59,9 @@ function setup(options?: { assetStore?: AssetStoreService; noteFile?: NoteFileSe
     clock,
     platform: createTestPlatformService(),
     graphSession: graph,
+    logger,
   })
-  return { attachments, assetStore, noteFile, fileChanges, progress, clock, graph }
+  return { attachments, assetStore, noteFile, fileChanges, progress, clock, graph, logger }
 }
 
 function fileOf(name: string, type: string, size = 16): File {
@@ -538,10 +542,24 @@ describe('watchCatalog', () => {
     const first = await attachments.loadCatalog()
     fileChanges.emitReconcile()
     await expect.poll(() => noteFile.listings()).toBe(2)
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
 
     expect(attachments.catalog.get()).toBe(first)
     expect(changes).toBe(1)
+  })
+
+  it('logs a failed listing', async () => {
+    const { attachments, logger } = setup({
+      noteFile: Object.assign(createTestNoteFileService(), {
+        listAttachments: failing('bridge down'),
+      }),
+    })
+
+    attachments.watchCatalog(3)
+
+    await expect
+      .poll(() => logger.getWarnings().map((entry) => entry.message))
+      .toEqual(['listing attachments failed:'])
   })
 })
 
@@ -600,7 +618,7 @@ describe('attachFilesToNote', () => {
     const assetStore = createTestAssetStoreService({ sources: { '/tmp/report.pdf': 'a' } })
     const { attachments } = setup({ assetStore })
 
-    await attachments.attachFilesToNote({ sources: ['/tmp/report.pdf'], findEditor: () => null })
+    await attachments.attachFilesToNote({ sources: ['/tmp/report.pdf'], findEditor: returnNull })
 
     const target = editor()
     await attachments.attachFilesToNote({ sources: [], findEditor: () => target })

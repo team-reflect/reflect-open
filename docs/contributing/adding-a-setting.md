@@ -4,14 +4,14 @@ User settings are one JSON document in the OS config dir, next to the recents
 store. It is never inside a graph's `.reflect/`: preferences follow the user
 across graphs and must survive graph deletion.
 
-- **Rust** (`apps/desktop/src-tauri/src/settings.rs`) persists the document as
+- **Rust** (`crates/core/src/settings.rs`) persists the document as
   an *opaque* JSON object. **You will not touch Rust to add a setting.**
 - **`@reflect/core`** owns the keys, defaults and validation
   (`packages/core/src/settings/schema.ts`) and the runtime document
   (`SettingsService`, `CoreServices.settings`).
 - **The desktop app** reads each setting through its own hook, such as
-  `useTimeFormat()` (`apps/desktop/src/providers/settings-provider.tsx`), and renders controls in
-  `apps/desktop/src/components/settings/`.
+  `useTimeFormat()` (`apps/web/src/providers/settings-provider.tsx`), and renders controls in
+  `apps/web/src/components/settings/`.
 
 ## 1. Declare the key in the schema
 
@@ -98,7 +98,7 @@ navigator and section DOM ids, and its component rendered from
 Build sections from the shared primitives: `SettingsSection` (`section.tsx`),
 `SettingsField` (`field.tsx`) and `SettingsOptionCard` (`option-card.tsx`). For
 controls and overlays, use the shadcn primitives in
-`apps/desktop/src/components/ui/` (`Switch`, `Select`, `Dialog`, …).
+`apps/web/src/components/ui/` (`Switch`, `Select`, `Dialog`, …).
 
 `onChange` calls `settingsService.update` or `settingsService.updateWith` directly (see
 `appearance-section.tsx`, `editor-section.tsx`, `all-notes-section.tsx`). Test

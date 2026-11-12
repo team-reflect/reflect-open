@@ -320,7 +320,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
       const memo = audioMemoIdentity(session.recordedAt, NATIVE_RECORDING_MIME)
       void (async () => {
         for (const path of await this.#pipeline.listSegments(memo)) {
-          await this.#pipeline.deleteSegment(path).catch(() => {})
+          await this.#pipeline.deleteSegment(path)
         }
       })().catch((cause: unknown) => {
         logger.error('discarding the recorded segments failed:', cause)
@@ -410,7 +410,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
   }
 
   #hapticImpactLight(): void {
-    void this.#deps.haptics.impactLight().catch(() => {})
+    void this.#deps.haptics.impactLight()
   }
 
   /**
@@ -452,7 +452,7 @@ class MobileAudioMemoSessionImpl implements MobileAudioMemoSession {
         // A cancel that swept the directory before this segment's copy
         // landed has to be honored here instead.
         if (owner?.cancelled === true) {
-          await pipeline.deleteSegment(path).catch(() => {})
+          await pipeline.deleteSegment(path)
         }
         await release()
       },

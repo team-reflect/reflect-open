@@ -10,6 +10,7 @@ import {
   IDENTITY,
   type CaptureTestKit,
 } from './capture-test-kit.ts'
+import { returnTrue } from '@ocavue/utils'
 
 let kit: CaptureTestKit
 
@@ -479,7 +480,7 @@ describe('CaptureDrainService', () => {
 
   it('stops before any work when the session is stale', async () => {
     kit.addSpool(envelope())
-    const outcome = await kit.drain({ isStale: () => true })
+    const outcome = await kit.drain({ isStale: returnTrue })
     expect(outcome.stopped?.reason).toBe('stale')
     expect(kit.writeNoteMock).not.toHaveBeenCalled()
     expect(kit.captureInbox.files().size).toBe(2)
@@ -603,6 +604,15 @@ describe('CaptureDrainService (text captures)', () => {
 
     expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
     expect(kit.noteFile.files().get(DAILY)).toBe('- call the bank\n')
+  })
+
+  it('nests a text capture under its parent bullet', async () => {
+    kit.noteFile.set(DAILY, '- Inbox\n  - first\n- later\n')
+    addTextSpool(textEnvelope({ source: 'ios-intent', parent: 'Inbox' }))
+
+    await kit.drain()
+
+    expect(kit.noteFile.files().get(DAILY)).toBe('- Inbox\n  - first\n  - call the bank\n- later\n')
   })
 
   it('a checkbox never joins a task list — the + marker stays a task', async () => {

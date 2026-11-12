@@ -45,6 +45,7 @@ import {
   type TaskService,
   type TaskServiceDeps,
 } from './task-service.ts'
+import { sleep, noop } from '@ocavue/utils'
 
 /**
  * The `index`th task of `source` as the index would hand it to the Tasks view.
@@ -150,7 +151,7 @@ beforeEach(() => {
   tasks = createTasks(new WritableStore({ session: openGraph }))
 })
 
-const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0))
+const flushMicrotasks = () => sleep(0)
 
 describe('write serialization', () => {
   it('serializes concurrent writes to the same note — no read/write interleave', async () => {
@@ -703,7 +704,7 @@ describe('task list state', () => {
    */
   async function subscribed(open: readonly OpenTask[] = [one, two]) {
     const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([...open])
-    const unsubscribe = tasks.subscribe(() => {})
+    const unsubscribe = tasks.subscribe(noop)
     await flushMicrotasks()
     return { getOpenTasks, unsubscribe }
   }
@@ -747,7 +748,7 @@ describe('task list state', () => {
 
   it('reports a failed read and clears it once a read lands', async () => {
     const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockRejectedValue(new Error('no index'))
-    tasks.subscribe(() => {})
+    tasks.subscribe(noop)
     await flushMicrotasks()
     expect(tasks.get()).toMatchObject({ open: undefined, openFailed: true })
 
@@ -885,20 +886,22 @@ describe('task list state', () => {
     await clock.advance(3_000)
     expect(getOpenTasks).toHaveBeenCalledTimes(3)
 
-    // Unsubscribed, a change only marks the rows stale for the next subscriber.
+    // Unsubscribed, the service stops listening and the next subscriber reads again.
     unsubscribe()
+    expect(appliedListeners.size).toBe(0)
+    expect(reconciledListeners.size).toBe(0)
     await clock.advance(3_000)
     emitApplied()
     await flushMicrotasks()
     expect(getOpenTasks).toHaveBeenCalledTimes(3)
-    tasks.subscribe(() => {})
+    tasks.subscribe(noop)
     await flushMicrotasks()
     expect(getOpenTasks).toHaveBeenCalledTimes(4)
   })
 
   it('keeps reading while one subscription is left, however often another unsubscribes', async () => {
     const { getOpenTasks, unsubscribe } = await subscribed()
-    tasks.subscribe(() => {})
+    tasks.subscribe(vi.fn())
     unsubscribe()
     unsubscribe()
 
@@ -930,7 +933,7 @@ describe('task list state', () => {
     ] as const) {
       tasks = createTasks(new WritableStore({ session: openGraph }), role)
       const getOpenTasks = vi.spyOn(tasks, 'getOpenTasks').mockResolvedValue([one])
-      tasks.subscribe(() => {})
+      tasks.subscribe(noop)
       await flushMicrotasks()
 
       ipc.emit('index:written', null)
@@ -960,7 +963,7 @@ describe('task list state', () => {
     const source = new WritableStore<{ session: GraphSession | null }>({ session: openGraph })
     const switching = createTasks(source)
     const getOpenTasks = vi.spyOn(switching, 'getOpenTasks').mockResolvedValue([one])
-    switching.subscribe(() => {})
+    switching.subscribe(noop)
     await flushMicrotasks()
     expect(switching.get().open).toEqual([one])
 

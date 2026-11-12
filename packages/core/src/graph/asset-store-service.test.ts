@@ -6,6 +6,7 @@ import {
   createTestIpcBridgeService,
 } from '../testing/index.ts'
 import { createAssetStoreService } from './asset-store-service.ts'
+import { returnNull } from '@ocavue/utils'
 
 function bytesOf(size: number, fill: number): Blob {
   return new Blob([new Uint8Array(size).fill(fill)])
@@ -55,7 +56,7 @@ describe('uploadBlob', () => {
   it('aborts the upload and rethrows when an append fails', async () => {
     const { ipc, fileChanges, assetStore } = setup()
     ipc.onCommand('asset_upload_begin', () => 'upload-9')
-    ipc.onCommand('asset_upload_abort', () => null)
+    ipc.onCommand('asset_upload_abort', returnNull)
     ipc.onBinaryCommand('asset_upload_append', () => {
       throw new AppError('io', 'disk full')
     })
@@ -76,7 +77,7 @@ describe('uploadBlob', () => {
   it('fails loudly when the bridge has no binary transport', async () => {
     const { ipc, assetStore } = setup({ binary: false })
     ipc.onCommand('asset_upload_begin', () => 'upload-2')
-    ipc.onCommand('asset_upload_abort', () => null)
+    ipc.onCommand('asset_upload_abort', returnNull)
 
     await expect(assetStore.uploadBlob('a.pdf', bytesOf(8, 0), 1)).rejects.toMatchObject({
       kind: 'io',
@@ -92,8 +93,8 @@ describe('uploadToPath', () => {
   it('streams to the exact path when the transport carries binary bodies', async () => {
     const { ipc, fileChanges, assetStore } = setup()
     ipc.onCommand('asset_upload_begin', () => 'upload-3')
-    ipc.onCommand('asset_upload_commit_path', () => null)
-    ipc.onBinaryCommand('asset_upload_append', () => null)
+    ipc.onCommand('asset_upload_commit_path', returnNull)
+    ipc.onBinaryCommand('asset_upload_append', returnNull)
 
     await assetStore.uploadToPath('audio-memos/a.webm', bytesOf(4, 1), 5)
 
@@ -106,7 +107,7 @@ describe('uploadToPath', () => {
 
   it('falls back to base64 without a binary transport', async () => {
     const { ipc, fileChanges, assetStore } = setup({ binary: false })
-    ipc.onCommand('asset_write', () => null)
+    ipc.onCommand('asset_write', returnNull)
 
     await assetStore.uploadToPath('audio-memos/a.webm', new Blob(['audio']), 5)
 
@@ -178,7 +179,7 @@ describe('createAssetStoreService', () => {
       'audio_memo_import',
       'transcript_cache_write',
     ]) {
-      ipc.onCommand(command, () => null)
+      ipc.onCommand(command, returnNull)
     }
     ipc.onCommand('transcript_cache_read', () => 'cached')
 

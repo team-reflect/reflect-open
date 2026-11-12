@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestIpcBridgeService } from '../testing/index.ts'
 import { createCaptureInboxService } from './capture-inbox-service.ts'
+import { returnNull } from '@ocavue/utils'
 describe('createCaptureInboxService', () => {
   it('sends each operation as its command with the graph generation', async () => {
     const ipc = createTestIpcBridgeService()
@@ -11,7 +12,7 @@ describe('createCaptureInboxService', () => {
       'capture_inbox_reject',
       'capture_screenshot_promote',
     ]) {
-      ipc.onCommand(command, () => null)
+      ipc.onCommand(command, returnNull)
     }
     const inbox = createCaptureInboxService({ ipc })
 

@@ -6,12 +6,13 @@ import {
   parseRepoInput,
   suggestRepoName,
 } from './github-repo-service.ts'
+import { returnTrue } from '@ocavue/utils'
 
 /**
  * A `GithubRepoService` whose every request gets `reply`.
  */
 function repos(reply: TestHttpReply) {
-  const http = createTestHttpService([{ method: '*', url: () => true, reply }])
+  const http = createTestHttpService([{ method: '*', url: returnTrue, reply }])
   return { http, service: createGithubRepoService({ http }) }
 }
 

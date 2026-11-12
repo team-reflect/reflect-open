@@ -9,10 +9,10 @@ import { addDaysToIsoDate, getDaysBetweenIsoDates } from '@reflect/utils'
  *
  * Two surfaces share this module: the desktop daily stream (a wide, asymmetric
  * window it virtualizes with virtua) and the mobile day carousel (a tighter
- * symmetric window Embla pages through). They differ in radius and in how they
- * treat a date outside the window: the stream grows back to an earlier date
- * ({@link extendDayWindowBack}) and clamps a later one to its end
- * ({@link indexOfDate}), while the carousel re-anchors around it
+ * symmetric window a native scroll-snap pager pages through). They differ in
+ * radius and in how they treat a date outside the window: the stream grows
+ * back to an earlier date ({@link extendDayWindowBack}) and clamps a later one
+ * to its end ({@link indexOfDate}), while the carousel re-anchors around it
  * ({@link indexWithin} reports `-1`).
  */
 

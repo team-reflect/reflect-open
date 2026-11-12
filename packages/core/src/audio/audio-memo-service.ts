@@ -171,7 +171,8 @@ export interface AudioMemoPipeline extends Store<AudioMemoPipelineState> {
    */
   listSegments(memo: AudioMemoIdentity): Promise<string[]>
   /**
-   * Delete one segment from the graph. Idempotent.
+   * Delete one segment from the graph. Idempotent. Never rejects: a failure is
+   * logged and the segment stays.
    */
   deleteSegment(path: string): Promise<void>
   /**
@@ -482,7 +483,11 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
   }
 
   async deleteSegment(path: string): Promise<void> {
-    await this.#deps.assetStore.deleteAudioMemo(path, this.#generation)
+    try {
+      await this.#deps.assetStore.deleteAudioMemo(path, this.#generation)
+    } catch (cause) {
+      this.#deps.logger.warn('deleting an audio memo segment failed:', cause)
+    }
   }
 
   dispose(): void {
@@ -681,7 +686,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
       // whose write is still in flight delete themselves via onCaptured.
       session.cancelled = true
       for (const path of session.captured) {
-        void this.#pipeline.deleteSegment(path).catch(() => {})
+        void this.#pipeline.deleteSegment(path)
       }
       session.captured = []
     }
@@ -774,7 +779,7 @@ class AudioMemoSessionImpl implements AudioMemoSession {
         // A cancel may land while this segment's write is in flight. Its
         // bytes are durable by now, so the cancel cleanup runs here.
         if (session.cancelled) {
-          return pipeline.deleteSegment(path).catch(() => {})
+          return pipeline.deleteSegment(path)
         }
         session.captured.push(path)
       },

@@ -12,6 +12,7 @@ import type { AiProviderConfigService } from './ai-provider-config-service.ts'
 import type { ChatModelOption } from './chat/model-options.ts'
 import type { LanguageModelService } from './language-model-service.ts'
 import { renderSelectionPrompt } from './selection-prompts.ts'
+import { returnNull } from '@ocavue/utils'
 
 /**
  * The editor AI menu's provider call: one BYOK streaming completion that
@@ -124,7 +125,7 @@ class SelectionTransformServiceImpl implements SelectionTransformService {
       throw cause
     }
 
-    const apiKey = await credentials.read(config).catch(() => null)
+    const apiKey = await credentials.read(config).catch(returnNull)
     if (apiKey === null) {
       yield {
         type: 'error',

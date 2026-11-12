@@ -1,17 +1,36 @@
 # Running the iOS simulator
 
+The iOS app is the Swift shell in `apps/ios`. It loads the web app from
+`apps/ios/Web`, a link to `apps/web/dist/mobile`.
+
 ```bash
-pnpm tauri:ios:dev "iPhone 17 Pro"   # `--host` for a physical device
-xcrun simctl list devices available
+mise install                                   # cbindgen and other tools from mise.toml
+pnpm install                                   # also writes apps/ios/.xcode.env.local
+pnpm --filter @reflect/ios build:web           # apps/web/dist/mobile
+pnpm build:ffi --debug --sdk iphonesimulator   # the Rust core
+open apps/ios/Reflect.xcodeproj                # run the Reflect scheme
 ```
 
-Debug builds are the dev flavor (`app.reflect.ios.dev`, "Reflect Dev"). It needs the script's
-`tauri.ios.dev.conf.json`: plain `tauri ios dev` writes the `app.reflect.ios` identifier from
-`tauri.ios.conf.json` into the Xcode project instead.
+The `Debug-Dev` configuration is the dev flavor (`app.reflect.ios.dev`, "Reflect Dev"). For hot
+reload, run `pnpm --filter @reflect/ios dev:web` and enable `REFLECT_DEV_URL` in the scheme's
+environment variables.
+On a physical device, run `pnpm --filter @reflect/ios dev:web --host` and point
+`REFLECT_DEV_URL` at the Mac's LAN address.
 
 With "Connect Hardware Keyboard" on (I/O → Keyboard, ⇧⌘K), the simulator shows no software
 keyboard and `--keyboard-height` stays 0. Turn it off to test keyboard avoidance.
 
-`tauri ios dev` rewrites files under `apps/desktop/src-tauri/gen/apple/` (`project.pbxproj`
-build settings, the merged `Info.plist`). Do not commit those changes. To change the project,
-edit `ios.project.yml` and `gen/apple/project.yml` and follow their header comment.
+## Evaluating JavaScript in the web view
+
+`pnpm web-inspector` connects to the Web Inspector of the booted simulator and serves an HTTP
+endpoint on localhost. The request body is a JavaScript expression. The response is JSON with the
+awaited `value`, or an `error`.
+
+```bash
+pnpm web-inspector
+curl -d 'document.title' http://127.0.0.1:9229
+curl -d 'fetch("/index.html").then((r) => r.status)' http://127.0.0.1:9229
+```
+
+The web view must be inspectable (`WKWebView.isInspectable`). The connection reopens after the
+app restarts.

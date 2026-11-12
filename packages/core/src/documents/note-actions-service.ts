@@ -23,6 +23,7 @@ import {
 } from './note-row-service.ts'
 import type { OpenDocumentsService } from './open-documents-service.ts'
 import { getNextPinOrder, isValidPinOrder } from './pin-order.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * How a deduped, self-reporting note action ended:
@@ -240,7 +241,7 @@ class NoteActionsServiceImpl implements NoteActionsService {
     }
     // The overlay shows every reorder at once; the writes land in call order.
     const run = this.#reorderChain.then(() => this.#writePinOrders(writes, generation))
-    this.#reorderChain = run.catch(() => undefined)
+    this.#reorderChain = run.catch(noop)
     return await run
   }
 

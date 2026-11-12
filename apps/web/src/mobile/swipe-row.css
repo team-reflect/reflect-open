@@ -1,0 +1,8 @@
+/* Only the trailing action width is colored, so a leading over-swipe shows nothing. */
+.swipe-row[data-active] {
+  background: linear-gradient(
+    to left,
+    var(--swipe-row-overscroll-color) var(--swipe-row-action-width),
+    transparent var(--swipe-row-action-width)
+  );
+}
