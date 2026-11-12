@@ -17,6 +17,9 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   /// Sends an intent to the page.
   var send: (ChromeIntent) -> Void = { _ in }
+  /// Called when the corner buttons move between the page's header row
+  /// (`true`) and the row of the floating tab bar (`false`).
+  var onCornersInHeaderRow: (Bool) -> Void = { _ in }
 
   private let webView: WKWebView
   /// The one page: it holds the web view for every tab.
@@ -171,6 +174,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       ? windowTop + WebPageController.buttonSize / 2 - frame.minY : nil
     if page.topRowCenter != rowCenter {
       page.topRowCenter = rowCenter
+      onCornersInHeaderRow(rowCenter == nil)
     }
     let extra = UIEdgeInsets(
       top: max(0, want.top - natural.top), left: max(0, want.left - natural.left),

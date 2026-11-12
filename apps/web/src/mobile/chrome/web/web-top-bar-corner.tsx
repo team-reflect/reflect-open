@@ -10,24 +10,12 @@ import { ChromeMenuDrawer } from '@/mobile/chrome/web/chrome-menu-drawer.tsx'
 import { WEB_ICONS } from '@/mobile/chrome/web/web-icons.ts'
 import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 
-interface WebTopBarCornerProps extends TopBarCornerProps {
-  /**
-   * Extra classes of the back button.
-   */
-  backClassName?: string | undefined
-}
-
 /**
  * One corner of a top bar as web buttons. In a `start` bar the outer
  * buttons reach into the row's padding, so their icons line up with the
  * screen's content.
  */
-export function WebTopBarCorner({
-  edge,
-  align,
-  chrome,
-  backClassName,
-}: WebTopBarCornerProps): ReactElement | null {
+export function WebTopBarCorner({ edge, align, chrome }: TopBarCornerProps): ReactElement | null {
   const back = edge === 'leading' ? chrome.back : undefined
   const buttons = (edge === 'leading' ? chrome.leading : chrome.trailing) ?? []
   if (back === undefined && buttons.length === 0) {
@@ -37,12 +25,7 @@ export function WebTopBarCorner({
   return (
     <>
       {back === undefined ? null : (
-        <MobileTopBarIconButton
-          edge={outer}
-          aria-label="Back"
-          className={backClassName}
-          onClick={back}
-        >
+        <MobileTopBarIconButton edge={outer} aria-label="Back" onClick={back}>
           <ChevronLeft aria-hidden />
         </MobileTopBarIconButton>
       )}

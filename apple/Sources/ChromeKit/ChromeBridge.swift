@@ -28,6 +28,16 @@ public final class ChromeBridge {
   public private(set) var state: ChromeState?
   /// Whether the current document listens for intents.
   public private(set) var isReady = false
+  /// Whether the corner buttons sit in the page's header row. The page starts
+  /// with `true`; the bridge sends a `layout` intent when the value changes,
+  /// and when a page with that start value gets ready.
+  public var cornersInHeaderRow = true {
+    didSet {
+      if cornersInHeaderRow != oldValue {
+        send(.layout(cornersInHeaderRow: cornersInHeaderRow))
+      }
+    }
+  }
 
   /// Handles one message as JSON data.
   public func receive(_ data: Data) {
@@ -49,6 +59,9 @@ public final class ChromeBridge {
       onBackSwipe(started)
     case .chromeReady:
       isReady = true
+      if !cornersInHeaderRow {
+        send(.layout(cornersInHeaderRow: false))
+      }
     }
   }
 

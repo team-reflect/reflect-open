@@ -46,6 +46,7 @@ final class ChromeBridgeTests: XCTestCase {
       .action(entryId: 3, id: "gear"),
       .command(.indent),
       .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
+      .layout(cornersInHeaderRow: false),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -104,6 +105,24 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(intent["type"] as? String, "action")
     XCTAssertEqual(intent["entryId"] as? Int, 4)
     XCTAssertEqual(intent["id"] as? String, "pin")
+  }
+
+  func testSendsTheLayoutWhenItChangesAndToANewPage() throws {
+    let bridge = ChromeBridge()
+    var sent: [ChromeIntent] = []
+    bridge.send = { data in
+      let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
+      sent.append(.layout(cornersInHeaderRow: object["cornersInHeaderRow"] as! Bool))
+    }
+
+    bridge.cornersInHeaderRow = false
+    bridge.receive(try message(["type": "chromeReady"]))
+    bridge.cornersInHeaderRow = false
+    bridge.cornersInHeaderRow = true
+    bridge.documentDidStart()
+    bridge.receive(try message(["type": "chromeReady"]))
+
+    XCTAssertEqual(sent, [.layout(cornersInHeaderRow: false), .layout(cornersInHeaderRow: true)])
   }
 
   func testANewDocumentResetsTheStateAndTheIntentGate() throws {

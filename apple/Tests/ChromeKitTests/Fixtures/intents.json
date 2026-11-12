@@ -3,5 +3,6 @@
   { "type": "tab", "tab": "all" },
   { "type": "action", "entryId": 3, "id": "gear" },
   { "type": "command", "id": "indent" },
-  { "type": "files", "files": [{ "name": "Image.png", "type": "image/png", "data": "AQID" }] }
+  { "type": "files", "files": [{ "name": "Image.png", "type": "image/png", "data": "AQID" }] },
+  { "type": "layout", "cornersInHeaderRow": false }
 ]

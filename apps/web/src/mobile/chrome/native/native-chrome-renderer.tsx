@@ -49,6 +49,11 @@ class NativeChromeRenderer implements ChromeRenderer {
    * How many web drawers are open. The shell hides its bars while one is.
    */
   readonly modalCount = new WritableStore(0)
+  /**
+   * Whether the shell draws the corner buttons in the page's header row. On
+   * an iPad with the tab bar at the top, they sit in the tab bar's row.
+   */
+  readonly cornersInHeaderRow = new WritableStore(true)
   readonly attachFiles = createAttachQueue()
   readonly #nativeChrome: NativeChromeService
 
@@ -93,13 +98,22 @@ function useNativeChromeRenderer(): NativeChromeRenderer {
 
 /**
  * The space of the corner buttons and the back button that the shell draws
- * over the bar. The shell's back button is wider than the web one, so a
- * title that starts after it moves clear.
+ * over the header row, or nothing when the shell draws them in another row.
+ * The shell's back button is wider than the web one, so a spacer moves a
+ * title that starts after it clear.
  */
-function NativeTopBarCorner(props: TopBarCornerProps): ReactElement {
+function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
+  const renderer = useNativeChromeRenderer()
+  const cornersInHeaderRow = useStore(renderer.cornersInHeaderRow)
+  if (!cornersInHeaderRow) {
+    return null
+  }
+  const clearsBack =
+    props.edge === 'leading' && props.align === 'start' && props.chrome.back !== undefined
   return (
     <div className="invisible contents" inert aria-hidden>
-      <WebTopBarCorner {...props} backClassName={props.align === 'start' ? 'mr-2' : undefined} />
+      <WebTopBarCorner {...props} />
+      {clearsBack ? <div className="w-1 shrink-0" /> : null}
     </div>
   )
 }
@@ -170,6 +184,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           attachCommands: attach?.entryId === context.entryId ? attach.commands : null,
           attachFiles: renderer.attachFiles,
           toasts,
+          setCornersInHeaderRow: (value) => renderer.cornersInHeaderRow.set(value),
         })
       }
     })

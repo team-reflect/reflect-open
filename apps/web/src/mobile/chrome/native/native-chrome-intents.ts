@@ -33,6 +33,11 @@ export interface IntentContext {
    * Shows the rejection of an action.
    */
   toasts: ToastController
+  /**
+   * Stores whether the shell draws the corner buttons in the page's header
+   * row.
+   */
+  setCornersInHeaderRow: (cornersInHeaderRow: boolean) => void
 }
 
 const FORMATTING_RUNNERS: Record<
@@ -100,6 +105,9 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
       }
       return
     }
+    case 'layout':
+      context.setCornersInHeaderRow(intent.cornersInHeaderRow)
+      return
   }
 }
 

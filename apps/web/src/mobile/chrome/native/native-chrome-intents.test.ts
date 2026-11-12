@@ -18,6 +18,7 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     attachCommands: null,
     attachFiles: createAttachQueue(),
     toasts: { add: vi.fn(), close: vi.fn() },
+    setCornersInHeaderRow: vi.fn(),
     ...overrides,
   }
 }
@@ -50,7 +51,7 @@ describe('parseNativeIntent', () => {
       '../../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
-    expect(intents).toHaveLength(5)
+    expect(intents).toHaveLength(6)
     for (const intent of intents) {
       expect(parseNativeIntent(intent)).toEqual(intent)
     }

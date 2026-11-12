@@ -37,6 +37,7 @@ final class ChromeCoordinator {
     let bridge = host.chrome
     menus.send = { [weak self] intent in self?.send(intent) }
     tabs.send = { [weak self] intent in self?.send(intent) }
+    tabs.onCornersInHeaderRow = { [bridge] inHeaderRow in bridge.cornersInHeaderRow = inHeaderRow }
     menus.presenter = { [weak self] in self?.container }
     formatting.send = { [weak self] intent in self?.send(intent) }
     formatting.presenter = { [weak self] in self?.container }

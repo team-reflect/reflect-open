@@ -188,16 +188,20 @@ public enum FormattingCommand: String, CaseIterable, Encodable, Sendable {
   case slash, list, todo, link, tag, dedent, indent, up, down, dismiss
 }
 
-/// What a native control asks the page to do.
+/// What the shell sends the page: a tap on a native control, or a change of
+/// the shell's layout.
 public enum ChromeIntent: Encodable, Equatable, Sendable {
   case back(entryId: Int)
   case tab(ChromeTab)
   case action(entryId: Int, id: String)
   case command(FormattingCommand)
   case files([IntentFile])
+  /// Whether the corner buttons sit in the page's header row (`true`), or in
+  /// the row of the floating tab bar above it (`false`).
+  case layout(cornersInHeaderRow: Bool)
 
   private enum CodingKeys: String, CodingKey {
-    case type, entryId, tab, id, files
+    case type, entryId, tab, id, files, cornersInHeaderRow
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -219,6 +223,9 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
     case .files(let files):
       try container.encode("files", forKey: .type)
       try container.encode(files, forKey: .files)
+    case .layout(let cornersInHeaderRow):
+      try container.encode("layout", forKey: .type)
+      try container.encode(cornersInHeaderRow, forKey: .cornersInHeaderRow)
     }
   }
 }

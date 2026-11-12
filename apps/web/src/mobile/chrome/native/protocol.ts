@@ -130,10 +130,14 @@ const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('action'), entryId: z.number(), id: z.string() }),
   z.object({ type: z.literal('command'), id: z.enum(FORMATTING_COMMANDS) }),
   z.object({ type: z.literal('files'), files: z.array(fileSchema) }),
+  z.object({ type: z.literal('layout'), cornersInHeaderRow: z.boolean() }),
 ])
 
 /**
- * What a native control asks the page to do.
+ * What the shell sends the page: a tap on a native control, or a change of
+ * the shell's layout. `layout` tells whether the shell draws the corner
+ * buttons in the page's header row, or in the row of the floating tab bar
+ * above it.
  */
 export type NativeIntent = z.infer<typeof intentSchema>
 
