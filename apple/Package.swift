@@ -62,6 +62,7 @@ for module in modules {
 let swiftSettings: [SwiftSetting] = [
   .enableUpcomingFeature("InternalImportsByDefault"),
   .enableUpcomingFeature("MemberImportVisibility"),
+  .treatAllWarnings(as: .error),
 ]
 
 let package = Package(
