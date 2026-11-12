@@ -35,7 +35,7 @@ in the core, app and web projects.
   without a measured reason in that file.
 - Code logs through `LoggerService`. A test of an error path passes
   `createTestLoggerService()` and asserts `logger.getErrors()`.
-- In desktop tests, import `act` from `@/test-utils/act.ts`, not from `react`,
+- In web tests, import `act` from `@/test-utils/act.ts`, not from `react`,
   and always await it, so no act warning prints.
 
 ## Testing a service
@@ -77,7 +77,7 @@ builds `AppServices` over `core`, sharing its platform and ports.
 ## Testing React code
 
 Components read `useCoreServices()` and `useAppServices()`, which throw
-outside their providers. Every desktop test that renders goes through
+outside their providers. Every web test that renders goes through
 `renderInApp(ui, options)` or `renderHookInApp(hook, options)`
 (`apps/web/src/test-utils/render-in-app.tsx`), which mount the app's
 providers as `main.tsx` does. The options are documented on
@@ -122,7 +122,7 @@ builds the app itself.
 ## `vi.mock`
 
 `eslint.config.js` allows `vi.mock` only for the specifiers in
-`DESKTOP_VI_MOCK_ALLOW` and `DESKTOP_VI_MOCK_ALLOW_BY_FILE`: pure UI children,
+`WEB_VI_MOCK_ALLOW` and `WEB_VI_MOCK_ALLOW_BY_FILE`: pure UI children,
 heavy children, and `@tauri-apps/*` in adapter tests. `packages/` allows none.
 Never mock `@reflect/core`, `@reflect/app`, a service, or a provider that
 reads a service. Seed or spy on `core` instead. A new entry needs a reason next

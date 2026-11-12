@@ -116,7 +116,7 @@ const architecturePlugin = {
 // `vi.mock` allowlists
 // ---------------------------------------------------------------------------
 
-/** Mocked in any desktop test: pure UI children and heavy children. */
+/** Mocked in any web test: pure UI children and heavy children. */
 const WEB_VI_MOCK_ALLOW = [
   // The ProseKit editor: a test of a screen around it uses a probe.
   '@/editor/note-editor.tsx',
@@ -124,7 +124,7 @@ const WEB_VI_MOCK_ALLOW = [
   '@/editor/markdown-preview.tsx',
 ]
 
-/** Extra specifiers for one desktop test file, each with its reason. */
+/** Extra specifiers for one web test file, each with its reason. */
 const WEB_VI_MOCK_ALLOW_BY_FILE = {
   // Platform adapters: the test stands in for the Tauri API under the adapter.
   'apps/web/src/services/*.test.ts': ['@tauri-apps/*'],
