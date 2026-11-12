@@ -41,10 +41,11 @@ app restarts.
 pnpm test:ios    # the same run as the test-ios CI job
 ```
 
-`pnpm test:ios` creates a simulator for the run, builds the app and its tests, runs the Reflect
-test plan, and deletes the simulator. It prints the path of the result bundle; open it in Xcode
-for the screenshots and the steps of each test. After a failed test run it also saves the
-log of the simulator. `scripts/test-ios.ts` lists the options.
+`pnpm test:ios` builds the web app and the Rust core, creates a simulator for the run, builds the
+app and its tests, runs the Reflect test plan, and deletes the simulator. It prints the time of
+each step. The result bundle goes to `apps/ios/build/test-ios`; open it in Xcode for the
+screenshots and the steps of each test. After a failed test run that directory also holds the log
+of the simulator.
 
 | Tests | Where they run |
 | --- | --- |
