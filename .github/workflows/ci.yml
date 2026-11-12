@@ -282,8 +282,6 @@ jobs:
       - name: Build the web app
         run: pnpm --filter @reflect/ios build:web
 
-      # `build-for-testing` needs only the UDID. The simulator boots after
-      # the build, so its first-boot work does not slow the build.
       - name: Pick the simulator
         run: |
           udid=$(xcrun simctl list devices available --json \
@@ -312,12 +310,14 @@ jobs:
             -showBuildTimingSummary
 
       # A simulator that still does its first-boot work launches the app
-      # slowly, or not at all. It keeps starting daemons for some time after
-      # `bootstatus` returns, so the step also waits for that work.
+      # slowly, or not at all.
       - name: Boot the simulator
-        run: |
-          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
-          sleep 10
+        run: xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+
+      # The simulator keeps starting daemons for some time after `bootstatus`
+      # returns.
+      - name: Wait for the simulator to settle
+        run: sleep 10
 
       - name: Run the unit tests
         run: |
