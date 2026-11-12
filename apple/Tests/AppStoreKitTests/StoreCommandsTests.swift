@@ -5,8 +5,8 @@ import Testing
 
 private struct StoreFailure: Error {}
 
-/// A `StoreClient` that answers from its properties. The test sends updates
-/// through `send`.
+/// A `StoreClient` that answers from its properties. After `updates()`, the
+/// test sends updates through `send`.
 private final class FakeStoreClient: StoreClient, @unchecked Sendable {
   var catalog: [StoreProduct] = []
   var outcome: PurchaseOutcome? = .purchased
@@ -16,14 +16,15 @@ private final class FakeStoreClient: StoreClient, @unchecked Sendable {
   /// The number of `updates()` calls.
   private(set) var listeners = 0
 
-  private let stream: AsyncStream<StoreUpdate>
-  private let continuation: AsyncStream<StoreUpdate>.Continuation
+  private var continuation: AsyncStream<StoreUpdate>.Continuation?
 
-  init() {
-    (stream, continuation) = AsyncStream.makeStream(of: StoreUpdate.self)
-  }
-
+  /// Sends an update to the listener. As in the live client, no update
+  /// exists before `updates()`.
   func send(_ update: StoreUpdate) {
+    guard let continuation else {
+      Issue.record("an update was sent before updates()")
+      return
+    }
     continuation.yield(update)
   }
 
@@ -51,6 +52,8 @@ private final class FakeStoreClient: StoreClient, @unchecked Sendable {
 
   func updates() -> AsyncStream<StoreUpdate> {
     listeners += 1
+    let (stream, continuation) = AsyncStream.makeStream(of: StoreUpdate.self)
+    self.continuation = continuation
     return stream
   }
 }
@@ -207,21 +210,6 @@ func getProductStatusAnswersWhetherTheUserOwnsTheProduct(owned: Bool) async thro
 
   let emitted = "emit plugin:iap:purchaseUpdated 0"
   #expect(log.entries == [emitted, "finish", emitted, "finish"])
-}
-
-@MainActor
-@Test func anUpdateThatArrivesBeforeStartIsEmittedAfterIt() async {
-  let client = FakeStoreClient()
-  let log = EventLog()
-  let commands = StoreCommands(client: client, emit: { _, _ in log.entries.append("emit") })
-
-  await withCheckedContinuation { finished in
-    client.send(StoreUpdate { finished.resume() })
-    #expect(log.entries.isEmpty)
-    commands.start()
-  }
-
-  #expect(log.entries == ["emit"])
 }
 
 @MainActor

@@ -130,6 +130,8 @@ a stable release, check on a TestFlight build with a sandbox Apple Account:
 - The paywall shows the monthly and the yearly price.
 - A purchase unlocks the subscription.
 - After a reinstall, the app shows the subscription as active again.
+- A redeemed offer code unlocks the subscription while the app runs. This transaction arrives
+  outside a purchase, through the listener that the app starts at launch.
 
 ### Install
 

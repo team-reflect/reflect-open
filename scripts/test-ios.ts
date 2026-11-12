@@ -5,16 +5,17 @@
 //   pnpm test:ios [--output <dir>] [--derived-data <dir>] [--skip-web] [--keep-simulator]
 //
 //   --output          Directory for the result bundle, the full xcodebuild logs and,
-//                     after a failure, the simulator's log archive
+//                     after a failure, the simulator's log archive (default: a
+//                     new directory for each run)
 //   --derived-data    Xcode's DerivedData directory
 //   --skip-web        Use the web app that is already in apps/ios/Web
 //   --keep-simulator  Leave the simulator in place after the run
 //
 // The Xcode build makes the Rust core when its slice is missing.
 //
-// Runs share the default DerivedData directory, so a second run builds only
-// what changed. Give two runs at the same time their own `--output` and
-// `--derived-data`.
+// Each run has its own default output directory. Runs share the default
+// DerivedData directory, so a second run builds only what changed; give two
+// runs at the same time their own `--derived-data`.
 
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -116,9 +117,11 @@ function printSummary(): void {
 
 async function main(): Promise<void> {
   const defaultDir = join(tmpdir(), 'reflect-test-ios')
+  // The name of the simulator and of the default output directory of this run.
+  const runName = `reflect-test-${Date.now()}`
   const { values } = parseArgs({
     options: {
-      output: { type: 'string', default: join(defaultDir, 'results') },
+      output: { type: 'string', default: join(defaultDir, 'results', runName) },
       'derived-data': { type: 'string', default: join(defaultDir, 'DerivedData') },
       'skip-web': { type: 'boolean', default: false },
       'keep-simulator': { type: 'boolean', default: false },
@@ -139,13 +142,12 @@ async function main(): Promise<void> {
   }
 
   const simulator = await step('Create the simulator', async () => {
-    const name = `reflect-test-${Date.now()}`
     const runtime = await newestRuntime()
-    const created = await exec('xcrun', ['simctl', 'create', name, DEVICE_TYPE, runtime], {
+    const created = await exec('xcrun', ['simctl', 'create', runName, DEVICE_TYPE, runtime], {
       throwOnError: true,
     })
     const udid = created.stdout.trim()
-    log(`created ${name} (${udid}) on ${runtime}`)
+    log(`created ${runName} (${udid}) on ${runtime}`)
     return udid
   })
 
