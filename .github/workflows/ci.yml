@@ -78,26 +78,7 @@ jobs:
             'apple/*'
             'apps/ios/*'
             'apps/tauri/safari-extension/*'
-          )
-
-          # What the Swift shell is built from: Swift, Rust, and the web adapters.
-          ios_files=(
-            '.github/*'
-            'apple/*'
-            'apps/ios/*'
-            'crates/*'
-            'design-system/assets/app-icons/*'
-            'Cargo.toml'
-            'Cargo.lock'
             'scripts/build-ffi.ts'
-            'apps/web/src/services/swift-*'
-            'apps/web/src/boot.ts'
-            'apps/web/src/services/detect-platform.ts'
-            'apps/web/vite.config.ts'
-            'apps/web/package.json'
-            'apps/web/index.html'
-            'apps/web/src/platform-root.mobile.tsx'
-            'apps/web/src/mobile/*'
           )
 
           changed() {
@@ -107,14 +88,13 @@ jobs:
           js=false
           rust=false
           swift=false
-          ios=false
+
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
           elif [[ $EVENT_NAME != pull_request || $HEAD_REF == release-please--* ]]; then
             js=true
             rust=true
             swift=true
-            ios=true
           else
             git diff --name-only --no-renames HEAD^1 HEAD
             if changed "${js_files[@]}"; then
@@ -126,9 +106,6 @@ jobs:
             if changed "${swift_files[@]}"; then
               swift=true
             fi
-            if changed "${ios_files[@]}"; then
-              ios=true
-            fi
           fi
 
           {
@@ -137,7 +114,7 @@ jobs:
             echo "test-chromium=$js"
             echo "test-webkit=$([[ $js == true && $PR_IS_DRAFT == false ]] && echo true || echo false)"
             echo "test-swift=$swift"
-            echo "test-ios=$ios"
+            echo "test-ios=$swift"
             echo "lint-rust=$rust"
             echo "test-rust=$rust"
           } | tee -a "$GITHUB_OUTPUT"
