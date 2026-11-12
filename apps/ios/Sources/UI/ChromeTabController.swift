@@ -173,7 +173,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       guard let self, let page, self.moves == move else { return }
       self.removeCover(from: page)
       // The page did not show the tapped tab: follow the tab it shows.
-      if let pageTab = page.chromeTab, let tab = self.tabFollow.timeOut(pageTab) {
+      if let tab = self.tabFollow.timeOut(page.chromeTab) {
         self.follow(tab)
       }
     }

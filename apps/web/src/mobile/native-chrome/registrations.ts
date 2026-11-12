@@ -1,13 +1,9 @@
 import { createContext, use, useEffect, useLayoutEffect, useRef } from 'react'
 import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
-import {
-  NO_ENTRY,
-  type NativeBarButton,
-  type NativeMenuItem,
-} from '@/mobile/native-chrome/protocol.ts'
-import { useOptionalRouterState } from '@/routing/router.tsx'
-import { hasAnyNativeChrome } from '@/services/native-chrome-transport.ts'
+import type { NativeBarButton, NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
+import { useRouterState } from '@/routing/router.tsx'
+import { hasNativeChrome } from '@/services/native-chrome-transport.ts'
 
 /**
  * What one screen shows in the native navigation bar.
@@ -66,8 +62,8 @@ export function nativeBarHandlers(entryId: number): NativeBarHandlers | undefine
  * only a change of its content reaches the shell.
  */
 export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): void {
-  const entryId = useOptionalRouterState()?.entryId ?? NO_ENTRY
-  const enabled = hasAnyNativeChrome() && use(NativeBarLayerContext)
+  const { entryId } = useRouterState()
+  const enabled = hasNativeChrome() && use(NativeBarLayerContext)
   const handlersRef = useRef(handlers)
   useLayoutEffect(() => {
     handlersRef.current = handlers
@@ -120,7 +116,7 @@ export const nativeModalCount = new WritableStore(0)
  */
 export function useNativeModal(open: boolean): void {
   useEffect(() => {
-    if (!open || !hasAnyNativeChrome()) {
+    if (!open || !hasNativeChrome()) {
       return
     }
     nativeModalCount.set(nativeModalCount.get() + 1)

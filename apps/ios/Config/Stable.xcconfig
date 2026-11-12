@@ -9,6 +9,5 @@ REFLECT_DISPLAY_NAME = Reflect
 REFLECT_APP_GROUP = group.app.reflect
 REFLECT_APP_ICON = AppIcon
 
-// The native chrome parts this flavor draws (ChromeKit `ChromeFeature`,
-// separated by spaces): the parts that ran on Beta for one release.
-REFLECT_CHROME_FEATURES =
+// Whether this flavor draws the mobile chrome natively (ChromeKit `NativeChrome`).
+REFLECT_NATIVE_CHROME = NO

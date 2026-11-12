@@ -51,7 +51,7 @@ export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement
     const root = document.documentElement
     // Under the native tab bar this bar takes no space, and the safe area
     // already holds the native bar.
-    if (nav === null || hasNativeChrome('tabbar')) {
+    if (nav === null || hasNativeChrome()) {
       return
     }
     const publish = (): void => {

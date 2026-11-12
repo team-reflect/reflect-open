@@ -23,9 +23,9 @@ describe('NativeChromeProjection', () => {
     const postMessage = vi.fn()
     installNativeChrome(
       {
-        __nativeChromeFeatures: ['tabbar', 'navbar'],
+        __nativeChrome: true,
         webkit: {
-          messageHandlers: { reflectHost: { postMessage }, reflectChrome: { postMessage } },
+          messageHandlers: { reflectHost: { postMessage } },
         },
       },
       document.documentElement,

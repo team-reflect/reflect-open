@@ -11,8 +11,8 @@ final class AppHost {
   let webView: ReflectWebView
   /// The page to load: the dev server in `REFLECT_DEV_URL`, or the bundled web app.
   let startURL: URL
-  /// The native chrome parts of this build.
-  let chromeFeatures: Set<ChromeFeature>
+  /// Whether this build draws the native chrome.
+  let nativeChrome: Bool
   /// The page's chrome state and the native intents.
   let chrome = ChromeBridge()
 
@@ -70,12 +70,17 @@ final class AppHost {
       await core.resolveAsset(requestPath: requestPath, query: query, range: range)
     }
     #if DEBUG
-    let allowOverrides = true
+    let allowOverride = true
     #else
-    let allowOverrides = false
+    let allowOverride = false
     #endif
-    chromeFeatures = ChromeFeatures.enabled(
-      bundle: .main, defaults: .standard, allowOverrides: allowOverrides)
+    nativeChrome = NativeChrome.isEnabled(
+      bundle: .main, defaults: .standard, allowOverride: allowOverride)
+    if nativeChrome {
+      // The page's chrome messages share the `reflectHost` handler.
+      bridge.onMessage = { [chrome] body in chrome.receive(body: body) }
+      bridge.onDocumentStart = { [chrome] in chrome.documentDidStart() }
+    }
     // An intent never waits in the queue: one sent while a new document
     // loads would reach that document.
     chrome.send = { [bridge] intent in
@@ -84,8 +89,8 @@ final class AppHost {
       }
     }
     webView = ReflectWebView(
-      routes: routes, assets: assets, bridge: bridge, chrome: chrome,
-      chromeFeatures: chromeFeatures, dataStore: directories.websiteDataStore)
+      routes: routes, assets: assets, bridge: bridge, nativeChrome: nativeChrome,
+      dataStore: directories.websiteDataStore)
     presenter = webView
 
     navigation = ExternalNavigation(

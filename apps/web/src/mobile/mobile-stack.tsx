@@ -309,7 +309,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   // new page, which the chrome projection posts from a passive effect. Each
   // new slide posts its own start, so the shell's timeout follows the last one.
   useLayoutEffect(() => {
-    if (hasNativeChrome('navbar')) {
+    if (hasNativeChrome()) {
       postNativeChrome({
         type: 'transition',
         phase: transition.kind === 'none' ? 'end' : 'start',

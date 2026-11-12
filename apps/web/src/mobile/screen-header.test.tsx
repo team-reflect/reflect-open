@@ -1,5 +1,4 @@
-import { NO_ENTRY } from '@/mobile/native-chrome/protocol.ts'
-import { render } from 'vitest-browser-react'
+import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import {
   NativeBarLayerContext,
@@ -7,11 +6,21 @@ import {
   nativeBars,
 } from '@/mobile/native-chrome/registrations.ts'
 import { installNativeChrome } from '@/services/native-chrome-transport.ts'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MobileScreenHeader } from './screen-header.tsx'
+
+/**
+ * The history entry of the only registered bar.
+ */
+function onlyBarEntry(): number {
+  const entries = [...nativeBars.get().keys()]
+  expect(entries).toHaveLength(1)
+  return entries[0] ?? -1
+}
 
 describe('MobileScreenHeader', () => {
   it('centers the title between balanced header action slots', async () => {
-    const view = await render(
+    const view = await renderInApp(
       <MobileScreenHeader
         title="Roadmap"
         onBack={vi.fn()}
@@ -41,7 +50,7 @@ describe('MobileScreenHeader', () => {
   it('keeps header actions clear of an uneven side inset', async () => {
     document.documentElement.style.setProperty('--twsa-safe-area-inset-right', '84px')
     try {
-      const view = await render(
+      const view = await renderInApp(
         <MobileScreenHeader
           title="Roadmap"
           onBack={vi.fn()}
@@ -65,15 +74,15 @@ describe('MobileScreenHeader', () => {
     const handler = { postMessage: vi.fn() }
     installNativeChrome(
       {
-        __nativeChromeFeatures: ['tabbar', 'navbar'],
-        webkit: { messageHandlers: { reflectHost: handler, reflectChrome: handler } },
+        __nativeChrome: true,
+        webkit: { messageHandlers: { reflectHost: handler } },
       },
       document.documentElement,
     )
     try {
       const onBack = vi.fn()
       const onNativeAction = vi.fn()
-      await render(
+      await renderInApp(
         <MobileScreenHeader
           title="Roadmap"
           onBack={onBack}
@@ -83,13 +92,14 @@ describe('MobileScreenHeader', () => {
       )
 
       await vi.waitFor(() => {
-        expect(nativeBars.get().get(NO_ENTRY)).toEqual({
+        expect(nativeBars.get().get(onlyBarEntry())).toEqual({
           title: 'Roadmap',
           trailing: [{ id: 'more', title: 'More', icon: 'ellipsis' }],
         })
       })
-      nativeBarHandlers(NO_ENTRY)?.onBack?.()
-      nativeBarHandlers(NO_ENTRY)?.onAction('more')
+      const entryId = onlyBarEntry()
+      nativeBarHandlers(entryId)?.onBack?.()
+      nativeBarHandlers(entryId)?.onAction('more')
       expect(onBack).toHaveBeenCalledOnce()
       expect(onNativeAction).toHaveBeenCalledWith('more')
     } finally {
@@ -101,24 +111,28 @@ describe('MobileScreenHeader', () => {
     const handler = { postMessage: vi.fn() }
     installNativeChrome(
       {
-        __nativeChromeFeatures: ['tabbar', 'navbar'],
-        webkit: { messageHandlers: { reflectHost: handler, reflectChrome: handler } },
+        __nativeChrome: true,
+        webkit: { messageHandlers: { reflectHost: handler } },
       },
       document.documentElement,
     )
     try {
-      const older = await render(<MobileScreenHeader title="Older" onBack={vi.fn()} />)
-      await render(<MobileScreenHeader title="On top" onBack={vi.fn()} />)
-      await render(
-        <NativeBarLayerContext value={false}>
-          <MobileScreenHeader title="Below" onBack={vi.fn()} />
-        </NativeBarLayerContext>,
+      // Three screens of one history entry: the later one owns its bar.
+      const screens = (withOlder: boolean): ReactElement => (
+        <>
+          {withOlder && <MobileScreenHeader title="Older" onBack={vi.fn()} />}
+          <MobileScreenHeader title="On top" onBack={vi.fn()} />
+          <NativeBarLayerContext value={false}>
+            <MobileScreenHeader title="Below" onBack={vi.fn()} />
+          </NativeBarLayerContext>
+        </>
       )
+      const view = await renderInApp(screens(true))
       await vi.waitFor(() => {
-        expect(nativeBars.get().get(NO_ENTRY)?.title).toBe('On top')
+        expect(nativeBars.get().get(onlyBarEntry())?.title).toBe('On top')
       })
-      await older.unmount()
-      expect(nativeBars.get().get(NO_ENTRY)?.title).toBe('On top')
+      await view.rerender(screens(false))
+      expect(nativeBars.get().get(onlyBarEntry())?.title).toBe('On top')
     } finally {
       installNativeChrome({}, document.documentElement)
     }

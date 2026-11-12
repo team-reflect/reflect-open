@@ -14,8 +14,7 @@ final class ReflectWebView: WKWebView {
 
   init(
     routes: [any SchemeRoute], assets: AssetSchemeHandler, bridge: HostBridge,
-    chrome: ChromeBridge, chromeFeatures: Set<ChromeFeature>,
-    dataStore: WKWebsiteDataStore = .default()
+    nativeChrome: Bool, dataStore: WKWebsiteDataStore = .default()
   ) {
     let configuration = WKWebViewConfiguration()
     configuration.setURLSchemeHandler(
@@ -23,10 +22,8 @@ final class ReflectWebView: WKWebView {
     configuration.setURLSchemeHandler(assets, forURLScheme: AssetSchemeHandler.scheme)
     configuration.userContentController.addUserScript(HostBridge.userScript)
     configuration.userContentController.add(bridge, name: HostBridge.messageHandlerName)
-    if !chromeFeatures.isEmpty {
-      configuration.userContentController.addUserScript(ChromeFeatures.userScript(chromeFeatures))
-      configuration.userContentController.addUserScript(ChromeBridge.userScript)
-      configuration.userContentController.add(chrome, name: ChromeBridge.messageHandlerName)
+    if nativeChrome {
+      configuration.userContentController.addUserScript(NativeChrome.userScript)
     }
     configuration.allowsInlineMediaPlayback = true
     configuration.allowsPictureInPictureMediaPlayback = true

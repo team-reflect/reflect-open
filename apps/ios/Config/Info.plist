@@ -66,8 +66,8 @@
 			<string>Any</string>
 		</dict>
 	</dict>
-	<key>ReflectChromeFeatures</key>
-	<string>$(REFLECT_CHROME_FEATURES)</string>
+	<key>ReflectNativeChrome</key>
+	<string>$(REFLECT_NATIVE_CHROME)</string>
 	<key>ReflectAppGroup</key>
 	<string>$(REFLECT_APP_GROUP)</string>
 	<key>ReflectSentryDSN</key>

@@ -22,7 +22,7 @@ Cascade layer order, low to high priority.
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* The iOS shell draws the tab bar natively (mobile/native-chrome/). */
-@custom-variant native-tabbar (:root[data-native-chrome~='tabbar'] &);
+@custom-variant native-chrome (:root[data-native-chrome] &);
 
 /* `tailwindcss-safe-area` knows neither the software keyboard nor the tab bar.
    These clear the home indicator, or the keyboard while it is up

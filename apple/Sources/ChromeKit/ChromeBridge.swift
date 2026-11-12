@@ -1,23 +1,14 @@
 public import Foundation
-public import WebKit
 
-/// Receives the page's chrome messages on the `reflectChrome` handler and
-/// sends native intents back.
+/// Receives the page's chrome messages, which come on the shell's
+/// `reflectHost` handler, and sends native intents back.
 ///
 /// The bridge keeps the latest state and drops a state older than it. Each
 /// new document resets the bridge: it drops the state, and it drops intents
 /// until the page posts `chromeReady`, so a reload never replays old taps.
 @MainActor
-public final class ChromeBridge: NSObject, WKScriptMessageHandler {
-  /// The name of the script message handler that the page posts to.
-  public static let messageHandlerName = "reflectChrome"
-
-  /// Reports each new document of the main frame.
-  public static let userScript = WKUserScript(
-    source:
-      "window.webkit.messageHandlers.\(messageHandlerName).postMessage({ type: 'documentStart' })",
-    injectionTime: .atDocumentStart,
-    forMainFrameOnly: true)
+public final class ChromeBridge {
+  public init() {}
 
   /// Sends the JSON of one intent to the page.
   public var send: (Data) -> Void = { _ in }
@@ -53,8 +44,6 @@ public final class ChromeBridge: NSObject, WKScriptMessageHandler {
       onTransition(started)
     case .chromeReady:
       isReady = true
-    case .documentStart:
-      documentDidStart()
     }
   }
 
@@ -71,18 +60,17 @@ public final class ChromeBridge: NSObject, WKScriptMessageHandler {
     send(data)
   }
 
-  public func userContentController(
-    _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
-  ) {
-    guard message.frameInfo.isMainFrame else { return }
-    if let text = message.body as? String {
+  /// Handles one message body of the script message handler: a JSON string,
+  /// or an object that converts to JSON.
+  public func receive(body: Any) {
+    if let text = body as? String {
       receive(Data(text.utf8))
-    } else if JSONSerialization.isValidJSONObject(message.body),
-      let data = try? JSONSerialization.data(withJSONObject: message.body)
+    } else if JSONSerialization.isValidJSONObject(body),
+      let data = try? JSONSerialization.data(withJSONObject: body)
     {
       receive(data)
     } else {
-      onError("chrome message: unsupported body \(type(of: message.body))")
+      onError("chrome message: unsupported body \(type(of: body))")
     }
   }
 }

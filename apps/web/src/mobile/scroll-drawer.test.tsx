@@ -165,8 +165,8 @@ describe('ScrollDrawer', () => {
     const handler = { postMessage: vi.fn() }
     installNativeChrome(
       {
-        __nativeChromeFeatures: ['tabbar'],
-        webkit: { messageHandlers: { reflectHost: handler, reflectChrome: handler } },
+        __nativeChrome: true,
+        webkit: { messageHandlers: { reflectHost: handler } },
       },
       document.documentElement,
     )

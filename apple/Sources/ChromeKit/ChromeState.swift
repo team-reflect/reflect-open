@@ -128,15 +128,13 @@ public struct ToolbarState: Decodable, Equatable, Sendable {
   public var canAttachFiles: Bool
 }
 
-/// A message from the page to the `reflectChrome` handler.
+/// A chrome message from the page.
 public enum ChromeMessage: Decodable, Equatable, Sendable {
   case state(ChromeState)
   /// A web push or pop slide starts (`true`) or ends (`false`).
   case transition(started: Bool)
   /// The page listens for intents.
   case chromeReady
-  /// A new document of the main frame started.
-  case documentStart
 
   private enum CodingKeys: String, CodingKey {
     case type, phase
@@ -156,7 +154,6 @@ public enum ChromeMessage: Decodable, Equatable, Sendable {
           forKey: .phase, in: container, debugDescription: "unknown transition phase \(phase)")
       }
     case "chromeReady": self = .chromeReady
-    case "documentStart": self = .documentStart
     default:
       throw DecodingError.dataCorruptedError(
         forKey: .type, in: container, debugDescription: "unknown message type \(type)")

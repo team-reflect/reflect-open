@@ -26,7 +26,7 @@ import {
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
 import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import {
-  hasAnyNativeChrome,
+  hasNativeChrome,
   listenNativeIntent,
   postNativeChrome,
 } from '@/services/native-chrome-transport.ts'
@@ -167,7 +167,7 @@ export function NativeChromeProjection({
   const modalCount = useStore(nativeModalCount)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
-  const enabled = hasAnyNativeChrome()
+  const enabled = hasNativeChrome()
 
   useEffect(() => {
     if (!enabled) {
@@ -237,7 +237,7 @@ export function NativeChromeProjection({
 export function NativeChromeOff(): null {
   const theme = useThemeSetting()
   useEffect(() => {
-    if (hasAnyNativeChrome()) {
+    if (hasNativeChrome()) {
       postChromeState(buildNoChromeState(theme))
     }
   }, [theme])

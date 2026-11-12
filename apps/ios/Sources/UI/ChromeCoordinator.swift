@@ -11,15 +11,12 @@ final class ChromeCoordinator {
     subsystem: Bundle.main.bundleIdentifier ?? "app.reflect.ios", category: "chrome")
 
   private let host: AppHost
-  private let features: Set<ChromeFeature>
+  /// The native tab bar.
+  private let tabs: ChromeTabController
   /// The container of the pages: the root's only child.
-  let container: UIViewController
-  /// The native tab bar, when the build draws it.
-  private let tabs: ChromeTabController?
-  /// The only page, when the build draws no tab bar.
-  private let page: WebPageController?
+  var container: UIViewController { tabs }
   private let menus = MenuPresenter()
-  private let formatting: FormattingAccessory?
+  private let formatting: FormattingAccessory
   /// Set during a web slide: a bar shown on both pages keeps the old page
   /// until the slide ends.
   private var barFrozen = false
@@ -28,28 +25,15 @@ final class ChromeCoordinator {
 
   init(host: AppHost) {
     self.host = host
-    features = host.chromeFeatures
-    if features.contains(.tabbar) {
-      let tabs = ChromeTabController(webView: host.webView)
-      self.tabs = tabs
-      page = nil
-      container = tabs
-    } else {
-      let page = WebPageController(tab: nil)
-      page.loadViewIfNeeded()
-      page.attach(host.webView)
-      self.page = page
-      tabs = nil
-      container = page
-    }
-    formatting = features.contains(.toolbar) ? FormattingAccessory(webView: host.webView) : nil
+    tabs = ChromeTabController(webView: host.webView)
+    formatting = FormattingAccessory(webView: host.webView)
 
     let bridge = host.chrome
     menus.send = { [weak self] intent in self?.send(intent) }
-    tabs?.send = { [weak self] intent in self?.send(intent) }
+    tabs.send = { [weak self] intent in self?.send(intent) }
     menus.presenter = { [weak self] in self?.container }
-    formatting?.send = { [weak self] intent in self?.send(intent) }
-    formatting?.presenter = { [weak self] in self?.container }
+    formatting.send = { [weak self] intent in self?.send(intent) }
+    formatting.presenter = { [weak self] in self?.container }
     bridge.onState = { [weak self] state in self?.apply(state) }
     bridge.onReset = { [weak self] in self?.reset() }
     bridge.onTransition = { [weak self] started in self?.transition(started: started) }
@@ -63,17 +47,15 @@ final class ChromeCoordinator {
     )
     #endif
     applyTheme(state.theme)
-    tabs?.apply(state)
+    tabs.apply(state)
     // A bar that comes or goes changes the page's top safe area, so it
     // changes as the slide starts, not as the new page lands.
-    if !barFrozen || tabs?.page(for: state.tab)?.barVisibilityChanges(for: state) == true {
+    if !barFrozen || tabs.page(for: state.tab)?.barVisibilityChanges(for: state) == true {
       showBar(state)
     }
-    if features.contains(.navbar) {
-      tabs?.page(for: state.tab)?.setBarDimmed(state.modal)
-    }
+    tabs.page(for: state.tab)?.setBarDimmed(state.modal)
     menus.pageDidShow(entryId: state.entryId)
-    formatting?.update(state.toolbar)
+    formatting.update(state.toolbar)
   }
 
   /// Sends a native tap to the page. The web view becomes first responder
@@ -86,7 +68,7 @@ final class ChromeCoordinator {
 
   /// Shows the navigation bar of `state` in the page of its tab.
   private func showBar(_ state: ChromeState) {
-    guard features.contains(.navbar), let page = tabs?.page(for: state.tab) else { return }
+    guard let page = tabs.page(for: state.tab) else { return }
     page.showBar(state, menus: menus) { [weak self] intent in self?.send(intent) }
   }
 
@@ -96,7 +78,7 @@ final class ChromeCoordinator {
   /// thaws the bar after one second.
   private func transition(started: Bool) {
     // An end without a slide (a tab switch, the first mount) changes nothing.
-    guard features.contains(.navbar), started || barFrozen else { return }
+    guard started || barFrozen else { return }
     slide += 1
     let current = slide
     barFrozen = started
@@ -108,7 +90,7 @@ final class ChromeCoordinator {
       return
     }
     guard let state = host.chrome.state,
-      let bar = tabs?.page(for: state.tab)?.navigationController?.navigationBar
+      let bar = tabs.page(for: state.tab)?.navigationController?.navigationBar
     else { return }
     UIView.transition(with: bar, duration: 0.2, options: .transitionCrossDissolve) {
       self.showBar(state)
@@ -117,7 +99,7 @@ final class ChromeCoordinator {
 
   /// The window changed size (rotation, iPhone Duo posture, iPad split).
   func sizeDidChange() {
-    formatting?.sizeDidChange()
+    formatting.sizeDidChange()
   }
 
   /// A new document started: nothing of the old page stays on screen. The
@@ -125,9 +107,9 @@ final class ChromeCoordinator {
   private func reset() {
     menus.closeAll()
     barFrozen = false
-    formatting?.update(nil)
-    formatting?.reset()
-    tabs?.reset()
+    formatting.update(nil)
+    formatting.reset()
+    tabs.reset()
   }
 
   /// Pins the light or dark style that the page pins, so the system bars match it.

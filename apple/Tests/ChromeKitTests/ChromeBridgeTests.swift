@@ -117,12 +117,23 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.receive(try fixture("tasks"))
     bridge.receive(try message(["type": "chromeReady"]))
 
-    bridge.receive(try message(["type": "documentStart"]))
+    bridge.documentDidStart()
     bridge.send(.tab(.daily))
 
     XCTAssertNil(bridge.state)
     XCTAssertEqual(resets, 1)
     XCTAssertEqual(sent, 0)
+  }
+
+  func testTakesAnObjectBodyOfTheScriptMessageHandler() {
+    let bridge = ChromeBridge()
+    var transitions: [Bool] = []
+    bridge.onTransition = { transitions.append($0) }
+
+    bridge.receive(body: ["type": "transition", "phase": "start"])
+    bridge.receive(body: #"{"type":"transition","phase":"end"}"#)
+
+    XCTAssertEqual(transitions, [true, false])
   }
 
   func testReportsTransitions() throws {

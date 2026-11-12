@@ -8,8 +8,8 @@ import WebKit
 /// navigation bar of the page.
 @MainActor
 final class WebPageController: UIViewController {
-  /// The tab of this page, or `nil` for the page of a build without a tab bar.
-  let chromeTab: ChromeTab?
+  /// The tab of this page.
+  let chromeTab: ChromeTab
 
   /// The bar buttons on screen, so a state with the same buttons keeps the
   /// items, and an open menu stays open.
@@ -20,7 +20,7 @@ final class WebPageController: UIViewController {
   /// The history entry the bar items send their intents for.
   private var shownEntryId: Int?
 
-  init(tab: ChromeTab?) {
+  init(tab: ChromeTab) {
     self.chromeTab = tab
     super.init(nibName: nil, bundle: nil)
     navigationItem.largeTitleDisplayMode = .never
