@@ -1,5 +1,7 @@
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, vi } from 'vitest'
+import { nativeBarHandlers, nativeBars } from '@/mobile/native-chrome/registrations.ts'
+import { installNativeChrome } from '@/services/native-chrome-transport.ts'
 import { MobileScreenHeader } from './screen-header.tsx'
 
 describe('MobileScreenHeader', () => {
@@ -51,6 +53,42 @@ describe('MobileScreenHeader', () => {
       )
     } finally {
       document.documentElement.style.removeProperty('--twsa-safe-area-inset-right')
+    }
+  })
+
+  it('gives the native bar its title, trailing buttons, and back', async () => {
+    const handler = { postMessage: vi.fn() }
+    installNativeChrome(
+      {
+        __nativeChromeFeatures: ['tabbar', 'navbar'],
+        webkit: { messageHandlers: { reflectHost: handler, reflectChrome: handler } },
+      },
+      document.documentElement,
+    )
+    try {
+      const onBack = vi.fn()
+      const onNativeAction = vi.fn()
+      await render(
+        <MobileScreenHeader
+          title="Roadmap"
+          onBack={onBack}
+          nativeTrailing={[{ id: 'more', title: 'More', icon: 'ellipsis' }]}
+          onNativeAction={onNativeAction}
+        />,
+      )
+
+      await vi.waitFor(() => {
+        expect(nativeBars.get().get(0)).toEqual({
+          title: 'Roadmap',
+          trailing: [{ id: 'more', title: 'More', icon: 'ellipsis' }],
+        })
+      })
+      nativeBarHandlers(0)?.onBack?.()
+      nativeBarHandlers(0)?.onAction('more')
+      expect(onBack).toHaveBeenCalledOnce()
+      expect(onNativeAction).toHaveBeenCalledWith('more')
+    } finally {
+      installNativeChrome({}, document.documentElement)
     }
   })
 })

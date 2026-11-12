@@ -20,6 +20,10 @@ final class ChromeCoordinator {
   private let page: WebPageController?
   private let menus = MenuPresenter()
   private let formatting: FormattingAccessory?
+  /// Set during a web slide: the bar keeps the old page until the slide ends.
+  private var barFrozen = false
+  /// Bumped on every slide start, so an old timeout never thaws a newer slide.
+  private var slide = 0
 
   init(host: AppHost) {
     self.host = host
@@ -48,6 +52,7 @@ final class ChromeCoordinator {
     bridge.onState = { [weak self] state in self?.apply(state) }
     bridge.onReset = { [weak self] in self?.reset() }
     bridge.onPresentMenu = { [weak self] request in self?.presentMenu(request) }
+    bridge.onTransition = { [weak self] started in self?.transition(started: started) }
     bridge.onError = { message in Self.logger.error("\(message, privacy: .public)") }
   }
 
@@ -59,6 +64,9 @@ final class ChromeCoordinator {
     #endif
     applyTheme(state.theme)
     tabs?.apply(state)
+    if !barFrozen {
+      showBar(state)
+    }
     menus.pageDidShow(entryId: state.entryId)
     formatting?.update(state.toolbar)
   }
@@ -71,6 +79,35 @@ final class ChromeCoordinator {
     host.chrome.send(intent)
   }
 
+  /// Shows the navigation bar of `state` in the page of its tab.
+  private func showBar(_ state: ChromeState) {
+    guard features.contains(.navbar), let page = tabs?.page(for: state.tab) else { return }
+    page.showBar(state, menus: menus) { [weak self] intent in self?.send(intent) }
+  }
+
+  /// A web push or pop slide starts or ends. During the slide the bar keeps
+  /// the old page; at the end it cross-fades to the latest state. A lost end
+  /// thaws the bar after one second.
+  private func transition(started: Bool) {
+    guard features.contains(.navbar) else { return }
+    slide += 1
+    let current = slide
+    barFrozen = started
+    if started {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+        guard let self, self.slide == current else { return }
+        self.transition(started: false)
+      }
+      return
+    }
+    guard let state = host.chrome.state,
+      let bar = tabs?.page(for: state.tab)?.navigationController?.navigationBar
+    else { return }
+    UIView.transition(with: bar, duration: 0.2, options: .transitionCrossDissolve) {
+      self.showBar(state)
+    }
+  }
+
   /// The page asks for a menu at one of its elements, for the entry on screen.
   private func presentMenu(_ request: MenuRequest) {
     guard features.contains(.menus), host.chrome.state?.entryId == request.entryId else { return }
@@ -81,6 +118,7 @@ final class ChromeCoordinator {
   /// A new document started: nothing of the old page stays on screen.
   private func reset() {
     menus.closeAll()
+    barFrozen = false
     formatting?.update(nil)
     tabs?.reset()
     applyTheme(.system)

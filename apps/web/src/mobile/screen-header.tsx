@@ -1,5 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
 import { ChevronLeft } from 'lucide-react'
+import type { NativeBarButton } from '@/mobile/native-chrome/protocol.ts'
+import { useNativeBar } from '@/mobile/native-chrome/registrations.ts'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
 
 interface MobileScreenHeaderProps {
@@ -8,6 +10,10 @@ interface MobileScreenHeaderProps {
   onBack: () => void
   /** Optional trailing control (an add button, …). */
   trailing?: ReactNode
+  /** The trailing control as native bar buttons, for the iOS shell. */
+  nativeTrailing?: NativeBarButton[] | undefined
+  /** Runs a native bar button or menu item by id. */
+  onNativeAction?: ((id: string) => void) | undefined
 }
 
 /**
@@ -19,9 +25,15 @@ export function MobileScreenHeader({
   title,
   onBack,
   trailing,
+  nativeTrailing,
+  onNativeAction,
 }: MobileScreenHeaderProps): ReactElement {
+  useNativeBar(
+    { title, trailing: nativeTrailing },
+    { onAction: (id) => onNativeAction?.(id), onBack },
+  )
   return (
-    <MobileTopBar>
+    <MobileTopBar screenHeader>
       <MobileTopBarRow className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] gap-0 px-1">
         <MobileTopBarIconButton className="justify-self-center" aria-label="Back" onClick={onBack}>
           <ChevronLeft />

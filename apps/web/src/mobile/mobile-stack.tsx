@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -12,6 +13,7 @@ import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
+import { hasNativeChrome, postNativeChrome } from '@/services/native-chrome-transport.ts'
 import './mobile-stack.css'
 
 /** The stacked card's leading-edge shadow, visible while it slides. */
@@ -300,6 +302,14 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     })
     return () => controller.abort()
   }, [transition, finishTransition])
+
+  // The native navigation bar keeps the old page's items during a slide.
+  const sliding = transition.kind !== 'none'
+  useEffect(() => {
+    if (hasNativeChrome('navbar')) {
+      postNativeChrome({ type: 'transition', phase: sliding ? 'start' : 'end' })
+    }
+  }, [sliding])
 
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below

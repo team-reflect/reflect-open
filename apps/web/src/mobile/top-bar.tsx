@@ -2,8 +2,25 @@ import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import { Button } from '@/components/ui/button.tsx'
 import { cn } from '@/lib/utils.ts'
 
-export function MobileTopBar({ children }: { children: ReactNode }): ReactElement {
-  return <header className="shrink-0 border-b border-border px-safe">{children}</header>
+/**
+ * The header of a mobile screen. A `screenHeader` is the bar that the iOS
+ * shell replaces with its native navigation bar.
+ */
+export function MobileTopBar({
+  children,
+  screenHeader = false,
+}: {
+  children: ReactNode
+  screenHeader?: boolean | undefined
+}): ReactElement {
+  return (
+    <header
+      data-screen-header={screenHeader ? '' : undefined}
+      className="shrink-0 border-b border-border px-safe"
+    >
+      {children}
+    </header>
+  )
 }
 
 export function MobileTopBarRow({

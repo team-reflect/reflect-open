@@ -19,21 +19,29 @@ interface NoteActionsMenuProps {
 }
 
 /**
- * The note screen's "⋯" action sheet (Plan 19): pin/unpin, lock/unlock from
- * external services, share, and delete-to-trash. Pin reflects the index's
- * pinned set; privacy reflects the note's indexed `private: true` flag,
- * both with the note-row overlay merged over them while the index catches up. {@link shareNote} hands the note's body to the OS share sheet via
- * the Web Share API (`navigator.share`); delete confirms first (it's
- * destructive, even if recoverable from `.reflect/trash/`) and routes through
- * `NoteActionsService.trashOne` so the open session is discarded rather than flushed.
+ * The state of the note actions of one note, and the functions that run them.
  */
-export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
+export interface NoteActions {
+  isPinned: boolean
+  isPrivate: boolean
+  privacyReady: boolean
+  privacyActionLabel: string
+  items: NativeMenuItem[]
+  pin: () => void
+  togglePrivate: () => Promise<void>
+  share: () => void
+  runAction: (id: string) => void
+}
+
+/**
+ * The note actions of `path`: their state, their native menu items, and
+ * `runAction`, which runs one by id (Delete without asking: callers confirm).
+ */
+export function useNoteActions(path: string, onDeleted: () => void): NoteActions {
   const { noteActions, logger } = useCoreServices()
   const { share: shareService } = useAppServices()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const { row: noteRow, settled: privacyReady } = useNoteRowState(path)
-  const [actionsOpen, setActionsOpen] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const isPrivate = noteRow?.isPrivate ?? false
   const privacyActionLabel = !privacyReady
     ? 'Loading privacy…'
@@ -74,11 +82,48 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
     }
   }
 
+  return {
+    isPinned,
+    isPrivate,
+    privacyReady,
+    privacyActionLabel,
+    items: noteActionItems({ isPinned, isPrivate, privacyReady, privacyActionLabel }),
+    pin,
+    togglePrivate,
+    share,
+    runAction,
+  }
+}
+
+/**
+ * The note screen's "⋯" action sheet (Plan 19): pin/unpin, lock/unlock from
+ * external services, share, and delete-to-trash. Pin reflects the index's
+ * pinned set; privacy reflects the note's indexed `private: true` flag,
+ * both with the note-row overlay merged over them while the index catches up. {@link shareNote} hands the note's body to the OS share sheet via
+ * the Web Share API (`navigator.share`); delete confirms first (it's
+ * destructive, even if recoverable from `.reflect/trash/`) and routes through
+ * `NoteActionsService.trashOne` so the open session is discarded rather than flushed.
+ */
+export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
+  const {
+    isPinned,
+    isPrivate,
+    privacyReady,
+    privacyActionLabel,
+    items,
+    pin,
+    togglePrivate,
+    share,
+    runAction,
+  } = useNoteActions(path, onDeleted)
+  const [actionsOpen, setActionsOpen] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
   const nativeMenu = useNativeMenuDrawer({
     open: actionsOpen,
     onOpenChange: setActionsOpen,
     menuId: 'note-actions',
-    items: noteActionItems({ isPinned, isPrivate, privacyReady, privacyActionLabel }),
+    items,
     onSelect: runAction,
   })
 

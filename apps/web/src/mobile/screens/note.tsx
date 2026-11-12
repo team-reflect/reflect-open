@@ -4,7 +4,7 @@ import { NotePane } from '@/components/note-pane.tsx'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks.tsx'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter.ts'
 import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
-import { NoteActionsMenu } from '@/mobile/note-actions-menu.tsx'
+import { NoteActionsMenu, useNoteActions } from '@/mobile/note-actions-menu.tsx'
 import { cn } from '@/lib/utils.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
@@ -23,18 +23,19 @@ export function MobileNote({ path }: { path: string }): ReactElement {
   const { canBack } = useRouterState()
   const { back, navigate } = useRouterActions()
   const untitled = isUntitledNotePath(path)
+  const close = (): void => (canBack ? back() : navigate({ kind: 'today' }))
+  const actions = useNoteActions(path, close)
 
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
       <MobileScreenHeader
         title={untitled ? 'New note' : 'Edit note'}
-        onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
-        trailing={
-          <NoteActionsMenu
-            path={path}
-            onDeleted={() => (canBack ? back() : navigate({ kind: 'today' }))}
-          />
-        }
+        onBack={close}
+        trailing={<NoteActionsMenu path={path} onDeleted={close} />}
+        nativeTrailing={[
+          { id: 'note-actions', title: 'Note actions', icon: 'ellipsis', menu: actions.items },
+        ]}
+        onNativeAction={actions.runAction}
       />
       <main
         // Keyboard avoidance is the shell root's job (it ends at the

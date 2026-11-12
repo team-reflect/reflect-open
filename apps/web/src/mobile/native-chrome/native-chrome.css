@@ -8,3 +8,8 @@
 :root[data-native-chrome~='tabbar'] nav[aria-label='Sections'] {
   display: none;
 }
+
+:root[data-native-chrome~='navbar'] [data-screen-header],
+:root[data-native-chrome~='navbar'] [data-daily-header] {
+  display: none;
+}
