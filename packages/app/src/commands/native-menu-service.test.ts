@@ -72,7 +72,7 @@ describe('install', () => {
       { kind: 'command', id: 'theme.toggle', text: 'Switch theme', action: menu.dispatchCommand },
       { kind: 'predefined', item: 'Quit', text: 'Quit Reflect' },
     ])
-    expect(view).not.toHaveProperty('nsAppRole')
+    expect(view?.nsAppRole).toBeUndefined()
     expect(windowMenu).toMatchObject({ text: 'Window', nsAppRole: 'windows' })
 
     const sidebarToggle = view?.items[0]

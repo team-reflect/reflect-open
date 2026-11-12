@@ -33,7 +33,7 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
   // until the deep link navigated.
   const initialRoute = appWindow.isMainWindow() ? null : deepLinkRouter.getInitialWindowRoute()
   return (
-    <RouterProvider key={graph.root} {...(initialRoute !== null ? { initialRoute } : {})}>
+    <RouterProvider key={graph.root} initialRoute={initialRoute ?? undefined}>
       <PaletteProvider>
         <ShortcutsProvider>
           <NoteTemplatesProvider>
