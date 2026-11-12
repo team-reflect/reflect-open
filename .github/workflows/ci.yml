@@ -89,13 +89,9 @@ jobs:
           js=false
           rust=false
           swift=false
-
           # A draft PR skips the slow jobs. release-please opens some
-          # Release PRs as drafts, and those run every job.
-          skip_slow=false
-          if [[ $EVENT_NAME == pull_request && $PR_IS_DRAFT == true && $HEAD_REF != release-please--* ]]; then
-            skip_slow=true
-          fi
+          # Release PRs as drafts, and the branch below runs every job.
+          skip_slow=$PR_IS_DRAFT
 
           if [[ $PR_IS_STACK_MIDDLE == true ]]; then
             echo "In the middle of a stack: the top PR runs the jobs."
@@ -103,6 +99,7 @@ jobs:
             js=true
             rust=true
             swift=true
+            skip_slow=false
           else
             git diff --name-only --no-renames HEAD^1 HEAD
             if changed "${js_files[@]}"; then
