@@ -7,7 +7,7 @@
 // The result bundle and, after a failed test run, the log archive of the
 // simulator go to apps/ios/build/test-ios.
 
-import { rmSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -62,6 +62,7 @@ async function xcodebuild(args: string[]): Promise<void> {
 async function main(): Promise<void> {
   // xcodebuild and `log collect` refuse to write over an existing bundle.
   rmSync(OUTPUT_DIR, { recursive: true, force: true })
+  mkdirSync(OUTPUT_DIR, { recursive: true })
 
   await step('Build the web app', async () => {
     await run('pnpm', ['--filter', '@reflect/ios', 'build:web'])
@@ -136,18 +137,23 @@ async function main(): Promise<void> {
         ])
       })
     } catch (error) {
+      // A failed collection leaves the test failure as the reported error.
       await step('Collect the log of the simulator', async () => {
-        await run('xcrun', [
-          'simctl',
-          'spawn',
-          simulator,
-          'log',
-          'collect',
-          '--last',
-          '30m',
-          '--output',
-          LOG_ARCHIVE,
-        ])
+        await exec(
+          'xcrun',
+          [
+            'simctl',
+            'spawn',
+            simulator,
+            'log',
+            'collect',
+            '--last',
+            '30m',
+            '--output',
+            LOG_ARCHIVE,
+          ],
+          { nodeOptions: { stdio: 'inherit' } },
+        )
       })
       throw error
     }
