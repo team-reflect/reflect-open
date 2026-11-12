@@ -43,7 +43,7 @@ async function renderChooser(options?: {
     core,
     graph: null,
     route: null,
-    ...(options?.settings === undefined ? {} : { settings: options.settings }),
+    settings: options?.settings,
   })
 }
 

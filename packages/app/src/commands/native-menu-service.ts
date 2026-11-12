@@ -38,7 +38,7 @@ export interface AppSubmenuLayout {
    * macOS NSApp role: `windows` gains the automatic window list,
    * `help` gains the Search field.
    */
-  nsAppRole?: 'windows' | 'help'
+  nsAppRole?: 'windows' | 'help' | undefined
   entries: AppMenuEntry[]
 }
 
@@ -50,17 +50,17 @@ export type NativeMenuItem =
       kind: 'command'
       id: string
       text: string
-      accelerator?: string
+      accelerator?: string | undefined
       /**
        * Invoked with the item id when the item is activated.
        */
       action: (id: string) => void
     }
-  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string }
+  | { kind: 'predefined'; item: NativeMenuPredefinedItem; text?: string | undefined }
 
 export interface NativeSubmenu {
   text: string
-  nsAppRole?: 'windows' | 'help'
+  nsAppRole?: 'windows' | 'help' | undefined
   items: NativeMenuItem[]
 }
 
@@ -203,7 +203,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     const menu = await host.buildAppMenu(
       layout.map((submenu) => ({
         text: submenu.text,
-        ...(submenu.nsAppRole !== undefined ? { nsAppRole: submenu.nsAppRole } : {}),
+        nsAppRole: submenu.nsAppRole,
         items: submenu.entries.map((entry) => this.#menuItem(entry)),
       })),
     )
@@ -297,7 +297,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
       return {
         kind: 'predefined',
         item: entry.item,
-        ...(entry.text !== undefined ? { text: entry.text } : {}),
+        text: entry.text,
       }
     }
     const command = this.#deps.commands.list().find((candidate) => candidate.id === entry.commandId)
@@ -309,7 +309,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
       kind: 'command',
       id: command.id,
       text: entry.text ?? command.title,
-      ...(accelerator !== undefined ? { accelerator } : {}),
+      accelerator,
       action: this.dispatchCommand,
     }
   }

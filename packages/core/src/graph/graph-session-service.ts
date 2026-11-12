@@ -153,7 +153,7 @@ export interface GraphSessionServiceDeps<Services = unknown> {
    * dispose themselves when `session.signal` aborts. Without it, `services`
    * stays null.
    */
-  readonly createServices?: (session: GraphSession) => Services
+  readonly createServices?: ((session: GraphSession) => Services) | undefined
 }
 
 /**

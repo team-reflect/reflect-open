@@ -50,11 +50,11 @@ export interface TestNoteFileServiceOptions {
   /**
    * Graph-relative paths to file contents.
    */
-  files?: Readonly<Record<string, string>>
+  files?: Readonly<Record<string, string>> | undefined
   /**
    * When set, calls pinned to another generation reject.
    */
-  generation?: number
+  generation?: number | undefined
   /**
    * Paths whose bytes are offloaded to iCloud.
    */

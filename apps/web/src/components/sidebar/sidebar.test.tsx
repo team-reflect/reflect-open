@@ -155,7 +155,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
       aiProviders,
       defaultAiProviderId: aiProviders[0]?.id ?? null,
     },
-    ...(initialRoute === undefined ? {} : { route: initialRoute }),
+    route: initialRoute,
     wrapper: (children: ReactNode) => (
       <div style={{ width: 260, height: 560 }}>
         <UpdateProvider autoCheck={false}>

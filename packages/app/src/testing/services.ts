@@ -89,9 +89,7 @@ export function createTestAppServices(
   const navigation = overrides.navigation ?? createTestNavigationService()
   // Over the core's test activity port, so one emit reaches both layers.
   const activity = (core as { activity?: TestActivityPort }).activity
-  const lifecycle =
-    overrides.lifecycle ??
-    createTestLifecycleService(activity === undefined ? undefined : { activity })
+  const lifecycle = overrides.lifecycle ?? createTestLifecycleService({ activity })
   const app = createAppServices(core, {
     ...createTestAppHost({ window, dialog, operations, clipboard, lifecycle }),
     updater: createTestUpdaterAdapter(),
