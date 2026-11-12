@@ -11,6 +11,7 @@ import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
+import { useToastController } from '@/lib/use-toasts.ts'
 
 interface AiProviderActionsDrawerProps {
   /** The provider the sheet manages; null renders nothing (exit animation). */
@@ -41,6 +42,7 @@ export function AiProviderActionsDrawer({
   onRemove,
 }: AiProviderActionsDrawerProps): ReactElement {
   const { logger } = useCoreServices()
+  const toastController = useToastController()
   const { run, pending: removing } = useAsyncAction()
   const providerInfo = provider === null ? null : aiProvider(provider.provider)
   const models =
@@ -127,6 +129,12 @@ export function AiProviderActionsDrawer({
       } else if (id === 'remove') {
         void onRemove(provider.id).catch((cause: unknown) => {
           logger.error('AI provider removal failed:', errorMessage(cause))
+          // The native confirmation has closed, so the error shows as a toast.
+          toastController.add({
+            type: 'error',
+            title: 'Could not remove the provider',
+            description: errorMessage(cause),
+          })
         })
       }
     },

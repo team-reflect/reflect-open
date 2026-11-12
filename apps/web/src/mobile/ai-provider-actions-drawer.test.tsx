@@ -2,6 +2,10 @@ import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiProviderConfig } from '@reflect/core'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { NO_ENTRY } from '@/mobile/native-chrome/protocol.ts'
+import { nativeMenuHandler } from '@/mobile/native-chrome/registrations.ts'
+import { installNativeChrome } from '@/services/native-chrome-transport.ts'
+import { createTestToastController, withToastController } from '@/test-utils/toast.tsx'
 import { AiProviderActionsDrawer } from './ai-provider-actions-drawer.tsx'
 
 /** The per-provider management sheet: make-default and remove wiring. */
@@ -94,5 +98,49 @@ describe('AiProviderActionsDrawer', () => {
     expect(onOpenChange).not.toHaveBeenCalled()
     // The pending spinner cleared — the row is pressable again.
     await expect.element(page.getByRole('button', { name: 'Remove provider' })).toBeEnabled()
+  })
+
+  it('shows a toast when a removal from the native menu fails', async () => {
+    onRemove.mockRejectedValue(new Error('keychain unavailable'))
+    const handler = { postMessage: vi.fn() }
+    installNativeChrome(
+      {
+        __nativeChromeFeatures: ['menus'],
+        webkit: { messageHandlers: { reflectHost: handler, reflectChrome: handler } },
+      },
+      document.documentElement,
+    )
+    try {
+      const toasts = createTestToastController()
+      await renderInApp(
+        <AiProviderActionsDrawer
+          provider={PROVIDER}
+          isDefault={false}
+          open
+          onOpenChange={onOpenChange}
+          onMakeDefault={onMakeDefault}
+          onSetDefaultModel={onSetDefaultModel}
+          onRemove={onRemove}
+        />,
+        { servicesOnly: true, wrapper: withToastController(toasts) },
+      )
+      await vi.waitFor(() => {
+        expect(nativeMenuHandler('ai-provider-actions', NO_ENTRY)).not.toBeNull()
+      })
+
+      nativeMenuHandler('ai-provider-actions', NO_ENTRY)?.('remove')
+
+      await vi.waitFor(() => {
+        expect(toasts.open()).toEqual([
+          expect.objectContaining({
+            type: 'error',
+            title: 'Could not remove the provider',
+            description: 'keychain unavailable',
+          }),
+        ])
+      })
+    } finally {
+      installNativeChrome({}, document.documentElement)
+    }
   })
 })

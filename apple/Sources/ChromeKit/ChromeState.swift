@@ -113,6 +113,19 @@ public indirect enum MenuItem: Decodable, Equatable, Sendable {
   }
 }
 
+extension MenuItem {
+  /// This item with the checkmark of the action `id` flipped, in sections too.
+  public func togglingCheckmark(of id: String) -> MenuItem {
+    switch self {
+    case .action(var action):
+      if action.id == id { action.checked.toggle() }
+      return .action(action)
+    case .section(let title, let items):
+      return .section(title: title, items: items.map { $0.togglingCheckmark(of: id) })
+    }
+  }
+}
+
 /// A button of the navigation bar. A tap opens `menu`, or sends an `action` intent.
 public struct BarButton: Decodable, Equatable, Sendable {
   public var id: String

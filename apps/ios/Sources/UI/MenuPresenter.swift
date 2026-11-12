@@ -126,20 +126,10 @@ final class MenuPresenter {
   /// on screen.
   private func toggleVisibleCheckmark(of id: String) {
     guard var request = openRequest else { return }
-    request.items = request.items.map { Self.toggling(id, in: $0) }
+    request.items = request.items.map { $0.togglingCheckmark(of: id) }
     openRequest = request
     let updated = menu(for: request)
     anchor.menu = updated
     anchor.contextMenuInteraction?.updateVisibleMenu { _ in updated }
-  }
-
-  private static func toggling(_ id: String, in item: MenuItem) -> MenuItem {
-    switch item {
-    case .action(var action):
-      if action.id == id { action.checked.toggle() }
-      return .action(action)
-    case .section(let title, let items):
-      return .section(title: title, items: items.map { toggling(id, in: $0) })
-    }
   }
 }
