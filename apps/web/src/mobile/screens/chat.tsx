@@ -34,8 +34,8 @@ export function MobileChat(): ReactElement {
     {
       trailing: hasProvider
         ? [
-            ...(hasTurns ? [{ id: 'new', title: 'New chat', icon: 'plus' }] : []),
-            { id: 'history', title: 'Chat history', icon: 'clock.arrow.circlepath' },
+            ...(hasTurns ? [{ id: 'new', title: 'New chat', icon: 'plus' } as const] : []),
+            { id: 'history', title: 'Chat history', icon: 'history' },
           ]
         : [],
     },

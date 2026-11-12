@@ -12,6 +12,16 @@ import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 
+export interface TopBarCornerProps {
+  edge: 'leading' | 'trailing'
+  /**
+   * The layout of the bar: corners of equal width around a centered title,
+   * or corners at the edges of a title that fills the row.
+   */
+  align: 'center' | 'start'
+  chrome: ScreenChrome
+}
+
 export interface ShellBarsProps {
   tab: MobileTab
   onSelectTab: (tab: MobileTab) => void
@@ -30,6 +40,11 @@ export type StackMotion =
  * declare their chrome and never ask which renderer runs.
  */
 export interface ChromeRenderer {
+  /**
+   * One corner of a top bar: the back button (leading only) and the buttons,
+   * or the space they take when something else draws them.
+   */
+  readonly TopBarCorner: ComponentType<TopBarCornerProps>
   /**
    * The bars of the routed shell: the tab bar, or the formatting toolbar
    * while the keyboard is up.

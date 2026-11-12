@@ -39,14 +39,18 @@ function checkJSONFixture(name: string, value: unknown): void {
 }
 
 describe('buildShellChromeState', () => {
-  it('shows the gear and the Today button of Daily', () => {
+  it('shows the gear and the Today button of Daily, and no hidden button', () => {
     const state = buildShellChromeState({
       ...BASE,
       route: { kind: 'today' },
       tab: 'daily',
       bar: {
-        leading: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
-        trailing: [{ id: 'today', title: 'Today' }],
+        canBack: false,
+        leading: [{ id: 'settings', title: 'Settings', icon: 'settings' }],
+        trailing: [
+          { id: 'today', title: 'Today' },
+          { id: 'hidden', title: 'Hidden', hidden: true },
+        ],
       },
     })
     expect(state).toMatchObject({ canBack: false })
@@ -55,7 +59,8 @@ describe('buildShellChromeState', () => {
 
   it('shows the back button on a pushed screen', () => {
     const route: Route = { kind: 'note', path: 'ideas.md' }
-    const state = buildShellChromeState({ ...BASE, route, tab: 'all' })
+    const bar = { canBack: true, leading: [], trailing: [] }
+    const state = buildShellChromeState({ ...BASE, route, tab: 'all', bar })
     expect(state).toMatchObject({ canBack: true, leading: [], trailing: [] })
   })
 
@@ -65,6 +70,7 @@ describe('buildShellChromeState', () => {
       route: { kind: 'note', path: 'ideas.md' },
       tab: 'daily',
       bar: {
+        canBack: true,
         leading: [],
         trailing: [
           {

@@ -15,7 +15,7 @@ import { ConnectGitHostDrawer } from '@/mobile/connect-git-host-drawer.tsx'
 import { ConnectRepositoryDrawer } from '@/mobile/connect-repository-drawer.tsx'
 import { GithubSignInDrawer } from '@/mobile/github-sign-in-drawer.tsx'
 import { PRIVACY_POLICY_URL } from '@/mobile/legal-urls.ts'
-import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { TextSettingDrawer } from '@/mobile/text-setting-drawer.tsx'
 import {
   SettingsActionRow,
@@ -310,9 +310,10 @@ export function MobileSettings(): ReactElement {
 
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileScreenHeader
-        title="Settings"
-        onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
+      <ChromeTopBar
+        align="center"
+        back={() => (canBack ? back() : navigate({ kind: 'today' }))}
+        title={<h1 className="truncate text-base font-semibold">Settings</h1>}
       />
       <main className="min-h-0 flex-1 overflow-y-auto bg-surface-app px-safe pb-safe">
         <div className="flex flex-col gap-8 px-4 py-5">

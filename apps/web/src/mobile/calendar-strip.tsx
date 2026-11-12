@@ -95,7 +95,7 @@ export function CalendarStrip({
 
   useNativeBar(
     {
-      leading: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
+      leading: [{ id: 'settings', title: 'Settings', icon: 'settings' }],
       trailing: showToday ? [{ id: 'today', title: 'Today' }] : [],
     },
     {

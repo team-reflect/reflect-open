@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react'
 import type { NativeChromeService } from '@reflect/app'
 import { WritableStore, type Unlisten } from '@reflect/core'
 import {
@@ -11,9 +11,11 @@ import {
   type ChromeRenderer,
   type ShellBarsProps,
   type StackMotion,
+  type TopBarCornerProps,
 } from '@/mobile/chrome/chrome-renderer.ts'
 import { ScreenRegistry } from '@/mobile/chrome/native/screen-registry.ts'
 import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
 import {
   createAttachQueue,
   runNativeIntent,
@@ -25,7 +27,7 @@ import {
 } from '@/mobile/native-chrome/native-chrome-state.ts'
 import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/native-chrome/protocol.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
-import { useRouterActions, useRouterState } from '@/routing/router.tsx'
+import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -33,6 +35,7 @@ import { useAppServices } from '@/services/services-provider.tsx'
  * shell's intents.
  */
 class NativeChromeRenderer implements ChromeRenderer {
+  readonly TopBarCorner = NativeTopBarCorner
   readonly ShellBars = NativeShellBars
   readonly NoChrome = NativeNoChrome
   // The native bars sit in the safe area, so the page clears it.
@@ -88,13 +91,25 @@ function useNativeChromeRenderer(): NativeChromeRenderer {
 }
 
 /**
+ * The space of the corner buttons and the back button that the shell draws
+ * over the bar. The shell's back button is wider than the web one, so a
+ * title that starts after it moves clear.
+ */
+function NativeTopBarCorner(props: TopBarCornerProps): ReactElement {
+  return (
+    <div className="invisible contents" inert aria-hidden>
+      <WebTopBarCorner {...props} backClassName={props.align === 'start' ? 'mr-2' : undefined} />
+    </div>
+  )
+}
+
+/**
  * Posts the routed shell's chrome state to the Swift shell after every change
  * and runs the shell's intents. Renders nothing.
  */
 function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps): null {
   const renderer = useNativeChromeRenderer()
-  const { route, entryId, canBack } = useRouterState()
-  const { back, navigate } = useRouterActions()
+  const { route, entryId } = useRouterState()
   const bars = useStore(renderer.screens.bars)
   const modalCount = useStore(renderer.modalCount)
   const toolbar = useFormattingToolbar()
@@ -137,17 +152,12 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     }
   }, [toolbar, entryId])
 
-  const contextRef = useRef<
-    Pick<IntentContext, 'entryId' | 'canBack' | 'back' | 'navigate' | 'selectTab'>
-  >({
+  const contextRef = useRef<Pick<IntentContext, 'entryId' | 'selectTab'>>({
     entryId,
-    canBack,
-    back,
-    navigate,
     selectTab: onSelectTab,
   })
   useLayoutEffect(() => {
-    contextRef.current = { entryId, canBack, back, navigate, selectTab: onSelectTab }
+    contextRef.current = { entryId, selectTab: onSelectTab }
   })
 
   useEffect(() => {

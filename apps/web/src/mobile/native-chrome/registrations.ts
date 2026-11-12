@@ -1,12 +1,12 @@
 import { useScreenChrome } from '@/mobile/chrome/chrome-renderer.ts'
-import type { NativeBarButton } from '@/mobile/native-chrome/protocol.ts'
+import type { ChromeButton } from '@/mobile/chrome/screen-chrome.ts'
 
 /**
  * The native corner buttons of one screen. The screen draws its own title.
  */
 export interface NativeBarSpec {
-  leading?: NativeBarButton[] | undefined
-  trailing?: NativeBarButton[] | undefined
+  leading?: ChromeButton[] | undefined
+  trailing?: ChromeButton[] | undefined
 }
 
 /**

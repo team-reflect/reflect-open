@@ -6,7 +6,7 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scro
 import { useNoteRowState } from '@/hooks/use-note-row.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { NOTE_DELETE_CONFIRM, NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
-import type { NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
+import type { ChromeMenuItem } from '@/mobile/chrome/screen-chrome.ts'
 import { shareNote } from '@/mobile/share.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 import { useToastController } from '@/lib/use-toasts.ts'
@@ -28,7 +28,7 @@ export interface NoteActions {
   isPrivate: boolean
   privacyReady: boolean
   privacyActionLabel: string
-  items: NativeMenuItem[]
+  items: ChromeMenuItem[]
   pin: () => void
   togglePrivate: () => Promise<void>
   share: () => void
@@ -224,22 +224,22 @@ export function noteActionItems({
   privacyReady: boolean
   privacyActionLabel: string
   canDelete: boolean
-}): NativeMenuItem[] {
-  const items: NativeMenuItem[] = [
+}): ChromeMenuItem[] {
+  const items: ChromeMenuItem[] = [
     {
       type: 'action',
       id: 'pin',
       title: isPinned ? 'Unpin' : 'Pin',
-      icon: isPinned ? 'pin.slash' : 'pin',
+      icon: isPinned ? 'pin-off' : 'pin',
     },
     {
       type: 'action',
       id: 'privacy',
       title: privacyActionLabel,
-      icon: privacyReady && isPrivate ? 'lock.open' : 'lock',
+      icon: privacyReady && isPrivate ? 'lock-open' : 'lock',
       disabled: !privacyReady,
     },
-    { type: 'action', id: 'share', title: 'Share', icon: 'square.and.arrow.up' },
+    { type: 'action', id: 'share', title: 'Share', icon: 'share' },
   ]
   if (!canDelete) {
     return items

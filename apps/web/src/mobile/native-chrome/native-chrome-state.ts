@@ -2,7 +2,8 @@ import type { Route } from '@reflect/app'
 import type { ThemePreference } from '@reflect/core'
 import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
 import type { ScreenBar } from '@/mobile/chrome/native/screen-registry.ts'
-import { tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
+import { toWireButtons } from '@/mobile/chrome/native/sf-symbols.ts'
+import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { NO_ENTRY, type NativeChromeState } from '@/mobile/native-chrome/protocol.ts'
 
 /**
@@ -32,9 +33,9 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     chrome: 'shell',
     routeKind: route.kind,
     tab: input.tab,
-    canBack: tabRootFor(route) === null,
-    leading: bar?.leading ?? [],
-    trailing: bar?.trailing ?? [],
+    canBack: bar?.canBack ?? false,
+    leading: toWireButtons(bar?.leading ?? []),
+    trailing: toWireButtons(bar?.trailing ?? []),
     keyboardVisible: input.keyboardVisible,
     modal: input.modal,
     toolbar: input.toolbar === null ? null : { ...input.toolbar },

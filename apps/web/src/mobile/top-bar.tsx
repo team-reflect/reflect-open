@@ -23,7 +23,7 @@ export function MobileTopBarIconButton({
   edge,
   className,
   ...props
-}: ComponentProps<typeof Button> & { edge?: 'leading' | 'trailing' }): ReactElement {
+}: ComponentProps<typeof Button> & { edge?: 'leading' | 'trailing' | undefined }): ReactElement {
   return (
     <Button
       variant="ghost"

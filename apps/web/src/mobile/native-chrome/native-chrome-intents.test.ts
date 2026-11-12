@@ -13,11 +13,8 @@ import { FORMATTING_COMMANDS, parseNativeIntent } from '@/mobile/native-chrome/p
 function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContext {
   return {
     entryId: 5,
-    canBack: true,
-    back: vi.fn(),
-    navigate: vi.fn(),
     selectTab: vi.fn(),
-    screen: undefined,
+    screen: { back: vi.fn(), onAction: vi.fn() },
     attachCommands: null,
     attachFiles: createAttachQueue(),
     ...overrides,
@@ -60,22 +57,16 @@ describe('parseNativeIntent', () => {
 })
 
 describe('runNativeIntent', () => {
-  it('goes back for the entry on screen', () => {
-    const ctx = makeIntentContext()
-    runNativeIntent({ type: 'back', entryId: 5 }, ctx)
-    expect(ctx.back).toHaveBeenCalledOnce()
-  })
-
-  it('drops a back for another entry', () => {
+  it('goes back and runs actions for the entry on screen only', () => {
     const ctx = makeIntentContext()
     runNativeIntent({ type: 'back', entryId: 4 }, ctx)
-    expect(ctx.back).not.toHaveBeenCalled()
-  })
-
-  it('opens today when there is no history to go back to', () => {
-    const ctx = makeIntentContext({ canBack: false })
+    runNativeIntent({ type: 'action', entryId: 4, id: 'more' }, ctx)
+    expect(ctx.screen?.back).not.toHaveBeenCalled()
+    expect(ctx.screen?.onAction).not.toHaveBeenCalled()
     runNativeIntent({ type: 'back', entryId: 5 }, ctx)
-    expect(ctx.navigate).toHaveBeenCalledWith({ kind: 'today' })
+    runNativeIntent({ type: 'action', entryId: 5, id: 'more' }, ctx)
+    expect(ctx.screen?.back).toHaveBeenCalledOnce()
+    expect(ctx.screen?.onAction).toHaveBeenCalledWith('more')
   })
 
   it('selects a tab', () => {

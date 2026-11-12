@@ -1,4 +1,3 @@
-import type { NavigateOptions, Route } from '@reflect/app'
 import {
   focusedEditorCommands,
   type FormattingToolbarCommands,
@@ -17,9 +16,6 @@ export type AttachFiles = (commands: FormattingToolbarCommands, files: File[]) =
  */
 export interface IntentContext {
   entryId: number
-  canBack: boolean
-  back: () => void
-  navigate: (route: Route, options?: NavigateOptions) => void
   selectTab: (tab: MobileTab) => void
   /**
    * The chrome the screen of `entryId` registered.
@@ -75,20 +71,11 @@ function decodeFile(file: { name: string; type: string; data: string }): File {
  */
 export function runNativeIntent(intent: NativeIntent, context: IntentContext): void {
   switch (intent.type) {
-    case 'back': {
-      if (intent.entryId !== context.entryId) {
-        return
-      }
-      const back = context.screen?.back
-      if (back !== undefined) {
-        back()
-      } else if (context.canBack) {
-        context.back()
-      } else {
-        context.navigate({ kind: 'today' })
+    case 'back':
+      if (intent.entryId === context.entryId) {
+        context.screen?.back?.()
       }
       return
-    }
     case 'tab':
       context.selectTab(intent.tab)
       return

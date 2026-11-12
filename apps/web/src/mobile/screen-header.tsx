@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import { ChevronLeft } from 'lucide-react'
-import type { NativeBarButton } from '@/mobile/native-chrome/protocol.ts'
+import type { ChromeButton } from '@/mobile/chrome/screen-chrome.ts'
 import { useNativeBar } from '@/mobile/native-chrome/registrations.ts'
 import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
 
@@ -11,7 +11,7 @@ interface MobileScreenHeaderProps {
   /** Optional trailing control (an add button, …). */
   trailing?: ReactNode
   /** The trailing control as native corner buttons, for the iOS shell. */
-  nativeTrailing?: NativeBarButton[] | undefined
+  nativeTrailing?: ChromeButton[] | undefined
   /** Runs a native corner button or menu item by id. */
   onNativeAction?: ((id: string) => void) | undefined
 }

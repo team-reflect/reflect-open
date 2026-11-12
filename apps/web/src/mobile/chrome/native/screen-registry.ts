@@ -1,14 +1,14 @@
 import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore, type Unlisten } from '@reflect/core'
-import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
-import type { NativeBarButton } from '@/mobile/native-chrome/protocol.ts'
+import type { ChromeButton, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 
 /**
- * The corner buttons of one screen, as the shell draws them.
+ * The corners of one screen without its handlers.
  */
 export interface ScreenBar {
-  leading: NativeBarButton[]
-  trailing: NativeBarButton[]
+  canBack: boolean
+  leading: ChromeButton[]
+  trailing: ChromeButton[]
 }
 
 /**
@@ -49,7 +49,11 @@ export class ScreenRegistry {
       return
     }
     // A copy, so an in-place change of the screen's buttons is a change.
-    const bar = structuredClone({ leading: chrome.leading ?? [], trailing: chrome.trailing ?? [] })
+    const bar = structuredClone({
+      canBack: chrome.back !== undefined,
+      leading: chrome.leading ?? [],
+      trailing: chrome.trailing ?? [],
+    })
     this.#updateBars((bars) => {
       bars.set(entryId, bar)
     })
