@@ -23,9 +23,6 @@
   },
   "testTargets": [
     {
-      "skippedTests": [
-        "StoreKitSessionTests"
-      ],
       "target": {
         "containerPath": "container:Reflect.xcodeproj",
         "identifier": "C2F7A91E5B3D48A6B0E4D8F3",
@@ -33,9 +30,6 @@
       }
     },
     {
-      "skippedTests": [
-        "EntryPointUITests"
-      ],
       "target": {
         "containerPath": "container:Reflect.xcodeproj",
         "identifier": "A9E3F6C17D524B08B6F1D4E7",

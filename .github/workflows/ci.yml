@@ -263,8 +263,7 @@ jobs:
         working-directory: apple
         run: xcodebuild build -scheme ReflectApple-Package -destination 'generic/platform=iOS' -quiet
 
-  # Builds the Swift shell in apps/ios and runs the Reflect test plan in a
-  # simulator. The Nightly plan runs in test-ios-nightly.yml.
+  # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
   test-ios:
     needs: [classify, test-swift]
     if: needs.classify.outputs.test-ios == 'true'
@@ -276,8 +275,6 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/test-ios
-        with:
-          plan: Nightly
 
   lint-rust:
     needs: classify

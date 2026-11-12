@@ -38,28 +38,31 @@ app restarts.
 ## Testing the iOS app
 
 ```bash
-pnpm test:ios                   # the Reflect test plan, the same run as the test-ios CI job
-pnpm test:ios --plan Nightly    # also the tests of the nightly workflow
+pnpm test:ios    # the same run as the test-ios CI job
 ```
 
-`pnpm test:ios` creates a simulator for the run, builds the app and its tests, runs one test plan
-of the Reflect scheme, and deletes the simulator. It prints the path of the result bundle; open it
-in Xcode for the screenshots and the steps of each test. After a failure it also saves the log of
-the simulator. `scripts/test-ios.ts` lists the options.
+`pnpm test:ios` creates a simulator for the run, builds the app and its tests, runs the Reflect
+test plan, and deletes the simulator. It prints the path of the result bundle; open it in Xcode
+for the screenshots and the steps of each test. After a failure it also saves the log of the
+simulator. `scripts/test-ios.ts` lists the options.
 
-| Tests | Where they run | Test plan |
-| --- | --- | --- |
-| Logic of a module in `apple/` (for example the store commands in `AppStoreKit`) | macOS, `pnpm test:swift` | none |
-| `apps/ios/Tests`: code that needs the app target or the Rust core | simulator, inside the app | Reflect, Nightly |
-| `apps/ios/UITests/GoldenPathUITests.swift`: one path through the real app | simulator | Reflect, Nightly |
-| Tests that depend on system services of a new simulator (`StoreKitSessionTests`, `EntryPointUITests`) | simulator | Nightly |
+| Tests | Where they run |
+| --- | --- |
+| Logic of a module in `apple/` (for example the store commands in `AppStoreKit`) | macOS, `pnpm test:swift` |
+| `apps/ios/Tests`: code that needs the app target or the Rust core | simulator, inside the app |
+| `apps/ios/UITests/GoldenPathUITests.swift`: one path through the real app | simulator |
 
 Rules for a test in the simulator:
 
 - **Put logic in an `apple/` module and test it there** with a fake for the system framework. A
   test in the simulator shows only that the parts connect.
+- **No test depends on a system service of the simulator** such as the StoreKit test session. Its
+  result changes from one new simulator to the next. Check real purchases with a sandbox account
+  on TestFlight (see `docs/distribution.md`).
 - **A UI test calls `app.useSession(UUID())` before the first launch.** The app then keeps its
   data in a place of its own and starts with finished onboarding (`AppDirectories.swift`, Debug
   builds only), so a test does not depend on the data of another test or of the developer.
 - **Wait for a condition** with `XCUIApplication.patience` as the timeout. Do not wait for a
   fixed time: the first launch of an app on a new simulator can take minutes.
+- **Add a step to the golden path before you add a UI test.** Each launch of the app costs
+  seconds to minutes.

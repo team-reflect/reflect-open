@@ -90,13 +90,11 @@ final class AppHost {
   /// a recording; the page gets every other URL as a `host:open-url` event
   /// with a `string[]` payload.
   func open(_ urls: [URL]) {
-    let links = urls.filter { !($0.scheme == "reflect" && $0.host == "record-audio") }
-    if links.count < urls.count {
+    let opened = OpenedURLs(urls)
+    if opened.requestsRecording {
       recording.requestRecording()
     }
-    if !links.isEmpty,
-      let payload = try? JSONSerialization.data(withJSONObject: links.map(\.absoluteString))
-    {
+    if let payload = opened.linksPayload {
       bridge.emit("host:open-url", payload: payload)
     }
   }

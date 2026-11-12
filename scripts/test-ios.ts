@@ -2,10 +2,8 @@
 // and in CI: in a simulator that it creates for this run, so each run starts
 // from an empty device.
 //
-//   pnpm test:ios [--plan <name>] [--output <dir>] [--derived-data <dir>]
-//                 [--skip-web] [--keep-simulator]
+//   pnpm test:ios [--output <dir>] [--derived-data <dir>] [--skip-web] [--keep-simulator]
 //
-//   --plan            Test plan of the Reflect scheme: `Reflect` (default) or `Nightly`
 //   --output          Directory for the result bundle, the full xcodebuild logs and,
 //                     after a failure, the simulator's log archive
 //   --derived-data    Xcode's DerivedData directory
@@ -24,7 +22,6 @@ import { exec } from 'tinyexec'
 
 const ROOT_DIR = join(import.meta.dirname, '..')
 const DEVICE_TYPE = 'iPhone 17'
-const PLANS = ['Reflect', 'Nightly']
 
 /** `tinyexec` options for a command that prints straight to the terminal. */
 const INHERIT = { throwOnError: true, nodeOptions: { stdio: 'inherit', cwd: ROOT_DIR } } as const
@@ -117,19 +114,14 @@ async function main(): Promise<void> {
   const defaultDir = join(tmpdir(), 'reflect-test-ios')
   const { values } = parseArgs({
     options: {
-      plan: { type: 'string', default: 'Reflect' },
       output: { type: 'string', default: join(defaultDir, 'results') },
       'derived-data': { type: 'string', default: join(defaultDir, 'DerivedData') },
       'skip-web': { type: 'boolean', default: false },
       'keep-simulator': { type: 'boolean', default: false },
     },
   })
-  const plan = values.plan
-  if (!PLANS.includes(plan)) {
-    throw new Error(`--plan must be one of: ${PLANS.join(', ')}`)
-  }
   const outputDir = values.output
-  const resultBundle = join(outputDir, `${plan}.xcresult`)
+  const resultBundle = join(outputDir, 'Reflect.xcresult')
   const logArchive = join(outputDir, 'simulator.logarchive')
   mkdirSync(outputDir, { recursive: true })
   // xcodebuild and `log collect` refuse to write over an existing bundle.
@@ -189,16 +181,9 @@ async function main(): Promise<void> {
       await exec('xcrun', ['simctl', 'terminate', simulator, 'com.apple.mobilesafari'], INHERIT)
     })
 
-    passed = await step(`Run the tests of the ${plan} plan`, () => {
+    passed = await step('Run the tests', () => {
       return xcodebuild(
-        [
-          'test-without-building',
-          ...xcodebuildArgs,
-          '-testPlan',
-          plan,
-          '-resultBundlePath',
-          resultBundle,
-        ],
+        ['test-without-building', ...xcodebuildArgs, '-resultBundlePath', resultBundle],
         join(outputDir, 'test.log'),
       )
     })

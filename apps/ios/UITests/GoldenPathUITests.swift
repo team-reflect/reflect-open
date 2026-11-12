@@ -1,8 +1,8 @@
 import XCTest
 
 /// Drives the real app from outside along one path: the web app starts,
-/// takes keyboard input, saves it, shows it again after a relaunch, and opens
-/// the page of a `reflect://` URL.
+/// takes keyboard input and saves it. A `reflect://` URL then starts the app
+/// again on its page, and a second URL shows the saved text in the running app.
 @MainActor
 final class GoldenPathUITests: XCTestCase {
   private let app = XCUIApplication()
@@ -20,7 +20,7 @@ final class GoldenPathUITests: XCTestCase {
       for: [expectation(for: hasText, evaluatedWith: editor)], timeout: XCUIApplication.patience)
   }
 
-  func testTypedTextSurvivesARelaunchAndAURLOpensItsPage() throws {
+  func testTypedTextSurvivesARelaunchAndURLsOpenTheirPages() throws {
     let token = "uitest\(UUID().uuidString.prefix(8).lowercased())"
     app.launch()
     let editor = app.waitForDailyNote()
@@ -33,12 +33,14 @@ final class GoldenPathUITests: XCTestCase {
     XCTAssertTrue(app.wait(for: .runningBackground, timeout: XCUIApplication.patience))
     app.terminate()
 
-    app.launch()
-    waitForText(token, in: app.waitForDailyNote())
-
+    // A URL starts the app: the page gets the URL when it is ready.
     app.open(try XCTUnwrap(URL(string: "reflect://tasks")))
     XCTAssertTrue(
       app.webViews.searchFields["Search tasks"].waitForExistence(
         timeout: XCUIApplication.patience))
+
+    // A URL reaches the running app: today's note has the text from before.
+    app.open(try XCTUnwrap(URL(string: "reflect://today")))
+    waitForText(token, in: app.waitForDailyNote())
   }
 }

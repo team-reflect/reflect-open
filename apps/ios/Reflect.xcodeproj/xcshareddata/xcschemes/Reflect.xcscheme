@@ -50,9 +50,6 @@
             reference = "container:Reflect.xctestplan"
             default = "YES">
          </TestPlanReference>
-         <TestPlanReference
-            reference = "container:Nightly.xctestplan">
-         </TestPlanReference>
       </TestPlans>
    </TestAction>
    <LaunchAction

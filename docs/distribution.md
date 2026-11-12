@@ -122,6 +122,15 @@ To ship the current `master` to Reflect Beta without a release, run the **TestFl
 workflow from the Actions tab. The build keeps the last release's version; its build number (the
 commit count) tells it apart.
 
+### Check purchases
+
+No automated test buys a subscription: the simulator has only Xcode's local StoreKit data. Before
+a stable release, check on a TestFlight build with a sandbox Apple Account:
+
+- The paywall shows the monthly and the yearly price.
+- A purchase unlocks the subscription.
+- After a reinstall, the app shows the subscription as active again.
+
 ### Install
 
 | | Stable | Beta |
