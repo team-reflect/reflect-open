@@ -28,8 +28,10 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private var shown = false
   /// Set while the strip is off for a keyboard relayout.
   private var relayout = false
-  /// Loads the picked images; a new document cancels it.
+  /// Loads the picked images, after the images of earlier picks.
   private var loading: Task<Void, Never>?
+  /// Counts documents, so the loads of an earlier document send nothing.
+  private var document = 0
   /// Whether the on-screen keyboard is up, from its last frame. Before the
   /// first frame, a connected hardware keyboard means no on-screen keyboard.
   private var softwareKeyboard: Bool?
@@ -98,6 +100,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
 
   /// A new document: the images of an earlier pick never reach it.
   func reset() {
+    document += 1
     loading?.cancel()
     loading = nil
     picker?.dismiss(animated: true)
@@ -147,14 +150,17 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     // A cancel keeps the images of an earlier pick that still load.
     guard !results.isEmpty else { return }
     let providers = results.map(\.itemProvider)
-    loading?.cancel()
+    let previous = loading
+    let document = document
     loading = Task { [weak self] in
+      // The images of an earlier pick go first.
+      await previous?.value
       // One intent per image, in the picked order, keeps each script small.
       for provider in providers {
         let file = await Self.loadImage(provider)
-        guard !Task.isCancelled else { return }
+        guard let self, self.document == document else { return }
         if let file {
-          self?.send(.files([file]))
+          self.send(.files([file]))
         } else {
           Self.logger.error("picked image did not load: \(provider.registeredContentTypes)")
         }
@@ -163,21 +169,32 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   }
 
   /// The image of `provider` as a file: JPEG, PNG, and GIF as they are,
-  /// any other format (HEIC) as JPEG, which every web engine shows.
+  /// any other format (HEIC, RAW) as JPEG, which every web engine shows.
   private static func loadImage(_ provider: NSItemProvider) async -> IntentFile? {
     guard provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) else { return nil }
+    let base = provider.suggestedName ?? "Image"
     let kept: [UTType] = [.jpeg, .png, .gif]
-    let type =
-      provider.registeredContentTypes.first { registered in
-        kept.contains { registered.conforms(to: $0) }
-      } ?? .jpeg
+    if let type = provider.registeredContentTypes.first(where: { registered in
+      kept.contains { registered.conforms(to: $0) }
+    }) {
+      let data: Data? = await withCheckedContinuation { continuation in
+        _ = provider.loadDataRepresentation(for: type) { data, _ in
+          continuation.resume(returning: data)
+        }
+      }
+      guard let data else { return nil }
+      return IntentFile(
+        name: "\(base).\(type.preferredFilenameExtension ?? "jpg")",
+        type: type.preferredMIMEType ?? "image/jpeg", data: data)
+    }
+    // No kept format: decode the image and encode it as JPEG.
+    guard provider.canLoadObject(ofClass: UIImage.self) else { return nil }
     let data: Data? = await withCheckedContinuation { continuation in
-      _ = provider.loadDataRepresentation(for: type) { data, _ in
-        continuation.resume(returning: data)
+      _ = provider.loadObject(ofClass: UIImage.self) { object, _ in
+        continuation.resume(returning: (object as? UIImage)?.jpegData(compressionQuality: 0.9))
       }
     }
     guard let data else { return nil }
-    let name = "\(provider.suggestedName ?? "Image").\(type.preferredFilenameExtension ?? "jpg")"
-    return IntentFile(name: name, type: type.preferredMIMEType ?? "image/jpeg", data: data)
+    return IntentFile(name: "\(base).jpg", type: "image/jpeg", data: data)
   }
 }

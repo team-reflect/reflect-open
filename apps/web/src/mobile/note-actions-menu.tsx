@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useRef, useState, type ReactElement } from 'react'
 import { Lock, LockOpen, MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'lucide-react'
 import { canTrashNote, errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
@@ -51,6 +51,8 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
     : isPrivate
       ? 'Unlock note'
       : 'Lock note'
+  // Set while a delete from the native menu runs, so a second confirm waits.
+  const deletingRef = useRef(false)
 
   const pin = (): void => {
     void noteActions.togglePinned(path)
@@ -78,10 +80,12 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
         share()
         return
       case 'delete':
-        if (!canTrashNote(path)) {
+        if (!canTrashNote(path) || deletingRef.current) {
           return
         }
+        deletingRef.current = true
         void noteActions.trashOne(path).then(onDeleted, (cause: unknown) => {
+          deletingRef.current = false
           logger.error('delete failed:', errorMessage(cause))
           // The native confirmation has closed, so the error shows as a toast.
           toastController.add({

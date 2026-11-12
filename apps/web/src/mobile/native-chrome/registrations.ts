@@ -72,6 +72,10 @@ export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): 
   useLayoutEffect(() => {
     handlersRef.current = handlers
   })
+  const specRef = useRef(spec)
+  useLayoutEffect(() => {
+    specRef.current = spec
+  })
   const specJSON = JSON.stringify(spec)
 
   // Layout effects, so the bar is in the store before the chrome projection
@@ -100,7 +104,7 @@ export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): 
       return
     }
     updateBars((bars) => {
-      bars.set(entryId, JSON.parse(specJSON) as NativeBarSpec)
+      bars.set(entryId, specRef.current)
     })
   }, [enabled, entryId, specJSON])
 }

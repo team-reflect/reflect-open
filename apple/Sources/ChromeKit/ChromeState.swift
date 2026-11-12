@@ -19,10 +19,14 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   public var generation: Int
   /// The history entry the state describes. Intents echo it.
   public var entryId: Int
+  /// Whether the page shows its shell (`shell`) or a full-screen page with
+  /// no bars (`none`: onboarding, loading, the crash card).
   public var chrome: Chrome
   /// The kind of the route on screen, for logs.
   public var routeKind: String?
+  /// The tab the page shows. The tab bar selects it.
   public var tab: ChromeTab
+  /// Whether the page can go back. The navigation bar shows a back button.
   public var canBack: Bool
   /// The navigation bar title, or `nil` while the page does not know it.
   public var title: String?
