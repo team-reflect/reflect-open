@@ -16,6 +16,7 @@ import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
 import { linkOpacityToScroll } from '@/lib/scroll-linked-opacity.ts'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 import { cn } from '@/lib/utils.ts'
+import { useNativeModal } from '@/mobile/native-chrome/registrations.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './scroll-drawer.css'
 
@@ -58,6 +59,7 @@ export interface DrawerProps {
  */
 export function Drawer({ open, onOpenChange, children }: DrawerProps): ReactElement {
   const contextValue = useMemo(() => ({ open, onOpenChange }), [open, onOpenChange])
+  useNativeModal(open)
   return (
     <DrawerContext value={contextValue}>
       <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>

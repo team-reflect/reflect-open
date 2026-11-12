@@ -4,3 +4,7 @@
 :root[data-native-chrome~='toolbar'] [role='toolbar'][aria-label='Formatting'] {
   display: none;
 }
+
+:root[data-native-chrome~='tabbar'] nav[aria-label='Sections'] {
+  display: none;
+}

@@ -217,7 +217,7 @@ export function MobileTasks(): ReactElement {
       <Button
         size="icon"
         aria-label="New task"
-        className="fixed right-safe-offset-4 bottom-above-keyboard-offset-17 z-40 size-12 rounded-full shadow-lg"
+        className="fixed right-safe-offset-4 bottom-above-keyboard-offset-17 native-tabbar:bottom-above-keyboard-offset-4 z-40 size-12 rounded-full shadow-lg"
         onClick={() => onAdd(todaysDailyTarget(today))}
       >
         <Plus className="size-6" />

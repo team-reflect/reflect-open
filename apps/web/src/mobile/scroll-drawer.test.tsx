@@ -2,6 +2,8 @@ import { useCallback, useState, type ReactElement } from 'react'
 import { page } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { describe, expect, it, vi } from 'vitest'
+import { nativeModalCount } from '@/mobile/native-chrome/registrations.ts'
+import { installNativeChrome } from '@/services/native-chrome-transport.ts'
 import { act } from '@/test-utils/act.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement } from '@/test-utils/scroll.ts'
@@ -157,5 +159,25 @@ describe('ScrollDrawer', () => {
     // A detached scroller would also read 0 for both.
     expect(scroller.isConnected).toBe(true)
     await expect.element(page.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('counts as a modal for the native shell while open', async () => {
+    const handler = { postMessage: vi.fn() }
+    installNativeChrome(
+      {
+        __nativeChromeFeatures: ['tabbar'],
+        webkit: { messageHandlers: { reflectHost: handler, reflectChrome: handler } },
+      },
+      document.documentElement,
+    )
+    try {
+      const view = await renderInApp(<Harness />)
+      await openScroller()
+      expect(nativeModalCount.get()).toBe(1)
+      await view.unmount()
+      expect(nativeModalCount.get()).toBe(0)
+    } finally {
+      installNativeChrome({}, document.documentElement)
+    }
   })
 })
