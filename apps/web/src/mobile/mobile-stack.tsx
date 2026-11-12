@@ -82,12 +82,14 @@ function layerKey(route: Route): string {
  * pushed onto the screen being left slides in; one that lands over any other
  * screen (the All tab returning to its open Chat or note, with All's list put
  * beneath it, or Back from another tab into a card) is a tab switch too, so
- * it appears in place.
+ * it appears in place. Likewise a card slides out only on the way back (a
+ * history pop, or a move to the screen beneath it); a tab tap that leaves a
+ * card for another tab's root is instant.
  *
  * @param below The screen the arriving route sits on (what its Back reveals).
  */
 function transitionFor(
-  from: { route: Route; entryId: number },
+  from: { route: Route; entryId: number; below: Route },
   to: { route: Route; entryId: number },
   below: Route,
 ): StackTransition {
@@ -101,7 +103,7 @@ function transitionFor(
     return routesEqual(below, from.route) ? { kind: 'push' } : { kind: 'none' }
   }
   if (!toStacked && fromStacked) {
-    return pop
+    return to.entryId < from.entryId || routesEqual(to.route, from.below) ? pop : { kind: 'none' }
   }
   if (toStacked && fromStacked) {
     // Note to note: entry ids grow monotonically, so a smaller id means the
@@ -247,7 +249,8 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const edgeRef = useRef<HTMLDivElement>(null)
 
   const [transition, setTransition] = useState<StackTransition>({ kind: 'none' })
-  const [arrival, setArrival] = useState({ route, entryId })
+  const below: Route = backRoute ?? { kind: 'today' }
+  const [arrival, setArrival] = useState({ route, entryId, below })
   // Set when a completed back-swipe commits its pop: the screen is already
   // offscreen, so the arrival it causes must not animate a second time.
   const [poppedByGesture, setPoppedByGesture] = useState(false)
@@ -255,17 +258,15 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   // Transition detection happens during render (the mobile-shell `lastTab`
   // pattern) so the new screen's very first frame starts offscreen.
   if (entryId !== arrival.entryId) {
-    setArrival({ route, entryId })
+    setArrival({ route, entryId, below })
     setPoppedByGesture(false)
     setTransition(
-      poppedByGesture
-        ? { kind: 'none' }
-        : transitionFor(arrival, { route, entryId }, backRoute ?? { kind: 'today' }),
+      poppedByGesture ? { kind: 'none' } : transitionFor(arrival, { route, entryId }, below),
     )
   } else if (route !== arrival.route) {
     // Same entry, new route object: a note move rewrote the history in
     // place. Track it so a later pop's exiting card shows the live path.
-    setArrival({ route, entryId })
+    setArrival({ route, entryId, below })
   }
 
   const popByGesture = useCallback((): void => {
