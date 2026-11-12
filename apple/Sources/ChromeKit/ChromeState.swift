@@ -67,10 +67,11 @@ public struct MenuAction: Decodable, Equatable, Sendable {
   public var destructive: Bool
   public var disabled: Bool
   public var checked: Bool
+  public var keepsMenuPresented: Bool
   public var confirm: MenuConfirm?
 
   private enum CodingKeys: String, CodingKey {
-    case id, title, icon, destructive, disabled, checked, confirm
+    case id, title, icon, destructive, disabled, checked, keepsMenuPresented, confirm
   }
 
   public init(from decoder: any Decoder) throws {
@@ -81,6 +82,8 @@ public struct MenuAction: Decodable, Equatable, Sendable {
     destructive = try container.decodeIfPresent(Bool.self, forKey: .destructive) ?? false
     disabled = try container.decodeIfPresent(Bool.self, forKey: .disabled) ?? false
     checked = try container.decodeIfPresent(Bool.self, forKey: .checked) ?? false
+    keepsMenuPresented =
+      try container.decodeIfPresent(Bool.self, forKey: .keepsMenuPresented) ?? false
     confirm = try container.decodeIfPresent(MenuConfirm.self, forKey: .confirm)
   }
 }
@@ -128,9 +131,26 @@ public struct ToolbarState: Decodable, Equatable, Sendable {
   public var canAttachFiles: Bool
 }
 
+/// A rectangle in CSS pixels of the web view.
+public struct ChromeRect: Decodable, Equatable, Sendable {
+  public var x: Double
+  public var y: Double
+  public var width: Double
+  public var height: Double
+}
+
+/// The page asks the shell to show a menu at a web element.
+public struct MenuRequest: Decodable, Equatable, Sendable {
+  public var entryId: Int
+  public var menuId: String
+  public var rect: ChromeRect
+  public var items: [MenuItem]
+}
+
 /// A message from the page to the `reflectChrome` handler.
 public enum ChromeMessage: Decodable, Equatable, Sendable {
   case state(ChromeState)
+  case presentMenu(MenuRequest)
   /// A web push or pop slide starts (`true`) or ends (`false`).
   case transition(started: Bool)
   /// The page listens for intents.
@@ -147,6 +167,7 @@ public enum ChromeMessage: Decodable, Equatable, Sendable {
     let type = try container.decode(String.self, forKey: .type)
     switch type {
     case "state": self = .state(try ChromeState(from: decoder))
+    case "presentMenu": self = .presentMenu(try MenuRequest(from: decoder))
     case "transition":
       switch try container.decode(String.self, forKey: .phase) {
       case "start": self = .transition(started: true)
@@ -188,11 +209,12 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
   case back(entryId: Int)
   case tab(ChromeTab)
   case action(entryId: Int, id: String)
+  case menu(entryId: Int, menuId: String, id: String)
   case command(FormattingCommand)
   case files([IntentFile])
 
   private enum CodingKeys: String, CodingKey {
-    case type, entryId, tab, id, files
+    case type, entryId, tab, id, menuId, files
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -207,6 +229,11 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
     case .action(let entryId, let id):
       try container.encode("action", forKey: .type)
       try container.encode(entryId, forKey: .entryId)
+      try container.encode(id, forKey: .id)
+    case .menu(let entryId, let menuId, let id):
+      try container.encode("menu", forKey: .type)
+      try container.encode(entryId, forKey: .entryId)
+      try container.encode(menuId, forKey: .menuId)
       try container.encode(id, forKey: .id)
     case .command(let id):
       try container.encode("command", forKey: .type)

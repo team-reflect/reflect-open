@@ -10,6 +10,7 @@ import { Drawer, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
+import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
 
 interface AiProviderActionsDrawerProps {
   /** The provider the sheet manages; null renders nothing (exit animation). */
@@ -74,8 +75,65 @@ export function AiProviderActionsDrawer({
     })
   }
 
+  const nativeMenu = useNativeMenuDrawer({
+    open,
+    onOpenChange,
+    menuId: 'ai-provider-actions',
+    items:
+      provider === null
+        ? []
+        : [
+            {
+              type: 'section',
+              title: 'Default model',
+              items: models.map((model) => ({
+                type: 'action',
+                id: `model:${model.id}`,
+                title: model.label,
+                checked: model.id === provider.model,
+              })),
+            },
+            {
+              type: 'section',
+              items: [
+                {
+                  type: 'action',
+                  id: 'default',
+                  title: isDefault ? 'Default provider' : 'Use as default',
+                  disabled: isDefault,
+                },
+                {
+                  type: 'action',
+                  id: 'remove',
+                  title: 'Remove provider',
+                  destructive: true,
+                  confirm: {
+                    title: `Remove ${providerInfo?.label ?? 'this provider'}?`,
+                    message: 'Its API key is deleted from this device.',
+                    action: 'Remove',
+                  },
+                },
+              ],
+            },
+          ],
+    onSelect: (id) => {
+      if (provider === null) {
+        return
+      }
+      if (id.startsWith('model:')) {
+        onSetDefaultModel(provider.id, id.slice('model:'.length))
+      } else if (id === 'default') {
+        onMakeDefault(provider.id)
+      } else if (id === 'remove') {
+        void onRemove(provider.id).catch((cause: unknown) => {
+          logger.error('AI provider removal failed:', errorMessage(cause))
+        })
+      }
+    },
+  })
+
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open && !nativeMenu} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Manage AI provider">
         {provider !== null && providerInfo !== null ? (
           <>
