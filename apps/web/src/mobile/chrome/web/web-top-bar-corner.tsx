@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button.tsx'
 import { useToastController } from '@/lib/use-toasts.ts'
@@ -81,23 +81,41 @@ function CornerButton({
       'transition-opacity duration-150 motion-reduce:transition-none',
       hidden ? 'pointer-events-none opacity-0' : 'opacity-100',
     ),
-    onClick: () => void runChromeAction(chrome, button.id, toasts),
   }
   if (button.menu !== undefined) {
     return (
-      <ChromeMenuDrawer button={{ ...button, menu: button.menu }} chrome={chrome} edge={edge} />
+      <ChromeMenuDrawer
+        button={{ ...button, menu: button.menu }}
+        chrome={chrome}
+        trigger={renderButtonFace(button, edge, hiddenProps)}
+      />
     )
   }
+  return renderButtonFace(button, edge, {
+    ...hiddenProps,
+    onClick: () => void runChromeAction(chrome, button.id, toasts),
+  })
+}
+
+/**
+ * The button element of `button`: its icon, or a small text button with its
+ * title when it has no icon.
+ */
+function renderButtonFace(
+  button: ChromeButton,
+  edge: 'leading' | 'trailing' | undefined,
+  props: ComponentProps<typeof Button>,
+): ReactElement {
   if (button.icon === undefined) {
     return (
-      <Button variant="ghost" size="sm" {...hiddenProps}>
+      <Button variant="ghost" size="sm" {...props}>
         {button.title}
       </Button>
     )
   }
   const Icon = WEB_ICONS[button.icon]
   return (
-    <MobileTopBarIconButton edge={edge} aria-label={button.title} {...hiddenProps}>
+    <MobileTopBarIconButton edge={edge} aria-label={button.title} {...props}>
       <Icon aria-hidden />
     </MobileTopBarIconButton>
   )

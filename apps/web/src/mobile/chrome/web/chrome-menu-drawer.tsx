@@ -13,12 +13,14 @@ import type {
 import { ChromeConfirmDrawer } from '@/mobile/chrome/web/chrome-confirm-drawer.tsx'
 import { WEB_ICONS } from '@/mobile/chrome/web/web-icons.ts'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scroll-drawer.tsx'
-import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 
 interface ChromeMenuDrawerProps {
   button: ChromeButton & { menu: ChromeMenuItem[] }
   chrome: ScreenChrome
-  edge: 'leading' | 'trailing' | undefined
+  /**
+   * The button that opens the menu.
+   */
+  trigger: ReactElement
 }
 
 type ActionItem = Extract<ChromeMenuItem, { type: 'action' }>
@@ -27,13 +29,12 @@ type ActionItem = Extract<ChromeMenuItem, { type: 'action' }>
  * A corner button that opens its menu as a bottom drawer. An item with a
  * confirmation asks in a second drawer before it runs.
  */
-export function ChromeMenuDrawer({ button, chrome, edge }: ChromeMenuDrawerProps): ReactElement {
+export function ChromeMenuDrawer({ button, chrome, trigger }: ChromeMenuDrawerProps): ReactElement {
   const toasts = useToastController()
   const [open, setOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   // Kept after the drawer closes, so its content stays during the exit.
   const [confirming, setConfirming] = useState<{ id: string; confirm: ChromeConfirm } | null>(null)
-  const Icon = button.icon === undefined ? null : WEB_ICONS[button.icon]
 
   const select = (item: ActionItem): void => {
     setOpen(false)
@@ -48,9 +49,7 @@ export function ChromeMenuDrawer({ button, chrome, edge }: ChromeMenuDrawerProps
   return (
     <>
       <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerTrigger render={<MobileTopBarIconButton edge={edge} aria-label={button.title} />}>
-          {Icon === null ? button.title : <Icon aria-hidden />}
-        </DrawerTrigger>
+        <DrawerTrigger render={trigger} />
         <DrawerContent>
           <DrawerTitle className="sr-only">{button.title}</DrawerTitle>
           <div className="flex flex-col gap-1 p-4">

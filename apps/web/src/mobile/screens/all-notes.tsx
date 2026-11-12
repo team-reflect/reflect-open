@@ -96,7 +96,7 @@ export function MobileAllNotes({
 }: MobileAllNotesProps): ReactElement {
   const graph = useGraphInfo()
   const { noteList, search } = useCoreServices()
-  const { arrivalSeq, arrivalFocusEditor } = useRouterState()
+  const { arrivalSeq, arrivalFocusEditor, canBack } = useRouterState()
   const { navigate, back } = useRouterActions()
   const enabled = graph !== null
 
@@ -138,6 +138,8 @@ export function MobileAllNotes({
     [hits, dateFormat],
   )
 
+  const clearRouteTag = (): void => navigate({ kind: 'allNotes', tag: null })
+
   const addPendingTag = (facet: NoteTagFacet): void => {
     const key = foldTag(facet.tag)
     if (!filters.tags.includes(key)) {
@@ -149,7 +151,7 @@ export function MobileAllNotes({
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
       <ChromeTopBar
-        back={tag !== null ? back : undefined}
+        back={tag === null ? undefined : canBack ? back : clearRouteTag}
         title={
           <>
             <SearchInput
@@ -175,7 +177,7 @@ export function MobileAllNotes({
               onFiltersChange={onFiltersChange}
               facets={facets ?? []}
               routeTag={tag}
-              onClearRouteTag={() => navigate({ kind: 'allNotes', tag: null })}
+              onClearRouteTag={clearRouteTag}
             />
           )}
         </MobileTopBarScrollableRow>

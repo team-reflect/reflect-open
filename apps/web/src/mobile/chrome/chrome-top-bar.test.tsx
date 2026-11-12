@@ -69,6 +69,28 @@ describe('ChromeTopBar', () => {
     expect(onAction).toHaveBeenCalledWith('more')
   })
 
+  it('hides a hidden menu button and opens the menu of a text button', async () => {
+    const view = await renderInApp(
+      <ChromeTopBar
+        trailing={[
+          {
+            id: 'gone',
+            title: 'Gone',
+            icon: 'ellipsis',
+            hidden: true,
+            menu: [{ type: 'action', id: 'a', title: 'A' }],
+          },
+          { id: 'sort', title: 'Sort', menu: [{ type: 'action', id: 'newest', title: 'Newest' }] },
+        ]}
+        title={<h1>Notes</h1>}
+      />,
+    )
+
+    expect(view.getByRole('button', { name: 'Gone' }).query()).toBeNull()
+    await view.getByRole('button', { name: 'Sort' }).click()
+    await expect.element(view.getByRole('button', { name: 'Newest' })).toBeVisible()
+  })
+
   it('leaves the corner buttons to the shell with the native renderer', async () => {
     const host = createTestNativeChromeHost()
     const back = vi.fn()
