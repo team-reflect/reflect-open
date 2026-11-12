@@ -1,7 +1,7 @@
 import UIKit
 
-/// Shows the web app (in the native chrome containers when the build draws
-/// them), or the error of a shell that did not start.
+/// Shows the web app in the native chrome containers, or the error of a
+/// shell that did not start.
 @MainActor
 final class RootViewController: UIViewController {
   private(set) var host: AppHost?
@@ -11,11 +11,6 @@ final class RootViewController: UIViewController {
     do {
       let host = try AppHost()
       self.host = host
-      // Without native chrome the web view is the whole screen, as before.
-      guard host.nativeChrome else {
-        view = host.webView
-        return
-      }
       let view = UIView()
       view.backgroundColor = .systemBackground
       self.view = view

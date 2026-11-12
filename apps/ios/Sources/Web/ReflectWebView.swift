@@ -1,4 +1,3 @@
-import ChromeKit
 import KeyboardKit
 import UIKit
 import WebHostKit
@@ -14,7 +13,7 @@ final class ReflectWebView: WKWebView {
 
   init(
     routes: [any SchemeRoute], assets: AssetSchemeHandler, bridge: HostBridge,
-    nativeChrome: Bool, dataStore: WKWebsiteDataStore = .default()
+    dataStore: WKWebsiteDataStore = .default()
   ) {
     let configuration = WKWebViewConfiguration()
     configuration.setURLSchemeHandler(
@@ -22,9 +21,6 @@ final class ReflectWebView: WKWebView {
     configuration.setURLSchemeHandler(assets, forURLScheme: AssetSchemeHandler.scheme)
     configuration.userContentController.addUserScript(HostBridge.userScript)
     configuration.userContentController.add(bridge, name: HostBridge.messageHandlerName)
-    if nativeChrome {
-      configuration.userContentController.addUserScript(NativeChrome.userScript)
-    }
     configuration.allowsInlineMediaPlayback = true
     configuration.allowsPictureInPictureMediaPlayback = true
     configuration.mediaTypesRequiringUserActionForPlayback = []

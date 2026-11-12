@@ -8,6 +8,3 @@ REFLECT_BUNDLE_ID = app.reflect.ios
 REFLECT_DISPLAY_NAME = Reflect
 REFLECT_APP_GROUP = group.app.reflect
 REFLECT_APP_ICON = AppIcon
-
-// Whether this flavor draws the mobile chrome natively (ChromeKit `NativeChrome`).
-REFLECT_NATIVE_CHROME = NO

@@ -1,33 +1,14 @@
 import type { NativeChromeHost } from '@reflect/app'
-import { listenHostEvent, type SwiftMessageHandler } from '@/services/swift-events.ts'
+import { listenHostEvent } from '@/services/swift-events.ts'
 
 /**
- * The globals of the Swift shell that carry the native chrome: the flag (a
- * user script sets it before any page script runs) and the `reflectHost`
- * message handler, which also takes the chrome messages.
+ * The Swift shell, which always draws the mobile chrome natively: messages
+ * go to its `reflectHost` handler, and intents come as `chrome:intent` events.
  */
-export interface NativeChromeGlobals {
-  readonly __nativeChrome?: boolean | undefined
-  readonly webkit?:
-    | { messageHandlers?: { reflectHost?: SwiftMessageHandler | undefined } | undefined }
-    | undefined
-}
-
-/**
- * The Swift shell as the native chrome host: messages go to its
- * `reflectHost` handler, and intents come as `chrome:intent` events.
- * `undefined` when the shell draws no native chrome.
- */
-export function createSwiftNativeChromeHost(
-  globals: NativeChromeGlobals,
-): NativeChromeHost | undefined {
-  const handler = globals.webkit?.messageHandlers?.reflectHost
-  if (globals.__nativeChrome !== true || handler === undefined) {
-    return undefined
-  }
+export function createSwiftNativeChromeHost(target: Window): NativeChromeHost {
   return {
     post: (message) => {
-      handler.postMessage(message)
+      target.webkit?.messageHandlers?.reflectHost?.postMessage(message)
     },
     listenIntent: (listener) => {
       return listenHostEvent('chrome:intent', listener)
