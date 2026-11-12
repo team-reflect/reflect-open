@@ -195,7 +195,7 @@ export function MobileTasks(): ReactElement {
         <div
           // A stacking context, so WebKit composites the sticky headers and row
           // surfaces inside this scroller, below the iOS scroll indicator.
-          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-24"
+          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-24 native-tabbar:pb-safe-offset-24"
           onScroll={() => revealedRow.set(null)}
         >
           {groups.map((group) => (

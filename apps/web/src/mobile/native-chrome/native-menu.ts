@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { NO_ENTRY, type NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
-import { rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
+import { forgetNativeMenu, rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
 import { useOptionalRouterState } from '@/routing/router.tsx'
 import { hasNativeChrome, postNativeChrome } from '@/services/native-chrome-transport.ts'
 
@@ -105,6 +105,9 @@ export function useNativeMenuDrawer({
   useLayoutEffect(() => {
     latestRef.current = { items, onSelect, onOpenChange }
   })
+  // One handler per mounted drawer, so an unmount forgets only its own menu.
+  const [select] = useState(() => (id: string) => latestRef.current.onSelect(id))
+  useEffect(() => () => forgetNativeMenu(menuId, select), [menuId, select])
 
   useEffect(() => {
     if (native) {
@@ -121,10 +124,10 @@ export function useNativeMenuDrawer({
       menuId,
       anchor: lastPressedControl(),
       items: latestRef.current.items,
-      onSelect: (id) => latestRef.current.onSelect(id),
+      onSelect: select,
     })
     latestRef.current.onOpenChange(false)
-  }, [native, open, entryId, menuId])
+  }, [native, open, entryId, menuId, select])
 
   return native
 }

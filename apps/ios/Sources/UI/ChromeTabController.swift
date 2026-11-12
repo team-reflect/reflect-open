@@ -15,14 +15,13 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   private var pages: [ChromeTab: WebPageController] = [:]
   /// Set while the selection follows a state, so it sends no intent.
   private var following = false
-  /// The tab the user tapped, until the page shows it. States posted before
-  /// the tap still name the old tab, so they must not move the selection back
-  /// (for at most 2 s).
-  private var pendingTab: ChromeTab?
+  /// The tab to select, with a tap that waits for the page (at most 2 s).
+  private var tabFollow = TabFollow()
   /// The picture of the old tab over the new page until the page shows the new tab.
   private var cover: UIView?
-  /// The tab of the last state.
-  private var stateTab: ChromeTab?
+  /// The last state's reasons to hide the tab bar.
+  private var hidesForState = true
+  private var hidesForKeyboard = false
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -47,6 +46,10 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     // The launch look: no bars before the first state.
     isTabBarHidden = true
     pages[.daily]?.attach(webView)
+    registerForTraitChanges([UITraitHorizontalSizeClass.self]) {
+      (self: Self, _: UITraitCollection) in
+      self.updateTabBarHidden()
+    }
   }
 
   @available(*, unavailable)
@@ -82,16 +85,22 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   }
 
   /// Follows a state: selects its tab, holds the web view in its page, and
-  /// hides the bar while the keyboard or a web drawer is up.
+  /// hides the bar while a web drawer is up, or while the keyboard is up and
+  /// the bar sits at the bottom.
   func apply(_ state: ChromeState) {
-    stateTab = state.tab
-    if pendingTab == state.tab {
-      pendingTab = nil
+    if let tab = tabFollow.state(state.tab) {
+      follow(tab)
     }
-    if pendingTab == nil {
-      follow(state.tab)
-    }
-    let hidden = state.chrome == .none || state.keyboardVisible || state.modal
+    hidesForState = state.chrome == .none || state.modal
+    hidesForKeyboard = state.keyboardVisible
+    updateTabBarHidden()
+  }
+
+  /// In a regular width the bar sits at the top, where the keyboard never
+  /// reaches it.
+  private func updateTabBarHidden() {
+    let atBottom = traitCollection.horizontalSizeClass != .regular
+    let hidden = hidesForState || (hidesForKeyboard && atBottom)
     if hidden != isTabBarHidden {
       setTabBarHidden(hidden, animated: true)
     }
@@ -111,8 +120,9 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   /// A new document: back to the launch look.
   func reset() {
-    pendingTab = nil
-    stateTab = nil
+    tabFollow = TabFollow()
+    hidesForState = true
+    hidesForKeyboard = false
     for page in pages.values {
       page.clearBar()
     }
@@ -128,7 +138,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     guard !following, let next = ChromeTab(rawValue: tab.identifier) else { return true }
     send(.tab(next))
     if tab !== selectedTab, let page = pages[next] {
-      pendingTab = next
+      tabFollow.tap(next)
       move(to: page)
     }
     return true
@@ -155,11 +165,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       guard let self, let page else { return }
       self.removeCover(from: page)
       // The page did not show the tapped tab: follow the tab it shows.
-      if self.pendingTab == page.chromeTab {
-        self.pendingTab = nil
-        if let stateTab = self.stateTab {
-          self.follow(stateTab)
-        }
+      if let pageTab = page.chromeTab, let tab = self.tabFollow.timeOut(pageTab) {
+        self.follow(tab)
       }
     }
   }

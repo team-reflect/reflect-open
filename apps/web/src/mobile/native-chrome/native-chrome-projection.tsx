@@ -128,10 +128,34 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'command':
       runFormattingCommand(intent.id)
       return
-    case 'files':
-      void context.attachCommands?.attachFiles(intent.files.map(decodeFile))
+    case 'files': {
+      const commands = context.attachCommands
+      if (commands !== null) {
+        attachQueue = attachAfter(attachQueue, commands, intent.files.map(decodeFile))
+      }
       return
+    }
   }
+}
+
+/**
+ * The inserts of earlier `files` intents. The shell sends one intent per
+ * picked image, so each insert waits for the one before it and the images
+ * land in the picked order.
+ */
+let attachQueue: Promise<void> = Promise.resolve()
+
+async function attachAfter(
+  previous: Promise<void>,
+  commands: FormattingToolbarCommands,
+  files: File[],
+): Promise<void> {
+  try {
+    await previous
+  } catch {
+    // The failed insert surfaced as an unhandled rejection; this one goes on.
+  }
+  await commands.attachFiles(files)
 }
 
 interface NativeChromeProjectionProps {

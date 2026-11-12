@@ -119,6 +119,15 @@ export function rememberNativeMenu(menuId: string, menu: OpenMenu): void {
 }
 
 /**
+ * Forget the menu `menuId` when `onSelect` is still its handler.
+ */
+export function forgetNativeMenu(menuId: string, onSelect: (id: string) => void): void {
+  if (openMenus.get(menuId)?.onSelect === onSelect) {
+    openMenus.delete(menuId)
+  }
+}
+
+/**
  * The handler of the menu `menuId`, when it was opened for `entryId`.
  */
 export function nativeMenuHandler(menuId: string, entryId: number): ((id: string) => void) | null {

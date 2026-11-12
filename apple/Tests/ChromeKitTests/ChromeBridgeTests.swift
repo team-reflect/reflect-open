@@ -41,7 +41,7 @@ final class ChromeBridgeTests: XCTestCase {
   func testDailyFixtureHasTheMonthMenuAndTheGear() throws {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("daily"))
     XCTAssertEqual(state.title, "November 2026")
-    XCTAssertEqual(state.route?.kind, "today")
+    XCTAssertEqual(state.routeKind, "today")
     XCTAssertEqual(state.leading.map(\.id), ["today"])
     XCTAssertEqual(state.trailing.first?.icon, "gearshape")
     guard case .action(let current) = state.titleMenu?.first else {

@@ -124,7 +124,7 @@ describe('buildShellChromeState', () => {
 describe('buildNoChromeState', () => {
   it('shows no bars', () => {
     const state = buildNoChromeState('light')
-    expect(state).toMatchObject({ chrome: 'none', showsBar: false, route: null })
+    expect(state).toMatchObject({ chrome: 'none', showsBar: false, routeKind: null })
     checkFixture('none', state)
   })
 })

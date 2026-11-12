@@ -2,10 +2,7 @@
   "type": "state",
   "entryId": 7,
   "chrome": "shell",
-  "route": {
-    "kind": "note",
-    "path": "ideas.md"
-  },
+  "routeKind": "note",
   "tab": "daily",
   "canBack": true,
   "title": "Ideas",

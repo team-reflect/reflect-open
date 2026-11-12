@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { noop } from '@ocavue/utils'
 import { describe, expect, it, vi } from 'vitest'
 import {
   runNativeIntent,
   type IntentContext,
 } from '@/mobile/native-chrome/native-chrome-projection.tsx'
+import type { FormattingToolbarCommands } from '@/editor/formatting-toolbar-store.ts'
 import { parseNativeIntent } from '@/mobile/native-chrome/protocol.ts'
 import { nativeMenuHandler, rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
 
@@ -75,5 +77,28 @@ describe('runNativeIntent', () => {
     runNativeIntent({ type: 'menu', entryId: 5, menuId: 'filters', id: 'a' }, makeIntentContext())
     expect(onSelect).toHaveBeenCalledWith('a')
     expect(nativeMenuHandler('filters', 4)).toBeNull()
+  })
+
+  it('inserts the images of one pick in the picked order', async () => {
+    const order: string[] = []
+    let finishFirst: () => void = noop
+    const attachFiles = vi.fn(async (files: File[]) => {
+      const name = files[0]?.name ?? ''
+      if (name === 'big.jpg') {
+        await new Promise<void>((resolve) => {
+          finishFirst = resolve
+        })
+      }
+      order.push(name)
+    })
+    const ctx = makeIntentContext({
+      attachCommands: { attachFiles } as unknown as FormattingToolbarCommands,
+    })
+    const file = (name: string) => ({ name, type: 'image/jpeg', data: 'AQID' })
+    runNativeIntent({ type: 'files', files: [file('big.jpg')] }, ctx)
+    runNativeIntent({ type: 'files', files: [file('small.jpg')] }, ctx)
+    await vi.waitFor(() => expect(attachFiles).toHaveBeenCalledTimes(1))
+    finishFirst()
+    await vi.waitFor(() => expect(order).toEqual(['big.jpg', 'small.jpg']))
   })
 })

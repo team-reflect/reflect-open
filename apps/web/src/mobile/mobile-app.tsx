@@ -119,7 +119,7 @@ function MobileSurface(): ReactElement {
 
   if (status === 'ready' && graph) {
     return (
-      <AppErrorBoundary>
+      <AppErrorBoundary besideFallback={<NativeChromeOff />}>
         <MobileRouter key={graph.root} graphRoot={graph.root}>
           {/* Native recording over the shared capture pipeline — the
               mobile leg of desktop's audio memos. Mounted here so the

@@ -2,9 +2,7 @@
   "type": "state",
   "entryId": 7,
   "chrome": "shell",
-  "route": {
-    "kind": "tasks"
-  },
+  "routeKind": "tasks",
   "tab": "tasks",
   "canBack": false,
   "title": "Tasks",

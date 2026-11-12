@@ -2,9 +2,7 @@
   "type": "state",
   "entryId": 7,
   "chrome": "shell",
-  "route": {
-    "kind": "today"
-  },
+  "routeKind": "today",
   "tab": "daily",
   "canBack": false,
   "title": "November 2026",

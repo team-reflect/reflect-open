@@ -59,7 +59,7 @@ final class ChromeCoordinator {
   private func apply(_ state: ChromeState) {
     #if DEBUG
     Self.logger.debug(
-      "state \(state.generation) entry \(state.entryId) \(state.route?.kind ?? "none", privacy: .public)"
+      "state \(state.generation) entry \(state.entryId) \(state.routeKind ?? "none", privacy: .public)"
     )
     #endif
     applyTheme(state.theme)
@@ -123,13 +123,13 @@ final class ChromeCoordinator {
     formatting?.sizeDidChange()
   }
 
-  /// A new document started: nothing of the old page stays on screen.
+  /// A new document started: nothing of the old page stays on screen. The
+  /// theme stays until the first state, so a pinned style does not flip.
   private func reset() {
     menus.closeAll()
     barFrozen = false
     formatting?.update(nil)
     tabs?.reset()
-    applyTheme(.system)
   }
 
   /// Pins the light or dark style that the page pins, so the system bars match it.

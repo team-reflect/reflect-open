@@ -78,7 +78,8 @@ export interface NativeChromeState {
   entryId: number
   /** `none` on the surfaces outside the shell (onboarding, loading, error). */
   chrome: 'shell' | 'none'
-  route: Route | null
+  /** The kind of the route on screen, for the shell's logs. */
+  routeKind: Route['kind'] | null
   tab: MobileTab
   canBack: boolean
   /** The navigation bar title, or `null` while it is not known yet. */

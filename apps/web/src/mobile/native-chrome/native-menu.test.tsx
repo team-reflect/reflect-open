@@ -54,6 +54,9 @@ describe('useNativeMenuDrawer', () => {
     expect(message.rect.width).toBeGreaterThan(0)
     nativeMenuHandler('picker', NO_ENTRY)?.('a')
     expect(onSelect).toHaveBeenCalledWith('a')
+
+    await screen.unmount()
+    expect(nativeMenuHandler('picker', NO_ENTRY)).toBeNull()
   })
 
   it('opens the web drawer without the shell', async () => {

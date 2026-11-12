@@ -20,7 +20,8 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   /// The history entry the state describes. Intents echo it.
   public var entryId: Int
   public var chrome: Chrome
-  public var route: ChromeRoute?
+  /// The kind of the route on screen, for logs.
+  public var routeKind: String?
   public var tab: ChromeTab
   public var canBack: Bool
   /// The navigation bar title, or `nil` while the page does not know it.
@@ -36,11 +37,6 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   public var modal: Bool
   public var toolbar: ToolbarState?
   public var theme: Theme
-}
-
-/// The route of the page. The shell reads only its kind, for logs.
-public struct ChromeRoute: Decodable, Equatable, Sendable {
-  public var kind: String
 }
 
 /// A tab of the shell.

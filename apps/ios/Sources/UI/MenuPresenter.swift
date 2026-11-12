@@ -20,6 +20,8 @@ final class MenuPresenter {
   private var openRequest: MenuRequest?
   /// The history entry of the open menu or confirmation.
   private var openEntryId: Int?
+  /// The open confirmation.
+  private weak var confirmation: UIAlertController?
 
   init() {
     anchor.alpha = 0
@@ -52,9 +54,9 @@ final class MenuPresenter {
   ) -> UIMenu {
     MenuBuilder.menu(items) { [weak self] action in
       guard let self else { return }
-      self.openEntryId = entryId
       // The next state rebuilds a bar menu with the new checkmarks.
-      self.select(action, intent: .action(entryId: entryId, id: action.id), source: source)
+      self.select(
+        action, intent: .action(entryId: entryId, id: action.id), entryId: entryId, source: source)
     }
   }
 
@@ -69,9 +71,7 @@ final class MenuPresenter {
     openEntryId = nil
     openRequest = nil
     anchor.contextMenuInteraction?.dismissMenu()
-    if let alert = presenter()?.presentedViewController as? UIAlertController {
-      alert.dismiss(animated: true)
-    }
+    confirmation?.dismiss(animated: true)
   }
 
   private func menu(for request: MenuRequest) -> UIMenu {
@@ -81,14 +81,15 @@ final class MenuPresenter {
         self.toggleVisibleCheckmark(of: action.id)
       }
       self.select(
-        action, intent: .menu(entryId: request.entryId, menuId: request.menuId, id: action.id)
+        action, intent: .menu(entryId: request.entryId, menuId: request.menuId, id: action.id),
+        entryId: request.entryId
       ) { [weak self] in self?.anchor }
     }
   }
 
   /// Sends the intent of `action`, after a confirmation when it has one.
   private func select(
-    _ action: MenuAction, intent: ChromeIntent,
+    _ action: MenuAction, intent: ChromeIntent, entryId: Int,
     source: @escaping () -> (any UIPopoverPresentationControllerSourceItem)?
   ) {
     guard let confirm = action.confirm else {
@@ -97,11 +98,12 @@ final class MenuPresenter {
     }
     guard let presenter = presenter() else { return }
     guard let item = source() ?? presenter.viewIfLoaded else { return }
-    let entryId = openEntryId
+    openEntryId = entryId
     let alert = MenuBuilder.confirmation(confirm, source: item) { [weak self] in
       guard let self, self.openEntryId == entryId else { return }
       self.send(intent)
     }
+    confirmation = alert
     // The menu dismisses as the tap lands; the alert waits for it.
     DispatchQueue.main.async {
       presenter.present(alert, animated: true)
