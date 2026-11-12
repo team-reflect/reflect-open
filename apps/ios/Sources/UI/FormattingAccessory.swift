@@ -26,6 +26,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private var relayout = false
   /// Loads the picked images; a new document cancels it.
   private var loading: Task<Void, Never>?
+  /// The presented photo picker; a new document closes it.
+  private weak var picker: PHPickerViewController?
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -66,6 +68,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   func reset() {
     loading?.cancel()
     loading = nil
+    picker?.dismiss(animated: true)
+    picker = nil
   }
 
   /// Lays the keyboard out again after the window changed size: the strip
@@ -100,11 +104,14 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     configuration.selectionLimit = Self.imageLimit
     let picker = PHPickerViewController(configuration: configuration)
     picker.delegate = self
+    self.picker = picker
     presenter()?.present(picker, animated: true)
   }
 
   func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
     picker.dismiss(animated: true)
+    // A cancel keeps the images of an earlier pick that still load.
+    guard !results.isEmpty else { return }
     let providers = results.map(\.itemProvider)
     loading?.cancel()
     loading = Task { [weak self] in

@@ -95,7 +95,8 @@ final class ChromeCoordinator {
   /// latest state. A lost end
   /// thaws the bar after one second.
   private func transition(started: Bool) {
-    guard features.contains(.navbar) else { return }
+    // An end without a slide (a tab switch, the first mount) changes nothing.
+    guard features.contains(.navbar), started || barFrozen else { return }
     slide += 1
     let current = slide
     barFrozen = started

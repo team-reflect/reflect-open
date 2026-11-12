@@ -24,6 +24,9 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// The last state's reasons to hide the tab bar.
   private var hidesForState = true
   private var hidesForKeyboard = false
+  /// Whether the page shows its shell, so a tap on a tab moves to it. The
+  /// iPad sidebar stays tappable while the tab bar is hidden.
+  private var showsShell = false
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -88,7 +91,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     if let tab = tabFollow.state(state.tab) {
       follow(tab)
     }
-    hidesForState = state.chrome == .none || state.modal
+    showsShell = state.chrome != .none
+    hidesForState = !showsShell || state.modal
     hidesForKeyboard = state.keyboardVisible
     updateTabBarHidden()
   }
@@ -121,6 +125,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     tabFollow = TabFollow()
     hidesForState = true
     hidesForKeyboard = false
+    showsShell = false
     for page in pages.values {
       page.clearBar()
     }
@@ -134,6 +139,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   func tabBarController(_ tabBarController: UITabBarController, shouldSelectTab tab: UITab) -> Bool
   {
     guard !following, let next = ChromeTab(rawValue: tab.identifier) else { return true }
+    guard showsShell else { return false }
     send(.tab(next))
     if tab !== selectedTab, let page = pages[next] {
       tabFollow.tap(next)
