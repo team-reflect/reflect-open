@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 import UniformTypeIdentifiers
 
 /// Reads files from the bundled `Web/` folder, the output of the desktop app's Vite build.

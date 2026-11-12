@@ -64,8 +64,8 @@ final class RecordingCapability {
         await Self.reply { engine.stop(completion: $0) }
       },
       "plugin:recording|cancel_recording": { [engine] _ in
-        let result = await withCheckedContinuation {
-          engine.cancel(completion: $0.resume(returning:))
+        let result = await withCheckedContinuation { continuation in
+          engine.cancel { result in continuation.resume(returning: result) }
         }
         if case .failure(let error) = result {
           return .error(kind: "io", message: error.message)
@@ -113,7 +113,7 @@ final class RecordingCapability {
   }
 
   /// Runs an engine call that ends with a completion, and answers its result.
-  private static func reply<Response: Encodable>(
+  private static func reply<Response: Encodable & Sendable>(
     _ call: (@escaping (Result<Response, RecordingError>) -> Void) -> Void
   ) async -> CoreReply {
     let result = await withCheckedContinuation { continuation in

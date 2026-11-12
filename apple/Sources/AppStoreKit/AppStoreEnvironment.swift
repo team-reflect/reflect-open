@@ -29,10 +29,10 @@ public enum AppStoreEnvironment {
     // A simulator has no App Store account and names its receipt `receipt`,
     // so it fails both checks; it is always a development install.
     #if targetEnvironment(simulator)
-    let isSandboxInstall = true
+    return "Sandbox"
     #else
     let isSandboxInstall = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-    #endif
     return isSandboxInstall ? "Sandbox" : nil
+    #endif
   }
 }
