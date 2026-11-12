@@ -36,11 +36,10 @@ describe('parseNativeIntent', () => {
       import.meta.dirname,
       '../../../../../apple/Tests/ChromeKitTests/Fixtures/commands.json',
     )
-    const json = `${JSON.stringify(FORMATTING_COMMANDS, null, 2)}\n`
     if (process.env.UPDATE_CHROME_FIXTURES === '1') {
-      writeFileSync(path, json)
+      writeFileSync(path, `${JSON.stringify(FORMATTING_COMMANDS)}\n`)
     }
-    expect(readFileSync(path, 'utf8')).toBe(json)
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual(FORMATTING_COMMANDS)
     expect(parseNativeIntent({ type: 'command', id: 'bold' })).toBeNull()
   })
 
