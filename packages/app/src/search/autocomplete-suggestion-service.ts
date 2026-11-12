@@ -32,7 +32,7 @@ export interface WikiLinkMenuItem {
   /**
    * Secondary text shown beside the label.
    */
-  detail?: string
+  detail?: string | undefined
   /**
    * Runs after the menu inserted the link, e.g. to create the note in the background.
    */
@@ -191,7 +191,7 @@ class AutocompleteSuggestionServiceImpl implements AutocompleteSuggestionService
             : path !== null && titleCounts.get(displayedTitle) > 1
               ? path
               : undefined
-      return { target, label, ...(detail !== undefined ? { detail } : {}) }
+      return { target, label, detail }
     })
   }
 

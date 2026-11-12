@@ -274,7 +274,7 @@ export function createTestGraphSessionService<Services = never>(
     noteMove: options?.noteMove ?? createTestNoteMoveService(),
     icloudNative: options?.icloudNative ?? createTestICloudNativeService(),
     logger,
-    ...(createServices === undefined ? {} : { createServices }),
+    createServices,
   })
   const testService: TestGraphSessionService<Services> = new TestGraphSessionServiceImpl<Services>(
     inner,

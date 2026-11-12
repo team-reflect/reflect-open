@@ -83,7 +83,7 @@ async function setup(options?: { status?: EmbedStatus; embedded?: boolean }) {
   }
   const runtime = createTestEmbeddingRuntimeService({
     vectors: embed,
-    ...(options?.status === undefined ? {} : { status: options.status }),
+    status: options?.status,
   })
   const retrieval = createRetrievalService({
     database,

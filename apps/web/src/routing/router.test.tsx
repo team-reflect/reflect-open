@@ -24,7 +24,7 @@ function routerHook(
     }),
     {
       core,
-      ...(initialRoute === undefined ? {} : { route: initialRoute }),
+      route: initialRoute,
     },
   )
 }

@@ -65,7 +65,7 @@ export interface RenderInAppOptions {
   /**
    * The stored settings document, loaded before the first render.
    */
-  settings?: Partial<Settings>
+  settings?: Partial<Settings> | undefined
   /**
    * Reported over the mobile onboarding state, e.g. `{ kind: 'icloud' }`.
    */
@@ -73,7 +73,7 @@ export interface RenderInAppOptions {
   /**
    * The route the router starts on; defaults to today. `null` mounts no router.
    */
-  route?: Route | null
+  route?: Route | null | undefined
   /**
    * Swap the backup service for a scripted one that starts in this state; the
    * result's `backup` drives it. Needs an open graph.
@@ -82,16 +82,16 @@ export interface RenderInAppOptions {
   /**
    * The facts of the test platform. Only without `core`; see {@link MOBILE_PLATFORM}.
    */
-  platform?: TestPlatformOptions
+  platform?: TestPlatformOptions | undefined
   /**
    * Defaults to a fresh client without retries, cleared when the test ends.
    */
-  queryClient?: QueryClient
+  queryClient?: QueryClient | undefined
   /**
    * Replaces fields of the app layer built over `core`, e.g. `{ update }` or a whole
    * `createTestAppServices(core)` a test must share with the render.
    */
-  appServices?: Partial<AppServices>
+  appServices?: Partial<AppServices> | undefined
   /**
    * Wraps `ui` inside every provider, for providers this helper does not mount.
    */

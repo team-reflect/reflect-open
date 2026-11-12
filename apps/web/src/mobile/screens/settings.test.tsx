@@ -108,7 +108,7 @@ async function mount(options?: MountOptions) {
     graph: { root: '/g', name: 'Field Notes', generation: 1 },
     mobile: { kind: options?.storageKind ?? 'icloud' },
     route: { kind: 'settings' },
-    ...(options?.settings === undefined ? {} : { settings: options.settings }),
+    settings: options?.settings,
   })
   return Object.assign(view, { gitSync, gitHostConnector, updateSettings, appStore })
 }
