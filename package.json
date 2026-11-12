@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:web": "pnpm --filter @reflect/web dev",
+    "dev:ios": "node scripts/dev-ios.ts",
     "build": "turbo run build",
     "build:ipa": "pnpm --filter @reflect/ios build:ipa",
     "build:ffi": "node scripts/build-ffi.ts",

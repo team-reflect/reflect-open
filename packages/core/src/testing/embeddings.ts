@@ -46,7 +46,7 @@ export interface TestEmbeddingRuntimeServiceOptions {
   /**
    * The runtime status. Defaults to `ready` with model `all-MiniLM-L6-v2`.
    */
-  status?: EmbedStatus
+  status?: EmbedStatus | undefined
   /**
    * The vector for one text. Defaults to a 384-dim unit vector.
    */
@@ -267,7 +267,7 @@ export interface TestEmbeddingIndexServiceOptions {
   /**
    * Answers `backfill` calls in place of the real pass; a `follow` still runs the real one.
    */
-  backfill?: (options: EmbeddingBackfillOptions) => Promise<EmbeddingBackfillResult>
+  backfill?: ((options: EmbeddingBackfillOptions) => Promise<EmbeddingBackfillResult>) | undefined
   /**
    * Called before a chunk set is written. A returned `Error`
    * rejects the write with it, unrecorded.

@@ -145,7 +145,7 @@ async function renderScreen(options: RenderScreenOptions = {}) {
         dateFormat: options.dateFormat ?? 'mdy',
         allNotesFilterTags: ['book', 'person'],
       },
-      ...(options.queryClient === undefined ? {} : { queryClient: options.queryClient }),
+      queryClient: options.queryClient,
     },
   )
 }
