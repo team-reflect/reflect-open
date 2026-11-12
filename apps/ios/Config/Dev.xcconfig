@@ -13,4 +13,4 @@ REFLECT_APP_ICON = AppIcon-Dev
 
 // The native chrome parts this flavor draws (ChromeKit `ChromeFeature`,
 // separated by spaces): every part under work.
-REFLECT_CHROME_FEATURES = 
+REFLECT_CHROME_FEATURES = menus

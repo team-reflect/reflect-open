@@ -6,6 +6,8 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scro
 import { useNoteRowState } from '@/hooks/use-note-row.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
+import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
+import type { NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
 import { shareNote } from '@/mobile/share.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -53,9 +55,36 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
     })
   }
 
+  const runAction = (id: string): void => {
+    switch (id) {
+      case 'pin':
+        pin()
+        return
+      case 'privacy':
+        void togglePrivate()
+        return
+      case 'share':
+        share()
+        return
+      case 'delete':
+        void noteActions.trashOne(path).then(onDeleted, (cause: unknown) => {
+          logger.error('delete failed:', errorMessage(cause))
+        })
+        return
+    }
+  }
+
+  const nativeMenu = useNativeMenuDrawer({
+    open: actionsOpen,
+    onOpenChange: setActionsOpen,
+    menuId: 'note-actions',
+    items: noteActionItems({ isPinned, isPrivate, privacyReady, privacyActionLabel }),
+    onSelect: runAction,
+  })
+
   return (
     <>
-      <Drawer open={actionsOpen} onOpenChange={setActionsOpen}>
+      <Drawer open={actionsOpen && !nativeMenu} onOpenChange={setActionsOpen}>
         <DrawerTrigger
           render={
             <Button variant="ghost" size="icon" className="size-10" aria-label="Note actions" />
@@ -127,4 +156,55 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
       />
     </>
   )
+}
+
+/**
+ * The note actions as native menu items. Delete asks first, with the same
+ * words as {@link NoteDeleteDrawer}.
+ */
+export function noteActionItems({
+  isPinned,
+  isPrivate,
+  privacyReady,
+  privacyActionLabel,
+}: {
+  isPinned: boolean
+  isPrivate: boolean
+  privacyReady: boolean
+  privacyActionLabel: string
+}): NativeMenuItem[] {
+  return [
+    {
+      type: 'action',
+      id: 'pin',
+      title: isPinned ? 'Unpin' : 'Pin',
+      icon: isPinned ? 'pin.slash' : 'pin',
+    },
+    {
+      type: 'action',
+      id: 'privacy',
+      title: privacyActionLabel,
+      icon: privacyReady && isPrivate ? 'lock.open' : 'lock',
+      disabled: !privacyReady,
+    },
+    { type: 'action', id: 'share', title: 'Share', icon: 'square.and.arrow.up' },
+    {
+      type: 'section',
+      items: [
+        {
+          type: 'action',
+          id: 'delete',
+          title: 'Delete',
+          icon: 'trash',
+          destructive: true,
+          confirm: {
+            title: 'Delete this note?',
+            message:
+              'It moves to the graph’s trash and disappears from your notes. You can recover it on desktop.',
+            action: 'Delete',
+          },
+        },
+      ],
+    },
+  ]
 }

@@ -6,7 +6,7 @@ import {
 import { parseNativeIntent } from '@/mobile/native-chrome/protocol.ts'
 import { nativeMenuHandler, rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
 
-function createContext(overrides: Partial<IntentContext> = {}): IntentContext {
+function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContext {
   return {
     entryId: 5,
     canBack: true,
@@ -29,35 +29,35 @@ describe('parseNativeIntent', () => {
 
 describe('runNativeIntent', () => {
   it('goes back for the entry on screen', () => {
-    const context = createContext()
-    runNativeIntent({ type: 'back', entryId: 5 }, context)
-    expect(context.back).toHaveBeenCalledOnce()
+    const ctx = makeIntentContext()
+    runNativeIntent({ type: 'back', entryId: 5 }, ctx)
+    expect(ctx.back).toHaveBeenCalledOnce()
   })
 
   it('drops a back for another entry', () => {
-    const context = createContext()
-    runNativeIntent({ type: 'back', entryId: 4 }, context)
-    expect(context.back).not.toHaveBeenCalled()
+    const ctx = makeIntentContext()
+    runNativeIntent({ type: 'back', entryId: 4 }, ctx)
+    expect(ctx.back).not.toHaveBeenCalled()
   })
 
   it('opens today when there is no history to go back to', () => {
-    const context = createContext({ canBack: false })
-    runNativeIntent({ type: 'back', entryId: 5 }, context)
-    expect(context.navigate).toHaveBeenCalledWith({ kind: 'today' })
+    const ctx = makeIntentContext({ canBack: false })
+    runNativeIntent({ type: 'back', entryId: 5 }, ctx)
+    expect(ctx.navigate).toHaveBeenCalledWith({ kind: 'today' })
   })
 
   it('selects a tab', () => {
-    const context = createContext()
-    runNativeIntent({ type: 'tab', tab: 'tasks' }, context)
-    expect(context.selectTab).toHaveBeenCalledWith('tasks')
+    const ctx = makeIntentContext()
+    runNativeIntent({ type: 'tab', tab: 'tasks' }, ctx)
+    expect(ctx.selectTab).toHaveBeenCalledWith('tasks')
   })
 
   it('runs a menu item only for the entry that opened the menu', () => {
     const onSelect = vi.fn()
     rememberNativeMenu('filters', { entryId: 5, onSelect })
-    runNativeIntent({ type: 'menu', entryId: 6, menuId: 'filters', id: 'a' }, createContext())
+    runNativeIntent({ type: 'menu', entryId: 6, menuId: 'filters', id: 'a' }, makeIntentContext())
     expect(onSelect).not.toHaveBeenCalled()
-    runNativeIntent({ type: 'menu', entryId: 5, menuId: 'filters', id: 'a' }, createContext())
+    runNativeIntent({ type: 'menu', entryId: 5, menuId: 'filters', id: 'a' }, makeIntentContext())
     expect(onSelect).toHaveBeenCalledWith('a')
     expect(nativeMenuHandler('filters', 4)).toBeNull()
   })

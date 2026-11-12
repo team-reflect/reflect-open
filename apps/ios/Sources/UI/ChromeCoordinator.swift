@@ -15,6 +15,7 @@ final class ChromeCoordinator {
   /// The container of the pages: the root's only child.
   let container: UIViewController
   private let page: WebPageController
+  private let menus = MenuPresenter()
 
   init(host: AppHost) {
     self.host = host
@@ -25,8 +26,11 @@ final class ChromeCoordinator {
     page.attach(host.webView)
 
     let bridge = host.chrome
+    menus.send = { [weak bridge] intent in bridge?.send(intent) }
+    menus.presenter = { [weak self] in self?.container }
     bridge.onState = { [weak self] state in self?.apply(state) }
     bridge.onReset = { [weak self] in self?.reset() }
+    bridge.onPresentMenu = { [weak self] request in self?.presentMenu(request) }
     bridge.onError = { message in Self.logger.error("\(message, privacy: .public)") }
   }
 
@@ -37,10 +41,18 @@ final class ChromeCoordinator {
     )
     #endif
     applyTheme(state.theme)
+    menus.pageDidShow(entryId: state.entryId)
+  }
+
+  /// The page asks for a menu at one of its elements, for the entry on screen.
+  private func presentMenu(_ request: MenuRequest) {
+    guard features.contains(.menus), host.chrome.state?.entryId == request.entryId else { return }
+    menus.present(request, webView: host.webView, in: page.view)
   }
 
   /// A new document started: nothing of the old page stays on screen.
   private func reset() {
+    menus.closeAll()
     applyTheme(.system)
   }
 

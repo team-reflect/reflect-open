@@ -198,6 +198,14 @@ export function useRouterState(): RouterState {
 }
 
 /**
+ * The router state, or `null` outside a RouterProvider (a drawer rendered on
+ * its own).
+ */
+export function useOptionalRouterState(): RouterState | null {
+  return use(RouterStateContext)
+}
+
+/**
  * Access the scroll callbacks for the history entry on screen. Use within a
  * RouterProvider.
  */

@@ -3,6 +3,7 @@ import type { RepositoryHost } from '@/components/settings/connect-repository-di
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from '@/mobile/scroll-drawer.tsx'
 import { SettingsGroup, SettingsNavRow } from '@/mobile/settings-list.tsx'
 import { useGithubConnected } from '@/hooks/use-github-connected.ts'
+import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
 
 interface ConnectRepositoryDrawerProps {
   open: boolean
@@ -21,8 +22,32 @@ export function ConnectRepositoryDrawer({
   onChoose,
 }: ConnectRepositoryDrawerProps): ReactElement {
   const githubConnected = useGithubConnected()
+  const nativeMenu = useNativeMenuDrawer({
+    open,
+    onOpenChange,
+    menuId: 'connect-repository',
+    items: [
+      {
+        type: 'section',
+        title: 'Where is the repository?',
+        items: [
+          {
+            type: 'action',
+            id: 'github',
+            title: githubConnected ? 'GitHub (signed in)' : 'GitHub (sign in first)',
+          },
+          { type: 'action', id: 'other', title: 'Other host' },
+        ],
+      },
+    ],
+    onSelect: (id) => {
+      if (id === 'github' || id === 'other') {
+        onChoose(id)
+      }
+    },
+  })
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open && !nativeMenu} onOpenChange={onOpenChange}>
       <DrawerContent aria-label="Connect a repository">
         <DrawerTitle>Connect a repository</DrawerTitle>
         <DrawerBody>
