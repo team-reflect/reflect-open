@@ -282,15 +282,6 @@ jobs:
       - name: Build the web app
         run: pnpm --filter @reflect/ios build:web
 
-      # A simulator that still does its first-boot work launches the app
-      # slowly, or not at all.
-      - name: Boot the simulator
-        run: |
-          udid=$(xcrun simctl list devices available --json \
-            | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
-          xcrun simctl bootstatus "$udid" -b
-          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
-
       # The steps are separate so that the job page shows the time of each.
       - name: Build the Rust core
         run: pnpm build:ffi --debug --sdk iphonesimulator
@@ -302,6 +293,12 @@ jobs:
             -scheme Reflect \
             -derivedDataPath "$RUNNER_TEMP/DerivedData"
 
+      - name: Pick the simulator
+        run: |
+          udid=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
+          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+
       - name: Build the app and the tests
         run: |
           xcodebuild build-for-testing \
@@ -311,6 +308,18 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -showBuildTimingSummary
+
+      - name: Boot the simulator
+        run: xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+
+      - name: Wait for the simulator to settle
+        run: sleep 10
+
+      - name: Warms up the app launch path
+        timeout-minutes: 5
+        run: |
+          xcrun simctl launch "$SIMULATOR_UDID" com.apple.mobilesafari
+          xcrun simctl terminate "$SIMULATOR_UDID" com.apple.mobilesafari
 
       - name: Run the unit tests
         run: |
