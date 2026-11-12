@@ -182,6 +182,10 @@ export interface EnrichSessionTranscriptInput {
    * Timestamp-derived title used when enrichment cannot name the memo.
    */
   readonly fallbackTitle: string
+  /**
+   * Returns `true` once the graph session has ended, which skips the title-only call.
+   */
+  readonly isStale?: (() => boolean) | undefined
 }
 
 export interface EnrichedSessionTranscript {
@@ -200,16 +204,16 @@ export interface TranscriptEnrichmentServiceDeps {
 export interface TranscriptEnrichmentService {
   /**
    * Format and name one session's stitched transcript. The formatting pass
-   * returns a body and a title; a missing or rejected title comes from a
-   * title-only call, and the timestamp title is the last fallback. A failed
-   * or rejected formatting pass keeps the raw transcript.
+   * returns a title and a body; a body that does not retain the transcript is
+   * replaced by the raw transcript. A failed formatting pass or an empty title
+   * falls back to a title-only call, then to the timestamp title.
    */
   enrich(input: EnrichSessionTranscriptInput): Promise<EnrichedSessionTranscript>
 }
 
 interface FormattedTranscript {
   readonly title: string | null
-  readonly body: string
+  readonly body: string | null
 }
 
 class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
@@ -228,12 +232,15 @@ class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
       input.formatTranscript && transcript.length <= FORMAT_MAX_CHARS
         ? await this.#format(credentials, transcript)
         : null
-    const title = formatted?.title ?? (await this.#title(credentials, transcript))
+    const title =
+      formatted?.title ??
+      (input.isStale?.() === true ? null : await this.#title(credentials, transcript))
     return { title: title ?? input.fallbackTitle, body: formatted?.body ?? transcript }
   }
 
   /**
-   * Returns `null` when the call fails or the body does not retain the transcript.
+   * Returns `null` when the call fails. The body is `null` when it does not
+   * retain the transcript.
    */
   async #format(
     credentials: AudioMemoEnrichmentCredentials,
@@ -250,10 +257,10 @@ class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
         maxRetries: 0,
       })
       const body = result.output.body.trim()
-      if (body === '' || !retainsTranscriptContent(transcript, body)) {
-        return null
+      return {
+        title: normalizedAudioMemoTitle(result.output.title),
+        body: body !== '' && retainsTranscriptContent(transcript, body) ? body : null,
       }
-      return { title: normalizedAudioMemoTitle(result.output.title), body }
     } catch {
       return null
     }

@@ -24,8 +24,6 @@ const CONFIG: AiProviderConfig = {
   keyHint: 'wxyz1',
 }
 
-const SMALL_CONFIG: AiProviderConfig = { ...CONFIG, model: 'gpt-6-luna' }
-
 const ANTHROPIC_CONFIG: AiProviderConfig = {
   id: 'cfg-anthropic',
   provider: 'anthropic',
@@ -85,7 +83,7 @@ function modelThrowing(error: unknown): void {
 async function request(transcript = 'talked about planning the Rome trip'): Promise<string> {
   const enriched = await enrichment.enrich({
     transcript,
-    enrichmentCredentials: { config: SMALL_CONFIG, apiKey: 'sk-live-key' },
+    enrichmentCredentials: { config: CONFIG, apiKey: 'sk-live-key' },
     formatTranscript: false,
     fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
   })
@@ -136,14 +134,14 @@ describe('TranscriptEnrichmentService.enrich naming', () => {
     await expect(request()).resolves.toBe('Rome itinerary')
   })
 
-  it('calls the model with the given small-model credentials', async () => {
+  it('passes the given credentials through unchanged', async () => {
     modelAnswering('Planning notes')
 
     await request('planning notes')
 
     expect(
       languageModelService.calls().map(({ config, apiKey }) => ({ model: config.model, apiKey })),
-    ).toEqual([{ model: 'gpt-6-luna', apiKey: 'sk-live-key' }])
+    ).toEqual([{ model: 'gpt-5.5', apiKey: 'sk-live-key' }])
   })
 
   it('falls back to the timestamp when the provider returns nothing useful', async () => {
@@ -170,7 +168,7 @@ describe('TranscriptEnrichmentService.enrich naming', () => {
 
 describe('TranscriptEnrichmentService.enrich', () => {
   const FALLBACK_TITLE = 'Audio memo 2026-06-11 15:30:22'
-  const CREDENTIALS = { config: SMALL_CONFIG, apiKey: 'sk-live-key' }
+  const CREDENTIALS = { config: CONFIG, apiKey: 'sk-live-key' }
 
   /**
    * Install a model answering `output` as JSON; returns the captured call options.

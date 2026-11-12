@@ -1,3 +1,4 @@
+import { returnTrue } from '@ocavue/utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createTestLanguageModelService, type TestLanguageModelService } from '../testing/index.ts'
 import { MockLanguageModelV3 } from '@reflect/modules/ai/test'
@@ -16,7 +17,7 @@ const USAGE: LanguageModelV3Usage = {
 const CONFIG: AiProviderConfig = {
   id: 'cfg-openai',
   provider: 'openai',
-  model: 'gpt-6-luna',
+  model: 'gpt-5.5',
   keyHint: 'wxyz1',
 }
 
@@ -31,9 +32,9 @@ beforeEach(() => {
 })
 
 // Answers the formatting call with `output`, then any title call with
-// `titleOutput`, or a failure when it is omitted.
+// `titleOutput`. An `Error` or a missing answer fails that call.
 function modelAnswering(
-  output: { title: string; body: string },
+  output: { title: string; body: string } | Error,
   titleOutput?: { title: string },
 ): MockLanguageModelV3 {
   let calls = 0
@@ -41,8 +42,8 @@ function modelAnswering(
     doGenerate: () => {
       calls += 1
       const answer = calls === 1 ? output : titleOutput
-      if (answer === undefined) {
-        return Promise.reject(new Error('title model unavailable'))
+      if (answer === undefined || answer instanceof Error) {
+        return Promise.reject(answer ?? new Error('title model unavailable'))
       }
       return Promise.resolve({
         content: [{ type: 'text', text: JSON.stringify(answer) }],
@@ -66,7 +67,7 @@ function request(transcript: string) {
 }
 
 describe('TranscriptEnrichmentService.enrich formatting', () => {
-  it('returns readable Markdown and a sanitized title from one small-model call', async () => {
+  it('returns readable Markdown and a sanitized title from one call', async () => {
     modelAnswering({
       title: '  Launch planning!  ',
       body: 'We reviewed the launch.\n\n## Next steps\n\n- Invite beta users',
@@ -77,10 +78,9 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
       body: 'We reviewed the launch.\n\n## Next steps\n\n- Invite beta users',
     })
     const calls = languageModelService.calls()
-    expect(calls.map(({ config, apiKey }) => ({ model: config.model, apiKey }))).toContainEqual({
-      model: 'gpt-6-luna',
-      apiKey: 'sk-live-key',
-    })
+    expect(calls.map(({ config, apiKey }) => ({ model: config.model, apiKey }))).toEqual([
+      { model: 'gpt-5.5', apiKey: 'sk-live-key' },
+    ])
   })
 
   it('frames the complete transcript as untrusted data and forbids meaning changes', async () => {
@@ -96,7 +96,7 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
     expect(prompt).toContain('coherent paragraphs')
     expect(prompt).toContain(tail)
     expect(result.body).toBe(transcript)
-    expect(result.title).not.toBe('Long memo')
+    expect(result.title).toBe('Long memo')
   })
 
   it('falls back to the untouched transcript and the timestamp title when the call fails', async () => {
@@ -112,16 +112,16 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
     })
   })
 
-  it('falls back when structured output contains an empty body', async () => {
-    modelAnswering({ title: 'Ignored', body: '   ' })
+  it('keeps the raw transcript when structured output contains an empty body', async () => {
+    modelAnswering({ title: 'Two ideas', body: '   ' })
 
     await expect(request('first idea. second idea')).resolves.toEqual({
-      title: FALLBACK_TITLE,
+      title: 'Two ideas',
       body: 'first idea. second idea',
     })
   })
 
-  it('falls back when a same-length response does not retain the transcript', async () => {
+  it('keeps the raw transcript when a same-length response does not retain it', async () => {
     const transcript = 'review the launch timeline and invite the beta group tomorrow'
     modelAnswering({
       title: 'Unrelated response',
@@ -129,52 +129,64 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
     })
 
     await expect(request(transcript)).resolves.toEqual({
-      title: FALLBACK_TITLE,
+      title: 'Unrelated response',
       body: transcript,
     })
   })
 
-  it('names the memo with a separate title call when formatting fails validation', async () => {
+  it('keeps the response title in one call when formatting fails validation', async () => {
     const transcript = 'It is 8:46 a.m. and I need to call the dentist and buy groceries.'
-    const model = modelAnswering(
-      { title: 'Ignored', body: '## To-do\n\n1. Call the dentist\n2. Buy groceries' },
-      { title: 'Dentist and groceries' },
-    )
+    const model = modelAnswering({
+      title: 'Dentist and groceries',
+      body: '## To-do\n\n1. Call the dentist\n2. Buy groceries',
+    })
 
     await expect(request(transcript)).resolves.toEqual({
       title: 'Dentist and groceries',
       body: transcript,
     })
+    expect(model.doGenerateCalls).toHaveLength(1)
+  })
+
+  it('names the memo with a separate title call when the formatted title is empty', async () => {
+    const model = modelAnswering(
+      { title: '  ', body: 'Review the launch.' },
+      { title: 'Launch review' },
+    )
+
+    await expect(request('review the launch')).resolves.toEqual({
+      title: 'Launch review',
+      body: 'Review the launch.',
+    })
     expect(model.doGenerateCalls).toHaveLength(2)
   })
 
   it('names the memo with a separate title call when the formatting call fails', async () => {
-    let calls = 0
-    languageModelService.setModel(
-      new MockLanguageModelV3({
-        doGenerate: () => {
-          calls += 1
-          if (calls === 1) {
-            return Promise.reject(new Error('formatting timed out'))
-          }
-          return Promise.resolve({
-            content: [{ type: 'text', text: JSON.stringify({ title: 'Launch review' }) }],
-            finishReason: { unified: 'stop' as const, raw: undefined },
-            usage: USAGE,
-            warnings: [],
-          })
-        },
-      }),
-    )
+    const model = modelAnswering(new Error('formatting timed out'), { title: 'Launch review' })
 
     await expect(request('review the launch')).resolves.toEqual({
       title: 'Launch review',
       body: 'review the launch',
     })
-    expect(calls).toBe(2)
+    expect(model.doGenerateCalls).toHaveLength(2)
   })
 
-  it('falls back when a response repeats transcript content', async () => {
+  it('skips the title call once the session is stale', async () => {
+    const model = modelAnswering(new Error('formatting timed out'), { title: 'Launch review' })
+
+    await expect(
+      enrichment.enrich({
+        transcript: 'review the launch',
+        enrichmentCredentials: { config: CONFIG, apiKey: 'sk-live-key' },
+        formatTranscript: true,
+        fallbackTitle: FALLBACK_TITLE,
+        isStale: returnTrue,
+      }),
+    ).resolves.toEqual({ title: FALLBACK_TITLE, body: 'review the launch' })
+    expect(model.doGenerateCalls).toHaveLength(1)
+  })
+
+  it('keeps the raw transcript when a response repeats transcript content', async () => {
     const transcript = 'Review the launch timeline tomorrow.'
     modelAnswering({
       title: 'Repeated response',
@@ -182,12 +194,12 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
     })
 
     await expect(request(transcript)).resolves.toEqual({
-      title: FALLBACK_TITLE,
+      title: 'Repeated response',
       body: transcript,
     })
   })
 
-  it('falls back when formatting swaps named entities', async () => {
+  it('keeps the raw transcript when formatting swaps named entities', async () => {
     const transcript = 'Alice will send the draft, and Bob will review the budget.'
     modelAnswering({
       title: 'Swapped owners',
@@ -195,12 +207,12 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
     })
 
     await expect(request(transcript)).resolves.toEqual({
-      title: FALLBACK_TITLE,
+      title: 'Swapped owners',
       body: transcript,
     })
   })
 
-  it('falls back when formatting drops a meaningful combining mark', async () => {
+  it('keeps the raw transcript when formatting drops a meaningful combining mark', async () => {
     const transcript = 'यह किताब मेरी है और इसे रखना है'
     modelAnswering({
       title: 'किताब रखना',
@@ -209,10 +221,10 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
 
     const result = await request(transcript)
     expect(result.body).toBe(transcript)
-    expect(result.title).not.toBe('किताब रखना')
+    expect(result.title).toBe('किताब रखना')
   })
 
-  it('falls back when formatting changes a signed decimal percentage', async () => {
+  it('keeps the raw transcript when formatting changes a signed decimal percentage', async () => {
     const transcript = 'The margin fell to -1.5% today'
     modelAnswering({
       title: 'Margin update',
@@ -221,7 +233,7 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
 
     const result = await request(transcript)
     expect(result.body).toBe(transcript)
-    expect(result.title).not.toBe('Margin update')
+    expect(result.title).toBe('Margin update')
   })
 
   it.each([
@@ -232,24 +244,24 @@ describe('TranscriptEnrichmentService.enrich formatting', () => {
     ],
     ['changes a suffix currency', 'The price is 50€ today', 'The price is 50$ today.'],
     ['drops a spaced percentage', 'The margin is 50 % today', 'The margin is 50 today.'],
-  ])('falls back when formatting %s', async (_case, transcript, body) => {
+  ])('keeps the raw transcript when formatting %s', async (_case, transcript, body) => {
     modelAnswering({ title: 'Changed number', body })
 
     const result = await request(transcript)
     expect(result.body).toBe(transcript)
-    expect(result.title).not.toBe('Changed number')
+    expect(result.title).toBe('Changed number')
   })
 
   it.each([
     ['a Roman numeral to ASCII letters', 'Phase Ⅳ starts tomorrow', 'Phase IV starts tomorrow.'],
     ['full-width digits to ASCII digits', 'Invite ５０ people', 'Invite 50 people.'],
     ['accounting parentheses', 'The loss was ($50) today', 'The loss was $50 today.'],
-  ])('falls back when formatting changes %s', async (_case, transcript, body) => {
+  ])('keeps the raw transcript when formatting changes %s', async (_case, transcript, body) => {
     modelAnswering({ title: 'Changed notation', body })
 
     const result = await request(transcript)
     expect(result.body).toBe(transcript)
-    expect(result.title).not.toBe('Changed notation')
+    expect(result.title).toBe('Changed notation')
   })
 
   it('does not call a model for an empty transcript', async () => {
