@@ -136,12 +136,13 @@ async function attachAfter(
   commands: FormattingToolbarCommands,
   files: File[],
 ): Promise<void> {
+  await previous
   try {
-    await previous
-  } catch {
-    // The failed insert surfaced as an unhandled rejection; this one goes on.
+    await commands.attachFiles(files)
+  } catch (cause) {
+    // Reported like an uncaught error; the queue stays settled for the next insert.
+    reportError(cause)
   }
-  await commands.attachFiles(files)
 }
 
 interface NativeChromeProjectionProps {

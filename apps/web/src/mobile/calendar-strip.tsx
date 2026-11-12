@@ -196,10 +196,15 @@ export function CalendarStrip({
 
 /**
  * The month menu of the native Daily title: today's month and the five
- * before it, newest first, with a check on `shown`, then the full picker.
+ * before it, newest first, with a check on `shown` (added first when it is
+ * not one of them), then the full picker.
  */
 function recentMonthItems(todayMonth: string, shown: string): NativeMenuItem[] {
   const months = Array.from({ length: 6 }, (_, index) => addMonthsToYearMonth(todayMonth, -index))
+  // A month outside the recent ones (a far date) still shows with its check.
+  if (!months.includes(shown)) {
+    months.unshift(shown)
+  }
   return [
     ...months.map((month): NativeMenuItem => ({
       type: 'action',

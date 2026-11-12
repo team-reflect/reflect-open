@@ -59,11 +59,21 @@ final class MenuPresenter {
       self.send(intent)
     }
     confirmation = alert
-    // The menu dismisses as the tap lands; the alert waits for it, and
-    // shows only while the page still shows its entry.
+    // The menu dismisses as the tap lands; the alert waits for it, and for
+    // an earlier alert that still closes, and shows only while the page
+    // still shows its entry.
     DispatchQueue.main.async { [weak self] in
-      guard self?.openEntryId == entryId else { return }
-      presenter.present(alert, animated: true)
+      let present = { [weak self] in
+        guard self?.openEntryId == entryId else { return }
+        presenter.present(alert, animated: true)
+      }
+      if let closing = presenter.presentedViewController, closing.isBeingDismissed,
+        let coordinator = closing.transitionCoordinator
+      {
+        coordinator.animate(alongsideTransition: nil) { _ in present() }
+      } else {
+        present()
+      }
     }
   }
 }

@@ -87,19 +87,26 @@ final class WebPageController: UIViewController {
     }
 
     if newEntry || state.leading != shownLeading || state.canBack != shownCanBack {
+      let items = (navigationItem.leftBarButtonItems ?? []).dropFirst(state.canBack ? 1 : 0)
+      if !newEntry, state.canBack == shownCanBack, let shownLeading,
+        Self.differInMenusOnly(state.leading, shownLeading), items.count == state.leading.count
+      {
+        setMenus(of: Array(items), to: state.leading, entryId: entryId, menus: menus)
+      } else {
+        var items: [UIBarButtonItem] = []
+        if state.canBack {
+          let item = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.backward"),
+            primaryAction: UIAction { _ in send(.back(entryId: entryId)) })
+          item.accessibilityLabel = Bundle(for: UIButton.self).localizedString(
+            forKey: "Back", value: "Back", table: nil)
+          items.append(item)
+        }
+        items += state.leading.map { barItem($0, entryId: entryId, menus: menus, send: send) }
+        navigationItem.leftBarButtonItems = items
+      }
       shownLeading = state.leading
       shownCanBack = state.canBack
-      var items: [UIBarButtonItem] = []
-      if state.canBack {
-        let item = UIBarButtonItem(
-          image: UIImage(systemName: "chevron.backward"),
-          primaryAction: UIAction { _ in send(.back(entryId: entryId)) })
-        item.accessibilityLabel = Bundle(for: UIButton.self).localizedString(
-          forKey: "Back", value: "Back", table: nil)
-        items.append(item)
-      }
-      items += state.leading.map { barItem($0, entryId: entryId, menus: menus, send: send) }
-      navigationItem.leftBarButtonItems = items
     }
 
     if newEntry || state.trailing != shownTrailing {
@@ -107,19 +114,25 @@ final class WebPageController: UIViewController {
       if !newEntry, let shownTrailing, Self.differInMenusOnly(state.trailing, shownTrailing),
         items.count == state.trailing.count
       {
-        // Only menus changed: the same items take the new menus, so an open
-        // menu stays open and a confirmation keeps its anchor.
-        for (item, button) in zip(items, state.trailing.reversed()) {
-          if let menu = button.menu {
-            item.menu = menus.barMenu(menu, entryId: entryId) { [weak item] in item }
-          }
-        }
+        setMenus(of: items, to: state.trailing.reversed(), entryId: entryId, menus: menus)
       } else {
         navigationItem.rightBarButtonItems = state.trailing.reversed().map {
           barItem($0, entryId: entryId, menus: menus, send: send)
         }
       }
       shownTrailing = state.trailing
+    }
+  }
+
+  /// Only menus changed: the same items take the new menus, so an open menu
+  /// stays open and a confirmation keeps its anchor.
+  private func setMenus(
+    of items: [UIBarButtonItem], to buttons: [BarButton], entryId: Int, menus: MenuPresenter
+  ) {
+    for (item, button) in zip(items, buttons) {
+      if let menu = button.menu {
+        item.menu = menus.barMenu(menu, entryId: entryId) { [weak item] in item }
+      }
     }
   }
 

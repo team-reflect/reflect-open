@@ -41,5 +41,6 @@ final class TabFollowTests: XCTestCase {
     var follow = TabFollow()
     follow.tap(.all)
     XCTAssertNil(follow.timeOut(.all))
+    XCTAssertNil(follow.pendingTab)
   }
 }

@@ -81,6 +81,8 @@ public final class ChromeBridge: NSObject, WKScriptMessageHandler {
       let data = try? JSONSerialization.data(withJSONObject: message.body)
     {
       receive(data)
+    } else {
+      onError("chrome message: unsupported body \(type(of: message.body))")
     }
   }
 }

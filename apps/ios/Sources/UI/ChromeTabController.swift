@@ -155,6 +155,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// dropped the tap), the selection follows the tab of the last state.
   private func move(to page: WebPageController) {
     cover?.removeFromSuperview()
+    cover = nil
     let picture = webView.snapshotView(afterScreenUpdates: false)
     page.loadViewIfNeeded()
     // The page's bar shows its last visit until the first state of the tab.

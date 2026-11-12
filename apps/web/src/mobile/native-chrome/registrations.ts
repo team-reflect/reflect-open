@@ -95,7 +95,8 @@ export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): 
   }, [enabled, entryId])
 
   useLayoutEffect(() => {
-    if (!enabled) {
+    // Another screen may own the entry by now; its bar stays.
+    if (!enabled || barHandlers.get(entryId) !== handlersRef) {
       return
     }
     updateBars((bars) => {

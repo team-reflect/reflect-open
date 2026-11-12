@@ -97,8 +97,11 @@ public indirect enum MenuItem: Decodable, Equatable, Sendable {
       self = .section(
         title: try container.decodeIfPresent(String.self, forKey: .title),
         items: try container.decode([MenuItem].self, forKey: .items))
-    default:
+    case "action":
       self = .action(try MenuAction(from: decoder))
+    case let type:
+      throw DecodingError.dataCorruptedError(
+        forKey: .type, in: container, debugDescription: "unknown menu item type \(type)")
     }
   }
 }
@@ -141,7 +144,13 @@ public enum ChromeMessage: Decodable, Equatable, Sendable {
     switch type {
     case "state": self = .state(try ChromeState(from: decoder))
     case "transition":
-      self = .transition(started: try container.decode(String.self, forKey: .phase) == "start")
+      switch try container.decode(String.self, forKey: .phase) {
+      case "start": self = .transition(started: true)
+      case "end": self = .transition(started: false)
+      case let phase:
+        throw DecodingError.dataCorruptedError(
+          forKey: .phase, in: container, debugDescription: "unknown transition phase \(phase)")
+      }
     case "chromeReady": self = .chromeReady
     case "documentStart": self = .documentStart
     default:

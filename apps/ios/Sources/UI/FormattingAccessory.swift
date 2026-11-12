@@ -66,7 +66,8 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   /// the shortcut bar of a hardware keyboard.
   @objc private func keyboardFrameWillChange(_ notification: Notification) {
     guard let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-      let screen = webView.window?.screen
+      let screen = webView.window?.screen,
+      (notification.object as? UIScreen).map({ $0 === screen }) ?? true
     else { return }
     let height = frame.intersection(screen.bounds).height - (shown ? strip.bounds.height : 0)
     softwareKeyboard = height > 0 ? height > Self.shortcutBarHeight : nil

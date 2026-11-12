@@ -11,4 +11,4 @@ REFLECT_APP_ICON = AppIcon
 
 // The native chrome parts this flavor draws (ChromeKit `ChromeFeature`,
 // separated by spaces): the parts that ran on Beta for one release.
-REFLECT_CHROME_FEATURES = 
+REFLECT_CHROME_FEATURES =

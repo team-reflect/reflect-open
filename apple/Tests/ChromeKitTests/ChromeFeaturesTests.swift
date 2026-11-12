@@ -8,6 +8,7 @@ final class ChromeFeaturesTests: XCTestCase {
     let name = "ChromeFeaturesTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: name)!
     defaults.removePersistentDomain(forName: name)
+    addTeardownBlock { UserDefaults().removePersistentDomain(forName: name) }
     for (key, value) in values {
       defaults.set(value, forKey: key)
     }

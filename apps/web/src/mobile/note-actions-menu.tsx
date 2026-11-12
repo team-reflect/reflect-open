@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { Lock, LockOpen, MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'lucide-react'
-import { errorMessage } from '@reflect/core'
+import { canTrashNote, errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scroll-drawer.tsx'
 import { useNoteRowState } from '@/hooks/use-note-row.ts'
@@ -78,6 +78,9 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
         share()
         return
       case 'delete':
+        if (!canTrashNote(path)) {
+          return
+        }
         void noteActions.trashOne(path).then(onDeleted, (cause: unknown) => {
           logger.error('delete failed:', errorMessage(cause))
           // The native confirmation has closed, so the error shows as a toast.
@@ -96,7 +99,13 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
     isPrivate,
     privacyReady,
     privacyActionLabel,
-    items: noteActionItems({ isPinned, isPrivate, privacyReady, privacyActionLabel }),
+    items: noteActionItems({
+      isPinned,
+      isPrivate,
+      privacyReady,
+      privacyActionLabel,
+      canDelete: canTrashNote(path),
+    }),
     pin,
     togglePrivate,
     share,
@@ -196,21 +205,23 @@ export function NoteActionsMenu({ path, onDeleted, actions }: NoteActionsMenuPro
 }
 
 /**
- * The note actions as native menu items. Delete asks first, with the same
- * words as {@link NoteDeleteDrawer}.
+ * The note actions as native menu items. Delete, when the note can go to
+ * the trash, asks first, with the same words as {@link NoteDeleteDrawer}.
  */
 export function noteActionItems({
   isPinned,
   isPrivate,
   privacyReady,
   privacyActionLabel,
+  canDelete,
 }: {
   isPinned: boolean
   isPrivate: boolean
   privacyReady: boolean
   privacyActionLabel: string
+  canDelete: boolean
 }): NativeMenuItem[] {
-  return [
+  const items: NativeMenuItem[] = [
     {
       type: 'action',
       id: 'pin',
@@ -225,6 +236,12 @@ export function noteActionItems({
       disabled: !privacyReady,
     },
     { type: 'action', id: 'share', title: 'Share', icon: 'square.and.arrow.up' },
+  ]
+  if (!canDelete) {
+    return items
+  }
+  return [
+    ...items,
     {
       type: 'section',
       items: [
