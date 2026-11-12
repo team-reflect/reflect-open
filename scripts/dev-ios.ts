@@ -91,7 +91,11 @@ async function main(): Promise<void> {
   const simulator = await findSimulator()
   console.log(`[dev-ios] booting ${DEVICE_NAME} (${simulator})`)
   await run('xcrun', ['simctl', 'bootstatus', simulator, '-b'])
-  await run('open', ['-a', 'Simulator'])
+  // Only shows the window; the app runs without it.
+  const opened = await exec('open', ['-a', 'Simulator'])
+  if (opened.exitCode !== 0) {
+    console.log('[dev-ios] Simulator.app did not open; the simulator runs without a window')
+  }
 
   // The app bundles apps/ios/Web (a link to apps/web/dist/mobile). The build
   // needs the folder, but this run loads the dev server.
