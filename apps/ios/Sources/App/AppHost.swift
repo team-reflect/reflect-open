@@ -25,7 +25,8 @@ final class AppHost {
   private var eventPump: Task<Void, Never>?
 
   init() throws {
-    let core = try ReflectCore(config: .current(), openURL: Self.openFromCore)
+    let directories = try AppDirectories.current()
+    let core = try ReflectCore(config: .current(directories), openURL: Self.openFromCore)
     self.core = core
 
     let devURL = ProcessInfo.processInfo.environment["REFLECT_DEV_URL"].flatMap(URL.init(string:))
@@ -40,6 +41,8 @@ final class AppHost {
     self.webAuth = webAuth
     let store = StoreCapability(scene: { presenter?.window?.windowScene }, emit: emit)
     self.store = store
+    // Apple asks an app to listen for transactions from its launch.
+    store.start()
     let recording = RecordingCapability(emit: emit)
     self.recording = recording
 
@@ -82,7 +85,7 @@ final class AppHost {
     }
     webView = ReflectWebView(
       routes: routes, assets: assets, bridge: bridge, chrome: chrome,
-      chromeFeatures: chromeFeatures)
+      chromeFeatures: chromeFeatures, dataStore: directories.websiteDataStore)
     presenter = webView
 
     navigation = ExternalNavigation(
@@ -107,13 +110,11 @@ final class AppHost {
   /// a recording; the page gets every other URL as a `host:open-url` event
   /// with a `string[]` payload.
   func open(_ urls: [URL]) {
-    let links = urls.filter { !($0.scheme == "reflect" && $0.host == "record-audio") }
-    if links.count < urls.count {
+    let opened = OpenedURLs(urls)
+    if opened.requestsRecording {
       recording.requestRecording()
     }
-    if !links.isEmpty,
-      let payload = try? JSONSerialization.data(withJSONObject: links.map(\.absoluteString))
-    {
+    if let payload = opened.linksPayload {
       bridge.emit("host:open-url", payload: payload)
     }
   }
@@ -158,17 +159,15 @@ final class AppHost {
 extension CoreConfig {
   /// The config of this app: the Documents directory, `Application Support/<bundle id>`
   /// (created when missing) and `Reflect/<version>`, the same values as the Tauri shell.
-  static func current(fileManager: FileManager = .default, bundle: Bundle = .main) throws
-    -> CoreConfig
-  {
-    let documents = try fileManager.url(
-      for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let support = try fileManager.url(
-      for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-    let data = support.appendingPathComponent(bundle.bundleIdentifier ?? "app.reflect.ios")
+  static func current(
+    _ directories: AppDirectories, fileManager: FileManager = .default, bundle: Bundle = .main
+  ) throws -> CoreConfig {
+    let data = directories.applicationSupport
+      .appendingPathComponent(bundle.bundleIdentifier ?? "app.reflect.ios")
     try fileManager.createDirectory(at: data, withIntermediateDirectories: true)
     let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     return CoreConfig(
-      documentDir: documents.path, dataDir: data.path, userAgent: "Reflect/\(version ?? "0.0.0")")
+      documentDir: directories.documents.path, dataDir: data.path,
+      userAgent: "Reflect/\(version ?? "0.0.0")")
   }
 }

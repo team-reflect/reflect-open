@@ -79,6 +79,7 @@ jobs:
             'apps/ios/*'
             'apps/safari-extension/*'
             'scripts/build-ffi.ts'
+            'scripts/test-ios.ts'
           )
 
           changed() {
@@ -283,10 +284,10 @@ jobs:
 
       - uses: ./.github/actions/setup-mise
 
+      # The steps are separate so that the job page shows the time of each.
       - name: Build the web app
         run: pnpm --filter @reflect/ios build:web
 
-      # The steps are separate so that the job page shows the time of each.
       - name: Build the Rust core
         run: pnpm build:ffi --debug --sdk iphonesimulator
 
@@ -297,69 +298,22 @@ jobs:
             -scheme Reflect \
             -derivedDataPath "$RUNNER_TEMP/DerivedData"
 
-      - name: Pick the simulator
+      # The job summary shows the time of each step of the script.
+      - name: Build and run the tests
         run: |
-          udid=$(xcrun simctl list devices available --json \
-            | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
-          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          pnpm test:ios \
+            --skip-web \
+            --derived-data "$RUNNER_TEMP/DerivedData" \
+            --output "$RUNNER_TEMP/test-ios"
 
-      - name: Print the xcbeautify version
-        run: xcbeautify --version
-
-      - name: Build the app and the tests
-        run: |
-          set -o pipefail
-          xcodebuild build-for-testing \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -configuration Debug-Dev \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" 2>&1 \
-            | tee "$RUNNER_TEMP/ios-build.log" \
-            | xcbeautify --renderer github-actions
-
-      - name: Upload the full build log
+      # The result bundle has the screenshots and the steps of each failed test.
+      - name: Upload the result bundle and the logs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ios-build-log
-          path: ${{ runner.temp }}/ios-build.log
-
-      - name: Boot the simulator
-        run: xcrun simctl bootstatus "$SIMULATOR_UDID" -b
-
-      - name: Wait for the simulator to settle
-        run: sleep 10
-
-      - name: Warms up the app launch path
-        timeout-minutes: 5
-        run: |
-          xcrun simctl launch "$SIMULATOR_UDID" com.apple.mobilesafari
-          xcrun simctl terminate "$SIMULATOR_UDID" com.apple.mobilesafari
-
-      - name: Run the unit tests
-        run: |
-          set -o pipefail
-          xcodebuild test-without-building \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -configuration Debug-Dev \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectTests 2>&1 \
-            | xcbeautify --renderer github-actions
-
-      - name: Run the UI tests
-        run: |
-          set -o pipefail
-          xcodebuild test-without-building \
-            -project apps/ios/Reflect.xcodeproj \
-            -scheme Reflect \
-            -configuration Debug-Dev \
-            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectUITests 2>&1 \
-            | xcbeautify --renderer github-actions
+          name: test-ios-results
+          path: ${{ runner.temp }}/test-ios
+          retention-days: 7
 
   lint-rust:
     needs: classify

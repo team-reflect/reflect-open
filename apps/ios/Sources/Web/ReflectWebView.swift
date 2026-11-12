@@ -14,7 +14,8 @@ final class ReflectWebView: WKWebView {
 
   init(
     routes: [any SchemeRoute], assets: AssetSchemeHandler, bridge: HostBridge,
-    chrome: ChromeBridge, chromeFeatures: Set<ChromeFeature>
+    chrome: ChromeBridge, chromeFeatures: Set<ChromeFeature>,
+    dataStore: WKWebsiteDataStore = .default()
   ) {
     let configuration = WKWebViewConfiguration()
     configuration.setURLSchemeHandler(
@@ -31,7 +32,7 @@ final class ReflectWebView: WKWebView {
     configuration.allowsPictureInPictureMediaPlayback = true
     configuration.mediaTypesRequiringUserActionForPlayback = []
     configuration.preferences.isElementFullscreenEnabled = true
-    configuration.websiteDataStore = .default()
+    configuration.websiteDataStore = dataStore
     super.init(frame: .zero, configuration: configuration)
 
     bridge.evaluate = { [weak self] script in

@@ -37,7 +37,7 @@ struct Module {
 }
 
 let modules: [Module] = [
-  Module(name: "AppStoreKit", layer: .engine),
+  Module(name: "AppStoreKit", layer: .engine, hasTests: true),
   Module(name: "CaptureShared", layer: .shared, hasTests: true),
   Module(name: "ChromeKit", layer: .engine, hasTests: true, hasTestFixtures: true),
   Module(name: "KeyboardKit", layer: .engine),
