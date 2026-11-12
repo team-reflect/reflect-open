@@ -32,9 +32,9 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     self.webView = webView
     super.init(nibName: nil, bundle: nil)
     tabs = [
-      makeTab(.daily, title: "Daily", icon: "square.and.pencil"),
-      makeTab(.all, title: "All", icon: "doc.on.doc"),
-      makeTab(.tasks, title: "Tasks", icon: "checkmark.circle"),
+      makeTab(.daily, title: "Daily", image: UIImage(systemName: "square.and.pencil")),
+      makeTab(.all, title: "All", image: UIImage(systemName: "doc.on.doc")),
+      makeTab(.tasks, title: "Tasks", image: Self.outlineSymbol("checkmark.circle")),
     ]
     mode = .tabSidebar
     delegate = self
@@ -67,7 +67,20 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     pages[tab]
   }
 
-  private func makeTab(_ tab: ChromeTab, title: String, icon: String) -> UITab {
+  /// A template image of a symbol at the tab bar's 23 pt symbol size. The tab
+  /// bar shows a symbol's `.fill` variant, but shows a bitmap as it is.
+  private static func outlineSymbol(_ name: String) -> UIImage? {
+    let configuration = UIImage.SymbolConfiguration(pointSize: 23)
+    guard
+      let symbol = UIImage(systemName: name, variableValue: 1, configuration: configuration)
+    else { return nil }
+    let bitmap = UIGraphicsImageRenderer(size: symbol.size).image { _ in
+      symbol.draw(at: .zero)
+    }
+    return bitmap.withRenderingMode(.alwaysTemplate)
+  }
+
+  private func makeTab(_ tab: ChromeTab, title: String, image: UIImage?) -> UITab {
     let page = WebPageController(tab: tab)
     pages[tab] = page
     let navigation = UINavigationController(rootViewController: page)
@@ -79,7 +92,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     navigation.navigationBar.standardAppearance = appearance
     navigation.navigationBar.scrollEdgeAppearance = appearance
     navigation.navigationBar.compactAppearance = appearance
-    return UITab(title: title, image: UIImage(systemName: icon), identifier: tab.rawValue) { _ in
+    return UITab(title: title, image: image, identifier: tab.rawValue) { _ in
       navigation
     }
   }
