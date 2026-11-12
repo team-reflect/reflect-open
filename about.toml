@@ -18,6 +18,8 @@ accepted = [
 ]
 ignore-build-dependencies = true
 ignore-dev-dependencies = true
+# Scans only the files at the root of each crate.
+max-depth = 1
 targets = [
   "aarch64-apple-darwin",
   "x86_64-apple-darwin",
