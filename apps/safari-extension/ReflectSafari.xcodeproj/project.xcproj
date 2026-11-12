@@ -42,6 +42,7 @@
         "PRODUCT_BUNDLE_IDENTIFIER": "$(REFLECT_APP_IDENTIFIER).safari-extension",
         "PRODUCT_NAME": "SafariExtension",
         "SDKROOT": "macosx",
+        "SWIFT_TREAT_WARNINGS_AS_ERRORS": "YES",
         "SWIFT_VERSION": "5.0",
       },
     },

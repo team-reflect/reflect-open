@@ -18,10 +18,10 @@ import AppIntents
 /// Deliberately not `@MainActor`: the file write must not queue behind
 /// app-boot main-thread work.
 struct QuickNoteIntent: AppIntent {
-  static var title: LocalizedStringResource = "Add quick note"
-  static var description = IntentDescription(
+  static let title: LocalizedStringResource = "Add quick note"
+  static let description = IntentDescription(
     "Append a one-line note to today's daily note in Reflect, under the bullet set in Settings.")
-  static var openAppWhenRun = false
+  static let openAppWhenRun = false
 
   /// Apple's default is `.alwaysAllowed` (runs on a locked device), and
   /// `.requiresAuthentication` still allows a locked iPhone driven from an
@@ -29,7 +29,7 @@ struct QuickNoteIntent: AppIntent {
   /// protection is verified for locked writes, the device performing the
   /// write must itself be unlocked; Face ID satisfies this invisibly from
   /// the lock screen.
-  static var authenticationPolicy: IntentAuthenticationPolicy =
+  static let authenticationPolicy: IntentAuthenticationPolicy =
     .requiresLocalDeviceAuthentication
 
   @Parameter(title: "Note", requestValueDialog: "What do you want to note down?")

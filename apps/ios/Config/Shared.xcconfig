@@ -15,6 +15,9 @@ IPHONEOS_DEPLOYMENT_TARGET = 18.0
 // Complete checking reports concurrency issues as warnings.
 SWIFT_VERSION = 5.0
 SWIFT_STRICT_CONCURRENCY = complete
+// Every Swift warning fails the build. This applies to the project's own
+// targets only: Swift packages keep their own warning settings.
+SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
 
 // Automatic signing with the Reflect team. No provisioning profiles are committed.
 CODE_SIGN_STYLE = Automatic

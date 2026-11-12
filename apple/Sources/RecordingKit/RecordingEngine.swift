@@ -65,7 +65,7 @@ public struct NativeAction: Encodable {
 }
 
 /// `stopRecording`'s response: the session's final segment.
-public struct StopResponse: Encodable {
+public struct StopResponse: Encodable, Sendable {
   /// Absolute path of the staged `.m4a`, already `-end`-marked.
   public let path: String
   /// The session's identity timestamp in epoch ms, shared by every segment.
@@ -78,7 +78,7 @@ public struct StopResponse: Encodable {
 
 /// `startRecording`'s response: the identity the webview files this session's
 /// segments under.
-public struct StartResponse: Encodable {
+public struct StartResponse: Encodable, Sendable {
   public let sessionStartedMs: Double
 }
 
@@ -95,7 +95,7 @@ public enum RecordingEvent {
 }
 
 /// A failed command; `message` is what the host rejects the call with.
-public struct RecordingError: Error {
+public struct RecordingError: Error, Sendable {
   public let message: String
 }
 

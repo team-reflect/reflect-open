@@ -13,10 +13,10 @@ import AppIntents
 /// Compiled into BOTH the app target (execution) and the widget extension
 /// (the button references the type) — the standard shared-source pattern.
 struct StopRecordingLiveActivityIntent: LiveActivityIntent {
-  static var title: LocalizedStringResource = "Stop recording"
+  static let title: LocalizedStringResource = "Stop recording"
   /// Hidden from the Shortcuts app — `StopRecordingSiriIntent` is the
   /// discoverable stop; this one exists only behind the activity's button.
-  static var isDiscoverable: Bool = false
+  static let isDiscoverable: Bool = false
 
   @MainActor
   func perform() async throws -> some IntentResult {

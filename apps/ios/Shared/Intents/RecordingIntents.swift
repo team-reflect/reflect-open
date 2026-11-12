@@ -15,10 +15,10 @@ import AppIntents
 /// queue (the webview must present recording UI); stopping is finalized
 /// natively at once.
 struct StartRecordingIntent: AppIntent {
-  static var title: LocalizedStringResource = "Start recording"
-  static var description = IntentDescription(
+  static let title: LocalizedStringResource = "Start recording"
+  static let description = IntentDescription(
     "Start recording an audio memo that Reflect transcribes into your daily note.")
-  static var openAppWhenRun = true
+  static let openAppWhenRun = true
 
   @MainActor
   func perform() async throws -> some IntentResult {
@@ -29,9 +29,9 @@ struct StartRecordingIntent: AppIntent {
 }
 
 struct StopRecordingSiriIntent: AppIntent {
-  static var title: LocalizedStringResource = "Stop recording"
-  static var description = IntentDescription("Stop the audio memo Reflect is recording.")
-  static var openAppWhenRun = false
+  static let title: LocalizedStringResource = "Stop recording"
+  static let description = IntentDescription("Stop the audio memo Reflect is recording.")
+  static let openAppWhenRun = false
 
   @MainActor
   func perform() async throws -> some IntentResult {
