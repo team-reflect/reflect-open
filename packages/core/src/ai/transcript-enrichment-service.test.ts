@@ -4,6 +4,7 @@ import { MockLanguageModelV3 } from '@reflect/modules/ai/test'
 import type { LanguageModelV3CallOptions, LanguageModelV3Usage } from '@ai-sdk/provider'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import {
+  audioMemoEnrichmentConfig,
   createTranscriptEnrichmentService,
   FORMAT_MAX_CHARS,
   pickAudioMemoEnrichmentConfig,
@@ -79,80 +80,24 @@ function modelThrowing(error: unknown): void {
   )
 }
 
-function request(transcript = 'talked about planning the Rome trip'): Promise<string> {
-  return enrichment.generateTitle({
-    credentials: { config: CONFIG, apiKey: 'sk-live-key' },
+async function request(transcript = 'talked about planning the Rome trip'): Promise<string> {
+  const enriched = await enrichment.enrich({
     transcript,
+    enrichmentCredentials: { config: CONFIG, apiKey: 'sk-live-key' },
+    formatTranscript: false,
     fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
   })
+  return enriched.title
 }
 
-describe('TranscriptEnrichmentService.generateTitle', () => {
-  it('returns a sanitized generated title', async () => {
-    modelAnswering('  Rome itinerary!  ')
-
-    await expect(request()).resolves.toBe('Rome itinerary')
-  })
-
+describe('audio memo enrichment config', () => {
   it.each([
     [CONFIG, 'gpt-5.5', 'gpt-6-luna'],
     [ANTHROPIC_CONFIG, 'claude-sonnet-4-6', 'claude-haiku-5-5'],
     [GOOGLE_CONFIG, 'gemini-3.1-pro-preview', 'gemini-3.5-flash-lite'],
-  ])('uses the fixed small model for %s', async (config, originalModel, titleModel) => {
-    modelAnswering('Planning notes')
-
-    await enrichment.generateTitle({
-      credentials: { config, apiKey: 'sk-live-key' },
-      transcript: 'planning notes',
-      fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
-    })
-
+  ])('maps %s to its fixed small model', (config, originalModel, titleModel) => {
+    expect(audioMemoEnrichmentConfig(config)).toEqual({ ...config, model: titleModel })
     expect(config.model).toBe(originalModel)
-    const calls = languageModelService.calls().map((call) => ({
-      id: call.config.id,
-      provider: call.config.provider,
-      model: call.config.model,
-      apiKey: call.apiKey,
-    }))
-    expect(calls).toContainEqual({
-      id: config.id,
-      provider: config.provider,
-      model: titleModel,
-      apiKey: 'sk-live-key',
-    })
-  })
-
-  it('falls back to the transcript when the provider returns nothing useful', async () => {
-    modelAnswering('[]')
-
-    await expect(request('first idea. second idea')).resolves.toBe('First idea')
-  })
-
-  it('falls back to the transcript when the provider call fails', async () => {
-    modelThrowing(new Error('model unavailable'))
-
-    await expect(request('review launch checklist and beta feedback')).resolves.toBe(
-      'Review launch checklist and beta feedback',
-    )
-  })
-
-  it('uses the timestamp fallback for empty transcripts', async () => {
-    modelAnswering('Ignored')
-
-    await expect(request('')).resolves.toBe('Audio memo 2026-06-11 15:30:22')
-    expect(languageModelService.calls()).toEqual([])
-  })
-
-  it('uses the transcript fallback when title credentials are absent', async () => {
-    modelAnswering('Ignored')
-
-    await expect(
-      enrichment.generateTitle({
-        transcript: 'review launch checklist',
-        fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
-      }),
-    ).resolves.toBe('Review launch checklist')
-    expect(languageModelService.calls()).toEqual([])
   })
 
   it('prefers the default supported provider for title generation', () => {
@@ -179,6 +124,45 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
       provider: 'google',
       model: 'gemini-3.5-flash-lite',
     })
+  })
+})
+
+describe('TranscriptEnrichmentService.enrich naming', () => {
+  it('returns a sanitized generated title', async () => {
+    modelAnswering('  Rome itinerary!  ')
+
+    await expect(request()).resolves.toBe('Rome itinerary')
+  })
+
+  it('passes the given credentials through unchanged', async () => {
+    modelAnswering('Planning notes')
+
+    await request('planning notes')
+
+    expect(
+      languageModelService.calls().map(({ config, apiKey }) => ({ model: config.model, apiKey })),
+    ).toEqual([{ model: 'gpt-5.5', apiKey: 'sk-live-key' }])
+  })
+
+  it('falls back to the timestamp when the provider returns nothing useful', async () => {
+    modelAnswering('[]')
+
+    await expect(request('first idea. second idea')).resolves.toBe('Audio memo 2026-06-11 15:30:22')
+  })
+
+  it('falls back to the timestamp when the provider call fails', async () => {
+    modelThrowing(new Error('model unavailable'))
+
+    await expect(request('review launch checklist and beta feedback')).resolves.toBe(
+      'Audio memo 2026-06-11 15:30:22',
+    )
+  })
+
+  it('uses the timestamp fallback for empty transcripts', async () => {
+    modelAnswering('Ignored')
+
+    await expect(request('')).resolves.toBe('Audio memo 2026-06-11 15:30:22')
+    expect(languageModelService.calls()).toEqual([])
   })
 })
 
@@ -260,7 +244,7 @@ describe('TranscriptEnrichmentService.enrich', () => {
     expect(promptText(calls[0]!)).not.toContain('b')
   })
 
-  it('names the transcript locally when there are no credentials', async () => {
+  it('uses the timestamp title when there are no credentials', async () => {
     modelAnsweringObject({ title: 'Ignored' })
 
     await expect(
@@ -270,7 +254,7 @@ describe('TranscriptEnrichmentService.enrich', () => {
         formatTranscript: true,
         fallbackTitle: FALLBACK_TITLE,
       }),
-    ).resolves.toEqual({ title: 'Review launch checklist', body: 'review launch checklist' })
+    ).resolves.toEqual({ title: FALLBACK_TITLE, body: 'review launch checklist' })
     expect(languageModelService.calls()).toEqual([])
   })
 })

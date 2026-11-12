@@ -94,6 +94,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
       enrichmentCredentials: OPENAI_ENRICHMENT,
       formatTranscript: false,
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
+      isStale: expect.any(Function) as () => boolean,
     })
   })
 
@@ -133,6 +134,7 @@ describe('AudioMemoTranscriptionService.reconcile', () => {
       enrichmentCredentials: OPENAI_ENRICHMENT,
       formatTranscript: true,
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
+      isStale: expect.any(Function) as () => boolean,
     })
     expect(kit.noteFile.getWrites(MEMO.notePath)[0]).toContain(
       '# Planning the launch\n\n[Recording](audio-memos/audio-memo-2026-06-11-153022-845.webm)\n\nWe reviewed the launch.\n\n## Next steps\n\n- Invite beta users',
