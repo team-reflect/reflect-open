@@ -200,7 +200,7 @@ jobs:
 
   # Not part of `all-green`: a WebKit failure does not block merging.
   test-webkit:
-    needs: classify
+    needs: [classify, test-chromium]
     if: needs.classify.outputs.test-webkit == 'true'
     runs-on: xcode-27
     env:
@@ -260,7 +260,7 @@ jobs:
 
   # Builds the Swift shell in apps/ios and runs its unit and UI tests in a simulator.
   test-ios:
-    needs: classify
+    needs: [classify, test-swift]
     if: needs.classify.outputs.test-ios == 'true'
     runs-on: xcode-27
     timeout-minutes: 60
