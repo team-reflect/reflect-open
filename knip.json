@@ -5,6 +5,9 @@
   "workspaces": {
     ".": { "entry": ["fixtures/*.mjs"] },
     "design-system": { "ignore": "./**/*" },
-    "apps/ios": { "ignore": "Extensions/**", "ignoreDependencies": ["@sentry/cli"] }
+    "apps/ios": {
+      "ignore": "Extensions/**",
+      "ignoreDependencies": ["@sentry/cli", "FIXME: do we still need @sentry/cli here?"]
+    }
   }
 }
