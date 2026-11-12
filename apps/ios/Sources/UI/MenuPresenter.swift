@@ -44,16 +44,17 @@ final class MenuPresenter {
     anchor.performPrimaryAction()
   }
 
-  /// The menu of a bar button: its taps send `action` intents for `entryId`.
-  func barMenu(_ items: [MenuItem], entryId: Int, source: @escaping () -> UIBarButtonItem?)
-    -> UIMenu
-  {
+  /// The menu of a bar button or title: its taps send `action` intents for
+  /// `entryId`, and a confirmation opens from `source`.
+  func barMenu(
+    _ items: [MenuItem], entryId: Int,
+    source: @escaping () -> (any UIPopoverPresentationControllerSourceItem)?
+  ) -> UIMenu {
     MenuBuilder.menu(items) { [weak self] action in
       guard let self else { return }
       self.openEntryId = entryId
-      self.select(action, intent: .action(entryId: entryId, id: action.id)) {
-        source() ?? self.anchor
-      }
+      // The next state rebuilds a bar menu with the new checkmarks.
+      self.select(action, intent: .action(entryId: entryId, id: action.id), source: source)
     }
   }
 
@@ -75,7 +76,11 @@ final class MenuPresenter {
 
   private func menu(for request: MenuRequest) -> UIMenu {
     MenuBuilder.menu(request.items) { [weak self] action in
-      self?.select(
+      guard let self else { return }
+      if action.keepsMenuPresented {
+        self.toggleVisibleCheckmark(of: action.id)
+      }
+      self.select(
         action, intent: .menu(entryId: request.entryId, menuId: request.menuId, id: action.id)
       ) { [weak self] in self?.anchor }
     }
@@ -86,14 +91,12 @@ final class MenuPresenter {
     _ action: MenuAction, intent: ChromeIntent,
     source: @escaping () -> (any UIPopoverPresentationControllerSourceItem)?
   ) {
-    if action.keepsMenuPresented {
-      toggleVisibleCheckmark(of: action.id)
-    }
     guard let confirm = action.confirm else {
       send(intent)
       return
     }
-    guard let presenter = presenter(), let item = source() else { return }
+    guard let presenter = presenter() else { return }
+    guard let item = source() ?? presenter.viewIfLoaded else { return }
     let entryId = openEntryId
     let alert = MenuBuilder.confirmation(confirm, source: item) { [weak self] in
       guard let self, self.openEntryId == entryId else { return }
@@ -105,7 +108,8 @@ final class MenuPresenter {
     }
   }
 
-  /// Flips the checkmark of `id` in the open menu, which stays on screen.
+  /// Flips the checkmark of `id` in the open `presentMenu` menu, which stays
+  /// on screen.
   private func toggleVisibleCheckmark(of id: String) {
     guard var request = openRequest else { return }
     request.items = request.items.map { Self.toggling(id, in: $0) }

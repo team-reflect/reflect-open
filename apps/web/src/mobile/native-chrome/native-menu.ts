@@ -1,11 +1,15 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import type { NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
+import { NO_ENTRY, type NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
 import { rememberNativeMenu } from '@/mobile/native-chrome/registrations.ts'
 import { useOptionalRouterState } from '@/routing/router.tsx'
 import { hasNativeChrome, postNativeChrome } from '@/services/native-chrome-transport.ts'
 
 let lastPressed: Element | null = null
+let lastPressedAt = 0
 let tracking = false
+
+/** How long a press can anchor a menu that opens after it. */
+const PRESS_ANCHOR_MS = 1000
 
 /**
  * Remember the element of the last press, so a drawer that opens from it can
@@ -20,16 +24,25 @@ function trackPresses(): void {
     'pointerdown',
     (event) => {
       lastPressed = event.target instanceof Element ? event.target : null
+      lastPressedAt = event.timeStamp
     },
     { capture: true },
   )
 }
 
 /**
- * The control under the last press, or `null`.
+ * The control under the last press, while it is in the page and the press
+ * is recent; `null` otherwise (a drawer opened from code or the keyboard).
  */
 function lastPressedControl(): Element | null {
-  return lastPressed?.closest('button, [role="button"], a, label') ?? lastPressed
+  if (
+    lastPressed === null ||
+    !lastPressed.isConnected ||
+    performance.now() - lastPressedAt > PRESS_ANCHOR_MS
+  ) {
+    return null
+  }
+  return lastPressed.closest('button, [role="button"], a, label') ?? lastPressed
 }
 
 /**
@@ -87,7 +100,7 @@ export function useNativeMenuDrawer({
   onSelect,
 }: NativeMenuDrawerOptions): boolean {
   const native = hasNativeChrome('menus')
-  const entryId = useOptionalRouterState()?.entryId ?? 0
+  const entryId = useOptionalRouterState()?.entryId ?? NO_ENTRY
   const latestRef = useRef({ items, onSelect, onOpenChange })
   useLayoutEffect(() => {
     latestRef.current = { items, onSelect, onOpenChange }

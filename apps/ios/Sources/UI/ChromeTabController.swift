@@ -16,7 +16,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Set while the selection follows a state, so it sends no intent.
   private var following = false
   /// The tab the user tapped, until the page shows it. States posted before
-  /// the tap still name the old tab, so they must not move the selection back.
+  /// the tap still name the old tab, so they must not move the selection back
+  /// (for at most 2 s).
   private var pendingTab: ChromeTab?
   /// The picture of the old tab over the new page until the page shows the new tab.
   private var cover: UIView?
@@ -112,6 +113,9 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   func reset() {
     pendingTab = nil
     stateTab = nil
+    for page in pages.values {
+      page.clearBar()
+    }
     if let cover {
       cover.removeFromSuperview()
       self.cover = nil
@@ -132,18 +136,22 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   /// Moves the web view into `page` behind a picture of the old tab, so the
   /// old tab's content never shows in the new tab for a frame. The picture
-  /// fades out when the page shows the new tab, or after 0.5 s.
+  /// fades out when the page shows the new tab, or after 2 s (a first visit
+  /// can wait for a lazy screen). If the page never shows the new tab (it
+  /// dropped the tap), the selection follows the tab of the last state.
   private func move(to page: WebPageController) {
     cover?.removeFromSuperview()
     let picture = webView.snapshotView(afterScreenUpdates: false)
     page.loadViewIfNeeded()
+    // The page's bar shows its last visit until the first state of the tab.
+    page.navigationController?.setNavigationBarHidden(true, animated: false)
     page.attach(webView)
     guard let picture else { return }
     picture.frame = page.view.bounds
     picture.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     page.view.addSubview(picture)
     cover = picture
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak page] in
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak page] in
       guard let self, let page else { return }
       self.removeCover(from: page)
       // The page did not show the tapped tab: follow the tab it shows.

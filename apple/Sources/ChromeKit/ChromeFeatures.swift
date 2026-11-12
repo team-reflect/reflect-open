@@ -8,7 +8,7 @@ public enum ChromeFeature: String, CaseIterable, Sendable {
   case tabbar
   case navbar
 
-  /// The parts this part needs: the navigation bar of E sits in each tab's page.
+  /// The parts this part needs: the navigation bar sits in each tab's page.
   public var needs: [ChromeFeature] {
     switch self {
     case .navbar: [.tabbar]

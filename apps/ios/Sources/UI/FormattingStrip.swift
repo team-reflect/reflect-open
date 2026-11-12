@@ -35,12 +35,16 @@ final class FormattingStrip: UIInputView {
   init() {
     super.init(frame: CGRect(x: 0, y: 0, width: 400, height: 48), inputViewStyle: .keyboard)
     allowsSelfSizing = true
+    // The symbols follow Dynamic Type up to a size that fits the 48 pt strip.
+    maximumContentSizeCategory = .accessibilityMedium
+    let symbols = UIImage.SymbolConfiguration(textStyle: .body)
     let row = UIStackView()
     row.axis = .horizontal
     row.spacing = 4
     for item in Self.items {
       let button = UIButton(type: .system)
       button.setImage(UIImage(systemName: item.icon), for: .normal)
+      button.setPreferredSymbolConfiguration(symbols, forImageIn: .normal)
       button.accessibilityLabel = item.label
       button.addAction(
         UIAction { [weak self] _ in self?.tap(item.id) }, for: .primaryActionTriggered)
@@ -53,6 +57,7 @@ final class FormattingStrip: UIInputView {
     scroll.addSubview(row)
     let dismiss = UIButton(type: .system)
     dismiss.setImage(UIImage(systemName: "keyboard.chevron.compact.down"), for: .normal)
+    dismiss.setPreferredSymbolConfiguration(symbols, forImageIn: .normal)
     dismiss.accessibilityLabel = "Hide keyboard"
     dismiss.addAction(
       UIAction { [weak self] _ in self?.tap("dismiss") }, for: .primaryActionTriggered)

@@ -1,3 +1,4 @@
+import { NO_ENTRY } from '@/mobile/native-chrome/protocol.ts'
 import { useState, type ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
@@ -51,7 +52,7 @@ describe('useNativeMenuDrawer', () => {
     const message = postMessage.mock.calls.at(-1)?.[0] as { type: string; rect: { width: number } }
     expect(message.type).toBe('presentMenu')
     expect(message.rect.width).toBeGreaterThan(0)
-    nativeMenuHandler('picker', 0)?.('a')
+    nativeMenuHandler('picker', NO_ENTRY)?.('a')
     expect(onSelect).toHaveBeenCalledWith('a')
   })
 

@@ -1,0 +1,8 @@
+[
+  { "type": "back", "entryId": 3 },
+  { "type": "tab", "tab": "all" },
+  { "type": "action", "entryId": 3, "id": "gear" },
+  { "type": "menu", "entryId": 3, "menuId": "note-actions", "id": "pin" },
+  { "type": "command", "id": "indent" },
+  { "type": "files", "files": [{ "name": "Image.png", "type": "image/png", "data": "AQID" }] }
+]

@@ -157,7 +157,6 @@ export function NativeChromeProjection({
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
   const enabled = hasAnyNativeChrome()
-  const bar = bars.get(entryId)
 
   useEffect(() => {
     if (!enabled) {
@@ -168,14 +167,16 @@ export function NativeChromeProjection({
         route,
         entryId,
         tab,
-        bar,
+        // The store, not the render's `bars`: a new screen registers its bar
+        // in a layout effect of this commit, after this component rendered.
+        bar: nativeBars.get().get(entryId),
         keyboardVisible,
         modal: modalCount > 0,
         toolbar: toolbar?.capabilities ?? null,
         theme,
       }),
     )
-  }, [enabled, route, entryId, tab, bar, keyboardVisible, modalCount, toolbar, theme])
+  }, [enabled, route, entryId, tab, bars, keyboardVisible, modalCount, toolbar, theme])
 
   const attachCommandsRef = useRef<FormattingToolbarCommands | null>(null)
   useLayoutEffect(() => {

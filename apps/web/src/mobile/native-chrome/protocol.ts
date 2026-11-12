@@ -3,6 +3,12 @@ import type { Route } from '@reflect/app'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 
 /**
+ * The entry id of a surface outside the router (onboarding, loading), so it
+ * never matches a history entry: those start at 0 for every router.
+ */
+export const NO_ENTRY = -1
+
+/**
  * A confirmation the shell shows before it sends the item's intent: an
  * action sheet (a popover on iPad) with one destructive button and Cancel.
  */

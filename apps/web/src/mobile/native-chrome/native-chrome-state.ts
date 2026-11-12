@@ -2,7 +2,7 @@ import type { Route } from '@reflect/app'
 import type { ThemePreference } from '@reflect/core'
 import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
 import { tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
-import type { NativeChromeState } from '@/mobile/native-chrome/protocol.ts'
+import { NO_ENTRY, type NativeChromeState } from '@/mobile/native-chrome/protocol.ts'
 import type { NativeBarSpec } from '@/mobile/native-chrome/registrations.ts'
 import { postNativeChrome } from '@/services/native-chrome-transport.ts'
 
@@ -80,7 +80,7 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
 export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeState {
   return {
     type: 'state',
-    entryId: 0,
+    entryId: NO_ENTRY,
     chrome: 'none',
     route: null,
     tab: 'daily',

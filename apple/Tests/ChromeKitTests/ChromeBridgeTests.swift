@@ -24,6 +24,20 @@ final class ChromeBridgeTests: XCTestCase {
     }
   }
 
+  func testEncodesEveryIntentAsTheFixtureThePageParses() throws {
+    let intents: [ChromeIntent] = [
+      .back(entryId: 3),
+      .tab(.all),
+      .action(entryId: 3, id: "gear"),
+      .menu(entryId: 3, menuId: "note-actions", id: "pin"),
+      .command("indent"),
+      .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
+    ]
+    let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
+    let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
+    XCTAssertEqual(encoded as? NSArray, expected as? NSArray)
+  }
+
   func testDailyFixtureHasTheMonthMenuAndTheGear() throws {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("daily"))
     XCTAssertEqual(state.title, "November 2026")

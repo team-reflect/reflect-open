@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   runNativeIntent,
@@ -24,6 +26,19 @@ describe('parseNativeIntent', () => {
     expect(parseNativeIntent({ type: 'back', entryId: 1 })).toEqual({ type: 'back', entryId: 1 })
     expect(parseNativeIntent({ type: 'tab', tab: 'chat' })).toBeNull()
     expect(parseNativeIntent('back')).toBeNull()
+  })
+
+  it('reads every intent the Swift shell encodes', () => {
+    // `ChromeKitTests` checks that Swift encodes exactly this file.
+    const path = join(
+      import.meta.dirname,
+      '../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
+    )
+    const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
+    expect(intents).toHaveLength(6)
+    for (const intent of intents) {
+      expect(parseNativeIntent(intent)).toEqual(intent)
+    }
   })
 })
 

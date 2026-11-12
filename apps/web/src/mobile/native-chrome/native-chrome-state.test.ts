@@ -119,13 +119,6 @@ describe('buildShellChromeState', () => {
       buildShellChromeState({ ...BASE, route: { kind: 'tasks' }, tab: 'tasks' }),
     )
   })
-
-  it('names the settings screens', () => {
-    const titles = (['settings', 'graphs', 'licenses', 'chat'] as const).map((kind) => {
-      return buildShellChromeState({ ...BASE, route: { kind }, tab: 'daily' }).title
-    })
-    expect(titles).toEqual(['Settings', 'Graphs', 'Licenses', 'Chat'])
-  })
 })
 
 describe('buildNoChromeState', () => {

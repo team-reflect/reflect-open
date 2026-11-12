@@ -72,8 +72,8 @@ final class WebPageController: UIViewController {
     if newEntry || state.titleMenu != shownTitleMenu {
       shownTitleMenu = state.titleMenu
       navigationItem.titleMenuProvider = state.titleMenu.map { items in
-        { [weak menus] _ in
-          menus?.barMenu(items, entryId: entryId, source: { nil })
+        { [weak menus, weak self] _ in
+          menus?.barMenu(items, entryId: entryId) { self?.navigationController?.navigationBar }
         }
       }
     }
@@ -100,6 +100,22 @@ final class WebPageController: UIViewController {
         barItem($0, entryId: entryId, menus: menus, send: send)
       }
     }
+  }
+
+  /// Hides the navigation bar and forgets its items, so nothing of an old
+  /// document stays on screen.
+  func clearBar() {
+    navigationController?.setNavigationBarHidden(true, animated: false)
+    navigationItem.title = nil
+    navigationItem.titleMenuProvider = nil
+    navigationItem.leftBarButtonItems = nil
+    navigationItem.rightBarButtonItems = nil
+    shownLeading = nil
+    shownTrailing = nil
+    shownCanBack = false
+    shownTitleMenu = nil
+    shownEntryId = nil
+    setBarDimmed(false)
   }
 
   /// Dims the navigation bar and ignores its touches while a web drawer is

@@ -1,3 +1,4 @@
+import { NO_ENTRY } from '@/mobile/native-chrome/protocol.ts'
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -82,13 +83,13 @@ describe('MobileScreenHeader', () => {
       )
 
       await vi.waitFor(() => {
-        expect(nativeBars.get().get(0)).toEqual({
+        expect(nativeBars.get().get(NO_ENTRY)).toEqual({
           title: 'Roadmap',
           trailing: [{ id: 'more', title: 'More', icon: 'ellipsis' }],
         })
       })
-      nativeBarHandlers(0)?.onBack?.()
-      nativeBarHandlers(0)?.onAction('more')
+      nativeBarHandlers(NO_ENTRY)?.onBack?.()
+      nativeBarHandlers(NO_ENTRY)?.onAction('more')
       expect(onBack).toHaveBeenCalledOnce()
       expect(onNativeAction).toHaveBeenCalledWith('more')
     } finally {
@@ -114,10 +115,10 @@ describe('MobileScreenHeader', () => {
         </NativeBarLayerContext>,
       )
       await vi.waitFor(() => {
-        expect(nativeBars.get().get(0)?.title).toBe('On top')
+        expect(nativeBars.get().get(NO_ENTRY)?.title).toBe('On top')
       })
       await older.unmount()
-      expect(nativeBars.get().get(0)?.title).toBe('On top')
+      expect(nativeBars.get().get(NO_ENTRY)?.title).toBe('On top')
     } finally {
       installNativeChrome({}, document.documentElement)
     }
