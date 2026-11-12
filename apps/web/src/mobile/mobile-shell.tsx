@@ -1,9 +1,8 @@
 import { Suspense, useEffect, useRef, useState, type ReactElement } from 'react'
 import { LoadingScreen } from '@/components/loading-screen.tsx'
 import { useDoubleTap } from '@/hooks/use-double-tap.ts'
-import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import { MobileStack } from '@/mobile/mobile-stack.tsx'
-import { MobileTabBar, tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
+import { tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { SafeAreaBoundary } from '@/mobile/safe-area-boundary.tsx'
 import { useAllTabScreen } from '@/mobile/use-all-tab-screen.ts'
 import {
@@ -119,11 +118,6 @@ export function MobileShell(): ReactElement {
 
   return (
     <SafeAreaBoundary>
-      <chromeRenderer.ShellBars
-        tab={tab}
-        keyboardVisible={keyboardVisible}
-        onSelectTab={handleTabSelect}
-      />
       {/* The shell yields to the software keyboard by height (Plan 19,
           decision 8): the root ends at the keyboard's top, so every screen's
           layout sees the true visible viewport. Only `position: fixed`
@@ -143,16 +137,11 @@ export function MobileShell(): ReactElement {
             />
           </Suspense>
         </div>
-        {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
-          would ride above the keyboard instead, so it hides while typing.
-          Its slot goes to the formatting toolbar, which — sitting at the
-          bottom of a root that ends at the keyboard's top — lands exactly
-          on the keyboard edge with no fixed positioning. */}
-        {keyboardVisible ? (
-          <MobileFormattingToolbar />
-        ) : (
-          <MobileTabBar tab={tab} onSelect={handleTabSelect} />
-        )}
+        <chromeRenderer.ShellBars
+          tab={tab}
+          keyboardVisible={keyboardVisible}
+          onSelectTab={handleTabSelect}
+        />
       </div>
     </SafeAreaBoundary>
   )

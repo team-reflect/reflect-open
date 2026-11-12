@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import type { Route } from '@reflect/app'
-import { useAppServices } from '@/services/services-provider.tsx'
 
 export type MobileTab = 'daily' | 'all' | 'tasks'
 
@@ -45,14 +44,11 @@ interface MobileTabBarProps {
  */
 export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement {
   const navRef = useRef<HTMLElement | null>(null)
-  const nativeTabBar = useAppServices().nativeChrome.enabled
 
   useLayoutEffect(() => {
     const nav = navRef.current
     const root = document.documentElement
-    // Under the native tab bar this bar takes no space, and the safe area
-    // already holds the native bar.
-    if (nav === null || nativeTabBar) {
+    if (nav === null) {
       return
     }
     const publish = (): void => {
@@ -66,7 +62,7 @@ export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement
       observer.disconnect()
       root.style.removeProperty('--mobile-tab-bar-height')
     }
-  }, [nativeTabBar])
+  }, [])
 
   return (
     <nav

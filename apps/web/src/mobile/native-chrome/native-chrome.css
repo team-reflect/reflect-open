@@ -1,11 +1,3 @@
-/* The Swift shell draws these parts. The web versions stay mounted, so their
-   state keeps running, but they take no space. */
-
-:root[data-native-chrome] [role='toolbar'][aria-label='Formatting'],
-:root[data-native-chrome] nav[aria-label='Sections'] {
-  display: none;
-}
-
 /* The Swift shell draws a native button over each of these controls. They
    keep their space, so the web header lays out the same around them. */
 
