@@ -5,7 +5,7 @@ import WidgetKit
 
 /// The recording Live Activity (V1's `RecordingActivityWidget`, rebuilt):
 /// lock-screen banner + Dynamic Island showing a live elapsed timer while a
-/// memo records, with a stop button on iOS 17+ (a `LiveActivityIntent` that
+/// memo records, with a stop button (a `LiveActivityIntent` that
 /// performs in the app's process — see `StopRecordingLiveActivityIntent.swift`,
 /// compiled into both targets). The timer renders from `startedAt` with no
 /// updates needed; the recording plugin starts and ends the activity.
@@ -74,19 +74,15 @@ private struct RecordingTimerText: View {
   }
 }
 
-/// The stop control: iOS 17 can run a `LiveActivityIntent` straight from the
-/// lock screen; earlier versions get no button (V1 parity — tapping the
-/// activity opens the app, where the drawer's stop lives).
+/// The stop control: runs a `LiveActivityIntent` straight from the lock screen.
 private struct StopRecordingButton: View {
   var body: some View {
-    if #available(iOS 17.0, *) {
-      Button(intent: StopRecordingLiveActivityIntent()) {
-        Image(systemName: "stop.fill")
-          .font(.title3)
-          .foregroundStyle(.red)
-          .padding(8)
-      }
-      .buttonStyle(.plain)
+    Button(intent: StopRecordingLiveActivityIntent()) {
+      Image(systemName: "stop.fill")
+        .font(.title3)
+        .foregroundStyle(.red)
+        .padding(8)
     }
+    .buttonStyle(.plain)
   }
 }

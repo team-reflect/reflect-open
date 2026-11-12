@@ -12,7 +12,6 @@ import AppIntents
 ///
 /// Compiled into BOTH the app target (execution) and the widget extension
 /// (the button references the type) — the standard shared-source pattern.
-@available(iOS 17.0, *)
 struct StopRecordingLiveActivityIntent: LiveActivityIntent {
   static let title: LocalizedStringResource = "Stop recording"
   /// Hidden from the Shortcuts app — `StopRecordingSiriIntent` is the

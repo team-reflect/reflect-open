@@ -11,7 +11,7 @@ import StoreKit
 public enum AppStoreEnvironment {
   /// The environment of this install, or nil when StoreKit cannot tell.
   public static func current() async -> String? {
-    if #available(iOS 16.0, *), let result = try? await AppTransaction.shared {
+    if let result = try? await AppTransaction.shared {
       // An unverified payload names the same environment as a verified one:
       // StoreKit lists it beside a thrown error as a case for
       // `AppTransaction.refresh()`, not as a wrong answer.

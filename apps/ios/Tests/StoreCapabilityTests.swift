@@ -56,7 +56,7 @@ final class StoreCapabilityTests: XCTestCase {
   // The purchase command needs the system's purchase sheet, which does not
   // answer in a simulator's first run. The test session buys the product.
   func testATransactionOutsideAPurchaseIsReportedAndOwned() async throws {
-    try session.buyProduct(productIdentifier: monthly)
+    _ = try await session.buyProduct(identifier: monthly)
     for _ in 0..<600 where updated == 0 {
       try await Task.sleep(nanoseconds: 100_000_000)
     }

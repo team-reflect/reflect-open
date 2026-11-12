@@ -14,7 +14,7 @@ here until you verify that the fact changed on every engine we ship to.
 | Safari            | Safari 27.0.1 on macOS                                   |
 | iOS               | Safari on iOS 26.4 (iPhone 17 Pro simulator, real touch) |
 
-The minimum iOS target is 16.0 (`IPHONEOS_DEPLOYMENT_TARGET` in
+The minimum iOS target is 18.0 (`IPHONEOS_DEPLOYMENT_TARGET` in
 `apps/ios/Config/Shared.xcconfig`). Engines in the supported range can be older
 than the ones above.
 
@@ -98,8 +98,8 @@ assumption in Safari or in the iOS simulator
 
 - `scrollIntoView({ container: 'nearest' })`: Safari and iOS ignore `container` and also scroll
   the outer scrollers.
-- Per browser compatibility data, iOS 16.2 has none of `scrollend`, `ScrollTimeline`, or `animation-timeline: scroll()`. Keep the
-  fallbacks for them while the minimum target is below the iOS version that added them.
+- Per browser compatibility data, iOS added `ScrollTimeline` and `animation-timeline: scroll()` in 26.0 and `scrollend` in 26.2.
+  Keep the fallbacks for them while the minimum target is below those versions.
 
 ## CSS `scroll-behavior: smooth`
 

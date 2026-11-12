@@ -7,7 +7,6 @@ public import Foundation
 /// (which renders it). ActivityKit matches the two sides by this type's
 /// name, so both binaries link this one module. Keep it free of plugin
 /// imports.
-@available(iOS 16.1, *)
 public struct RecordingActivityAttributes: ActivityAttributes {
   public struct ContentState: Codable, Hashable {
     /// When recording started — the lock-screen timer counts up from it.

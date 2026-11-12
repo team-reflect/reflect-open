@@ -41,7 +41,6 @@ struct StopRecordingSiriIntent: AppIntent {
   }
 }
 
-@available(iOS 16.4, *)
 struct ReflectAppShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
     AppShortcut(
