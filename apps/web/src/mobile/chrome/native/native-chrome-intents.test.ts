@@ -6,9 +6,9 @@ import {
   createAttachQueue,
   runNativeIntent,
   type IntentContext,
-} from '@/mobile/native-chrome/native-chrome-intents.ts'
+} from '@/mobile/chrome/native/native-chrome-intents.ts'
 import type { FormattingToolbarCommands } from '@/editor/formatting-toolbar-store.ts'
-import { FORMATTING_COMMANDS, parseNativeIntent } from '@/mobile/native-chrome/protocol.ts'
+import { FORMATTING_COMMANDS, parseNativeIntent } from '@/mobile/chrome/native/protocol.ts'
 
 function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContext {
   return {
@@ -34,7 +34,7 @@ describe('parseNativeIntent', () => {
     // `ChromeKitTests` checks that `FormattingCommand` has exactly these.
     const path = join(
       import.meta.dirname,
-      '../../../../../apple/Tests/ChromeKitTests/Fixtures/commands.json',
+      '../../../../../../apple/Tests/ChromeKitTests/Fixtures/commands.json',
     )
     if (process.env.UPDATE_CHROME_FIXTURES === '1') {
       writeFileSync(path, `${JSON.stringify(FORMATTING_COMMANDS)}\n`)
@@ -47,7 +47,7 @@ describe('parseNativeIntent', () => {
     // `ChromeKitTests` checks that Swift encodes exactly this file.
     const path = join(
       import.meta.dirname,
-      '../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
+      '../../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
     expect(intents).toHaveLength(5)

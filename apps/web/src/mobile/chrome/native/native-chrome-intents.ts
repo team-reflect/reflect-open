@@ -6,7 +6,7 @@ import type { ToastController } from '@/lib/use-toasts.ts'
 import { runChromeAction } from '@/mobile/chrome/chrome-action.ts'
 import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
-import type { FormattingCommandId, NativeIntent } from '@/mobile/native-chrome/protocol.ts'
+import type { FormattingCommandId, NativeIntent } from '@/mobile/chrome/native/protocol.ts'
 
 /**
  * Inserts files into an editor after the inserts it was given before.

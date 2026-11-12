@@ -21,12 +21,12 @@ import {
   createAttachQueue,
   runNativeIntent,
   type IntentContext,
-} from '@/mobile/native-chrome/native-chrome-intents.ts'
+} from '@/mobile/chrome/native/native-chrome-intents.ts'
 import {
   buildNoChromeState,
   buildShellChromeState,
-} from '@/mobile/native-chrome/native-chrome-state.ts'
-import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/native-chrome/protocol.ts'
+} from '@/mobile/chrome/native/native-chrome-state.ts'
+import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'

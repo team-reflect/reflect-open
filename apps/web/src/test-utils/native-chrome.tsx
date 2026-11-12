@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { noop } from '@ocavue/utils'
 import { createTestNativeChromeService, type TestNativeChromeHost } from '@reflect/app/testing'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
-import type { NativeChromeState } from '@/mobile/native-chrome/protocol.ts'
+import type { NativeChromeState } from '@/mobile/chrome/native/protocol.ts'
 import type { RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 
 function TestShellBars(): ReactElement {

@@ -4,7 +4,7 @@ import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-
 import type { ScreenBar } from '@/mobile/chrome/native/screen-registry.ts'
 import { toWireButtons } from '@/mobile/chrome/native/sf-symbols.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
-import { NO_ENTRY, type NativeChromeState } from '@/mobile/native-chrome/protocol.ts'
+import { NO_ENTRY, type NativeChromeState } from '@/mobile/chrome/native/protocol.ts'
 
 /**
  * A chrome state before the transport numbers it.

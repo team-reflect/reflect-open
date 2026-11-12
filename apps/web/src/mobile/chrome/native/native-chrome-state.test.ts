@@ -6,15 +6,15 @@ import {
   buildNoChromeState,
   buildShellChromeState,
   type ShellChromeInput,
-} from '@/mobile/native-chrome/native-chrome-state.ts'
-import type { NativeChromeMessage } from '@/mobile/native-chrome/protocol.ts'
+} from '@/mobile/chrome/native/native-chrome-state.ts'
+import type { NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
 
 /**
  * The Swift tests decode the same files (`ChromeKitTests`), so a field that
  * one side renames fails on the other. `UPDATE_CHROME_FIXTURES=1` rewrites
  * them.
  */
-const FIXTURES = join(import.meta.dirname, '../../../../../apple/Tests/ChromeKitTests/Fixtures')
+const FIXTURES = join(import.meta.dirname, '../../../../../../apple/Tests/ChromeKitTests/Fixtures')
 
 const BASE: Omit<ShellChromeInput, 'route' | 'tab'> = {
   entryId: 7,

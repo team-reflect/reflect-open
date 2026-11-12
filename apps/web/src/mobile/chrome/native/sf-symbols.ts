@@ -1,5 +1,5 @@
 import type { ChromeButton, ChromeIcon, ChromeMenuItem } from '@/mobile/chrome/screen-chrome.ts'
-import type { NativeBarButton, NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
+import type { NativeBarButton, NativeMenuItem } from '@/mobile/chrome/native/protocol.ts'
 
 const SF_SYMBOLS: Record<ChromeIcon, string> = {
   settings: 'gearshape',
