@@ -28,7 +28,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    # The desktop package lives at the repo root ("."), so its outputs have
+    # The app package lives at the repo root ("."), so its outputs have
     # no path prefix. The channels never release from the same push:
     # a push merges at most one Release PR, and the two passes only create
     # releases for merged PRs on their own head branch (the component in the
@@ -85,13 +85,13 @@ jobs:
       CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
       CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
 
-  publish-desktop-stable: # FIXME rename "publish-desktop-stable" to "publish-app-stable"
-    name: Publish stable # FIXME rename "Publish stable" to "Publish App stable"
+  publish-app-stable:
+    name: Publish App stable
     needs: release-please
     if: needs.release-please.outputs.stable_created == 'true'
     permissions:
       contents: write
-    uses: ./.github/workflows/publish-desktop.yml
+    uses: ./.github/workflows/publish-app.yml
     with:
       tag: ${{ needs.release-please.outputs.stable_tag }}
       commit: ${{ needs.release-please.outputs.stable_commit }}
@@ -106,13 +106,13 @@ jobs:
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-  publish-desktop-beta: # FIXME: same
-    name: Publish beta # FIXME: same
+  publish-app-beta:
+    name: Publish App beta
     needs: release-please
     if: needs.release-please.outputs.beta_created == 'true'
     permissions:
       contents: write
-    uses: ./.github/workflows/publish-desktop.yml # FIXME: rename  publish-desktop.yml to publish-app.yml
+    uses: ./.github/workflows/publish-app.yml
     with:
       tag: ${{ needs.release-please.outputs.beta_tag }}
       commit: ${{ needs.release-please.outputs.beta_commit }}

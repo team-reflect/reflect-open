@@ -1,4 +1,4 @@
-name: Publish desktop
+name: Publish app
 
 on:
   workflow_call:
@@ -70,8 +70,8 @@ jobs:
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
-  testflight: # FIXME: rename "testflight" to "ios"
-    name: TestFlight # FIXME: rename "TestFlight" to "iOS"
+  ios:
+    name: iOS
     uses: ./.github/workflows/publish-ios.yml
     with:
       commit: ${{ inputs.commit }}
