@@ -12,6 +12,7 @@ import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyStream } from './daily-stream.tsx'
+import { noop, returnFalse } from '@ocavue/utils'
 
 /**
  * The stream's arrival-focus contract: every fresh arrival autofocuses the
@@ -58,8 +59,8 @@ vi.mock('@/components/note-pane.tsx', () => ({
       }
       registerHandle(dailyDate, {
         getMarkdown: () => '',
-        setMarkdown: () => {},
-        insertMarkdown: () => {},
+        setMarkdown: noop,
+        insertMarkdown: noop,
         focus: () => {
           focusLog.calls.push(`focus:${dailyDate}`)
         },
@@ -67,13 +68,13 @@ vi.mock('@/components/note-pane.tsx', () => ({
           focusLog.calls.push(`setSelection:${dailyDate}:${position}`)
         },
         getSelectedText: () => '',
-        openSelectionMenu: () => {},
-        startPendingReplacement: () => false,
-        appendPendingReplacementText: () => {},
-        acceptPendingReplacement: () => {},
-        discardPendingReplacement: () => {},
-        findNext: () => {},
-        findPrevious: () => {},
+        openSelectionMenu: noop,
+        startPendingReplacement: returnFalse,
+        appendPendingReplacementText: noop,
+        acceptPendingReplacement: noop,
+        discardPendingReplacement: noop,
+        findNext: noop,
+        findPrevious: noop,
       })
       return () => registerHandle(dailyDate, null)
     }, [dailyDate, registerHandle])

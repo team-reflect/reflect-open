@@ -8,6 +8,7 @@ import type {
   PullOutcome,
   SkippedFile,
 } from './git-repository-service.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The sync engine: debounced commit→push on edit, fetch→pull→push with retry
@@ -451,7 +452,7 @@ class SyncEngineImpl implements SyncEngine {
     if (this.#running !== null) {
       // Queue one follow-up that does the union of every request.
       if (this.#followUp === null) {
-        let settle = (): void => {}
+        let settle: () => void = noop
         const done = new Promise<void>((resolve) => {
           settle = resolve
         })
@@ -483,7 +484,7 @@ class SyncEngineImpl implements SyncEngine {
         await this.#cycle(request, quiet, owesCommit, (changes) => {
           const task = this.#startRemoteChanges(changes)
           // Attach a handler now so an early rejection is never unhandled.
-          void task.catch(() => {})
+          void task.catch(noop)
           remoteChangeTasks.push(task)
         })
         await this.#settleRemoteChanges(remoteChangeTasks)

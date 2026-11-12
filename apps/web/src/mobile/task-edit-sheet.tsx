@@ -24,6 +24,7 @@ import {
   useEditorSpellCheck,
   useTimeFormat,
 } from '@/providers/settings-provider.tsx'
+import { noop } from '@ocavue/utils'
 
 interface MobileTaskEditSheetProps {
   /** The task being edited. Remount (key by task) to reseed the draft. */
@@ -127,7 +128,7 @@ export function MobileTaskEditSheet({
 
   // Enter finishes the visit exactly like a dismissal (commit / delete-empty),
   // read through a latest-closure ref so the keymap binds once.
-  const finishRef = useRef<() => void>(() => {})
+  const finishRef = useRef<() => void>(noop)
   useEffect(() => {
     finishRef.current = () => handleOpenChange(false)
   })

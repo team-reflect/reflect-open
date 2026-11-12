@@ -17,6 +17,7 @@ import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
 import { useNoteDocument } from './use-note-document.ts'
+import { noop, returnFalse } from '@ocavue/utils'
 
 /**
  * Runs the save debounce and the rename quiet period.
@@ -50,17 +51,17 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
       applied.push(markdown)
     },
     getMarkdown: () => '',
-    insertMarkdown: () => {},
-    focus: () => {},
-    setSelection: () => {},
+    insertMarkdown: noop,
+    focus: noop,
+    setSelection: noop,
     getSelectedText: () => '',
-    openSelectionMenu: () => {},
-    startPendingReplacement: () => false,
-    appendPendingReplacementText: () => {},
-    acceptPendingReplacement: () => {},
-    discardPendingReplacement: () => {},
-    findNext: () => {},
-    findPrevious: () => {},
+    openSelectionMenu: noop,
+    startPendingReplacement: returnFalse,
+    appendPendingReplacementText: noop,
+    acceptPendingReplacement: noop,
+    discardPendingReplacement: noop,
+    findNext: noop,
+    findPrevious: noop,
   }
 }
 

@@ -9,6 +9,7 @@ import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import type { NoteEditorHandle } from './note-editor.tsx'
 import { useTemplateSlashItems } from './use-template-slash-items.ts'
+import { noop, returnFalse, returnNull } from '@ocavue/utils'
 
 function setup() {
   const operations = createTestProgressPort()
@@ -44,20 +45,20 @@ function fakeEditor(): NoteEditorHandle & { inserted: string[] } {
   return {
     inserted,
     getMarkdown: () => '',
-    setMarkdown: () => {},
+    setMarkdown: noop,
     insertMarkdown: (markdown) => {
       inserted.push(markdown)
     },
-    focus: () => {},
-    setSelection: () => {},
+    focus: noop,
+    setSelection: noop,
     getSelectedText: () => '',
-    openSelectionMenu: () => {},
-    startPendingReplacement: () => false,
-    appendPendingReplacementText: () => {},
-    acceptPendingReplacement: () => {},
-    discardPendingReplacement: () => {},
-    findNext: () => {},
-    findPrevious: () => {},
+    openSelectionMenu: noop,
+    startPendingReplacement: returnFalse,
+    appendPendingReplacementText: noop,
+    acceptPendingReplacement: noop,
+    discardPendingReplacement: noop,
+    findNext: noop,
+    findPrevious: noop,
   }
 }
 
@@ -88,7 +89,7 @@ describe('useTemplateSlashItems', () => {
     // The pane unmounted between the menu opening and the select — the shared
     // flow receives null and surfaces the failure, never a stale editor.
     const { core, operations } = setup()
-    const { result } = await renderHookInApp(() => useTemplateSlashItems(() => null), { core })
+    const { result } = await renderHookInApp(() => useTemplateSlashItems(returnNull), { core })
     const items = await result.current('')
     items[0]!.onSelect()
     await vi.waitFor(() => {

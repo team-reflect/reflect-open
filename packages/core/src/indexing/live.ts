@@ -1,3 +1,4 @@
+import { returnTrue } from '@ocavue/utils'
 import type { Unlisten } from '../unlisten.ts'
 import { sha256Hex } from '@reflect/utils'
 import { isAssetPath, isNotePath } from '../graph/paths.ts'
@@ -111,7 +112,7 @@ class LiveIndexImpl implements LiveIndex {
     fileGeneration: number,
     onError: ApplyErrorHandler = (error, change) => this.#logApplyError(error, change),
     onMoved?: MovedHandler,
-    canApply: () => boolean = () => true,
+    canApply: () => boolean = returnTrue,
   ): Promise<number> {
     const { indexStore, noteFile, clock, logger } = this.#deps
     if (!canApply()) {
@@ -241,7 +242,7 @@ class LiveIndexImpl implements LiveIndex {
     generation: number,
     fileGeneration: number,
     onMoved?: MovedHandler,
-    canApply: () => boolean = () => true,
+    canApply: () => boolean = returnTrue,
   ): Unlisten {
     const { fileChanges, logger, emitChangesApplied } = this.#deps
     // Serialize batches so overlapping events for the same path can't reorder

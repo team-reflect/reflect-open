@@ -20,6 +20,7 @@ import { hover, unhover } from '@/test-utils/mouse.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { NotePane } from './note-pane.tsx'
+import { noop, sleep } from '@ocavue/utils'
 
 const NEW_NOTE_PATH = 'notes/01arz3ndektsv4rrffq69g5fav.md'
 
@@ -81,7 +82,7 @@ async function renderPane(options: RenderPaneOptions) {
     id: createTestIdService({ seed: 'note-pane' }),
   })
   prepare?.(core)
-  let setPath: (path: string) => void = () => {}
+  let setPath: (path: string) => void = noop
   function Pane(): ReactElement {
     const [panePath, setPanePath] = useState(path)
     setPath = setPanePath
@@ -131,7 +132,7 @@ describe('NotePane', () => {
       const gammaEditor = noteEditorHandleFor('notes/gamma.md')
       expect(gammaEditor).not.toBeNull()
       // Flush pending effects first: the editor registers its change listener in one.
-      await act(() => {})
+      await act(noop)
       gammaEditor?.insertMarkdown('typed ')
       await clock.advance(2000)
 
@@ -293,7 +294,7 @@ describe('NotePane', () => {
         files: { 'notes/tweets.md': '![](https://x.com/jack/status/101)\n' },
         path: 'notes/tweets.md',
         prepare: resolveArchiveWith(async (postId) => {
-          await new Promise((resolve) => setTimeout(resolve, 50))
+          await sleep(50)
           return archivedPost(postId, 'Archived first')
         }),
       })
@@ -307,7 +308,7 @@ describe('NotePane', () => {
       await renderPane({
         files: { 'notes/slow.md': 'Slow note\n\n![](https://x.com/jack/status/102)\n' },
         path: 'notes/slow.md',
-        prepare: resolveArchiveWith(() => new Promise(() => {})),
+        prepare: resolveArchiveWith(() => new Promise(noop)),
       })
 
       await expect.element(page.getByText('Slow note')).toBeVisible()

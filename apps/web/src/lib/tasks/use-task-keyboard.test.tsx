@@ -1,3 +1,4 @@
+import { returnFalse, returnNull } from '@ocavue/utils'
 import { act } from '@/test-utils/act.ts'
 import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,15 +13,15 @@ function makeSelection(over: Partial<TaskSelection> = {}): TaskSelection {
   return {
     selected: new Set<string>(),
     selectedCount: 0,
-    isSelected: () => false,
-    isSoleSelected: () => false,
+    isSelected: returnFalse,
+    isSoleSelected: returnFalse,
     clickSelect: vi.fn(),
     select: vi.fn(),
     selectAll: vi.fn(),
     clear: vi.fn(),
     move: vi.fn(),
     extend: vi.fn(),
-    activeKey: () => null,
+    activeKey: returnNull,
     ...over,
   }
 }

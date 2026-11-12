@@ -3,6 +3,7 @@ import { applyTaskEdits } from '../markdown/task-ast.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { blockContextLinesAt, prepareBlockContext } from './block-context.ts'
 import { createSourceTaskLocator, extractSnippetTasks, type SnippetTask } from './snippet-tasks.ts'
+import { noop } from '@ocavue/utils'
 
 /** Offset of the first `[[target]]` occurrence — the index's `pos_from`. */
 function posOf(content: string, link: string): number {
@@ -120,7 +121,7 @@ describe('extractSnippetTasks', () => {
   })
 
   it('returns no tasks for a snippet without checkboxes', () => {
-    const none = () => undefined
+    const none = noop
     expect(extractSnippetTasks('just a [[Target]] paragraph', [0], none)).toEqual([])
     expect(extractSnippetTasks('', [], none)).toEqual([])
   })

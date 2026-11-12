@@ -16,6 +16,7 @@ import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { GitSyncSettingsField } from './git-sync-section.tsx'
+import { noop } from '@ocavue/utils'
 
 // The card names the remote and always speaks of sync. One door connects a
 // repository on any host; a host remote gets its sign-in here; the GitHub
@@ -329,7 +330,7 @@ describe('GitSyncSettingsField', () => {
   })
 
   it('ignores an older open-repo failure after a newer retry succeeds', async () => {
-    let rejectFirstOpen: (reason?: unknown) => void = () => {}
+    let rejectFirstOpen: (reason?: unknown) => void = noop
     openUrl
       .mockImplementationOnce(() => {
         return new Promise<void>((_resolve, reject) => {

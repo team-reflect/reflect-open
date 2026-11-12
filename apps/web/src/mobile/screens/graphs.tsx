@@ -1,3 +1,4 @@
+import { noop } from '@ocavue/utils'
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
@@ -67,10 +68,9 @@ export function MobileGraphs(): ReactElement {
     if (busy || graph?.root === root) {
       return
     }
-    switchTo(kind, root).catch(() => {
-      // Surfaced via switchError; the rethrow is for the create sheet's own
-      // error display.
-    })
+    // Surfaced via switchError; the rethrow is for the create sheet's own
+    // error display.
+    switchTo(kind, root).catch(noop)
   }
 
   return (

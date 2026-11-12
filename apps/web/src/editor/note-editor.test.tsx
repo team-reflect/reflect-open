@@ -11,6 +11,7 @@ import { hover, unhover } from '@/test-utils/mouse.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import type { XPost } from '@post-embed/types'
 import { NoteEditor, type NoteEditorHandle } from './note-editor.tsx'
+import { noop } from '@ocavue/utils'
 
 // Media that loads without the network: the card hides a photo that fails.
 const X_PHOTO_URL = getSvgImageUrl(100, 100)
@@ -507,7 +508,7 @@ describe('NoteEditor attachment resolution', () => {
     await render(
       <NoteEditor
         initialContent="![[../outside.png]]"
-        resolveWikiEmbed={() => undefined}
+        resolveWikiEmbed={noop}
         resolveImageUrl={(src) => `asset://${src}`}
         handleRef={handleRef}
       />,

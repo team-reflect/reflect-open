@@ -17,6 +17,7 @@ import {
 import { deepLinkForRoute, notePathForRoute, type Route, type NavigateOptions } from '@reflect/app'
 import { APP_COMMANDS, keybindingFor } from './app-commands.ts'
 import type { CommandContext } from './types.ts'
+import { noop } from '@ocavue/utils'
 
 const TODAY = '2026-06-09'
 
@@ -73,8 +74,8 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
-    togglePin: vi.fn(() => {}),
-    togglePrivate: vi.fn(() => {}),
+    togglePin: vi.fn(noop),
+    togglePrivate: vi.fn(noop),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),

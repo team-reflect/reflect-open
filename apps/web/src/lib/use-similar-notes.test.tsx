@@ -12,6 +12,7 @@ import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { queryKeys } from './query-client.ts'
 import { useSimilarNotes } from './use-similar-notes.ts'
+import { sleep } from '@ocavue/utils'
 
 const DAILY = 'daily/2026-06-09.md'
 
@@ -81,7 +82,7 @@ describe('useSimilarNotes', () => {
     const client = newClient()
     const { result, rerender } = await mount('notes/x.md', client)
 
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(relatedNotes).not.toHaveBeenCalled()
     const first = result.current
     expect(first).toEqual([])
@@ -95,7 +96,7 @@ describe('useSimilarNotes', () => {
     const client = newClient()
     const { result } = await mount('notes/x.md', client)
 
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(relatedNotes).not.toHaveBeenCalled()
     expect(result.current).toEqual([])
   })
@@ -106,7 +107,7 @@ describe('useSimilarNotes', () => {
     const { result } = await mount('daily/2026-06-09.md', client)
 
     await vi.waitFor(() => expect(readPaths()).toContain(DAILY))
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(relatedNotes).not.toHaveBeenCalled()
     expect(result.current).toEqual([])
   })
@@ -122,7 +123,7 @@ describe('useSimilarNotes', () => {
     // churn (a sync batch, a Git commit, the user's own typing) must not drag
     // it along, so it deliberately sits outside the index invalidation scope.
     await client.invalidateQueries({ queryKey: queryKeys.index.all })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(relatedNotes).toHaveBeenCalledTimes(1)
   })
 
@@ -146,7 +147,7 @@ describe('useSimilarNotes', () => {
     // Once they exist they hold for the session — a remount reads the cache.
     const third = await mount('notes/x.md', client)
     await vi.waitFor(() => expect(third.result.current.length).toBe(1))
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(relatedNotes).toHaveBeenCalledTimes(2)
   })
 

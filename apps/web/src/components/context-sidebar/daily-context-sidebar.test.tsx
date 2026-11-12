@@ -25,6 +25,7 @@ import '@/test-utils/locator.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { DailyContextSidebar } from './daily-context-sidebar.tsx'
+import { sleep } from '@ocavue/utils'
 
 // What the app's fakes answer; each test sets them before `renderSidebar`.
 const dailyDatesInRange = vi.fn<DailyNoteService['dailyDatesInRange']>()
@@ -185,7 +186,7 @@ describe('DailyContextSidebar related notes', () => {
     await vi.waitFor(() => {
       expect(noteFile.getReads().map((read) => read.path)).toContain('daily/2026-06-09.md')
     })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await sleep(0)
     expect(relatedNotes).not.toHaveBeenCalled()
     await expect.element(page.getByText('Similar notes')).not.toBeInTheDocument()
   })

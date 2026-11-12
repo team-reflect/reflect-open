@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import { resolveTaskEdit } from '@reflect/core'
+import { noop, returnFalse } from '@ocavue/utils'
 
 /** The finalizer commands a task editor's keymap binds to its keys. */
 export interface TaskEditorApi {
@@ -114,15 +115,15 @@ export function useTaskEditorFinalizer({
   // Bound once, but reassigned each render so the keymap's stable reference
   // always reaches this render's finalizers.
   const apiRef = useRef<TaskEditorApi>({
-    commit: () => {},
-    commitAndContinue: () => {},
-    cancel: () => {},
-    complete: () => {},
-    checkboxToggle: () => {},
-    convertToBullet: () => {},
-    delete: () => {},
-    deleteEmpty: () => {},
-    isEmpty: () => false,
+    commit: noop,
+    commitAndContinue: noop,
+    cancel: noop,
+    complete: noop,
+    checkboxToggle: noop,
+    convertToBullet: noop,
+    delete: noop,
+    deleteEmpty: noop,
+    isEmpty: returnFalse,
   })
   const claim = (): boolean => {
     if (doneRef.current) {
@@ -133,7 +134,7 @@ export function useTaskEditorFinalizer({
   }
   // Reassigned each render (like apiRef) so the unmount cleanup — registered once
   // — flushes against this render's `initial`/`onFlush`, not the mount-time ones.
-  const flushRef = useRef<() => void>(() => {})
+  const flushRef = useRef<() => void>(noop)
   useEffect(() => {
     flushRef.current = (): void => {
       if (doneRef.current) {

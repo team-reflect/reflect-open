@@ -13,6 +13,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { AiProvidersSection } from './ai-providers-section.tsx'
+import { sleep } from '@ocavue/utils'
 
 // The dialog verifies keys through the key validation service; the default
 // per-test behavior is "key accepted".
@@ -346,7 +347,7 @@ describe('AiProvidersSection', () => {
     await page.getByRole('option', { name: /GPT-5\.4 mini/ }).hover()
     await search.hover()
     await userEvent.keyboard('{Enter}')
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await sleep(100)
 
     expect(saved()).toHaveLength(0)
   })

@@ -37,6 +37,7 @@ import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useAppShortcuts } from './app-shortcuts.ts'
 import { useRouterActions, useRouterHandlers, useRouterState } from './router.tsx'
+import { noop, returnFalse } from '@ocavue/utils'
 
 const GRAPH = { root: '/g', name: 'g', generation: 1 } satisfies TestOpenGraph
 
@@ -49,16 +50,16 @@ let newChat: MockInstance<ChatSession['newChat']>
 function findHandle(findNext: () => void, findPrevious: () => void): NoteEditorHandle {
   return {
     getMarkdown: () => '',
-    setMarkdown: () => {},
-    insertMarkdown: () => {},
-    focus: () => {},
-    setSelection: () => {},
+    setMarkdown: noop,
+    insertMarkdown: noop,
+    focus: noop,
+    setSelection: noop,
     getSelectedText: () => '',
-    openSelectionMenu: () => {},
-    startPendingReplacement: () => false,
-    appendPendingReplacementText: () => {},
-    acceptPendingReplacement: () => {},
-    discardPendingReplacement: () => {},
+    openSelectionMenu: noop,
+    startPendingReplacement: returnFalse,
+    appendPendingReplacementText: noop,
+    acceptPendingReplacement: noop,
+    discardPendingReplacement: noop,
     findNext,
     findPrevious,
   }
