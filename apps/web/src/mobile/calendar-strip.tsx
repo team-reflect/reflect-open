@@ -1,15 +1,13 @@
 import { useEffect, useRef, type ReactElement } from 'react'
-import { ChevronDown, Settings } from 'lucide-react'
-import { Button } from '@/components/ui/button.tsx'
+import { ChevronDown } from 'lucide-react'
 import { addDaysToIsoDate, getYearMonth } from '@reflect/utils'
 import { getUserWeekStart } from '@reflect/core'
 import { monthPickTarget, weekAtIndex } from '@reflect/app'
-import { cn } from '@/lib/utils.ts'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MonthPicker } from '@/mobile/month-picker.tsx'
 import { MonthTitle } from '@/mobile/month-title.tsx'
-import { useNativeBar } from '@/mobile/native-chrome/registrations.ts'
 import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
 import { WeekRow } from '@/mobile/week-row.tsx'
@@ -93,22 +91,6 @@ export function CalendarStrip({
     showWeekOf(target)
   }
 
-  useNativeBar(
-    {
-      leading: [{ id: 'settings', title: 'Settings', icon: 'settings' }],
-      trailing: showToday ? [{ id: 'today', title: 'Today' }] : [],
-    },
-    {
-      onAction: (id) => {
-        if (id === 'today') {
-          jumpToToday()
-        } else if (id === 'settings') {
-          openSettings()
-        }
-      },
-    },
-  )
-
   // An explicit re-arrival doesn't change `date`, so the follow effect won't
   // move a browsed-away strip — re-center it here.
   const lastResetSeqRef = useRef(resetSeq)
@@ -121,25 +103,13 @@ export function CalendarStrip({
   }, [resetSeq, date, showWeekOf])
 
   return (
-    <header className="shrink-0 border-b border-border px-safe-offset-2 pt-safe pb-1">
-      {/* Three equal-flanked columns so the month sits at the screen's center
-          regardless of the gear (left) and the fading Today button (right).
-          Under the native chrome the row is as tall as a screen header row,
-          so the native corner buttons center on it. */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1 native-chrome:h-12 native-chrome:py-0">
-        <div className="justify-self-start">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            aria-label="Settings"
-            data-native-slot
-            onClick={openSettings}
-          >
-            <Settings />
-          </Button>
-        </div>
-        <h1 className="min-w-0 text-center text-base font-semibold">
+    <ChromeTopBar
+      align="center"
+      leading={[{ id: 'settings', title: 'Settings', icon: 'settings' }]}
+      trailing={[{ id: 'today', title: 'Today', hidden: !showToday }]}
+      onAction={(id) => (id === 'today' ? jumpToToday() : openSettings())}
+      title={
+        <h1 className="text-base font-semibold">
           <MonthPicker
             month={getYearMonth(headerDate)}
             selected={getYearMonth(date)}
@@ -150,40 +120,27 @@ export function CalendarStrip({
             <ChevronDown aria-hidden className="size-4 shrink-0 text-text-muted" />
           </MonthPicker>
         </h1>
-        <div className="justify-self-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-hidden={!showToday || undefined}
-            inert={!showToday}
-            data-native-slot
-            className={cn(
-              'transition-opacity duration-150 motion-reduce:transition-none',
-              showToday ? 'opacity-100' : 'pointer-events-none opacity-0',
-            )}
-            onClick={jumpToToday}
-          >
-            Today
-          </Button>
+      }
+    >
+      <div className="px-2 pb-1">
+        <div ref={scrollerRef} data-scroll-x className="pager-x flex overflow-x-auto">
+          {Array.from({ length: weekWindow.count }, (_, index) => {
+            const weekStart = weekAtIndex(weekWindow, index)
+            const weekEnd = addDaysToIsoDate(weekStart, 6)
+            const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
+            return (
+              <WeekRow
+                key={weekStart}
+                weekStart={weekStart}
+                selectedDay={contains(date) ? date : null}
+                todayDay={contains(today) ? today : null}
+                dailyNoteDates={dailyNoteDates}
+                onSelect={onSelect}
+              />
+            )
+          })}
         </div>
       </div>
-      <div ref={scrollerRef} data-scroll-x className="pager-x flex overflow-x-auto">
-        {Array.from({ length: weekWindow.count }, (_, index) => {
-          const weekStart = weekAtIndex(weekWindow, index)
-          const weekEnd = addDaysToIsoDate(weekStart, 6)
-          const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
-          return (
-            <WeekRow
-              key={weekStart}
-              weekStart={weekStart}
-              selectedDay={contains(date) ? date : null}
-              todayDay={contains(today) ? today : null}
-              dailyNoteDates={dailyNoteDates}
-              onSelect={onSelect}
-            />
-          )
-        })}
-      </div>
-    </header>
+    </ChromeTopBar>
   )
 }
