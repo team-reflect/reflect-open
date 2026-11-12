@@ -54,15 +54,13 @@ export interface ShellChromeInput {
  */
 export function buildShellChromeState(input: ShellChromeInput): UnnumberedChromeState {
   const { route, bar } = input
-  const isTabRoot = tabRootFor(route) !== null
   return {
     type: 'state',
     entryId: input.entryId,
     chrome: 'shell',
     route,
     tab: input.tab,
-    isTabRoot,
-    canBack: !isTabRoot,
+    canBack: tabRootFor(route) === null,
     title: bar === undefined ? defaultTitle(route) : bar.title,
     titleMenu: bar?.titleMenu ?? null,
     showsBar: route.kind !== 'allNotes' && route.kind !== 'search' && route.kind !== 'tasks',
@@ -86,7 +84,6 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     chrome: 'none',
     route: null,
     tab: 'daily',
-    isTabRoot: true,
     canBack: false,
     title: null,
     titleMenu: null,

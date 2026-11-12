@@ -83,7 +83,11 @@ function runFormattingCommand(id: string): void {
 }
 
 function decodeFile(file: { name: string; type: string; data: string }): File {
-  const bytes = Uint8Array.from(atob(file.data), (char) => char.charCodeAt(0))
+  const binary = atob(file.data)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
   return new File([bytes], file.name, { type: file.type })
 }
 

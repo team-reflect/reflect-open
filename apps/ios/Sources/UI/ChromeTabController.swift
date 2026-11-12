@@ -20,6 +20,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   private var pendingTab: ChromeTab?
   /// The picture of the old tab over the new page until the page shows the new tab.
   private var cover: UIView?
+  /// The tab of the last state.
+  private var stateTab: ChromeTab?
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -81,6 +83,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Follows a state: selects its tab, holds the web view in its page, and
   /// hides the bar while the keyboard or a web drawer is up.
   func apply(_ state: ChromeState) {
+    stateTab = state.tab
     if pendingTab == state.tab {
       pendingTab = nil
     }
@@ -108,6 +111,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// A new document: back to the launch look.
   func reset() {
     pendingTab = nil
+    stateTab = nil
     if let cover {
       cover.removeFromSuperview()
       self.cover = nil
@@ -142,8 +146,12 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak page] in
       guard let self, let page else { return }
       self.removeCover(from: page)
+      // The page did not show the tapped tab: follow the tab it shows.
       if self.pendingTab == page.chromeTab {
         self.pendingTab = nil
+        if let stateTab = self.stateTab {
+          self.follow(stateTab)
+        }
       }
     }
   }

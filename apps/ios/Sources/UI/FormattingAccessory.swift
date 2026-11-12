@@ -66,10 +66,14 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     return shown ? strip : nil
   }
 
+  /// The most images one pick inserts. Each image crosses the bridge as
+  /// base64 in its own script.
+  private static let imageLimit = 10
+
   private func pickImages() {
     var configuration = PHPickerConfiguration()
     configuration.filter = .images
-    configuration.selectionLimit = 0
+    configuration.selectionLimit = Self.imageLimit
     let picker = PHPickerViewController(configuration: configuration)
     picker.delegate = self
     presenter()?.present(picker, animated: true)
@@ -79,23 +83,24 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     picker.dismiss(animated: true)
     let providers = results.map(\.itemProvider)
     Task { [weak self] in
-      var files: [IntentFile] = []
+      // One intent per image, in the picked order, keeps each script small.
       for provider in providers {
         if let file = await Self.loadImage(provider) {
-          files.append(file)
+          self?.send(.files([file]))
         }
-      }
-      if !files.isEmpty {
-        self?.send(.files(files))
       }
     }
   }
 
-  /// The image of `provider` as a file, in its own format.
+  /// The image of `provider` as a file: JPEG, PNG, and GIF as they are,
+  /// any other format (HEIC) as JPEG, which every web engine shows.
   private static func loadImage(_ provider: NSItemProvider) async -> IntentFile? {
-    guard
-      let type = provider.registeredContentTypes.first(where: { $0.conforms(to: .image) })
-    else { return nil }
+    guard provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) else { return nil }
+    let kept: [UTType] = [.jpeg, .png, .gif]
+    let type =
+      provider.registeredContentTypes.first { registered in
+        kept.contains { registered.conforms(to: $0) }
+      } ?? .jpeg
     let data: Data? = await withCheckedContinuation { continuation in
       _ = provider.loadDataRepresentation(for: type) { data, _ in
         continuation.resume(returning: data)

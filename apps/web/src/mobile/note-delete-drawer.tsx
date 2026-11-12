@@ -10,6 +10,16 @@ import {
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
 import { useCoreServices } from '@/services/services-provider.tsx'
 
+/**
+ * The words of the delete confirmation, shared with the native menu's.
+ */
+export const NOTE_DELETE_CONFIRM = {
+  title: 'Delete this note?',
+  message:
+    'It moves to the graph’s trash and disappears from your notes. You can recover it on desktop.',
+  action: 'Delete',
+} as const
+
 interface NoteDeleteDrawerProps {
   /** Graph-relative path of the regular note to move to trash. */
   path: string
@@ -51,12 +61,9 @@ export function NoteDeleteDrawer({
   return (
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent aria-label="Delete note confirmation">
-        <DrawerTitle>Delete this note?</DrawerTitle>
+        <DrawerTitle>{NOTE_DELETE_CONFIRM.title}</DrawerTitle>
         <DrawerBody>
-          <DrawerDescription>
-            It moves to the graph’s trash and disappears from your notes. You can recover it on
-            desktop.
-          </DrawerDescription>
+          <DrawerDescription>{NOTE_DELETE_CONFIRM.message}</DrawerDescription>
           {error !== null ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -69,7 +76,7 @@ export function NoteDeleteDrawer({
               disabled={busy}
               onClick={() => void confirmDelete()}
             >
-              Delete
+              {NOTE_DELETE_CONFIRM.action}
             </Button>
             <Button
               variant="ghost"

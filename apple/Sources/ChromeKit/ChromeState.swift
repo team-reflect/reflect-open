@@ -22,7 +22,6 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   public var chrome: Chrome
   public var route: ChromeRoute?
   public var tab: ChromeTab
-  public var isTabRoot: Bool
   public var canBack: Bool
   /// The navigation bar title, or `nil` while the page does not know it.
   public var title: String?
@@ -39,11 +38,9 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   public var theme: Theme
 }
 
-/// The route of the page: its kind and the fields the shell reads.
+/// The route of the page. The shell reads only its kind, for logs.
 public struct ChromeRoute: Decodable, Equatable, Sendable {
   public var kind: String
-  public var path: String?
-  public var date: String?
 }
 
 /// A tab of the shell.

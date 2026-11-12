@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { createContext, use, useEffect, useLayoutEffect, useRef } from 'react'
 import { isDeepEqual } from '@ocavue/utils'
 import { WritableStore } from '@reflect/core'
 import type { NativeBarButton, NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
@@ -36,6 +36,13 @@ export const nativeBars = new WritableStore<ReadonlyMap<number, NativeBarSpec>>(
 
 const barHandlers = new Map<number, { current: NativeBarHandlers }>()
 
+/**
+ * Whether the subtree is the screen on top of the mobile stack. Only that
+ * screen registers a bar: a hidden layer can mount with the router state of
+ * the screen on top, so it would register under the wrong entry.
+ */
+export const NativeBarLayerContext = createContext(true)
+
 function updateBars(update: (bars: Map<number, NativeBarSpec>) => void): void {
   const next = new Map(nativeBars.get())
   update(next)
@@ -56,7 +63,7 @@ export function nativeBarHandlers(entryId: number): NativeBarHandlers | undefine
  */
 export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): void {
   const entryId = useOptionalRouterState()?.entryId ?? 0
-  const enabled = hasAnyNativeChrome()
+  const enabled = hasAnyNativeChrome() && use(NativeBarLayerContext)
   const handlersRef = useRef(handlers)
   useLayoutEffect(() => {
     handlersRef.current = handlers
@@ -69,9 +76,11 @@ export function useNativeBar(spec: NativeBarSpec, handlers: NativeBarHandlers): 
     }
     barHandlers.set(entryId, handlersRef)
     return () => {
-      if (barHandlers.get(entryId) === handlersRef) {
-        barHandlers.delete(entryId)
+      // Another screen may own the entry by now; its bar stays.
+      if (barHandlers.get(entryId) !== handlersRef) {
+        return
       }
+      barHandlers.delete(entryId)
       updateBars((bars) => {
         bars.delete(entryId)
       })

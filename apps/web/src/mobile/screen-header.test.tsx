@@ -1,6 +1,10 @@
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, vi } from 'vitest'
-import { nativeBarHandlers, nativeBars } from '@/mobile/native-chrome/registrations.ts'
+import {
+  NativeBarLayerContext,
+  nativeBarHandlers,
+  nativeBars,
+} from '@/mobile/native-chrome/registrations.ts'
 import { installNativeChrome } from '@/services/native-chrome-transport.ts'
 import { MobileScreenHeader } from './screen-header.tsx'
 
@@ -87,6 +91,33 @@ describe('MobileScreenHeader', () => {
       nativeBarHandlers(0)?.onAction('more')
       expect(onBack).toHaveBeenCalledOnce()
       expect(onNativeAction).toHaveBeenCalledWith('more')
+    } finally {
+      installNativeChrome({}, document.documentElement)
+    }
+  })
+
+  it('registers no bar from a hidden stack layer and keeps a bar it does not own', async () => {
+    const handler = { postMessage: vi.fn() }
+    installNativeChrome(
+      {
+        __nativeChromeFeatures: ['tabbar', 'navbar'],
+        webkit: { messageHandlers: { reflectHost: handler, reflectChrome: handler } },
+      },
+      document.documentElement,
+    )
+    try {
+      const older = await render(<MobileScreenHeader title="Older" onBack={vi.fn()} />)
+      await render(<MobileScreenHeader title="On top" onBack={vi.fn()} />)
+      await render(
+        <NativeBarLayerContext value={false}>
+          <MobileScreenHeader title="Below" onBack={vi.fn()} />
+        </NativeBarLayerContext>,
+      )
+      await vi.waitFor(() => {
+        expect(nativeBars.get().get(0)?.title).toBe('On top')
+      })
+      await older.unmount()
+      expect(nativeBars.get().get(0)?.title).toBe('On top')
     } finally {
       installNativeChrome({}, document.documentElement)
     }

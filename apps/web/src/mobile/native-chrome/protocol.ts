@@ -74,7 +74,6 @@ export interface NativeChromeState {
   chrome: 'shell' | 'none'
   route: Route | null
   tab: MobileTab
-  isTabRoot: boolean
   canBack: boolean
   /** The navigation bar title, or `null` while it is not known yet. */
   title: string | null

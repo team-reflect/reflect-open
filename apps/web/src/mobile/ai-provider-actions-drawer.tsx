@@ -102,7 +102,17 @@ export function AiProviderActionsDrawer({
                   title: isDefault ? 'Default provider' : 'Use as default',
                   disabled: isDefault,
                 },
-                { type: 'action', id: 'remove', title: 'Remove provider', destructive: true },
+                {
+                  type: 'action',
+                  id: 'remove',
+                  title: 'Remove provider',
+                  destructive: true,
+                  confirm: {
+                    title: `Remove ${providerInfo?.label ?? 'this provider'}?`,
+                    message: 'Its API key is deleted from this device.',
+                    action: 'Remove',
+                  },
+                },
               ],
             },
           ],

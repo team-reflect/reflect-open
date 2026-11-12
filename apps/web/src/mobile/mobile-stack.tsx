@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -11,6 +10,7 @@ import {
 import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
+import { NativeBarLayerContext } from '@/mobile/native-chrome/registrations.ts'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { hasNativeChrome, postNativeChrome } from '@/services/native-chrome-transport.ts'
@@ -303,9 +303,11 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     return () => controller.abort()
   }, [transition, finishTransition])
 
-  // The native navigation bar keeps the old page's items during a slide.
+  // The native navigation bar keeps the old page's items during a slide. A
+  // layout effect, so the start reaches the shell before the state of the
+  // new page, which the chrome projection posts from a passive effect.
   const sliding = transition.kind !== 'none'
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (hasNativeChrome('navbar')) {
       postNativeChrome({ type: 'transition', phase: sliding ? 'start' : 'end' })
     }
@@ -373,7 +375,9 @@ export function MobileStack(props: MobileStackProps): ReactElement {
                     arrivalSeq, which the daily surface under the note would read
                     as a re-arrival and re-anchor its scroll while hidden. */}
                 <RouterFreeze frozen={hidden}>
-                  <MobileScreen route={layer.route} {...props} />
+                  <NativeBarLayerContext value={!hidden}>
+                    <MobileScreen route={layer.route} {...props} />
+                  </NativeBarLayerContext>
                 </RouterFreeze>
               </div>
               {swipeEnabled && !hidden ? (

@@ -52,14 +52,14 @@ describe('buildShellChromeState', () => {
         trailing: [{ id: 'settings', title: 'Settings', icon: 'gearshape' }],
       },
     })
-    expect(state).toMatchObject({ isTabRoot: true, canBack: false, showsBar: true })
+    expect(state).toMatchObject({ canBack: false, showsBar: true })
     checkFixture('daily', state)
   })
 
   it('has no title for a note until its screen names it', () => {
     const route: Route = { kind: 'note', path: 'ideas.md' }
     const state = buildShellChromeState({ ...BASE, route, tab: 'all' })
-    expect(state).toMatchObject({ title: null, canBack: true, isTabRoot: false })
+    expect(state).toMatchObject({ title: null, canBack: true })
   })
 
   it('carries the note menu and a confirmation', () => {

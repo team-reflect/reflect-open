@@ -67,6 +67,9 @@ final class ChromeCoordinator {
     if !barFrozen {
       showBar(state)
     }
+    if features.contains(.navbar) {
+      tabs?.page(for: state.tab)?.setBarDimmed(state.modal)
+    }
     menus.pageDidShow(entryId: state.entryId)
     formatting?.update(state.toolbar)
   }

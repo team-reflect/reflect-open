@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react'
 import type { ShareService } from '@reflect/app'
 import {
   frontmatterPatchToYaml,
@@ -15,7 +16,7 @@ import { act } from '@/test-utils/act.ts'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { NoteActionsMenu } from './note-actions-menu.tsx'
+import { NoteActionsMenu, useNoteActions } from './note-actions-menu.tsx'
 import { noop } from '@ocavue/utils'
 
 // What the app's fakes answer; each test sets them before `mount`.
@@ -80,13 +81,19 @@ async function mount(path = 'notes/meeting.md', onDeleted = vi.fn()) {
   vi.spyOn(created.indexQuery, 'getNote').mockImplementation(getNote)
   vi.spyOn(created.indexQuery, 'getPinnedNotes').mockResolvedValue([])
   trash = vi.spyOn(created.noteActions, 'trashOne').mockResolvedValue()
-  const view = await renderInApp(<NoteActionsMenu path={path} onDeleted={onDeleted} />, {
+  const view = await renderInApp(<NoteActions path={path} onDeleted={onDeleted} />, {
     core: created,
     graph: { root: '/g', name: 'g', generation: 7 },
   })
   core = view.core
   noteContent = vi.spyOn(view.appServices.share, 'noteContent').mockReturnValue(SHARED)
   return { view, onDeleted, client: view.queryClient }
+}
+
+function NoteActions({ path, onDeleted }: { path: string; onDeleted: () => void }): ReactElement {
+  return (
+    <NoteActionsMenu path={path} onDeleted={onDeleted} actions={useNoteActions(path, onDeleted)} />
+  )
 }
 
 async function openActions(): Promise<void> {

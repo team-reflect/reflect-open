@@ -102,6 +102,14 @@ final class WebPageController: UIViewController {
     }
   }
 
+  /// Dims the navigation bar and ignores its touches while a web drawer is
+  /// open, as the system bars do behind a sheet.
+  func setBarDimmed(_ dimmed: Bool) {
+    guard let bar = navigationController?.navigationBar else { return }
+    bar.isUserInteractionEnabled = !dimmed
+    bar.tintAdjustmentMode = dimmed ? .dimmed : .automatic
+  }
+
   private func barItem(
     _ button: BarButton, entryId: Int, menus: MenuPresenter,
     send: @escaping (ChromeIntent) -> Void

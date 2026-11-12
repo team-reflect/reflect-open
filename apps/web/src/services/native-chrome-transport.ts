@@ -85,9 +85,25 @@ export function postNativeChrome(message: unknown): void {
   handler?.postMessage(message)
 }
 
+let intentListener: ((payload: unknown) => void) | null = null
+let intentSubscribed = false
+
 /**
  * Subscribe to the shell's `chrome:intent` events; returns the unsubscribe.
+ * One listener at a time. An intent that arrives with no listener is dropped,
+ * never kept for a later listener: it was a tap on a page that is gone.
  */
 export function listenNativeIntent(listener: (payload: unknown) => void): Unlisten {
-  return listenHostEvent('chrome:intent', listener)
+  if (!intentSubscribed) {
+    intentSubscribed = true
+    listenHostEvent('chrome:intent', (payload) => {
+      intentListener?.(payload)
+    })
+  }
+  intentListener = listener
+  return () => {
+    if (intentListener === listener) {
+      intentListener = null
+    }
+  }
 }

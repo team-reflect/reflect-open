@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button.tsx'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scroll-drawer.tsx'
 import { useNoteRowState } from '@/hooks/use-note-row.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
-import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
+import { NOTE_DELETE_CONFIRM, NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
 import { useNativeMenuDrawer } from '@/mobile/native-chrome/native-menu.ts'
 import type { NativeMenuItem } from '@/mobile/native-chrome/protocol.ts'
 import { shareNote } from '@/mobile/share.ts'
@@ -16,6 +16,8 @@ interface NoteActionsMenuProps {
   path: string
   /** Called after the note is deleted, so the screen can navigate away. */
   onDeleted: () => void
+  /** The note's actions, from {@link useNoteActions} with the same `path` and `onDeleted`. */
+  actions: NoteActions
 }
 
 /**
@@ -104,7 +106,7 @@ export function useNoteActions(path: string, onDeleted: () => void): NoteActions
  * destructive, even if recoverable from `.reflect/trash/`) and routes through
  * `NoteActionsService.trashOne` so the open session is discarded rather than flushed.
  */
-export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
+export function NoteActionsMenu({ path, onDeleted, actions }: NoteActionsMenuProps): ReactElement {
   const {
     isPinned,
     isPrivate,
@@ -115,7 +117,7 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
     togglePrivate,
     share,
     runAction,
-  } = useNoteActions(path, onDeleted)
+  } = actions
   const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -242,12 +244,7 @@ export function noteActionItems({
           title: 'Delete',
           icon: 'trash',
           destructive: true,
-          confirm: {
-            title: 'Delete this note?',
-            message:
-              'It moves to the graph’s trash and disappears from your notes. You can recover it on desktop.',
-            action: 'Delete',
-          },
+          confirm: NOTE_DELETE_CONFIRM,
         },
       ],
     },

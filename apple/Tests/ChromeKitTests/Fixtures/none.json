@@ -4,7 +4,6 @@
   "chrome": "none",
   "route": null,
   "tab": "daily",
-  "isTabRoot": true,
   "canBack": false,
   "title": null,
   "titleMenu": null,

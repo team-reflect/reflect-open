@@ -31,7 +31,7 @@ export function MobileNote({ path }: { path: string }): ReactElement {
       <MobileScreenHeader
         title={untitled ? 'New note' : 'Edit note'}
         onBack={close}
-        trailing={<NoteActionsMenu path={path} onDeleted={close} />}
+        trailing={<NoteActionsMenu path={path} onDeleted={close} actions={actions} />}
         nativeTrailing={[
           { id: 'note-actions', title: 'Note actions', icon: 'ellipsis', menu: actions.items },
         ]}
