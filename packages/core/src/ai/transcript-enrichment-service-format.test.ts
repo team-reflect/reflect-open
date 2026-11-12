@@ -30,11 +30,22 @@ beforeEach(() => {
   enrichment = createTranscriptEnrichmentService({ languageModel: languageModelService })
 })
 
-function modelAnswering(output: { title: string; body: string }): MockLanguageModelV3 {
+// Answers the formatting call with `output`, then any title call with
+// `titleOutput`, or a failure when it is omitted.
+function modelAnswering(
+  output: { title: string; body: string },
+  titleOutput?: { title: string },
+): MockLanguageModelV3 {
+  let calls = 0
   const model = new MockLanguageModelV3({
     doGenerate: () => {
+      calls += 1
+      const answer = calls === 1 ? output : titleOutput
+      if (answer === undefined) {
+        return Promise.reject(new Error('title model unavailable'))
+      }
       return Promise.resolve({
-        content: [{ type: 'text', text: JSON.stringify(output) }],
+        content: [{ type: 'text', text: JSON.stringify(answer) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: USAGE,
         warnings: [],
@@ -120,6 +131,20 @@ describe('TranscriptEnrichmentService.formatTranscript', () => {
       title: 'Review the launch timeline and invite the beta',
       body: transcript,
     })
+  })
+
+  it('names the memo with a separate title call when formatting fails validation', async () => {
+    const transcript = 'It is 8:46 a.m. and I need to call the dentist and buy groceries.'
+    const model = modelAnswering(
+      { title: 'Ignored', body: '## To-do\n\n1. Call the dentist\n2. Buy groceries' },
+      { title: 'Dentist and groceries' },
+    )
+
+    await expect(request(transcript)).resolves.toEqual({
+      title: 'Dentist and groceries',
+      body: transcript,
+    })
+    expect(model.doGenerateCalls).toHaveLength(2)
   })
 
   it('falls back when a response repeats transcript content', async () => {

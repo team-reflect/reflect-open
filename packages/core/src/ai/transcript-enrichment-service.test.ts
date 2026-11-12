@@ -155,6 +155,18 @@ describe('TranscriptEnrichmentService.generateTitle', () => {
     expect(languageModelService.calls()).toEqual([])
   })
 
+  it.each([
+    ['It is 8:46 a.m. and I need to call the dentist. Then lunch', 'It is 8:46 a.m. and i need to'],
+    ['The price is 3.5 dollars today. More later', 'The price is 3.5 dollars today'],
+  ])(
+    'keeps abbreviations and decimals in the transcript fallback for %j',
+    async (transcript, title) => {
+      await expect(
+        enrichment.generateTitle({ transcript, fallbackTitle: 'Audio memo 2026-06-11 15:30:22' }),
+      ).resolves.toBe(title)
+    },
+  )
+
   it('prefers the default supported provider for title generation', () => {
     expect(
       pickAudioMemoEnrichmentConfig({

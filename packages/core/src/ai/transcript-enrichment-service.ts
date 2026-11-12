@@ -116,11 +116,15 @@ function titleCaseFallback(text: string): string {
     .join(' ')
 }
 
+// A sentence ends at `.`, `!` or `?` before whitespace or the end of the line,
+// except after a dotted abbreviation such as "a.m." or "e.g.".
+const SENTENCE_END_PATTERN = /(?<!(?:^|[\s(])(?:\p{L}\.)+\p{L})[.!?](?=\s|$)/u
+
 /**
  * Derive a short local title from the transcript without making a provider call.
  */
 export function transcriptFallbackTitle(transcript: string, fallbackTitle: string): string {
-  const firstSentence = firstContentLine(transcript).split(/[.!?]/u)[0] ?? ''
+  const firstSentence = firstContentLine(transcript).split(SENTENCE_END_PATTERN)[0] ?? ''
   const normalized = normalizedAudioMemoTitle(titleCaseFallback(firstSentence))
   return normalized ?? fallbackTitle
 }
@@ -275,9 +279,10 @@ export interface TranscriptEnrichmentService {
   generateTitle(request: GenerateAudioMemoTitleRequest): Promise<string>
   /**
    * Best-effort transcript cleanup and naming in one small-model call. Formatting
-   * is optional enrichment: any model, timeout, or validation failure returns the
-   * raw transcript and a deterministic local title so successful transcription
-   * is never repeated or billed twice.
+   * is optional enrichment: a validation failure returns the raw transcript with
+   * a title from a separate title call, and any model or timeout failure returns
+   * the raw transcript and a deterministic local title, so successful
+   * transcription is never repeated or billed twice.
    */
   formatTranscript(request: FormatAudioMemoTranscriptRequest): Promise<FormattedAudioMemoTranscript>
 }
@@ -361,7 +366,12 @@ class TranscriptEnrichmentServiceImpl implements TranscriptEnrichmentService {
 
       const body = result.output.body.trim()
       if (body === '' || !retainsTranscriptContent(request.transcript, body)) {
-        return { title: fallbackTitle, body: request.transcript }
+        const title = await this.generateTitle({
+          credentials: request.credentials,
+          transcript: request.transcript.slice(0, TITLE_INPUT_MAX_CHARS),
+          fallbackTitle: request.fallbackTitle,
+        })
+        return { title, body: request.transcript }
       }
       return {
         title: normalizedAudioMemoTitle(result.output.title) ?? fallbackTitle,
