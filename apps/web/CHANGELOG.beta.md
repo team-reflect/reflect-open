@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.19.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.1...v0.19.0-beta.2) (2026-11-12)
+
+
+### Features
+
+* **ios:** native Swift shell ([#2069](https://github.com/team-reflect/reflect-open/issues/2069)) ([dd329d2](https://github.com/team-reflect/reflect-open/commit/dd329d22305ca3e4ac5aadd1d34bb8baa05a98ef))
+
+
+### Bug Fixes
+
+* don't title memos with truncated transcript text ([#2138](https://github.com/team-reflect/reflect-open/issues/2138)) ([58dc964](https://github.com/team-reflect/reflect-open/commit/58dc964cdd4984b53f5c719fd282bdd3567bf9bc))
+* **ios:** drop the deprecated receipt fallback ([#2140](https://github.com/team-reflect/reflect-open/issues/2140)) ([18930fa](https://github.com/team-reflect/reflect-open/commit/18930fad6f1d30afc7da6b93112d5babe85b6eba))
+* **ios:** raise minimum iOS to 18.0 ([#2133](https://github.com/team-reflect/reflect-open/issues/2133)) ([5980ba4](https://github.com/team-reflect/reflect-open/commit/5980ba4df820d09b76c7b262bca942e36e9f6373))
+* **mobile:** wait for the install channel before the paywall ([#2126](https://github.com/team-reflect/reflect-open/issues/2126)) ([683dfba](https://github.com/team-reflect/reflect-open/commit/683dfbaedbc0e89413166c996c26ef14f8c7d63d))
+
 ## [0.19.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.18.0...v0.19.0-beta.1) (2026-11-10)
 
 
