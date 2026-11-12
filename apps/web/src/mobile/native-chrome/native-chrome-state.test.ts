@@ -65,6 +65,7 @@ describe('buildShellChromeState', () => {
       route: { kind: 'note', path: 'ideas.md' },
       tab: 'daily',
       bar: {
+        leading: [],
         trailing: [
           {
             id: 'actions',

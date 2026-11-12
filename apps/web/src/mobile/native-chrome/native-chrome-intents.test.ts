@@ -3,9 +3,10 @@ import { join } from 'node:path'
 import { noop } from '@ocavue/utils'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  createAttachQueue,
   runNativeIntent,
   type IntentContext,
-} from '@/mobile/native-chrome/native-chrome-projection.tsx'
+} from '@/mobile/native-chrome/native-chrome-intents.ts'
 import type { FormattingToolbarCommands } from '@/editor/formatting-toolbar-store.ts'
 import { FORMATTING_COMMANDS, parseNativeIntent } from '@/mobile/native-chrome/protocol.ts'
 
@@ -16,7 +17,9 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     back: vi.fn(),
     navigate: vi.fn(),
     selectTab: vi.fn(),
+    screen: undefined,
     attachCommands: null,
+    attachFiles: createAttachQueue(),
     ...overrides,
   }
 }

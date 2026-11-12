@@ -1,31 +1,10 @@
 import type { ReactElement } from 'react'
-import { createTestNativeChromeHost, createTestNativeChromeService } from '@reflect/app/testing'
+import { createTestNativeChromeHost } from '@reflect/app/testing'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  NativeBarLayerContext,
-  nativeBarHandlers,
-  nativeBars,
-} from '@/mobile/native-chrome/registrations.ts'
+import { ChromeLayerContext } from '@/mobile/chrome/chrome-renderer.ts'
+import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { MobileScreenHeader } from './screen-header.tsx'
-
-/**
- * The app layer of a shell that draws the native chrome.
- */
-function nativeChromeOptions() {
-  return {
-    appServices: { nativeChrome: createTestNativeChromeService(createTestNativeChromeHost()) },
-  }
-}
-
-/**
- * The history entry of the only registered bar.
- */
-function onlyBarEntry(): number {
-  const entries = [...nativeBars.get().keys()]
-  expect(entries).toHaveLength(1)
-  return entries[0] ?? -1
-}
 
 describe('MobileScreenHeader', () => {
   it('centers the title between balanced header action slots', async () => {
@@ -80,6 +59,7 @@ describe('MobileScreenHeader', () => {
   })
 
   it('gives the native corner buttons their trailing buttons and back', async () => {
+    const host = createTestNativeChromeHost()
     const onBack = vi.fn()
     const onNativeAction = vi.fn()
     await renderInApp(
@@ -89,23 +69,24 @@ describe('MobileScreenHeader', () => {
         nativeTrailing={[{ id: 'more', title: 'More', icon: 'ellipsis' }]}
         onNativeAction={onNativeAction}
       />,
-      nativeChromeOptions(),
+      nativeChromeOptions(host),
     )
 
     await vi.waitFor(() => {
-      expect(nativeBars.get().get(onlyBarEntry())).toEqual({
-        trailing: [{ id: 'more', title: 'More', icon: 'ellipsis' }],
-      })
+      expect(lastChromeState(host)?.trailing).toEqual([
+        { id: 'more', title: 'More', icon: 'ellipsis' },
+      ])
     })
-    const entryId = onlyBarEntry()
-    nativeBarHandlers(entryId)?.onBack?.()
-    nativeBarHandlers(entryId)?.onAction('more')
+    const entryId = lastChromeState(host)?.entryId
+    host.sendIntent({ type: 'back', entryId })
+    host.sendIntent({ type: 'action', entryId, id: 'more' })
     expect(onBack).toHaveBeenCalledOnce()
     expect(onNativeAction).toHaveBeenCalledWith('more')
   })
 
   it('registers no bar from a hidden stack layer and keeps a bar it does not own', async () => {
     // Three screens of one history entry: the later one owns its bar.
+    const host = createTestNativeChromeHost()
     const header = (id: string): ReactElement => (
       <MobileScreenHeader
         title={id}
@@ -118,14 +99,14 @@ describe('MobileScreenHeader', () => {
       <>
         {withOlder && header('older')}
         {header('top')}
-        <NativeBarLayerContext value={false}>{header('below')}</NativeBarLayerContext>
+        <ChromeLayerContext value={false}>{header('below')}</ChromeLayerContext>
       </>
     )
-    const view = await renderInApp(screens(true), nativeChromeOptions())
+    const view = await renderInApp(screens(true), nativeChromeOptions(host))
     await vi.waitFor(() => {
-      expect(nativeBars.get().get(onlyBarEntry())?.trailing?.[0]?.id).toBe('top')
+      expect(lastChromeState(host)?.trailing.map((button) => button.id)).toEqual(['top'])
     })
     await view.rerender(screens(false))
-    expect(nativeBars.get().get(onlyBarEntry())?.trailing?.[0]?.id).toBe('top')
+    expect(lastChromeState(host)?.trailing.map((button) => button.id)).toEqual(['top'])
   })
 })

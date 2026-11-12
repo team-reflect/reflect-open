@@ -1,9 +1,9 @@
 import type { Route } from '@reflect/app'
 import type { ThemePreference } from '@reflect/core'
 import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
+import type { ScreenBar } from '@/mobile/chrome/native/screen-registry.ts'
 import { tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { NO_ENTRY, type NativeChromeState } from '@/mobile/native-chrome/protocol.ts'
-import type { NativeBarSpec } from '@/mobile/native-chrome/registrations.ts'
 
 /**
  * A chrome state before the transport numbers it.
@@ -14,7 +14,7 @@ export interface ShellChromeInput {
   route: Route
   entryId: number
   tab: MobileTab
-  bar: NativeBarSpec | undefined
+  bar: ScreenBar | undefined
   keyboardVisible: boolean
   modal: boolean
   toolbar: FormattingToolbarCapabilities | null

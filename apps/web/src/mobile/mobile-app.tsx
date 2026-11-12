@@ -6,7 +6,7 @@ import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
 import { PaywallDrawer } from '@/mobile/paywall-drawer.tsx'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MobileShell } from '@/mobile/mobile-shell.tsx'
-import { NativeChromeOff } from '@/mobile/native-chrome/native-chrome-projection.tsx'
+import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { MobileStatusLayer } from '@/mobile/status-layer.tsx'
 import { RecordingDrawer } from '@/mobile/recording-drawer.tsx'
 import { WhatsNewDrawer } from '@/mobile/whats-new-drawer.tsx'
@@ -106,6 +106,7 @@ function MobileSurface(): ReactElement {
   const graph = useGraphInfo()
   const error = useGraphError()
   const needsOnboarding = useNeedsOnboarding()
+  const chromeRenderer = useChromeRenderer()
   useTaskCheckboxHaptics()
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the
@@ -119,7 +120,7 @@ function MobileSurface(): ReactElement {
 
   if (status === 'ready' && graph) {
     return (
-      <AppErrorBoundary besideFallback={<NativeChromeOff />}>
+      <AppErrorBoundary besideFallback={<chromeRenderer.NoChrome />}>
         <MobileRouter key={graph.root} graphRoot={graph.root}>
           {/* Native recording over the shared capture pipeline — the
               mobile leg of desktop's audio memos. Mounted here so the
@@ -143,7 +144,7 @@ function MobileSurface(): ReactElement {
   if (needsOnboarding) {
     return (
       <>
-        <NativeChromeOff />
+        <chromeRenderer.NoChrome />
         <MobileOnboardingScreen />
       </>
     )
@@ -152,7 +153,7 @@ function MobileSurface(): ReactElement {
   if (status === 'choosing') {
     return (
       <div className="flex h-dvh w-screen flex-col items-center justify-center gap-2 px-safe-offset-8 text-center">
-        <NativeChromeOff />
+        <chromeRenderer.NoChrome />
         <p className="text-sm font-medium">Couldn’t open your notes</p>
         <p className="text-sm text-text-muted">{error ?? 'Unknown error'}</p>
       </div>
@@ -161,7 +162,7 @@ function MobileSurface(): ReactElement {
 
   return (
     <>
-      <NativeChromeOff />
+      <chromeRenderer.NoChrome />
       <LoadingScreen />
     </>
   )

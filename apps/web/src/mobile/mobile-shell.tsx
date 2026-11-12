@@ -13,7 +13,7 @@ import {
   type Route,
 } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
-import { NativeChromeProjection } from '@/mobile/native-chrome/native-chrome-projection.tsx'
+import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import '@/mobile/native-chrome/native-chrome.css'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
@@ -56,6 +56,7 @@ export function MobileShell(): ReactElement {
   // All tap that returns to its open card still pair with a quick second tap.
   const isDoubleTap = useDoubleTap<MobileTab>(tab)
   const keyboardVisible = useKeyboardVisible()
+  const chromeRenderer = useChromeRenderer()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
 
@@ -118,7 +119,7 @@ export function MobileShell(): ReactElement {
 
   return (
     <SafeAreaBoundary>
-      <NativeChromeProjection
+      <chromeRenderer.ShellBars
         tab={tab}
         keyboardVisible={keyboardVisible}
         onSelectTab={handleTabSelect}

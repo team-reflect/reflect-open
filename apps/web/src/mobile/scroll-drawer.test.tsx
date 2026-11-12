@@ -2,9 +2,10 @@ import { useCallback, useState, type ReactElement } from 'react'
 import { page } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { describe, expect, it, vi } from 'vitest'
-import { createTestNativeChromeHost, createTestNativeChromeService } from '@reflect/app/testing'
-import { nativeModalCount } from '@/mobile/native-chrome/registrations.ts'
+import { createTestNativeChromeHost } from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
+import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
+import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from './scroll-drawer.tsx'
@@ -162,12 +163,11 @@ describe('ScrollDrawer', () => {
   })
 
   it('counts as a modal for the native shell while open', async () => {
-    const view = await renderInApp(<Harness />, {
-      appServices: { nativeChrome: createTestNativeChromeService(createTestNativeChromeHost()) },
-    })
+    const host = createTestNativeChromeHost()
+    await renderInApp(<Harness />, nativeChromeOptions(host))
     await openScroller()
-    expect(nativeModalCount.get()).toBe(1)
-    await view.unmount()
-    expect(nativeModalCount.get()).toBe(0)
+    await vi.waitFor(() => expect(lastChromeState(host)?.modal).toBe(true))
+    await swipeDrawerClosed()
+    await vi.waitFor(() => expect(lastChromeState(host)?.modal).toBe(false))
   })
 })

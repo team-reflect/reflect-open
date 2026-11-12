@@ -10,11 +10,9 @@ import {
 import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
-import { NativeBarLayerContext } from '@/mobile/native-chrome/registrations.ts'
-import type { NativeChromeMessage } from '@/mobile/native-chrome/protocol.ts'
+import { ChromeLayerContext, useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
-import { useAppServices } from '@/services/services-provider.tsx'
 import './mobile-stack.css'
 
 /** The stacked card's leading-edge shadow, visible while it slides. */
@@ -242,7 +240,7 @@ interface MobileStackProps {
 export function MobileStack(props: MobileStackProps): ReactElement {
   const { route, entryId, backRoute, canBack } = useRouterState()
   const { back, navigate } = useRouterActions()
-  const { nativeChrome } = useAppServices()
+  const chromeRenderer = useChromeRenderer()
   const containerRef = useRef<HTMLDivElement>(null)
   const pagerRef = useRef<HTMLDivElement>(null)
   const scrimRef = useRef<HTMLDivElement>(null)
@@ -278,14 +276,11 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     }
   }, [canBack, back, navigate])
 
-  // The native navigation bar fades out while a back swipe moves the page.
   const reportSwipe = useCallback(
     (phase: 'start' | 'cancel'): void => {
-      if (nativeChrome.enabled) {
-        nativeChrome.post({ type: 'backSwipe', phase } satisfies NativeChromeMessage)
-      }
+      chromeRenderer.reportStackMotion({ type: 'backSwipe', phase })
     },
-    [nativeChrome],
+    [chromeRenderer],
   )
 
   const finishTransition = useCallback((): void => {
@@ -316,18 +311,15 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     return () => controller.abort()
   }, [transition, finishTransition])
 
-  // The native navigation bar keeps the old page's items during a slide. A
-  // layout effect, so the start reaches the shell before the state of the
-  // new page, which the chrome projection posts from a passive effect. Each
-  // new slide posts its own start, so the shell's timeout follows the last one.
+  // A layout effect, so the start reaches the chrome before the state of the
+  // new page, which the shell bars post from a passive effect. Each new slide
+  // reports its own start.
   useLayoutEffect(() => {
-    if (nativeChrome.enabled) {
-      nativeChrome.post({
-        type: 'transition',
-        phase: transition.kind === 'none' ? 'end' : 'start',
-      } satisfies NativeChromeMessage)
-    }
-  }, [nativeChrome, transition])
+    chromeRenderer.reportStackMotion({
+      type: 'transition',
+      phase: transition.kind === 'none' ? 'end' : 'start',
+    })
+  }, [chromeRenderer, transition])
 
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below
@@ -392,9 +384,9 @@ export function MobileStack(props: MobileStackProps): ReactElement {
                     arrivalSeq, which the daily surface under the note would read
                     as a re-arrival and re-anchor its scroll while hidden. */}
                 <RouterFreeze frozen={hidden}>
-                  <NativeBarLayerContext value={!hidden}>
+                  <ChromeLayerContext value={!hidden}>
                     <MobileScreen route={layer.route} {...props} />
-                  </NativeBarLayerContext>
+                  </ChromeLayerContext>
                 </RouterFreeze>
               </div>
               {swipeEnabled && !hidden ? (
