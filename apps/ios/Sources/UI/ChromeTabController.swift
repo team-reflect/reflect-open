@@ -98,10 +98,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     updateTabBarHidden()
   }
 
-  /// In a regular width the bar sits at the top, where the keyboard never
-  /// reaches it.
+  /// On an iPad in a regular width the bar sits at the top, where the
+  /// keyboard never reaches it.
   private func updateTabBarHidden() {
-    let atBottom = traitCollection.horizontalSizeClass != .regular
+    let atBottom =
+      traitCollection.userInterfaceIdiom != .pad || traitCollection.horizontalSizeClass != .regular
     let hidden = hidesForState || (hidesForKeyboard && atBottom)
     if hidden != isTabBarHidden {
       setTabBarHidden(hidden, animated: true)

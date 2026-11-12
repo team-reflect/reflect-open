@@ -1,4 +1,5 @@
 import ChromeKit
+import GameController
 import KeyboardKit
 import PhotosUI
 import UIKit
@@ -30,6 +31,16 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
     strip.onCommand = { [weak self] id in self?.send(.command(id)) }
     strip.onInsertImage = { [weak self] in self?.pickImages() }
     KeyboardTuning.accessoryProvider = { [weak self] view in self?.accessory(for: view) }
+    for name in [Notification.Name.GCKeyboardDidConnect, .GCKeyboardDidDisconnect] {
+      NotificationCenter.default.addObserver(
+        self, selector: #selector(keyboardDidChange), name: name, object: nil)
+    }
+  }
+
+  /// A hardware keyboard came or went: the strip shows only with the
+  /// on-screen keyboard.
+  @objc private func keyboardDidChange() {
+    contentView?.reloadInputViews()
   }
 
   /// Follows the page's toolbar. The keyboard reloads its accessory only when
@@ -62,7 +73,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   private func accessory(for view: UIView) -> UIView? {
     guard view.isDescendant(of: webView) else { return nil }
     contentView = view
-    shown = toolbar != nil && !relayout
+    shown = toolbar != nil && !relayout && GCKeyboard.coalesced == nil
     return shown ? strip : nil
   }
 

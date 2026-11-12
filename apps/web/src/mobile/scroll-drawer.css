@@ -34,7 +34,7 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  max-height: calc(100% - 6rem);
+  max-height: calc(100% - max(6rem, env(safe-area-inset-top) + 1rem));
   overflow: clip;
   scroll-snap-align: end;
 }
