@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import { noop } from '@ocavue/utils'
 import type { ChromeRenderer, ShellBarsProps } from '@/mobile/chrome/chrome-renderer.ts'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
@@ -29,6 +29,11 @@ function NoChrome(): null {
 export const WEB_CHROME_RENDERER: ChromeRenderer = {
   ShellBars: WebShellBars,
   NoChrome,
+  // The tab bar's height above the bottom safe area, which it pads itself.
+  shellStyle: {
+    '--chrome-bottom-bar': 'calc(var(--spacing) * 13)',
+    '--chrome-safe-bottom': '0px',
+  } as CSSProperties,
   registerScreen: () => noop,
   updateScreen: noop,
   openModal: () => noop,

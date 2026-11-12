@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
 import type { NativeChromeService } from '@reflect/app'
 import { WritableStore, type Unlisten } from '@reflect/core'
 import {
@@ -35,6 +35,11 @@ import { useAppServices } from '@/services/services-provider.tsx'
 class NativeChromeRenderer implements ChromeRenderer {
   readonly ShellBars = NativeShellBars
   readonly NoChrome = NativeNoChrome
+  // The native bars sit in the safe area, so the page clears it.
+  readonly shellStyle = {
+    '--chrome-bottom-bar': '0px',
+    '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
+  } as CSSProperties
   readonly screens = new ScreenRegistry()
   /**
    * How many web drawers are open. The shell hides its bars while one is.

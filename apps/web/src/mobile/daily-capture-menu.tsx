@@ -72,7 +72,7 @@ export function DailyCaptureMenu(): ReactElement {
 
   return (
     <>
-      <div className="fixed right-safe-offset-4 bottom-above-keyboard-offset-17 native-chrome:bottom-above-keyboard-offset-4 z-40 size-12">
+      <div className="fixed right-safe-offset-4 bottom-above-chrome-offset-4 z-40 size-12">
         <Button
           size="icon"
           aria-label={expanded ? 'Hide capture actions' : 'Show capture actions'}
