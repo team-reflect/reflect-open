@@ -313,7 +313,7 @@ export function MobileSettings(): ReactElement {
       <ChromeTopBar
         align="center"
         back={() => (canBack ? back() : navigate({ kind: 'today' }))}
-        title={<h1 className="truncate text-base font-semibold">Settings</h1>}
+        title="Settings"
       />
       <main className="min-h-0 flex-1 overflow-y-auto bg-surface-app px-safe pb-safe">
         <div className="flex flex-col gap-8 px-4 py-5">

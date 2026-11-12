@@ -5,12 +5,10 @@ import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 /**
  * The words of a failed action: the error's message, and its cause's.
  */
-export interface ActionErrorText {
+export function describeActionError(error: unknown): {
   title: string
   description: string | undefined
-}
-
-export function describeActionError(error: unknown): ActionErrorText {
+} {
   return {
     title: errorMessage(error),
     description:

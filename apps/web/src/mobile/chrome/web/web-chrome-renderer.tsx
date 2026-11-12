@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactElement } from 'react'
-import { noop } from '@ocavue/utils'
+import { noop, returnNull } from '@ocavue/utils'
 import type { ChromeRenderer, ShellBarsProps } from '@/mobile/chrome/chrome-renderer.ts'
 import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
@@ -18,24 +18,19 @@ function WebShellBars({ tab, onSelectTab, keyboardVisible }: ShellBarsProps): Re
   )
 }
 
-function NoChrome(): null {
-  return null
-}
-
 /**
  * The chrome the web page draws itself.
  */
 export const WEB_CHROME_RENDERER: ChromeRenderer = {
   TopBarCorner: WebTopBarCorner,
   ShellBars: WebShellBars,
-  NoChrome,
+  NoChrome: returnNull,
   // The tab bar's height above the bottom safe area, which it pads itself.
   shellStyle: {
     '--chrome-bottom-bar': 'calc(var(--spacing) * 13)',
     '--chrome-safe-bottom': '0px',
   } as CSSProperties,
   registerScreen: () => noop,
-  updateScreen: noop,
   openModal: () => noop,
   reportStackMotion: noop,
 }

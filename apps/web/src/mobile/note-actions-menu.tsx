@@ -1,11 +1,20 @@
 import { useRef } from 'react'
 import { canTrashNote, errorMessage } from '@reflect/core'
-import type { ChromeMenuItem } from '@/mobile/chrome/screen-chrome.ts'
+import type { ChromeConfirm, ChromeMenuItem } from '@/mobile/chrome/screen-chrome.ts'
 import { useNoteRowState } from '@/hooks/use-note-row.ts'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
-import { NOTE_DELETE_CONFIRM } from '@/mobile/note-delete-drawer.tsx'
 import { shareNote } from '@/mobile/share.ts'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
+
+/**
+ * The confirmation before a note moves to the graph's trash.
+ */
+export const NOTE_DELETE_CONFIRM: ChromeConfirm = {
+  title: 'Delete this note?',
+  message:
+    'It moves to the graph’s trash and disappears from your notes. You can recover it on desktop.',
+  action: 'Delete',
+}
 
 /**
  * The note actions of one note: the menu items, and the function that runs

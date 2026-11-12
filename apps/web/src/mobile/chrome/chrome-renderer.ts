@@ -60,14 +60,11 @@ export interface ChromeRenderer {
    */
   readonly shellStyle: CSSProperties
   /**
-   * Register the chrome of the screen on top for `entryId`; returns the
-   * unregister, which keeps a registration that a later screen made.
+   * Register the chrome of the screen on top for `entryId` and take a
+   * snapshot of its corners; returns the unregister, which keeps a
+   * registration that a later screen made.
    */
   registerScreen(entryId: number, chrome: { readonly current: ScreenChrome }): Unlisten
-  /**
-   * Tell the renderer that a registered screen changed its chrome.
-   */
-  updateScreen(entryId: number): void
   /**
    * Count one open drawer; returns the release.
    */
@@ -113,18 +110,11 @@ export function useScreenChrome(chrome: ScreenChrome): void {
   })
   const key = JSON.stringify([chrome.leading, chrome.trailing, chrome.back !== undefined])
 
-  // Layout effects, so the chrome is registered before the passive effects
-  // of the same commit run.
-
+  // A layout effect, so the chrome is registered before the passive effects
+  // of the same commit run. A change of `key` registers a new snapshot.
   useLayoutEffect(() => {
     if (onTop) {
       return renderer.registerScreen(entryId, chromeRef)
-    }
-  }, [renderer, onTop, entryId])
-
-  useLayoutEffect(() => {
-    if (onTop) {
-      renderer.updateScreen(entryId)
     }
   }, [renderer, onTop, entryId, key])
 }

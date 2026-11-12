@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import type { MaybePromise } from '@reflect/utils'
 import { Button } from '@/components/ui/button.tsx'
-import { describeActionError, type ActionErrorText } from '@/mobile/chrome/chrome-action.ts'
+import { describeActionError } from '@/mobile/chrome/chrome-action.ts'
 import type { ChromeConfirm } from '@/mobile/chrome/screen-chrome.ts'
 import {
   Drawer,
@@ -11,7 +11,7 @@ import {
   DrawerTitle,
 } from '@/mobile/scroll-drawer.tsx'
 
-interface ChromeConfirmDrawerProps {
+interface ConfirmDrawerProps {
   confirm: ChromeConfirm
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -22,16 +22,16 @@ interface ChromeConfirmDrawerProps {
 }
 
 /**
- * The confirmation of a menu item, with one destructive button and Cancel.
+ * A confirmation in a bottom drawer, with one destructive button and Cancel.
  */
-export function ChromeConfirmDrawer({
+export function ConfirmDrawer({
   confirm,
   open,
   onOpenChange,
   onConfirm,
-}: ChromeConfirmDrawerProps): ReactElement {
+}: ConfirmDrawerProps): ReactElement {
   const [pending, setPending] = useState(false)
-  const [error, setError] = useState<ActionErrorText | null>(null)
+  const [error, setError] = useState<ReturnType<typeof describeActionError> | null>(null)
 
   const handleOpenChange = (next: boolean): void => {
     if (!pending) {

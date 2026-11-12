@@ -1,10 +1,19 @@
 import type { Route } from '@reflect/app'
 import type { ThemePreference } from '@reflect/core'
 import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
-import type { ScreenBar } from '@/mobile/chrome/native/screen-registry.ts'
 import { toWireButtons } from '@/mobile/chrome/native/sf-symbols.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { NO_ENTRY, type NativeChromeState } from '@/mobile/chrome/native/protocol.ts'
+import type { ChromeButton } from '@/mobile/chrome/screen-chrome.ts'
+
+/**
+ * The corners of one screen without its handlers.
+ */
+export interface ScreenBar {
+  canBack: boolean
+  leading: ChromeButton[]
+  trailing: ChromeButton[]
+}
 
 /**
  * A chrome state before the transport numbers it.

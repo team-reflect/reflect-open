@@ -86,9 +86,7 @@ function MobileNoteHeader({
         { id: 'note-actions', title: 'Note actions', icon: 'ellipsis', menu: actions.items },
       ]}
       onAction={actions.runAction}
-      title={
-        <h1 className="truncate text-base font-semibold">{untitled ? 'New note' : 'Edit note'}</h1>
-      }
+      title={untitled ? 'New note' : 'Edit note'}
     />
   )
 }

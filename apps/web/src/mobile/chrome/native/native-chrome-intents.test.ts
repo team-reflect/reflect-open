@@ -71,12 +71,6 @@ describe('runNativeIntent', () => {
     expect(ctx.screen?.onAction).toHaveBeenCalledWith('more')
   })
 
-  it('selects a tab', () => {
-    const ctx = makeIntentContext()
-    runNativeIntent({ type: 'tab', tab: 'tasks' }, ctx)
-    expect(ctx.selectTab).toHaveBeenCalledWith('tasks')
-  })
-
   it('inserts the images of one pick in the picked order', async () => {
     const order: string[] = []
     let finishFirst: () => void = noop

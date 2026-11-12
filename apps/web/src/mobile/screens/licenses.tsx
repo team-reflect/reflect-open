@@ -12,7 +12,7 @@ export function MobileLicenses(): ReactElement {
       <ChromeTopBar
         align="center"
         back={() => (canBack ? back() : navigate({ kind: 'settings' }))}
-        title={<h1 className="truncate text-base font-semibold">Licenses</h1>}
+        title="Licenses"
       />
       <LicenseList className="flex-1 px-safe-offset-4 pt-3 pb-chrome-safe-offset-3" />
     </div>

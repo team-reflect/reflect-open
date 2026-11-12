@@ -10,8 +10,8 @@ import type {
   ChromeMenuItem,
   ScreenChrome,
 } from '@/mobile/chrome/screen-chrome.ts'
-import { ChromeConfirmDrawer } from '@/mobile/chrome/web/chrome-confirm-drawer.tsx'
 import { WEB_ICONS } from '@/mobile/chrome/web/web-icons.ts'
+import { ConfirmDrawer } from '@/mobile/confirm-drawer.tsx'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/mobile/scroll-drawer.tsx'
 
 interface ChromeMenuDrawerProps {
@@ -58,7 +58,7 @@ export function ChromeMenuDrawer({ button, chrome, trigger }: ChromeMenuDrawerPr
         </DrawerContent>
       </Drawer>
       {confirming === null ? null : (
-        <ChromeConfirmDrawer
+        <ConfirmDrawer
           confirm={confirming.confirm}
           open={confirmOpen}
           onOpenChange={setConfirmOpen}

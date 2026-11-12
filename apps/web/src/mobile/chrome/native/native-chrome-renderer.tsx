@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react'
+import { isDeepEqual } from '@ocavue/utils'
 import type { NativeChromeService } from '@reflect/app'
-import { WritableStore, type Unlisten } from '@reflect/core'
+import { deriveStore, WritableStore, type Unlisten } from '@reflect/core'
 import {
   useFormattingToolbar,
   type FormattingToolbarCommands,
 } from '@/editor/formatting-toolbar-store.ts'
-import { useSelector, useStore } from '@/lib/use-store.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { useToastController } from '@/lib/use-toasts.ts'
 import {
   useChromeRenderer,
@@ -14,7 +15,6 @@ import {
   type StackMotion,
   type TopBarCornerProps,
 } from '@/mobile/chrome/chrome-renderer.ts'
-import { ScreenRegistry } from '@/mobile/chrome/native/screen-registry.ts'
 import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
 import {
@@ -25,6 +25,7 @@ import {
 import {
   buildNoChromeState,
   buildShellChromeState,
+  type ScreenBar,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
 import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
@@ -37,6 +38,11 @@ import { useAppServices } from '@/services/services-provider.tsx'
  */
 class NativeChromeRenderer implements ChromeRenderer {
   readonly #nativeChrome: NativeChromeService
+  readonly #screens = new Map<number, { readonly current: ScreenChrome }>()
+  /**
+   * How many web drawers are open.
+   */
+  readonly #modalCount = new WritableStore(0)
   readonly TopBarCorner = NativeTopBarCorner
   readonly ShellBars = NativeShellBars
   readonly NoChrome = NativeNoChrome
@@ -45,11 +51,16 @@ class NativeChromeRenderer implements ChromeRenderer {
     '--chrome-bottom-bar': '0px',
     '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
   } as CSSProperties
-  readonly screens = new ScreenRegistry()
   /**
-   * How many web drawers are open. The shell hides its bars while one is.
+   * A snapshot of the bar of every registered screen, keyed by the history
+   * entry the screen shows. A screen kept mounted under a stacked card keeps
+   * its own entry, so the shell always gets the bar of the entry on screen.
    */
-  readonly modalCount = new WritableStore(0)
+  readonly bars = new WritableStore<ReadonlyMap<number, ScreenBar>>(new Map(), isDeepEqual)
+  /**
+   * Whether a web drawer is open. The shell hides its bars while one is.
+   */
+  readonly modal = deriveStore(this.#modalCount, (count) => count > 0)
   /**
    * Whether the shell draws the corner buttons in the page's header row. On
    * an iPad with the tab bar at the top, they sit in the tab bar's row.
@@ -62,22 +73,50 @@ class NativeChromeRenderer implements ChromeRenderer {
   }
 
   registerScreen(entryId: number, chrome: { readonly current: ScreenChrome }): Unlisten {
-    return this.screens.register(entryId, chrome)
+    this.#screens.set(entryId, chrome)
+    const { back, leading, trailing } = chrome.current
+    // A copy, so an in-place change of the screen's buttons is a change.
+    const bar = structuredClone({
+      canBack: back !== undefined,
+      leading: leading ?? [],
+      trailing: trailing ?? [],
+    })
+    this.#updateBars((bars) => {
+      bars.set(entryId, bar)
+    })
+    return () => {
+      if (this.#screens.get(entryId) !== chrome) {
+        return
+      }
+      this.#screens.delete(entryId)
+      this.#updateBars((bars) => {
+        bars.delete(entryId)
+      })
+    }
   }
 
-  updateScreen(entryId: number): void {
-    this.screens.update(entryId)
+  /**
+   * The chrome registered for `entryId`.
+   */
+  screenChrome(entryId: number): ScreenChrome | undefined {
+    return this.#screens.get(entryId)?.current
   }
 
   openModal(): Unlisten {
-    this.modalCount.set(this.modalCount.get() + 1)
+    this.#modalCount.set(this.#modalCount.get() + 1)
     return () => {
-      this.modalCount.set(this.modalCount.get() - 1)
+      this.#modalCount.set(this.#modalCount.get() - 1)
     }
   }
 
   reportStackMotion(motion: StackMotion): void {
     this.#nativeChrome.post(motion satisfies NativeChromeMessage)
+  }
+
+  #updateBars(update: (bars: Map<number, ScreenBar>) => void): void {
+    const next = new Map(this.bars.get())
+    update(next)
+    this.bars.set(next)
   }
 }
 
@@ -119,21 +158,14 @@ function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
 }
 
 /**
- * Returns whether `count` is above zero.
- */
-function isPositive(count: number): boolean {
-  return count > 0
-}
-
-/**
  * Posts the routed shell's chrome state to the Swift shell after every change
  * and runs the shell's intents. Renders nothing.
  */
 function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps): null {
   const renderer = useNativeChromeRenderer()
   const { route, entryId } = useRouterState()
-  const bars = useStore(renderer.screens.bars)
-  const modal = useSelector(renderer.modalCount, isPositive)
+  const bars = useStore(renderer.bars)
+  const modal = useStore(renderer.modal)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
@@ -147,7 +179,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         tab,
         // The store, not the render's `bars`: a new screen registers its bar
         // in a layout effect of this commit, after this component rendered.
-        bar: renderer.screens.bars.get().get(entryId),
+        bar: renderer.bars.get().get(entryId),
         keyboardVisible,
         modal,
         toolbar: toolbar?.capabilities ?? null,
@@ -180,7 +212,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         const context = contextRef.current
         runNativeIntent(intent, {
           ...context,
-          screen: renderer.screens.chrome(context.entryId),
+          screen: renderer.screenChrome(context.entryId),
           attachCommands: attach?.entryId === context.entryId ? attach.commands : null,
           attachFiles: renderer.attachFiles,
           toasts,

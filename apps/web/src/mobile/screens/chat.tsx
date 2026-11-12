@@ -42,7 +42,7 @@ export function MobileChat(): ReactElement {
             : []
         }
         onAction={(id) => (id === 'new' ? newChat() : setHistoryOpen(true))}
-        title={<h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>}
+        title="Chat"
       />
       {hasProvider ? (
         <>

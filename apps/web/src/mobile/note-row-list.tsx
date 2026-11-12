@@ -1,7 +1,8 @@
 import { WritableStore } from '@reflect/core'
 import { useState, type ReactElement } from 'react'
 import { Virtualizer } from 'virtua'
-import { NoteDeleteDrawer } from '@/mobile/note-delete-drawer.tsx'
+import { ConfirmDrawer } from '@/mobile/confirm-drawer.tsx'
+import { NOTE_DELETE_CONFIRM } from '@/mobile/note-actions-menu.tsx'
 import {
   NOTE_ROW_HEIGHT,
   SwipeableNoteRow,
@@ -55,15 +56,16 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
         </Virtualizer>
       </div>
       {deletePath !== null ? (
-        <NoteDeleteDrawer
+        <ConfirmDrawer
           key={deletePath}
-          path={deletePath}
+          confirm={NOTE_DELETE_CONFIRM}
           open
           onOpenChange={(open) => {
             if (!open) {
               setDeletePath(null)
             }
           }}
+          onConfirm={() => noteActions.trashOne(deletePath)}
         />
       ) : null}
     </>
