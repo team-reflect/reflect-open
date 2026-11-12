@@ -42,7 +42,7 @@ async function step<T>(name: string, body: () => Promise<T>): Promise<T> {
       console.log('::endgroup::')
     }
     const duration = Date.now() - start
-    console.log(`[test-ios] ${name}: ${ms(duration)} s`)
+    console.log(`[test-ios] ${name}: ${ms(duration)}`)
   }
 }
 
