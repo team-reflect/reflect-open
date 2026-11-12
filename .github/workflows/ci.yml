@@ -299,17 +299,18 @@ jobs:
             | jq -r '[.devices[][] | select(.name == "iPhone 17")][-1].udid')
           echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
 
+      - name: Print the xcbeautify version
+        run: xcbeautify --version
+
       - name: Build the app and the tests
         run: |
           set -o pipefail
-          command -v xcbeautify || brew install xcbeautify
           xcodebuild build-for-testing \
             -project apps/ios/Reflect.xcodeproj \
             -scheme Reflect \
             -configuration Debug-Dev \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -showBuildTimingSummary 2>&1 \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" 2>&1 \
             | tee "$RUNNER_TEMP/ios-build.log" \
             | xcbeautify --renderer github-actions
 
@@ -334,23 +335,27 @@ jobs:
 
       - name: Run the unit tests
         run: |
+          set -o pipefail
           xcodebuild test-without-building \
             -project apps/ios/Reflect.xcodeproj \
             -scheme Reflect \
             -configuration Debug-Dev \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectTests
+            -only-testing:ReflectTests 2>&1 \
+            | xcbeautify --renderer github-actions
 
       - name: Run the UI tests
         run: |
+          set -o pipefail
           xcodebuild test-without-building \
             -project apps/ios/Reflect.xcodeproj \
             -scheme Reflect \
             -configuration Debug-Dev \
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -only-testing:ReflectUITests
+            -only-testing:ReflectUITests 2>&1 \
+            | xcbeautify --renderer github-actions
 
   lint-rust:
     needs: classify
