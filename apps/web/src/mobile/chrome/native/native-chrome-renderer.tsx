@@ -126,7 +126,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         // in a layout effect of this commit, after this component rendered.
         bar: renderer.screens.bars.get().get(entryId),
         keyboardVisible,
-        modal: modalCount > 0,
+        modal: modalCount > 0, // FIXME: If we have models come in, like two or four, we would call this useEffect multiple times, right? Maybe we can use a variable like 'hasModel', which is true or false. We only monitor this 'hasModel' variable in this useEffect, and we can avoid some kind of re-rendering.
         toolbar: toolbar?.capabilities ?? null,
         theme,
       }),
