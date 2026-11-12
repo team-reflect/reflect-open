@@ -98,8 +98,8 @@ assumption in Safari or in the iOS simulator
 
 - `scrollIntoView({ container: 'nearest' })`: Safari and iOS ignore `container` and also scroll
   the outer scrollers.
-- Per browser compatibility data, iOS 16.2 has none of `scrollend`, `ScrollTimeline`, or `animation-timeline: scroll()`. Keep the
-  fallbacks for them while the minimum target is below the iOS version that added them.
+- Per browser compatibility data, iOS added `ScrollTimeline` and `animation-timeline: scroll()` in 26.0 and `scrollend` in 26.2.
+  Keep the fallbacks for them while the minimum target is below those versions.
 
 ## CSS `scroll-behavior: smooth`
 
