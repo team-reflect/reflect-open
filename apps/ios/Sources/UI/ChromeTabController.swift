@@ -11,6 +11,10 @@ import WebKit
 /// each state.
 @MainActor
 final class ChromeTabController: UITabBarController, UITabBarControllerDelegate {
+  /// The narrowest window that shows the sidebar. A narrower window shows
+  /// only the tab bar.
+  private static let sidebarMinWidth: CGFloat = 1100
+
   /// Sends an intent to the page.
   var send: (ChromeIntent) -> Void = { _ in }
 
@@ -46,7 +50,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       makeTab(.all, title: "All", image: UIImage(systemName: "doc.on.doc")),
       makeTab(.tasks, title: "Tasks", image: Self.outlineSymbol("checkmark.circle")),
     ]
-    mode = .tabSidebar
+    // A shown sidebar pins the content beside it.
+    sidebar.preferredLayout = .tile
     delegate = self
     view.tintColor = UIColor { traits in
       traits.userInterfaceStyle == .dark
@@ -80,9 +85,30 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     stage.didMove(toParent: self)
   }
 
+  override func viewWillTransition(
+    to size: CGSize, with coordinator: any UIViewControllerTransitionCoordinator
+  ) {
+    super.viewWillTransition(to: size, with: coordinator)
+    updateMode(width: size.width)
+  }
+
+  override func viewWillLayoutSubviews() {
+    updateMode(width: view.bounds.width)
+    super.viewWillLayoutSubviews()
+  }
+
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     placeStage()
+  }
+
+  /// Shows the sidebar and its toggle in a window of at least
+  /// `sidebarMinWidth`, and only the tab bar in a narrower window.
+  private func updateMode(width: CGFloat) {
+    let next: UITabBarController.Mode = width >= Self.sidebarMinWidth ? .tabSidebar : .tabBar
+    if mode != next {
+      mode = next
+    }
   }
 
   /// The page of `tab`: the one page holds every tab.
@@ -111,7 +137,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     {
       view.insertSubview(stage.view, aboveSubview: holder)
     }
-    if pinnedTo !== placeholder.view {
+    if pinnedTo !== placeholder.view || !stagePins.allSatisfy(\.isActive) {
       NSLayoutConstraint.deactivate(stagePins)
       stagePins = [
         stage.view.leadingAnchor.constraint(equalTo: placeholder.view.leadingAnchor),
@@ -136,12 +162,13 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       top: max(0, safe.minY - frame.minY), left: max(0, safe.minX - frame.minX),
       bottom: max(0, frame.maxY - safe.maxY), right: max(0, frame.maxX - safe.maxX))
     let want = placeholder.view.safeAreaInsets
-    // On iPad the floating tab bar sits at the top, under the status bar.
-    // The corner buttons share its row, as the bar buttons of a navigation
-    // controller in the selected tab do.
+    // On iPad the floating tab bar sits at the top, right under the status
+    // bar. The corner buttons share its row, as the bar buttons of a
+    // navigation controller in the selected tab do.
     let windowTop = view.window?.safeAreaInsets.top ?? want.top
     let rowCenter: CGFloat? =
-      want.top > windowTop + 1 ? (windowTop + want.top) / 2 - frame.minY : nil
+      want.top > windowTop + 1
+      ? windowTop + WebPageController.buttonSize / 2 - frame.minY : nil
     if page.topRowCenter != rowCenter {
       page.topRowCenter = rowCenter
     }

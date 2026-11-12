@@ -37,7 +37,7 @@ final class WebPageController: UIViewController {
 
   /// The height of the page's header row and of each corner button.
   private static let rowHeight: CGFloat = 48
-  private static let buttonSize: CGFloat = 44
+  static let buttonSize: CGFloat = 44
   /// The space between a corner group and the edge of the safe area.
   private static let margin: CGFloat = 8
 
