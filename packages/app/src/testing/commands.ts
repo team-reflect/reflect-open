@@ -1,3 +1,4 @@
+import { returnNull } from '@ocavue/utils'
 import type { IpcBridgeService, LoggerService, PlatformFacts, Unlisten } from '@reflect/core'
 import {
   createTestIpcBridgeService,
@@ -151,7 +152,7 @@ export function createTestNativeMenuService(
     ipc:
       options?.ipc ??
       createTestIpcBridgeService({
-        commands: { menu_install_paste_and_match_style: () => null },
+        commands: { menu_install_paste_and_match_style: returnNull },
         logger,
       }),
     logger,

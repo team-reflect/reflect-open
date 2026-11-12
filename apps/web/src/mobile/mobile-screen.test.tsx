@@ -33,6 +33,7 @@ import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
 import { MobileShell } from './mobile-shell.tsx'
+import { noop, returnFalse, sleep } from '@ocavue/utils'
 
 const waitFor = vi.waitFor
 
@@ -69,7 +70,7 @@ vi.mock('@/editor/note-editor.tsx', async () => {
             markdownRef.current = markdown
           },
           getMarkdown: () => markdownRef.current,
-          insertMarkdown: () => {},
+          insertMarkdown: noop,
           focus: () => {
             editorProbe.focusCalls += 1
           },
@@ -77,13 +78,13 @@ vi.mock('@/editor/note-editor.tsx', async () => {
             editorProbe.selectionCalls.push(position)
           },
           getSelectedText: () => '',
-          openSelectionMenu: () => {},
-          startPendingReplacement: () => false,
-          appendPendingReplacementText: () => {},
-          acceptPendingReplacement: () => {},
-          discardPendingReplacement: () => {},
-          findNext: () => {},
-          findPrevious: () => {},
+          openSelectionMenu: noop,
+          startPendingReplacement: returnFalse,
+          appendPendingReplacementText: noop,
+          acceptPendingReplacement: noop,
+          discardPendingReplacement: noop,
+          findNext: noop,
+          findPrevious: noop,
         })
         return () => {
           if (typeof cleanup === 'function') {
@@ -1131,7 +1132,7 @@ describe('MobileStack transitions & back pager', () => {
     const scroller = pager(view)
     await touch(scroller, 'start')
     await scrollElement({ element: scroller, left: 0 })
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
 
     await touch(scroller, 'end')
@@ -1175,7 +1176,7 @@ describe('MobileStack transitions & back pager', () => {
     await scrollElement({ element: scroller, left: 0 })
     await scrollElement({ element: scroller, left: scroller.clientWidth })
     await touch(scroller, 'end')
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     expect(stackLayers(view)).toHaveLength(2)
   })
@@ -1198,7 +1199,7 @@ describe('MobileStack transitions & back pager', () => {
     // after the pop must neither pop again nor pin the popped note back.
     await act(async () => {
       dispatchTouch(scroller, 'end')
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await sleep(200)
       scroller.dispatchEvent(new Event('scroll'))
       scroller.dispatchEvent(new Event('scrollend'))
       expect(scroller.scrollLeft).toBe(0)
@@ -1290,7 +1291,7 @@ describe('MobileStack transitions & back pager', () => {
     await mouseDragFromStrip(view, 60)
     await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
     expect(lowest).toBeLessThan(scroller.clientWidth - 30)
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await sleep(200)
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     expect(stackLayers(view)).toHaveLength(2)
   })

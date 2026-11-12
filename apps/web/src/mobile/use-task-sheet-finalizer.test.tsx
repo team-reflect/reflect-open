@@ -1,3 +1,4 @@
+import { returnNull } from '@ocavue/utils'
 import { StrictMode } from 'react'
 import { act } from '@/test-utils/act.ts'
 import { render, renderHook } from 'vitest-browser-react'
@@ -164,7 +165,7 @@ describe('useTaskSheetFinalizer', () => {
 
   it('falls back to the mirrored draft when readDraft cannot answer', async () => {
     const { result } = await renderHook(() => {
-      return useTaskSheetFinalizer(deps({ readDraft: () => null }))
+      return useTaskSheetFinalizer(deps({ readDraft: returnNull }))
     })
 
     await act(() => result.current.setDraft('alpha edited'))

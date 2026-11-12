@@ -33,6 +33,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { Sidebar } from './sidebar.tsx'
+import { noop, returnNull } from '@ocavue/utils'
 
 const openNativeContextMenu = vi.fn((options: NativeContextMenuOptions) => {
   return Promise.try(() => {
@@ -108,12 +109,12 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     app: appLayer,
     navigate,
     route: () => ({ kind: 'today' }),
-    notePath: () => null,
+    notePath: returnNull,
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
-    togglePin: vi.fn(() => {}),
-    togglePrivate: vi.fn(() => {}),
+    togglePin: vi.fn(noop),
+    togglePrivate: vi.fn(noop),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),

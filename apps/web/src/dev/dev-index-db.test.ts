@@ -23,6 +23,7 @@ import {
 } from '@reflect/core/testing'
 import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db.ts'
 import { buildAllNotesSearch, EMPTY_ALL_NOTES_FILTERS, searchPlanFor } from '@reflect/app'
+import { noop } from '@ocavue/utils'
 
 function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
   return {
@@ -117,7 +118,7 @@ function connectIndex(db: DevIndexDb, captured: CapturedQuery[] = []): IndexServ
           return db.query(sql, params)
         })
       },
-      listen: () => Promise.resolve(() => {}),
+      listen: () => Promise.resolve(noop),
     },
     logger: createTestLoggerService(),
   })

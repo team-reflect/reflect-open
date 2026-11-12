@@ -26,6 +26,7 @@ import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { ChatScreen } from './chat-screen.tsx'
 import { deepLinkForRoute, type Route } from '@reflect/app'
+import { noop, sleep } from '@ocavue/utils'
 
 /**
  * The chat view over a faked engine: the provider stack, the chat session and
@@ -608,7 +609,7 @@ describe('ChatScreen', () => {
       return (async function* (): AsyncGenerator<ChatStreamEvent> {
         yield { type: 'text-delta', text: 'Hi' }
         // Never settles — the turn only ends through the abort signal.
-        await new Promise<never>(() => {})
+        await new Promise<never>(noop)
       })()
     })
     const view = await renderChat()
@@ -660,7 +661,7 @@ describe('ChatScreen', () => {
 
     probedNewChatRef.current?.()
     pendingRead.resolve(new Uint8Array([0x89]).buffer)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await sleep(100)
 
     expect(view.getByAltText('cat.png').query()).toBeNull()
   })

@@ -8,6 +8,7 @@ import { activeSidebarWidthDrags } from '@/hooks/use-sidebar-resize.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { SidebarResizeHandle } from './sidebar-resize-handle.tsx'
+import { noop } from '@ocavue/utils'
 
 type SidebarWidths = Pick<Settings, 'sidebarWidth' | 'contextSidebarWidth'>
 
@@ -19,7 +20,7 @@ let updateSettings: MockInstance<SettingsService['update']>
 
 async function renderWithWidths(ui: ReactNode, widths: SidebarWidths): Promise<void> {
   const core = createTestCoreServices({ database: createWasmTestDatabaseService() })
-  updateSettings = vi.spyOn(core.settings, 'update').mockImplementation(() => {})
+  updateSettings = vi.spyOn(core.settings, 'update').mockImplementation(noop)
   await renderInApp(ui, { core, settings: widths })
 }
 

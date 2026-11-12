@@ -3,6 +3,7 @@ import { getTaskKey, previousTaskKey, todaysDailyTarget, type OpenTask } from '@
 import { getIsComposing, isModEvent } from '@meowdown/core'
 import type { TaskActions } from '@/lib/tasks/use-task-actions.ts'
 import type { TaskSelection } from '@/lib/tasks/use-task-selection.ts'
+import { noop } from '@ocavue/utils'
 
 export interface TaskKeyboardOptions {
   selection: TaskSelection
@@ -72,7 +73,7 @@ export function useTaskKeyboard({
   onToggleSchedule,
   onConvertToBullet,
 }: TaskKeyboardOptions): void {
-  const handlerRef = useRef<(event: KeyboardEvent) => void>(() => {})
+  const handlerRef = useRef<(event: KeyboardEvent) => void>(noop)
   useEffect(() => {
     handlerRef.current = (event) => {
       // Respect anything a focused widget already handled (e.g. the filters menu's

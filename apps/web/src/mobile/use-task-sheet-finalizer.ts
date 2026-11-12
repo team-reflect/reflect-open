@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { resolveTaskEdit, type OpenTask, type TaskDraftResolution } from '@reflect/core'
+import { noop } from '@ocavue/utils'
 
 /**
  * The two writes the finalizer itself performs; {@link TaskActions} satisfies it.
@@ -160,7 +161,7 @@ export function useTaskSheetFinalizer({
   // drawer is open — no dismissal callback fires, so flush like a dismissal
   // would (desktop's inline editor flushes on unmount the same way). The
   // latest-closure ref keeps the unmount-only cleanup reading current state.
-  const unmountFlushRef = useRef<() => void>(() => {})
+  const unmountFlushRef = useRef<() => void>(noop)
   useEffect(() => {
     unmountFlushRef.current = () => {
       if (open && !handled) {

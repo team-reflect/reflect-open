@@ -27,6 +27,7 @@ import {
 } from '@/providers/chat-provider.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The hooks as a shell over the open graph's chat session: they publish the
@@ -169,7 +170,7 @@ describe('chat hooks', () => {
       signal = request.signal
       yield { type: 'text-delta', text: 'Hi' }
       // Never settles — the turn only ends through the abort signal.
-      await new Promise<never>(() => {})
+      await new Promise<never>(noop)
     })
 
     void sessionRef.current?.send('hey')

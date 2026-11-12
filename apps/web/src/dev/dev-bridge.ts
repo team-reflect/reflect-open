@@ -10,6 +10,7 @@ import { z } from 'zod'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import type { DevIndexDb } from '@/dev/dev-index-db.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The fixed fake graph root the dev bridge reports (mirrors `mobile_storage`).
@@ -443,7 +444,7 @@ class DevBridgeImpl implements IpcBridge {
   // registrations get the same treatment, so the keyboard and recorder
   // hooks mount cleanly in the harness.
   listen(): Promise<() => void> {
-    return Promise.resolve(() => {})
+    return Promise.resolve(noop)
   }
 
   async listenPlugin(): Promise<void> {}

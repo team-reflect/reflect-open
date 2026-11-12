@@ -18,6 +18,7 @@ import { useToastController } from '@/lib/use-toasts.ts'
 import { useSidebar } from '@/providers/sidebar-provider.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { useSelector } from '@/lib/use-store.ts'
+import { noop } from '@ocavue/utils'
 
 /**
  * The desktop React surface for audio memos: a thin shell over the
@@ -62,8 +63,8 @@ const CLOSED_STATE: AudioMemoSessionState = {
 
 const CLOSED_SESSION: AudioMemoSessionStores = {
   get: () => CLOSED_STATE,
-  subscribe: () => () => {},
-  elapsedMs: { get: () => 0, subscribe: () => () => {} },
+  subscribe: () => noop,
+  elapsedMs: { get: () => 0, subscribe: () => noop },
 }
 
 function selectRecorderState(state: AudioMemoSessionState): AudioMemoSessionState['recorderState'] {

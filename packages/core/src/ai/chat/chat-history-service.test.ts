@@ -1,3 +1,4 @@
+import { returnNull } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
 import { createTestChatHistoryService } from '../../testing/chat.ts'
 import { createNodeTestDatabaseService } from '../../testing/database.ts'
@@ -78,7 +79,7 @@ function setup() {
 describe('createChatHistoryService', () => {
   it('sends the conversation and the JSON-encoded message row', async () => {
     const { ipc, history } = setup()
-    ipc.onCommand('chat_message_save', () => null)
+    ipc.onCommand('chat_message_save', returnNull)
     await history.saveTurn({ conversation, turn, createdMs: 2_000, generation: 7 })
 
     // No `seq` in the payload: Rust assigns it inside the insert.
@@ -104,7 +105,7 @@ describe('createChatHistoryService', () => {
 
   it('deletes a conversation for a generation', async () => {
     const { ipc, history } = setup()
-    ipc.onCommand('chat_conversation_delete', () => null)
+    ipc.onCommand('chat_conversation_delete', returnNull)
     await history.deleteConversation('conv-1', 3)
     expect(ipc.calls()).toEqual([
       { command: 'chat_conversation_delete', args: { id: 'conv-1', generation: 3 } },
