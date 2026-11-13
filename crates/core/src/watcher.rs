@@ -17,7 +17,6 @@
 //! frontend answers with its ordinary full reconcile pass — re-list, hash
 //! gate, prune. One coarse signal instead of a shadow manifest.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -25,7 +24,7 @@ use std::time::Duration;
 use file_id::{FileId, get_file_id};
 use notify::{EventKindMask, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
-    DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, new_debouncer_opt,
+    DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, FileIdMap, new_debouncer_opt,
 };
 use reflect_graph_paths::{
     GraphPathKind, classify, evicted_logical_path, eviction_placeholder, has_pruned_component,
@@ -71,14 +70,14 @@ pub struct WatcherState(pub Mutex<Option<(PathBuf, FileId, GraphDebouncer)>>);
 #[derive(Debug)]
 pub struct PrunedFileIdMap {
     root: PathBuf,
-    paths: HashMap<PathBuf, FileId>,
+    ids: FileIdMap,
 }
 
 impl PrunedFileIdMap {
     fn new(root: PathBuf) -> Self {
         Self {
             root,
-            paths: HashMap::new(),
+            ids: FileIdMap::new(),
         }
     }
 }
@@ -98,7 +97,7 @@ fn cache_keeps(root: &Path, path: &Path) -> bool {
 
 impl FileIdCache for PrunedFileIdMap {
     fn cached_file_id(&self, path: &Path) -> Option<impl AsRef<FileId>> {
-        self.paths.get(path)
+        self.ids.cached_file_id(path)
     }
 
     fn add_path(&mut self, path: &Path, recursive_mode: RecursiveMode) {
@@ -115,13 +114,8 @@ impl FileIdCache for PrunedFileIdMap {
             // `filter_entry` prunes whole subtrees: the walk never descends
             // into an excluded directory, which is the entire point.
             .filter_entry(move |entry| cache_keeps(&root, entry.path()));
-        for entry in walk {
-            let Ok(entry) = entry else { continue };
-            let path = entry.into_path();
-            let Ok(file_id) = get_file_id(&path) else {
-                continue;
-            };
-            self.paths.insert(path, file_id);
+        for entry in walk.flatten() {
+            self.ids.add_single_path(entry.path());
         }
     }
 
@@ -129,13 +123,11 @@ impl FileIdCache for PrunedFileIdMap {
         if !cache_keeps(&self.root, path) {
             return;
         }
-        if let Ok(file_id) = get_file_id(path) {
-            self.paths.insert(path.to_path_buf(), file_id);
-        }
+        self.ids.add_single_path(path);
     }
 
     fn remove_path(&mut self, path: &Path) {
-        self.paths.retain(|cached, _| !cached.starts_with(path));
+        self.ids.remove_path(path);
     }
 }
 
@@ -726,17 +718,20 @@ mod tests {
         let mut cache = PrunedFileIdMap::new(root.to_path_buf());
         cache.add_path(root, RecursiveMode::Recursive);
 
-        assert!(cache.paths.contains_key(&root.join("notes/a.md")));
-        assert!(cache.paths.contains_key(&root.join("notes/b.md.tmp")));
-        assert!(
-            !cache
-                .paths
-                .keys()
-                .any(|path| path.starts_with(root.join(".git"))
-                    || path.starts_with(root.join(".reflect"))
-                    || path.starts_with(root.join("node_modules"))),
-            "hidden and pruned trees must never enter the cache"
-        );
+        assert!(cache.cached_file_id(&root.join("notes/a.md")).is_some());
+        assert!(cache.cached_file_id(&root.join("notes/b.md.tmp")).is_some());
+        for skipped in [
+            ".git",
+            ".git/objects/aa/bb",
+            ".reflect/index.sqlite",
+            "node_modules",
+            "node_modules/pkg/x.js",
+        ] {
+            assert!(
+                cache.cached_file_id(&root.join(skipped)).is_none(),
+                "hidden and pruned trees must never enter the cache: {skipped}"
+            );
+        }
     }
 
     #[test]
@@ -752,9 +747,13 @@ mod tests {
         // Per-event adds arrive as single paths, not walks: `.git` churn from
         // the local-history commits must not grow the cache over a session.
         cache.add_path(&root.join(".git/objects/loose"), RecursiveMode::Recursive);
-        assert!(cache.paths.is_empty());
+        assert!(
+            cache
+                .cached_file_id(&root.join(".git/objects/loose"))
+                .is_none()
+        );
         cache.add_path(&root.join("notes/new.md"), RecursiveMode::Recursive);
-        assert!(cache.paths.contains_key(&root.join("notes/new.md")));
+        assert!(cache.cached_file_id(&root.join("notes/new.md")).is_some());
     }
 
     #[test]
@@ -768,9 +767,13 @@ mod tests {
 
         let mut cache = PrunedFileIdMap::new(root.to_path_buf());
         cache.add_single_path(&root.join(".git/objects/loose"));
-        assert!(cache.paths.is_empty());
+        assert!(
+            cache
+                .cached_file_id(&root.join(".git/objects/loose"))
+                .is_none()
+        );
         cache.add_single_path(&root.join("notes/new.md"));
-        assert!(cache.paths.contains_key(&root.join("notes/new.md")));
+        assert!(cache.cached_file_id(&root.join("notes/new.md")).is_some());
     }
 
     #[test]
@@ -784,7 +787,7 @@ mod tests {
 
         let mut cache = PrunedFileIdMap::new(root.clone());
         cache.add_path(&root, RecursiveMode::Recursive);
-        assert!(cache.paths.contains_key(&root.join("notes/a.md")));
+        assert!(cache.cached_file_id(&root.join("notes/a.md")).is_some());
     }
 
     #[test]
@@ -800,16 +803,15 @@ mod tests {
 
         let mut cache = PrunedFileIdMap::new(root.to_path_buf());
         cache.add_path(root, RecursiveMode::Recursive);
-        assert!(cache.paths.contains_key(&root.join("notes/sub/b.md")));
+        assert!(cache.cached_file_id(&root.join("notes/sub/b.md")).is_some());
 
         cache.remove_path(&root.join("notes"));
-        assert!(
-            !cache
-                .paths
-                .keys()
-                .any(|path| path.starts_with(root.join("notes"))),
-            "the removed subtree must be fully evicted"
-        );
-        assert!(cache.paths.contains_key(&root.join("top.md")));
+        for evicted in ["notes", "notes/a.md", "notes/sub", "notes/sub/b.md"] {
+            assert!(
+                cache.cached_file_id(&root.join(evicted)).is_none(),
+                "the removed subtree must be fully evicted: {evicted}"
+            );
+        }
+        assert!(cache.cached_file_id(&root.join("top.md")).is_some());
     }
 }
