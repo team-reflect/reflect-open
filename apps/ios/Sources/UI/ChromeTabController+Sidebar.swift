@@ -35,6 +35,7 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
       tab.preferredPlacement = .sidebarOnly
     }
     pinnedGroup.isHidden = true
+    footer.isHidden = true
     pinnedPlaceholder.onLayout = { [weak self] in
       guard let self, self.selectedTab?.parent === self.pinnedGroup else { return }
       self.placeStage()
