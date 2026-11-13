@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import TypesShared
 
 @testable import AppStoreKit
 
@@ -83,8 +84,11 @@ private func jsonObject(_ reply: StoreReply) throws -> NSObject {
 }
 
 private func isError(_ reply: StoreReply, kind: String, messagePrefix: String) -> Bool {
-  guard case .error(let replyKind, let message) = reply else { return false }
-  return replyKind == kind && message.hasPrefix(messagePrefix)
+  guard case .error(let error) = reply,
+    let wire = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(error))
+      as? [String: String]
+  else { return false }
+  return wire["kind"] == kind && wire["message"]?.hasPrefix(messagePrefix) == true
 }
 
 @MainActor
@@ -124,10 +128,10 @@ func aCommandWithoutItsArgumentAnswersAParseError(command: String, message: Stri
 @MainActor
 @Test(arguments: [
   (PurchaseOutcome.purchased, StoreReply.null),
-  (.unverified, .error(kind: "io", message: "Transaction verification failed")),
-  (.cancelled, .error(kind: "io", message: "Purchase cancelled by user")),
-  (.pending, .error(kind: "io", message: "Purchase is pending")),
-  (.unknown, .error(kind: "io", message: "Unknown purchase result")),
+  (.unverified, .error(.io(.init(message: "Transaction verification failed")))),
+  (.cancelled, .error(.io(.init(message: "Purchase cancelled by user")))),
+  (.pending, .error(.io(.init(message: "Purchase is pending")))),
+  (.unknown, .error(.io(.init(message: "Unknown purchase result")))),
 ])
 func purchaseAnswersNullOnlyForAVerifiedPurchase(
   outcome: PurchaseOutcome, expected: StoreReply
@@ -146,7 +150,7 @@ func purchaseAnswersNullOnlyForAVerifiedPurchase(
   client.outcome = nil
   let reply = try await run(
     "plugin:iap|purchase", #"{"payload":{"productId":"missing"}}"#, on: client)
-  #expect(reply == .error(kind: "notFound", message: "Product not found"))
+  #expect(reply == .error(.notFound(.init(message: "Product not found"))))
 }
 
 @MainActor
@@ -181,7 +185,7 @@ func getProductStatusAnswersWhetherTheUserOwnsTheProduct(owned: Bool) async thro
 
   client.environmentName = nil
   let failure = try await run("plugin:app-store|get_environment", on: client)
-  #expect(failure == .error(kind: "io", message: "the app transaction is unavailable"))
+  #expect(failure == .error(.io(.init(message: "the app transaction is unavailable"))))
 }
 
 @MainActor

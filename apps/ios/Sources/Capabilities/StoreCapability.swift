@@ -1,5 +1,6 @@
 import AppStoreKit
 import StoreKit
+import TypesShared
 import UIKit
 import WebHostKit
 
@@ -44,15 +45,14 @@ final class StoreCapability {
   /// code arrives as a `purchaseUpdated` event.
   private func redeemOfferCode() async -> CoreReply {
     guard let scene = scene() else {
-      return .error(kind: "io", message: "no active window scene")
+      return .error(.io(.init(message: "no active window scene")))
     }
     do {
       try await AppStore.presentOfferCodeRedeemSheet(in: scene)
       return .null
     } catch {
       return .error(
-        kind: "io",
-        message: "presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")
+        .io(.init(message: "presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")))
     }
   }
 
@@ -60,7 +60,7 @@ final class StoreCapability {
   /// whether to show it.
   private func requestReview() -> CoreReply {
     guard let scene = scene() else {
-      return .error(kind: "io", message: "no active window scene")
+      return .error(.io(.init(message: "no active window scene")))
     }
     AppStore.requestReview(in: scene)
     return .null
@@ -73,7 +73,7 @@ extension CoreReply {
     switch reply {
     case .json(let json): self = .json(json)
     case .null: self = .null
-    case .error(let kind, let message): self = .error(kind: kind, message: message)
+    case .error(let error): self = .error(error)
     }
   }
 }

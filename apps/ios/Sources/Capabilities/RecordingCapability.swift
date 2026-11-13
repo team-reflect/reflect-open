@@ -1,5 +1,6 @@
 import Foundation
 import RecordingKit
+import TypesShared
 import WebHostKit
 
 /// The `plugin:recording` commands and events: the shell's face of
@@ -54,7 +55,7 @@ final class RecordingCapability {
         }
         guard let args = request.decodeArgs(Args.self)?.request else {
           return .error(
-            kind: "parse", message: "start_recording takes {request: {segmentMs, reminderMs}}")
+            .parse(.init(message: "start_recording takes {request: {segmentMs, reminderMs}}")))
         }
         return await Self.reply {
           engine.start(segmentMs: args.segmentMs, reminderMs: args.reminderMs, completion: $0)
@@ -68,7 +69,7 @@ final class RecordingCapability {
           engine.cancel { result in continuation.resume(returning: result) }
         }
         if case .failure(let error) = result {
-          return .error(kind: "io", message: error.message)
+          return .error(.io(.init(message: error.message)))
         }
         return .null
       },
@@ -78,8 +79,7 @@ final class RecordingCapability {
           return .value(ListStagedResponse(files: try engine.listStaged()))
         } catch {
           return .error(
-            kind: "io",
-            message: "listing staged recordings failed: \(error.localizedDescription)")
+            .io(.init(message: "listing staged recordings failed: \(error.localizedDescription)")))
         }
       },
       "plugin:recording|delete_staged": { [engine] request in
@@ -90,15 +90,14 @@ final class RecordingCapability {
           var request: Request
         }
         guard let path = request.decodeArgs(Args.self)?.request.path else {
-          return .error(kind: "parse", message: "delete_staged takes {request: {path}}")
+          return .error(.parse(.init(message: "delete_staged takes {request: {path}}")))
         }
         do {
           try engine.deleteStaged(path: path)
           return .null
         } catch {
           return .error(
-            kind: "io",
-            message: "deleting staged recording failed: \(error.localizedDescription)")
+            .io(.init(message: "deleting staged recording failed: \(error.localizedDescription)")))
         }
       },
       "plugin:recording|actions_ready": { [engine] _ in
@@ -121,7 +120,7 @@ final class RecordingCapability {
     }
     switch result {
     case .success(let response): return .value(response)
-    case .failure(let error): return .error(kind: "io", message: error.message)
+    case .failure(let error): return .error(.io(.init(message: error.message)))
     }
   }
 }

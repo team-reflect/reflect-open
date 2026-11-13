@@ -70,6 +70,9 @@ jobs:
             'Cargo.lock'
             '*.sql'
             'apps/tauri/*.json'
+            # The generated wire types: `lint-rust` checks they are current.
+            'packages/types/src/*.gen.ts'
+            'apple/Sources/TypesShared/*'
           )
           swift_files=(
             '.github/*'
@@ -350,6 +353,16 @@ jobs:
 
       - name: Format check
         run: cargo fmt --all -- --check
+
+      - name: Verify the generated wire types are current
+        if: matrix.name == 'Linux'
+        run: |
+          cargo run --quiet --package reflect-types --features codegen --bin codegen
+          if [[ -n $(git status --porcelain --untracked-files=all -- packages/types apple/Sources/TypesShared) ]]; then
+            git status --short -- packages/types apple/Sources/TypesShared
+            echo "::error::Generated wire types are stale. Run 'pnpm gen:types' and commit the result."
+            exit 1
+          fi
 
       - if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise

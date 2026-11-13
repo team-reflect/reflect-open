@@ -244,7 +244,7 @@ mod platform {
     static NUDGED: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    use reflect_types::events::INDEX_CHANGED;
+    use reflect_types::events::EventName;
     use reflect_types::{ChangeKind, FileChange};
 
     /// Lifecycle epoch: every `start`/`stop` bumps it, and a queued install
@@ -680,8 +680,10 @@ mod platform {
                 reflect_graph_io::invalidate_file_catalog(&core.graph, root);
             }
             if is_update {
-                core.host()
-                    .emit(INDEX_CHANGED, serde_json::json!(round.changes));
+                core.host().emit(
+                    EventName::IndexChanged.as_str(),
+                    serde_json::json!(round.changes),
+                );
             }
         }
         if !is_update {
@@ -697,7 +699,7 @@ mod platform {
             // placeholders never appear as changes at all — so an empty
             // gather proves nothing about that window.
             core.host().emit(
-                reflect_types::events::INDEX_RECONCILE,
+                reflect_types::events::EventName::IndexReconcile.as_str(),
                 serde_json::Value::Null,
             );
         }

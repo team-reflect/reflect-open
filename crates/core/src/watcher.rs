@@ -30,7 +30,7 @@ use reflect_graph_paths::{
     GraphPathKind, classify, evicted_logical_path, eviction_placeholder, has_pruned_component,
     is_pruned_dir_name, to_slash_lossy, wire_path,
 };
-use reflect_types::events::{INDEX_CHANGED, INDEX_RECONCILE};
+use reflect_types::events::EventName;
 use reflect_types::{AppError, AppResult, ChangeKind, FileChange};
 use walkdir::WalkDir;
 
@@ -341,10 +341,11 @@ impl Core {
             if !effects.changes.is_empty()
                 && let Ok(payload) = serde_json::to_value(&effects.changes)
             {
-                core.host().emit(INDEX_CHANGED, payload);
+                core.host().emit(EventName::IndexChanged.as_str(), payload);
             }
             if effects.reconcile {
-                core.host().emit(INDEX_RECONCILE, serde_json::Value::Null);
+                core.host()
+                    .emit(EventName::IndexReconcile.as_str(), serde_json::Value::Null);
             }
         })
         .map_err(|err| AppError::io(err.to_string()))?;

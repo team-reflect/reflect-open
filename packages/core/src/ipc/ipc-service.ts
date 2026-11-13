@@ -1,3 +1,4 @@
+import type { EventName } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ZodType } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -7,7 +8,7 @@ import type { Unlisten } from '../unlisten.ts'
 /**
  * The shell's broadcast after an index write command commits.
  */
-export const INDEX_WRITTEN_EVENT = 'index:written'
+export const INDEX_WRITTEN_EVENT = 'index:written' satisfies EventName
 
 /**
  * The raw transport a host implements: the desktop app adapts Tauri's
