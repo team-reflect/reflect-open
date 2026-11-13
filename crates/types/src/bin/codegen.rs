@@ -74,7 +74,7 @@ fn add_undefined(ts: &str) -> String {
 /// `Codable` types, then the event names.
 fn swift(types: &Types) -> String {
     let out = specta_swift::Swift::default()
-        .header(format!("// {HEADER}"))
+        .header(format!("// {HEADER}\n// swift-format-ignore-file"))
         .add_protocol("Equatable")
         .export(types, specta_serde::Format)
         .expect("swift export");

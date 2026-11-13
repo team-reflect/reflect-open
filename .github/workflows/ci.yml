@@ -71,7 +71,6 @@ jobs:
             '*.sql'
             'apps/tauri/*.json'
             # The generated wire types: `lint-rust` checks they are current.
-            'scripts/generate-types.ts'
             'packages/types/src/*.gen.ts'
             'apple/Sources/TypesShared/*'
           )
@@ -355,14 +354,10 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
-      # The Swift output needs `swift format`, so this runs on macOS only.
-      - if: matrix.name == 'macOS'
-        uses: ./.github/actions/setup-node
-
       - name: Verify the generated wire types are current
-        if: matrix.name == 'macOS'
+        if: matrix.name == 'Linux'
         run: |
-          pnpm gen:types
+          cargo run --quiet --package reflect-types --features codegen --bin codegen
           if [[ -n $(git status --porcelain --untracked-files=all -- packages/types apple/Sources/TypesShared) ]]; then
             git status --short -- packages/types apple/Sources/TypesShared
             echo "::error::Generated wire types are stale. Run 'pnpm gen:types' and commit the result."
