@@ -1,5 +1,5 @@
 import type { RenderResult } from 'vitest-browser-react'
-import { page, userEvent } from 'vitest/browser'
+import { cdp, page, server, userEvent } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { StrictMode, type ReactElement } from 'react'
@@ -1331,6 +1331,126 @@ describe('MobileStack transitions & back pager', () => {
     expect(stackLayers(view)).toHaveLength(2)
     const scroller = pager(view)
     expect(scroller.scrollLeft).toBe(scroller.clientWidth)
+  })
+
+  /**
+   * Scrolls `element` into view and drags one finger horizontally by `dx`
+   * from near its left edge. The touches go through the compositor, so
+   * `touch-action` applies.
+   */
+  async function touchDrag(element: Element, dx: number): Promise<void> {
+    element.scrollIntoView({ block: 'center' })
+    await sleep(50)
+    const session = cdp()
+    const rect = element.getBoundingClientRect()
+    const x = rect.left + Math.min(40, rect.width / 2)
+    const y = rect.top + rect.height / 2
+    const at = (offset: number) => [{ x: x + offset, y, id: 1 }]
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) })
+    for (let step = 1; step <= 10; step++) {
+      await sleep(16)
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: at((dx * step) / 10),
+      })
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  }
+
+  it.skipIf(server.browser !== 'chromium')(
+    'pops on a finger drag from a settings row, not from its switch',
+    async () => {
+      const view = await mount({ kind: 'settings' })
+      const toggle = await waitFor(() => {
+        return view.getByRole('switch', { name: 'Smooth caret animation' }).element()
+      })
+      const checked = toggle.getAttribute('aria-checked')
+
+      await touchDrag(toggle, 300)
+      await sleep(300)
+      expect(pager(view).scrollLeft).toBe(pager(view).clientWidth)
+      expect(toggle.getAttribute('aria-checked')).toBe(checked)
+
+      await touchDrag(view.getByRole('button', { name: 'Add AI provider' }).element(), 300)
+      await waitFor(() => expect(shownMonth(view)).toBe(today()))
+    },
+  )
+
+  /**
+   * Which element a finger drag from each part of a stacked screen moves:
+   * the back pager, a horizontal scroller inside the screen, or nothing.
+   */
+  it.skipIf(server.browser !== 'chromium').each([
+    { start: 'background', dx: 120, moves: 'pager' },
+    { start: 'row', dx: 120, moves: 'pager' },
+    { start: 'row-label', dx: 120, moves: 'pager' },
+    { start: 'button', dx: 120, moves: 'nothing' },
+    { start: 'switch-thumb', dx: 120, moves: 'nothing' },
+    { start: 'row-switch-thumb', dx: 120, moves: 'nothing' },
+    { start: 'editor-text', dx: 120, moves: 'nothing' },
+    { start: 'code', dx: -120, moves: 'code' },
+    { start: 'code', dx: 120, moves: 'nothing' },
+    { start: 'swipe-row', dx: -120, moves: 'swipe-row' },
+    { start: 'swipe-row', dx: 120, moves: 'nothing' },
+  ])('moves the $moves on a drag of $dx px from the $start', async ({ start, dx, moves }) => {
+    const view = await renderInApp(
+      <div className="mobile-pager flex h-[600px] w-[375px] overflow-x-auto overscroll-none">
+        <div className="h-full w-full shrink-0" />
+        <div className="mobile-pager-content h-full w-full shrink-0">
+          <main className="h-full overflow-y-auto">
+            <div data-start="background" className="h-12" />
+            <button type="button" data-back-swipe="on" className="block h-12 w-full">
+              <span data-start="row-label">Row</span>
+            </button>
+            <button type="button" data-start="button" className="block h-12 w-full">
+              Button
+            </button>
+            <button type="button" role="switch" aria-checked className="block h-12 w-full">
+              <span data-start="switch-thumb">Thumb</span>
+            </button>
+            <label data-back-swipe="on" data-start="row" className="flex h-12">
+              <span className="w-1/2">Switch row</span>
+              <button type="button" role="switch" aria-checked className="w-1/2">
+                <span data-start="row-switch-thumb">Thumb</span>
+              </button>
+            </label>
+            <div contentEditable suppressContentEditableWarning>
+              <p data-start="editor-text" className="h-12">
+                Text
+              </p>
+              <pre data-scroll-x data-start="code" className="h-12 overflow-x-auto">
+                {'x'.repeat(300)}
+              </pre>
+            </div>
+            <div data-scroll-x className="flex h-12 overflow-x-auto">
+              <button type="button" data-start="swipe-row" className="w-full shrink-0">
+                Surface
+              </button>
+              <div className="w-36 shrink-0" />
+            </div>
+          </main>
+        </div>
+      </div>,
+      { core, appServices, graph: GRAPH, route: { kind: 'today' } },
+    )
+    const find = (selector: string) => view.container.querySelector<HTMLElement>(selector)!
+    const scrollers = {
+      pager: find('.mobile-pager'),
+      code: find('[data-start="code"]'),
+      'swipe-row': find('[data-start="swipe-row"]').parentElement!,
+    }
+    scrollers.pager.scrollLeft = scrollers.pager.clientWidth
+    const before = Object.fromEntries(
+      Object.entries(scrollers).map(([name, element]) => [name, element.scrollLeft]),
+    )
+
+    await touchDrag(find(`[data-start="${start}"]`), dx)
+    await sleep(300)
+
+    const moved = Object.entries(scrollers)
+      .filter(([name, element]) => Math.abs(element.scrollLeft - before[name]!) > 4)
+      .map(([name]) => name)
+    expect(moved).toEqual(moves === 'nothing' ? [] : [moves])
   })
 
   it('swipes a cold note entry back to today', async () => {
