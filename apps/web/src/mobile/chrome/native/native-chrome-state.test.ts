@@ -22,6 +22,8 @@ const BASE: Omit<ShellChromeInput, 'route' | 'tab'> = {
   keyboardVisible: false,
   modal: false,
   toolbar: null,
+  sidebar: null,
+  history: null,
   theme: 'system',
 }
 
@@ -53,6 +55,14 @@ describe('buildShellChromeState', () => {
         ],
         plus: { kind: 'capture', audio: 'idle' },
       },
+      sidebar: {
+        selection: 'pinned:reflect-v2.md',
+        pinned: [{ path: 'reflect-v2.md', title: 'Reflect V2' }],
+        graphName: 'My Graph',
+        graphColor: '#3b82f6',
+        graphMenu: [{ type: 'action', id: 'graphs', title: 'Switch graph…' }],
+      },
+      history: { back: true, forward: false },
     })
     expect(state).toMatchObject({ canBack: false })
     checkFixture('daily', state)

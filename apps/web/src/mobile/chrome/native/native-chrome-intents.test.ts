@@ -19,6 +19,9 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     attachFiles: createAttachQueue(),
     toasts: { add: vi.fn(), close: vi.fn() },
     setCornersInHeaderRow: vi.fn(),
+    setSidebarVisible: vi.fn(),
+    runSidebar: vi.fn(),
+    moveHistory: vi.fn(),
     ...overrides,
   }
 }
@@ -51,7 +54,7 @@ describe('parseNativeIntent', () => {
       '../../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
-    expect(intents).toHaveLength(7)
+    expect(intents).toHaveLength(18)
     for (const intent of intents) {
       expect(parseNativeIntent(intent)).toEqual(intent)
     }
@@ -69,6 +72,21 @@ describe('runNativeIntent', () => {
     runNativeIntent({ type: 'action', entryId: 5, id: 'more' }, ctx)
     expect(ctx.screen?.back).toHaveBeenCalledOnce()
     expect(ctx.screen?.onAction).toHaveBeenCalledWith('more')
+  })
+
+  it('moves the history only from the screen on screen', () => {
+    const ctx = makeIntentContext()
+    runNativeIntent({ type: 'history', entryId: 4, direction: 'back' }, ctx)
+    runNativeIntent({ type: 'history', entryId: 5, direction: 'forward' }, ctx)
+    expect(ctx.moveHistory).toHaveBeenCalledExactlyOnceWith('forward')
+  })
+
+  it('passes the sidebar visibility and taps to the page', () => {
+    const ctx = makeIntentContext()
+    runNativeIntent({ type: 'sidebarVisible', visible: true }, ctx)
+    runNativeIntent({ type: 'sidebar', command: { kind: 'unpin', path: 'a.md' } }, ctx)
+    expect(ctx.setSidebarVisible).toHaveBeenCalledWith(true)
+    expect(ctx.runSidebar).toHaveBeenCalledWith({ kind: 'unpin', path: 'a.md' })
   })
 
   it('runs the capture item or the action of the `+` on screen', () => {

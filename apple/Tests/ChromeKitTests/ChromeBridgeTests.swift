@@ -48,6 +48,17 @@ final class ChromeBridgeTests: XCTestCase {
       .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
       .layout(cornersInHeaderRow: false),
       .plus(entryId: 3, command: .note),
+      .sidebarVisible(true),
+      .sidebarVisible(nil),
+      .history(entryId: 3, forward: false),
+      .history(entryId: 3, forward: true),
+      .sidebar(.chat),
+      .sidebar(.search),
+      .sidebar(.settings),
+      .sidebar(.openNote("reflect-v2.md")),
+      .sidebar(.unpin("reflect-v2.md")),
+      .sidebar(.share("reflect-v2.md")),
+      .sidebar(.menu("graphs")),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -57,6 +68,8 @@ final class ChromeBridgeTests: XCTestCase {
   func testDailyFixtureHasTheGearAndTheTodayButton() throws {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("daily"))
     XCTAssertEqual(state.routeKind, "today")
+    XCTAssertEqual(state.history?.back, true)
+    XCTAssertEqual(state.history?.forward, false)
     XCTAssertEqual(state.leading.first?.icon, "gearshape")
     XCTAssertEqual(state.trailing.map(\.id), ["today"])
   }
@@ -135,6 +148,25 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.receive(try message(["type": "chromeReady"]))
 
     XCTAssertEqual(sent, [.layout(cornersInHeaderRow: false), .layout(cornersInHeaderRow: true)])
+  }
+
+  func testSendsTheSidebarVisibilityWhenItChangesAndToANewPage() throws {
+    let bridge = ChromeBridge()
+    var sent: [Bool?] = []
+    bridge.send = { data in
+      let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
+      sent.append(object["visible"] is NSNull ? nil : (object["visible"] as! Bool))
+    }
+
+    bridge.sidebarVisible = true
+    bridge.receive(try message(["type": "chromeReady"]))
+    bridge.sidebarVisible = true
+    bridge.sidebarVisible = false
+    bridge.documentDidStart()
+    bridge.receive(try message(["type": "chromeReady"]))
+    bridge.sidebarVisible = nil
+
+    XCTAssertEqual(sent, [true, false, false, nil])
   }
 
   func testANewDocumentResetsTheStateAndTheIntentGate() throws {
