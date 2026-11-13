@@ -67,7 +67,7 @@ export interface NativeToolbarState {
 }
 
 /**
- * The `+` of the screen on screen: Daily's capture menu, which shows the audio
+ * The `+` of the screen: Daily's capture menu, which shows the audio
  * action only with a phase, or one action with an accessibility label.
  */
 export type NativePlusState =

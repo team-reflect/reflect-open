@@ -1,5 +1,9 @@
-import type { ReactElement, ReactNode } from 'react'
-import { useChromeRenderer, useScreenChrome } from '@/mobile/chrome/chrome-renderer.ts'
+import { use, type ReactElement, type ReactNode } from 'react'
+import {
+  ChromeLayerContext,
+  useChromeRenderer,
+  useScreenChrome,
+} from '@/mobile/chrome/chrome-renderer.ts'
 import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 
 interface ChromeTopBarProps extends ScreenChrome {
@@ -29,6 +33,7 @@ export function ChromeTopBar({
   ...chrome
 }: ChromeTopBarProps): ReactElement {
   const chromeRenderer = useChromeRenderer()
+  const onTop = use(ChromeLayerContext)
   useScreenChrome(chrome)
   const heading =
     typeof title === 'string' ? (
@@ -61,7 +66,7 @@ export function ChromeTopBar({
         )}
         {children}
       </header>
-      {chrome.plus === undefined ? null : <chromeRenderer.Plus plus={chrome.plus} />}
+      {chrome.plus === undefined || !onTop ? null : <chromeRenderer.Plus plus={chrome.plus} />}
     </>
   )
 }

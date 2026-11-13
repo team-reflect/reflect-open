@@ -48,8 +48,9 @@ export interface ChromeRenderer {
    */
   readonly TopBarCorner: ComponentType<TopBarCornerProps>
   /**
-   * The bars of the routed shell: the tab bar, or the formatting toolbar
-   * while the keyboard is up.
+   * The bars of the routed shell in `form`. While the keyboard is up the
+   * formatting toolbar replaces the `bar` row; the rail and the pad's top
+   * capsule stay on screen.
    */
   readonly ShellBars: ComponentType<ShellBarsProps>
   /**

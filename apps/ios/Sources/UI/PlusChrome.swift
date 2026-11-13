@@ -127,18 +127,18 @@ final class PlusChrome {
     }
   }
 
-  private func updateAudioItem(_ audio: String?) {
-    let recording = audio == "recording" || audio == "requesting"
+  private func updateAudioItem(_ audio: AudioPhase?) {
+    let recording = audio == .recording || audio == .requesting
     let (label, symbol) =
       switch audio {
-      case "error": ("Show audio memo error", "exclamationmark.triangle")
-      case "transcribing": ("Record audio memo", "waveform")
-      case _ where recording: ("Stop recording", "stop.fill")
-      default: ("Record audio memo", "mic")
+      case .error: ("Show audio memo error", "exclamationmark.triangle")
+      case .transcribing: ("Record audio memo", "waveform")
+      case .recording, .requesting: ("Stop recording", "stop.fill")
+      case .idle, nil: ("Record audio memo", "mic")
       }
     audioItem.accessibilityLabel = label
     audioItem.configuration?.image = UIImage(systemName: symbol)
-    audioItem.configuration?.baseForegroundColor = recording || audio == "error" ? .systemRed : nil
+    audioItem.configuration?.baseForegroundColor = recording || audio == .error ? .systemRed : nil
   }
 
   /// Puts the `+` of `size` at `center` in `view`, over the page.

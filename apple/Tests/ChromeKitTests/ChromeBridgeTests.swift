@@ -65,7 +65,7 @@ final class ChromeBridgeTests: XCTestCase {
     let decoder = JSONDecoder()
     XCTAssertEqual(
       try decoder.decode(ChromeState.self, from: try fixture("daily")).plus,
-      .capture(audio: "idle"))
+      .capture(audio: .idle))
     XCTAssertEqual(
       try decoder.decode(ChromeState.self, from: try fixture("tasks")).plus,
       .action(label: "New task"))

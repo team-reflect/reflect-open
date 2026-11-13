@@ -7,6 +7,9 @@ import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import type { MobileForm } from '@/mobile/mobile-form.ts'
 import { TabCapsule } from '@/mobile/mobile-tab-bar.tsx'
 
+const RAIL_BOTTOM =
+  'calc(max(var(--twsa-safe-area-inset-bottom), var(--keyboard-height, 0px)) + var(--spacing) * 2)'
+
 /**
  * The shell's bottom chrome in each form. While the keyboard is up the
  * formatting toolbar takes the bottom of the shell root, which ends at the
@@ -21,7 +24,11 @@ function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProp
     case 'rail':
       return (
         <>
-          <aside className="fixed right-safe-offset-2 bottom-safe-offset-2 z-30 flex flex-col items-center gap-3">
+          <aside
+            className="fixed right-safe-offset-2 z-30 flex flex-col items-center gap-3"
+            // Above the keyboard while it is up, so the tabs stay reachable.
+            style={{ bottom: RAIL_BOTTOM }}
+          >
             <PlusSlot />
             <TabCapsule tab={tab} onSelect={onSelectTab} orientation="vertical" />
           </aside>

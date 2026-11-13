@@ -82,8 +82,12 @@ describe('runNativeIntent', () => {
     const ctx = makeIntentContext({ screen: { plus } })
     runNativeIntent({ type: 'plus', entryId: 4, command: 'note' }, ctx)
     expect(plus.onNote).not.toHaveBeenCalled()
+    runNativeIntent({ type: 'plus', entryId: 5, command: 'note' }, ctx)
     runNativeIntent({ type: 'plus', entryId: 5, command: 'task' }, ctx)
+    runNativeIntent({ type: 'plus', entryId: 5, command: 'audio' }, ctx)
+    expect(plus.onNote).toHaveBeenCalledOnce()
     expect(plus.onTask).toHaveBeenCalledOnce()
+    expect(plus.onAudio).toHaveBeenCalledOnce()
 
     const onTap = vi.fn()
     runNativeIntent(

@@ -110,12 +110,13 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'layout':
       context.setCornersInHeaderRow(intent.cornersInHeaderRow)
       return
-    case 'plus':
+    case 'plus': {
       const plus = context.screen?.plus
       if (intent.entryId === context.entryId && plus !== undefined) {
         runPlusCommand(plus, intent.command)
       }
       return
+    }
   }
 }
 

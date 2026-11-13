@@ -46,7 +46,7 @@ public struct ChromeState: Decodable, Equatable, Sendable {
 public enum PlusSpec: Decodable, Equatable, Sendable {
   /// The capture menu. `audio` is the audio memo phase, or `nil` where the
   /// recorder is unavailable: the menu then has no audio item.
-  case capture(audio: String?)
+  case capture(audio: AudioPhase?)
   /// One action. `label` is the accessibility label.
   case action(label: String)
 
@@ -58,7 +58,7 @@ public enum PlusSpec: Decodable, Equatable, Sendable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     switch try container.decode(String.self, forKey: .kind) {
     case "capture":
-      self = .capture(audio: try container.decodeIfPresent(String.self, forKey: .audio))
+      self = .capture(audio: try container.decodeIfPresent(AudioPhase.self, forKey: .audio))
     case "action":
       self = .action(label: try container.decode(String.self, forKey: .label))
     case let kind:
@@ -66,6 +66,11 @@ public enum PlusSpec: Decodable, Equatable, Sendable {
         forKey: .kind, in: container, debugDescription: "Unknown plus kind \(kind)")
     }
   }
+}
+
+/// The phase of the audio memo recorder.
+public enum AudioPhase: String, Decodable, Sendable {
+  case idle, requesting, recording, transcribing, error
 }
 
 /// A tap on the `+` (`tap`) or on one item of the capture menu.
