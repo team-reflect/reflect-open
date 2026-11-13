@@ -156,8 +156,19 @@ fn write_fixtures(dir: &Path) {
                 message: "disk full".into(),
                 git_code: Some(-14),
             },
-            AppError::no_graph(),
             AppError::not_found("notes/a.md"),
+            AppError::traversal("../etc/passwd"),
+            AppError::no_graph(),
+            AppError::parse("bad frontmatter"),
+            AppError::Auth {
+                message: "token expired".into(),
+            },
+            AppError::Network {
+                message: "offline".into(),
+            },
+            AppError::Unknown {
+                message: "boom".into(),
+            },
         ],
     );
     fixture(dir, "ChangeKind", &[ChangeKind::Upsert, ChangeKind::Remove]);

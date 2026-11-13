@@ -12,7 +12,7 @@ const schemas: Record<string, ZodType> = {
 
 describe('wire fixtures', () => {
   for (const [name, schema] of Object.entries(schemas)) {
-    it(`round-trips ${name}`, () => {
+    it(`parses every ${name} sample`, () => {
       const url = new URL(`../../../fixtures/wire/${name}.json`, import.meta.url)
       const samples = JSON.parse(readFileSync(url, 'utf8')) as unknown[]
       expect(samples.length).toBeGreaterThan(0)
