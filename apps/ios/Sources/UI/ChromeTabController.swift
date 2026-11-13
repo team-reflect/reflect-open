@@ -407,6 +407,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     setTabBarHidden(true, animated: false)
     standalone.bar.isHidden = true
     plus.update(nil)
+    updateSidebar(nil)
   }
 
   /// A tap on the standalone tab bar runs like a tap on the system one.

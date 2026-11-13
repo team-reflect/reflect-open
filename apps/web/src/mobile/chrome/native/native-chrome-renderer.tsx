@@ -1,7 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
-  useMemo,
+  useState,
   useRef,
   type CSSProperties,
   type ReactElement,
@@ -188,12 +188,16 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const { nativeChrome } = useAppServices()
   const toasts = useToastController()
   const sidebar = useSidebar(tab)
-  // A new object on every render: compare by value, so an equal sidebar posts no state.
-  const sidebarJson = JSON.stringify({
+  const nextSidebarState: NativeSidebarState = {
     ...sidebar.state,
     graphMenu: toWireMenu(sidebar.state.graphMenu),
-  })
-  const sidebarState = useMemo(() => JSON.parse(sidebarJson) as NativeSidebarState, [sidebarJson])
+  }
+  // A new object on every render: keep the last one while it is equal, so an
+  // equal sidebar posts no state.
+  const [sidebarState, setSidebarState] = useState(nextSidebarState)
+  if (!isDeepEqual(sidebarState, nextSidebarState)) {
+    setSidebarState(nextSidebarState)
+  }
 
   useEffect(() => {
     nativeChrome.postState(
