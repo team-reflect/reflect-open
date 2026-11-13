@@ -22,6 +22,7 @@ const BASE: Omit<ShellChromeInput, 'route' | 'tab'> = {
   keyboardVisible: false,
   modal: false,
   toolbar: null,
+  plus: undefined,
   theme: 'system',
 }
 
@@ -52,6 +53,7 @@ describe('buildShellChromeState', () => {
           { id: 'hidden', title: 'Hidden', hidden: true },
         ],
       },
+      plus: { kind: 'capture', audio: 'idle' },
     })
     expect(state).toMatchObject({ canBack: false })
     checkFixture('daily', state)
@@ -123,7 +125,12 @@ describe('buildShellChromeState', () => {
     }
     checkFixture(
       'tasks',
-      buildShellChromeState({ ...BASE, route: { kind: 'tasks' }, tab: 'tasks' }),
+      buildShellChromeState({
+        ...BASE,
+        route: { kind: 'tasks' },
+        tab: 'tasks',
+        plus: { kind: 'action', label: 'New task' },
+      }),
     )
   })
 })

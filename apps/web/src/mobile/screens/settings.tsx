@@ -29,6 +29,11 @@ import {
   type SettingsMenuOption,
 } from '@/mobile/settings-list.tsx'
 import { useStore } from '@/lib/use-store.ts'
+import {
+  setMobileFormOverride,
+  useMobileFormOverride,
+  type MobileFormOverride,
+} from '@/mobile/mobile-form.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { useAppStoreEnvironment } from '@/mobile/use-app-store-environment.ts'
 import { useSubscriptionControls } from '@/mobile/use-subscription-controls.ts'
@@ -110,6 +115,28 @@ function ReviewRow(): ReactElement {
       label="Simulate review page"
       checked={override}
       onCheckedChange={review.setOverride}
+    />
+  )
+}
+
+const MOBILE_LAYOUT_OPTIONS: readonly SettingsMenuOption<MobileFormOverride>[] = [
+  { value: 'auto', label: 'Automatic' },
+  { value: 'bar', label: 'iPhone' },
+  { value: 'rail', label: 'iPhone Duo' },
+  { value: 'pad', label: 'iPad' },
+]
+
+/**
+ * Pins the form of the web chrome until the page reloads. A web page cannot
+ * tell an iPhone Duo from an iPhone, so its layout shows only when pinned.
+ */
+function MobileLayoutRow(): ReactElement {
+  return (
+    <SettingsMenuRow
+      label="Mobile layout"
+      value={useMobileFormOverride()}
+      options={MOBILE_LAYOUT_OPTIONS}
+      onChange={setMobileFormOverride}
     />
   )
 }
@@ -309,7 +336,7 @@ export function MobileSettings(): ReactElement {
         : undefined
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
+    <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
         align="center"
         back={() => (canBack ? back() : navigate({ kind: 'today' }))}
@@ -622,6 +649,7 @@ export function MobileSettings(): ReactElement {
               ) : null}
               <WhatsNewRow />
               <ReviewRow />
+              {isIos ? null : <MobileLayoutRow />}
               <SettingsSwitchRow
                 label="Performance HUD"
                 checked={perfHudEnabled}

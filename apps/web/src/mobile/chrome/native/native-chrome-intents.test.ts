@@ -15,6 +15,7 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     entryId: 5,
     selectTab: vi.fn(),
     screen: { back: vi.fn(), onAction: vi.fn() },
+    plus: undefined,
     attachCommands: null,
     attachFiles: createAttachQueue(),
     toasts: { add: vi.fn(), close: vi.fn() },
@@ -51,7 +52,7 @@ describe('parseNativeIntent', () => {
       '../../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
-    expect(intents).toHaveLength(6)
+    expect(intents).toHaveLength(7)
     for (const intent of intents) {
       expect(parseNativeIntent(intent)).toEqual(intent)
     }
@@ -69,6 +70,28 @@ describe('runNativeIntent', () => {
     runNativeIntent({ type: 'action', entryId: 5, id: 'more' }, ctx)
     expect(ctx.screen?.back).toHaveBeenCalledOnce()
     expect(ctx.screen?.onAction).toHaveBeenCalledWith('more')
+  })
+
+  it('runs the capture item or the action of the `+` on screen', () => {
+    const plus = {
+      kind: 'capture' as const,
+      audio: null,
+      onNote: vi.fn(),
+      onTask: vi.fn(),
+      onAudio: vi.fn(),
+    }
+    const ctx = makeIntentContext({ plus })
+    runNativeIntent({ type: 'plus', entryId: 4, command: 'note' }, ctx)
+    expect(plus.onNote).not.toHaveBeenCalled()
+    runNativeIntent({ type: 'plus', entryId: 5, command: 'task' }, ctx)
+    expect(plus.onTask).toHaveBeenCalledOnce()
+
+    const onTap = vi.fn()
+    runNativeIntent(
+      { type: 'plus', entryId: 5, command: 'tap' },
+      makeIntentContext({ plus: { kind: 'action', label: 'New note', onTap } }),
+    )
+    expect(onTap).toHaveBeenCalledOnce()
   })
 
   it('inserts the images of one pick in the picked order', async () => {

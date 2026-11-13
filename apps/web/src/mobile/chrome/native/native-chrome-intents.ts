@@ -4,9 +4,11 @@ import {
 } from '@/editor/formatting-toolbar-store.ts'
 import type { ToastController } from '@/lib/use-toasts.ts'
 import { runChromeAction } from '@/mobile/chrome/chrome-action.ts'
-import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import type { ChromePlus, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import type { FormattingCommandId, NativeIntent } from '@/mobile/chrome/native/protocol.ts'
+
+type PlusCommand = Extract<NativeIntent, { type: 'plus' }>['command']
 
 /**
  * Inserts files into an editor after the inserts it was given before.
@@ -23,6 +25,10 @@ export interface IntentContext {
    * The chrome the screen of `entryId` registered.
    */
   screen: ScreenChrome | undefined
+  /**
+   * The `+` the screen of `entryId` registered.
+   */
+  plus: ChromePlus | undefined
   /**
    * The commands of the last focused editor that can attach files, while
    * the page still shows its entry.
@@ -108,6 +114,23 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'layout':
       context.setCornersInHeaderRow(intent.cornersInHeaderRow)
       return
+    case 'plus':
+      if (intent.entryId === context.entryId && context.plus !== undefined) {
+        runPlusCommand(context.plus, intent.command)
+      }
+      return
+  }
+}
+
+function runPlusCommand(plus: ChromePlus, command: PlusCommand): void {
+  if (plus.kind === 'action') {
+    plus.onTap()
+  } else if (command === 'note') {
+    plus.onNote()
+  } else if (command === 'task') {
+    plus.onTask()
+  } else if (command === 'audio') {
+    plus.onAudio()
   }
 }
 

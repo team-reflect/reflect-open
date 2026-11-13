@@ -1,3 +1,4 @@
+import type { AudioMemoPhase } from '@reflect/core'
 import type { MaybePromise } from '@reflect/utils'
 
 /**
@@ -88,3 +89,26 @@ export interface ScreenChrome {
    */
   onAction?: ((id: string) => MaybePromise<void>) | undefined
 }
+
+/**
+ * The `+` of a screen: Daily's capture actions, or one action.
+ */
+export type ChromePlus =
+  | {
+      kind: 'capture'
+      /**
+       * The audio memo phase, or `null` where the recorder is unavailable.
+       */
+      audio: AudioMemoPhase | null
+      onNote: () => void
+      onTask: () => void
+      onAudio: () => void
+    }
+  | {
+      kind: 'action'
+      /**
+       * The accessibility label.
+       */
+      label: string
+      onTap: () => void
+    }

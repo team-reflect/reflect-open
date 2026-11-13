@@ -13,6 +13,7 @@ import {
 } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
+import { useMobileForm } from '@/mobile/mobile-form.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
@@ -55,6 +56,7 @@ export function MobileShell(): ReactElement {
   const isDoubleTap = useDoubleTap<MobileTab>(tab)
   const keyboardVisible = useKeyboardVisible()
   const chromeRenderer = useChromeRenderer()
+  const form = useMobileForm()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
 
@@ -124,7 +126,7 @@ export function MobileShell(): ReactElement {
       <div
         className="mobile-shell flex w-screen flex-col"
         style={{
-          ...chromeRenderer.shellStyle,
+          ...chromeRenderer.shellStyle(form),
           height: 'calc(100dvh - var(--keyboard-height, 0px))',
         }}
       >
@@ -140,6 +142,7 @@ export function MobileShell(): ReactElement {
           </Suspense>
         </div>
         <chromeRenderer.ShellBars
+          form={form}
           tab={tab}
           keyboardVisible={keyboardVisible}
           onSelectTab={handleTabSelect}

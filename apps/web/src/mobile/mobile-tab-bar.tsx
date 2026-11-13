@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { CircleCheck, Files, SquarePen } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
@@ -23,71 +23,46 @@ export function tabRootFor(route: Route): MobileTab | null {
   }
 }
 
-interface MobileTabBarProps {
+const TABS = [
+  { id: 'daily', label: 'Daily', Icon: SquarePen },
+  { id: 'all', label: 'All', Icon: Files },
+  { id: 'tasks', label: 'Tasks', Icon: CircleCheck },
+] as const
+
+interface TabCapsuleProps {
   tab: MobileTab
   onSelect: (tab: MobileTab) => void
+  /**
+   * `horizontal` shows each tab's label under its icon; `vertical` shows icons only.
+   */
+  orientation: 'horizontal' | 'vertical'
 }
 
 /**
- * The V1-parity bottom tab bar: Daily (the chronological spine), All
+ * The Daily / All / Tasks capsule: Daily (the chronological spine), All
  * (every note + search), and Tasks (every open checkbox, grouped). Chat is
  * not a tab: it is a stacked screen reached from All, where asking sits next
- * to searching. The bar sits at the very bottom of the shell. In V1 the
- * software keyboard simply covered it; the shell root now ends at the
- * keyboard's top, so the shell hides the bar while the keyboard is up to
- * keep that behavior.
- *
- * The bar publishes its measured height as `--mobile-tab-bar-height` on the
- * document root, so viewport-anchored elements (the sync status pill) can
- * sit above it without hardcoding its size. The variable clears on unmount
- * (the keyboard-up state), leaving consumers their own fallback.
+ * to searching.
  */
-export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement {
-  const navRef = useRef<HTMLElement | null>(null)
-
-  useLayoutEffect(() => {
-    const nav = navRef.current
-    const root = document.documentElement
-    if (nav === null) {
-      return
-    }
-    const publish = (): void => {
-      root.style.setProperty('--mobile-tab-bar-height', `${nav.offsetHeight}px`)
-    }
-    publish()
-    // Content-sized: the height moves with rotation (safe-area padding).
-    const observer = new ResizeObserver(publish)
-    observer.observe(nav)
-    return () => {
-      observer.disconnect()
-      root.style.removeProperty('--mobile-tab-bar-height')
-    }
-  }, [])
-
+export function TabCapsule({ tab, onSelect, orientation }: TabCapsuleProps): ReactElement {
   return (
     <nav
-      ref={navRef}
       aria-label="Sections"
-      className="flex shrink-0 border-t border-border px-safe pb-safe"
+      className={cn(
+        'flex rounded-full bg-surface p-1 shadow-lg ring-1 ring-border',
+        orientation === 'vertical' && 'flex-col',
+      )}
     >
-      <TabButton
-        label="Daily"
-        icon={<SquarePen className="size-5" />}
-        active={tab === 'daily'}
-        onClick={() => onSelect('daily')}
-      />
-      <TabButton
-        label="All"
-        icon={<Files className="size-5" />}
-        active={tab === 'all'}
-        onClick={() => onSelect('all')}
-      />
-      <TabButton
-        label="Tasks"
-        icon={<CircleCheck className="size-5" />}
-        active={tab === 'tasks'}
-        onClick={() => onSelect('tasks')}
-      />
+      {TABS.map(({ id, label, Icon }) => (
+        <TabButton
+          key={id}
+          label={label}
+          icon={<Icon className="size-5" />}
+          active={tab === id}
+          compact={orientation === 'vertical'}
+          onClick={() => onSelect(id)}
+        />
+      ))}
     </nav>
   )
 }
@@ -96,11 +71,13 @@ function TabButton({
   label,
   icon,
   active,
+  compact,
   onClick,
 }: {
   label: string
   icon: ReactElement
   active: boolean
+  compact: boolean
   onClick: () => void
 }): ReactElement {
   const { haptics } = useMobileServices()
@@ -116,12 +93,13 @@ function TabButton({
         onClick()
       }}
       className={cn(
-        'flex flex-1 flex-col items-center gap-0.5 pb-1 pt-2 text-[11px] font-medium',
-        active ? 'text-primary' : 'text-text-muted',
+        'flex flex-col items-center justify-center gap-0.5 rounded-full text-xs font-medium',
+        compact ? 'size-12' : 'h-14 w-16',
+        active ? 'bg-muted text-primary' : 'text-text-muted',
       )}
     >
       {icon}
-      {label}
+      {compact ? null : label}
     </button>
   )
 }

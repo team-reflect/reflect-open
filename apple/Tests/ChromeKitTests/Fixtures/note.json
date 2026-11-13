@@ -46,6 +46,7 @@
     "canMoveDown": false,
     "canAttachFiles": true
   },
+  "plus": null,
   "theme": "dark",
   "generation": 1
 }

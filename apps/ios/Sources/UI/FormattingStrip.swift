@@ -38,6 +38,16 @@ final class FormattingStrip: UIInputView {
   init() {
     super.init(frame: CGRect(x: 0, y: 0, width: 400, height: 48), inputViewStyle: .keyboard)
     allowsSelfSizing = true
+    // A `UIInputView` draws no background on iOS 26 and later.
+    let background = UIVisualEffectView()
+    if #available(iOS 26, *) {
+      background.effect = UIGlassEffect()
+    } else {
+      background.effect = UIBlurEffect(style: .systemChromeMaterial)
+    }
+    background.frame = bounds
+    background.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    addSubview(background)
     // The symbols follow Dynamic Type up to a size that fits the 48 pt strip.
     maximumContentSizeCategory = .accessibilityMedium
     let symbols = UIImage.SymbolConfiguration(textStyle: .body)

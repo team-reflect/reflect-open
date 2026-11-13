@@ -3,8 +3,12 @@ import type { ThemePreference } from '@reflect/core'
 import type { FormattingToolbarCapabilities } from '@/editor/formatting-toolbar-store.ts'
 import { toWireButtons } from '@/mobile/chrome/native/sf-symbols.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
-import { NO_ENTRY, type NativeChromeState } from '@/mobile/chrome/native/protocol.ts'
-import type { ChromeButton } from '@/mobile/chrome/screen-chrome.ts'
+import {
+  NO_ENTRY,
+  type NativeChromeState,
+  type NativePlusState,
+} from '@/mobile/chrome/native/protocol.ts'
+import type { ChromeButton, ChromePlus } from '@/mobile/chrome/screen-chrome.ts'
 
 /**
  * The corners of one screen without its handlers.
@@ -13,6 +17,15 @@ export interface ScreenBar {
   canBack: boolean
   leading: ChromeButton[]
   trailing: ChromeButton[]
+}
+
+/**
+ * The `+` without its handlers.
+ */
+export function toWirePlus(plus: ChromePlus): NativePlusState {
+  return plus.kind === 'capture'
+    ? { kind: 'capture', audio: plus.audio }
+    : { kind: 'action', label: plus.label }
 }
 
 /**
@@ -28,6 +41,7 @@ export interface ShellChromeInput {
   keyboardVisible: boolean
   modal: boolean
   toolbar: FormattingToolbarCapabilities | null
+  plus: NativePlusState | undefined
   theme: ThemePreference
 }
 
@@ -48,6 +62,7 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     keyboardVisible: input.keyboardVisible,
     modal: input.modal,
     toolbar: input.toolbar === null ? null : { ...input.toolbar },
+    plus: input.plus ?? null,
     theme: input.theme,
   }
 }
@@ -69,6 +84,7 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     keyboardVisible: false,
     modal: false,
     toolbar: null,
+    plus: null,
     theme,
   }
 }

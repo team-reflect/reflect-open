@@ -24,7 +24,7 @@ Cascade layer order, low to high priority.
 /* `tailwindcss-safe-area` knows neither the software keyboard nor the tab bar.
    These clear the home indicator, or the keyboard while it is up
    (`--keyboard-height`, mobile/use-keyboard.ts), or the tab bar
-   (`--mobile-tab-bar-height`, mobile/mobile-tab-bar.tsx). */
+   (`--mobile-tab-bar-height`, mobile/chrome/web/web-chrome-renderer.tsx). */
 @utility pb-above-keyboard {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px));
 }

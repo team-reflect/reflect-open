@@ -8,7 +8,8 @@ import {
   type CSSProperties,
 } from 'react'
 import type { Unlisten } from '@reflect/core'
-import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import type { ChromePlus, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import type { MobileForm } from '@/mobile/mobile-form.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 
@@ -26,6 +27,7 @@ export interface ShellBarsProps {
   tab: MobileTab
   onSelectTab: (tab: MobileTab) => void
   keyboardVisible: boolean
+  form: MobileForm
 }
 
 /**
@@ -51,6 +53,10 @@ export interface ChromeRenderer {
    */
   readonly ShellBars: ComponentType<ShellBarsProps>
   /**
+   * The `+` of the screen that renders it.
+   */
+  readonly Plus: ComponentType<{ plus: ChromePlus }>
+  /**
    * Marks a surface outside the routed shell, which shows no shell bars.
    */
   readonly NoChrome: ComponentType
@@ -58,7 +64,7 @@ export interface ChromeRenderer {
    * The `--chrome-*` variables of the shell root, for content that clears
    * the bars (`styles/index.css`).
    */
-  readonly shellStyle: CSSProperties
+  shellStyle(form: MobileForm): CSSProperties
   /**
    * Register the chrome of the screen on top for `entryId` and take a
    * snapshot of its corners; returns the unregister, which keeps a

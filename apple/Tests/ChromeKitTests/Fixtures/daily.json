@@ -21,6 +21,10 @@
   "keyboardVisible": false,
   "modal": false,
   "toolbar": null,
+  "plus": {
+    "kind": "capture",
+    "audio": "idle"
+  },
   "theme": "system",
   "generation": 1
 }

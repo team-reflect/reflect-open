@@ -55,7 +55,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   })
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
+    <div className="flex h-full w-full flex-col pt-safe">
       <CalendarStrip
         date={targetDate ?? date}
         today={today}
