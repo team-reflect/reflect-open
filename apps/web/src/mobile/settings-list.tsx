@@ -72,7 +72,7 @@ export function SettingsValueRow({
   onPress?: () => void
 }): ReactElement {
   return (
-    <div data-back-swipe="on" className={ROW_CLASS} onClick={onPress}>
+    <div className={ROW_CLASS} onClick={onPress}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 text-text-secondary tabular-nums">{value}</span>
     </div>
@@ -163,13 +163,14 @@ export function SettingsMenuRow<Value extends string>({
   onChange,
 }: SettingsMenuRowProps<Value>): ReactElement {
   return (
-    <div data-back-swipe="on" className={cn(ROW_CLASS, 'relative')}>
+    <div className={cn(ROW_CLASS, 'relative')}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="flex shrink-0 items-center gap-1 text-text-secondary">
         {options.find((option) => option.value === value)?.label}
         <ChevronsUpDown aria-hidden className="-mr-1 size-[15px] shrink-0" strokeWidth={2.4} />
       </span>
       <select
+        data-back-swipe="on"
         aria-label={label}
         value={value}
         onChange={(event) => {

@@ -282,31 +282,19 @@ body {
   }
 
   /* A horizontal drag that starts on the background of a stacked mobile
-     screen, or on a row marked `data-back-swipe='on'`, chains to the back
-     pager (mobile-stack.tsx). A drag that starts on a protected element pans
-     only vertically, so it never reaches the pager. A horizontal scroller
-     (`data-scroll-x`, also set by meowdown) keeps its own horizontal
-     overscroll, so it never chains to the pager either. The background needs
-     no rule: `touch-action` starts as `auto`.
-
-     Every selector has specificity (0,2,0), so a later group wins on the same
-     element, and all of them win over the `manipulation` rule above, which
-     allows `pan-x`. Every `:is()` argument stays at (0,1,0) or less. Tailwind
-     `touch-*` utilities still win from `@layer utilities`. */
-
-  /* Protected elements and everything inside them. A `<button>` counts as a
-     button until it is marked as a row. */
+     screen chains to the back pager (mobile-stack.tsx). Controls, text fields
+     and the editor pan only vertically, unless marked
+     `data-back-swipe="on"` (a row that acts on a tap). The browser intersects
+     `touch-action` with every ancestor up to the nearest scroll container, so
+     their descendants follow without a rule of their own, and a horizontal
+     scroller (`data-scroll-x`, also set by meowdown) starts fresh. The
+     specificity beats the `manipulation` rule above, which allows `pan-x`. */
   .mobile-pager-content
     :is(
-      [contenteditable='true'],
-      [contenteditable=''],
-      [contenteditable='plaintext-only'],
-      button,
-      a,
+      :enabled,
+      :read-write,
+      :any-link,
       label,
-      input,
-      textarea,
-      select,
       summary,
       video,
       audio,
@@ -321,93 +309,13 @@ body {
       [role='menuitem'],
       [role='combobox'],
       [data-back-swipe='off']
-    ),
-  .mobile-pager-content
-    :is(
-      [contenteditable='true'],
-      [contenteditable=''],
-      [contenteditable='plaintext-only'],
-      button,
-      a,
-      label,
-      input,
-      textarea,
-      select,
-      summary,
-      video,
-      audio,
-      [role='button'],
-      [role='link'],
-      [role='checkbox'],
-      [role='radio'],
-      [role='switch'],
-      [role='slider'],
-      [role='tab'],
-      [role='option'],
-      [role='menuitem'],
-      [role='combobox'],
-      [data-back-swipe='off']
-    )
-    * {
+    ):not([data-back-swipe='on']) {
     touch-action: pan-y;
   }
 
-  /* A row that acts on a tap (navigates, opens a menu, runs an action) takes
-     a back swipe like the background, also on the `<select>` a menu row
-     lays over its trailing half. */
-  .mobile-pager-content [data-back-swipe='on'],
-  .mobile-pager-content [data-back-swipe='on'] * {
-    touch-action: auto;
-  }
-
-  /* Buttons, switches and text fields inside a row stay protected. */
-  :where(.mobile-pager-content)
-    [data-back-swipe='on']
-    :is(
-      [contenteditable='true'],
-      [contenteditable=''],
-      [contenteditable='plaintext-only'],
-      button,
-      a,
-      input,
-      textarea,
-      [role='button'],
-      [role='link'],
-      [role='checkbox'],
-      [role='radio'],
-      [role='switch'],
-      [role='slider'],
-      [data-back-swipe='off']
-    ),
-  :where(.mobile-pager-content)
-    [data-back-swipe='on']
-    :is(
-      [contenteditable='true'],
-      [contenteditable=''],
-      [contenteditable='plaintext-only'],
-      button,
-      a,
-      input,
-      textarea,
-      [role='button'],
-      [role='link'],
-      [role='checkbox'],
-      [role='radio'],
-      [role='switch'],
-      [role='slider'],
-      [data-back-swipe='off']
-    )
-    * {
-    touch-action: pan-y;
-  }
-
+  /* A drag past a scroller's end never reaches the back pager. */
   .mobile-pager-content [data-scroll-x] {
-    touch-action: auto;
     overscroll-behavior-x: contain;
-  }
-
-  .mobile-pager-content [data-scroll-x] * {
-    touch-action: auto;
   }
 }
 

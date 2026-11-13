@@ -1347,16 +1347,17 @@ describe('MobileStack transitions & back pager', () => {
     const header = Array.from(layer.querySelectorAll('h2')).find(
       (element) => element.textContent === 'Editor',
     )
-    const switchRow = Array.from(layer.querySelectorAll('label')).find((element) => {
-      return element.textContent?.includes('Smooth caret animation')
-    })
-    const menuRow = Array.from(layer.querySelectorAll('[data-back-swipe="on"]')).find((element) => {
-      return element.textContent?.startsWith('Theme')
-    })
+    const switchRow = Array.from(layer.querySelectorAll('label')).find((element) =>
+      element.textContent?.includes('Smooth caret animation'),
+    )
 
     expect(touchAction(header)).toBe('auto')
-    expect(touchAction(switchRow?.querySelector('span'))).toBe('auto')
-    expect(touchAction(menuRow?.querySelector('select'))).toBe('auto')
+    // Rows keep a horizontal pan: `manipulation` on a button or label, `auto` on a `<select>`.
+    expect(touchAction(view.getByRole('button', { name: 'Add AI provider' }).element())).not.toBe(
+      'pan-y',
+    )
+    expect(touchAction(switchRow)).not.toBe('pan-y')
+    expect(touchAction(layer.querySelector('select[aria-label="Theme"]'))).not.toBe('pan-y')
     expect(touchAction(switchRow?.querySelector('[role="switch"]'))).toBe('pan-y')
     expect(touchAction(layer.querySelector('[data-pager-edge]'))).toBe('pan-x')
   })
