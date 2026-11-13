@@ -69,7 +69,7 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
     // A screen without chrome leaves the sidebar with its rows only.
     footer.isHidden = state == nil
     guard let state else {
-      pinnedGroup.isHidden = true
+      updateSidebarRows()
       return
     }
     footer.update(state)
@@ -87,20 +87,31 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
       tab.title = note.title
       sidebar.reconfigureItem(for: tab)
     }
-    pinnedGroup.isHidden = state.pinned.isEmpty
+    updateSidebarRows()
   }
 
-  /// Shows the Search row only in the sidebar: the tab bar keeps a search
-  /// tab whatever its placement.
-  func updateSearchRow() {
-    tabs.first { $0 is UISearchTab }?.isHidden = mode != .tabSidebar || sidebar.isHidden
+  /// Shows the sidebar-only rows only in the sidebar: the tab bar keeps a
+  /// search tab, and the last sidebar-only tab selected, whatever their
+  /// placement.
+  func updateSidebarRows() {
+    let hidden = mode != .tabSidebar || sidebar.isHidden
+    for tab in tabs where tab is UISearchTab || tab.identifier == SidebarRow.chat {
+      tab.isHidden = hidden
+    }
+    pinnedGroup.isHidden = hidden || sidebarState?.pinned.isEmpty != false
+    for tab in pinnedGroup.children {
+      tab.isHidden = hidden
+    }
   }
 
   /// Tells the page whether the sidebar shows (`nil` without a sidebar), and
   /// selects the row or the tab of the last state.
   func reportSidebarVisible() {
-    updateSearchRow()
+    updateSidebarRows()
     let visible = mode == .tabSidebar ? sidebarVisible : nil
+    // The sidebar is gray, as on desktop; the tab bar and the page keep the
+    // purple.
+    view.tintColor = visible == true ? .secondaryLabel : Self.accent
     guard visible != reportedSidebarVisible else { return }
     reportedSidebarVisible = visible
     onSidebarVisible(visible)
@@ -117,7 +128,7 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
     if !settingSidebar {
       userToggledSidebar = true
     }
-    updateSearchRow()
+    updateSidebarRows()
     animator.addCompletion { [weak self] in self?.reportSidebarVisible() }
   }
 

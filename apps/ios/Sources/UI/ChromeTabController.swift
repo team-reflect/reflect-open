@@ -203,8 +203,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     let next: UITabBarController.Mode = regularPad ? .tabSidebar : .tabBar
     if mode != next {
       mode = next
-      // The sidebar is gray, as on desktop; the page keeps the purple.
-      view.tintColor = regularPad ? .secondaryLabel : Self.accent
     }
     let wide = width >= Self.sidebarMinWidth
     let layout: UITabBarController.Sidebar.Layout = wide ? .tile : .overlap
@@ -249,6 +247,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       send(.sidebar(.settings))
     case "search":
       send(.sidebar(.search))
+    case SidebarRow.chat:
+      send(.sidebar(.chat))
     case "back", "forward":
       guard let entryId, let history,
         id == "back" ? history.back : history.forward
