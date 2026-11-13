@@ -1347,8 +1347,7 @@ describe('MobileStack transitions & back pager', () => {
     const header = Array.from(layer.querySelectorAll('h2')).find(
       (element) => element.textContent === 'Editor',
     )
-    const switchRow = Array.from(layer.querySelectorAll('label')).find((element) =>
-      element.textContent?.includes('Smooth caret animation'),
+    const switchRow = Array.from(layer.querySelectorAll('label')).find((element) => { return element.textContent?.includes('Smooth caret animation') },
     )
 
     expect(touchAction(header)).toBe('auto')
