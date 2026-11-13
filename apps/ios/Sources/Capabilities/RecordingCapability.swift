@@ -55,7 +55,7 @@ final class RecordingCapability {
         }
         guard let args = request.decodeArgs(Args.self)?.request else {
           return .error(
-            kind: "parse", message: "start_recording takes {request: {segmentMs, reminderMs}}")
+            .parse(.init(message: "start_recording takes {request: {segmentMs, reminderMs}}")))
         }
         return await Self.reply {
           engine.start(segmentMs: args.segmentMs, reminderMs: args.reminderMs, completion: $0)
@@ -79,8 +79,7 @@ final class RecordingCapability {
           return .value(ListStagedResponse(files: try engine.listStaged()))
         } catch {
           return .error(
-            kind: "io",
-            message: "listing staged recordings failed: \(error.localizedDescription)")
+            .io(.init(message: "listing staged recordings failed: \(error.localizedDescription)")))
         }
       },
       "plugin:recording|delete_staged": { [engine] request in
@@ -98,8 +97,7 @@ final class RecordingCapability {
           return .null
         } catch {
           return .error(
-            kind: "io",
-            message: "deleting staged recording failed: \(error.localizedDescription)")
+            .io(.init(message: "deleting staged recording failed: \(error.localizedDescription)")))
         }
       },
       "plugin:recording|actions_ready": { [engine] _ in

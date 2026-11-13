@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import type { ZodType } from 'zod'
+import { z, type ZodType } from 'zod'
 import { AppErrorSchema, ChangeKindSchema, FileChangeSchema, FileMetaSchema } from './wire.gen.ts'
 
 const schemas: Record<string, ZodType> = {
@@ -14,7 +14,7 @@ describe('wire fixtures', () => {
   for (const [name, schema] of Object.entries(schemas)) {
     it(`parses every ${name} sample`, () => {
       const url = new URL(`../../../fixtures/wire/${name}.json`, import.meta.url)
-      const samples = JSON.parse(readFileSync(url, 'utf8')) as unknown[]
+      const samples = z.array(z.unknown()).parse(JSON.parse(readFileSync(url, 'utf8')))
       expect(samples.length).toBeGreaterThan(0)
       for (const sample of samples) {
         expect(schema.parse(sample)).toEqual(sample)

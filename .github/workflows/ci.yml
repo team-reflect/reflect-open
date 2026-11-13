@@ -365,8 +365,11 @@ jobs:
         if: matrix.name == 'macOS'
         run: |
           pnpm gen:types
-          git diff --exit-code packages/types apple/Sources/TypesShared fixtures/wire \
-            || (echo "::error::Generated wire types are stale. Run 'pnpm gen:types' and commit the result." && exit 1)
+          if [[ -n $(git status --porcelain --untracked-files=all -- packages/types apple/Sources/TypesShared fixtures/wire) ]]; then
+            git status --short -- packages/types apple/Sources/TypesShared fixtures/wire
+            echo "::error::Generated wire types are stale. Run 'pnpm gen:types' and commit the result."
+            exit 1
+          fi
 
       - if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise

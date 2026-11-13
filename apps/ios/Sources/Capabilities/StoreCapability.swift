@@ -52,8 +52,7 @@ final class StoreCapability {
       return .null
     } catch {
       return .error(
-        kind: "io",
-        message: "presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")
+        .io(.init(message: "presentOfferCodeRedeemSheet failed: \(error.localizedDescription)")))
     }
   }
 
