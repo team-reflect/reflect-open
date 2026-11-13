@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.19.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.2...v0.19.0-beta.3) (2026-11-13)
+
+
+### Features
+
+* **ios:** add the iPad sidebar ([#2160](https://github.com/team-reflect/reflect-open/issues/2160)) ([f735445](https://github.com/team-reflect/reflect-open/commit/f7354458dbb98239195a520b89605e332b915756))
+* **ios:** native components ([#2137](https://github.com/team-reflect/reflect-open/issues/2137)) ([0ba74c6](https://github.com/team-reflect/reflect-open/commit/0ba74c669477d9822e59d593349bb7f218afbde4))
+* **ios:** rework bottom bar ([#2158](https://github.com/team-reflect/reflect-open/issues/2158)) ([8f53173](https://github.com/team-reflect/reflect-open/commit/8f531730bd7141a656ad946931c244d6a91e2f74))
+
+
+### Bug Fixes
+
+* **ios:** use the accent color for the iPad sidebar ([#2164](https://github.com/team-reflect/reflect-open/issues/2164)) ([9bffb7e](https://github.com/team-reflect/reflect-open/commit/9bffb7ef368c211f02c3a2ad216e9528fc58a025))
+* **mobile:** start back swipe from the background and rows ([#2159](https://github.com/team-reflect/reflect-open/issues/2159)) ([27bac0c](https://github.com/team-reflect/reflect-open/commit/27bac0c2fcc584633391d1bceda7f0802311e7aa))
+
 ## [0.19.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.1...v0.19.0-beta.2) (2026-11-12)
 
 
