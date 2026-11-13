@@ -25,6 +25,10 @@ minimumReleaseAgeExclude:
   - '@post-embed/*'
   - '@prosemirror-adapter/*'
   - prosemirror-flat-list
+  - appium-ios-remotexpc@6.0.4
+  - appium-ios-tuntap@3.0.2
+  - appium-remote-debugger@19.1.5
+  - node-devicectl@3.0.1
 
 patchedDependencies:
   mdast-util-gfm-autolink-literal@2.0.1: patches/mdast-util-gfm-autolink-literal@2.0.1.patch
