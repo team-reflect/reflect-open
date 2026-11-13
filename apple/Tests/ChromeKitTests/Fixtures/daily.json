@@ -1,0 +1,26 @@
+{
+  "type": "state",
+  "entryId": 7,
+  "chrome": "shell",
+  "routeKind": "today",
+  "tab": "daily",
+  "canBack": false,
+  "leading": [
+    {
+      "id": "settings",
+      "title": "Settings",
+      "icon": "gearshape"
+    }
+  ],
+  "trailing": [
+    {
+      "id": "today",
+      "title": "Today"
+    }
+  ],
+  "keyboardVisible": false,
+  "modal": false,
+  "toolbar": null,
+  "theme": "system",
+  "generation": 1
+}

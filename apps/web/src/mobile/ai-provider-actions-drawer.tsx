@@ -25,7 +25,7 @@ interface AiProviderActionsDrawerProps {
 }
 
 /**
- * The per-provider management sheet (the {@link NoteActionsMenu} pattern):
+ * The per-provider management sheet (the `ChromeMenuDrawer` pattern):
  * tapping a configured provider row in Settings offers make-default and
  * remove. Removing deletes the keychain entry first, exactly like desktop —
  * both actions come from `useAiProviders`, this is only the touch shell.

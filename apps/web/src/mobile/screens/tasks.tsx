@@ -20,7 +20,8 @@ import { SearchInput } from '@/mobile/search-input.tsx'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
 import { MobileTaskGroup } from '@/mobile/task-group.tsx'
-import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
+import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { routeForPath } from '@reflect/app'
@@ -141,35 +142,37 @@ export function MobileTasks(): ReactElement {
 
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileTopBar>
-        <MobileTopBarRow>
-          <SearchInput
-            ref={searchInputRef}
-            placeholder="Search tasks…"
-            aria-label="Search tasks"
-            value={query}
-            onValueChange={setQuery}
-          />
-          {recentlyCompleted.length > 0 ? (
+      <ChromeTopBar
+        title={
+          <>
+            <SearchInput
+              ref={searchInputRef}
+              placeholder="Search tasks…"
+              aria-label="Search tasks"
+              value={query}
+              onValueChange={setQuery}
+            />
+            {recentlyCompleted.length > 0 ? (
+              <MobileTopBarIconButton
+                aria-label={`Archive ${recentlyCompleted.length} completed`}
+                onClick={archiveCompleted}
+              >
+                <Archive />
+              </MobileTopBarIconButton>
+            ) : null}
             <MobileTopBarIconButton
-              aria-label={`Archive ${recentlyCompleted.length} completed`}
-              onClick={archiveCompleted}
+              edge="trailing"
+              aria-label="Task filters"
+              onClick={() => {
+                hapticImpactLight(haptics)
+                setFiltersOpen(true)
+              }}
             >
-              <Archive />
+              <SlidersHorizontal />
             </MobileTopBarIconButton>
-          ) : null}
-          <MobileTopBarIconButton
-            edge="trailing"
-            aria-label="Task filters"
-            onClick={() => {
-              hapticImpactLight(haptics)
-              setFiltersOpen(true)
-            }}
-          >
-            <SlidersHorizontal />
-          </MobileTopBarIconButton>
-        </MobileTopBarRow>
-      </MobileTopBar>
+          </>
+        }
+      />
       {isError ? (
         <p role="alert" className="px-4 py-6 text-sm text-text-muted">
           Couldn’t load tasks.
@@ -195,7 +198,7 @@ export function MobileTasks(): ReactElement {
         <div
           // A stacking context, so WebKit composites the sticky headers and row
           // surfaces inside this scroller, below the iOS scroll indicator.
-          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-24"
+          className="isolate min-h-0 flex-1 overflow-y-auto px-safe pb-chrome-safe-offset-24"
           onScroll={() => revealedRow.set(null)}
         >
           {groups.map((group) => (
@@ -217,7 +220,7 @@ export function MobileTasks(): ReactElement {
       <Button
         size="icon"
         aria-label="New task"
-        className="fixed right-safe-offset-4 bottom-above-keyboard-offset-17 z-40 size-12 rounded-full shadow-lg"
+        className="fixed right-safe-offset-4 bottom-above-chrome-offset-4 z-40 size-12 rounded-full shadow-lg"
         onClick={() => onAdd(todaysDailyTarget(today))}
       >
         <Plus className="size-6" />

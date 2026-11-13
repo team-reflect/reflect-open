@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
 import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
+import { ChromeLayerContext, useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import './mobile-stack.css'
@@ -79,12 +80,14 @@ function layerKey(route: Route): string {
  * pushed onto the screen being left slides in; one that lands over any other
  * screen (the All tab returning to its open Chat or note, with All's list put
  * beneath it, or Back from another tab into a card) is a tab switch too, so
- * it appears in place.
+ * it appears in place. Likewise a card slides out only on the way back (a
+ * history pop, or a move to the screen beneath it); a tab tap that leaves a
+ * card for another tab's root is instant.
  *
  * @param below The screen the arriving route sits on (what its Back reveals).
  */
 function transitionFor(
-  from: { route: Route; entryId: number },
+  from: { route: Route; entryId: number; below: Route },
   to: { route: Route; entryId: number },
   below: Route,
 ): StackTransition {
@@ -98,7 +101,7 @@ function transitionFor(
     return routesEqual(below, from.route) ? { kind: 'push' } : { kind: 'none' }
   }
   if (!toStacked && fromStacked) {
-    return pop
+    return to.entryId < from.entryId || routesEqual(to.route, from.below) ? pop : { kind: 'none' }
   }
   if (toStacked && fromStacked) {
     // Note to note: entry ids grow monotonically, so a smaller id means the
@@ -237,13 +240,15 @@ interface MobileStackProps {
 export function MobileStack(props: MobileStackProps): ReactElement {
   const { route, entryId, backRoute, canBack } = useRouterState()
   const { back, navigate } = useRouterActions()
+  const chromeRenderer = useChromeRenderer()
   const containerRef = useRef<HTMLDivElement>(null)
   const pagerRef = useRef<HTMLDivElement>(null)
   const scrimRef = useRef<HTMLDivElement>(null)
   const edgeRef = useRef<HTMLDivElement>(null)
 
   const [transition, setTransition] = useState<StackTransition>({ kind: 'none' })
-  const [arrival, setArrival] = useState({ route, entryId })
+  const below: Route = backRoute ?? { kind: 'today' }
+  const [arrival, setArrival] = useState({ route, entryId, below })
   // Set when a completed back-swipe commits its pop: the screen is already
   // offscreen, so the arrival it causes must not animate a second time.
   const [poppedByGesture, setPoppedByGesture] = useState(false)
@@ -251,17 +256,15 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   // Transition detection happens during render (the mobile-shell `lastTab`
   // pattern) so the new screen's very first frame starts offscreen.
   if (entryId !== arrival.entryId) {
-    setArrival({ route, entryId })
+    setArrival({ route, entryId, below })
     setPoppedByGesture(false)
     setTransition(
-      poppedByGesture
-        ? { kind: 'none' }
-        : transitionFor(arrival, { route, entryId }, backRoute ?? { kind: 'today' }),
+      poppedByGesture ? { kind: 'none' } : transitionFor(arrival, { route, entryId }, below),
     )
   } else if (route !== arrival.route) {
     // Same entry, new route object: a note move rewrote the history in
     // place. Track it so a later pop's exiting card shows the live path.
-    setArrival({ route, entryId })
+    setArrival({ route, entryId, below })
   }
 
   const popByGesture = useCallback((): void => {
@@ -272,6 +275,13 @@ export function MobileStack(props: MobileStackProps): ReactElement {
       navigate({ kind: 'today' })
     }
   }, [canBack, back, navigate])
+
+  const reportSwipe = useCallback(
+    (phase: 'start' | 'cancel'): void => {
+      chromeRenderer.reportStackMotion({ type: 'backSwipe', phase })
+    },
+    [chromeRenderer],
+  )
 
   const finishTransition = useCallback((): void => {
     setTransition((current) => (current.kind === 'none' ? current : { kind: 'none' }))
@@ -300,6 +310,16 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     })
     return () => controller.abort()
   }, [transition, finishTransition])
+
+  // A layout effect, so the start reaches the chrome before the state of the
+  // new page, which the shell bars post from a passive effect. Each new slide
+  // reports its own start.
+  useLayoutEffect(() => {
+    chromeRenderer.reportStackMotion({
+      type: 'transition',
+      phase: transition.kind === 'none' ? 'end' : 'start',
+    })
+  }, [chromeRenderer, transition])
 
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below
@@ -330,6 +350,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     pagesKey: layers.map((layer) => layer.key).join('|'),
     enabled: swipeEnabled,
     onPop: popByGesture,
+    onSwipe: reportSwipe,
   })
 
   const transitionScrim = transition.kind === 'none' ? null : presentScrim(transition)
@@ -363,7 +384,9 @@ export function MobileStack(props: MobileStackProps): ReactElement {
                     arrivalSeq, which the daily surface under the note would read
                     as a re-arrival and re-anchor its scroll while hidden. */}
                 <RouterFreeze frozen={hidden}>
-                  <MobileScreen route={layer.route} {...props} />
+                  <ChromeLayerContext value={!hidden}>
+                    <MobileScreen route={layer.route} {...props} />
+                  </ChromeLayerContext>
                 </RouterFreeze>
               </div>
               {swipeEnabled && !hidden ? (

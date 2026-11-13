@@ -32,11 +32,14 @@ struct Module {
   let layer: Layer
   var deps: [String] = []
   var hasTests = false
+  /// The test target copies its `Fixtures` directory as a resource.
+  var hasTestFixtures = false
 }
 
 let modules: [Module] = [
   Module(name: "AppStoreKit", layer: .engine, hasTests: true),
   Module(name: "CaptureShared", layer: .shared, hasTests: true),
+  Module(name: "ChromeKit", layer: .engine, hasTests: true, hasTestFixtures: true),
   Module(name: "KeyboardKit", layer: .engine),
   Module(name: "RecordingShared", layer: .shared),
   Module(name: "RecordingKit", layer: .engine, deps: ["RecordingShared"], hasTests: true),
@@ -80,6 +83,7 @@ let package = Package(
       .testTarget(
         name: "\(module.name)Tests",
         dependencies: [.target(name: module.name)],
+        resources: module.hasTestFixtures ? [.copy("Fixtures")] : nil,
         swiftSettings: swiftSettings)
     },
   swiftLanguageModes: [.v5]

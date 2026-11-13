@@ -32,6 +32,7 @@ import {
 } from '@reflect/core/testing'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { registerAppCommands } from '@/lib/commands/app-commands.ts'
+import { ChromeRendererProvider } from '@/mobile/chrome/chrome-renderer-provider.tsx'
 import { GraphProvider } from '@/providers/graph-provider.tsx'
 import { RouterProvider } from '@/routing/router.tsx'
 import { AppServicesProvider, CoreServicesProvider } from '@/services/services-provider.tsx'
@@ -245,7 +246,9 @@ async function prepare(options: AnyOptions | undefined): Promise<
       return (
         <CoreServicesProvider services={core}>
           <AppServicesProvider services={appLayer}>
-            <QueryClientProvider client={queryClient}>{wrapped}</QueryClientProvider>
+            <ChromeRendererProvider>
+              <QueryClientProvider client={queryClient}>{wrapped}</QueryClientProvider>
+            </ChromeRendererProvider>
           </AppServicesProvider>
         </CoreServicesProvider>
       )
@@ -253,17 +256,19 @@ async function prepare(options: AnyOptions | undefined): Promise<
     return (
       <CoreServicesProvider services={core}>
         <AppServicesProvider services={appLayer}>
-          <QueryClientProvider client={queryClient}>
-            <GraphProvider platform={core.platform.appPlatform}>
-              <TooltipProvider>
-                {route === null ? (
-                  wrapped
-                ) : (
-                  <RouterProvider initialRoute={route}>{wrapped}</RouterProvider>
-                )}
-              </TooltipProvider>
-            </GraphProvider>
-          </QueryClientProvider>
+          <ChromeRendererProvider>
+            <QueryClientProvider client={queryClient}>
+              <GraphProvider platform={core.platform.appPlatform}>
+                <TooltipProvider>
+                  {route === null ? (
+                    wrapped
+                  ) : (
+                    <RouterProvider initialRoute={route}>{wrapped}</RouterProvider>
+                  )}
+                </TooltipProvider>
+              </GraphProvider>
+            </QueryClientProvider>
+          </ChromeRendererProvider>
         </AppServicesProvider>
       </CoreServicesProvider>
     )

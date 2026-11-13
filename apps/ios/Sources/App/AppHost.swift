@@ -1,4 +1,5 @@
 import AuthenticationServices
+import ChromeKit
 import UIKit
 import WebHostKit
 import os
@@ -10,6 +11,8 @@ final class AppHost {
   let webView: ReflectWebView
   /// The page to load: the dev server in `REFLECT_DEV_URL`, or the bundled web app.
   let startURL: URL
+  /// The page's chrome state and the native intents.
+  let chrome = ChromeBridge()
 
   private let core: ReflectCore
   private let bridge = HostBridge()
@@ -63,6 +66,16 @@ final class AppHost {
     ]
     let assets = AssetSchemeHandler { [core] requestPath, query, range in
       await core.resolveAsset(requestPath: requestPath, query: query, range: range)
+    }
+    // The page's chrome messages share the `reflectHost` handler.
+    bridge.onMessage = { [chrome] body in chrome.receive(body: body) }
+    bridge.onDocumentStart = { [chrome] in chrome.documentDidStart() }
+    // An intent never waits in the queue: one sent while a new document
+    // loads would reach that document.
+    chrome.send = { [bridge] intent in
+      if bridge.isPageReady {
+        bridge.emit("chrome:intent", payload: intent)
+      }
     }
     webView = ReflectWebView(
       routes: routes, assets: assets, bridge: bridge, dataStore: directories.websiteDataStore)

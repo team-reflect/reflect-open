@@ -7,7 +7,7 @@ import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { queryKeys } from '@/lib/query-client.ts'
 import { NewGraphDrawer } from '@/mobile/new-graph-drawer.tsx'
-import { MobileScreenHeader } from '@/mobile/screen-header.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list.tsx'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
@@ -75,9 +75,10 @@ export function MobileGraphs(): ReactElement {
 
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileScreenHeader
+      <ChromeTopBar
+        align="center"
+        back={() => (canBack ? back() : navigate({ kind: 'settings' }))}
         title="Graphs"
-        onBack={() => (canBack ? back() : navigate({ kind: 'settings' }))}
       />
       <main className="min-h-0 flex-1 overflow-y-auto px-safe pb-safe">
         <div className="flex flex-col gap-6 px-4 py-4">

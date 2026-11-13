@@ -169,6 +169,9 @@ function viMockBlock(files, allow) {
 // Imports
 // ---------------------------------------------------------------------------
 
+const CHROME_RENDERER_IMPORT_MESSAGE =
+  'Declare chrome through `ChromeTopBar`, `useScreenChrome` and `useChromeModal` from `@/mobile/chrome/`. Only `ChromeRendererProvider` picks a renderer.'
+
 const TAURI_IMPORT_MESSAGE =
   'Only the platform adapters in `apps/web/src/services/` (and `boot.ts`, `main.tsx`) import `@tauri-apps/*`. Read the service from `useCoreServices()` or take it in `ctx`.'
 
@@ -334,6 +337,36 @@ export default defineESLintConfig(
     rules: {
       'no-restricted-imports': 'off',
       'no-restricted-syntax': ['error', REACT_ACT_SELECTOR, ...CODE_SHAPE_SELECTORS],
+    },
+  },
+
+  // Rule: mobile screens declare their chrome and never reach a renderer. The
+  // web and native renderers live in `mobile/chrome/web/` and
+  // `mobile/chrome/native/`; only `mobile/chrome/` imports them.
+  {
+    files: [`apps/web/src/**/*.${SOURCE_EXTENSIONS}`],
+    ignores: [
+      'apps/web/src/mobile/chrome/**',
+      // The test helper reads the posted native state.
+      'apps/web/src/test-utils/native-chrome.tsx',
+      // The files where `no-restricted-imports` is off.
+      `apps/web/src/services/**/*.${SOURCE_EXTENSIONS}`,
+      'apps/web/src/boot.ts',
+      'apps/web/src/main.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@tauri-apps/*'], message: TAURI_IMPORT_MESSAGE },
+            {
+              group: ['@/mobile/chrome/native/*', '@/mobile/chrome/web/*'],
+              message: CHROME_RENDERER_IMPORT_MESSAGE,
+            },
+          ],
+        },
+      ],
     },
   },
 

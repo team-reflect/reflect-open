@@ -34,6 +34,11 @@ import {
 } from './app/update-service.ts'
 import { createThemeService, type ThemeService } from './settings/theme-service.ts'
 import { createKeyboardService, type KeyboardService } from './mobile/keyboard-service.ts'
+import {
+  createNativeChromeService,
+  type NativeChromeHost,
+  type NativeChromeService,
+} from './mobile/native-chrome-service.ts'
 import { createShareService, type ShareService } from './mobile/share-service.ts'
 import {
   createAutocompleteSuggestionService,
@@ -114,6 +119,11 @@ export interface AppHost {
    * The native menus; without a host, every menu operation rejects.
    */
   readonly nativeMenu?: NativeMenuHost
+  /**
+   * The shell that draws the mobile chrome natively; without one, the web
+   * draws it.
+   */
+  readonly nativeChrome?: NativeChromeHost | undefined
 }
 
 /**
@@ -185,6 +195,10 @@ export interface AppServices {
    * The software keyboard's overlap height, as the UI last measured it.
    */
   readonly keyboard: KeyboardService
+  /**
+   * Whether the shell draws the mobile chrome, and the messages to and from it.
+   */
+  readonly nativeChrome: NativeChromeService
   /**
    * Shares a note through the OS share sheet.
    */
@@ -313,6 +327,7 @@ export function createAppServices(core: CoreServices, host: AppHost): AppService
     }),
     operations: host.operations,
     keyboard: createKeyboardService(),
+    nativeChrome: createNativeChromeService({ host: host.nativeChrome, clock: core.clock }),
     share: createShareService({ openDocuments: core.openDocuments }),
     autocompleteSuggestions: createAutocompleteSuggestionService({
       suggestions: core.suggestions,

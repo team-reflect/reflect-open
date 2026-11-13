@@ -9,6 +9,9 @@ public import WebKit
 /// the shell, and go out in order when `ready` arrives. A user script reports
 /// each new document, which starts the wait again. The queue is bounded and
 /// drops its oldest events first.
+///
+/// The same handler carries the page's other one-way messages: a body that
+/// is not one of the two strings goes to `onMessage`.
 @MainActor
 public final class HostBridge: NSObject, WKScriptMessageHandler {
   /// The name of the script message handler that the page posts to.
@@ -25,6 +28,10 @@ public final class HostBridge: NSObject, WKScriptMessageHandler {
 
   /// Evaluates JavaScript in the page. The web view sets it.
   public var evaluate: (String) -> Void = { _ in }
+  /// Called when a new document of the main frame starts.
+  public var onDocumentStart: () -> Void = {}
+  /// Called with each other message body of the main frame.
+  public var onMessage: (Any) -> Void = { _ in }
 
   /// Whether the current document posted `ready`.
   public private(set) var isPageReady = false
@@ -49,6 +56,7 @@ public final class HostBridge: NSObject, WKScriptMessageHandler {
   /// A new document started to load: events wait for its `ready`.
   public func documentDidStart() {
     isPageReady = false
+    onDocumentStart()
   }
 
   /// The page takes events: sends the queue.
@@ -68,7 +76,7 @@ public final class HostBridge: NSObject, WKScriptMessageHandler {
     switch message.body as? String {
     case "document-start": documentDidStart()
     case "ready": pageDidBecomeReady()
-    default: break
+    default: onMessage(message.body)
     }
   }
 }

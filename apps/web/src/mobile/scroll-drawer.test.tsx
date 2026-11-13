@@ -2,7 +2,10 @@ import { useCallback, useState, type ReactElement } from 'react'
 import { page } from 'vitest/browser'
 import { mouse } from 'vitest-browser-commands/playwright'
 import { describe, expect, it, vi } from 'vitest'
+import { createTestNativeChromeHost } from '@reflect/app/testing'
 import { act } from '@/test-utils/act.ts'
+import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
+import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement } from '@/test-utils/scroll.ts'
 import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from './scroll-drawer.tsx'
@@ -157,5 +160,14 @@ describe('ScrollDrawer', () => {
     // A detached scroller would also read 0 for both.
     expect(scroller.isConnected).toBe(true)
     await expect.element(page.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('counts as a modal for the native shell while open', async () => {
+    const host = createTestNativeChromeHost()
+    await renderInApp(<Harness />, nativeChromeOptions(host))
+    await openScroller()
+    await vi.waitFor(() => expect(lastChromeState(host)?.modal).toBe(true))
+    await swipeDrawerClosed()
+    await vi.waitFor(() => expect(lastChromeState(host)?.modal).toBe(false))
   })
 })

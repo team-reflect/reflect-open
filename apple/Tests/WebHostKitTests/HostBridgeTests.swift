@@ -53,7 +53,8 @@ final class HostBridgeTests: XCTestCase {
   }
 
   /// Runs the bridge in a real web view: the events that the shell emits
-  /// before the page posts `ready` reach the page after it, in order.
+  /// before the page posts `ready` reach the page after it, in order, and
+  /// the page's other messages reach `onMessage`.
   func testAPageGetsTheEventsThatWaitedForIt() async throws {
     let bridge = HostBridge()
     let configuration = WKWebViewConfiguration()
@@ -61,12 +62,19 @@ final class HostBridgeTests: XCTestCase {
     configuration.userContentController.add(bridge, name: HostBridge.messageHandlerName)
     let webView = WKWebView(frame: .zero, configuration: configuration)
     bridge.evaluate = { [weak webView] script in webView?.evaluateJavaScript(script) }
+    var starts = 0
+    bridge.onDocumentStart = { starts += 1 }
+    var messages: [[String: String]] = []
+    bridge.onMessage = { body in
+      if let body = body as? [String: String] { messages.append(body) }
+    }
 
     bridge.emit("a", payload: Data("1".utf8))
     let page = """
       <script>
         window.seen = []
         window.__reflectHost = { dispatch: (name, payload) => window.seen.push([name, payload]) }
+        window.webkit.messageHandlers.reflectHost.postMessage({ type: 'chromeReady' })
         window.webkit.messageHandlers.reflectHost.postMessage('ready')
       </script>
       """
@@ -78,5 +86,7 @@ final class HostBridgeTests: XCTestCase {
 
     let seen = try await webView.evaluateJavaScript("JSON.stringify(window.seen)") as? String
     XCTAssertEqual(seen, #"[["a",1],["b",2]]"#)
+    XCTAssertEqual(starts, 1)
+    XCTAssertEqual(messages, [["type": "chromeReady"]])
   }
 }

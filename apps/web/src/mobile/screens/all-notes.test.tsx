@@ -1,6 +1,12 @@
+import { page } from 'vitest/browser'
+import { noop } from '@ocavue/utils'
 import { describe, expect, it } from 'vitest'
+import type { ReactElement } from 'react'
+import { EMPTY_ALL_NOTES_FILTERS, type Route } from '@reflect/app'
 import type { FilteredSearchHit, NoteTagFacet } from '@reflect/core'
-import { matchingTagFacets, rowForHit } from './all-notes.tsx'
+import { useRouterState } from '@/routing/router.tsx'
+import { renderInApp } from '@/test-utils/render-in-app.tsx'
+import { MobileAllNotes, matchingTagFacets, rowForHit } from './all-notes.tsx'
 
 function hit(overrides: Partial<FilteredSearchHit>): FilteredSearchHit {
   return {
@@ -99,5 +105,29 @@ describe('matchingTagFacets', () => {
 
   it('lists every tag for a bare # (empty partial)', () => {
     expect(matchingTagFacets(facets, '')).toHaveLength(3)
+  })
+})
+
+describe('MobileAllNotes', () => {
+  it('Back from a restored tag view with no history clears the tag', async () => {
+    let route: Route | null = null
+    function Harness(): ReactElement {
+      route = useRouterState().route
+      const tag = route.kind === 'allNotes' ? route.tag : null
+      return (
+        <MobileAllNotes
+          query=""
+          onQueryChange={noop}
+          tag={tag}
+          filters={EMPTY_ALL_NOTES_FILTERS}
+          onFiltersChange={noop}
+        />
+      )
+    }
+    await renderInApp(<Harness />, { route: { kind: 'allNotes', tag: 'work' } })
+
+    await page.getByRole('button', { name: 'Back' }).click()
+
+    expect(route).toEqual({ kind: 'allNotes', tag: null })
   })
 })

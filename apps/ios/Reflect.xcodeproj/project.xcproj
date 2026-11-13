@@ -105,6 +105,10 @@
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "apple",
+          "product-name": "ChromeKit",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
           "product-name": "KeyboardKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {

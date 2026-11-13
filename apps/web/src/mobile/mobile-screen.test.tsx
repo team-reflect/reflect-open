@@ -1010,6 +1010,22 @@ describe('MobileStack transitions & back pager', () => {
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeNull()
   })
 
+  it('leaves All’s open note for another tab in place, without a slide-out', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount(
+      { kind: 'allNotes', tag: null },
+      { kind: 'note', path: 'notes/meeting-notes.md' },
+    )
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await pushProbeNote(view)
+
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(1))
+    expect(view.container.querySelector('.mobile-stack-slide-out')).toBeNull()
+  })
+
   it('returns to All’s open note in place, over the list, like any tab switch', async () => {
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')

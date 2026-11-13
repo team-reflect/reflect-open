@@ -13,6 +13,10 @@ public import WebKit
 /// state crosses the bridge.
 @MainActor
 public enum KeyboardTuning {
+  /// Returns the view above the keyboard for the focused web content view,
+  /// or `nil` for no view. Without a provider no view shows.
+  public static var accessoryProvider: ((UIView) -> UIView?)?
+
   /// Applies the tuning to `webView`. The scroll offset stays pinned while
   /// the caller keeps the returned observation. The two changes to WebKit's
   /// content view apply to every web view of the process.
@@ -45,7 +49,8 @@ public enum KeyboardTuning {
 
   /// `WKContentView` (the web view's private first responder) returns the
   /// keyboard's form-assistant bar from `inputAccessoryView`. This replaces
-  /// that getter at the *class* level with one returning nil, so the swap
+  /// that getter at the *class* level with one returning the view of
+  /// ``accessoryProvider`` (nil without one), so the swap
   /// doesn't depend on the content view already existing, and so it survives
   /// the content view being recreated. Guarded by the class lookup, so a
   /// future WebKit rename degrades to "bar stays" rather than crashing.
@@ -54,7 +59,12 @@ public enum KeyboardTuning {
   private static let suppressInputAccessoryBar: Void = {
     guard let contentClass = NSClassFromString("WKContentView") else { return }
     let selector = NSSelectorFromString("inputAccessoryView")
-    let block: @convention(block) (AnyObject) -> UIView? = { _ in nil }
+    let block: @convention(block) (AnyObject) -> UIView? = { contentView in
+      MainActor.assumeIsolated {
+        guard let view = contentView as? UIView else { return nil }
+        return accessoryProvider?(view)
+      }
+    }
     let implementation = imp_implementationWithBlock(block)
     if let method = class_getInstanceMethod(contentClass, selector) {
       class_replaceMethod(contentClass, selector, implementation, method_getTypeEncoding(method))

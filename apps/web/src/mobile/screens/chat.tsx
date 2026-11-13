@@ -1,10 +1,10 @@
 import { useState, type ReactElement } from 'react'
-import { ChevronLeft, History, MessageSquare, Plus } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { ChatTurnList } from '@/components/chat/chat-turn-list.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
+import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
-import { MobileTopBar, MobileTopBarIconButton, MobileTopBarRow } from '@/mobile/top-bar.tsx'
 import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
@@ -27,37 +27,23 @@ export function MobileChat(): ReactElement {
   const { navigate, back } = useRouterActions()
   const [historyOpen, setHistoryOpen] = useState(false)
   const hasProvider = providers.length > 0
+  const goBack = (): void => (canBack ? back() : navigate({ kind: 'today' }))
 
   return (
     <div className="flex h-full w-screen flex-col pt-safe">
-      <MobileTopBar>
-        <MobileTopBarRow>
-          <MobileTopBarIconButton
-            edge="leading"
-            aria-label="Back"
-            onClick={() => (canBack ? back() : navigate({ kind: 'today' }))}
-          >
-            <ChevronLeft aria-hidden />
-          </MobileTopBarIconButton>
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">Chat</h1>
-          {hasProvider ? (
-            <>
-              {hasTurns ? (
-                <MobileTopBarIconButton aria-label="New chat" onClick={newChat}>
-                  <Plus aria-hidden />
-                </MobileTopBarIconButton>
-              ) : null}
-              <MobileTopBarIconButton
-                edge="trailing"
-                aria-label="Chat history"
-                onClick={() => setHistoryOpen(true)}
-              >
-                <History aria-hidden />
-              </MobileTopBarIconButton>
-            </>
-          ) : null}
-        </MobileTopBarRow>
-      </MobileTopBar>
+      <ChromeTopBar
+        back={goBack}
+        trailing={
+          hasProvider
+            ? [
+                ...(hasTurns ? [{ id: 'new', title: 'New chat', icon: 'plus' } as const] : []),
+                { id: 'history', title: 'Chat history', icon: 'history' },
+              ]
+            : []
+        }
+        onAction={(id) => (id === 'new' ? newChat() : setHistoryOpen(true))}
+        title="Chat"
+      />
       {hasProvider ? (
         <>
           <ChatTurnList />

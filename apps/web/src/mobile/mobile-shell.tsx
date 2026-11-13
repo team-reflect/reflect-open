@@ -1,9 +1,8 @@
 import { Suspense, useEffect, useRef, useState, type ReactElement } from 'react'
 import { LoadingScreen } from '@/components/loading-screen.tsx'
 import { useDoubleTap } from '@/hooks/use-double-tap.ts'
-import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import { MobileStack } from '@/mobile/mobile-stack.tsx'
-import { MobileTabBar, tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
+import { tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { SafeAreaBoundary } from '@/mobile/safe-area-boundary.tsx'
 import { useAllTabScreen } from '@/mobile/use-all-tab-screen.ts'
 import {
@@ -13,6 +12,7 @@ import {
   type Route,
 } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
+import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
@@ -54,6 +54,7 @@ export function MobileShell(): ReactElement {
   // All tap that returns to its open card still pair with a quick second tap.
   const isDoubleTap = useDoubleTap<MobileTab>(tab)
   const keyboardVisible = useKeyboardVisible()
+  const chromeRenderer = useChromeRenderer()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
 
@@ -122,7 +123,10 @@ export function MobileShell(): ReactElement {
           elements need `--keyboard-height` themselves. */}
       <div
         className="mobile-shell flex w-screen flex-col"
-        style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
+        style={{
+          ...chromeRenderer.shellStyle,
+          height: 'calc(100dvh - var(--keyboard-height, 0px))',
+        }}
       >
         <div className="min-h-0 flex-1">
           {/* A stable boundary lets route transitions retain the current screen while lazy code loads. */}
@@ -135,16 +139,11 @@ export function MobileShell(): ReactElement {
             />
           </Suspense>
         </div>
-        {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
-          would ride above the keyboard instead, so it hides while typing.
-          Its slot goes to the formatting toolbar, which — sitting at the
-          bottom of a root that ends at the keyboard's top — lands exactly
-          on the keyboard edge with no fixed positioning. */}
-        {keyboardVisible ? (
-          <MobileFormattingToolbar />
-        ) : (
-          <MobileTabBar tab={tab} onSelect={handleTabSelect} />
-        )}
+        <chromeRenderer.ShellBars
+          tab={tab}
+          keyboardVisible={keyboardVisible}
+          onSelectTab={handleTabSelect}
+        />
       </div>
     </SafeAreaBoundary>
   )
