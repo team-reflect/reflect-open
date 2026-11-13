@@ -1,9 +1,12 @@
 import { useState, type ReactElement } from 'react'
+import { createPortal } from 'react-dom'
 import { CircleCheck, Plus, Square } from 'lucide-react'
 import { MicIcon } from '@/components/icons/mic-icon.tsx'
 import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { WritableStore } from '@reflect/core'
+import { useStore } from '@/lib/use-store.ts'
 import { cn } from '@/lib/utils.ts'
 import type { ChromePlus } from '@/mobile/chrome/screen-chrome.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
@@ -17,29 +20,34 @@ const ACTION_MOTION =
 const ACTION_BUTTON_MOTION =
   'transition-[background-color,color,box-shadow,translate,scale] duration-100 ease-out active:translate-y-0 active:scale-[0.94] motion-reduce:transition-none'
 
-/**
- * Where the `+` sits in each form, matching the shell bars of
- * `web-chrome-renderer.tsx`: on the bar's center line, above the rail's
- * capsule, or in the bottom-right corner.
- */
-const PLACEMENT: Record<MobileForm, string> = {
-  bar: 'right-safe-offset-3 bottom-safe-offset-3 size-14',
-  // The rail's capsule is 38 spacing tall (three `size-12` tabs and `p-1`) at
-  // `bottom-safe-offset-2`; the `+` sits 3 spacing above it.
-  rail: 'right-safe-offset-3 bottom-safe-offset-43 size-12',
-  pad: 'right-safe-offset-6 bottom-safe-offset-6 size-14',
+const SIZE: Record<MobileForm, string> = { bar: 'size-14', rail: 'size-12', pad: 'size-14' }
+
+const plusSlot = new WritableStore<HTMLElement | null>(null)
+
+function setPlusSlot(element: HTMLElement | null): () => void {
+  plusSlot.set(element)
+  return () => plusSlot.set(null)
 }
 
 /**
- * The `+` the page draws. It hides while the keyboard is up.
+ * Where the shell bars put the page's `+`.
+ */
+export function PlusSlot({ className }: { className?: string }): ReactElement {
+  return <div ref={setPlusSlot} className={className} />
+}
+
+/**
+ * The `+` the page draws, in the shell's `PlusSlot`. It hides while the
+ * keyboard is up.
  */
 export function WebPlus({ plus }: { plus: ChromePlus }): ReactElement | null {
   const form = useMobileForm()
+  const slot = useStore(plusSlot)
   if (useKeyboardVisible()) {
     return null
   }
-  return (
-    <div className={cn('fixed z-40', PLACEMENT[form])}>
+  const button = (
+    <div className={cn('relative z-40', SIZE[form])}>
       {plus.kind === 'action' ? (
         <Button
           size="icon"
@@ -54,6 +62,7 @@ export function WebPlus({ plus }: { plus: ChromePlus }): ReactElement | null {
       )}
     </div>
   )
+  return slot === null ? button : createPortal(button, slot)
 }
 
 /**

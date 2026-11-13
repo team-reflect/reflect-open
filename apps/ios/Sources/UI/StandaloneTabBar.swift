@@ -3,15 +3,9 @@ import UIKit
 
 /// The tab bar of the `bar` form: a public `UITabBar` that the shell places
 /// itself, so its capsule sits at the bottom-leading edge. A `UITabBar` draws
-/// its glass capsule at the top of its bounds, centered, with `margin` on each
-/// side, and sizes its items to the capsule.
+/// its glass capsule centered in its bounds.
 @MainActor
 final class StandaloneTabBar: NSObject, UITabBarDelegate {
-  private static let capsuleHeight: CGFloat = 62
-  private static let capsuleWidth: CGFloat = 230
-  private static let margin: CGFloat = 21
-  private static let barHeight: CGFloat = 83
-
   let bar = UITabBar()
   private let onSelect: (ChromeTab) -> Void
 
@@ -32,14 +26,18 @@ final class StandaloneTabBar: NSObject, UITabBarDelegate {
     onSelect(ChromeTab.allCases[item.tag])
   }
 
-  /// Places the bar so its capsule starts at `leading` and its bottom edge is
-  /// at the bottom of `bounds`. Returns the capsule's frame.
-  @discardableResult
-  func layout(in bounds: CGRect, leading: CGFloat) -> CGRect {
-    bar.frame = CGRect(
-      x: leading - Self.margin, y: bounds.maxY - Self.barHeight,
-      width: Self.capsuleWidth + Self.margin * 2, height: Self.barHeight)
-    return CGRect(
-      x: leading, y: bar.frame.minY, width: Self.capsuleWidth, height: Self.capsuleHeight)
+  /// Places the bar at the bottom of `view` with its first item at
+  /// `leading`. Returns the frame of its items in `view`.
+  func layout(in view: UIView, leading: CGFloat) -> CGRect {
+    let bounds = view.bounds
+    let height = bar.sizeThatFits(bounds.size).height
+    bar.frame = CGRect(x: 0, y: bounds.maxY - height, width: bounds.width, height: height)
+    bar.layoutIfNeeded()
+    let items = (bar.items ?? []).compactMap { $0.frame(in: view) }.reduce(CGRect.null) {
+      $0.union($1)
+    }
+    guard !items.isNull else { return bar.frame }
+    bar.frame.origin.x += leading - items.minX
+    return items.offsetBy(dx: leading - items.minX, dy: 0)
   }
 }

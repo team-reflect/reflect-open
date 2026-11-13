@@ -34,6 +34,10 @@ final class FormattingStrip: UIInputView {
   var onInsertImage: () -> Void = {}
 
   private var buttons: [String: UIButton] = [:]
+  private let scroll = UIScrollView()
+  private let dismiss = UIButton(type: .system)
+  private lazy var leading = scroll.leadingAnchor.constraint(equalTo: leadingAnchor)
+  private lazy var trailing = dismiss.trailingAnchor.constraint(equalTo: trailingAnchor)
 
   init() {
     super.init(frame: CGRect(x: 0, y: 0, width: 400, height: 48), inputViewStyle: .keyboard)
@@ -65,10 +69,8 @@ final class FormattingStrip: UIInputView {
       buttons[item.id] = button
       row.addArrangedSubview(button)
     }
-    let scroll = UIScrollView()
     scroll.showsHorizontalScrollIndicator = false
     scroll.addSubview(row)
-    let dismiss = UIButton(type: .system)
     dismiss.setImage(UIImage(systemName: "keyboard.chevron.compact.down"), for: .normal)
     dismiss.setPreferredSymbolConfiguration(symbols, forImageIn: .normal)
     dismiss.accessibilityLabel = "Hide keyboard"
@@ -83,7 +85,6 @@ final class FormattingStrip: UIInputView {
     row.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
       heightAnchor.constraint(equalToConstant: 48),
-      scroll.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 8),
       scroll.topAnchor.constraint(equalTo: topAnchor),
       scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
       scroll.trailingAnchor.constraint(equalTo: divider.leadingAnchor, constant: -4),
@@ -91,8 +92,6 @@ final class FormattingStrip: UIInputView {
       divider.heightAnchor.constraint(equalToConstant: 24),
       divider.centerYAnchor.constraint(equalTo: centerYAnchor),
       divider.trailingAnchor.constraint(equalTo: dismiss.leadingAnchor, constant: -4),
-      dismiss.trailingAnchor.constraint(
-        equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -8),
       dismiss.widthAnchor.constraint(equalToConstant: 44),
       dismiss.topAnchor.constraint(equalTo: topAnchor),
       dismiss.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -102,7 +101,26 @@ final class FormattingStrip: UIInputView {
       row.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
       row.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
     ])
+    NSLayoutConstraint.activate([leading, trailing])
     tintColor = .label
+  }
+
+  override func layoutSubviews() {
+    let insets = horizontalInsets()
+    leading.constant = insets.left + 8
+    trailing.constant = -insets.right - 8
+    super.layoutSubviews()
+  }
+
+  /// The safe area where a camera or a sensor reaches the strip's row, as it
+  /// does the keyboard's. On an iPhone Duo the camera column ends above the
+  /// keyboard, so the strip spans the full width like the keys below it.
+  private func horizontalInsets() -> UIEdgeInsets {
+    if #available(iOS 27.1, *) {
+      let occluded = reservedRegions(kind: .occlusion).contains { $0.frame.intersects(bounds) }
+      return occluded ? safeAreaInsets : .zero
+    }
+    return safeAreaInsets
   }
 
   @available(*, unavailable)

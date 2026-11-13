@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react'
 import { noop, returnNull } from '@ocavue/utils'
 import type { ChromeRenderer, ShellBarsProps } from '@/mobile/chrome/chrome-renderer.ts'
-import { WebPlus } from '@/mobile/chrome/web/web-plus.tsx'
+import { PlusSlot, WebPlus } from '@/mobile/chrome/web/web-plus.tsx'
 import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar.tsx'
 import type { MobileForm } from '@/mobile/mobile-form.ts'
@@ -21,7 +21,8 @@ function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProp
     case 'rail':
       return (
         <>
-          <aside className="fixed right-safe-offset-2 bottom-safe-offset-2 z-30">
+          <aside className="fixed right-safe-offset-2 bottom-safe-offset-2 z-30 flex flex-col items-center gap-3">
+            <PlusSlot />
             <TabCapsule tab={tab} onSelect={onSelectTab} orientation="vertical" />
           </aside>
           {toolbar}
@@ -33,6 +34,7 @@ function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProp
           <div className="pointer-events-none fixed inset-x-0 top-safe-offset-2 z-30 flex justify-center *:pointer-events-auto">
             <TabCapsule tab={tab} onSelect={onSelectTab} orientation="horizontal" />
           </div>
+          <PlusSlot className="fixed right-safe-offset-6 bottom-safe-offset-6 z-30" />
           {toolbar}
         </>
       )
@@ -41,8 +43,7 @@ function WebShellBars({ form, tab, onSelectTab, keyboardVisible }: ShellBarsProp
 
 /**
  * The iPhone bar: the capsule at the leading edge of a row at the bottom of
- * the shell, with the page's `+` on the row's center line at the trailing
- * edge. The row publishes its height as `--mobile-tab-bar-height` on the
+ * the shell, with the page's `+` at the trailing edge. The row publishes its height as `--mobile-tab-bar-height` on the
  * document root, so viewport-anchored elements (the sync status pill) sit
  * above it. The variable clears on unmount, leaving consumers their fallback.
  */
@@ -69,8 +70,12 @@ function BarRow({ tab, onSelectTab }: Pick<ShellBarsProps, 'tab' | 'onSelectTab'
   }, [])
 
   return (
-    <div ref={rowRef} className="flex shrink-0 pt-2 pb-safe-offset-2 pl-safe-offset-3">
+    <div
+      ref={rowRef}
+      className="flex shrink-0 items-center justify-between pt-2 pb-safe-offset-2 px-safe-offset-3"
+    >
       <TabCapsule tab={tab} onSelect={onSelectTab} orientation="horizontal" />
+      <PlusSlot />
     </div>
   )
 }

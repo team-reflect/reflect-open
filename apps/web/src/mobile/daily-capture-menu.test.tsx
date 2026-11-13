@@ -6,6 +6,7 @@ import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useDailyCapture } from './daily-capture-menu.tsx'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
+import { PlusSlot } from '@/mobile/chrome/web/web-plus.tsx'
 import {
   WritableStore,
   type MobileAudioMemoSessionState,
@@ -93,6 +94,7 @@ function DailyCaptureMenu(): ReactElement {
   const { plus, sheet } = useDailyCapture()
   return (
     <>
+      <PlusSlot className="fixed right-4 bottom-4" />
       <renderer.Plus plus={plus} />
       {sheet}
     </>

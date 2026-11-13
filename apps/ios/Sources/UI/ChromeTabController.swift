@@ -134,16 +134,19 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         view.addSubview(standalone.bar)
       }
       view.bringSubviewToFront(standalone.bar)
-      let capsule = standalone.layout(in: bounds, leading: safe.left + 20)
+      let items = standalone.layout(in: view, leading: safe.left + 24)
       if !standalone.bar.isHidden {
-        inset = max(0, bounds.maxY - capsule.minY - safe.bottom)
+        inset = max(0, bounds.maxY - standalone.bar.frame.minY - safe.bottom)
       }
       plus.layout(
-        in: view, center: CGPoint(x: bounds.maxX - safe.right - 20 - 26, y: capsule.midY),
+        in: view, center: CGPoint(x: bounds.maxX - safe.right - 20 - 26, y: items.midY),
         size: 52)
     case .rail:
-      let capsule = railCapsuleFrame()
-      plus.layout(in: view, center: CGPoint(x: capsule.midX, y: capsule.minY - 12 - 22), size: 44)
+      // The `+` sits above the system's tabs, wherever the rail puts them.
+      let items = tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
+      if !items.isNull {
+        plus.layout(in: view, center: CGPoint(x: items.midX, y: items.minY - 16 - 22), size: 44)
+      }
     case .pad:
       let area = bounds.inset(by: safe)
       plus.layout(
@@ -153,14 +156,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     where placeholder.additionalSafeAreaInsets.bottom != inset {
       placeholder.additionalSafeAreaInsets.bottom = inset
     }
-  }
-
-  /// The frame of the glass capsule of the system's vertical tab rail. The
-  /// system draws it 48 pt wide and 162 pt tall, 24 pt above the bottom of the
-  /// tab bar's column, 13.5 pt before its center line (iOS 27, iPhone Duo).
-  private func railCapsuleFrame() -> CGRect {
-    let column = tabBar.frame
-    return CGRect(x: column.midX - 13.5 - 24, y: column.maxY - 24 - 162, width: 48, height: 162)
   }
 
   /// Shows the sidebar and its toggle in a window of at least
