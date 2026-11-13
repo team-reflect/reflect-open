@@ -1,26 +1,37 @@
 //! Names of the events the native side broadcasts to the frontend.
 
-/// Defines one `pub const` per event and [`ALL`], the list the codegen bin
-/// writes to TypeScript and Swift.
-macro_rules! events {
-    ($( $(#[doc = $doc:literal])* $name:ident = $value:literal, )*) => {
-        $( $(#[doc = $doc])* pub const $name: &str = $value; )*
+use serde::Serialize;
 
-        /// Every event: its constant name and its wire name.
-        pub const ALL: &[(&str, &str)] = &[$( (stringify!($name), $value) ),*];
-    };
-}
-
-events! {
+/// An event the native side broadcasts. The serde name is the wire name, and
+/// `pnpm gen:types` exports it to TypeScript and Swift.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+pub enum EventName {
     /// Batched [`crate::FileChange`]s for files that changed outside the editor.
-    INDEX_CHANGED = "index:changed",
+    #[serde(rename = "index:changed")]
+    IndexChanged,
     /// Asks the frontend for one full reconcile pass. Carries no payload.
-    INDEX_RECONCILE = "index:reconcile",
+    #[serde(rename = "index:reconcile")]
+    IndexReconcile,
     /// Fired after a note-projection write commits. Secondary note windows run
     /// no indexer of their own and refetch their index-backed queries on this
     /// signal.
-    INDEX_WRITTEN = "index:written",
+    #[serde(rename = "index:written")]
+    IndexWritten,
     /// Fired after a note's rows move to a new path (an in-app rename or an
     /// id-healed external one), with `{ "from": ..., "to": ... }`.
-    NOTE_MOVED = "note:moved",
+    #[serde(rename = "note:moved")]
+    NoteMoved,
+}
+
+impl EventName {
+    /// The wire name, the same string as the serde name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::IndexChanged => "index:changed",
+            Self::IndexReconcile => "index:reconcile",
+            Self::IndexWritten => "index:written",
+            Self::NoteMoved => "note:moved",
+        }
+    }
 }

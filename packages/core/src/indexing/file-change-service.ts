@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import { INDEX_CHANGED, INDEX_RECONCILE, type FileChange } from '@reflect/types'
+import type { EventName, FileChange } from '@reflect/types'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createFanOut, listenNow, type FanOut, type IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -8,14 +8,14 @@ import type { Unlisten } from '../unlisten.ts'
 /**
  * Event name the Rust watcher emits tracked-file changes on.
  */
-export const FILE_CHANGES_EVENT = INDEX_CHANGED
+export const FILE_CHANGES_EVENT = 'index:changed' satisfies EventName
 
 /**
  * Event name the Rust watcher emits when only a full reconcile can tell what
  * changed: a visible folder was created, renamed, or removed, and no platform
  * enumerates its descendants per file. Carries no payload.
  */
-export const RECONCILE_EVENT = INDEX_RECONCILE
+export const RECONCILE_EVENT = 'index:reconcile' satisfies EventName
 
 const fileChangeSchema: z.ZodType<FileChange> = z.object({
   path: z.string(),

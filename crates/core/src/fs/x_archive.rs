@@ -2,7 +2,7 @@ use reflect_graph_io::x_archive_store as archive;
 use reflect_graph_io::{current_root, resolve, root_for_generation};
 use reflect_types::AppResult;
 use reflect_types::FileChange;
-use reflect_types::events::INDEX_CHANGED;
+use reflect_types::events::EventName;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -32,7 +32,7 @@ impl Core {
                             let change =
                                 FileChange::upsert(format!("assets/x/{}", receipt.name), None);
                             if let Ok(payload) = serde_json::to_value(vec![change]) {
-                                core.host().emit(INDEX_CHANGED, payload);
+                                core.host().emit(EventName::IndexChanged.as_str(), payload);
                             }
                         }
                     }

@@ -232,11 +232,3 @@ public struct FileMeta: Codable, Sendable, Equatable {
     }
 }
 
-
-/// The names of the events the native side broadcasts to the page.
-public enum WireEvent {
-  public static let indexChanged = "index:changed"
-  public static let indexReconcile = "index:reconcile"
-  public static let indexWritten = "index:written"
-  public static let noteMoved = "note:moved"
-}

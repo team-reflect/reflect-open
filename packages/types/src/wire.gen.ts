@@ -25,6 +25,27 @@ export type ChangeKind =
 /**  Deleted. */
 "remove";
 
+/**
+ *  An event the native side broadcasts. The serde name is the wire name, and
+ *  `pnpm gen:types` exports it to TypeScript and Swift.
+ */
+export type EventName = 
+/**  Batched [`crate::FileChange`]s for files that changed outside the editor. */
+"index:changed" | 
+/**  Asks the frontend for one full reconcile pass. Carries no payload. */
+"index:reconcile" | 
+/**
+ *  Fired after a note-projection write commits. Secondary note windows run
+ *  no indexer of their own and refetch their index-backed queries on this
+ *  signal.
+ */
+"index:written" | 
+/**
+ *  Fired after a note's rows move to a new path (an in-app rename or an
+ *  id-healed external one), with `{ "from": ..., "to": ... }`.
+ */
+"note:moved";
+
 /**  One changed graph file. */
 export type FileChange = {
 	/**  Graph-relative path, forward-slashed. */
@@ -56,8 +77,3 @@ export type FileMeta = {
 	 */
 	placeholder?: boolean | undefined,
 };
-
-export const INDEX_CHANGED = 'index:changed'
-export const INDEX_RECONCILE = 'index:reconcile'
-export const INDEX_WRITTEN = 'index:written'
-export const NOTE_MOVED = 'note:moved'

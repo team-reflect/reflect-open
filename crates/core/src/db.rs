@@ -27,13 +27,15 @@ fn now_ms() -> u64 {
 
 impl Core {
     fn emit_index_written(&self) {
-        self.host()
-            .emit(reflect_types::events::INDEX_WRITTEN, Value::Null);
+        self.host().emit(
+            reflect_types::events::EventName::IndexWritten.as_str(),
+            Value::Null,
+        );
     }
 
     fn emit_note_moved(&self, from: &str, to: &str) {
         self.host().emit(
-            reflect_types::events::NOTE_MOVED,
+            reflect_types::events::EventName::NoteMoved.as_str(),
             serde_json::json!({ "from": from, "to": to }),
         );
     }
@@ -312,7 +314,9 @@ mod tests {
             assert_eq!(
                 *host.events.lock().unwrap(),
                 [(
-                    reflect_types::events::INDEX_WRITTEN.to_string(),
+                    reflect_types::events::EventName::IndexWritten
+                        .as_str()
+                        .to_string(),
                     Value::Null
                 )]
             );
