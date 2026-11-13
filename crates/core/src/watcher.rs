@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use file_id::{FileId, get_file_id};
-use notify::{EventKindMask, RecommendedWatcher, RecursiveMode};
+use notify_debouncer_full::file_id::{FileId, get_file_id};
+use notify_debouncer_full::notify::{self, EventKindMask, RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{
     DebounceEventHandler, DebounceEventResult, Debouncer, FileIdCache, FileIdMap, new_debouncer_opt,
 };

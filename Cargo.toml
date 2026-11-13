@@ -54,7 +54,6 @@ fastembed = { version = "7.5.0", default-features = false, features = [
   "hf-hub-native-tls",
   "ort-download-binaries-native-tls",
 ] }
-file-id = "0.2.3"
 futures-util = { version = "0.3.33", default-features = false, features = ["std"] }
 # Everything is vendored/static: libssh2 and openssl must never link against
 # homebrew dylibs the distributed app won't have (libssh2-sys only consults
@@ -74,7 +73,6 @@ infer = "0.22.0"
 jiff = { version = "0.2.38", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
 log = "0.4.34"
-notify = "9.0.0-rc.8"
 notify-debouncer-full = "0.8.0-rc.3"
 objc2 = "0.6.5"
 objc2-app-kit = { version = "0.3.2", default-features = false }
