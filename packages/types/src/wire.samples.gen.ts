@@ -8,12 +8,32 @@ export const samples = {
     "message": "disk full"
   },
   {
+    "kind": "notFound",
+    "message": "notes/a.md"
+  },
+  {
+    "kind": "traversal",
+    "message": "../etc/passwd"
+  },
+  {
     "kind": "noGraph",
     "message": "No graph is open"
   },
   {
-    "kind": "notFound",
-    "message": "notes/a.md"
+    "kind": "parse",
+    "message": "bad frontmatter"
+  },
+  {
+    "kind": "auth",
+    "message": "token expired"
+  },
+  {
+    "kind": "network",
+    "message": "offline"
+  },
+  {
+    "kind": "unknown",
+    "message": "boom"
   }
 ] satisfies AppError[],
   ChangeKind: [
