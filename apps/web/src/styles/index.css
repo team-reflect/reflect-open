@@ -281,22 +281,47 @@ body {
     touch-action: manipulation;
   }
 
-  /* Stacked mobile screens pan only vertically, so a horizontal drag reaches
-     the back pager only through its edge strip. The rule has zero
-     specificity, so any touch-* utility still wins. Horizontal scrollers
-     (`data-scroll-x`, also set by meowdown) and everything inside them opt
-     back in; the scrollers keep their own overscroll. */
-  :where(.mobile-pager-content, .mobile-pager-content *) {
+  /* A horizontal drag that starts on the background of a stacked mobile
+     screen chains to the back pager (mobile-stack.tsx). Controls and the
+     editor pan only vertically, unless marked `data-back-swipe="on"` (a row
+     that acts on a tap). The browser intersects `touch-action` with every
+     ancestor up to the nearest scroll container, so their descendants follow
+     without a rule of their own. A horizontal scroller (`data-scroll-x`, also
+     set by meowdown) owns every horizontal drag inside it, so nothing in it
+     is protected, and `contain` keeps a drag past its end from reaching the
+     pager. The specificity beats the `manipulation` rule above, which allows
+     `pan-x`. */
+  .mobile-pager-content
+    :is(
+      [contenteditable='true'],
+      [contenteditable=''],
+      [contenteditable='plaintext-only'],
+      button,
+      a,
+      label,
+      input,
+      textarea,
+      select,
+      summary,
+      video,
+      audio,
+      [role='button'],
+      [role='link'],
+      [role='checkbox'],
+      [role='radio'],
+      [role='switch'],
+      [role='slider'],
+      [role='tab'],
+      [role='option'],
+      [role='menuitem'],
+      [role='combobox'],
+      [data-back-swipe='off']
+    ):not([data-back-swipe='on'], [data-scroll-x], [data-scroll-x] *) {
     touch-action: pan-y;
   }
 
-  :where(.mobile-pager-content) [data-scroll-x] {
-    touch-action: auto;
+  .mobile-pager-content [data-scroll-x] {
     overscroll-behavior-x: contain;
-  }
-
-  :where(.mobile-pager-content) [data-scroll-x] * {
-    touch-action: auto;
   }
 }
 
