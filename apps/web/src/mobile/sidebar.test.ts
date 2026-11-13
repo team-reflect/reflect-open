@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findPinnedMove, selectSidebarRow } from '@/mobile/sidebar.ts'
+import { selectSidebarRow } from '@/mobile/sidebar.ts'
 
 const TODAY = '2026-11-13'
 
@@ -18,22 +18,5 @@ describe('selectSidebarRow', () => {
       'tasks',
     )
     expect(selectSidebarRow({ kind: 'settings' }, 'daily', pinned, TODAY)).toBe('daily')
-  })
-})
-
-describe('findPinnedMove', () => {
-  it('finds a move down and a move up', () => {
-    expect(findPinnedMove(['a', 'b', 'c', 'd'], ['b', 'c', 'a', 'd'])).toEqual({
-      active: 'a',
-      over: 'c',
-    })
-    expect(findPinnedMove(['a', 'b', 'c', 'd'], ['a', 'd', 'b', 'c'])).toEqual({
-      active: 'd',
-      over: 'b',
-    })
-  })
-
-  it('finds no move in the same order', () => {
-    expect(findPinnedMove(['a', 'b'], ['a', 'b'])).toBeNull()
   })
 })

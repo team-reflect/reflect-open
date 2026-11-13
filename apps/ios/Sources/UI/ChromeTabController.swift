@@ -82,13 +82,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     sidebar.delegate = self
     sidebar.bottomBarView = footer
     tabs = makeSidebarTabs { [self] in
-      ChromeTab.allCases.map { makeTab(identifier: $0.rawValue, title: $0.title, image: $0.image) }
+      ChromeTab.allCases.map {
+        let tab = makeTab(identifier: $0.rawValue, title: $0.title, image: $0.image)
+        // A fixed tab leaves the sidebar without an Edit button.
+        tab.preferredPlacement = .fixed
+        return tab
+      }
     }
-    view.tintColor = UIColor { traits in
-      traits.userInterfaceStyle == .dark
-        ? UIColor(red: 0x63 / 255, green: 0x66 / 255, blue: 0xF1 / 255, alpha: 1)
-        : UIColor(red: 0x4F / 255, green: 0x46 / 255, blue: 0xE5 / 255, alpha: 1)
-    }
+    view.tintColor = Self.accent
+    stage.view.tintColor = Self.accent
     // The page scrolls inside its own elements, so the edge effect of the web
     // view's scroll view would only draw a band at the top.
     if #available(iOS 26, *) {
@@ -185,12 +187,21 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// in a window of at least `sidebarMinWidth`, and over it, hidden until
   /// the toggle shows it, in a narrower one. A user's toggle wins over that
   /// default for the rest of the window's life.
+  /// The app's purple.
+  static let accent = UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0x63 / 255, green: 0x66 / 255, blue: 0xF1 / 255, alpha: 1)
+      : UIColor(red: 0x4F / 255, green: 0x46 / 255, blue: 0xE5 / 255, alpha: 1)
+  }
+
   private func updateMode(width: CGFloat) {
     let regularPad =
       traitCollection.userInterfaceIdiom == .pad && traitCollection.horizontalSizeClass == .regular
     let next: UITabBarController.Mode = regularPad ? .tabSidebar : .tabBar
     if mode != next {
       mode = next
+      // The sidebar is gray, as on desktop; the page keeps the purple.
+      view.tintColor = regularPad ? .secondaryLabel : Self.accent
     }
     let wide = width >= Self.sidebarMinWidth
     let layout: UITabBarController.Sidebar.Layout = wide ? .tile : .overlap

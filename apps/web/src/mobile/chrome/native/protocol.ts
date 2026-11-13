@@ -171,7 +171,6 @@ const intentSchema = z.discriminatedUnion('type', [
     command: z.discriminatedUnion('kind', [
       z.object({ kind: z.enum(['chat', 'search', 'settings']) }),
       z.object({ kind: z.enum(['openNote', 'unpin', 'share']), path: z.string() }),
-      z.object({ kind: z.literal('reorder'), paths: z.array(z.string()) }),
       z.object({ kind: z.literal('menu'), id: z.string() }),
     ]),
   }),

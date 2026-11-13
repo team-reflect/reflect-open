@@ -51,7 +51,6 @@ final class ChromeBridgeTests: XCTestCase {
       .sidebarVisible(true),
       .sidebar(.chat),
       .sidebar(.openNote("reflect-v2.md")),
-      .sidebar(.reorder(["b.md", "a.md"])),
       .sidebar(.menu("graphs")),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))

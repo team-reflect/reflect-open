@@ -314,13 +314,11 @@ public enum SidebarIntent: Encodable, Equatable, Sendable {
   case openNote(String)
   case unpin(String)
   case share(String)
-  /// The pinned notes in their new order, after a drag.
-  case reorder([String])
   /// An item of the graph menu.
   case menu(String)
 
   private enum CodingKeys: String, CodingKey {
-    case kind, path, paths, id
+    case kind, path, id
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -330,7 +328,6 @@ public enum SidebarIntent: Encodable, Equatable, Sendable {
     case .chat, .search, .settings: break
     case .openNote(let path), .unpin(let path), .share(let path):
       try container.encode(path, forKey: .path)
-    case .reorder(let paths): try container.encode(paths, forKey: .paths)
     case .menu(let id): try container.encode(id, forKey: .id)
     }
   }
@@ -343,7 +340,6 @@ public enum SidebarIntent: Encodable, Equatable, Sendable {
     case .openNote: "openNote"
     case .unpin: "unpin"
     case .share: "share"
-    case .reorder: "reorder"
     case .menu: "menu"
     }
   }

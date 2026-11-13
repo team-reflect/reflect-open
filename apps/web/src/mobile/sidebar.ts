@@ -5,7 +5,6 @@ import { WritableStore } from '@reflect/core'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
-import { useReorderPinnedNotes } from '@/hooks/use-reorder-pinned-notes.ts'
 import { graphColorCss } from '@/lib/graph-colors.ts'
 import { useToday } from '@/lib/use-today.ts'
 import type { ChromeMenuItem } from '@/mobile/chrome/screen-chrome.ts'
@@ -26,7 +25,6 @@ export const sidebarVisible = new WritableStore(false)
 export type SidebarCommand =
   | { kind: 'chat' | 'search' | 'settings' }
   | { kind: 'openNote' | 'unpin' | 'share'; path: string }
-  | { kind: 'reorder'; paths: string[] }
   | { kind: 'menu'; id: string }
 
 /**
@@ -57,25 +55,6 @@ export function selectSidebarRow(
     return `pinned:${path}`
   }
   return route.kind === 'chat' ? 'chat' : tab
-}
-
-/**
- * The one move that turns `from` into `to`, as the note that moved and the
- * note whose place it took; `null` when the orders match.
- */
-export function findPinnedMove(
-  from: readonly string[],
-  to: readonly string[],
-): { active: string; over: string } | null {
-  const first = from.findIndex((path, index) => to[index] !== path)
-  if (first === -1) {
-    return null
-  }
-  const last = from.findLastIndex((path, index) => to[index] !== path)
-  const up = to[first] === from[last]
-  const active = from[up ? last : first]
-  const over = from[up ? first : last]
-  return active === undefined || over === undefined ? null : { active, over }
 }
 
 /**
@@ -130,7 +109,6 @@ export function useSidebar(tab: MobileTab): {
   const today = useToday()
   const pinned = usePinnedNotes()
   const noteLabel = useNoteLabel()
-  const reorder = useReorderPinnedNotes(pinned)
   const graph = useGraphInfo()
   const { colorFor } = useGraphColors()
   const graphMenu = useGraphMenu()
@@ -167,16 +145,6 @@ export function useSidebar(tab: MobileTab): {
           logger.error('share failed:', cause)
         })
         return
-      case 'reorder': {
-        const move = findPinnedMove(
-          pinned.map((note) => note.path),
-          command.paths,
-        )
-        if (move !== null) {
-          reorder(move.active, move.over)
-        }
-        return
-      }
       case 'menu':
         graphMenu.run(command.id)
         return

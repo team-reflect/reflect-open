@@ -48,7 +48,7 @@ final class SidebarFooter: UIView {
     graphButton.configuration?.title = state.graphName
     graphButton.configuration?.baseForegroundColor = .label
     graphButton.configuration?.image = Self.swatch(
-      state.graphColor.flatMap(UIColor.init(hex:)) ?? tintColor)
+      state.graphColor.flatMap(UIColor.init(hex:)) ?? ChromeTabController.accent)
     graphButton.menu = MenuBuilder.menu(state.graphMenu) { [weak self] action in
       self?.onMenu(action.id)
     }

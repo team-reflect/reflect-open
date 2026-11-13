@@ -34,11 +34,17 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
     for tab in [search, chat, pinnedGroup] {
       tab.preferredPlacement = .sidebarOnly
     }
-    pinnedGroup.allowsReordering = true
     pinnedGroup.isHidden = true
     footer.onMenu = { [weak self] id in self?.send(.sidebar(.menu(id))) }
     footer.onSettings = { [weak self] in self?.send(.sidebar(.settings)) }
     return [search] + main() + [chat, pinnedGroup]
+  }
+
+  /// The row of a pinned note, which stays in the sidebar.
+  private func makePinnedTab(identifier: String, title: String) -> UITab {
+    let tab = makeTab(identifier: identifier, title: title, image: nil)
+    tab.preferredPlacement = .sidebarOnly
+    return tab
   }
 
   /// The top-level tab or the pinned row with `identifier`.
@@ -58,15 +64,11 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
     guard let state else { return }
     footer.update(state)
     let ids = state.pinned.map { SidebarRow.pinnedPrefix + $0.path }
-    if pinnedGroup.children.map(\.identifier) != ids
-      || pinnedGroup.displayOrder.map(\.identifier) != ids
-    {
+    if pinnedGroup.children.map(\.identifier) != ids {
       let old = Dictionary(uniqueKeysWithValues: pinnedGroup.children.map { ($0.identifier, $0) })
       pinnedGroup.children = zip(ids, state.pinned).map { id, note in
-        old[id] ?? makeTab(identifier: id, title: note.title, image: nil)
+        old[id] ?? makePinnedTab(identifier: id, title: note.title)
       }
-      // A drag keeps its own order; the page's order is the one to show.
-      pinnedGroup.displayOrderIdentifiers = ids
       for id in old.keys where !ids.contains(id) {
         placeholders[id] = nil
       }
@@ -125,15 +127,5 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
         },
       ])
     })
-  }
-
-  func tabBarController(
-    _ tabBarController: UITabBarController, displayOrderDidChangeFor group: UITabGroup
-  ) {
-    guard group === pinnedGroup else { return }
-    let paths = group.displayOrder.map { SidebarRow.path(of: $0.identifier) }
-    if paths != sidebarState?.pinned.map(\.path) {
-      send(.sidebar(.reorder(paths)))
-    }
   }
 }
