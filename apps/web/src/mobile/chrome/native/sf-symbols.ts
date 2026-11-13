@@ -22,6 +22,13 @@ function toWireMenuItem(item: ChromeMenuItem): NativeMenuItem {
 }
 
 /**
+ * A menu as the shell draws it: SF Symbol icons.
+ */
+export function toWireMenu(items: ChromeMenuItem[]): NativeMenuItem[] {
+  return items.map(toWireMenuItem)
+}
+
+/**
  * The buttons as the shell draws them: SF Symbol icons, and no hidden button.
  */
 export function toWireButtons(buttons: ChromeButton[]): NativeBarButton[] {
@@ -30,6 +37,6 @@ export function toWireButtons(buttons: ChromeButton[]): NativeBarButton[] {
     .map(({ hidden: _hidden, ...button }) => ({
       ...button,
       icon: button.icon === undefined ? undefined : SF_SYMBOLS[button.icon],
-      menu: button.menu?.map(toWireMenuItem),
+      menu: button.menu === undefined ? undefined : toWireMenu(button.menu),
     }))
 }

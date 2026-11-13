@@ -46,6 +46,10 @@ final class PlusChrome {
           self?.send(command)
         }, for: .primaryActionTriggered)
     }
+    // The `+` stays purple when the iPad sidebar turns the tint gray.
+    for view in [button, noteItem, taskItem, audioItem] {
+      view.tintColor = ChromeTabController.accent
+    }
     button.alpha = 0
     button.isHidden = true
   }

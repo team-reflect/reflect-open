@@ -39,7 +39,37 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   public var toolbar: ToolbarState?
   /// The `+` of the screen, or `nil` for a screen without one.
   public var plus: PlusSpec?
+  /// What the iPad sidebar shows.
+  public var sidebar: SidebarState?
+  /// Where the history can move, while the window has a sidebar. The shell
+  /// then shows a back and a forward button in place of the back button.
+  public var history: HistoryState?
   public var theme: Theme
+}
+
+/// Whether the history can move back and forward.
+public struct HistoryState: Decodable, Equatable, Sendable {
+  public var back: Bool
+  public var forward: Bool
+}
+
+/// What the iPad sidebar shows.
+public struct SidebarState: Decodable, Equatable, Sendable {
+  /// A pinned note: its path, and the name the sidebar shows.
+  public struct Note: Decodable, Equatable, Sendable {
+    public var path: String
+    public var title: String
+  }
+
+  /// The row to select: a tab, `chat`, or a pinned note's path after `pinned:`.
+  public var selection: String
+  /// The pinned notes, in shelf order.
+  public var pinned: [Note]
+  public var graphName: String
+  /// The graph's color as `#rrggbb`, or `nil` for the app's tint.
+  public var graphColor: String?
+  /// The menu of the graph button.
+  public var graphMenu: [MenuItem]
 }
 
 /// The `+` of a screen: Daily's capture menu, or one action.
@@ -230,6 +260,9 @@ public enum FormattingCommand: String, CaseIterable, Encodable, Sendable {
 /// the shell's layout.
 public enum ChromeIntent: Encodable, Equatable, Sendable {
   case back(entryId: Int)
+  /// A move back (`forward: false`) or forward in the history, from the
+  /// screen of `entryId`.
+  case history(entryId: Int, forward: Bool)
   case tab(ChromeTab)
   case action(entryId: Int, id: String)
   case command(FormattingCommand)
@@ -239,9 +272,13 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
   case layout(cornersInHeaderRow: Bool)
   /// A tap on the `+` of the screen of `entryId`.
   case plus(entryId: Int, command: PlusCommand)
+  /// Whether the iPad sidebar shows, or `nil` without a sidebar.
+  case sidebarVisible(Bool?)
+  /// A tap in the iPad sidebar.
+  case sidebar(SidebarIntent)
 
   private enum CodingKeys: String, CodingKey {
-    case type, entryId, tab, id, files, cornersInHeaderRow, command
+    case type, entryId, tab, id, files, cornersInHeaderRow, command, visible, direction
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -250,6 +287,10 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
     case .back(let entryId):
       try container.encode("back", forKey: .type)
       try container.encode(entryId, forKey: .entryId)
+    case .history(let entryId, let forward):
+      try container.encode("history", forKey: .type)
+      try container.encode(entryId, forKey: .entryId)
+      try container.encode(forward ? "forward" : "back", forKey: .direction)
     case .tab(let tab):
       try container.encode("tab", forKey: .type)
       try container.encode(tab, forKey: .tab)
@@ -270,6 +311,52 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
       try container.encode("plus", forKey: .type)
       try container.encode(entryId, forKey: .entryId)
       try container.encode(command, forKey: .command)
+    case .sidebarVisible(let visible):
+      try container.encode("sidebarVisible", forKey: .type)
+      try container.encode(visible, forKey: .visible)
+    case .sidebar(let intent):
+      try container.encode("sidebar", forKey: .type)
+      try container.encode(intent, forKey: .command)
+    }
+  }
+}
+
+/// A tap in the iPad sidebar.
+public enum SidebarIntent: Encodable, Equatable, Sendable {
+  case chat
+  case search
+  case settings
+  /// Opens a pinned note.
+  case openNote(String)
+  case unpin(String)
+  case share(String)
+  /// An item of the graph menu.
+  case menu(String)
+
+  private enum CodingKeys: String, CodingKey {
+    case kind, path, id
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(kind, forKey: .kind)
+    switch self {
+    case .chat, .search, .settings: break
+    case .openNote(let path), .unpin(let path), .share(let path):
+      try container.encode(path, forKey: .path)
+    case .menu(let id): try container.encode(id, forKey: .id)
+    }
+  }
+
+  private var kind: String {
+    switch self {
+    case .chat: "chat"
+    case .search: "search"
+    case .settings: "settings"
+    case .openNote: "openNote"
+    case .unpin: "unpin"
+    case .share: "share"
+    case .menu: "menu"
     }
   }
 }

@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  type CSSProperties,
+  type ReactElement,
+} from 'react'
 import { isDeepEqual, returnNull } from '@ocavue/utils'
 import type { NativeChromeService } from '@reflect/app'
 import { deriveStore, WritableStore, type Unlisten } from '@reflect/core'
@@ -28,9 +35,15 @@ import {
   toWirePlus,
   type ScreenBar,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
-import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
+import { toWireMenu } from '@/mobile/chrome/native/sf-symbols.ts'
+import {
+  parseNativeIntent,
+  type NativeChromeMessage,
+  type NativeSidebarState,
+} from '@/mobile/chrome/native/protocol.ts'
+import { sidebarVisible, useSidebar } from '@/mobile/sidebar.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
-import { useRouterState } from '@/routing/router.tsx'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -143,20 +156,23 @@ function useNativeChromeRenderer(): NativeChromeRenderer {
  * The space of the corner buttons and the back button that the shell draws
  * over the header row, or nothing when the shell draws them in another row.
  * The shell's back button is wider than the web one, so a spacer moves a
- * title that starts after it clear.
+ * title that starts after it clear. Beside the sidebar, the shell draws a back
+ * and a forward arrow on every screen, so the space holds both.
  */
 function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
   const renderer = useNativeChromeRenderer()
   const cornersInHeaderRow = useStore(renderer.cornersInHeaderRow)
+  const history = useStore(sidebarVisible) !== null && props.edge === 'leading'
   if (!cornersInHeaderRow) {
     return null
   }
-  const clearsBack =
-    props.edge === 'leading' && props.align === 'start' && props.chrome.back !== undefined
+  const back = history ? returnNull : props.chrome.back
+  const clearsBack = props.edge === 'leading' && props.align === 'start' && back !== undefined
   return (
     <div className="invisible contents" inert aria-hidden>
-      <WebTopBarCorner {...props} />
+      <WebTopBarCorner {...props} chrome={{ ...props.chrome, back }} />
       {clearsBack ? <div className="w-1 shrink-0" /> : null}
+      {history ? <div className="w-13 shrink-0" /> : null}
     </div>
   )
 }
@@ -167,13 +183,26 @@ function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
  */
 function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps): null {
   const renderer = useNativeChromeRenderer()
-  const { route, entryId } = useRouterState()
+  const { route, entryId, canBack, canForward } = useRouterState()
+  const { back, forward } = useRouterActions()
+  const showsSidebar = useStore(sidebarVisible) !== null
   const bars = useStore(renderer.bars)
   const modal = useStore(renderer.modal)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
   const toasts = useToastController()
+  const sidebar = useSidebar(tab)
+  const nextSidebarState: NativeSidebarState = {
+    ...sidebar.state,
+    graphMenu: toWireMenu(sidebar.state.graphMenu),
+  }
+  // A new object on every render: keep the last one while it is equal, so an
+  // equal sidebar posts no state.
+  const [sidebarState, setSidebarState] = useState(nextSidebarState)
+  if (!isDeepEqual(sidebarState, nextSidebarState)) {
+    setSidebarState(nextSidebarState)
+  }
 
   useEffect(() => {
     nativeChrome.postState(
@@ -187,10 +216,27 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         keyboardVisible,
         modal,
         toolbar: toolbar?.capabilities ?? null,
+        sidebar: sidebarState,
+        history: showsSidebar ? { back: canBack, forward: canForward } : null,
         theme,
       }),
     )
-  }, [nativeChrome, renderer, route, entryId, tab, bars, keyboardVisible, modal, toolbar, theme])
+  }, [
+    nativeChrome,
+    renderer,
+    route,
+    entryId,
+    tab,
+    bars,
+    keyboardVisible,
+    modal,
+    toolbar,
+    sidebarState,
+    showsSidebar,
+    canBack,
+    canForward,
+    theme,
+  ])
 
   // Kept while the photo picker holds focus, so the editor's toolbar is gone.
   const attachRef = useRef<{ commands: FormattingToolbarCommands; entryId: number } | null>(null)
@@ -200,12 +246,18 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     }
   }, [toolbar, entryId])
 
-  const contextRef = useRef<Pick<IntentContext, 'entryId' | 'selectTab'>>({
-    entryId,
-    selectTab: onSelectTab,
-  })
+  const moveHistory = (direction: 'back' | 'forward'): void => {
+    if (direction === 'back') {
+      back()
+    } else {
+      forward()
+    }
+  }
+  const contextRef = useRef<
+    Pick<IntentContext, 'entryId' | 'selectTab' | 'runSidebar' | 'moveHistory'>
+  >({ entryId, selectTab: onSelectTab, runSidebar: sidebar.run, moveHistory })
   useLayoutEffect(() => {
-    contextRef.current = { entryId, selectTab: onSelectTab }
+    contextRef.current = { entryId, selectTab: onSelectTab, runSidebar: sidebar.run, moveHistory }
   })
 
   useEffect(() => {
@@ -221,11 +273,17 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           attachFiles: renderer.attachFiles,
           toasts,
           setCornersInHeaderRow: (value) => renderer.cornersInHeaderRow.set(value),
+          setSidebarVisible: (value) => sidebarVisible.set(value),
         })
       }
     })
     nativeChrome.post({ type: 'chromeReady' } satisfies NativeChromeMessage)
-    return unlisten
+    return () => {
+      unlisten()
+      // Back to the start value: the next `chromeReady` gets only a sidebar
+      // that shows or hides.
+      sidebarVisible.set(null)
+    }
   }, [nativeChrome, renderer, toasts])
 
   return null

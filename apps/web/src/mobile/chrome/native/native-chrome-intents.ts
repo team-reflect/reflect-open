@@ -40,6 +40,18 @@ export interface IntentContext {
    * row.
    */
   setCornersInHeaderRow: (cornersInHeaderRow: boolean) => void
+  /**
+   * Stores whether the iPad sidebar shows.
+   */
+  setSidebarVisible: (visible: boolean | null) => void
+  /**
+   * Runs a tap in the iPad sidebar.
+   */
+  runSidebar: (command: Extract<NativeIntent, { type: 'sidebar' }>['command']) => void
+  /**
+   * Moves back or forward in the history.
+   */
+  moveHistory: (direction: 'back' | 'forward') => void
 }
 
 const FORMATTING_RUNNERS: Record<
@@ -89,6 +101,11 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
         context.screen?.back?.()
       }
       return
+    case 'history':
+      if (intent.entryId === context.entryId) {
+        context.moveHistory(intent.direction)
+      }
+      return
     case 'tab':
       context.selectTab(intent.tab)
       return
@@ -109,6 +126,12 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     }
     case 'layout':
       context.setCornersInHeaderRow(intent.cornersInHeaderRow)
+      return
+    case 'sidebarVisible':
+      context.setSidebarVisible(intent.visible)
+      return
+    case 'sidebar':
+      context.runSidebar(intent.command)
       return
     case 'plus': {
       const plus = context.screen?.plus
