@@ -125,6 +125,15 @@ impl FileIdCache for PrunedFileIdMap {
         }
     }
 
+    fn add_single_path(&mut self, path: &Path) {
+        if !cache_keeps(&self.root, path) {
+            return;
+        }
+        if let Ok(file_id) = get_file_id(path) {
+            self.paths.insert(path.to_path_buf(), file_id);
+        }
+    }
+
     fn remove_path(&mut self, path: &Path) {
         self.paths.retain(|cached, _| !cached.starts_with(path));
     }
@@ -745,6 +754,22 @@ mod tests {
         cache.add_path(&root.join(".git/objects/loose"), RecursiveMode::Recursive);
         assert!(cache.paths.is_empty());
         cache.add_path(&root.join("notes/new.md"), RecursiveMode::Recursive);
+        assert!(cache.paths.contains_key(&root.join("notes/new.md")));
+    }
+
+    #[test]
+    fn cache_single_path_adds_respect_the_same_prune() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join(".git/objects")).unwrap();
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        std::fs::write(root.join(".git/objects/loose"), "obj").unwrap();
+        std::fs::write(root.join("notes/new.md"), "note").unwrap();
+
+        let mut cache = PrunedFileIdMap::new(root.to_path_buf());
+        cache.add_single_path(&root.join(".git/objects/loose"));
+        assert!(cache.paths.is_empty());
+        cache.add_single_path(&root.join("notes/new.md"));
         assert!(cache.paths.contains_key(&root.join("notes/new.md")));
     }
 
