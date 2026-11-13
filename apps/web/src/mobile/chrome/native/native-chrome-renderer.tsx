@@ -156,20 +156,23 @@ function useNativeChromeRenderer(): NativeChromeRenderer {
  * The space of the corner buttons and the back button that the shell draws
  * over the header row, or nothing when the shell draws them in another row.
  * The shell's back button is wider than the web one, so a spacer moves a
- * title that starts after it clear.
+ * title that starts after it clear. Beside the sidebar, the shell draws a back
+ * and a forward arrow on every screen, so the space holds both.
  */
 function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
   const renderer = useNativeChromeRenderer()
   const cornersInHeaderRow = useStore(renderer.cornersInHeaderRow)
+  const history = useStore(sidebarVisible) !== null && props.edge === 'leading'
   if (!cornersInHeaderRow) {
     return null
   }
-  const clearsBack =
-    props.edge === 'leading' && props.align === 'start' && props.chrome.back !== undefined
+  const back = history ? returnNull : props.chrome.back
+  const clearsBack = props.edge === 'leading' && props.align === 'start' && back !== undefined
   return (
     <div className="invisible contents" inert aria-hidden>
-      <WebTopBarCorner {...props} />
+      <WebTopBarCorner {...props} chrome={{ ...props.chrome, back }} />
       {clearsBack ? <div className="w-1 shrink-0" /> : null}
+      {history ? <div className="w-13 shrink-0" /> : null}
     </div>
   )
 }
