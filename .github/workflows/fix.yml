@@ -60,7 +60,7 @@ jobs:
           swift format --version
           git ls-files -z '*.swift' | xargs -0 swift format format --parallel --in-place
 
-      - name: Install cargo-about
+      - name: Install dependencies required for license generation
         if: steps.changes.outputs.licenses == 'true'
         uses: ./.github/actions/setup-mise
 
