@@ -3,7 +3,7 @@ description: Installs the system packages that the builds need on Linux, with a 
 
 inputs:
   cache:
-    description: Whether to restore and save the apt package cache.
+    description: Whether to restore and save the cache.
     required: false
     default: 'true'
 

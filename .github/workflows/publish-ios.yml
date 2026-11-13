@@ -80,6 +80,8 @@ jobs:
           cache: false
 
       - uses: ./.github/actions/setup-mise
+        with:
+          cache: false
 
       - name: Resolve build number
         id: build_number

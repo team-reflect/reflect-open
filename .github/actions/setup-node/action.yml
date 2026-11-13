@@ -3,7 +3,7 @@ description: Installs Node.js, pnpm, and dependencies.
 
 inputs:
   cache:
-    description: Whether to restore and save the pnpm store cache.
+    description: Whether to restore and save the cache.
     required: false
     default: 'true'
 

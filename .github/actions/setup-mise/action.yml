@@ -1,6 +1,12 @@
 name: Set up mise
 description: Installs mise and the tools in `mise.toml`.
 
+inputs:
+  cache:
+    description: Whether to restore and save the cache.
+    required: false
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -8,3 +14,4 @@ runs:
       uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       with:
         version: 2026.11.5
+        cache: ${{ inputs.cache }}
