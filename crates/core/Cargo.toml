@@ -69,8 +69,6 @@ dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 trash = { workspace = true }
 notify-debouncer-full = { workspace = true }
-# The watcher's pruned file-ID cache walks with `filter_entry` to skip whole
-# subtrees; the debouncer re-exports `notify` and `file_id`, not `walkdir`.
 walkdir = { workspace = true }
 
 # The embedding runtime. Intel macOS has none: ONNX Runtime 1.24+ ships no
