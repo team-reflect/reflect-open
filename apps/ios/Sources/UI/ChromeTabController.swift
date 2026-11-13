@@ -20,13 +20,16 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Called when the corner buttons move between the page's header row
   /// (`true`) and the row of the floating tab bar (`false`).
   var onCornersInHeaderRow: (Bool) -> Void = { _ in }
+  /// Called when the iPad sidebar shows (`true`) or hides (`false`).
+  var onSidebarVisible: (Bool) -> Void = { _ in }
 
   private let webView: WKWebView
   /// The one page: it holds the web view for every tab.
   private let page = WebPageController(tab: .daily)
   /// The navigation controller of the page. It stays in place for every tab.
   private let stage: UINavigationController
-  private var placeholders: [ChromeTab: TabPlaceholder] = [:]
+  /// The placeholder of every tab, by tab identifier.
+  var placeholders: [String: TabPlaceholder] = [:]
   private var stagePins: [NSLayoutConstraint] = []
   private weak var pinnedTo: UIView?
   /// Set while the selection follows a state, so it sends no intent.
@@ -48,6 +51,24 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     self?.selectFromStandalone(tab)
   }
   private let plus = PlusChrome()
+  /// The iPad sidebar's group of pinned notes. Each child's identifier is
+  /// `pinned:` and the note's path.
+  let pinnedGroup = UITabGroup(
+    title: "Pinned notes", image: nil, identifier: SidebarRow.pinnedGroup, children: []
+  ) { _ in
+    // Never selected: a tap on the group only folds it.
+    TabPlaceholder()
+  }
+  let footer = SidebarFooter()
+  /// What the last state's sidebar shows.
+  var sidebarState: SidebarState?
+  /// Set once the user shows or hides the sidebar: the default for the
+  /// window width no longer applies.
+  var userToggledSidebar = false
+  /// Set while the shell itself shows or hides the sidebar.
+  var settingSidebar = false
+  /// Whether the sidebar shows, as last reported.
+  var reportedSidebarVisible = false
   /// The history entry of the last state, which `plus` intents echo.
   private var entryId: Int?
 
@@ -57,10 +78,12 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     super.init(nibName: nil, bundle: nil)
     // The page draws its own top row, under the native corner buttons.
     stage.setNavigationBarHidden(true, animated: false)
-    tabs = ChromeTab.allCases.map(makeTab)
-    // A shown sidebar pins the content beside it.
-    sidebar.preferredLayout = .tile
     delegate = self
+    sidebar.delegate = self
+    sidebar.bottomBarView = footer
+    tabs = makeSidebarTabs { [self] in
+      ChromeTab.allCases.map { makeTab(identifier: $0.rawValue, title: $0.title, image: $0.image) }
+    }
     view.tintColor = UIColor { traits in
       traits.userInterfaceStyle == .dark
         ? UIColor(red: 0x63 / 255, green: 0x66 / 255, blue: 0xF1 / 255, alpha: 1)
@@ -158,12 +181,66 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
   }
 
-  /// Shows the sidebar and its toggle in a window of at least
-  /// `sidebarMinWidth`, and only the tab bar in a narrower window.
+  /// Gives a regular iPad window the sidebar. It shows beside the content
+  /// in a window of at least `sidebarMinWidth`, and over it, hidden until
+  /// the toggle shows it, in a narrower one. A user's toggle wins over that
+  /// default for the rest of the window's life.
   private func updateMode(width: CGFloat) {
-    let next: UITabBarController.Mode = width >= Self.sidebarMinWidth ? .tabSidebar : .tabBar
+    let regularPad =
+      traitCollection.userInterfaceIdiom == .pad && traitCollection.horizontalSizeClass == .regular
+    let next: UITabBarController.Mode = regularPad ? .tabSidebar : .tabBar
     if mode != next {
       mode = next
+    }
+    let wide = width >= Self.sidebarMinWidth
+    let layout: UITabBarController.Sidebar.Layout = wide ? .tile : .overlap
+    if sidebar.preferredLayout != layout {
+      sidebar.preferredLayout = layout
+    }
+    if regularPad, !userToggledSidebar, sidebar.isHidden == wide {
+      settingSidebar = true
+      sidebar.isHidden = !wide
+      settingSidebar = false
+    }
+    reportSidebarVisible()
+  }
+
+  /// The tab the last state shows.
+  var shownTab: ChromeTab? { tabFollow.stateTab }
+
+  override var keyCommands: [UIKeyCommand]? {
+    guard mode == .tabSidebar else { return nil }
+    let command = { (title: String, input: String, flags: UIKeyModifierFlags, id: String) in
+      UIKeyCommand(
+        title: title, action: #selector(self.runKeyCommand(_:)), input: input,
+        modifierFlags: flags, propertyList: id)
+    }
+    return [
+      command("Daily Notes", "d", .command, ChromeTab.daily.rawValue),
+      command("All Notes", "a", [.command, .shift], ChromeTab.all.rawValue),
+      command("Tasks", "t", .command, ChromeTab.tasks.rawValue),
+      command("Chat", "j", .command, SidebarRow.chat),
+      command("Search", "k", .command, "search"),
+      command("Settings", ",", .command, "settings"),
+      command("Toggle Sidebar", "\\", .command, "sidebar"),
+    ]
+  }
+
+  @objc private func runKeyCommand(_ command: UIKeyCommand) {
+    guard let id = command.propertyList as? String else { return }
+    switch id {
+    case "settings":
+      send(.sidebar(.settings))
+    case "search":
+      send(.sidebar(.search))
+    case "sidebar":
+      userToggledSidebar = true
+      sidebar.isHidden.toggle()
+    default:
+      if let tab = tab(for: id), tabBarController(self, shouldSelectTab: tab) {
+        selectedTab = tab
+        placeStage()
+      }
     }
   }
 
@@ -179,7 +256,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Puts the stage right above the view that holds the selected
   /// placeholder (so under the tab bar and the sidebar), over the
   /// placeholder's frame, with the placeholder's safe area.
-  private func placeStage() {
+  func placeStage() {
     guard let placeholder = selectedPlaceholder, placeholder.isViewLoaded,
       placeholder.view.window != nil
     else { return }
@@ -243,14 +320,16 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
   }
 
-  private func makeTab(_ tab: ChromeTab) -> UITab {
-    let placeholder = TabPlaceholder()
+  /// A tab whose content is an empty placeholder, which the stage covers
+  /// while the tab is selected.
+  func makeTab(identifier: String, title: String, image: UIImage?) -> UITab {
+    let placeholder = placeholders[identifier] ?? TabPlaceholder()
     placeholder.onLayout = { [weak self, weak placeholder] in
       guard let self, let placeholder, placeholder === self.selectedPlaceholder else { return }
       self.placeStage()
     }
-    placeholders[tab] = placeholder
-    return UITab(title: tab.title, image: tab.image, identifier: tab.rawValue) { _ in
+    placeholders[identifier] = placeholder
+    return UITab(title: title, image: image, identifier: identifier) { _ in
       placeholder
     }
   }
@@ -259,6 +338,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// its `+`, and hides the bars while a web drawer is up, or while the
   /// keyboard is up and the bar sits at the bottom.
   func apply(_ state: ChromeState) {
+    updateSidebar(state.sidebar)
     if let tab = tabFollow.state(state.tab) {
       follow(tab)
     }
@@ -292,9 +372,12 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     send(.plus(entryId: entryId, command: command))
   }
 
-  private func follow(_ chromeTab: ChromeTab) {
+  /// Selects the tab the page shows, or, while the sidebar shows, the
+  /// sidebar row of its state.
+  func follow(_ chromeTab: ChromeTab) {
     standalone.select(chromeTab)
-    if let tab = tabs.first(where: { $0.identifier == chromeTab.rawValue }), selectedTab !== tab {
+    let row = sidebarVisible ? sidebarState?.selection ?? chromeTab.rawValue : chromeTab.rawValue
+    if let tab = tab(for: row) ?? tab(for: chromeTab.rawValue), selectedTab !== tab {
       following = true
       selectedTab = tab
       following = false
@@ -328,8 +411,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   func tabBarController(_ tabBarController: UITabBarController, shouldSelectTab tab: UITab) -> Bool
   {
-    guard !following, let next = ChromeTab(rawValue: tab.identifier) else { return true }
+    guard !following else { return true }
     guard showsShell else { return false }
+    guard let next = ChromeTab(rawValue: tab.identifier) else {
+      // The page opens the row's screen; its state selects the row.
+      if let intent = SidebarRow.intent(for: tab) {
+        send(.sidebar(intent))
+      }
+      return false
+    }
     send(.tab(next))
     if tab !== selectedTab {
       tabFollow.tap(next)

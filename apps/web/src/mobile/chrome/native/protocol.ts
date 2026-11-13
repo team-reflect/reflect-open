@@ -75,6 +75,22 @@ export type NativePlusState =
   | { kind: 'action'; label: string }
 
 /**
+ * What the iPad sidebar shows.
+ */
+export interface NativeSidebarState {
+  /**
+   * The row to select: a tab, `chat`, or a pinned note's path after `pinned:`.
+   */
+  selection: string
+  /** The pinned notes in shelf order, with the names the sidebar shows. */
+  pinned: { path: string; title: string }[]
+  graphName: string
+  /** The graph's color as `#rrggbb`, or `null` for the app's tint. */
+  graphColor: string | null
+  graphMenu: NativeMenuItem[]
+}
+
+/**
  * The chrome state the page posts after every change.
  */
 export interface NativeChromeState {
@@ -100,6 +116,8 @@ export interface NativeChromeState {
   toolbar: NativeToolbarState | null
   /** The `+` of the screen, or `null` for a screen without one. */
   plus: NativePlusState | null
+  /** What the iPad sidebar shows, or `null` outside the shell. */
+  sidebar: NativeSidebarState | null
   theme: 'system' | 'light' | 'dark'
 }
 
@@ -147,6 +165,16 @@ const intentSchema = z.discriminatedUnion('type', [
     entryId: z.number(),
     command: z.enum(['tap', 'note', 'task', 'audio']),
   }),
+  z.object({ type: z.literal('sidebarVisible'), visible: z.boolean() }),
+  z.object({
+    type: z.literal('sidebar'),
+    command: z.discriminatedUnion('kind', [
+      z.object({ kind: z.enum(['chat', 'search', 'settings']) }),
+      z.object({ kind: z.enum(['openNote', 'unpin', 'share']), path: z.string() }),
+      z.object({ kind: z.literal('reorder'), paths: z.array(z.string()) }),
+      z.object({ kind: z.literal('menu'), id: z.string() }),
+    ]),
+  }),
 ])
 
 /**
@@ -154,7 +182,8 @@ const intentSchema = z.discriminatedUnion('type', [
  * the shell's layout. `plus` is a tap on the `+` of an action screen (`tap`)
  * or on one item of the capture menu. `layout` tells whether the shell draws the corner
  * buttons in the page's header row, or in the row of the floating tab bar
- * above it.
+ * above it. `sidebarVisible` tells whether the iPad sidebar shows, and
+ * `sidebar` is a tap in it.
  */
 export type NativeIntent = z.infer<typeof intentSchema>
 

@@ -39,6 +39,17 @@ public final class ChromeBridge {
     }
   }
 
+  /// Whether the iPad sidebar shows. The page starts with `false`; the
+  /// bridge sends a `sidebarVisible` intent when the value changes, and when
+  /// a page gets ready while it is `true`.
+  public var sidebarVisible = false {
+    didSet {
+      if sidebarVisible != oldValue {
+        send(.sidebarVisible(sidebarVisible))
+      }
+    }
+  }
+
   /// Handles one message as JSON data.
   public func receive(_ data: Data) {
     let message: ChromeMessage
@@ -61,6 +72,9 @@ public final class ChromeBridge {
       isReady = true
       if !cornersInHeaderRow {
         send(.layout(cornersInHeaderRow: false))
+      }
+      if sidebarVisible {
+        send(.sidebarVisible(true))
       }
     }
   }

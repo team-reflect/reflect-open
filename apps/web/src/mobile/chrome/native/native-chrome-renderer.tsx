@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type ReactElement,
+} from 'react'
 import { isDeepEqual, returnNull } from '@ocavue/utils'
 import type { NativeChromeService } from '@reflect/app'
 import { deriveStore, WritableStore, type Unlisten } from '@reflect/core'
@@ -28,7 +35,13 @@ import {
   toWirePlus,
   type ScreenBar,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
-import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
+import { toWireMenu } from '@/mobile/chrome/native/sf-symbols.ts'
+import {
+  parseNativeIntent,
+  type NativeChromeMessage,
+  type NativeSidebarState,
+} from '@/mobile/chrome/native/protocol.ts'
+import { sidebarVisible, useSidebar } from '@/mobile/sidebar.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
@@ -174,6 +187,13 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
   const toasts = useToastController()
+  const sidebar = useSidebar(tab)
+  // A new object on every render: compare by value, so an equal sidebar posts no state.
+  const sidebarJson = JSON.stringify({
+    ...sidebar.state,
+    graphMenu: toWireMenu(sidebar.state.graphMenu),
+  })
+  const sidebarState = useMemo(() => JSON.parse(sidebarJson) as NativeSidebarState, [sidebarJson])
 
   useEffect(() => {
     nativeChrome.postState(
@@ -187,10 +207,23 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         keyboardVisible,
         modal,
         toolbar: toolbar?.capabilities ?? null,
+        sidebar: sidebarState,
         theme,
       }),
     )
-  }, [nativeChrome, renderer, route, entryId, tab, bars, keyboardVisible, modal, toolbar, theme])
+  }, [
+    nativeChrome,
+    renderer,
+    route,
+    entryId,
+    tab,
+    bars,
+    keyboardVisible,
+    modal,
+    toolbar,
+    sidebarState,
+    theme,
+  ])
 
   // Kept while the photo picker holds focus, so the editor's toolbar is gone.
   const attachRef = useRef<{ commands: FormattingToolbarCommands; entryId: number } | null>(null)
@@ -200,12 +233,13 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     }
   }, [toolbar, entryId])
 
-  const contextRef = useRef<Pick<IntentContext, 'entryId' | 'selectTab'>>({
+  const contextRef = useRef<Pick<IntentContext, 'entryId' | 'selectTab' | 'runSidebar'>>({
     entryId,
     selectTab: onSelectTab,
+    runSidebar: sidebar.run,
   })
   useLayoutEffect(() => {
-    contextRef.current = { entryId, selectTab: onSelectTab }
+    contextRef.current = { entryId, selectTab: onSelectTab, runSidebar: sidebar.run }
   })
 
   useEffect(() => {
@@ -221,6 +255,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
           attachFiles: renderer.attachFiles,
           toasts,
           setCornersInHeaderRow: (value) => renderer.cornersInHeaderRow.set(value),
+          setSidebarVisible: (value) => sidebarVisible.set(value),
         })
       }
     })

@@ -7,6 +7,7 @@ import {
   NO_ENTRY,
   type NativeChromeState,
   type NativePlusState,
+  type NativeSidebarState,
 } from '@/mobile/chrome/native/protocol.ts'
 import type { ChromeButton, ChromePlus } from '@/mobile/chrome/screen-chrome.ts'
 
@@ -42,6 +43,7 @@ export interface ShellChromeInput {
   keyboardVisible: boolean
   modal: boolean
   toolbar: FormattingToolbarCapabilities | null
+  sidebar: NativeSidebarState | null
   theme: ThemePreference
 }
 
@@ -63,6 +65,7 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     modal: input.modal,
     toolbar: input.toolbar === null ? null : { ...input.toolbar },
     plus: bar?.plus ?? null,
+    sidebar: input.sidebar,
     theme: input.theme,
   }
 }
@@ -85,6 +88,7 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     modal: false,
     toolbar: null,
     plus: null,
+    sidebar: null,
     theme,
   }
 }

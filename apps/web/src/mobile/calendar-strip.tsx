@@ -12,6 +12,9 @@ import { MonthTitle } from '@/mobile/month-title.tsx'
 import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
 import { WeekRow } from '@/mobile/week-row.tsx'
+import { useStore } from '@/lib/use-store.ts'
+import { useMobileForm } from '@/mobile/mobile-form.ts'
+import { sidebarVisible, useGraphMenu } from '@/mobile/sidebar.ts'
 import { useWeekStartDay } from '@/providers/settings-provider.tsx'
 import { useRouterActions } from '@/routing/router.tsx'
 
@@ -81,6 +84,20 @@ export function CalendarStrip({
     showWeekOf(today)
   }
 
+  const pad = useMobileForm() === 'pad'
+  const showsSidebar = useStore(sidebarVisible)
+  const graphMenu = useGraphMenu()
+
+  const runAction = (id: string): void => {
+    if (id === 'today') {
+      jumpToToday()
+    } else if (id === 'settings') {
+      openSettings()
+    } else {
+      graphMenu.run(id)
+    }
+  }
+
   const openSettings = (): void => {
     hapticImpactLight(haptics)
     navigate({ kind: 'settings' })
@@ -108,9 +125,16 @@ export function CalendarStrip({
   return (
     <ChromeTopBar
       align="center"
-      leading={[{ id: 'settings', title: 'Settings', icon: 'settings' }]}
-      trailing={[{ id: 'today', title: 'Today', hidden: !showToday }]}
-      onAction={(id) => (id === 'today' ? jumpToToday() : openSettings())}
+      // On iPad the sidebar holds Settings, or the graph menu does while the
+      // sidebar is hidden.
+      leading={pad ? [] : [{ id: 'settings', title: 'Settings', icon: 'settings' }]}
+      trailing={[
+        { id: 'today', title: 'Today', hidden: !showToday },
+        ...(pad && !showsSidebar
+          ? [{ id: 'graph', title: graphMenu.title, menu: graphMenu.items }]
+          : []),
+      ]}
+      onAction={runAction}
       plus={plus}
       title={
         <h1 className="text-base font-semibold">

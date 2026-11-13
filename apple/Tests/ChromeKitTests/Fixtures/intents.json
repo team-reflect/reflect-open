@@ -5,5 +5,10 @@
   { "type": "command", "id": "indent" },
   { "type": "files", "files": [{ "name": "Image.png", "type": "image/png", "data": "AQID" }] },
   { "type": "layout", "cornersInHeaderRow": false },
-  { "type": "plus", "entryId": 3, "command": "note" }
+  { "type": "plus", "entryId": 3, "command": "note" },
+  { "type": "sidebarVisible", "visible": true },
+  { "type": "sidebar", "command": { "kind": "chat" } },
+  { "type": "sidebar", "command": { "kind": "openNote", "path": "reflect-v2.md" } },
+  { "type": "sidebar", "command": { "kind": "reorder", "paths": ["b.md", "a.md"] } },
+  { "type": "sidebar", "command": { "kind": "menu", "id": "graphs" } }
 ]

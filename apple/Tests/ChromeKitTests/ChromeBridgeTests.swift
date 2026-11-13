@@ -48,6 +48,11 @@ final class ChromeBridgeTests: XCTestCase {
       .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
       .layout(cornersInHeaderRow: false),
       .plus(entryId: 3, command: .note),
+      .sidebarVisible(true),
+      .sidebar(.chat),
+      .sidebar(.openNote("reflect-v2.md")),
+      .sidebar(.reorder(["b.md", "a.md"])),
+      .sidebar(.menu("graphs")),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -135,6 +140,24 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.receive(try message(["type": "chromeReady"]))
 
     XCTAssertEqual(sent, [.layout(cornersInHeaderRow: false), .layout(cornersInHeaderRow: true)])
+  }
+
+  func testSendsTheSidebarVisibilityWhenItChangesAndToANewPage() throws {
+    let bridge = ChromeBridge()
+    var sent: [Bool] = []
+    bridge.send = { data in
+      let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
+      sent.append(object["visible"] as! Bool)
+    }
+
+    bridge.sidebarVisible = true
+    bridge.receive(try message(["type": "chromeReady"]))
+    bridge.sidebarVisible = true
+    bridge.sidebarVisible = false
+    bridge.documentDidStart()
+    bridge.receive(try message(["type": "chromeReady"]))
+
+    XCTAssertEqual(sent, [true, false])
   }
 
   func testANewDocumentResetsTheStateAndTheIntentGate() throws {
