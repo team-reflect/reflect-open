@@ -48,6 +48,10 @@ export interface IntentContext {
    * Runs a tap in the iPad sidebar.
    */
   runSidebar: (command: Extract<NativeIntent, { type: 'sidebar' }>['command']) => void
+  /**
+   * Moves back or forward in the history.
+   */
+  moveHistory: (direction: 'back' | 'forward') => void
 }
 
 const FORMATTING_RUNNERS: Record<
@@ -95,6 +99,11 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'back':
       if (intent.entryId === context.entryId) {
         context.screen?.back?.()
+      }
+      return
+    case 'history':
+      if (intent.entryId === context.entryId) {
+        context.moveHistory(intent.direction)
       }
       return
     case 'tab':

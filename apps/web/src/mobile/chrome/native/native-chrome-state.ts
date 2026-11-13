@@ -44,6 +44,7 @@ export interface ShellChromeInput {
   modal: boolean
   toolbar: FormattingToolbarCapabilities | null
   sidebar: NativeSidebarState | null
+  history: NativeChromeState['history']
   theme: ThemePreference
 }
 
@@ -66,6 +67,7 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     toolbar: input.toolbar === null ? null : { ...input.toolbar },
     plus: bar?.plus ?? null,
     sidebar: input.sidebar,
+    history: input.history,
     theme: input.theme,
   }
 }
@@ -89,6 +91,7 @@ export function buildNoChromeState(theme: ThemePreference): UnnumberedChromeStat
     toolbar: null,
     plus: null,
     sidebar: null,
+    history: null,
     theme,
   }
 }

@@ -118,6 +118,11 @@ export interface NativeChromeState {
   plus: NativePlusState | null
   /** What the iPad sidebar shows, or `null` outside the shell. */
   sidebar: NativeSidebarState | null
+  /**
+   * Where the history can move, while the window has a sidebar; the shell
+   * then shows a back and a forward button in place of the back button.
+   */
+  history: { back: boolean; forward: boolean } | null
   theme: 'system' | 'light' | 'dark'
 }
 
@@ -155,6 +160,11 @@ const fileSchema = z.object({ name: z.string(), type: z.string(), data: z.string
 
 const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('back'), entryId: z.number() }),
+  z.object({
+    type: z.literal('history'),
+    entryId: z.number(),
+    direction: z.enum(['back', 'forward']),
+  }),
   z.object({ type: z.literal('tab'), tab: tabSchema }),
   z.object({ type: z.literal('action'), entryId: z.number(), id: z.string() }),
   z.object({ type: z.literal('command'), id: z.enum(FORMATTING_COMMANDS) }),

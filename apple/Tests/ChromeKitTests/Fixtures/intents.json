@@ -8,6 +8,8 @@
   { "type": "plus", "entryId": 3, "command": "note" },
   { "type": "sidebarVisible", "visible": true },
   { "type": "sidebarVisible", "visible": null },
+  { "type": "history", "entryId": 3, "direction": "back" },
+  { "type": "history", "entryId": 3, "direction": "forward" },
   { "type": "sidebar", "command": { "kind": "chat" } },
   { "type": "sidebar", "command": { "kind": "search" } },
   { "type": "sidebar", "command": { "kind": "settings" } },

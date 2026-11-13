@@ -21,6 +21,7 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     setCornersInHeaderRow: vi.fn(),
     setSidebarVisible: vi.fn(),
     runSidebar: vi.fn(),
+    moveHistory: vi.fn(),
     ...overrides,
   }
 }
@@ -53,7 +54,7 @@ describe('parseNativeIntent', () => {
       '../../../../../../apple/Tests/ChromeKitTests/Fixtures/intents.json',
     )
     const intents = JSON.parse(readFileSync(path, 'utf8')) as unknown[]
-    expect(intents).toHaveLength(16)
+    expect(intents).toHaveLength(18)
     for (const intent of intents) {
       expect(parseNativeIntent(intent)).toEqual(intent)
     }
@@ -71,6 +72,13 @@ describe('runNativeIntent', () => {
     runNativeIntent({ type: 'action', entryId: 5, id: 'more' }, ctx)
     expect(ctx.screen?.back).toHaveBeenCalledOnce()
     expect(ctx.screen?.onAction).toHaveBeenCalledWith('more')
+  })
+
+  it('moves the history only from the screen on screen', () => {
+    const ctx = makeIntentContext()
+    runNativeIntent({ type: 'history', entryId: 4, direction: 'back' }, ctx)
+    runNativeIntent({ type: 'history', entryId: 5, direction: 'forward' }, ctx)
+    expect(ctx.moveHistory).toHaveBeenCalledExactlyOnceWith('forward')
   })
 
   it('passes the sidebar visibility and taps to the page', () => {

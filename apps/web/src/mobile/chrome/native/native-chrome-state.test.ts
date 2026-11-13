@@ -23,6 +23,7 @@ const BASE: Omit<ShellChromeInput, 'route' | 'tab'> = {
   modal: false,
   toolbar: null,
   sidebar: null,
+  history: null,
   theme: 'system',
 }
 
@@ -61,6 +62,7 @@ describe('buildShellChromeState', () => {
         graphColor: '#3b82f6',
         graphMenu: [{ type: 'action', id: 'graphs', title: 'Switch graph…' }],
       },
+      history: { back: true, forward: false },
     })
     expect(state).toMatchObject({ canBack: false })
     checkFixture('daily', state)

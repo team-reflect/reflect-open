@@ -43,7 +43,7 @@ import {
 } from '@/mobile/chrome/native/protocol.ts'
 import { sidebarVisible, useSidebar } from '@/mobile/sidebar.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
-import { useRouterState } from '@/routing/router.tsx'
+import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
 
 /**
@@ -180,7 +180,9 @@ function NativeTopBarCorner(props: TopBarCornerProps): ReactElement | null {
  */
 function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps): null {
   const renderer = useNativeChromeRenderer()
-  const { route, entryId } = useRouterState()
+  const { route, entryId, canBack, canForward } = useRouterState()
+  const { back, forward } = useRouterActions()
+  const showsSidebar = useStore(sidebarVisible) !== null
   const bars = useStore(renderer.bars)
   const modal = useStore(renderer.modal)
   const toolbar = useFormattingToolbar()
@@ -212,6 +214,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         modal,
         toolbar: toolbar?.capabilities ?? null,
         sidebar: sidebarState,
+        history: showsSidebar ? { back: canBack, forward: canForward } : null,
         theme,
       }),
     )
@@ -226,6 +229,9 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     modal,
     toolbar,
     sidebarState,
+    showsSidebar,
+    canBack,
+    canForward,
     theme,
   ])
 
@@ -237,13 +243,18 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     }
   }, [toolbar, entryId])
 
-  const contextRef = useRef<Pick<IntentContext, 'entryId' | 'selectTab' | 'runSidebar'>>({
-    entryId,
-    selectTab: onSelectTab,
-    runSidebar: sidebar.run,
-  })
+  const moveHistory = (direction: 'back' | 'forward'): void => {
+    if (direction === 'back') {
+      back()
+    } else {
+      forward()
+    }
+  }
+  const contextRef = useRef<
+    Pick<IntentContext, 'entryId' | 'selectTab' | 'runSidebar' | 'moveHistory'>
+  >({ entryId, selectTab: onSelectTab, runSidebar: sidebar.run, moveHistory })
   useLayoutEffect(() => {
-    contextRef.current = { entryId, selectTab: onSelectTab, runSidebar: sidebar.run }
+    contextRef.current = { entryId, selectTab: onSelectTab, runSidebar: sidebar.run, moveHistory }
   })
 
   useEffect(() => {

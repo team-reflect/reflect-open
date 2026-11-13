@@ -19,6 +19,8 @@ final class WebPageController: UIViewController {
   /// The `trailing` buttons, in the top-right corner.
   private let trailingGroup = UIStackView()
   private var rowCenters: [NSLayoutConstraint] = []
+  private lazy var leadingEdge = leadingGroup.leadingAnchor.constraint(
+    equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: Self.margin)
 
   /// The center of the row of the corner buttons, from the top of the view.
   /// `nil` centers them on the page's header row, right under the top safe
@@ -31,7 +33,7 @@ final class WebPageController: UIViewController {
   /// and an open menu stays open.
   private var shownLeading: [BarButton]?
   private var shownTrailing: [BarButton]?
-  private var shownCanBack = false
+  private var shownBack = BackButtons.none
   /// The history entry the buttons send their intents for.
   private var shownEntryId: Int?
 
@@ -76,13 +78,31 @@ final class WebPageController: UIViewController {
         cornerButtons.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         cornerButtons.topAnchor.constraint(equalTo: view.topAnchor),
         cornerButtons.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        leadingGroup.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: Self.margin),
+        leadingEdge,
         trailingGroup.trailingAnchor.constraint(
           equalTo: safe.trailingAnchor, constant: -Self.margin),
         leadingGroup.trailingAnchor.constraint(
           lessThanOrEqualTo: trailingGroup.leadingAnchor, constant: -Self.margin),
       ])
     updateRowCenter()
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    let constant = Self.margin + windowControlsWidth
+    if leadingEdge.constant != constant {
+      leadingEdge.constant = constant
+    }
+  }
+
+  /// How far a window's controls reach past the leading safe area, in the
+  /// row of the floating tab bar. The page's own safe area starts under that
+  /// row, so it leaves the controls out.
+  private var windowControlsWidth: CGFloat {
+    guard #available(iOS 26, *), topRowCenter != nil, let window = view.window else { return 0 }
+    let controls = window.edgeInsets(for: .safeArea(cornerAdaptation: .horizontal)).left
+    let start = view.convert(CGPoint.zero, to: window).x + view.safeAreaInsets.left
+    return max(0, controls - start)
   }
 
   override func viewSafeAreaInsetsDidChange() {
@@ -96,6 +116,8 @@ final class WebPageController: UIViewController {
     for constraint in rowCenters where constraint.constant != center {
       constraint.constant = center
     }
+    // The leading edge follows the row: see `windowControlsWidth`.
+    view.setNeedsLayout()
   }
 
   /// Whether the web view is in this page.
@@ -136,27 +158,36 @@ final class WebPageController: UIViewController {
   ) {
     let wasShown = shownEntryId != nil && !cornerButtons.isHidden
     cornerButtons.isHidden = Self.hidesBar(state)
-    let fades = animated && wasShown && state.canBack == shownCanBack
+    let back = BackButtons(state)
+    let fades = animated && wasShown && back == shownBack
     let entryId = state.entryId
     let newEntry = entryId != shownEntryId
     shownEntryId = entryId
 
-    if newEntry || state.leading != shownLeading || state.canBack != shownCanBack {
-      let shown = leadingGroup.arrangedSubviews.dropFirst(state.canBack ? 1 : 0)
-      if !newEntry, state.canBack == shownCanBack, let shownLeading,
+    if newEntry || state.leading != shownLeading || back != shownBack {
+      let shown = leadingGroup.arrangedSubviews.dropFirst(back.count)
+      if !newEntry, back == shownBack, let shownLeading,
         Self.differInMenusOnly(state.leading, shownLeading), shown.count == state.leading.count
       {
         setMenus(of: Array(shown), to: state.leading, entryId: entryId, menus: menus)
       } else {
         var buttons: [UIButton] = []
-        if state.canBack {
-          let button = Self.makeButton(
-            image: UIImage(systemName: "chevron.backward"), title: nil,
-            label: Bundle(for: UIButton.self).localizedString(
-              forKey: "Back", value: "Back", table: nil))
-          button.addAction(
-            UIAction { _ in send(.back(entryId: entryId)) }, for: .primaryActionTriggered)
-          buttons.append(button)
+        switch back {
+        case .none:
+          break
+        case .back:
+          buttons.append(
+            Self.makeArrow(forward: false) { send(.back(entryId: entryId)) })
+        case .history(let history):
+          let backButton = Self.makeArrow(forward: false) {
+            send(.history(entryId: entryId, forward: false))
+          }
+          backButton.isEnabled = history.back
+          let forwardButton = Self.makeArrow(forward: true) {
+            send(.history(entryId: entryId, forward: true))
+          }
+          forwardButton.isEnabled = history.forward
+          buttons += [backButton, forwardButton]
         }
         buttons += state.leading.map {
           cornerButton($0, entryId: entryId, menus: menus, send: send)
@@ -164,7 +195,7 @@ final class WebPageController: UIViewController {
         setButtons(buttons, in: leadingGroup, fades: fades && state.leading != shownLeading)
       }
       shownLeading = state.leading
-      shownCanBack = state.canBack
+      shownBack = back
     }
 
     if newEntry || state.trailing != shownTrailing {
@@ -181,6 +212,16 @@ final class WebPageController: UIViewController {
       }
       shownTrailing = state.trailing
     }
+  }
+
+  /// A back or forward arrow that runs `action`.
+  private static func makeArrow(forward: Bool, action: @escaping () -> Void) -> UIButton {
+    let name = forward ? "Forward" : "Back"
+    let button = makeButton(
+      image: UIImage(systemName: forward ? "chevron.forward" : "chevron.backward"), title: nil,
+      label: Bundle(for: UIButton.self).localizedString(forKey: name, value: name, table: nil))
+    button.addAction(UIAction { _ in action() }, for: .primaryActionTriggered)
+    return button
   }
 
   /// Puts `buttons` in `group`, with a cross-fade when `fades`.
@@ -237,7 +278,7 @@ final class WebPageController: UIViewController {
     setButtons([], in: trailingGroup, fades: false)
     shownLeading = nil
     shownTrailing = nil
-    shownCanBack = false
+    shownBack = .none
     shownEntryId = nil
     setBarDimmed(false)
     setBarFaded(false, animated: false)
@@ -314,5 +355,30 @@ final class PassthroughView: UIView {
   override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
     let hit = super.hitTest(point, with: event)
     return hit === self ? nil : hit
+  }
+}
+
+/// The arrows before the `leading` buttons: none, the back button of the
+/// screen, or the back and forward buttons of the history.
+private enum BackButtons: Equatable {
+  case none
+  case back
+  case history(HistoryState)
+
+  init(_ state: ChromeState) {
+    if let history = state.history {
+      self = .history(history)
+    } else {
+      self = state.canBack ? .back : .none
+    }
+  }
+
+  /// The number of buttons.
+  var count: Int {
+    switch self {
+    case .none: 0
+    case .back: 1
+    case .history: 2
+    }
   }
 }

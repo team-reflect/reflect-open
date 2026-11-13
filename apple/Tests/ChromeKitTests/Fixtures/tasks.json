@@ -15,6 +15,7 @@
     "label": "New task"
   },
   "sidebar": null,
+  "history": null,
   "theme": "system",
   "generation": 1
 }

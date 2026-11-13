@@ -50,6 +50,8 @@ final class ChromeBridgeTests: XCTestCase {
       .plus(entryId: 3, command: .note),
       .sidebarVisible(true),
       .sidebarVisible(nil),
+      .history(entryId: 3, forward: false),
+      .history(entryId: 3, forward: true),
       .sidebar(.chat),
       .sidebar(.search),
       .sidebar(.settings),
@@ -66,6 +68,8 @@ final class ChromeBridgeTests: XCTestCase {
   func testDailyFixtureHasTheGearAndTheTodayButton() throws {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("daily"))
     XCTAssertEqual(state.routeKind, "today")
+    XCTAssertEqual(state.history?.back, true)
+    XCTAssertEqual(state.history?.forward, false)
     XCTAssertEqual(state.leading.first?.icon, "gearshape")
     XCTAssertEqual(state.trailing.map(\.id), ["today"])
   }

@@ -43,6 +43,10 @@
       }
     ]
   },
+  "history": {
+    "back": true,
+    "forward": false
+  },
   "theme": "system",
   "generation": 1
 }

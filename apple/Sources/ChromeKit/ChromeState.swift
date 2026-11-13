@@ -41,7 +41,16 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   public var plus: PlusSpec?
   /// What the iPad sidebar shows.
   public var sidebar: SidebarState?
+  /// Where the history can move, while the window has a sidebar. The shell
+  /// then shows a back and a forward button in place of the back button.
+  public var history: HistoryState?
   public var theme: Theme
+}
+
+/// Whether the history can move back and forward.
+public struct HistoryState: Decodable, Equatable, Sendable {
+  public var back: Bool
+  public var forward: Bool
 }
 
 /// What the iPad sidebar shows.
@@ -251,6 +260,9 @@ public enum FormattingCommand: String, CaseIterable, Encodable, Sendable {
 /// the shell's layout.
 public enum ChromeIntent: Encodable, Equatable, Sendable {
   case back(entryId: Int)
+  /// A move back (`forward: false`) or forward in the history, from the
+  /// screen of `entryId`.
+  case history(entryId: Int, forward: Bool)
   case tab(ChromeTab)
   case action(entryId: Int, id: String)
   case command(FormattingCommand)
@@ -266,7 +278,7 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
   case sidebar(SidebarIntent)
 
   private enum CodingKeys: String, CodingKey {
-    case type, entryId, tab, id, files, cornersInHeaderRow, command, visible
+    case type, entryId, tab, id, files, cornersInHeaderRow, command, visible, direction
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -275,6 +287,10 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
     case .back(let entryId):
       try container.encode("back", forKey: .type)
       try container.encode(entryId, forKey: .entryId)
+    case .history(let entryId, let forward):
+      try container.encode("history", forKey: .type)
+      try container.encode(entryId, forKey: .entryId)
+      try container.encode(forward ? "forward" : "back", forKey: .direction)
     case .tab(let tab):
       try container.encode("tab", forKey: .type)
       try container.encode(tab, forKey: .tab)

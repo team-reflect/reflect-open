@@ -72,6 +72,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   var reportedSidebarVisible: Bool?
   /// The history entry of the last state, which `plus` intents echo.
   private var entryId: Int?
+  /// Where the history of the last state can move.
+  private var history: HistoryState?
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -235,6 +237,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       command("Search", "k", .command, "search"),
       command("Settings", ",", .command, "settings"),
       command("Toggle Sidebar", "\\", .command, "sidebar"),
+      command("Back", "[", .command, "back"),
+      command("Forward", "]", .command, "forward"),
     ]
   }
 
@@ -245,6 +249,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       send(.sidebar(.settings))
     case "search":
       send(.sidebar(.search))
+    case "back", "forward":
+      guard let entryId, let history,
+        id == "back" ? history.back : history.forward
+      else { return }
+      send(.history(entryId: entryId, forward: id == "forward"))
     case "sidebar":
       userToggledSidebar = true
       sidebar.isHidden.toggle()
@@ -360,6 +369,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     hidesForKeyboard = state.keyboardVisible
     plus.update(state.plus)
     entryId = state.entryId
+    history = state.history
     updateTabBarHidden()
   }
 
@@ -405,6 +415,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     hidesForKeyboard = false
     showsShell = false
     entryId = nil
+    history = nil
     page.clearBar()
     setTabBarHidden(true, animated: false)
     standalone.bar.isHidden = true
