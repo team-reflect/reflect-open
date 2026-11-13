@@ -4765,7 +4765,6 @@ dependencies = [
  "git2",
  "rusqlite",
  "serde",
- "serde_json",
  "specta",
  "specta-serde",
  "specta-swift",

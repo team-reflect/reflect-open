@@ -1,6 +1,6 @@
-// Generates `@reflect/types`, the `TypesShared` Swift module, and the
-// `fixtures/wire` samples from the wire types in `crates/types`, then formats
-// the Swift file with `swift format` (macOS only).
+// Generates `@reflect/types` and the `TypesShared` Swift module from the wire
+// types in `crates/types`, then formats the Swift file with `swift format`
+// (macOS only).
 //
 //   pnpm gen:types
 

@@ -43,7 +43,7 @@ let modules: [Module] = [
   Module(name: "KeyboardKit", layer: .engine),
   Module(name: "RecordingShared", layer: .shared),
   Module(name: "RecordingKit", layer: .engine, deps: ["RecordingShared"], hasTests: true),
-  Module(name: "TypesShared", layer: .shared, hasTests: true),
+  Module(name: "TypesShared", layer: .shared),
   Module(name: "WebAuthKit", layer: .engine),
   Module(name: "WebHostKit", layer: .engine, deps: ["TypesShared"], hasTests: true),
 ]

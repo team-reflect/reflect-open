@@ -1,11 +1,10 @@
-//! Writes the TypeScript (`@reflect/types`), Swift (`TypesShared`), and
-//! fixture files generated from the wire types. Run `pnpm gen:types`.
+//! Writes the TypeScript (`@reflect/types`) and Swift (`TypesShared`) files
+//! generated from the wire types. Run `pnpm gen:types`.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use reflect_types::{AppError, ChangeKind, FileChange, FileMeta, events};
-use serde::Serialize;
+use reflect_types::{AppError, FileChange, FileMeta, events};
 use specta::Types;
 use specta::datatype::{DataType, Primitive};
 
@@ -25,11 +24,6 @@ fn main() {
     write(
         &root.join("apple/Sources/TypesShared/Wire.gen.swift"),
         &swift(&types),
-    );
-    let samples = write_fixtures(&root.join("fixtures/wire"));
-    write(
-        &root.join("packages/types/src/wire.samples.gen.ts"),
-        &samples,
     );
 }
 
@@ -139,83 +133,6 @@ fn add_public_inits(swift: &str) -> String {
         out.push_str("}\n");
     }
     out
-}
-
-/// One JSON file per type: an array of samples as serde writes them. The
-/// Swift tests decode every sample. Returns the same samples as a TypeScript
-/// module, where `satisfies` makes `tsc` check them against the generated
-/// types.
-fn write_fixtures(dir: &Path) -> String {
-    let mut ts = format!(
-        "// {HEADER}\nimport type {{ AppError, ChangeKind, FileChange, FileMeta }} from './wire.gen.ts'\n\nexport const samples = {{\n"
-    );
-    fixture(
-        dir,
-        &mut ts,
-        "AppError",
-        &[
-            AppError::Io {
-                message: "disk full".into(),
-                git_code: Some(-14),
-            },
-            AppError::not_found("notes/a.md"),
-            AppError::traversal("../etc/passwd"),
-            AppError::no_graph(),
-            AppError::parse("bad frontmatter"),
-            AppError::Auth {
-                message: "token expired".into(),
-            },
-            AppError::Network {
-                message: "offline".into(),
-            },
-            AppError::Unknown {
-                message: "boom".into(),
-            },
-        ],
-    );
-    fixture(
-        dir,
-        &mut ts,
-        "ChangeKind",
-        &[ChangeKind::Upsert, ChangeKind::Remove],
-    );
-    fixture(
-        dir,
-        &mut ts,
-        "FileChange",
-        &[
-            FileChange::upsert("notes/a.md", Some(1_763_000_000_000)),
-            FileChange::upsert("notes/b.md", None),
-            FileChange::remove("notes/a.md"),
-        ],
-    );
-    fixture(
-        dir,
-        &mut ts,
-        "FileMeta",
-        &[
-            FileMeta {
-                path: "notes/a.md".into(),
-                size: 3,
-                modified_ms: 1_763_000_000_000,
-                placeholder: false,
-            },
-            FileMeta {
-                path: "notes/b.md".into(),
-                size: 0,
-                modified_ms: 9,
-                placeholder: true,
-            },
-        ],
-    );
-    ts.push_str("}\n");
-    ts
-}
-
-fn fixture<T: Serialize>(dir: &Path, ts: &mut String, name: &str, samples: &[T]) {
-    let json = serde_json::to_string_pretty(samples).expect("serialize fixture");
-    write(&dir.join(format!("{name}.json")), &format!("{json}\n"));
-    writeln!(ts, "  {name}: {json} satisfies {name}[],").unwrap();
 }
 
 fn write(path: &PathBuf, contents: &str) {

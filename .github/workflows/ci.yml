@@ -74,7 +74,6 @@ jobs:
             'scripts/generate-types.ts'
             'packages/types/src/*.gen.ts'
             'apple/Sources/TypesShared/*'
-            'fixtures/wire/*'
           )
           swift_files=(
             '.github/*'
@@ -83,7 +82,6 @@ jobs:
             'apple/*'
             'apps/ios/*'
             'apps/safari-extension/*'
-            'fixtures/wire/*'
             'scripts/build-ffi.ts'
             'scripts/test-ios.ts'
           )
@@ -365,7 +363,7 @@ jobs:
         if: matrix.name == 'macOS'
         run: |
           pnpm gen:types
-          git diff --exit-code packages/types apple/Sources/TypesShared fixtures/wire \
+          git diff --exit-code packages/types apple/Sources/TypesShared \
             || (echo "::error::Generated wire types are stale. Run 'pnpm gen:types' and commit the result." && exit 1)
 
       - if: matrix.name == 'Linux'
