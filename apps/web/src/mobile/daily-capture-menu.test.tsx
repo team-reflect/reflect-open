@@ -1,3 +1,4 @@
+import { noop } from '@ocavue/utils'
 import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -6,7 +7,6 @@ import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { useDailyCapture } from './daily-capture-menu.tsx'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
-import { PlusSlot } from '@/mobile/chrome/web/web-plus.tsx'
 import {
   WritableStore,
   type MobileAudioMemoSessionState,
@@ -94,7 +94,8 @@ function DailyCaptureMenu(): ReactElement {
   const { plus, sheet } = useDailyCapture()
   return (
     <>
-      <PlusSlot className="fixed right-4 bottom-4" />
+      {/* The `pad` bars put the `+` in the bottom-right corner. */}
+      <renderer.ShellBars form="pad" tab="daily" keyboardVisible={false} onSelectTab={noop} />
       <renderer.Plus plus={plus} />
       {sheet}
     </>
