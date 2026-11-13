@@ -18,7 +18,6 @@ describe('safe-area utilities', () => {
       '--twsa-safe-area-inset-right',
       '--keyboard-height',
       '--mobile-tab-bar-height',
-      '--chrome-bottom-bar',
       '--chrome-safe-bottom',
     ]) {
       root.style.removeProperty(name)
@@ -41,13 +40,6 @@ describe('safe-area utilities', () => {
     expect(styleOf('pb-above-keyboard', 'padding-bottom')).toBe(0)
     root.style.setProperty('--keyboard-height', '300px')
     expect(styleOf('pb-above-keyboard', 'padding-bottom')).toBe(300)
-  })
-
-  it('floats above the keyboard and the bottom bar of the chrome', () => {
-    root.style.setProperty('--chrome-bottom-bar', '52px')
-    expect(styleOf('fixed bottom-above-chrome-offset-4', 'bottom')).toBe(68)
-    root.style.setProperty('--keyboard-height', '300px')
-    expect(styleOf('fixed bottom-above-chrome-offset-4', 'bottom')).toBe(368)
   })
 
   it('clears the safe area the chrome leaves to the page', () => {

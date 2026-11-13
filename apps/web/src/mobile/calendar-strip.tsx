@@ -4,6 +4,7 @@ import { addDaysToIsoDate, getYearMonth } from '@reflect/utils'
 import { getUserWeekStart } from '@reflect/core'
 import { monthPickTarget, weekAtIndex } from '@reflect/app'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
+import type { ChromePlus } from '@/mobile/chrome/screen-chrome.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
 import { MonthPicker } from '@/mobile/month-picker.tsx'
@@ -32,6 +33,7 @@ interface CalendarStripProps {
   resetSeq: number
   /** Select a day — drives the carousel and the route. */
   onSelect: (date: string) => void
+  plus: ChromePlus
 }
 
 /**
@@ -50,6 +52,7 @@ export function CalendarStrip({
   today,
   resetSeq,
   onSelect,
+  plus,
 }: CalendarStripProps): ReactElement {
   const { haptics } = useMobileServices()
   const weekStartDay = useWeekStartDay()
@@ -108,6 +111,7 @@ export function CalendarStrip({
       leading={[{ id: 'settings', title: 'Settings', icon: 'settings' }]}
       trailing={[{ id: 'today', title: 'Today', hidden: !showToday }]}
       onAction={(id) => (id === 'today' ? jumpToToday() : openSettings())}
+      plus={plus}
       title={
         <h1 className="text-base font-semibold">
           <MonthPicker

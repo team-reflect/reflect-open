@@ -10,6 +10,7 @@
   "keyboardVisible": false,
   "modal": false,
   "toolbar": null,
+  "plus": null,
   "theme": "light",
   "generation": 1
 }

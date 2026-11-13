@@ -37,7 +37,45 @@ public struct ChromeState: Decodable, Equatable, Sendable {
   /// A web drawer is open.
   public var modal: Bool
   public var toolbar: ToolbarState?
+  /// The `+` of the screen, or `nil` for a screen without one.
+  public var plus: PlusSpec?
   public var theme: Theme
+}
+
+/// The `+` of a screen: Daily's capture menu, or one action.
+public enum PlusSpec: Decodable, Equatable, Sendable {
+  /// The capture menu. `audio` is the audio memo phase, or `nil` where the
+  /// recorder is unavailable: the menu then has no audio item.
+  case capture(audio: AudioPhase?)
+  /// One action. `label` is the accessibility label.
+  case action(label: String)
+
+  private enum CodingKeys: String, CodingKey {
+    case kind, audio, label
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    switch try container.decode(String.self, forKey: .kind) {
+    case "capture":
+      self = .capture(audio: try container.decodeIfPresent(AudioPhase.self, forKey: .audio))
+    case "action":
+      self = .action(label: try container.decode(String.self, forKey: .label))
+    case let kind:
+      throw DecodingError.dataCorruptedError(
+        forKey: .kind, in: container, debugDescription: "Unknown plus kind \(kind)")
+    }
+  }
+}
+
+/// The phase of the audio memo recorder.
+public enum AudioPhase: String, Decodable, Sendable {
+  case idle, requesting, recording, transcribing, error
+}
+
+/// A tap on the `+` (`tap`) or on one item of the capture menu.
+public enum PlusCommand: String, Encodable, Sendable {
+  case tap, note, task, audio
 }
 
 /// A tab of the shell.
@@ -199,9 +237,11 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
   /// Whether the corner buttons sit in the page's header row (`true`), or in
   /// the row of the floating tab bar above it (`false`).
   case layout(cornersInHeaderRow: Bool)
+  /// A tap on the `+` of the screen of `entryId`.
+  case plus(entryId: Int, command: PlusCommand)
 
   private enum CodingKeys: String, CodingKey {
-    case type, entryId, tab, id, files, cornersInHeaderRow
+    case type, entryId, tab, id, files, cornersInHeaderRow, command
   }
 
   public func encode(to encoder: any Encoder) throws {
@@ -226,6 +266,10 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
     case .layout(let cornersInHeaderRow):
       try container.encode("layout", forKey: .type)
       try container.encode(cornersInHeaderRow, forKey: .cornersInHeaderRow)
+    case .plus(let entryId, let command):
+      try container.encode("plus", forKey: .type)
+      try container.encode(entryId, forKey: .entryId)
+      try container.encode(command, forKey: .command)
     }
   }
 }

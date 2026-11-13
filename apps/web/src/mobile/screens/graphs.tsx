@@ -74,7 +74,7 @@ export function MobileGraphs(): ReactElement {
   }
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
+    <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
         align="center"
         back={() => (canBack ? back() : navigate({ kind: 'settings' }))}

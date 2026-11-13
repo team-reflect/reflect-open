@@ -30,7 +30,7 @@ export function MobileChat(): ReactElement {
   const goBack = (): void => (canBack ? back() : navigate({ kind: 'today' }))
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
+    <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
         back={goBack}
         trailing={

@@ -41,6 +41,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Whether the page shows its shell, so a tap on a tab moves to it. The
   /// iPad sidebar stays tappable while the tab bar is hidden.
   private var showsShell = false
+  /// The form of the bottom chrome, resolved on every layout.
+  private var form: BottomForm = .bar
+  /// The tab bar of the `bar` form. The system tab bar shows in the others.
+  private lazy var standalone = StandaloneTabBar { [weak self] tab in
+    self?.selectFromStandalone(tab)
+  }
+  private let plus = PlusChrome()
+  /// The history entry of the last state, which `plus` intents echo.
+  private var entryId: Int?
 
   init(webView: WKWebView) {
     self.webView = webView
@@ -48,11 +57,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     super.init(nibName: nil, bundle: nil)
     // The page draws its own top row, under the native corner buttons.
     stage.setNavigationBarHidden(true, animated: false)
-    tabs = [
-      makeTab(.daily, title: "Daily", image: UIImage(systemName: "square.and.pencil")),
-      makeTab(.all, title: "All", image: UIImage(systemName: "doc.on.doc")),
-      makeTab(.tasks, title: "Tasks", image: Self.outlineSymbol("checkmark.circle")),
-    ]
+    tabs = ChromeTab.allCases.map(makeTab)
     // A shown sidebar pins the content beside it.
     sidebar.preferredLayout = .tile
     delegate = self
@@ -69,6 +74,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     // The launch look: no bars before the first state.
     isTabBarHidden = true
     page.attach(webView)
+    plus.send = { [weak self] command in self?.sendPlus(command) }
+    standalone.bar.isHidden = true
     registerForTraitChanges([UITraitHorizontalSizeClass.self]) {
       (self: Self, _: UITraitCollection) in
       self.updateTabBarHidden()
@@ -102,7 +109,53 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+    // The system lays its tab bar out as a vertical rail on an iPhone Duo, and
+    // keeps that frame while the bar is hidden.
+    let next: BottomForm =
+      traitCollection.userInterfaceIdiom == .pad && traitCollection.horizontalSizeClass == .regular
+      ? .pad : tabBar.frame.height > tabBar.frame.width ? .rail : .bar
+    if next != form {
+      form = next
+      updateTabBarHidden()
+    }
+    layoutBottomChrome()
     placeStage()
+  }
+
+  /// Places the standalone tab bar and the `+` for the form, and gives the
+  /// placeholders the standalone bar's height as a bottom inset.
+  private func layoutBottomChrome() {
+    let bounds = view.bounds
+    let safe = view.safeAreaInsets
+    var inset: CGFloat = 0
+    switch form {
+    case .bar:
+      if standalone.bar.superview !== view {
+        view.addSubview(standalone.bar)
+      }
+      view.bringSubviewToFront(standalone.bar)
+      let items = standalone.layout(in: view, leading: safe.left + 24)
+      if !standalone.bar.isHidden {
+        inset = max(0, bounds.maxY - standalone.bar.frame.minY - safe.bottom)
+      }
+      plus.layout(
+        in: view, center: CGPoint(x: bounds.maxX - safe.right - 20 - 26, y: items.midY),
+        size: 52)
+    case .rail:
+      // The `+` sits above the system's tabs, wherever the rail puts them.
+      let items = tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
+      if !items.isNull {
+        plus.layout(in: view, center: CGPoint(x: items.midX, y: items.minY - 16 - 22), size: 44)
+      }
+    case .pad:
+      let area = bounds.inset(by: safe)
+      plus.layout(
+        in: view, center: CGPoint(x: area.maxX - 24 - 28, y: area.maxY - 24 - 28), size: 56)
+    }
+    for placeholder in placeholders.values
+    where placeholder.additionalSafeAreaInsets.bottom != inset {
+      placeholder.additionalSafeAreaInsets.bottom = inset
+    }
   }
 
   /// Shows the sidebar and its toggle in a window of at least
@@ -190,34 +243,21 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
   }
 
-  /// A template image of a symbol at the tab bar's 23 pt symbol size. The tab
-  /// bar shows a symbol's `.fill` variant, but shows a bitmap as it is.
-  private static func outlineSymbol(_ name: String) -> UIImage? {
-    let configuration = UIImage.SymbolConfiguration(pointSize: 23)
-    guard
-      let symbol = UIImage(systemName: name, variableValue: 1, configuration: configuration)
-    else { return nil }
-    let bitmap = UIGraphicsImageRenderer(size: symbol.size).image { _ in
-      symbol.draw(at: .zero)
-    }
-    return bitmap.withRenderingMode(.alwaysTemplate)
-  }
-
-  private func makeTab(_ tab: ChromeTab, title: String, image: UIImage?) -> UITab {
+  private func makeTab(_ tab: ChromeTab) -> UITab {
     let placeholder = TabPlaceholder()
     placeholder.onLayout = { [weak self, weak placeholder] in
       guard let self, let placeholder, placeholder === self.selectedPlaceholder else { return }
       self.placeStage()
     }
     placeholders[tab] = placeholder
-    return UITab(title: title, image: image, identifier: tab.rawValue) { _ in
+    return UITab(title: tab.title, image: tab.image, identifier: tab.rawValue) { _ in
       placeholder
     }
   }
 
-  /// Follows a state: selects its tab, holds the web view in its page, and
-  /// hides the bar while a web drawer is up, or while the keyboard is up and
-  /// the bar sits at the bottom.
+  /// Follows a state: selects its tab, holds the web view in its page, shows
+  /// its `+`, and hides the bars while a web drawer is up, or while the
+  /// keyboard is up and the bar sits at the bottom.
   func apply(_ state: ChromeState) {
     if let tab = tabFollow.state(state.tab) {
       follow(tab)
@@ -225,21 +265,35 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     showsShell = state.chrome != .none
     hidesForState = !showsShell || state.modal
     hidesForKeyboard = state.keyboardVisible
+    plus.update(state.plus)
+    entryId = state.entryId
     updateTabBarHidden()
   }
 
-  /// On an iPad in a regular width the bar sits at the top, where the
-  /// keyboard never reaches it.
+  /// Only the `bar` form sits where the keyboard rises: the rail stands beside
+  /// it, and the iPad bar sits at the top. The `+` hides with the keyboard in
+  /// every form.
   private func updateTabBarHidden() {
-    let atBottom =
-      traitCollection.userInterfaceIdiom != .pad || traitCollection.horizontalSizeClass != .regular
-    let hidden = hidesForState || (hidesForKeyboard && atBottom)
-    if hidden != isTabBarHidden {
-      setTabBarHidden(hidden, animated: true)
+    let hidden = hidesForState || (hidesForKeyboard && form == .bar)
+    let systemHidden = hidden || form == .bar
+    if systemHidden != isTabBarHidden {
+      setTabBarHidden(systemHidden, animated: true)
     }
+    let standaloneHidden = hidden || form != .bar
+    if standaloneHidden != standalone.bar.isHidden {
+      standalone.bar.isHidden = standaloneHidden
+      view.setNeedsLayout()
+    }
+    plus.setHidden(hidesForState || hidesForKeyboard)
+  }
+
+  private func sendPlus(_ command: PlusCommand) {
+    guard let entryId else { return }
+    send(.plus(entryId: entryId, command: command))
   }
 
   private func follow(_ chromeTab: ChromeTab) {
+    standalone.select(chromeTab)
     if let tab = tabs.first(where: { $0.identifier == chromeTab.rawValue }), selectedTab !== tab {
       following = true
       selectedTab = tab
@@ -254,8 +308,22 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     hidesForState = true
     hidesForKeyboard = false
     showsShell = false
+    entryId = nil
     page.clearBar()
     setTabBarHidden(true, animated: false)
+    standalone.bar.isHidden = true
+    plus.update(nil)
+  }
+
+  /// A tap on the standalone tab bar runs like a tap on the system one.
+  private func selectFromStandalone(_ chromeTab: ChromeTab) {
+    guard let tab = tabs.first(where: { $0.identifier == chromeTab.rawValue }) else { return }
+    if tabBarController(self, shouldSelectTab: tab) {
+      selectedTab = tab
+      placeStage()
+    } else if let shown = (selectedTab?.identifier).flatMap(ChromeTab.init(rawValue:)) {
+      standalone.select(shown)
+    }
   }
 
   func tabBarController(_ tabBarController: UITabBarController, shouldSelectTab tab: UITab) -> Bool
@@ -309,5 +377,49 @@ final class TabPlaceholder: UIViewController {
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     onLayout()
+  }
+}
+
+/// Where the shell draws the tab capsule and the `+`.
+private enum BottomForm {
+  /// The iPhone: the standalone capsule at the bottom-leading edge, the `+` on
+  /// its row at the trailing edge.
+  case bar
+  /// The iPhone Duo: the system's vertical tab rail at the trailing edge, the
+  /// `+` above it.
+  case rail
+  /// The iPad: the system's tab bar at the top, the `+` in the bottom-right
+  /// corner.
+  case pad
+}
+
+extension ChromeTab {
+  var title: String {
+    switch self {
+    case .daily: "Daily"
+    case .all: "All"
+    case .tasks: "Tasks"
+    }
+  }
+
+  var image: UIImage? {
+    switch self {
+    case .daily: UIImage(systemName: "square.and.pencil")
+    case .all: UIImage(systemName: "doc.on.doc")
+    case .tasks: Self.outlineSymbol("checkmark.circle")
+    }
+  }
+
+  /// A template image of a symbol at the tab bar's 23 pt symbol size. The tab
+  /// bar shows a symbol's `.fill` variant, but shows a bitmap as it is.
+  private static func outlineSymbol(_ name: String) -> UIImage? {
+    let configuration = UIImage.SymbolConfiguration(pointSize: 23)
+    guard
+      let symbol = UIImage(systemName: name, variableValue: 1, configuration: configuration)
+    else { return nil }
+    let bitmap = UIGraphicsImageRenderer(size: symbol.size).image { _ in
+      symbol.draw(at: .zero)
+    }
+    return bitmap.withRenderingMode(.alwaysTemplate)
   }
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { Route } from '@reflect/app'
+import type { AudioMemoPhase } from '@reflect/core'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 
 /**
@@ -66,6 +67,14 @@ export interface NativeToolbarState {
 }
 
 /**
+ * The `+` of the screen: Daily's capture menu, which shows the audio
+ * action only with a phase, or one action with an accessibility label.
+ */
+export type NativePlusState =
+  | { kind: 'capture'; audio: AudioMemoPhase | null }
+  | { kind: 'action'; label: string }
+
+/**
  * The chrome state the page posts after every change.
  */
 export interface NativeChromeState {
@@ -89,6 +98,8 @@ export interface NativeChromeState {
   /** A web drawer is open: the shell hides its bars. */
   modal: boolean
   toolbar: NativeToolbarState | null
+  /** The `+` of the screen, or `null` for a screen without one. */
+  plus: NativePlusState | null
   theme: 'system' | 'light' | 'dark'
 }
 
@@ -131,11 +142,17 @@ const intentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('command'), id: z.enum(FORMATTING_COMMANDS) }),
   z.object({ type: z.literal('files'), files: z.array(fileSchema) }),
   z.object({ type: z.literal('layout'), cornersInHeaderRow: z.boolean() }),
+  z.object({
+    type: z.literal('plus'),
+    entryId: z.number(),
+    command: z.enum(['tap', 'note', 'task', 'audio']),
+  }),
 ])
 
 /**
  * What the shell sends the page: a tap on a native control, or a change of
- * the shell's layout. `layout` tells whether the shell draws the corner
+ * the shell's layout. `plus` is a tap on the `+` of an action screen (`tap`)
+ * or on one item of the capture menu. `layout` tells whether the shell draws the corner
  * buttons in the page's header row, or in the row of the floating tab bar
  * above it.
  */

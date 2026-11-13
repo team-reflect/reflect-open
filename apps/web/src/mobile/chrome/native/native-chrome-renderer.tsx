@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react'
-import { isDeepEqual } from '@ocavue/utils'
+import { isDeepEqual, returnNull } from '@ocavue/utils'
 import type { NativeChromeService } from '@reflect/app'
 import { deriveStore, WritableStore, type Unlisten } from '@reflect/core'
 import {
@@ -25,6 +25,7 @@ import {
 import {
   buildNoChromeState,
   buildShellChromeState,
+  toWirePlus,
   type ScreenBar,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
 import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
@@ -45,12 +46,9 @@ class NativeChromeRenderer implements ChromeRenderer {
   readonly #modalCount = new WritableStore(0)
   readonly TopBarCorner = NativeTopBarCorner
   readonly ShellBars = NativeShellBars
+  // The shell draws the `+` that `registerScreen` snapshots.
+  readonly Plus = returnNull
   readonly NoChrome = NativeNoChrome
-  // The native bars sit in the safe area, so the page clears it.
-  readonly shellStyle = {
-    '--chrome-bottom-bar': '0px',
-    '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
-  } as CSSProperties
   /**
    * A snapshot of the bar of every registered screen, keyed by the history
    * entry the screen shows. A screen kept mounted under a stacked card keeps
@@ -74,12 +72,13 @@ class NativeChromeRenderer implements ChromeRenderer {
 
   registerScreen(entryId: number, chrome: { readonly current: ScreenChrome }): Unlisten {
     this.#screens.set(entryId, chrome)
-    const { back, leading, trailing } = chrome.current
+    const { back, leading, trailing, plus } = chrome.current
     // A copy, so an in-place change of the screen's buttons is a change.
     const bar = structuredClone({
       canBack: back !== undefined,
       leading: leading ?? [],
       trailing: trailing ?? [],
+      plus: plus === undefined ? null : toWirePlus(plus),
     })
     this.#updateBars((bars) => {
       bars.set(entryId, bar)
@@ -93,6 +92,11 @@ class NativeChromeRenderer implements ChromeRenderer {
         bars.delete(entryId)
       })
     }
+  }
+
+  // The native bars sit in the safe area, so the page clears it in every form.
+  shellStyle(): CSSProperties {
+    return { '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)' } as CSSProperties
   }
 
   /**

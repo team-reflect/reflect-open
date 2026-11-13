@@ -1,9 +1,12 @@
+import { noop } from '@ocavue/utils'
+import type { ReactElement } from 'react'
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { createTestCoreServices, makeOpenTask, type TestCoreServices } from '@reflect/core/testing'
 import { renderInApp, type InAppRenderResult } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { DailyCaptureMenu } from './daily-capture-menu.tsx'
+import { useDailyCapture } from './daily-capture-menu.tsx'
+import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import {
   WritableStore,
   type MobileAudioMemoSessionState,
@@ -83,6 +86,19 @@ function focusedSheetEditor(): Promise<HTMLElement> {
 function captureToggle(view: InAppRenderResult<TestCoreServices>): HTMLButtonElement | null {
   return view.container.querySelector<HTMLButtonElement>(
     'button[aria-controls="daily-capture-actions"]',
+  )
+}
+
+function DailyCaptureMenu(): ReactElement {
+  const renderer = useChromeRenderer()
+  const { plus, sheet } = useDailyCapture()
+  return (
+    <>
+      {/* The `pad` bars put the `+` in the bottom-right corner. */}
+      <renderer.ShellBars form="pad" tab="daily" keyboardVisible={false} onSelectTab={noop} />
+      <renderer.Plus plus={plus} />
+      {sheet}
+    </>
   )
 }
 

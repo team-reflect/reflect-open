@@ -18,6 +18,7 @@ import {
   routeForPath,
 } from '@reflect/app'
 import { queryKeys } from '@/lib/query-client.ts'
+import { newNoteRoute } from '@/lib/commands/app-commands.ts'
 import { MobileAskRow } from '@/mobile/ask-row.tsx'
 import { MobileChatButton } from '@/mobile/chat-button.tsx'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
@@ -95,7 +96,7 @@ export function MobileAllNotes({
   onFiltersChange,
 }: MobileAllNotesProps): ReactElement {
   const graph = useGraphInfo()
-  const { noteList, search } = useCoreServices()
+  const { noteList, search, noteCreation } = useCoreServices()
   const { arrivalSeq, arrivalFocusEditor, canBack } = useRouterState()
   const { navigate, back } = useRouterActions()
   const enabled = graph !== null
@@ -149,9 +150,14 @@ export function MobileAllNotes({
   }
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
+    <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
         back={tag === null ? undefined : canBack ? back : clearRouteTag}
+        plus={{
+          kind: 'action',
+          label: 'New note',
+          onTap: () => navigate(newNoteRoute(noteCreation)),
+        }}
         title={
           <>
             <SearchInput

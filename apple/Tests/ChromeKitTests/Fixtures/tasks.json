@@ -10,6 +10,10 @@
   "keyboardVisible": false,
   "modal": false,
   "toolbar": null,
+  "plus": {
+    "kind": "action",
+    "label": "New task"
+  },
   "theme": "system",
   "generation": 1
 }

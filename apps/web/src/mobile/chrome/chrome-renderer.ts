@@ -8,7 +8,8 @@ import {
   type CSSProperties,
 } from 'react'
 import type { Unlisten } from '@reflect/core'
-import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import type { ChromePlus, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import type { MobileForm } from '@/mobile/mobile-form.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 
@@ -26,6 +27,7 @@ export interface ShellBarsProps {
   tab: MobileTab
   onSelectTab: (tab: MobileTab) => void
   keyboardVisible: boolean
+  form: MobileForm
 }
 
 /**
@@ -46,10 +48,15 @@ export interface ChromeRenderer {
    */
   readonly TopBarCorner: ComponentType<TopBarCornerProps>
   /**
-   * The bars of the routed shell: the tab bar, or the formatting toolbar
-   * while the keyboard is up.
+   * The bars of the routed shell in `form`. While the keyboard is up the
+   * formatting toolbar replaces the `bar` row; the rail and the pad's top
+   * capsule stay on screen.
    */
   readonly ShellBars: ComponentType<ShellBarsProps>
+  /**
+   * The `+` of a screen, which its top bar renders.
+   */
+  readonly Plus: ComponentType<{ plus: ChromePlus }>
   /**
    * Marks a surface outside the routed shell, which shows no shell bars.
    */
@@ -58,7 +65,7 @@ export interface ChromeRenderer {
    * The `--chrome-*` variables of the shell root, for content that clears
    * the bars (`styles/index.css`).
    */
-  readonly shellStyle: CSSProperties
+  shellStyle(form: MobileForm): CSSProperties
   /**
    * Register the chrome of the screen on top for `entryId` and take a
    * snapshot of its corners; returns the unregister, which keeps a
@@ -97,8 +104,8 @@ export function useChromeRenderer(): ChromeRenderer {
 
 /**
  * Declare this screen's chrome for the history entry it shows. `chrome` may
- * be a new object on every render: only a change of its buttons, or of
- * whether it has `back`, reaches the renderer.
+ * be a new object on every render: only a change of its buttons, of its `+`,
+ * or of whether it has `back`, reaches the renderer.
  */
 export function useScreenChrome(chrome: ScreenChrome): void {
   const renderer = useChromeRenderer()
@@ -108,7 +115,13 @@ export function useScreenChrome(chrome: ScreenChrome): void {
   useLayoutEffect(() => {
     chromeRef.current = chrome
   })
-  const key = JSON.stringify([chrome.leading, chrome.trailing, chrome.back !== undefined])
+  // `JSON.stringify` leaves out the `+` handlers.
+  const key = JSON.stringify([
+    chrome.leading,
+    chrome.trailing,
+    chrome.back !== undefined,
+    chrome.plus,
+  ])
 
   // A layout effect, so the chrome is registered before the passive effects
   // of the same commit run. A change of `key` registers a new snapshot.

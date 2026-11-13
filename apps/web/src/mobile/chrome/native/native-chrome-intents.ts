@@ -4,9 +4,11 @@ import {
 } from '@/editor/formatting-toolbar-store.ts'
 import type { ToastController } from '@/lib/use-toasts.ts'
 import { runChromeAction } from '@/mobile/chrome/chrome-action.ts'
-import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import type { ChromePlus, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import type { MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import type { FormattingCommandId, NativeIntent } from '@/mobile/chrome/native/protocol.ts'
+
+type PlusCommand = Extract<NativeIntent, { type: 'plus' }>['command']
 
 /**
  * Inserts files into an editor after the inserts it was given before.
@@ -108,6 +110,25 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
     case 'layout':
       context.setCornersInHeaderRow(intent.cornersInHeaderRow)
       return
+    case 'plus': {
+      const plus = context.screen?.plus
+      if (intent.entryId === context.entryId && plus !== undefined) {
+        runPlusCommand(plus, intent.command)
+      }
+      return
+    }
+  }
+}
+
+function runPlusCommand(plus: ChromePlus, command: PlusCommand): void {
+  if (plus.kind === 'action') {
+    plus.onTap()
+  } else if (command === 'note') {
+    plus.onNote()
+  } else if (command === 'task') {
+    plus.onTask()
+  } else if (command === 'audio') {
+    plus.onAudio()
   }
 }
 

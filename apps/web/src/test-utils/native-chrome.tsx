@@ -7,7 +7,7 @@ import type { RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 
 function TestShellBars(): ReactElement {
   const renderer = useChromeRenderer()
-  return <renderer.ShellBars tab="daily" keyboardVisible={false} onSelectTab={noop} />
+  return <renderer.ShellBars form="bar" tab="daily" keyboardVisible={false} onSelectTab={noop} />
 }
 
 /**

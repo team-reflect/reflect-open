@@ -24,22 +24,14 @@ Cascade layer order, low to high priority.
 /* `tailwindcss-safe-area` knows neither the software keyboard nor the tab bar.
    These clear the home indicator, or the keyboard while it is up
    (`--keyboard-height`, mobile/use-keyboard.ts), or the tab bar
-   (`--mobile-tab-bar-height`, mobile/mobile-tab-bar.tsx). */
+   (`--mobile-tab-bar-height`, mobile/chrome/web/web-chrome-renderer.tsx). */
 @utility pb-above-keyboard {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px));
 }
-/* The chrome renderer of the shell (mobile/chrome/) sets the height of the
-   bottom bar the page draws (`--chrome-bottom-bar`) and the bottom safe area
-   the page must clear itself (`--chrome-safe-bottom`). Floating buttons sit
-   above the keyboard and the bar; edge-to-edge content clears the safe area,
-   and, with `-unless-keyboard`, only while the keyboard is down: the shell
-   root then already ends at the keyboard's top. */
-@utility bottom-above-chrome-offset-* {
-  bottom: calc(
-    max(env(safe-area-inset-bottom, 0px), var(--keyboard-height, 0px)) +
-      var(--chrome-bottom-bar, 0px) + var(--spacing) * --value(integer)
-  );
-}
+/* The chrome renderer of the shell (mobile/chrome/) sets the bottom safe
+   area the page must clear itself (`--chrome-safe-bottom`). Edge-to-edge
+   content clears it, and, with `-unless-keyboard`, only while the keyboard is
+   down: the shell root then already ends at the keyboard's top. */
 @utility pb-chrome-safe-offset-* {
   padding-bottom: calc(var(--chrome-safe-bottom, 0px) + var(--spacing) * --value(integer));
 }

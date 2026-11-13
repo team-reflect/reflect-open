@@ -47,6 +47,7 @@ final class ChromeBridgeTests: XCTestCase {
       .command(.indent),
       .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
       .layout(cornersInHeaderRow: false),
+      .plus(entryId: 3, command: .note),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -58,6 +59,17 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(state.routeKind, "today")
     XCTAssertEqual(state.leading.first?.icon, "gearshape")
     XCTAssertEqual(state.trailing.map(\.id), ["today"])
+  }
+
+  func testFixturesCarryThePlusOfTheScreen() throws {
+    let decoder = JSONDecoder()
+    XCTAssertEqual(
+      try decoder.decode(ChromeState.self, from: try fixture("daily")).plus,
+      .capture(audio: .idle))
+    XCTAssertEqual(
+      try decoder.decode(ChromeState.self, from: try fixture("tasks")).plus,
+      .action(label: "New task"))
+    XCTAssertNil(try decoder.decode(ChromeState.self, from: try fixture("none")).plus)
   }
 
   func testNoteFixtureCarriesTheConfirmationAndTheToolbar() throws {

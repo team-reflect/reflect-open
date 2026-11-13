@@ -26,7 +26,7 @@ export function MobileNote({ path }: { path: string }): ReactElement {
   const close = (): void => (canBack ? back() : navigate({ kind: 'today' }))
 
   return (
-    <div className="flex h-full w-screen flex-col pt-safe">
+    <div className="flex h-full w-full flex-col pt-safe">
       <MobileNoteHeader path={path} untitled={untitled} close={close} />
       <main
         // Keyboard avoidance is the shell root's job (it ends at the
