@@ -722,9 +722,13 @@ mod tests {
         assert!(cache.cached_file_id(&root.join("notes/b.md.tmp")).is_some());
         for skipped in [
             ".git",
+            ".git/objects",
+            ".git/objects/aa",
             ".git/objects/aa/bb",
+            ".reflect",
             ".reflect/index.sqlite",
             "node_modules",
+            "node_modules/pkg",
             "node_modules/pkg/x.js",
         ] {
             assert!(
