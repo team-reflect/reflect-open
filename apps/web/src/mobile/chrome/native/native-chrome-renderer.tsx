@@ -1,12 +1,5 @@
-import {
-  use,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  type CSSProperties,
-  type ReactElement,
-} from 'react'
-import { isDeepEqual } from '@ocavue/utils'
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactElement } from 'react'
+import { isDeepEqual, returnNull } from '@ocavue/utils'
 import type { NativeChromeService } from '@reflect/app'
 import { deriveStore, WritableStore, type Unlisten } from '@reflect/core'
 import {
@@ -16,14 +9,13 @@ import {
 import { useStore } from '@/lib/use-store.ts'
 import { useToastController } from '@/lib/use-toasts.ts'
 import {
-  ChromeLayerContext,
   useChromeRenderer,
   type ChromeRenderer,
   type ShellBarsProps,
   type StackMotion,
   type TopBarCornerProps,
 } from '@/mobile/chrome/chrome-renderer.ts'
-import type { ChromePlus, ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
+import type { ScreenChrome } from '@/mobile/chrome/screen-chrome.ts'
 import { WebTopBarCorner } from '@/mobile/chrome/web/web-top-bar-corner.tsx'
 import {
   createAttachQueue,
@@ -36,11 +28,7 @@ import {
   toWirePlus,
   type ScreenBar,
 } from '@/mobile/chrome/native/native-chrome-state.ts'
-import {
-  parseNativeIntent,
-  type NativeChromeMessage,
-  type NativePlusState,
-} from '@/mobile/chrome/native/protocol.ts'
+import { parseNativeIntent, type NativeChromeMessage } from '@/mobile/chrome/native/protocol.ts'
 import { useThemeSetting } from '@/providers/settings-provider.tsx'
 import { useRouterState } from '@/routing/router.tsx'
 import { useAppServices } from '@/services/services-provider.tsx'
@@ -52,20 +40,15 @@ import { useAppServices } from '@/services/services-provider.tsx'
 class NativeChromeRenderer implements ChromeRenderer {
   readonly #nativeChrome: NativeChromeService
   readonly #screens = new Map<number, { readonly current: ScreenChrome }>()
-  readonly #pluses = new Map<number, { readonly current: ChromePlus }>()
   /**
    * How many web drawers are open.
    */
   readonly #modalCount = new WritableStore(0)
   readonly TopBarCorner = NativeTopBarCorner
   readonly ShellBars = NativeShellBars
-  readonly Plus = NativePlus
+  // The shell draws the `+` that `registerScreen` snapshots.
+  readonly Plus = returnNull
   readonly NoChrome = NativeNoChrome
-  /**
-   * The `+` of every registered screen without its handlers, keyed like
-   * {@link bars}.
-   */
-  readonly pluses = new WritableStore<ReadonlyMap<number, NativePlusState>>(new Map(), isDeepEqual)
   /**
    * A snapshot of the bar of every registered screen, keyed by the history
    * entry the screen shows. A screen kept mounted under a stacked card keeps
@@ -89,12 +72,13 @@ class NativeChromeRenderer implements ChromeRenderer {
 
   registerScreen(entryId: number, chrome: { readonly current: ScreenChrome }): Unlisten {
     this.#screens.set(entryId, chrome)
-    const { back, leading, trailing } = chrome.current
+    const { back, leading, trailing, plus } = chrome.current
     // A copy, so an in-place change of the screen's buttons is a change.
     const bar = structuredClone({
       canBack: back !== undefined,
       leading: leading ?? [],
       trailing: trailing ?? [],
+      plus: plus === undefined ? null : toWirePlus(plus),
     })
     this.#updateBars((bars) => {
       bars.set(entryId, bar)
@@ -110,39 +94,9 @@ class NativeChromeRenderer implements ChromeRenderer {
     }
   }
 
-  /**
-   * Register the `+` of the screen on top for `entryId`, like
-   * {@link registerScreen}.
-   */
-  registerPlus(entryId: number, plus: { readonly current: ChromePlus }): Unlisten {
-    this.#pluses.set(entryId, plus)
-    this.#updatePluses((pluses) => {
-      pluses.set(entryId, toWirePlus(plus.current))
-    })
-    return () => {
-      if (this.#pluses.get(entryId) !== plus) {
-        return
-      }
-      this.#pluses.delete(entryId)
-      this.#updatePluses((pluses) => {
-        pluses.delete(entryId)
-      })
-    }
-  }
-
-  /**
-   * The `+` registered for `entryId`.
-   */
-  screenPlus(entryId: number): ChromePlus | undefined {
-    return this.#pluses.get(entryId)?.current
-  }
-
   // The native bars sit in the safe area, so the page clears it in every form.
   shellStyle(): CSSProperties {
-    return {
-      '--chrome-bottom-bar': '0px',
-      '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
-    } as CSSProperties
+    return { '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)' } as CSSProperties
   }
 
   /**
@@ -167,12 +121,6 @@ class NativeChromeRenderer implements ChromeRenderer {
     const next = new Map(this.bars.get())
     update(next)
     this.bars.set(next)
-  }
-
-  #updatePluses(update: (pluses: Map<number, NativePlusState>) => void): void {
-    const next = new Map(this.pluses.get())
-    update(next)
-    this.pluses.set(next)
   }
 }
 
@@ -221,7 +169,6 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const renderer = useNativeChromeRenderer()
   const { route, entryId } = useRouterState()
   const bars = useStore(renderer.bars)
-  const pluses = useStore(renderer.pluses)
   const modal = useStore(renderer.modal)
   const toolbar = useFormattingToolbar()
   const theme = useThemeSetting()
@@ -240,23 +187,10 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         keyboardVisible,
         modal,
         toolbar: toolbar?.capabilities ?? null,
-        plus: renderer.pluses.get().get(entryId),
         theme,
       }),
     )
-  }, [
-    nativeChrome,
-    renderer,
-    route,
-    entryId,
-    tab,
-    bars,
-    pluses,
-    keyboardVisible,
-    modal,
-    toolbar,
-    theme,
-  ])
+  }, [nativeChrome, renderer, route, entryId, tab, bars, keyboardVisible, modal, toolbar, theme])
 
   // Kept while the photo picker holds focus, so the editor's toolbar is gone.
   const attachRef = useRef<{ commands: FormattingToolbarCommands; entryId: number } | null>(null)
@@ -283,7 +217,6 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
         runNativeIntent(intent, {
           ...context,
           screen: renderer.screenChrome(context.entryId),
-          plus: renderer.screenPlus(context.entryId),
           attachCommands: attach?.entryId === context.entryId ? attach.commands : null,
           attachFiles: renderer.attachFiles,
           toasts,
@@ -295,26 +228,6 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
     return unlisten
   }, [nativeChrome, renderer, toasts])
 
-  return null
-}
-
-/**
- * Registers the screen's `+` for the shell to draw. Renders nothing.
- */
-function NativePlus({ plus }: { plus: ChromePlus }): null {
-  const renderer = useNativeChromeRenderer()
-  const { entryId } = useRouterState()
-  const onTop = use(ChromeLayerContext)
-  const plusRef = useRef(plus)
-  useLayoutEffect(() => {
-    plusRef.current = plus
-  })
-  const key = JSON.stringify(toWirePlus(plus))
-  useLayoutEffect(() => {
-    if (onTop) {
-      return renderer.registerPlus(entryId, plusRef)
-    }
-  }, [renderer, onTop, entryId, key])
   return null
 }
 

@@ -20,7 +20,6 @@ import {
 import { queryKeys } from '@/lib/query-client.ts'
 import { MobileAskRow } from '@/mobile/ask-row.tsx'
 import { MobileChatButton } from '@/mobile/chat-button.tsx'
-import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { FilterBar } from '@/mobile/search-filters/filter-bar.tsx'
 import { NoteRowList } from '@/mobile/note-row-list.tsx'
 import { SearchInput } from '@/mobile/search-input.tsx'
@@ -97,7 +96,6 @@ export function MobileAllNotes({
 }: MobileAllNotesProps): ReactElement {
   const graph = useGraphInfo()
   const { noteList, search, noteCreation } = useCoreServices()
-  const chromeRenderer = useChromeRenderer()
   const { arrivalSeq, arrivalFocusEditor, canBack } = useRouterState()
   const { navigate, back } = useRouterActions()
   const enabled = graph !== null
@@ -154,6 +152,11 @@ export function MobileAllNotes({
     <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
         back={tag === null ? undefined : canBack ? back : clearRouteTag}
+        plus={{
+          kind: 'action',
+          label: 'New note',
+          onTap: () => navigate({ kind: 'note', path: noteCreation.untitledNotePath() }),
+        }}
         title={
           <>
             <SearchInput
@@ -201,13 +204,6 @@ export function MobileAllNotes({
       ) : (
         <NoteRowList rows={rows} onOpen={(path) => navigate(routeForPath(path))} />
       )}
-      <chromeRenderer.Plus
-        plus={{
-          kind: 'action',
-          label: 'New note',
-          onTap: () => navigate({ kind: 'note', path: noteCreation.untitledNotePath() }),
-        }}
-      />
     </div>
   )
 }

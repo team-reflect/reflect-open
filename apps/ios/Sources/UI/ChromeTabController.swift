@@ -48,7 +48,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     self?.selectFromStandalone(tab)
   }
   private let plus = PlusChrome()
-  private var plusSpec: PlusSpec?
   /// The history entry of the last state, which `plus` intents echo.
   private var entryId: Int?
 
@@ -110,10 +109,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    let next = BottomForm.resolve(
-      regularPad: traitCollection.userInterfaceIdiom == .pad
-        && traitCollection.horizontalSizeClass == .regular,
-      tabBarFrame: tabBar.frame)
+    // The system lays its tab bar out as a vertical rail on an iPhone Duo, and
+    // keeps that frame while the bar is hidden.
+    let next: BottomForm =
+      traitCollection.userInterfaceIdiom == .pad && traitCollection.horizontalSizeClass == .regular
+      ? .pad : tabBar.frame.height > tabBar.frame.width ? .rail : .bar
     if next != form {
       form = next
       updateTabBarHidden()
@@ -270,7 +270,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     showsShell = state.chrome != .none
     hidesForState = !showsShell || state.modal
     hidesForKeyboard = state.keyboardVisible
-    plusSpec = state.plus
+    plus.update(state.plus)
     entryId = state.entryId
     updateTabBarHidden()
   }
@@ -289,7 +289,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       standalone.bar.isHidden = standaloneHidden
       view.setNeedsLayout()
     }
-    plus.update(plusSpec, hidden: hidesForState || hidesForKeyboard)
+    plus.setHidden(hidesForState || hidesForKeyboard)
   }
 
   private func sendPlus(_ command: PlusCommand) {
@@ -313,12 +313,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     hidesForState = true
     hidesForKeyboard = false
     showsShell = false
-    plusSpec = nil
     entryId = nil
     page.clearBar()
     setTabBarHidden(true, animated: false)
     standalone.bar.isHidden = true
-    plus.update(nil, hidden: true)
+    plus.update(nil)
   }
 
   /// A tap on the standalone tab bar runs like a tap on the system one.
@@ -383,5 +382,49 @@ final class TabPlaceholder: UIViewController {
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     onLayout()
+  }
+}
+
+/// Where the shell draws the tab capsule and the `+`.
+private enum BottomForm {
+  /// The iPhone: the standalone capsule at the bottom-leading edge, the `+` on
+  /// its row at the trailing edge.
+  case bar
+  /// The iPhone Duo: the system's vertical tab rail at the trailing edge, the
+  /// `+` above it.
+  case rail
+  /// The iPad: the system's tab bar at the top, the `+` in the bottom-right
+  /// corner.
+  case pad
+}
+
+extension ChromeTab {
+  var title: String {
+    switch self {
+    case .daily: "Daily"
+    case .all: "All"
+    case .tasks: "Tasks"
+    }
+  }
+
+  var image: UIImage? {
+    switch self {
+    case .daily: UIImage(systemName: "square.and.pencil")
+    case .all: UIImage(systemName: "doc.on.doc")
+    case .tasks: Self.outlineSymbol("checkmark.circle")
+    }
+  }
+
+  /// A template image of a symbol at the tab bar's 23 pt symbol size. The tab
+  /// bar shows a symbol's `.fill` variant, but shows a bitmap as it is.
+  private static func outlineSymbol(_ name: String) -> UIImage? {
+    let configuration = UIImage.SymbolConfiguration(pointSize: 23)
+    guard
+      let symbol = UIImage(systemName: name, variableValue: 1, configuration: configuration)
+    else { return nil }
+    let bitmap = UIGraphicsImageRenderer(size: symbol.size).image { _ in
+      symbol.draw(at: .zero)
+    }
+    return bitmap.withRenderingMode(.alwaysTemplate)
   }
 }

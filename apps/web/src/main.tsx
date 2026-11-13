@@ -8,7 +8,6 @@ import { queryClient } from '@/lib/query-client.ts'
 import { registerAppCommands } from '@/lib/commands/app-commands.ts'
 import { installNativeMenu } from '@/lib/native-menu/menu.ts'
 import { registerAppKeymaps } from '@/lib/shortcuts.ts'
-import { startMobileForm } from '@/mobile/mobile-form.ts'
 import { startPerfHud } from '@/perf-hud/flag.ts'
 import { PlatformRoot, warmPlatformRoot } from '@platform-root'
 import { EditorFullWidthEffect } from '@/providers/editor-full-width.tsx'
@@ -27,7 +26,6 @@ installNativeMenu(appServices.nativeMenu).catch((cause: unknown) => {
 })
 
 startPerfHud()
-startMobileForm()
 
 const rootElement = document.getElementById('root')
 if (!rootElement) {

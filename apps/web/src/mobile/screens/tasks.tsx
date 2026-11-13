@@ -20,7 +20,6 @@ import { SearchInput } from '@/mobile/search-input.tsx'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet.tsx'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer.tsx'
 import { MobileTaskGroup } from '@/mobile/task-group.tsx'
-import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus.ts'
@@ -51,7 +50,6 @@ export function MobileTasks(): ReactElement {
   const graph = useGraphInfo()
   const { arrivalSeq, arrivalFocusEditor } = useRouterState()
   const { navigate } = useRouterActions()
-  const chromeRenderer = useChromeRenderer()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
   const [query, setQuery] = useState('')
@@ -145,6 +143,7 @@ export function MobileTasks(): ReactElement {
   return (
     <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
+        plus={{ kind: 'action', label: 'New task', onTap: () => onAdd(todaysDailyTarget(today)) }}
         title={
           <>
             <SearchInput
@@ -219,9 +218,6 @@ export function MobileTasks(): ReactElement {
           ))}
         </div>
       )}
-      <chromeRenderer.Plus
-        plus={{ kind: 'action', label: 'New task', onTap: () => onAdd(todaysDailyTarget(today)) }}
-      />
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet
           key={getTaskKey(liveEditingTask)}

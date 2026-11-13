@@ -88,6 +88,10 @@ export interface ScreenChrome {
    * the user; its message is the text the user reads.
    */
   onAction?: ((id: string) => MaybePromise<void>) | undefined
+  /**
+   * The screen's `+`.
+   */
+  plus?: ChromePlus | undefined
 }
 
 /**

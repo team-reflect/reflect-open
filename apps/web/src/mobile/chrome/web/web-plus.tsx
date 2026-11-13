@@ -24,6 +24,8 @@ const ACTION_BUTTON_MOTION =
  */
 const PLACEMENT: Record<MobileForm, string> = {
   bar: 'right-safe-offset-3 bottom-safe-offset-3 size-14',
+  // The rail's capsule is 38 spacing tall (three `size-12` tabs and `p-1`) at
+  // `bottom-safe-offset-2`; the `+` sits 3 spacing above it.
   rail: 'right-safe-offset-3 bottom-safe-offset-43 size-12',
   pad: 'right-safe-offset-6 bottom-safe-offset-6 size-14',
 }
@@ -103,7 +105,7 @@ function CaptureDial({ plus }: { plus: Extract<ChromePlus, { kind: 'capture' }> 
           className={cn(
             ACTION_MOTION,
             expanded
-              ? 'pointer-events-auto z-[1] -translate-y-[125%] scale-100 opacity-100 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+              ? 'pointer-events-auto z-[1] -translate-y-5/4 scale-100 opacity-100 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
               : 'pointer-events-none z-[1] translate-y-0 scale-50 opacity-0 delay-[50ms] duration-200 ease-[cubic-bezier(0.64,0,0.78,0)]',
           )}
         >
@@ -124,7 +126,7 @@ function CaptureDial({ plus }: { plus: Extract<ChromePlus, { kind: 'capture' }> 
           className={cn(
             ACTION_MOTION,
             expanded
-              ? 'pointer-events-auto -translate-y-[250%] scale-100 opacity-100 delay-[35ms] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+              ? 'pointer-events-auto -translate-y-5/2 scale-100 opacity-100 delay-[35ms] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
               : 'pointer-events-none translate-y-0 scale-50 opacity-0 delay-[25ms] duration-200 ease-[cubic-bezier(0.64,0,0.78,0)]',
           )}
         >
@@ -146,7 +148,7 @@ function CaptureDial({ plus }: { plus: Extract<ChromePlus, { kind: 'capture' }> 
             className={cn(
               ACTION_MOTION,
               expanded
-                ? 'pointer-events-auto -translate-y-[375%] scale-100 opacity-100 delay-[70ms] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
+                ? 'pointer-events-auto -translate-y-15/4 scale-100 opacity-100 delay-[70ms] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]'
                 : 'pointer-events-none translate-y-0 scale-50 opacity-0 duration-200 ease-[cubic-bezier(0.64,0,0.78,0)]',
             )}
           >

@@ -15,7 +15,6 @@ function makeIntentContext(overrides: Partial<IntentContext> = {}): IntentContex
     entryId: 5,
     selectTab: vi.fn(),
     screen: { back: vi.fn(), onAction: vi.fn() },
-    plus: undefined,
     attachCommands: null,
     attachFiles: createAttachQueue(),
     toasts: { add: vi.fn(), close: vi.fn() },
@@ -80,7 +79,7 @@ describe('runNativeIntent', () => {
       onTask: vi.fn(),
       onAudio: vi.fn(),
     }
-    const ctx = makeIntentContext({ plus })
+    const ctx = makeIntentContext({ screen: { plus } })
     runNativeIntent({ type: 'plus', entryId: 4, command: 'note' }, ctx)
     expect(plus.onNote).not.toHaveBeenCalled()
     runNativeIntent({ type: 'plus', entryId: 5, command: 'task' }, ctx)
@@ -89,7 +88,7 @@ describe('runNativeIntent', () => {
     const onTap = vi.fn()
     runNativeIntent(
       { type: 'plus', entryId: 5, command: 'tap' },
-      makeIntentContext({ plus: { kind: 'action', label: 'New note', onTap } }),
+      makeIntentContext({ screen: { plus: { kind: 'action', label: 'New note', onTap } } }),
     )
     expect(onTap).toHaveBeenCalledOnce()
   })

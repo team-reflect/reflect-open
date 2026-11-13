@@ -17,20 +17,16 @@ export type MobileFormOverride = MobileForm | 'auto'
 
 const PAD_QUERY = '(min-width: 768px)'
 
-const override = new WritableStore<MobileFormOverride>('auto')
-
+/**
+ * Reads `?mobile-form=bar|rail|pad`. A web page cannot tell an iPhone Duo
+ * from an iPhone, so the rail shows only when pinned.
+ */
 function readUrlOverride(): MobileFormOverride {
   const value = new URLSearchParams(window.location.search).get('mobile-form')
   return value === 'bar' || value === 'rail' || value === 'pad' ? value : 'auto'
 }
 
-/**
- * Pins the form from `?mobile-form=bar|rail|pad`. A web page cannot tell an
- * iPhone Duo from an iPhone, so the rail shows only when pinned.
- */
-export function startMobileForm(): void {
-  override.set(readUrlOverride())
-}
+const override = new WritableStore<MobileFormOverride>(readUrlOverride())
 
 /**
  * Pins the form until the page reloads.

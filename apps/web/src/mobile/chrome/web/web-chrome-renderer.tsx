@@ -76,27 +76,21 @@ function BarRow({ tab, onSelectTab }: Pick<ShellBarsProps, 'tab' | 'onSelectTab'
 }
 
 /**
- * The bar row is in the shell's flow, so the page clears only what floats over
- * it. The rail and the top capsule float, so the shell pads for them and the
- * page clears the bottom safe area itself.
+ * The bar row is in the shell's flow. The rail and the top capsule float, so
+ * the shell pads for them and the page clears the bottom safe area itself.
  */
 function webShellStyle(form: MobileForm): CSSProperties {
   switch (form) {
     case 'bar':
-      // The row's height above the bottom safe area, which it pads itself.
-      return {
-        '--chrome-bottom-bar': 'calc(var(--spacing) * 20)',
-        '--chrome-safe-bottom': '0px',
-      } as CSSProperties
+      // The row pads the bottom safe area itself.
+      return { '--chrome-safe-bottom': '0px' } as CSSProperties
     case 'rail':
       return {
-        '--chrome-bottom-bar': '0px',
         '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
         paddingRight: 'calc(var(--spacing) * 16)',
       } as CSSProperties
     case 'pad':
       return {
-        '--chrome-bottom-bar': '0px',
         '--chrome-safe-bottom': 'var(--twsa-safe-area-inset-bottom)',
         paddingTop: 'calc(var(--spacing) * 20)',
       } as CSSProperties

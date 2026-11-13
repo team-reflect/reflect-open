@@ -53,7 +53,7 @@ export interface ChromeRenderer {
    */
   readonly ShellBars: ComponentType<ShellBarsProps>
   /**
-   * The `+` of the screen that renders it.
+   * The `+` of a screen, which its top bar renders.
    */
   readonly Plus: ComponentType<{ plus: ChromePlus }>
   /**
@@ -103,8 +103,8 @@ export function useChromeRenderer(): ChromeRenderer {
 
 /**
  * Declare this screen's chrome for the history entry it shows. `chrome` may
- * be a new object on every render: only a change of its buttons, or of
- * whether it has `back`, reaches the renderer.
+ * be a new object on every render: only a change of its buttons, of its `+`,
+ * or of whether it has `back`, reaches the renderer.
  */
 export function useScreenChrome(chrome: ScreenChrome): void {
   const renderer = useChromeRenderer()
@@ -114,7 +114,13 @@ export function useScreenChrome(chrome: ScreenChrome): void {
   useLayoutEffect(() => {
     chromeRef.current = chrome
   })
-  const key = JSON.stringify([chrome.leading, chrome.trailing, chrome.back !== undefined])
+  // `JSON.stringify` leaves out the `+` handlers.
+  const key = JSON.stringify([
+    chrome.leading,
+    chrome.trailing,
+    chrome.back !== undefined,
+    chrome.plus,
+  ])
 
   // A layout effect, so the chrome is registered before the passive effects
   // of the same commit run. A change of `key` registers a new snapshot.

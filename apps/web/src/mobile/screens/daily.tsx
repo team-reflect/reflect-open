@@ -1,7 +1,7 @@
 import { useCallback, type ReactElement } from 'react'
 import { useToday } from '@/lib/use-today.ts'
 import { CalendarStrip } from '@/mobile/calendar-strip.tsx'
-import { DailyCaptureMenu } from '@/mobile/daily-capture-menu.tsx'
+import { useDailyCapture } from '@/mobile/daily-capture-menu.tsx'
 import { DayCarousel } from '@/mobile/day-carousel.tsx'
 import { useDailyArrivals } from '@/mobile/use-daily-arrivals.ts'
 import { useSwipeTarget } from '@/mobile/use-swipe-target.ts'
@@ -48,6 +48,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // surface, and a capture arrival focuses the day's editor; the arrival
   // bookkeeping (including a focus request racing this surface's remount)
   // lives in use-daily-arrivals.ts.
+  const capture = useDailyCapture()
   const { resetSeq, focusDate, consumeFocus } = useDailyArrivals({
     arrivalSeq,
     arrivalFocusEditor,
@@ -61,6 +62,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         today={today}
         resetSeq={resetSeq}
         onSelect={select}
+        plus={capture.plus}
       />
       <DayCarousel
         date={date}
@@ -72,7 +74,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         onSelect={select}
         onTarget={followSwipeTarget}
       />
-      <DailyCaptureMenu />
+      {capture.sheet}
     </div>
   )
 }

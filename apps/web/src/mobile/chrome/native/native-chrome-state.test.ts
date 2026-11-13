@@ -22,7 +22,6 @@ const BASE: Omit<ShellChromeInput, 'route' | 'tab'> = {
   keyboardVisible: false,
   modal: false,
   toolbar: null,
-  plus: undefined,
   theme: 'system',
 }
 
@@ -52,8 +51,8 @@ describe('buildShellChromeState', () => {
           { id: 'today', title: 'Today' },
           { id: 'hidden', title: 'Hidden', hidden: true },
         ],
+        plus: { kind: 'capture', audio: 'idle' },
       },
-      plus: { kind: 'capture', audio: 'idle' },
     })
     expect(state).toMatchObject({ canBack: false })
     checkFixture('daily', state)
@@ -61,7 +60,7 @@ describe('buildShellChromeState', () => {
 
   it('shows the back button on a pushed screen', () => {
     const route: Route = { kind: 'note', path: 'ideas.md' }
-    const bar = { canBack: true, leading: [], trailing: [] }
+    const bar = { canBack: true, leading: [], trailing: [], plus: null }
     const state = buildShellChromeState({ ...BASE, route, tab: 'all', bar })
     expect(state).toMatchObject({ canBack: true, leading: [], trailing: [] })
   })
@@ -97,6 +96,7 @@ describe('buildShellChromeState', () => {
             ],
           },
         ],
+        plus: null,
       },
       keyboardVisible: true,
       toolbar: {
@@ -129,7 +129,12 @@ describe('buildShellChromeState', () => {
         ...BASE,
         route: { kind: 'tasks' },
         tab: 'tasks',
-        plus: { kind: 'action', label: 'New task' },
+        bar: {
+          canBack: false,
+          leading: [],
+          trailing: [],
+          plus: { kind: 'action', label: 'New task' },
+        },
       }),
     )
   })

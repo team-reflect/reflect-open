@@ -17,6 +17,7 @@ export interface ScreenBar {
   canBack: boolean
   leading: ChromeButton[]
   trailing: ChromeButton[]
+  plus: NativePlusState | null
 }
 
 /**
@@ -41,7 +42,6 @@ export interface ShellChromeInput {
   keyboardVisible: boolean
   modal: boolean
   toolbar: FormattingToolbarCapabilities | null
-  plus: NativePlusState | undefined
   theme: ThemePreference
 }
 
@@ -62,7 +62,7 @@ export function buildShellChromeState(input: ShellChromeInput): UnnumberedChrome
     keyboardVisible: input.keyboardVisible,
     modal: input.modal,
     toolbar: input.toolbar === null ? null : { ...input.toolbar },
-    plus: input.plus ?? null,
+    plus: bar?.plus ?? null,
     theme: input.theme,
   }
 }

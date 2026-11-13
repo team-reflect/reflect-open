@@ -26,10 +26,6 @@ export interface IntentContext {
    */
   screen: ScreenChrome | undefined
   /**
-   * The `+` the screen of `entryId` registered.
-   */
-  plus: ChromePlus | undefined
-  /**
    * The commands of the last focused editor that can attach files, while
    * the page still shows its entry.
    */
@@ -115,8 +111,9 @@ export function runNativeIntent(intent: NativeIntent, context: IntentContext): v
       context.setCornersInHeaderRow(intent.cornersInHeaderRow)
       return
     case 'plus':
-      if (intent.entryId === context.entryId && context.plus !== undefined) {
-        runPlusCommand(context.plus, intent.command)
+      const plus = context.screen?.plus
+      if (intent.entryId === context.entryId && plus !== undefined) {
+        runPlusCommand(plus, intent.command)
       }
       return
   }

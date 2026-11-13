@@ -19,6 +19,7 @@ final class PlusChrome {
   private let audioItem: UIButton
   private var spec: PlusSpec?
   private var hidden = true
+  private var shown = false
   private var menuOpen = false
 
   init() {
@@ -72,10 +73,13 @@ final class PlusChrome {
     return [noteItem, taskItem]
   }
 
-  /// Shows `spec`, or hides the `+` while `hidden`.
-  func update(_ spec: PlusSpec?, hidden: Bool) {
-    let hidden = hidden || spec == nil
-    if hidden || spec != self.spec {
+  /// Shows `spec`, or no `+` for `nil`. The capture menu stays open while
+  /// only its audio phase changes.
+  func update(_ spec: PlusSpec?) {
+    switch (self.spec, spec) {
+    case (.capture, .capture):
+      break
+    default:
       setMenu(false)
     }
     self.spec = spec
@@ -85,19 +89,39 @@ final class PlusChrome {
     case .capture(let audio):
       button.accessibilityLabel = menuOpen ? "Hide capture actions" : "Show capture actions"
       updateAudioItem(audio)
+      if menuOpen {
+        for item in items {
+          item.isHidden = false
+        }
+        layoutItems()
+      }
     case nil:
       break
     }
-    guard hidden != self.hidden else { return }
+    updateShown()
+  }
+
+  /// Hides the `+` while `hidden`, as for a modal or the keyboard.
+  func setHidden(_ hidden: Bool) {
     self.hidden = hidden
-    if !hidden {
+    updateShown()
+  }
+
+  private func updateShown() {
+    let shown = !hidden && spec != nil
+    if !shown {
+      setMenu(false)
+    }
+    guard shown != self.shown else { return }
+    self.shown = shown
+    if shown {
       button.isHidden = false
     }
     UIView.animate(withDuration: 0.2) {
-      self.button.alpha = hidden ? 0 : 1
-      self.button.transform = hidden ? CGAffineTransform(scaleX: 0.8, y: 0.8) : .identity
+      self.button.alpha = shown ? 1 : 0
+      self.button.transform = shown ? .identity : CGAffineTransform(scaleX: 0.8, y: 0.8)
     } completion: { _ in
-      if self.hidden {
+      if !self.shown {
         self.button.isHidden = true
       }
     }

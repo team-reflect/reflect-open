@@ -72,14 +72,6 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertNil(try decoder.decode(ChromeState.self, from: try fixture("none")).plus)
   }
 
-  func testResolvesTheFormFromTheIdiomAndTheTabBarFrame() {
-    let rail = CGRect(x: 397, y: 0, width: 69, height: 678)
-    let bar = CGRect(x: 0, y: 760, width: 402, height: 84)
-    XCTAssertEqual(BottomForm.resolve(regularPad: true, tabBarFrame: bar), .pad)
-    XCTAssertEqual(BottomForm.resolve(regularPad: false, tabBarFrame: rail), .rail)
-    XCTAssertEqual(BottomForm.resolve(regularPad: false, tabBarFrame: bar), .bar)
-  }
-
   func testNoteFixtureCarriesTheConfirmationAndTheToolbar() throws {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("note"))
     XCTAssertEqual(state.theme, .dark)
