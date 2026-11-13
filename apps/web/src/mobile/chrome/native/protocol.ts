@@ -165,7 +165,7 @@ const intentSchema = z.discriminatedUnion('type', [
     entryId: z.number(),
     command: z.enum(['tap', 'note', 'task', 'audio']),
   }),
-  z.object({ type: z.literal('sidebarVisible'), visible: z.boolean() }),
+  z.object({ type: z.literal('sidebarVisible'), visible: z.boolean().nullable() }),
   z.object({
     type: z.literal('sidebar'),
     command: z.discriminatedUnion('kind', [
@@ -181,7 +181,8 @@ const intentSchema = z.discriminatedUnion('type', [
  * the shell's layout. `plus` is a tap on the `+` of an action screen (`tap`)
  * or on one item of the capture menu. `layout` tells whether the shell draws the corner
  * buttons in the page's header row, or in the row of the floating tab bar
- * above it. `sidebarVisible` tells whether the iPad sidebar shows, and
+ * above it. `sidebarVisible` tells whether the iPad sidebar shows (`null` without a
+ * sidebar), and
  * `sidebar` is a tap in it.
  */
 export type NativeIntent = z.infer<typeof intentSchema>

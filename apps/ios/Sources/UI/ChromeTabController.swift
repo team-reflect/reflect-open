@@ -21,7 +21,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// (`true`) and the row of the floating tab bar (`false`).
   var onCornersInHeaderRow: (Bool) -> Void = { _ in }
   /// Called when the iPad sidebar shows (`true`) or hides (`false`).
-  var onSidebarVisible: (Bool) -> Void = { _ in }
+  var onSidebarVisible: (Bool?) -> Void = { _ in }
 
   private let webView: WKWebView
   /// The one page: it holds the web view for every tab.
@@ -68,7 +68,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Set while the shell itself shows or hides the sidebar.
   var settingSidebar = false
   /// Whether the sidebar shows, as last reported.
-  var reportedSidebarVisible = false
+  var reportedSidebarVisible: Bool?
   /// The history entry of the last state, which `plus` intents echo.
   private var entryId: Int?
 

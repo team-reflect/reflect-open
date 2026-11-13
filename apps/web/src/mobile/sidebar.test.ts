@@ -12,6 +12,12 @@ describe('selectSidebarRow', () => {
     )
   })
 
+  it("selects today's daily note when it is pinned", () => {
+    expect(selectSidebarRow({ kind: 'today' }, 'daily', pinned, TODAY)).toBe(
+      'pinned:daily/2026-11-13.md',
+    )
+  })
+
   it('selects Chat, or else the tab under the screen', () => {
     expect(selectSidebarRow({ kind: 'chat' }, 'all', pinned, TODAY)).toBe('chat')
     expect(selectSidebarRow({ kind: 'note', path: 'other.md' }, 'tasks', pinned, TODAY)).toBe(

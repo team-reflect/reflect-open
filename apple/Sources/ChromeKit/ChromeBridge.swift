@@ -39,10 +39,10 @@ public final class ChromeBridge {
     }
   }
 
-  /// Whether the iPad sidebar shows. The page starts with `false`; the
-  /// bridge sends a `sidebarVisible` intent when the value changes, and when
-  /// a page gets ready while it is `true`.
-  public var sidebarVisible = false {
+  /// Whether the iPad sidebar shows, or `nil` without a sidebar. The page
+  /// starts with `nil`; the bridge sends a `sidebarVisible` intent when the
+  /// value changes, and when a page gets ready while it is not `nil`.
+  public var sidebarVisible: Bool? = nil {
     didSet {
       if sidebarVisible != oldValue {
         send(.sidebarVisible(sidebarVisible))
@@ -73,8 +73,8 @@ public final class ChromeBridge {
       if !cornersInHeaderRow {
         send(.layout(cornersInHeaderRow: false))
       }
-      if sidebarVisible {
-        send(.sidebarVisible(true))
+      if let sidebarVisible {
+        send(.sidebarVisible(sidebarVisible))
       }
     }
   }

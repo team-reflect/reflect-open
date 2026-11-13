@@ -61,7 +61,12 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
   func updateSidebar(_ state: SidebarState?) {
     guard state != sidebarState else { return }
     sidebarState = state
-    guard let state else { return }
+    // A screen without chrome leaves the sidebar with its rows only.
+    footer.isHidden = state == nil
+    guard let state else {
+      pinnedGroup.isHidden = true
+      return
+    }
     footer.update(state)
     let ids = state.pinned.map { SidebarRow.pinnedPrefix + $0.path }
     if pinnedGroup.children.map(\.identifier) != ids {
@@ -86,11 +91,11 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
     tabs.first { $0 is UISearchTab }?.isHidden = mode != .tabSidebar || sidebar.isHidden
   }
 
-  /// Tells the page whether the sidebar shows, and selects the row or the
-  /// tab of the last state.
+  /// Tells the page whether the sidebar shows (`nil` without a sidebar), and
+  /// selects the row or the tab of the last state.
   func reportSidebarVisible() {
     updateSearchRow()
-    let visible = sidebarVisible
+    let visible = mode == .tabSidebar ? sidebarVisible : nil
     guard visible != reportedSidebarVisible else { return }
     reportedSidebarVisible = visible
     onSidebarVisible(visible)
@@ -117,15 +122,16 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
   ) -> UIContextMenuConfiguration? {
     guard tab.identifier.hasPrefix(SidebarRow.pinnedPrefix) else { return nil }
     let path = SidebarRow.path(of: tab.identifier)
+    // Share reads the open editor's buffer, so it is for the note on screen.
+    let open = sidebarState?.selection == tab.identifier
     return UIContextMenuConfiguration(actionProvider: { [weak self] _ in
-      UIMenu(children: [
-        UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { _ in
-          self?.send(.sidebar(.share(path)))
-        },
-        UIAction(title: "Unpin", image: UIImage(systemName: "pin.slash")) { _ in
-          self?.send(.sidebar(.unpin(path)))
-        },
-      ])
+      let share = UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) {
+        _ in self?.send(.sidebar(.share(path)))
+      }
+      let unpin = UIAction(title: "Unpin", image: UIImage(systemName: "pin.slash")) { _ in
+        self?.send(.sidebar(.unpin(path)))
+      }
+      return UIMenu(children: open ? [share, unpin] : [unpin])
     })
   }
 }

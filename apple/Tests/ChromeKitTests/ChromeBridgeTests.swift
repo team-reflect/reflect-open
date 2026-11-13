@@ -49,8 +49,13 @@ final class ChromeBridgeTests: XCTestCase {
       .layout(cornersInHeaderRow: false),
       .plus(entryId: 3, command: .note),
       .sidebarVisible(true),
+      .sidebarVisible(nil),
       .sidebar(.chat),
+      .sidebar(.search),
+      .sidebar(.settings),
       .sidebar(.openNote("reflect-v2.md")),
+      .sidebar(.unpin("reflect-v2.md")),
+      .sidebar(.share("reflect-v2.md")),
       .sidebar(.menu("graphs")),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
@@ -143,10 +148,10 @@ final class ChromeBridgeTests: XCTestCase {
 
   func testSendsTheSidebarVisibilityWhenItChangesAndToANewPage() throws {
     let bridge = ChromeBridge()
-    var sent: [Bool] = []
+    var sent: [Bool?] = []
     bridge.send = { data in
       let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
-      sent.append(object["visible"] as! Bool)
+      sent.append(object["visible"] as? Bool)
     }
 
     bridge.sidebarVisible = true
@@ -155,8 +160,9 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.sidebarVisible = false
     bridge.documentDidStart()
     bridge.receive(try message(["type": "chromeReady"]))
+    bridge.sidebarVisible = nil
 
-    XCTAssertEqual(sent, [true, false])
+    XCTAssertEqual(sent, [true, false, false, nil])
   }
 
   func testANewDocumentResetsTheStateAndTheIntentGate() throws {

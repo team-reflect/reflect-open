@@ -43,7 +43,7 @@ export interface IntentContext {
   /**
    * Stores whether the iPad sidebar shows.
    */
-  setSidebarVisible: (visible: boolean) => void
+  setSidebarVisible: (visible: boolean | null) => void
   /**
    * Runs a tap in the iPad sidebar.
    */

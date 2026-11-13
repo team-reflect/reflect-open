@@ -13,7 +13,6 @@ import { useDailyNoteDates } from '@/mobile/use-daily-note-dates.ts'
 import { useWeekStrip } from '@/mobile/use-week-strip.ts'
 import { WeekRow } from '@/mobile/week-row.tsx'
 import { useStore } from '@/lib/use-store.ts'
-import { useMobileForm } from '@/mobile/mobile-form.ts'
 import { sidebarVisible, useGraphMenu } from '@/mobile/sidebar.ts'
 import { useWeekStartDay } from '@/providers/settings-provider.tsx'
 import { useRouterActions } from '@/routing/router.tsx'
@@ -84,8 +83,7 @@ export function CalendarStrip({
     showWeekOf(today)
   }
 
-  const pad = useMobileForm() === 'pad'
-  const showsSidebar = useStore(sidebarVisible)
+  const sidebar = useStore(sidebarVisible)
   const graphMenu = useGraphMenu()
 
   const runAction = (id: string): void => {
@@ -127,10 +125,10 @@ export function CalendarStrip({
       align="center"
       // On iPad the sidebar holds Settings, or the graph menu does while the
       // sidebar is hidden.
-      leading={pad ? [] : [{ id: 'settings', title: 'Settings', icon: 'settings' }]}
+      leading={sidebar === null ? [{ id: 'settings', title: 'Settings', icon: 'settings' }] : []}
       trailing={[
         { id: 'today', title: 'Today', hidden: !showToday },
-        ...(pad && !showsSidebar
+        ...(sidebar === false
           ? [{ id: 'graph', title: graphMenu.title, menu: graphMenu.items }]
           : []),
       ]}

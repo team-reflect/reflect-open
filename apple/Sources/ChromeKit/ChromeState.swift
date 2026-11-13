@@ -260,8 +260,8 @@ public enum ChromeIntent: Encodable, Equatable, Sendable {
   case layout(cornersInHeaderRow: Bool)
   /// A tap on the `+` of the screen of `entryId`.
   case plus(entryId: Int, command: PlusCommand)
-  /// Whether the iPad sidebar shows.
-  case sidebarVisible(Bool)
+  /// Whether the iPad sidebar shows, or `nil` without a sidebar.
+  case sidebarVisible(Bool?)
   /// A tap in the iPad sidebar.
   case sidebar(SidebarIntent)
 

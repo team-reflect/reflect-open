@@ -15,9 +15,10 @@ import { useRouterActions, useRouterState } from '@/routing/router.tsx'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
 /**
- * Whether the iPad sidebar shows. The Swift shell reports it.
+ * Whether the iPad sidebar shows, or `null` without a sidebar (iPhone, a
+ * compact iPad window, the web). The Swift shell reports it.
  */
-export const sidebarVisible = new WritableStore(false)
+export const sidebarVisible = new WritableStore<boolean | null>(null)
 
 /**
  * A tap in the iPad sidebar.
@@ -138,7 +139,7 @@ export function useSidebar(tab: MobileTab): {
         navigate(routeForPath(command.path))
         return
       case 'unpin':
-        noteActions.togglePinned(command.path).catch(noop)
+        noteActions.unpin(command.path).catch(noop)
         return
       case 'share':
         shareNote(share, command.path).catch((cause: unknown) => {

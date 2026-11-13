@@ -7,7 +7,12 @@
   { "type": "layout", "cornersInHeaderRow": false },
   { "type": "plus", "entryId": 3, "command": "note" },
   { "type": "sidebarVisible", "visible": true },
+  { "type": "sidebarVisible", "visible": null },
   { "type": "sidebar", "command": { "kind": "chat" } },
+  { "type": "sidebar", "command": { "kind": "search" } },
+  { "type": "sidebar", "command": { "kind": "settings" } },
   { "type": "sidebar", "command": { "kind": "openNote", "path": "reflect-v2.md" } },
+  { "type": "sidebar", "command": { "kind": "unpin", "path": "reflect-v2.md" } },
+  { "type": "sidebar", "command": { "kind": "share", "path": "reflect-v2.md" } },
   { "type": "sidebar", "command": { "kind": "menu", "id": "graphs" } }
 ]
