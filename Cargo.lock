@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "Inflector"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4760,6 +4766,11 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "specta",
+ "specta-serde",
+ "specta-swift",
+ "specta-typescript",
+ "specta-util",
 ]
 
 [[package]]
@@ -5569,6 +5580,68 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "specta"
+version = "2.0.0-rc.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fa60a95f1bed059a9e9b1f4052dfa8fee47813c429223c8590b338f719ac12e"
+dependencies = [
+ "chrono",
+ "rustc_version",
+ "specta-macros",
+ "uuid",
+]
+
+[[package]]
+name = "specta-macros"
+version = "2.0.0-rc.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7eeb2926ce0ef69a996fb8ad805c39936d47b6f02b327eca79cb207645ac8686"
+dependencies = [
+ "Inflector",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "specta-serde"
+version = "0.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69fbb7f8846160cc2924352f5a3b199281742ea335b6b4328d886a44d398e417"
+dependencies = [
+ "specta",
+]
+
+[[package]]
+name = "specta-swift"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1630c8614204dcd98135029c05127972a64d811f531e5ca8edf5a8302af47cc"
+dependencies = [
+ "serde",
+ "specta",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "specta-typescript"
+version = "0.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b96519dc9b060d66e50b55ab10fb550bbf56c7576b9c9cca467d580a53cd473d"
+dependencies = [
+ "specta",
+]
+
+[[package]]
+name = "specta-util"
+version = "0.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed24b868f6dec27caa846d02ea7ba6568fea4676dc7ebf27f2ca407f6b787d05"
+dependencies = [
+ "specta",
 ]
 
 [[package]]

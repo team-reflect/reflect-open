@@ -1,3 +1,4 @@
+import { NOTE_MOVED } from '@reflect/types'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IndexStoreService } from '../indexing/index-store-service.ts'
@@ -8,7 +9,7 @@ import type { OpenDocumentsService } from './open-documents-service.ts'
 /**
  * Event name the Rust move commands emit after their rows commit.
  */
-export const NOTE_MOVED_EVENT = 'note:moved'
+export const NOTE_MOVED_EVENT = NOTE_MOVED
 
 const noteMovedSchema = z.object({ from: z.string(), to: z.string() })
 

@@ -1,28 +1,41 @@
-import { z } from 'zod'
+import type { AppError as AppErrorWire } from '@reflect/types'
 
 /**
- * Every `kind` an {@link AppError} can carry. Kinds mirror the Rust `AppError`
- * enum (camelCase via serde).
+ * Every `kind` an {@link AppError} can carry, generated from the Rust
+ * `AppError` enum.
  */
-const appErrorKinds = [
-  'io',
-  'notFound',
-  'traversal',
-  'noGraph',
-  'parse',
-  'auth',
-  'network',
-  'unknown',
-] as const
-
-export type AppErrorKind = (typeof appErrorKinds)[number]
+export type AppErrorKind = AppErrorWire['kind']
 
 /**
- * The serialized Rust `AppError`: Rust commands return `Result<T, AppError>`
- * and reject with `{ kind, message }`. {@link toAppError} turns it into an
- * {@link AppError} at the IPC boundary.
+ * Every {@link AppErrorKind} at runtime. The `Record` type makes `tsc` reject
+ * a missing or unknown kind.
  */
-const appErrorWireSchema = z.object({ kind: z.enum(appErrorKinds), message: z.string() })
+const appErrorKinds: Record<AppErrorKind, true> = {
+  io: true,
+  notFound: true,
+  traversal: true,
+  noGraph: true,
+  parse: true,
+  auth: true,
+  network: true,
+  unknown: true,
+}
+
+/**
+ * Checks for the serialized Rust `AppError`: Rust commands return
+ * `Result<T, AppError>` and reject with `{ kind, message }`.
+ */
+function isAppErrorWire(value: unknown): value is AppErrorWire {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const wire = value as Record<string, unknown>
+  return (
+    typeof wire.kind === 'string' &&
+    Object.hasOwn(appErrorKinds, wire.kind) &&
+    typeof wire.message === 'string'
+  )
+}
 
 /**
  * The shared error contract. Rust-originated errors become instances at the
@@ -53,9 +66,8 @@ export function toAppError(value: unknown): AppError {
   if (isAppError(value)) {
     return value
   }
-  const parsed = appErrorWireSchema.safeParse(value)
-  if (parsed.success) {
-    return new AppError(parsed.data.kind, parsed.data.message, { cause: value })
+  if (isAppErrorWire(value)) {
+    return new AppError(value.kind, value.message, { cause: value })
   }
   let message: string
   if (value instanceof Error) {

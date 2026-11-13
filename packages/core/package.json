@@ -21,6 +21,7 @@
     "@post-embed/types": "^0.5.0",
     "@reflect/db": "workspace:*",
     "@reflect/modules": "workspace:*",
+    "@reflect/types": "workspace:*",
     "@reflect/utils": "workspace:*",
     "kysely": "^0.28.18",
     "pkce-challenge": "^6.0.0",

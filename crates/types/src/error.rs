@@ -11,6 +11,7 @@ use serde::Serialize;
 // embedding runtime.
 #[allow(dead_code)]
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AppError {
     /// Filesystem / IO failure.

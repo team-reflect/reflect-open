@@ -1,6 +1,13 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["**/*.md", "**/*.gen.*", "**/schema.json", "**/*.icon/**", "**/.wxt/**"],
+  "ignorePatterns": [
+    "**/*.md",
+    "**/*.gen.*",
+    "**/schema.json",
+    "**/*.icon/**",
+    "**/.wxt/**",
+    "fixtures/wire/**"
+  ],
   "singleQuote": true,
   "semi": false
 }

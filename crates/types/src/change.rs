@@ -7,6 +7,7 @@ use serde::Serialize;
 
 /// What happened to a graph file. Serializes as `"upsert"` or `"remove"`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub enum ChangeKind {
     /// Created or modified.
@@ -26,6 +27,7 @@ impl std::fmt::Display for ChangeKind {
 
 /// One changed graph file.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct FileChange {
     /// Graph-relative path, forward-slashed.
@@ -36,6 +38,7 @@ pub struct FileChange {
     /// carry no real timestamp (and reconcile would never repair them, since it
     /// is content-hash gated).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "codegen", specta(type = u64))]
     pub modified_ms: Option<u64>,
 }
 

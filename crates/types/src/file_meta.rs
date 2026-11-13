@@ -2,6 +2,7 @@ use serde::Serialize;
 
 /// Metadata for a file inside the graph.
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct FileMeta {
     /// Graph-relative path, forward-slashed.
@@ -15,6 +16,6 @@ pub struct FileMeta {
     /// deleted (Plan 21). Covers both eviction forms: for a legacy `.icloud`
     /// stub, `size` and `modified_ms` describe the stub; for a modern
     /// dataless file they are the real (preserved) values.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub placeholder: bool,
 }

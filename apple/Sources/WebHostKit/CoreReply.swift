@@ -1,4 +1,5 @@
 public import Foundation
+public import TypesShared
 
 /// The result of one command: a JSON value, raw bytes, or a `{kind, message}` error as JSON.
 public enum CoreReply: Sendable, Equatable {
@@ -6,9 +7,9 @@ public enum CoreReply: Sendable, Equatable {
   case bytes(Data)
   case error(Data)
 
-  /// An error reply with the wire shape of the core's `AppError`.
-  public static func error(kind: String, message: String) -> CoreReply {
-    let json = try? JSONSerialization.data(withJSONObject: ["kind": kind, "message": message])
+  /// An error reply of the core's `AppError` contract.
+  public static func error(_ error: AppError) -> CoreReply {
+    let json = try? JSONEncoder().encode(error)
     return .error(json ?? Data(#"{"kind":"unknown","message":""}"#.utf8))
   }
 
@@ -18,7 +19,7 @@ public enum CoreReply: Sendable, Equatable {
   /// A JSON reply that encodes `value`.
   public static func value(_ value: some Encodable) -> CoreReply {
     guard let json = try? JSONEncoder().encode(value) else {
-      return .error(kind: "unknown", message: "the shell could not encode a reply")
+      return .error(.unknown(.init(message: "the shell could not encode a reply")))
     }
     return .json(json)
   }

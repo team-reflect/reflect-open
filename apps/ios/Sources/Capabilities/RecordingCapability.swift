@@ -1,5 +1,6 @@
 import Foundation
 import RecordingKit
+import TypesShared
 import WebHostKit
 
 /// The `plugin:recording` commands and events: the shell's face of
@@ -68,7 +69,7 @@ final class RecordingCapability {
           engine.cancel { result in continuation.resume(returning: result) }
         }
         if case .failure(let error) = result {
-          return .error(kind: "io", message: error.message)
+          return .error(.io(.init(message: error.message)))
         }
         return .null
       },
@@ -90,7 +91,7 @@ final class RecordingCapability {
           var request: Request
         }
         guard let path = request.decodeArgs(Args.self)?.request.path else {
-          return .error(kind: "parse", message: "delete_staged takes {request: {path}}")
+          return .error(.parse(.init(message: "delete_staged takes {request: {path}}")))
         }
         do {
           try engine.deleteStaged(path: path)
@@ -121,7 +122,7 @@ final class RecordingCapability {
     }
     switch result {
     case .success(let response): return .value(response)
-    case .failure(let error): return .error(kind: "io", message: error.message)
+    case .failure(let error): return .error(.io(.init(message: error.message)))
     }
   }
 }

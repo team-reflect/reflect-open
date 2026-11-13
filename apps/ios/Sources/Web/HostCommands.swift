@@ -1,4 +1,5 @@
 import Foundation
+import TypesShared
 import WebHostKit
 import os
 
@@ -26,7 +27,7 @@ enum HostCommands {
       var message: String
     }
     guard let args = request.decodeArgs(Args.self) else {
-      return .error(kind: "parse", message: "host.log takes {level, message}")
+      return .error(.parse(.init(message: "host.log takes {level, message}")))
     }
     let level: ReflectCore.LogLevel
     switch args.level {
@@ -56,10 +57,10 @@ enum HostCommands {
     guard let args = request.decodeArgs(Args.self),
       let url = URL(string: args.url), url.scheme != nil
     else {
-      return .error(kind: "parse", message: "host.open_url takes {url} with an absolute URL")
+      return .error(.parse(.init(message: "host.open_url takes {url} with an absolute URL")))
     }
     guard await openURL(url) else {
-      return .error(kind: "io", message: "no app opens \(args.url)")
+      return .error(.io(.init(message: "no app opens \(args.url)")))
     }
     return .null
   }

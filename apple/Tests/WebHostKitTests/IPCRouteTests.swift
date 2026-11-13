@@ -1,3 +1,4 @@
+import TypesShared
 import XCTest
 
 @testable import WebHostKit
@@ -96,7 +97,7 @@ final class IPCRouteTests: XCTestCase {
   }
 
   func testErrorReplyIsFlaggedWithStatus200() async {
-    let error = CoreReply.error(kind: "notFound", message: "missing")
+    let error = CoreReply.error(.notFound(.init(message: "missing")))
     let fake = await post(route(reply: error), command: "note_read")
 
     XCTAssertEqual(fake.response?.statusCode, 200)

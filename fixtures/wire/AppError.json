@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "io",
+    "message": "disk full"
+  },
+  {
+    "kind": "noGraph",
+    "message": "No graph is open"
+  },
+  {
+    "kind": "notFound",
+    "message": "notes/a.md"
+  }
+]

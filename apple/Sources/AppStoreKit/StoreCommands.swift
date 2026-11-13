@@ -1,4 +1,5 @@
 public import Foundation
+public import TypesShared
 
 /// The answer of one store command.
 public enum StoreReply: Sendable, Equatable {
@@ -6,12 +7,12 @@ public enum StoreReply: Sendable, Equatable {
   case json(Data)
   /// The JSON value `null`: the answer of a command that returns nothing.
   case null
-  /// An error with the wire shape of the core's `AppError`.
-  case error(kind: String, message: String)
+  /// An error of the core's `AppError` contract.
+  case error(AppError)
 
   fileprivate static func value(_ value: some Encodable) -> StoreReply {
     guard let json = try? JSONEncoder().encode(value) else {
-      return .error(kind: "unknown", message: "the shell could not encode a reply")
+      return .error(.unknown(.init(message: "the shell could not encode a reply")))
     }
     return .json(json)
   }
@@ -92,7 +93,7 @@ public final class StoreCommands {
       var products: [Item]
     }
     guard let ids = payload(args)?.productIds else {
-      return .error(kind: "parse", message: "iap get_products takes {payload: {productIds}}")
+      return .error(.parse(.init(message: "iap get_products takes {payload: {productIds}}")))
     }
     do {
       let products = try await client.products(for: ids)
@@ -100,7 +101,7 @@ public final class StoreCommands {
         Response(
           products: products.map { .init(productId: $0.id, formattedPrice: $0.displayPrice) }))
     } catch {
-      return .error(kind: "io", message: "Failed to fetch products: \(error.localizedDescription)")
+      return .error(.io(.init(message: "Failed to fetch products: \(error.localizedDescription)")))
     }
   }
 
@@ -108,25 +109,25 @@ public final class StoreCommands {
   /// `null` for a verified purchase and an error for any other outcome.
   private static func purchase(_ client: any StoreClient, _ args: Data) async -> StoreReply {
     guard let id = payload(args)?.productId else {
-      return .error(kind: "parse", message: "iap purchase takes {payload: {productId}}")
+      return .error(.parse(.init(message: "iap purchase takes {payload: {productId}}")))
     }
     do {
       switch try await client.purchase(id) {
       case nil:
-        return .error(kind: "notFound", message: "Product not found")
+        return .error(.notFound(.init(message: "Product not found")))
       case .purchased:
         return .null
       case .unverified:
-        return .error(kind: "io", message: "Transaction verification failed")
+        return .error(.io(.init(message: "Transaction verification failed")))
       case .cancelled:
-        return .error(kind: "io", message: "Purchase cancelled by user")
+        return .error(.io(.init(message: "Purchase cancelled by user")))
       case .pending:
-        return .error(kind: "io", message: "Purchase is pending")
+        return .error(.io(.init(message: "Purchase is pending")))
       case .unknown:
-        return .error(kind: "io", message: "Unknown purchase result")
+        return .error(.io(.init(message: "Unknown purchase result")))
       }
     } catch {
-      return .error(kind: "io", message: "Purchase failed: \(error.localizedDescription)")
+      return .error(.io(.init(message: "Purchase failed: \(error.localizedDescription)")))
     }
   }
 
@@ -139,7 +140,7 @@ public final class StoreCommands {
       var isOwned: Bool
     }
     guard let id = payload(args)?.productId else {
-      return .error(kind: "parse", message: "iap get_product_status takes {payload: {productId}}")
+      return .error(.parse(.init(message: "iap get_product_status takes {payload: {productId}}")))
     }
     return .value(Response(isOwned: await client.isEntitled(to: id)))
   }
@@ -152,7 +153,7 @@ public final class StoreCommands {
       var environment: String
     }
     guard let environment = await client.environment() else {
-      return .error(kind: "io", message: "the app transaction is unavailable")
+      return .error(.io(.init(message: "the app transaction is unavailable")))
     }
     return .value(Response(environment: environment))
   }
@@ -164,7 +165,7 @@ public final class StoreCommands {
       try await client.sync()
       return .null
     } catch {
-      return .error(kind: "io", message: "AppStore.sync failed: \(error.localizedDescription)")
+      return .error(.io(.init(message: "AppStore.sync failed: \(error.localizedDescription)")))
     }
   }
 }
