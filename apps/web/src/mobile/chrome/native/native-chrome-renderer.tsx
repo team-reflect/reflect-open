@@ -264,7 +264,12 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
       }
     })
     nativeChrome.post({ type: 'chromeReady' } satisfies NativeChromeMessage)
-    return unlisten
+    return () => {
+      unlisten()
+      // Back to the start value: the next `chromeReady` gets only a sidebar
+      // that shows or hides.
+      sidebarVisible.set(null)
+    }
   }, [nativeChrome, renderer, toasts])
 
   return null

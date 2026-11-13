@@ -151,7 +151,7 @@ final class ChromeBridgeTests: XCTestCase {
     var sent: [Bool?] = []
     bridge.send = { data in
       let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
-      sent.append(object["visible"] as? Bool)
+      sent.append(object["visible"] is NSNull ? nil : (object["visible"] as! Bool))
     }
 
     bridge.sidebarVisible = true
