@@ -282,19 +282,26 @@ body {
   }
 
   /* A horizontal drag that starts on the background of a stacked mobile
-     screen chains to the back pager (mobile-stack.tsx). Controls, text fields
-     and the editor pan only vertically, unless marked
-     `data-back-swipe="on"` (a row that acts on a tap). The browser intersects
-     `touch-action` with every ancestor up to the nearest scroll container, so
-     their descendants follow without a rule of their own, and a horizontal
-     scroller (`data-scroll-x`, also set by meowdown) starts fresh. The
-     specificity beats the `manipulation` rule above, which allows `pan-x`. */
+     screen chains to the back pager (mobile-stack.tsx). Controls and the
+     editor pan only vertically, unless marked `data-back-swipe="on"` (a row
+     that acts on a tap). The browser intersects `touch-action` with every
+     ancestor up to the nearest scroll container, so their descendants follow
+     without a rule of their own. A horizontal scroller (`data-scroll-x`, also
+     set by meowdown) owns every horizontal drag inside it, so nothing in it
+     is protected, and `contain` keeps a drag past its end from reaching the
+     pager. The specificity beats the `manipulation` rule above, which allows
+     `pan-x`. */
   .mobile-pager-content
     :is(
-      :enabled,
-      :read-write,
-      :any-link,
+      [contenteditable='true'],
+      [contenteditable=''],
+      [contenteditable='plaintext-only'],
+      button,
+      a,
       label,
+      input,
+      textarea,
+      select,
       summary,
       video,
       audio,
@@ -309,11 +316,10 @@ body {
       [role='menuitem'],
       [role='combobox'],
       [data-back-swipe='off']
-    ):not([data-back-swipe='on']) {
+    ):not([data-back-swipe='on'], [data-scroll-x], [data-scroll-x] *) {
     touch-action: pan-y;
   }
 
-  /* A drag past a scroller's end never reaches the back pager. */
   .mobile-pager-content [data-scroll-x] {
     overscroll-behavior-x: contain;
   }
