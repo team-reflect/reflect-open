@@ -1,4 +1,5 @@
 import AuthenticationServices
+import TypesShared
 import WebAuthKit
 import WebHostKit
 
@@ -32,15 +33,14 @@ final class WebAuthCapability {
     }
     guard let payload = request.decodeArgs(Args.self)?.payload else {
       return .error(
-        kind: "parse", message: "web-auth start takes {payload: {url, callbackScheme, ephemeral}}")
+        .parse(.init(message: "web-auth start takes {payload: {url, callbackScheme, ephemeral}}")))
     }
     do {
       let callbackURL = try await session.start(
         url: payload.url, callbackScheme: payload.callbackScheme, ephemeral: payload.ephemeral)
       return .value(Response(url: callbackURL?.absoluteString))
     } catch {
-      return .error(
-        kind: "io", message: "web authentication failed: \(error.localizedDescription)")
+      return .error(.io(.init(message: "web authentication failed: \(error.localizedDescription)")))
     }
   }
 }
