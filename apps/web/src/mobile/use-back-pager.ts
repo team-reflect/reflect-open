@@ -56,7 +56,7 @@ function revealBelow(scroller: HTMLElement): void {
 }
 
 /**
- * The edge back-swipe as native horizontal scrolling. The browser moves the
+ * The back-swipe as native horizontal scrolling. The browser moves the
  * current page with the finger and snaps it home or off, so the drag never
  * waits for the main thread. A mouse drag from the edge strip scrolls it the
  * same way. Between gestures the scroller rests on the last page; a user

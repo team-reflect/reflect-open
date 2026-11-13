@@ -1333,6 +1333,34 @@ describe('MobileStack transitions & back pager', () => {
     expect(scroller.scrollLeft).toBe(scroller.clientWidth)
   })
 
+  it('takes a back swipe from the background and rows of a stacked screen, not its controls', async () => {
+    const view = await mount({ kind: 'settings' })
+    const layer = await waitFor(() => {
+      const current = visibleLayer(view)
+      expect(current.textContent).toContain('Smooth caret animation')
+      return current
+    })
+    const touchAction = (element: Element | null | undefined): string => {
+      expect(element).toBeTruthy()
+      return getComputedStyle(element!).touchAction
+    }
+    const header = Array.from(layer.querySelectorAll('h2')).find(
+      (element) => element.textContent === 'Editor',
+    )
+    const switchRow = Array.from(layer.querySelectorAll('label')).find((element) =>
+      element.textContent?.includes('Smooth caret animation'),
+    )
+    const menuRow = Array.from(layer.querySelectorAll('[data-back-swipe="on"]')).find((element) =>
+      element.textContent?.startsWith('Theme'),
+    )
+
+    expect(touchAction(header)).toBe('auto')
+    expect(touchAction(switchRow?.querySelector('span'))).toBe('auto')
+    expect(touchAction(menuRow?.querySelector('select'))).toBe('auto')
+    expect(touchAction(switchRow?.querySelector('[role="switch"]'))).toBe('pan-y')
+    expect(touchAction(layer.querySelector('[data-pager-edge]'))).toBe('pan-x')
+  })
+
   it('swipes a cold note entry back to today', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'note', path: 'notes/meeting-notes.md' })

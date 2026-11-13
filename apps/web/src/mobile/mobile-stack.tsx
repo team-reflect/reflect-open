@@ -222,13 +222,16 @@ interface MobileStackProps {
  * remounting it, bounded to the one screen `back()` would land on.
  *
  * The layers are pages of a horizontal scroll-snap pager, each sticky at the
- * left edge with the current one last. An edge back-swipe is a native scroll
- * of that pager ({@link useBackPager}): the browser moves the card with the
+ * left edge with the current one last. A back-swipe is a native scroll of
+ * that pager ({@link useBackPager}): the browser moves the card with the
  * finger and snaps it home or off, so the drag never waits for the main
- * thread. Stacked screens pan only vertically (`.mobile-pager-content` in
- * index.css); a strip along the card's left edge takes the horizontal drag,
- * by finger or by mouse, and hands taps to what lies under it. A horizontal scroller inside a
- * stacked screen needs `data-scroll-x`.
+ * thread. A horizontal drag reaches the pager from the background of a
+ * stacked screen and from rows marked `data-back-swipe="on"`; controls, the
+ * editor and `data-back-swipe="off"` pan only vertically (`.mobile-pager-content`
+ * in index.css). A strip along the card's left edge takes the horizontal
+ * drag over any of them, by finger or by mouse, and hands taps to what lies
+ * under it. A horizontal scroller inside a stacked screen needs
+ * `data-scroll-x`.
  *
  * A stacked screen must not hold a `position: fixed` element: it stays put
  * while the card moves. Put floating UI in a portal or the top layer.

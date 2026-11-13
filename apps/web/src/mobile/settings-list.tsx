@@ -72,7 +72,7 @@ export function SettingsValueRow({
   onPress?: () => void
 }): ReactElement {
   return (
-    <div className={ROW_CLASS} onClick={onPress}>
+    <div data-back-swipe="on" className={ROW_CLASS} onClick={onPress}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="shrink-0 text-text-secondary tabular-nums">{value}</span>
     </div>
@@ -95,7 +95,13 @@ export function SettingsNavRow({
   disabled,
 }: SettingsNavRowProps): ReactElement {
   return (
-    <button type="button" className={PRESSABLE_ROW_CLASS} onClick={onPress} disabled={disabled}>
+    <button
+      type="button"
+      data-back-swipe="on"
+      className={PRESSABLE_ROW_CLASS}
+      onClick={onPress}
+      disabled={disabled}
+    >
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {value !== undefined ? (
         <span className="max-w-[55%] shrink-0 truncate text-text-secondary">{value}</span>
@@ -121,7 +127,7 @@ export function SettingsSwitchRow({
   descriptionId,
 }: SettingsSwitchRowProps): ReactElement {
   return (
-    <label className={ROW_CLASS}>
+    <label data-back-swipe="on" className={ROW_CLASS}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <Switch
         aria-describedby={descriptionId}
@@ -157,7 +163,7 @@ export function SettingsMenuRow<Value extends string>({
   onChange,
 }: SettingsMenuRowProps<Value>): ReactElement {
   return (
-    <div className={cn(ROW_CLASS, 'relative')}>
+    <div data-back-swipe="on" className={cn(ROW_CLASS, 'relative')}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <span className="flex shrink-0 items-center gap-1 text-text-secondary">
         {options.find((option) => option.value === value)?.label}
@@ -208,6 +214,7 @@ export function SettingsActionRow({
   return (
     <button
       type="button"
+      data-back-swipe="on"
       className={cn(
         PRESSABLE_ROW_CLASS,
         tone === 'destructive' ? 'text-destructive' : 'text-primary',
@@ -246,6 +253,7 @@ export function SettingsSelectRow({
   return (
     <button
       type="button"
+      data-back-swipe="on"
       className={PRESSABLE_ROW_CLASS}
       onClick={onPress}
       disabled={disabled}
@@ -285,6 +293,7 @@ export function SettingsHeroRow({
   return (
     <button
       type="button"
+      data-back-swipe="on"
       className={cn(PRESSABLE_ROW_CLASS, 'gap-4 py-3.5')}
       onClick={onPress}
       disabled={disabled}
