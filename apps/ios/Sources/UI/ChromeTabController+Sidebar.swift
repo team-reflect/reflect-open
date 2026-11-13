@@ -109,9 +109,6 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
   func reportSidebarVisible() {
     updateSidebarRows()
     let visible = mode == .tabSidebar ? sidebarVisible : nil
-    // The sidebar is gray, as on desktop; the tab bar and the page keep the
-    // purple.
-    view.tintColor = visible == true ? .secondaryLabel : Self.accent
     guard visible != reportedSidebarVisible else { return }
     reportedSidebarVisible = visible
     onSidebarVisible(visible)
