@@ -30,6 +30,8 @@ final class SidebarFooter: UIView {
     addSubview(row)
     graphButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
     graphButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    // The graph button takes the free width, so the gear sits in the corner.
+    settingsButton.setContentHuggingPriority(.required, for: .horizontal)
     NSLayoutConstraint.activate([
       row.leadingAnchor.constraint(equalTo: layoutMarginsGuide.leadingAnchor),
       row.trailingAnchor.constraint(equalTo: layoutMarginsGuide.trailingAnchor),
