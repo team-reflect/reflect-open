@@ -24,22 +24,7 @@ export const recentGraphSchema = z.object({
 })
 export type RecentGraph = z.infer<typeof recentGraphSchema>
 
-/** Metadata for a file inside the graph (mirrors the Rust `FileMeta`). */
-export const fileMetaSchema = z.object({
-  /** Graph-relative path, forward-slashed. */
-  path: z.string(),
-  size: z.number(),
-  /** Last-modified time in epoch milliseconds. */
-  modifiedMs: z.number(),
-  /**
-   * True when the file is an iCloud eviction placeholder (Plan 21): the file
-   * exists but its content is offloaded until re-download. It must not be
-   * read — and must not be treated as deleted. Rust omits the field for
-   * regular files.
-   */
-  placeholder: z.boolean().optional(),
-})
-export type FileMeta = z.infer<typeof fileMetaSchema>
+export { FileMetaSchema as fileMetaSchema, type FileMeta } from '@reflect/types'
 
 /** Result of the native no-clobber note claim. */
 export const noteCreateOutcomeSchema = z.discriminatedUnion('kind', [

@@ -8,6 +8,16 @@ license.workspace = true
 publish.workspace = true
 
 [features]
+# Derives `specta::Type` and builds the `codegen` bin, which writes the
+# TypeScript, Swift, and fixture files. Release builds never enable it.
+codegen = [
+  "dep:serde_json",
+  "dep:specta",
+  "dep:specta-serde",
+  "dep:specta-swift",
+  "dep:specta-util",
+  "dep:specta-zod",
+]
 git2 = ["dep:git2"]
 rusqlite = ["dep:rusqlite"]
 
@@ -17,6 +27,13 @@ serde = { workspace = true }
 # optional so a host without libgit2 or SQLite (a wasm build) never links them.
 git2 = { workspace = true, optional = true }
 rusqlite = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+specta = { workspace = true, optional = true }
+specta-serde = { workspace = true, optional = true }
+specta-swift = { workspace = true, optional = true }
+specta-util = { workspace = true, optional = true }
+specta-zod = { workspace = true, optional = true }
 
-[dev-dependencies]
-serde_json = { workspace = true }
+[[bin]]
+name = "codegen"
+required-features = ["codegen"]

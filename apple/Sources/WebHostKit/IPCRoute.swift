@@ -1,4 +1,5 @@
 public import Foundation
+import TypesShared
 
 /// Answers `POST reflect-app://localhost/__ipc/<command>`. A command in
 /// `shellCommands` runs in the shell; any other `host.` or `plugin:` command
@@ -84,7 +85,7 @@ public final class IPCRoute: SchemeRoute {
       return await shellCommand(request)
     }
     if command.hasPrefix("host.") || command.hasPrefix("plugin:") {
-      return .error(kind: "notFound", message: "the shell has no command \"\(command)\"")
+      return .error(.notFound(.init(message: "the shell has no command \"\(command)\"")))
     }
     let headers = (try? JSONSerialization.data(withJSONObject: request.headers)) ?? Data()
     return await dispatch(command, request.args, headers, request.body)

@@ -32,6 +32,7 @@
     "check": "pnpm typecheck && pnpm lint",
     "gen:ios-csp": "node scripts/generate-ios-csp.ts",
     "gen:licenses": "pnpm --filter @reflect/web gen:licenses",
+    "gen:types": "node scripts/generate-types.ts",
     "gen:wxt": "pnpm --filter @reflect/extension gen:wxt",
     "tauri": "pnpm --filter @reflect/tauri tauri",
     "upload:testflight": "pnpm --filter @reflect/ios upload:testflight",

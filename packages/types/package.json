@@ -1,0 +1,21 @@
+{
+  "name": "@reflect/types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0"
+  }
+}

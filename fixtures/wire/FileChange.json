@@ -1,0 +1,15 @@
+[
+  {
+    "path": "notes/a.md",
+    "kind": "upsert",
+    "modifiedMs": 1763000000000
+  },
+  {
+    "path": "notes/b.md",
+    "kind": "upsert"
+  },
+  {
+    "path": "notes/a.md",
+    "kind": "remove"
+  }
+]

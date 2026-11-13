@@ -1,28 +1,10 @@
-import { z } from 'zod'
+import { AppErrorSchema, type AppError as AppErrorWire } from '@reflect/types'
 
 /**
- * Every `kind` an {@link AppError} can carry. Kinds mirror the Rust `AppError`
- * enum (camelCase via serde).
+ * Every `kind` an {@link AppError} can carry, generated from the Rust
+ * `AppError` enum.
  */
-const appErrorKinds = [
-  'io',
-  'notFound',
-  'traversal',
-  'noGraph',
-  'parse',
-  'auth',
-  'network',
-  'unknown',
-] as const
-
-export type AppErrorKind = (typeof appErrorKinds)[number]
-
-/**
- * The serialized Rust `AppError`: Rust commands return `Result<T, AppError>`
- * and reject with `{ kind, message }`. {@link toAppError} turns it into an
- * {@link AppError} at the IPC boundary.
- */
-const appErrorWireSchema = z.object({ kind: z.enum(appErrorKinds), message: z.string() })
+export type AppErrorKind = AppErrorWire['kind']
 
 /**
  * The shared error contract. Rust-originated errors become instances at the
@@ -53,7 +35,7 @@ export function toAppError(value: unknown): AppError {
   if (isAppError(value)) {
     return value
   }
-  const parsed = appErrorWireSchema.safeParse(value)
+  const parsed = AppErrorSchema.safeParse(value)
   if (parsed.success) {
     return new AppError(parsed.data.kind, parsed.data.message, { cause: value })
   }

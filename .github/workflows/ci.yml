@@ -78,6 +78,7 @@ jobs:
             'apple/*'
             'apps/ios/*'
             'apps/safari-extension/*'
+            'fixtures/wire/*'
             'scripts/build-ffi.ts'
             'scripts/test-ios.ts'
           )
@@ -350,6 +351,17 @@ jobs:
 
       - name: Format check
         run: cargo fmt --all -- --check
+
+      # The Swift output needs `swift format`, so this runs on macOS only.
+      - if: matrix.name == 'macOS'
+        uses: ./.github/actions/setup-node
+
+      - name: Verify the generated wire types are current
+        if: matrix.name == 'macOS'
+        run: |
+          pnpm gen:types
+          git diff --exit-code packages/types apple/Sources/TypesShared fixtures/wire \
+            || (echo "::error::Generated wire types are stale. Run 'pnpm gen:types' and commit the result." && exit 1)
 
       - if: matrix.name == 'Linux'
         uses: ./.github/actions/setup-mise

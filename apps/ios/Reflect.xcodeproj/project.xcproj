@@ -121,6 +121,10 @@
           "build-phase": { "build-phase": "frameworks" },
         }, {
           "package": "apple",
+          "product-name": "TypesShared",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "apple",
           "product-name": "WebAuthKit",
           "build-phase": { "build-phase": "frameworks" },
         }, {

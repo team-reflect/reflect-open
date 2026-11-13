@@ -1,15 +1,26 @@
 //! Names of the events the native side broadcasts to the frontend.
 
-/// Batched [`crate::FileChange`]s for files that changed outside the editor.
-pub const INDEX_CHANGED: &str = "index:changed";
+/// Defines one `pub const` per event and [`ALL`], the list the codegen bin
+/// writes to TypeScript and Swift.
+macro_rules! events {
+    ($( $(#[doc = $doc:literal])* $name:ident = $value:literal, )*) => {
+        $( $(#[doc = $doc])* pub const $name: &str = $value; )*
 
-/// Asks the frontend for one full reconcile pass. Carries no payload.
-pub const INDEX_RECONCILE: &str = "index:reconcile";
+        /// Every event: its constant name and its wire name.
+        pub const ALL: &[(&str, &str)] = &[$( (stringify!($name), $value) ),*];
+    };
+}
 
-/// Fired after a note-projection write commits. Secondary note windows run no
-/// indexer of their own and refetch their index-backed queries on this signal.
-pub const INDEX_WRITTEN: &str = "index:written";
-
-/// Fired after a note's rows move to a new path (an in-app rename or an
-/// id-healed external one), with `{ "from": ..., "to": ... }`.
-pub const NOTE_MOVED: &str = "note:moved";
+events! {
+    /// Batched [`crate::FileChange`]s for files that changed outside the editor.
+    INDEX_CHANGED = "index:changed",
+    /// Asks the frontend for one full reconcile pass. Carries no payload.
+    INDEX_RECONCILE = "index:reconcile",
+    /// Fired after a note-projection write commits. Secondary note windows run
+    /// no indexer of their own and refetch their index-backed queries on this
+    /// signal.
+    INDEX_WRITTEN = "index:written",
+    /// Fired after a note's rows move to a new path (an in-app rename or an
+    /// id-healed external one), with `{ "from": ..., "to": ... }`.
+    NOTE_MOVED = "note:moved",
+}
