@@ -20,7 +20,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Called when the corner buttons move between the page's header row
   /// (`true`) and the row of the floating tab bar (`false`).
   var onCornersInHeaderRow: (Bool) -> Void = { _ in }
-  /// Called when the iPad sidebar shows (`true`) or hides (`false`).
+  /// Called when the iPad sidebar shows (`true`) or hides (`false`), and
+  /// with `nil` when the window has no sidebar.
   var onSidebarVisible: (Bool?) -> Void = { _ in }
 
   private let webView: WKWebView
@@ -53,12 +54,12 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   private let plus = PlusChrome()
   /// The iPad sidebar's group of pinned notes. Each child's identifier is
   /// `pinned:` and the note's path.
-  let pinnedGroup = UITabGroup(
+  lazy var pinnedGroup = UITabGroup(
     title: "Pinned notes", image: nil, identifier: SidebarRow.pinnedGroup, children: []
-  ) { _ in
-    // Never selected: a tap on the group only folds it.
-    TabPlaceholder()
-  }
+  ) { [pinnedPlaceholder] _ in pinnedPlaceholder }
+  /// The placeholder on screen while a pinned row is selected: the tab bar
+  /// controller shows the group's view controller, not the row's.
+  let pinnedPlaceholder = TabPlaceholder()
   let footer = SidebarFooter()
   /// What the last state's sidebar shows.
   var sidebarState: SidebarState?
@@ -183,10 +184,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
   }
 
-  /// Gives a regular iPad window the sidebar. It shows beside the content
-  /// in a window of at least `sidebarMinWidth`, and over it, hidden until
-  /// the toggle shows it, in a narrower one. A user's toggle wins over that
-  /// default for the rest of the window's life.
   /// The app's purple.
   static let accent = UIColor { traits in
     traits.userInterfaceStyle == .dark
@@ -194,6 +191,10 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       : UIColor(red: 0x4F / 255, green: 0x46 / 255, blue: 0xE5 / 255, alpha: 1)
   }
 
+  /// Gives a regular iPad window the sidebar. It shows beside the content
+  /// in a window of at least `sidebarMinWidth`, and over it, hidden until
+  /// the toggle shows it, in a narrower one. A user's toggle wins over that
+  /// default for the rest of the window's life.
   private func updateMode(width: CGFloat) {
     let regularPad =
       traitCollection.userInterfaceIdiom == .pad && traitCollection.horizontalSizeClass == .regular
@@ -261,7 +262,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   }
 
   private var selectedPlaceholder: TabPlaceholder? {
-    selectedTab?.viewController as? TabPlaceholder
+    selectedTab?.parent === pinnedGroup
+      ? pinnedPlaceholder : selectedTab?.viewController as? TabPlaceholder
   }
 
   /// Puts the stage right above the view that holds the selected

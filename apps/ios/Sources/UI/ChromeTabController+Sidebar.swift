@@ -35,6 +35,10 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
       tab.preferredPlacement = .sidebarOnly
     }
     pinnedGroup.isHidden = true
+    pinnedPlaceholder.onLayout = { [weak self] in
+      guard let self, self.selectedTab?.parent === self.pinnedGroup else { return }
+      self.placeStage()
+    }
     footer.onMenu = { [weak self] id in self?.send(.sidebar(.menu(id))) }
     footer.onSettings = { [weak self] in self?.send(.sidebar(.settings)) }
     return [search] + main() + [chat, pinnedGroup]
