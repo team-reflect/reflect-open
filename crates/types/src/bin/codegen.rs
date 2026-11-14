@@ -51,7 +51,10 @@ fn typescript(types: &Types) -> String {
         .dangerous_bigints_as_number()
         .rule(Primitive::f32.into(), number.clone())
         .rule(Primitive::f64.into(), number)
-        .rule(json, DataType::Reference(specta_typescript::define("unknown")));
+        .rule(
+            json,
+            DataType::Reference(specta_typescript::define("unknown")),
+        );
     let out = specta_typescript::Typescript::default()
         .header(format!("// {HEADER}"))
         .export(&remapper.remap_types(types.clone()), specta_serde::Format)
