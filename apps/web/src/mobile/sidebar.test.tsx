@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { selectSidebarRow } from '@/mobile/sidebar.ts'
+import { createTestCoreServices } from '@reflect/core/testing'
+import { selectSidebarRow, sidebarVisible, useSyncChatSection } from '@/mobile/sidebar.ts'
+import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
+import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 
 const TODAY = '2026-11-13'
 
@@ -25,5 +28,26 @@ describe('selectSidebarRow', () => {
     )
     expect(selectSidebarRow({ kind: 'settings' }, 'daily', pinned, TODAY)).toBe('daily')
     expect(selectSidebarRow({ kind: 'note', path: 'other.md' }, 'chat', pinned, TODAY)).toBe('chat')
+  })
+})
+
+describe('useSyncChatSection', () => {
+  it('puts Chat in its own section only while there is a sidebar', async () => {
+    const view = await renderHookInApp(() => useSyncChatSection(), {
+      core: createTestCoreServices({ database: createWasmTestDatabaseService() }),
+    })
+    const { navigation } = view.appServices
+    navigation.navigate({ kind: 'chat' })
+    expect(navigation.get().section).toBe('all')
+
+    sidebarVisible.set(false)
+    try {
+      await view.rerender()
+      navigation.navigate({ kind: 'tasks' })
+      navigation.navigate({ kind: 'chat' })
+      expect(navigation.get().section).toBe('chat')
+    } finally {
+      sidebarVisible.set(null)
+    }
   })
 })
