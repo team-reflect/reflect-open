@@ -180,8 +180,8 @@ The short version:
 
 **Frontend ↔ Rust**
 
-- Define commands as `Core` methods in `crates/core` with a row in `dispatch_table!`. Desktop-only commands are `#[tauri::command]`s in `apps/tauri/src/`.
-- Bind each command as a method of the core service that owns the domain, through `ipc.call(command, args, zodSchema)`. Components never call `invoke`. See [docs/contributing/adding-a-command.md](docs/contributing/adding-a-command.md).
+- Define commands as `Core` methods in `crates/core`, or `#[tauri::command]`s in `apps/tauri/src/` for desktop-only ones, each with a row in the command table (`crates/types/src/commands.rs`). Run `pnpm gen:types` after you change a row or a type.
+- Bind each command as a method of the core service that owns the domain, through `ipc.call(command, args)`. The table types the args and the result. Components never call `invoke`. See [docs/contributing/adding-a-command.md](docs/contributing/adding-a-command.md).
 - Add Tauri plugins in `apps/tauri/Cargo.toml` (Rust) and grant permissions in `apps/tauri/capabilities/`.
 
 **Common commands** (run from the repo root; the rest are in `package.json`)
@@ -230,9 +230,10 @@ and the existing local patterns over new abstractions.
 
 ## Data Boundaries
 
-- Use Zod for all incoming or untrusted data: JSON, IPC payloads, external API
-  responses, file-derived metadata, and worker payloads. Never parse JSON with type
-  assertions.
+- Use Zod for all incoming or untrusted data: JSON, external API responses,
+  file-derived metadata, and worker payloads. Never parse JSON with type
+  assertions. IPC results are typed from the Rust command table and need no Zod,
+  unless the data comes from disk or the network.
 - Normalize casing once at the boundary; TypeScript types are camelCase.
 - In public function parameters or returns, use Kysely helper types
   (`Selectable<T>`, `Insertable<T>`, `Updateable<T>`), not raw table types.
