@@ -315,11 +315,11 @@ describe('NavigationService', () => {
   describe('sections', () => {
     it('puts a Chat navigation in the section set for Chat', () => {
       const navigation = createNavigationService()
-      navigation.navigate({ kind: 'chat' })
+      navigation.navigate({ kind: 'chat', conversationId: null })
       expect(navigation.get().section).toBe('chat')
       navigation.setChatSection('all')
       navigation.navigate({ kind: 'tasks' })
-      navigation.navigate({ kind: 'chat' })
+      navigation.navigate({ kind: 'chat', conversationId: null })
       expect(navigation.get().section).toBe('all')
     })
 
@@ -329,7 +329,7 @@ describe('NavigationService', () => {
       navigation.navigate({ kind: 'tasks' })
       navigation.navigate({ kind: 'note', path: 'notes/a.md' })
       expect(navigation.get().section).toBe('tasks')
-      navigation.navigate({ kind: 'chat' }, { section: 'all' })
+      navigation.navigate({ kind: 'chat', conversationId: null }, { section: 'all' })
       expect(navigation.get().section).toBe('all')
       navigation.back()
       expect(navigation.get().section).toBe('tasks')
@@ -376,10 +376,10 @@ describe('NavigationService', () => {
 
     it('pushes the current route again when a navigation moves it to another section', () => {
       const navigation = createNavigationService()
-      navigation.navigate({ kind: 'chat' }, { section: 'all' })
-      navigation.navigate({ kind: 'chat' }, { section: 'chat' })
+      navigation.navigate({ kind: 'chat', conversationId: null }, { section: 'all' })
+      navigation.navigate({ kind: 'chat', conversationId: null }, { section: 'chat' })
       expect(navigation.get().section).toBe('chat')
-      navigation.navigate({ kind: 'chat' })
+      navigation.navigate({ kind: 'chat', conversationId: null })
       expect(navigation.get().section).toBe('chat')
       navigation.back()
       expect(navigation.get().section).toBe('all')

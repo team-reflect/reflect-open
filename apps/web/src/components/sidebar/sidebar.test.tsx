@@ -200,7 +200,9 @@ describe('Sidebar', () => {
     })
 
     await view.getByRole('button', { name: /chat/i }).click()
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'chat' }))
+    await vi.waitFor(() => {
+      return expect(navigate).toHaveBeenCalledWith({ kind: 'chat', conversationId: null })
+    })
   })
 
   it('Daily notes on the stream re-anchors to today with focus', async () => {

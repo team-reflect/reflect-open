@@ -19,7 +19,7 @@ export function MobileChatButton(): ReactElement {
       edge="trailing"
       aria-label="Chat"
       className="relative"
-      onClick={() => navigate({ kind: 'chat' }, { focusEditor: !hasTurns })}
+      onClick={() => navigate({ kind: 'chat', conversationId: null }, { focusEditor: !hasTurns })}
     >
       <MessageSquare aria-hidden />
       {hasTurns ? (

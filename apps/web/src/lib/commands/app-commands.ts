@@ -121,7 +121,7 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'Chat',
     keywords: ['ai', 'assistant', 'copilot', 'ask'],
     keybinding: 'Mod-j',
-    run: (context) => context.navigate({ kind: 'chat' }),
+    run: (context) => context.navigate({ kind: 'chat', conversationId: null }),
   },
   {
     id: 'chat.new',

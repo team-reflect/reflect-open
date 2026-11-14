@@ -22,7 +22,9 @@ describe('selectSidebarRow', () => {
   })
 
   it("selects Chat, or else the row of the entry's section", () => {
-    expect(selectSidebarRow({ kind: 'chat' }, 'all', pinned, TODAY)).toBe('chat')
+    expect(selectSidebarRow({ kind: 'chat', conversationId: null }, 'all', pinned, TODAY)).toBe(
+      'chat',
+    )
     expect(selectSidebarRow({ kind: 'note', path: 'other.md' }, 'tasks', pinned, TODAY)).toBe(
       'tasks',
     )
@@ -39,14 +41,14 @@ describe('useSyncChatSection', () => {
       core: createTestCoreServices({ database: createWasmTestDatabaseService() }),
     })
     const { navigation } = view.appServices
-    navigation.navigate({ kind: 'chat' })
+    navigation.navigate({ kind: 'chat', conversationId: null })
     expect(navigation.get().section).toBe('all')
 
     sidebarVisible.set(false)
     try {
       await view.rerender()
       navigation.navigate({ kind: 'tasks' })
-      navigation.navigate({ kind: 'chat' })
+      navigation.navigate({ kind: 'chat', conversationId: null })
       expect(navigation.get().section).toBe('chat')
     } finally {
       sidebarVisible.set(null)

@@ -197,7 +197,7 @@ describe('app commands', () => {
   })
 
   it('chat.new starts a fresh conversation only from the chat route', async () => {
-    const { context } = fakeContext({ route: () => ({ kind: 'chat' }) })
+    const { context } = fakeContext({ route: () => ({ kind: 'chat', conversationId: null }) })
     await command('chat.new').run(context)
     expect(context.newChat).toHaveBeenCalledTimes(1)
     expect(keybindingFor('chat.new')).toBe('Mod-Shift-n')

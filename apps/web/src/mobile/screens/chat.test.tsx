@@ -69,7 +69,10 @@ function RouteProbe(): null {
 function FocusChatProbe(): ReactElement {
   const { navigate } = useRouterActions()
   return (
-    <button type="button" onClick={() => navigate({ kind: 'chat' }, { focusEditor: true })}>
+    <button
+      type="button"
+      onClick={() => navigate({ kind: 'chat', conversationId: null }, { focusEditor: true })}
+    >
       focus chat input
     </button>
   )
@@ -124,8 +127,8 @@ describe('MobileChat', () => {
 
   it('Back from a cold entry lands on today, as the back-swipe does', async () => {
     // Chat is the first and only history entry: there is nothing to pop.
-    await renderHarness({ kind: 'chat' })
-    expect(probedRouteRef.current).toEqual({ kind: 'chat' })
+    await renderHarness({ kind: 'chat', conversationId: null })
+    expect(probedRouteRef.current).toMatchObject({ kind: 'chat' })
 
     await page.getByRole('button', { name: 'Back' }).click()
 
@@ -133,7 +136,7 @@ describe('MobileChat', () => {
   })
 
   it('is the root of its own section on iPad, with no Back', async () => {
-    await renderHarness({ kind: 'chat' }, 'chat')
+    await renderHarness({ kind: 'chat', conversationId: null }, 'chat')
     await expect.element(page.getByRole('heading', { name: 'Chat' }).first()).toBeVisible()
     expect(page.getByRole('button', { name: 'Back' }).query()).toBeNull()
   })
@@ -154,6 +157,29 @@ describe('MobileChat', () => {
     await expect.element(page.getByText('what did I write?')).toBeVisible()
     // A send that goes through clears the provider-held draft.
     await expect.element(composer).toHaveValue('')
+  })
+
+  it('names the open conversation in its entry, and New chat renames it', async () => {
+    configureModel()
+    scriptTurn([
+      { type: 'text-delta', text: 'First answer.' },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'First answer.' }] },
+    ])
+    await renderHarness({ kind: 'chat', conversationId: null })
+    await expect
+      .poll(() => probedRouteRef.current)
+      .toSatisfy((route: Route | null) => route?.kind === 'chat' && route.conversationId !== null)
+    const first = probedRouteRef.current
+
+    fireEvent.change(page.getByLabelText('Chat message'), { target: { value: 'question' } })
+    await page.getByRole('button', { name: 'Send' }).click()
+    await expect.element(page.getByText('First answer.')).toBeVisible()
+    await page.getByRole('button', { name: 'New chat' }).click()
+
+    await expect.poll(() => probedRouteRef.current).not.toEqual(first)
+    expect(probedRouteRef.current).toSatisfy(
+      (route: Route | null) => route?.kind === 'chat' && route.conversationId !== null,
+    )
   })
 
   it('keeps the draft and the conversation across a screen unmount (leaving it)', async () => {

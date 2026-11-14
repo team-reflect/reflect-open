@@ -29,7 +29,9 @@ export const routeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('allNotes'), tag: z.string().nullable() }),
   z.object({ kind: z.literal('search'), query: z.string() }),
   z.object({ kind: z.literal('tasks') }),
-  z.object({ kind: z.literal('chat') }),
+  // `conversationId` names the conversation the entry shows; `null` (the
+  // Chat button, ⌘J) stands for the conversation the chat session has open.
+  z.object({ kind: z.literal('chat'), conversationId: z.string().nullable().default(null) }),
   // `graphs` (the graph switcher) and `licenses` (Open Source Licenses) are
   // mobile sub-screens of Settings. Desktop renders every page as the
   // settings screen: its graph switcher lives in the sidebar footer and its

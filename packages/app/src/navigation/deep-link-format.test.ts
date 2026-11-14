@@ -29,7 +29,7 @@ describe('deepLinkForRoute', () => {
 
   it('returns null for screens the grammar does not address', () => {
     expect(deepLinkForRoute({ kind: 'allNotes', tag: null })).toBeNull()
-    expect(deepLinkForRoute({ kind: 'chat' })).toBeNull()
+    expect(deepLinkForRoute({ kind: 'chat', conversationId: null })).toBeNull()
     expect(deepLinkForRoute({ kind: 'settings', page: 'main' })).toBeNull()
   })
 })

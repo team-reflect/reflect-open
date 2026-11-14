@@ -130,7 +130,7 @@ describe('RouteContent', () => {
   })
 
   it('renders the chat screen for the chat route, not the stream', async () => {
-    const view = await renderRoute({ kind: 'chat' })
+    const view = await renderRoute({ kind: 'chat', conversationId: null })
     await expect.element(page.getByTestId('chat-screen')).toBeInTheDocument()
     await expect.element(page.getByTestId('daily-stream')).not.toBeInTheDocument()
     await view.unmount()

@@ -144,7 +144,7 @@ export function useSidebar(): {
         // Chat returns to where it was left where it is a section, and opens
         // as a card over All elsewhere.
         if (sidebarVisible.get() === null) {
-          navigate({ kind: 'chat' })
+          navigate({ kind: 'chat', conversationId: null })
         } else {
           selectSection('chat')
         }

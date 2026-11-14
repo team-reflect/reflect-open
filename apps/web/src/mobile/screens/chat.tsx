@@ -5,7 +5,12 @@ import { Button } from '@/components/ui/button.tsx'
 import { MobileChatComposer } from '@/mobile/chat-composer.tsx'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
-import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
+import {
+  useChatActions,
+  useChatProviders,
+  useHasChatTurns,
+  useSyncChatRoute,
+} from '@/providers/chat-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
 /**
@@ -21,6 +26,7 @@ import { useRouterState, useRouterActions } from '@/routing/router.tsx'
  */
 export function MobileChat(): ReactElement {
   const providers = useChatProviders()
+  useSyncChatRoute()
   const hasTurns = useHasChatTurns()
   const { newChat } = useChatActions()
   const { canBack, section } = useRouterState()

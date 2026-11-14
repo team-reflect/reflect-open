@@ -198,7 +198,7 @@ function defaultSectionRoot(section: Section): Route {
     case 'tasks':
       return { kind: 'tasks' }
     case 'chat':
-      return { kind: 'chat' }
+      return { kind: 'chat', conversationId: null }
   }
 }
 

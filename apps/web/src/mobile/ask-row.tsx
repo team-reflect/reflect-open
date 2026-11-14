@@ -31,7 +31,7 @@ export function MobileAskRow({ query }: MobileAskRowProps): ReactElement | null 
       type="button"
       onClick={() => {
         void ask(question)
-        navigate({ kind: 'chat' })
+        navigate({ kind: 'chat', conversationId: null })
       }}
       className="flex w-full shrink-0 items-center gap-3 border-b border-border bg-surface-sunken px-safe-offset-4 py-3 text-left"
     >
