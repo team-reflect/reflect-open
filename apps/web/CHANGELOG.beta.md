@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.19.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.3...v0.19.0-beta.4) (2026-11-14)
+
+
+### Features
+
+* **ios:** return each section to its last screen ([#2168](https://github.com/team-reflect/reflect-open/issues/2168)) ([60896f3](https://github.com/team-reflect/reflect-open/commit/60896f37d403e8a1435afbb267fc9bc7c71491e1))
+
+
+### Bug Fixes
+
+* **ios:** clear the iPad window controls in compact windows ([#2174](https://github.com/team-reflect/reflect-open/issues/2174)) ([2492d6a](https://github.com/team-reflect/reflect-open/commit/2492d6af351c9289bd45f7c7031b2512a1763fe1))
+* **ios:** morph corner buttons like system bar buttons ([#2173](https://github.com/team-reflect/reflect-open/issues/2173)) ([8d74054](https://github.com/team-reflect/reflect-open/commit/8d74054697037ac9817031cbcfc226629525c2a5))
+* **mobile:** faster swipe release ([#2165](https://github.com/team-reflect/reflect-open/issues/2165)) ([c1403f7](https://github.com/team-reflect/reflect-open/commit/c1403f7ee0391b9e27b5b06574bd49556e7587e7))
+* **mobile:** pad content beside the iPad sidebar ([#2175](https://github.com/team-reflect/reflect-open/issues/2175)) ([6345fb7](https://github.com/team-reflect/reflect-open/commit/6345fb732beb97551da166852d78b71ec1c53180))
+
 ## [0.19.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.2...v0.19.0-beta.3) (2026-11-13)
 
 
