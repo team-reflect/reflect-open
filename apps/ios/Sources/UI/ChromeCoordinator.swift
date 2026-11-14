@@ -59,7 +59,9 @@ final class ChromeCoordinator {
     applyTheme(state.theme)
     tabs.apply(state)
     if !barFrozen {
-      showBar(state, animated: state.tab == shownTab)
+      // During a back swipe the buttons are faded out: they change at once
+      // and fade back in.
+      showBar(state, animated: state.tab == shownTab && swipe == nil)
     }
     shownTab = state.tab
     // The pop of a back swipe brings a new entry: its buttons fade back in.

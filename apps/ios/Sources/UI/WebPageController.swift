@@ -218,25 +218,49 @@ final class WebPageController: UIViewController {
   }
 
   /// Puts buttons for `items` in `group`. With `animated`, the buttons morph
-  /// as system bar buttons do. The button at each place stays: it replaces
-  /// its symbol, and its glass resizes when a title becomes an icon. A new
-  /// button grows out of nothing, and a removed button shrinks away.
+  /// as system bar buttons do. A button stays for the item with its key, and
+  /// the other buttons pair up by place: each replaces its symbol, and its
+  /// glass resizes when a title becomes an icon. A new button grows out of
+  /// nothing, and a removed button shrinks away in its place. Before iOS 26,
+  /// a symbol changes without a transition, so the group cross-fades.
   private func setItems(_ items: [CornerItem], in group: UIStackView, animated: Bool) {
-    let shown = Self.shownButtons(in: group)
-    guard animated, #available(iOS 26, *) else {
-      for view in group.arrangedSubviews {
-        view.removeFromSuperview()
-      }
-      for item in items {
-        group.addArrangedSubview(CornerButton(item))
+    guard animated else {
+      replaceButtons(in: group, with: items)
+      return
+    }
+    guard #available(iOS 26, *) else {
+      UIView.transition(with: group, duration: 0.2, options: .transitionCrossDissolve) {
+        self.replaceButtons(in: group, with: items)
       }
       return
     }
-    let added = items.dropFirst(shown.count).map { item in
-      let button = CornerButton(item)
-      button.alpha = 0
-      group.addArrangedSubview(button)
-      return button
+    var leaving = Self.shownButtons(in: group)
+    var kept: [CornerButton?] = items.map { item in
+      leaving.firstIndex { $0.key == item.key }.map { leaving.remove(at: $0) }
+    }
+    for index in kept.indices where kept[index] == nil && !leaving.isEmpty {
+      kept[index] = leaving.removeFirst()
+    }
+    var added: [CornerButton] = []
+    let buttons = zip(kept, items).map { button, item in
+      if let button { return button }
+      let new = CornerButton(item)
+      new.alpha = 0
+      added.append(new)
+      return new
+    }
+    // A button that goes away keeps its place before the next button that
+    // stays.
+    let old = group.arrangedSubviews
+    var order: [UIView] = buttons
+    for (index, view) in old.enumerated() where !buttons.contains(where: { $0 === view }) {
+      let next = old[(index + 1)...].first { view in buttons.contains { $0 === view } }
+      order.insert(
+        view, at: next.flatMap { next in order.firstIndex { $0 === next } } ?? order.count)
+    }
+    for (index, view) in order.enumerated()
+    where group.arrangedSubviews.firstIndex(of: view) != index {
+      group.insertArrangedSubview(view, at: index)
     }
     // A hidden button has no frame of its own, so it would grow from the
     // corner of the group. Start it at the frame it ends at.
@@ -252,10 +276,9 @@ final class WebPageController: UIViewController {
         button.transform = CornerButton.small
       }
     }
-    for (button, item) in zip(shown, items) {
+    for (button, item) in zip(buttons, items) where !added.contains(button) {
       button.show(item)
     }
-    let leaving = shown.dropFirst(items.count)
     for button in leaving {
       button.isLeaving = true
     }
@@ -275,6 +298,16 @@ final class WebPageController: UIViewController {
       for button in leaving {
         button.removeFromSuperview()
       }
+    }
+  }
+
+  /// Replaces the buttons of `group` with new buttons for `items`.
+  private func replaceButtons(in group: UIStackView, with items: [CornerItem]) {
+    for view in group.arrangedSubviews {
+      view.removeFromSuperview()
+    }
+    for item in items {
+      group.addArrangedSubview(CornerButton(item))
     }
   }
 
@@ -356,20 +389,21 @@ final class WebPageController: UIViewController {
       }
     }
     return CornerItem(
-      image: button.icon.flatMap { UIImage(systemName: $0) }, title: button.title,
+      key: button.id, image: button.icon.flatMap { UIImage(systemName: $0) }, title: button.title,
       label: button.title, action: { send(.action(.init(entryId: entryId, id: button.id))) },
       menu: menu)
   }
 }
 
 /// A round glass button for an icon, or a glass capsule for a title.
-@MainActor
 private final class CornerButton: UIButton {
   /// The scale a button grows from and shrinks to.
   static let small = CGAffineTransform(scaleX: 0.5, y: 0.5)
 
   /// The button animates away; a new state does not reuse it.
   var isLeaving = false
+  /// The key of the item the button shows.
+  private(set) var key = ""
 
   private lazy var iconWidth = widthAnchor.constraint(
     equalToConstant: WebPageController.buttonSize)
@@ -406,6 +440,7 @@ private final class CornerButton: UIButton {
   /// Shows `item`: its symbol or title, its label, and its tap action or
   /// menu.
   func show(_ item: CornerItem) {
+    key = item.key
     accessibilityLabel = item.label
     isEnabled = item.isEnabled
     removeAction(identifiedBy: Self.tapAction, for: .primaryActionTriggered)
@@ -430,6 +465,9 @@ private final class CornerButton: UIButton {
 
 /// What one corner button shows and does.
 private struct CornerItem {
+  /// Names the button across states, so the button stays when its item
+  /// moves or changes.
+  let key: String
   let image: UIImage?
   let title: String?
   let label: String
@@ -444,7 +482,9 @@ private struct CornerItem {
   static func arrow(forward: Bool, action: @escaping () -> Void) -> CornerItem {
     let name = forward ? "Forward" : "Back"
     return CornerItem(
-      image: UIImage(systemName: forward ? "chevron.forward" : "chevron.backward"), title: nil,
+      key: "arrow.\(name)",
+      image: UIImage(systemName: forward ? "chevron.forward" : "chevron.backward"),
+      title: nil,
       label: Bundle(for: UIButton.self).localizedString(forKey: name, value: name, table: nil),
       action: action, menu: nil)
   }
