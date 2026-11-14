@@ -287,13 +287,13 @@ describe('NavigationService', () => {
       expect(navigation.get().backRoute).toEqual({ kind: 'tasks' })
     })
 
-    it('goes to the root from a screen over it, and re-anchors on the root', () => {
+    it('goes to the default root from within the section, and re-anchors there', () => {
       const navigation = createNavigationService()
       navigation.navigate({ kind: 'allNotes', tag: 'work' })
       navigation.navigate({ kind: 'note', path: 'notes/a.md' })
 
       navigation.selectSection('all')
-      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: 'work' })
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: null })
 
       const arrivals = navigation.get().arrivalSeq
       const entry = navigation.get().entryId
@@ -301,6 +301,27 @@ describe('NavigationService', () => {
       expect(navigation.get().entryId).toBe(entry)
       expect(navigation.get().arrivalSeq).toBe(arrivals + 1)
       expect(navigation.get().arrivalFocusEditor).toBe(true)
+    })
+
+    it('puts the last root, tag filter included, under the restored screen', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'allNotes', tag: 'work' })
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.navigate({ kind: 'tasks' })
+
+      navigation.selectSection('all')
+      expect(navigation.get().backRoute).toEqual({ kind: 'allNotes', tag: 'work' })
+    })
+
+    it('pushes the current route again when a navigation moves it to another section', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'chat' }, { section: 'all' })
+      navigation.navigate({ kind: 'chat' }, { section: 'chat' })
+      expect(navigation.get().section).toBe('chat')
+      navigation.navigate({ kind: 'chat' })
+      expect(navigation.get().section).toBe('chat')
+      navigation.back()
+      expect(navigation.get().section).toBe('all')
     })
 
     it('returns Daily to its last day, never to a note opened from it', () => {

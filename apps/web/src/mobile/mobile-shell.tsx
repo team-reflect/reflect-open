@@ -51,21 +51,11 @@ export function MobileShell(): ReactElement {
   const handleTabSelect = (next: MobileTab): void => {
     const doubleTap = isDoubleTap(next)
 
-    if (next === 'all') {
-      // Within All (its list or a card over it), the tab pops back to the
-      // list. The double-tap is a search gesture: it lands there with the
-      // search input focused (the Daily tab's capture double-tap,
-      // All-flavored).
-      if (tab === 'all' || doubleTap) {
-        navigate({ kind: 'allNotes', tag: null }, doubleTap ? { focusEditor: true } : undefined)
-      } else {
-        selectSection('all')
-      }
-      return
-    }
-
-    if (next === 'tasks') {
-      selectSection('tasks', doubleTap ? { focusEditor: true } : undefined)
+    // The list tabs' double-tap is a search gesture: it lands on the root
+    // with the search input focused (the Daily tab's capture double-tap,
+    // list-flavored).
+    if (next !== 'daily') {
+      selectSection(next, doubleTap ? { focusEditor: true } : undefined)
       return
     }
 

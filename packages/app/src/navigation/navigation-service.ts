@@ -112,10 +112,10 @@ export type NavigationPosition = Pick<NavigationState, 'entryId' | 'route'>
 export interface NavigationService extends Store<NavigationState> {
   navigate(route: Route, options?: NavigateOptions): void
   /**
-   * Go to `section`. From another section this lands where that section was
-   * left: the daily surface on its last day, or another section on its last
-   * screen, pushed over its root so Back reveals the root. Within the section
-   * it goes to the section's root, and on the root it re-anchors.
+   * Go to `section`. Daily lands on its last day with the stream's scroll
+   * restored. Another section lands on its last screen, pushed over its last
+   * root so Back reveals the root; from within the section it lands on the
+   * section's default root (All without a tag filter).
    */
   selectSection(section: Section, options?: NavigateOptions): void
   back(): void
@@ -267,13 +267,12 @@ class NavigationServiceImpl implements NavigationService {
   selectSection(section: Section, options?: NavigateOptions): void {
     const current = this.#stack[this.#index]!
     const root = this.#rootBySection.get(section) ?? defaultSectionRoot(section)
-    if (current.section === section) {
-      const onRoot = rootSectionForRoute(current.route) === section
-      this.navigate(onRoot ? current.route : root, { ...options, section })
-      return
-    }
     if (section === 'daily') {
       this.navigate(root, { restoreSurfaceScroll: true, ...options, section })
+      return
+    }
+    if (current.section === section) {
+      this.navigate(defaultSectionRoot(section), { ...options, section })
       return
     }
     const last = this.#lastBySection.get(section) ?? root
@@ -304,7 +303,10 @@ class NavigationServiceImpl implements NavigationService {
       // repopulates it.
       this.#scrollBySurface.delete(surface)
     }
-    if (routesEqual(currentEntry.route, target)) {
+    const sameEntry =
+      routesEqual(currentEntry.route, target) &&
+      (options?.section ?? currentEntry.section) === currentEntry.section
+    if (sameEntry) {
       if (restored !== undefined) {
         this.#scrollById.set(currentEntry.id, restored)
       } else {
