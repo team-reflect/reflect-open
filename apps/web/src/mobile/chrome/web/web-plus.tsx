@@ -20,7 +20,7 @@ const ACTION_MOTION =
 const ACTION_BUTTON_MOTION =
   'transition-[background-color,color,box-shadow,translate,scale] duration-100 ease-out active:translate-y-0 active:scale-[0.94] motion-reduce:transition-none'
 
-const SIZE: Record<MobileForm, string> = { bar: 'size-14', rail: 'size-12', pad: 'size-14' }
+const SIZE: Record<MobileForm, string> = { bar: 'size-14', pad: 'size-14' }
 
 const plusSlot = new WritableStore<HTMLElement | null>(null)
 

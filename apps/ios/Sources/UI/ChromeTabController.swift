@@ -140,11 +140,10 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    // The system lays its tab bar out as a vertical rail on an iPhone Duo, and
-    // keeps that frame while the bar is hidden.
+    // Every iPhone, the iPhone Duo too, gets the standalone capsule.
     let next: BottomForm =
       traitCollection.userInterfaceIdiom == .pad && traitCollection.horizontalSizeClass == .regular
-      ? .pad : tabBar.frame.height > tabBar.frame.width ? .rail : .bar
+      ? .pad : .bar
     if next != form {
       form = next
       updateTabBarHidden()
@@ -172,12 +171,6 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       plus.layout(
         in: view, center: CGPoint(x: bounds.maxX - safe.right - 20 - 26, y: items.midY),
         size: 52)
-    case .rail:
-      // The `+` sits above the system's tabs, wherever the rail puts them.
-      let items = tabs.compactMap { $0.frame(in: view) }.reduce(CGRect.null) { $0.union($1) }
-      if !items.isNull {
-        plus.layout(in: view, center: CGPoint(x: items.midX, y: items.minY - 16 - 22), size: 44)
-      }
     case .pad:
       let area = bounds.inset(by: safe)
       plus.layout(
@@ -384,8 +377,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     updateTabBarHidden()
   }
 
-  /// Only the `bar` form sits where the keyboard rises: the rail stands beside
-  /// it, and the iPad bar sits at the top. The `+` hides with the keyboard in
+  /// Only the `bar` form sits where the keyboard rises: the iPad bar sits at
+  /// the top. The `+` hides with the keyboard in
   /// every form.
   private func updateTabBarHidden() {
     let hidden = hidesForState || (hidesForKeyboard && form == .bar)
@@ -513,12 +506,9 @@ final class TabPlaceholder: UIViewController {
 
 /// Where the shell draws the tab capsule and the `+`.
 private enum BottomForm {
-  /// The iPhone: the standalone capsule at the bottom-leading edge, the `+` on
+  /// The iPhone, the iPhone Duo too: the standalone capsule at the bottom-leading edge, the `+` on
   /// its row at the trailing edge.
   case bar
-  /// The iPhone Duo: the system's vertical tab rail at the trailing edge, the
-  /// `+` above it.
-  case rail
   /// The iPad: the system's tab bar at the top, the `+` in the bottom-right
   /// corner.
   case pad

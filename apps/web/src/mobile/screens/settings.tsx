@@ -122,13 +122,11 @@ function ReviewRow(): ReactElement {
 const MOBILE_LAYOUT_OPTIONS: readonly SettingsMenuOption<MobileFormOverride>[] = [
   { value: 'auto', label: 'Automatic' },
   { value: 'bar', label: 'iPhone' },
-  { value: 'rail', label: 'iPhone Duo' },
   { value: 'pad', label: 'iPad' },
 ]
 
 /**
- * Pins the form of the web chrome until the page reloads. A web page cannot
- * tell an iPhone Duo from an iPhone, so its layout shows only when pinned.
+ * Pins the form of the web chrome until the page reloads.
  */
 function MobileLayoutRow(): ReactElement {
   return (
