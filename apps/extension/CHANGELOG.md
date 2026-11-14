@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/team-reflect/reflect-open/compare/extension-v0.4.2...extension-v0.5.0) (2026-11-14)
+
+
+### Features
+
+* **ios:** native Swift shell ([#2069](https://github.com/team-reflect/reflect-open/issues/2069)) ([dd329d2](https://github.com/team-reflect/reflect-open/commit/dd329d22305ca3e4ac5aadd1d34bb8baa05a98ef))
+* save pages from Safari on macOS ([#2036](https://github.com/team-reflect/reflect-open/issues/2036)) ([f7cb87a](https://github.com/team-reflect/reflect-open/commit/f7cb87a25985d9e5d2635bbf8efda517304a20f1))
+
 ## [0.4.2](https://github.com/team-reflect/reflect-open/compare/extension-v0.4.1...extension-v0.4.2) (2026-10-19)
 
 
