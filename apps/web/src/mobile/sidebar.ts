@@ -41,9 +41,9 @@ export type SidebarCommand =
   | { kind: 'menu'; id: string }
 
 /**
- * What the iPad sidebar shows. `selection` is a tab, `chat`, or a pinned
- * note's path after `pinned:`; `graphColor` is `#rrggbb`, or `null` for the
- * app's tint.
+ * What the iPad sidebar shows. `selection` is a tab, `chat`, or, while the
+ * sidebar shows, a pinned note's path after `pinned:`; `graphColor` is
+ * `#rrggbb`, or `null` for the app's tint.
  */
 export interface SidebarState {
   selection: string
@@ -109,7 +109,7 @@ export function useGraphMenu(): {
 }
 
 /**
- * What the iPad sidebar shows for `tab`, and the runner of its taps.
+ * What the iPad sidebar shows, and the runner of its taps.
  */
 export function useSidebar(): {
   state: SidebarState
@@ -126,9 +126,12 @@ export function useSidebar(): {
   const { colorFor } = useGraphColors()
   const graphMenu = useGraphMenu()
   const color = graph === null ? undefined : graphColorCss(colorFor(graph.root))
+  // A hidden sidebar has no pinned rows to select: the top tab bar selects
+  // the row of the section instead.
+  const pinnedRows = useStore(sidebarVisible) === true ? pinned.map((note) => note.path) : []
 
   const state: SidebarState = {
-    selection: selectSidebarRow(route, section, new Set(pinned.map((note) => note.path)), today),
+    selection: selectSidebarRow(route, section, new Set(pinnedRows), today),
     pinned: pinned.map((note) => ({ path: note.path, title: noteLabel(note) })),
     graphName: graphMenu.title,
     graphColor: color?.startsWith('#') === true ? color : null,
