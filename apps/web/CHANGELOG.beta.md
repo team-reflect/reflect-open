@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.19.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.4...v0.19.0-beta.5) (2026-11-14)
+
+
+### Bug Fixes
+
+* **ios:** fit the tab bar in narrow windows ([#2176](https://github.com/team-reflect/reflect-open/issues/2176)) ([ea19896](https://github.com/team-reflect/reflect-open/commit/ea19896a480592b80f652e65e7f795f15c16903d))
+* **ios:** keep notification calls off the main thread ([#2177](https://github.com/team-reflect/reflect-open/issues/2177)) ([36be9fb](https://github.com/team-reflect/reflect-open/commit/36be9fbc26203a91e58d826c5879c27111a8688d))
+* **mobile:** let the back pager take hits at rest ([#2180](https://github.com/team-reflect/reflect-open/issues/2180)) ([4b7ee39](https://github.com/team-reflect/reflect-open/commit/4b7ee398272a70548dd01b2050dad1e1af2337dc))
+
 ## [0.19.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.19.0-beta.3...v0.19.0-beta.4) (2026-11-14)
 
 
