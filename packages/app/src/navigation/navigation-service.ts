@@ -20,9 +20,9 @@ import {
  *
  * Long-lived surfaces (the daily stream, shared by the today/daily routes)
  * additionally keep a **surface position** — the last reported position,
- * independent of any history entry — so a nav-tab return can resume the stream
- * where the user left it (`restoreSurfaceScroll`) even though it lands on a
- * fresh entry.
+ * independent of any history entry — so a Daily section return can resume the stream
+ * where the user left it (`selectSection('daily')`) even though it lands on
+ * a fresh entry.
  */
 
 /**
@@ -31,15 +31,6 @@ import {
 export type ScrollPosition = number | DayScrollPosition
 
 export interface NavigateOptions {
-  /**
-   * Seed the new history entry with the last saved scroll position of the
-   * target route's surface. Primary nav tabs use this so switching away and
-   * back does not reset long-lived list surfaces. Only a genuine return
-   * honors it: when the current route already sits on the target's surface
-   * the arrival re-anchors like any other explicit navigation, and ordinary
-   * command arrivals omit it and re-anchor as before.
-   */
-  restoreSurfaceScroll?: boolean
   /**
    * Ask the destination to focus its primary input on arrival — see
    * {@link NavigationState.arrivalFocusEditor}. Consumed by the daily surfaces —
@@ -137,7 +128,7 @@ export interface NavigationService extends Store<NavigationState> {
    * Discard a view's saved scroll positions — its history entry's and, when the
    * route belongs to a long-lived surface, the surface's too — so the view
    * re-anchors when revisited through **any** door (⌘[ back or a
-   * `restoreSurfaceScroll` nav-tab return alike).
+   * Daily section return alike).
    */
   clearScrollState(at?: NavigationPosition): void
   /**
@@ -261,7 +252,7 @@ class NavigationServiceImpl implements NavigationService {
   }
 
   navigate(route: Route, options?: NavigateOptions): void {
-    this.#arrive(route, options)
+    this.#arrive(route, options, false)
     this.#publish()
   }
 
@@ -269,7 +260,9 @@ class NavigationServiceImpl implements NavigationService {
     const current = this.#stack[this.#index]!
     const root = this.#rootBySection.get(section) ?? defaultSectionRoot(section)
     if (section === 'daily') {
-      this.navigate(root, { restoreSurfaceScroll: true, ...options, section })
+      // The stream resumes where it was left.
+      this.#arrive(root, { ...options, section }, true)
+      this.#publish()
       return
     }
     if (current.section === section) {
@@ -278,13 +271,17 @@ class NavigationServiceImpl implements NavigationService {
     }
     const last = this.#lastBySection.get(section) ?? root
     if (!routesEqual(last, root)) {
-      this.#arrive(root, { section })
+      this.#arrive(root, { section }, false)
     }
-    this.#arrive(last, { ...options, section })
+    this.#arrive(last, { ...options, section }, false)
     this.#publish()
   }
 
-  #arrive(route: Route, options?: NavigateOptions): void {
+  /**
+   * @param restoreSurface Seed a new entry with its surface's last scroll
+   * position when it returns to that surface from off it.
+   */
+  #arrive(route: Route, options: NavigateOptions | undefined, restoreSurface: boolean): void {
     this.#revision += 1
     const target = normalizeRoute(route)
     const surface = scrollSurfaceForRoute(target)
@@ -293,13 +290,11 @@ class NavigationServiceImpl implements NavigationService {
     // the Daily tab clicked while already on the stream is an explicit
     // re-anchor request, exactly like ⌘D.
     const returning =
-      options?.restoreSurfaceScroll === true &&
-      surface !== null &&
-      scrollSurfaceForRoute(currentEntry.route) !== surface
+      restoreSurface && surface !== null && scrollSurfaceForRoute(currentEntry.route) !== surface
     const restored = returning ? this.#scrollBySurface.get(surface) : undefined
     if (surface !== null && restored === undefined) {
       // An explicit arrival re-anchors the surface, making its saved position
-      // stale — drop it so a later nav-tab return re-anchors too instead of
+      // stale — drop it so a later Daily section return re-anchors too instead of
       // resurrecting the pre-arrival position. Scrolling after the arrival
       // repopulates it.
       this.#scrollBySurface.delete(surface)

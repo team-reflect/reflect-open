@@ -43,7 +43,7 @@ interface RouterHandlers {
    * Discard the current view's saved scroll positions — the active history
    * entry's and, when the route belongs to a long-lived surface, the surface's
    * too — so the view re-anchors when revisited through **any** door (⌘[ back
-   * or a `restoreSurfaceScroll` nav-tab return alike).
+   * or a Daily section return alike).
    */
   clearScrollState: () => void
   /** The rendered entry's recorded position (present when revisited), or `null`. */

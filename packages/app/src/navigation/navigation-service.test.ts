@@ -126,7 +126,7 @@ describe('NavigationService', () => {
     const navigation = createNavigationService()
     navigation.saveScrollState(500) // user scrolled the daily stream
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
 
     expect(navigation.get().route).toEqual({ kind: 'today' })
     expect(navigation.savedScroll()).toBe(500)
@@ -146,11 +146,11 @@ describe('NavigationService', () => {
       initialRoute: { kind: 'daily', date: '2026-06-08' },
     })
     navigation.saveScrollState(500) // scrolled the stream on a dated day
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
     expect(navigation.savedScroll()).toBeNull() // Daily tab on-stream = ⌘D re-anchor
 
     navigation.saveScrollState(300)
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
     expect(navigation.savedScroll()).toBeNull() // same while already on today
   })
 
@@ -159,7 +159,7 @@ describe('NavigationService', () => {
     navigation.saveScrollState(500) // user scrolled away on today
     navigation.navigate({ kind: 'today' }) // ⌘D re-anchors the stream
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
 
     expect(navigation.savedScroll()).toBeNull() // the tab can't resurrect pre-⌘D scroll
   })
@@ -175,7 +175,7 @@ describe('NavigationService', () => {
 
     navigation.saveScrollState(120) // post-clear scrolling
     navigation.forward()
-    navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+    navigation.selectSection('daily')
     expect(navigation.savedScroll()).toBe(120) // the tab restores only the new offset
   })
 
@@ -474,7 +474,7 @@ describe('NavigationService', () => {
       })
       expect(navigation.savedScroll()).toBeNull()
       // The old history's daily surface offset is gone too.
-      navigation.navigate({ kind: 'today' }, { restoreSurfaceScroll: true })
+      navigation.selectSection('daily')
       expect(navigation.savedScroll()).toBeNull()
     })
 

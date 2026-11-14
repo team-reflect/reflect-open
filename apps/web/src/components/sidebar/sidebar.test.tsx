@@ -173,9 +173,8 @@ describe('Sidebar', () => {
   it('nav rows navigate, with Daily notes always re-anchoring to today', async () => {
     const { view, navigate } = await renderSidebar(undefined, { kind: 'settings' })
 
-    // The Daily row shares the ⌘D capture command: omitting
-    // `restoreSurfaceScroll` makes even an off-surface return discard the
-    // stream's saved position and re-anchor on today.
+    // The Daily row shares the ⌘D capture command: even an off-surface
+    // return discards the stream's saved position and re-anchors on today.
     await view.getByRole('button', { name: /daily notes/i }).click()
     await vi.waitFor(() => {
       expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true })
