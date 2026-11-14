@@ -426,19 +426,22 @@ export function MobileStack(props: MobileStackProps): ReactElement {
             </Fragment>
           )
         })}
-        {layers.map((layer, index) => (
-          <div
-            key={`snap:${layer.key}`}
-            aria-hidden
-            className="pointer-events-none absolute top-0 size-px snap-start"
-            style={{
-              left:
-                hasBelow && index >= currentIndex
+        {layers.map((layer, index) => {
+          // The current layer and the layers after it sit after the spacer.
+          const afterSpacer = hasBelow && index >= currentIndex
+          return (
+            <div
+              key={`snap:${layer.key}`}
+              aria-hidden
+              className="pointer-events-none absolute top-0 size-px snap-start"
+              style={{
+                left: afterSpacer
                   ? `calc(${index * 100}% + ${BACK_PAGER_OVERSHOOT_PX}px)`
                   : `${index * 100}%`,
-            }}
-          />
-        ))}
+              }}
+            />
+          )
+        })}
       </div>
       {transitionScrim ? (
         <div
