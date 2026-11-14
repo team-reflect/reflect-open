@@ -37,6 +37,8 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
     for tab in [search, pinnedGroup] {
       tab.preferredPlacement = .sidebarOnly
     }
+    // A fixed tab leaves the sidebar without an Edit button.
+    chat.preferredPlacement = .fixed
     pinnedGroup.isHidden = true
     footer.isHidden = true
     pinnedPlaceholder.onLayout = { [weak self] in
