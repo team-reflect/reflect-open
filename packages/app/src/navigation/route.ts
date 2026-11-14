@@ -27,7 +27,6 @@ export const routeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('daily'), date: z.string() }),
   z.object({ kind: z.literal('note'), path: z.string() }),
   z.object({ kind: z.literal('allNotes'), tag: z.string().nullable() }),
-  z.object({ kind: z.literal('search'), query: z.string() }),
   z.object({ kind: z.literal('tasks') }),
   // `conversationId` names the conversation the entry shows; `null` (the
   // Chat button, ⌘J) stands for the conversation the chat session has open.
@@ -106,12 +105,6 @@ export const ROUTE_META: { readonly [K in Route['kind']]: RouteMeta<RouteOf<K>> 
     deepLink: (route) => noteDeepLink(route.path),
   },
   allNotes: { section: 'all', scrollSurface: 'allNotes', parent: today, deepLink: returnNull },
-  search: {
-    section: 'all',
-    scrollSurface: null,
-    parent: today,
-    deepLink: (route) => `${DEEP_LINK_SCHEME}://search?q=${encodeURIComponent(route.query)}`,
-  },
   tasks: {
     section: 'tasks',
     scrollSurface: 'tasks',

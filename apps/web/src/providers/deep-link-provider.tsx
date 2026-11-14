@@ -11,10 +11,14 @@ import { useAppServices } from '@/services/services-provider.tsx'
  */
 
 interface DeepLinkProviderProps {
+  /**
+   * Shows the results of a `reflect://search` link.
+   */
+  search: (query: string) => void
   children: ReactNode
 }
 
-export function DeepLinkProvider({ children }: DeepLinkProviderProps): ReactElement {
+export function DeepLinkProvider({ search, children }: DeepLinkProviderProps): ReactElement {
   const { navigate } = useRouterActions()
   const { deepLinkRouter, linkNavigation } = useAppServices()
   // Serve again for each graph session: the service acts on the session open
@@ -24,9 +28,10 @@ export function DeepLinkProvider({ children }: DeepLinkProviderProps): ReactElem
   useEffect(() => {
     return deepLinkRouter.serve({
       navigate,
+      search,
       beginNavigationIntent: () => linkNavigation.beginIntent(),
     })
-  }, [deepLinkRouter, linkNavigation, navigate, session])
+  }, [deepLinkRouter, linkNavigation, navigate, search, session])
 
   return <>{children}</>
 }

@@ -65,7 +65,6 @@ function layerKey(route: Route): string {
     case 'settings':
       return `settings:${route.page}`
     case 'allNotes':
-    case 'search':
       return 'all'
     default:
       return 'daily'

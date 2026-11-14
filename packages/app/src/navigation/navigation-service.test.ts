@@ -29,7 +29,7 @@ describe('NavigationService', () => {
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })
     navigation.navigate({ kind: 'daily', date: '2026-06-07' })
     navigation.back()
-    navigation.navigate({ kind: 'search', query: 'x' })
+    navigation.navigate({ kind: 'tasks' })
     expect(navigation.get().canForward).toBe(false)
     navigation.back()
     expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
@@ -307,7 +307,7 @@ describe('NavigationService', () => {
     navigation.saveScrollState(99)
     navigation.back()
     // Navigating from a back position truncates the branch holding notes/a.md.
-    navigation.navigate({ kind: 'search', query: 'x' })
+    navigation.navigate({ kind: 'tasks' })
     navigation.navigate({ kind: 'note', path: 'notes/a.md' })
     expect(navigation.savedScroll()).toBeNull() // a new entry, not the old one
   })

@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState, type ReactElement } from 'react'
+import { Suspense, useState, type ReactElement } from 'react'
 import { LoadingScreen } from '@/components/loading-screen.tsx'
 import { useDoubleTap } from '@/hooks/use-double-tap.ts'
 import { MobileStack } from '@/mobile/mobile-stack.tsx'
@@ -11,6 +11,7 @@ import { useMobileForm } from '@/mobile/mobile-form.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useSyncChatSection } from '@/mobile/sidebar.ts'
+import { useAllSearch } from '@/mobile/all-search.tsx'
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): screens above, the
@@ -23,9 +24,9 @@ import { useSyncChatSection } from '@/mobile/sidebar.ts'
  * tab's search text lives here too, so switching tabs keeps it.
  */
 export function MobileShell(): ReactElement {
-  const { route, entryId, section } = useRouterState()
+  const { route, section } = useRouterState()
   const { navigate, selectSection } = useRouterActions()
-  const [allQuery, setAllQuery] = useState('')
+  const [allQuery, setAllQuery] = useAllSearch()
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [tasksQuery, setTasksQuery] = useState('')
   const tab = mobileTabForSection(section)
@@ -41,16 +42,6 @@ export function MobileShell(): ReactElement {
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
   useSyncChatSection()
-
-  // A `search` history entry seeds the live query — once per entry, so the
-  // user can keep typing without the effect snapping the text back.
-  const seededEntryRef = useRef<number | null>(null)
-  useEffect(() => {
-    if (route.kind === 'search' && seededEntryRef.current !== entryId) {
-      seededEntryRef.current = entryId
-      setAllQuery(route.query)
-    }
-  }, [route, entryId])
 
   const handleTabSelect = (next: MobileTab): void => {
     const doubleTap = isDoubleTap(next)

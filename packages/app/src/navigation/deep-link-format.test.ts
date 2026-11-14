@@ -9,7 +9,6 @@ describe('deepLinkForRoute', () => {
       { kind: 'today' },
       { kind: 'tasks' },
       { kind: 'daily', date: '2026-07-01' },
-      { kind: 'search', query: 'meeting notes & more' },
     ]
     for (const route of routes) {
       const url = deepLinkForRoute(route)

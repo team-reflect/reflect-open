@@ -85,19 +85,6 @@ export function MobileScreen({
           onFiltersChange={onAllFiltersChange}
         />
       )
-    case 'search':
-      // Mobile has no dedicated search surface: a search entry (shared
-      // history shapes with desktop) renders as the All tab; the shell seeds
-      // the live query from the entry.
-      return (
-        <MobileAllNotes
-          query={allQuery}
-          onQueryChange={onAllQueryChange}
-          tag={null}
-          filters={allFilters}
-          onFiltersChange={onAllFiltersChange}
-        />
-      )
     case 'tasks':
       return <MobileTasks key="tasks" query={tasksQuery} onQueryChange={onTasksQueryChange} />
     case 'chat':

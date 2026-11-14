@@ -32,6 +32,7 @@ import '@/test-utils/locator.ts'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
+import { AllSearchProvider } from '@/mobile/all-search.tsx'
 import { MobileShell } from './mobile-shell.tsx'
 import { BACK_PAGER_OVERSHOOT_PX } from './use-back-pager.ts'
 import { noop, returnFalse, sleep } from '@ocavue/utils'
@@ -138,10 +139,12 @@ function mount(
   options?: { strict?: boolean; settings?: RenderInAppOptions['settings'] },
 ) {
   const tree = (
-    <MobileAudioMemoProvider graph={GRAPH}>
-      <MobileShell />
-      {probeRoute ? <NavProbe to={probeRoute} /> : null}
-    </MobileAudioMemoProvider>
+    <AllSearchProvider>
+      <MobileAudioMemoProvider graph={GRAPH}>
+        <MobileShell />
+        {probeRoute ? <NavProbe to={probeRoute} /> : null}
+      </MobileAudioMemoProvider>
+    </AllSearchProvider>
   )
   // The app runs under StrictMode (main.tsx); opt in where a test guards
   // against impure updaters (dev double-invocation caught a double-pop once).
@@ -680,24 +683,6 @@ describe('MobileShell', () => {
     })
     expect(view.getByRole('toolbar', { name: 'Formatting' }).query()).toBeNull()
     await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
-  })
-
-  it('renders a search entry as the All tab with the query seeded', async () => {
-    const user = userEvent
-    const view = await mount({ kind: 'search', query: 'meeting' })
-
-    const box = view.getByRole('searchbox', { name: 'Search notes' })
-    await waitFor(() => {
-      expect((box.element() as HTMLInputElement).value).toBe('meeting')
-    })
-    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
-      'page',
-    )
-
-    await user.click(view.getByRole('button', { name: 'Clear search' }))
-
-    expect((box.element() as HTMLInputElement).value).toBe('')
-    expect(view.getByRole('button', { name: 'Clear search' }).query()).toBeNull()
   })
 
   it('has three tabs: Daily, All and Tasks (Chat lives in All)', async () => {

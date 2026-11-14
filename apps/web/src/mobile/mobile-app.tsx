@@ -1,5 +1,6 @@
 import { useEffect, type ReactElement, type ReactNode } from 'react'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider.tsx'
+import { AllSearchProvider } from '@/mobile/all-search.tsx'
 import { MobileDeepLinks } from '@/mobile/mobile-deep-links.tsx'
 import { AppErrorBoundary } from '@/components/app-error-boundary.tsx'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen.tsx'
@@ -59,7 +60,9 @@ function MobileRouter({
   const restored = useRestoredRoute(graphRoot)
   return (
     <RouterProvider initialRoute={restored?.route} initialSection={restored?.section}>
-      <MobileDeepLinks>{children}</MobileDeepLinks>
+      <AllSearchProvider>
+        <MobileDeepLinks>{children}</MobileDeepLinks>
+      </AllSearchProvider>
     </RouterProvider>
   )
 }
