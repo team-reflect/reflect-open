@@ -294,6 +294,12 @@ export default defineESLintConfig(
     },
   },
 
+  // Generated from Rust: `Option<serde_json::Value>` prints as `unknown | null`.
+  {
+    files: ['packages/types/src/*.gen.ts'],
+    rules: { '@typescript-eslint/no-redundant-type-constituents': 'off' },
+  },
+
   // Rule: no module-level state in core. Every service is built by
   // `createCoreServices(adapters)` and holds its state in its own `#` fields.
   {

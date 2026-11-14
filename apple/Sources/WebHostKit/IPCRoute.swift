@@ -1,5 +1,5 @@
 public import Foundation
-import TypesShared
+public import TypesShared
 
 /// Answers `POST reflect-app://localhost/__ipc/<command>`. A command in
 /// `shellCommands` runs in the shell; any other `host.` or `plugin:` command
@@ -27,12 +27,12 @@ public final class IPCRoute: SchemeRoute {
   public let pathPrefix = "/__ipc/"
 
   private let dispatch: Dispatch
-  private let shellCommands: [String: ShellCommand]
+  private let shellCommands: [ShellCommandName: ShellCommand]
   private let callers: TrustedCallers
 
   public init(
     dispatch: @escaping Dispatch,
-    shellCommands: [String: ShellCommand],
+    shellCommands: [ShellCommandName: ShellCommand],
     callers: TrustedCallers = TrustedCallers()
   ) {
     self.dispatch = dispatch
@@ -81,7 +81,7 @@ public final class IPCRoute: SchemeRoute {
   }
 
   private func run(_ command: String, _ request: ShellRequest) async -> CoreReply {
-    if let shellCommand = shellCommands[command] {
+    if let name = ShellCommandName(rawValue: command), let shellCommand = shellCommands[name] {
       return await shellCommand(request)
     }
     if command.hasPrefix("host.") || command.hasPrefix("plugin:") {

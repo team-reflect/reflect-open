@@ -1,4 +1,5 @@
 public import Foundation
+public import TypesShared
 
 /// Receives the page's chrome messages, which come on the shell's
 /// `reflectHost` handler, and sends native intents back.
@@ -34,7 +35,7 @@ public final class ChromeBridge {
   public var cornersInHeaderRow = true {
     didSet {
       if cornersInHeaderRow != oldValue {
-        send(.layout(cornersInHeaderRow: cornersInHeaderRow))
+        send(.layout(.init(cornersInHeaderRow: cornersInHeaderRow)))
       }
     }
   }
@@ -45,7 +46,7 @@ public final class ChromeBridge {
   public var sidebarVisible: Bool? = nil {
     didSet {
       if sidebarVisible != oldValue {
-        send(.sidebarVisible(sidebarVisible))
+        send(.sidebarVisible(.init(visible: sidebarVisible)))
       }
     }
   }
@@ -64,17 +65,17 @@ public final class ChromeBridge {
       if let state, next.generation <= state.generation { return }
       state = next
       onState(next)
-    case .transition(let started):
-      onTransition(started)
-    case .backSwipe(let started):
-      onBackSwipe(started)
+    case .transition(let transition):
+      onTransition(transition.phase == .start)
+    case .backSwipe(let swipe):
+      onBackSwipe(swipe.phase == .start)
     case .chromeReady:
       isReady = true
       if !cornersInHeaderRow {
-        send(.layout(cornersInHeaderRow: false))
+        send(.layout(.init(cornersInHeaderRow: false)))
       }
       if let sidebarVisible {
-        send(.sidebarVisible(sidebarVisible))
+        send(.sidebarVisible(.init(visible: sidebarVisible)))
       }
     }
   }

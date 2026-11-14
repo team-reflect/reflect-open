@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { LocalNoteRead, NoteFileService } from '../graph/note-file-service.ts'
@@ -117,8 +116,6 @@ export interface EmbeddingIndexService {
    */
   follow(options: { generation: number; fileGeneration: number; modelId: string }): Unlisten
 }
-
-const voidSchema = z.null()
 
 export interface EmbeddingIndexServiceDeps {
   readonly ipc: IpcBridgeService
@@ -247,7 +244,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
   }
 
   async removeNote(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('embed_remove', { path, generation }, voidSchema)
+    await this.#deps.ipc.call('embed_remove', { path, generation })
   }
 
   async backfill(options: EmbeddingBackfillOptions): Promise<EmbeddingBackfillResult> {
@@ -334,7 +331,7 @@ class EmbeddingIndexServiceImpl implements EmbeddingIndexService {
    * Replace a note's chunk set (hash-diff applied in Rust; generation-pinned).
    */
   async #applyChunks(path: string, chunks: EmbedChunkPayload[], generation: number): Promise<void> {
-    await this.#deps.ipc.call('embed_apply', { path, chunks, generation }, voidSchema)
+    await this.#deps.ipc.call('embed_apply', { path, chunks, generation })
   }
 
   async #backfillNotes(

@@ -3,6 +3,7 @@ import { createTestNativeChromeHost } from '@reflect/app/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { ChromeLayerContext } from '@/mobile/chrome/chrome-renderer.ts'
 import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
+import type { NativeBarButton } from '@/mobile/chrome/native/protocol.ts'
 import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app.tsx'
 
@@ -126,9 +127,13 @@ describe('ChromeTopBar', () => {
     )
     const view = await renderInApp(screens(true), nativeChromeOptions(host))
     await vi.waitFor(() => {
-      expect(lastChromeState(host)?.trailing.map((button) => button.id)).toEqual(['top'])
+      expect(lastChromeState(host)?.trailing.map((button: NativeBarButton) => button.id)).toEqual([
+        'top',
+      ])
     })
     await view.rerender(screens(false))
-    expect(lastChromeState(host)?.trailing.map((button) => button.id)).toEqual(['top'])
+    expect(lastChromeState(host)?.trailing.map((button: NativeBarButton) => button.id)).toEqual([
+      'top',
+    ])
   })
 })

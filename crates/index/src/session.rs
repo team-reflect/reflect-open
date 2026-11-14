@@ -5,16 +5,18 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{Connection, params};
-use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use reflect_types::{AppError, AppResult, FileMeta};
+use reflect_types::{
+    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, FileMeta, IndexTouch,
+    IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
+};
 
-use crate::chat_write::{self, ChatConversation, ChatMessageRow};
-use crate::embed_write::{self, EmbeddedChunk};
+use crate::chat_write;
+use crate::embed_write;
 use crate::query;
-use crate::scan::{self, ReconcileScan};
-use crate::write::{self, IndexedNote, MovedNoteAddress};
+use crate::scan;
+use crate::write;
 
 /// Where a session gets its connections when it opens a root.
 pub trait IndexConnections {
@@ -75,26 +77,6 @@ struct ReaderInner {
 pub struct IndexSession {
     writer: Mutex<WriterInner>,
     reader: Mutex<ReaderInner>,
-}
-
-/// One `touch` entry: re-stamp `path`'s stored mtime to `mtime` (epoch ms, as
-/// listed by the file walk).
-#[derive(Debug, Deserialize)]
-pub struct IndexTouch {
-    pub path: String,
-    pub mtime: i64,
-}
-
-/// One user-initiated move, with the folded addressing for both directions:
-/// the destination's for the forward row move, the source's for the
-/// compensating reverse move when the disk refuses.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NoteMoveRequest {
-    pub from: String,
-    pub to: String,
-    pub to_address: MovedNoteAddress,
-    pub from_address: MovedNoteAddress,
 }
 
 impl IndexSession {
@@ -302,7 +284,7 @@ impl IndexSession {
     ) -> AppResult<ReconcileScan> {
         let writer = self.lock_writer()?;
         if writer.generation != generation {
-            return Ok(ReconcileScan::empty());
+            return Ok(ReconcileScan::default());
         }
         let conn = writer.conn.as_ref().ok_or_else(AppError::no_graph)?;
         scan::scan_reconcile(conn, files, now_ms)

@@ -2,6 +2,7 @@ import ChromeKit
 import GameController
 import KeyboardKit
 import PhotosUI
+import TypesShared
 import UIKit
 import UniformTypeIdentifiers
 import WebKit
@@ -41,7 +42,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
   init(webView: WKWebView) {
     self.webView = webView
     super.init()
-    strip.onCommand = { [weak self] id in self?.send(.command(id)) }
+    strip.onCommand = { [weak self] id in self?.send(.command(.init(id: id))) }
     strip.onInsertImage = { [weak self] in self?.pickImages() }
     KeyboardTuning.accessoryProvider = { [weak self] view in self?.accessory(for: view) }
     for name in [Notification.Name.GCKeyboardDidConnect, .GCKeyboardDidDisconnect] {
@@ -160,7 +161,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
         let file = await Self.loadImage(provider)
         guard let self, self.document == document else { return }
         if let file {
-          self.send(.files([file]))
+          self.send(.files(.init(files: [file])))
         } else {
           Self.logger.error("picked image did not load: \(provider.registeredContentTypes)")
         }
@@ -185,7 +186,7 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
       guard let data else { return nil }
       return IntentFile(
         name: "\(base).\(type.preferredFilenameExtension ?? "jpg")",
-        type: type.preferredMIMEType ?? "image/jpeg", data: data)
+        type: type.preferredMIMEType ?? "image/jpeg", bytes: data)
     }
     // No kept format: decode the image and encode it as JPEG.
     guard provider.canLoadObject(ofClass: UIImage.self) else { return nil }
@@ -195,6 +196,6 @@ final class FormattingAccessory: NSObject, PHPickerViewControllerDelegate {
       }
     }
     guard let data else { return nil }
-    return IntentFile(name: "\(base).jpg", type: "image/jpeg", data: data)
+    return IntentFile(name: "\(base).jpg", type: "image/jpeg", bytes: data)
   }
 }

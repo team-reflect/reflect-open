@@ -34,7 +34,7 @@ describe('createCaptureInboxService', () => {
     ])
   })
 
-  it('validates list, read, and relay answers', async () => {
+  it('returns list, read, and relay answers', async () => {
     const entry = { path: '.reflect/inbox/a.json', size: 2, modifiedMs: 5 }
     const ipc = createTestIpcBridgeService({
       commands: {
@@ -48,8 +48,5 @@ describe('createCaptureInboxService', () => {
     await expect(inbox.list(3)).resolves.toEqual([entry])
     await expect(inbox.read('a.json', 3)).resolves.toBe('{}')
     await expect(inbox.relaySharedInbox(3)).resolves.toBe(2)
-
-    ipc.onCommand('capture_shared_inbox_relay', () => 'two')
-    await expect(inbox.relaySharedInbox(3)).rejects.toMatchObject({ kind: 'parse' })
   })
 })

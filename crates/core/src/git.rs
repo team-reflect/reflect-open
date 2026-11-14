@@ -10,12 +10,12 @@
 
 use std::path::{Path, PathBuf};
 
-use reflect_git::{
-    CommitOutcome, GitCredential, GitStatus, MAX_FILE_BYTES, PullOutcome, PushOutcome, RemoteDelta,
+use reflect_git::MAX_FILE_BYTES;
+use reflect_graph_io::{invalidate_file_catalog, root_for_generation, with_graph_lock};
+use reflect_types::{
+    AppResult, CommitOutcome, GitCredential, GitStatus, PullOutcome, PushOutcome, RemoteDelta,
     RemoteTip,
 };
-use reflect_graph_io::{invalidate_file_catalog, root_for_generation, with_graph_lock};
-use reflect_types::AppResult;
 
 use crate::Core;
 

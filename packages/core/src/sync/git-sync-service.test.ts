@@ -74,6 +74,7 @@ const COMMITTED: CommitOutcome = {
   skippedLargeFiles: [],
 }
 const PULLED: PullOutcome = {
+  kind: 'merged',
   committed: true,
   ahead: 0,
   skippedLargeFiles: [],
@@ -1251,6 +1252,7 @@ describe('createGitSyncService', () => {
   it('fans a pull’s writes whole to the local file-changes channel — consumers filter by path', async () => {
     fakeServices({
       pullOutcome: {
+        kind: 'merged',
         committed: false,
         ahead: 1,
         skippedLargeFiles: [],
@@ -1290,6 +1292,7 @@ describe('createGitSyncService', () => {
   it('a hint lists every copy by its graph path', async () => {
     const { progress } = fakeServices({
       pullOutcome: {
+        kind: 'merged',
         committed: false,
         ahead: 0,
         skippedLargeFiles: [],

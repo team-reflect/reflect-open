@@ -46,7 +46,16 @@ describe('createNoteFileService', () => {
     await expect(noteFile.write('notes/a.md', 'new', 7)).resolves.toEqual({ merged: null })
 
     expect(ipc.calls()).toEqual([
-      { command: 'note_write', args: { path: 'notes/a.md', contents: 'new', generation: 7 } },
+      {
+        command: 'note_write',
+        args: {
+          path: 'notes/a.md',
+          contents: 'new',
+          generation: 7,
+          checkContents: null,
+          expectedContents: null,
+        },
+      },
     ])
     expect(fileChanges.ownWrites()).toEqual([['notes/a.md']])
   })
@@ -140,7 +149,7 @@ describe('createNoteFileService', () => {
     expect(batches).toEqual([])
   })
 
-  it('validates the listings', async () => {
+  it('returns the listings', async () => {
     const entry = { path: 'notes/a.md', size: 2, modifiedMs: 5 }
     const { ipc, noteFile } = setup(
       createTestIpcBridgeService({
@@ -162,9 +171,6 @@ describe('createNoteFileService', () => {
       skipped: 2,
     })
     expect(ipc.calls()[2]).toEqual({ command: 'dir_list', args: { dir: 'notes', generation: 3 } })
-
-    ipc.onCommand('list_files', () => [{ path: 'notes/a.md' }])
-    await expect(noteFile.listNotes(3)).rejects.toMatchObject({ kind: 'parse' })
   })
 })
 describe('createTestNoteFileService', () => {

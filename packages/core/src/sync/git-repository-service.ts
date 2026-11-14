@@ -1,109 +1,25 @@
-import { z } from 'zod'
+import type {
+  CommitOutcome,
+  GitCredential,
+  GitStatus,
+  PullOutcome,
+  PushOutcome,
+  RemoteDelta,
+  RemoteTip,
+} from '@reflect/types'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 
-/**
- * An HTTPS sign-in for one remote operation: basic auth, presented once by
- * the Rust layer and never written anywhere, and only to `origin` (scheme,
- * host and port, as `URL.origin` writes them). GitHub's shape is
- * `githubCredential(token)` in `./github-auth`.
- */
-export interface GitCredential {
-  origin: string
-  username: string
-  secret: string
-}
-
-/**
- * Snapshot of the graph's backup repository (cheap — no working-tree scan).
- */
-export const gitStatusSchema = z.object({
-  initialized: z.boolean(),
-  branch: z.string().nullable(),
-  remoteUrl: z.string().nullable(),
-  ahead: z.number(),
-  behind: z.number(),
-})
-export type GitStatus = z.infer<typeof gitStatusSchema>
-
-/**
- * A file excluded from backup by the size guardrail (GitHub hard-fails >100 MB).
- */
-export const skippedFileSchema = z.object({
-  path: z.string(),
-  size: z.number(),
-})
-export type SkippedFile = z.infer<typeof skippedFileSchema>
-
-/**
- * A file a merge rewrote on disk, same shape as the watcher's FileChange.
- */
-export const changedFileSchema = z.object({
-  path: z.string(),
-  kind: z.enum(['upsert', 'remove']),
-  /** Last-modified time in epoch ms; `null` for a removed file. */
-  modifiedMs: z.number().nullable(),
-})
-export type ChangedFile = z.infer<typeof changedFileSchema>
-
-export const commitOutcomeSchema = z.object({
-  /**
-   * False when the tree already matched HEAD — nothing new to back up.
-   */
-  committed: z.boolean(),
-  /**
-   * The new commit, or `null` when `committed` is false.
-   */
-  sha: z.string().nullable(),
-  /**
-   * Unpushed local commits (vs the last fetch) — the engine's skip-push gate.
-   */
-  ahead: z.number(),
-  skippedLargeFiles: z.array(skippedFileSchema),
-})
-export type CommitOutcome = z.infer<typeof commitOutcomeSchema>
-
-/**
- * Where the current branch stands relative to the just-fetched remote branch:
- * `ahead` = local commits the remote lacks (a push is due), `behind` = remote
- * commits not yet merged locally (a merge is due).
- */
-export const remoteDeltaSchema = z.object({
-  ahead: z.number(),
-  behind: z.number(),
-})
-export type RemoteDelta = z.infer<typeof remoteDeltaSchema>
-
-/**
- * Where `origin` says the current branch is (`remoteOid`, `null` when the
- * remote has no such branch) next to the last-fetched tracking ref.
- */
-export const remoteTipSchema = z.object({
-  remoteOid: z.string().nullable(),
-  trackingOid: z.string().nullable(),
-  /** The branch the remote's HEAD points at; `null` for an empty remote. */
-  defaultBranch: z.string().nullable(),
-})
-export type RemoteTip = z.infer<typeof remoteTipSchema>
-
-export const pullOutcomeSchema = z.object({
-  /** True when the pull committed local changes before it merged. */
-  committed: z.boolean(),
-  /** Unpushed local commits after the merge. */
-  ahead: z.number(),
-  skippedLargeFiles: z.array(skippedFileSchema),
-  /** Graph-relative paths of the conflict copies the merge wrote. */
-  reviewPaths: z.array(z.string()),
-  /** Every file the merge changed on disk. */
-  changedFiles: z.array(changedFileSchema),
-})
-export type PullOutcome = z.infer<typeof pullOutcomeSchema>
-
-export const pushOutcomeSchema = z.object({
-  pushed: z.boolean(),
-  nonFastForward: z.boolean(),
-  rejectionMessage: z.string().nullable(),
-})
-export type PushOutcome = z.infer<typeof pushOutcomeSchema>
+export type {
+  ChangedFile,
+  CommitOutcome,
+  GitCredential,
+  GitStatus,
+  PullOutcome,
+  PushOutcome,
+  RemoteDelta,
+  RemoteTip,
+  SkippedFile,
+} from '@reflect/types'
 
 /**
  * The Rust git primitives for the open graph's repository. The Rust layer is
@@ -168,27 +84,23 @@ class GitRepositoryServiceImpl implements GitRepositoryService {
   }
 
   status(generation: number): Promise<GitStatus> {
-    return this.#deps.ipc.call('git_status', { generation }, gitStatusSchema)
+    return this.#deps.ipc.call('git_status', { generation })
   }
 
   setup(remoteUrl: string | null, branch: string | null, generation: number): Promise<GitStatus> {
-    return this.#deps.ipc.call('git_setup', { remoteUrl, branch, generation }, gitStatusSchema)
+    return this.#deps.ipc.call('git_setup', { remoteUrl, branch, generation })
   }
 
   disconnect(generation: number): Promise<GitStatus> {
-    return this.#deps.ipc.call('git_disconnect', { generation }, gitStatusSchema)
+    return this.#deps.ipc.call('git_disconnect', { generation })
   }
 
   commitAll(fallbackMessage: string, generation: number): Promise<CommitOutcome> {
-    return this.#deps.ipc.call(
-      'git_commit_all',
-      { message: fallbackMessage, generation },
-      commitOutcomeSchema,
-    )
+    return this.#deps.ipc.call('git_commit_all', { message: fallbackMessage, generation })
   }
 
   fetch(credential: GitCredential | null, generation: number): Promise<RemoteDelta> {
-    return this.#deps.ipc.call('git_fetch', { credential, generation }, remoteDeltaSchema)
+    return this.#deps.ipc.call('git_fetch', { credential, generation })
   }
 
   remoteHead(
@@ -196,23 +108,15 @@ class GitRepositoryServiceImpl implements GitRepositoryService {
     generation: number,
     url?: string,
   ): Promise<RemoteTip> {
-    return this.#deps.ipc.call(
-      'git_remote_head',
-      { url: url ?? null, credential, generation },
-      remoteTipSchema,
-    )
+    return this.#deps.ipc.call('git_remote_head', { url: url ?? null, credential, generation })
   }
 
   push(credential: GitCredential | null, generation: number): Promise<PushOutcome> {
-    return this.#deps.ipc.call('git_push', { credential, generation }, pushOutcomeSchema)
+    return this.#deps.ipc.call('git_push', { credential, generation })
   }
 
   pull(fallbackMessage: string, generation: number): Promise<PullOutcome> {
-    return this.#deps.ipc.call(
-      'git_pull',
-      { message: fallbackMessage, generation },
-      pullOutcomeSchema,
-    )
+    return this.#deps.ipc.call('git_pull', { message: fallbackMessage, generation })
   }
 }
 

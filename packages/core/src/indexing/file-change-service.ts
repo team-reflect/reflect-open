@@ -27,7 +27,6 @@ const fileChangeSchema: z.ZodType<FileChange> = z.object({
   modifiedMs: z.number().optional(),
 })
 const fileChangesSchema = z.array(fileChangeSchema)
-const voidSchema = z.null()
 
 export type { FileChange }
 
@@ -147,11 +146,11 @@ class FileChangeServiceImpl implements FileChangeService {
   }
 
   async startWatcher(): Promise<void> {
-    await this.#deps.ipc.call('watch_start', {}, voidSchema)
+    await this.#deps.ipc.call('watch_start', {})
   }
 
   async stopWatcher(): Promise<void> {
-    await this.#deps.ipc.call('watch_stop', {}, voidSchema)
+    await this.#deps.ipc.call('watch_stop', {})
   }
 
   #listenNative(event: string, handler: (payload: unknown) => void): Unlisten {

@@ -9,11 +9,11 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use reflect_index::{
-    Applied, ChatConversation, ChatMessageRow, EmbeddedChunk, FileIndexConnections, IndexTouch,
-    IndexedNote, MovedNoteAddress, NoteMoveRequest, ReconcileScan,
+use reflect_index::{Applied, FileIndexConnections};
+use reflect_types::{
+    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, IndexTouch, IndexedNote,
+    MovedNoteAddress, NoteMoveRequest, ReconcileScan,
 };
-use reflect_types::{AppError, AppResult};
 use serde_json::{Map, Value};
 
 use crate::{Core, background_task};
@@ -147,7 +147,7 @@ impl Core {
         self.spawn_blocking(move || {
             let started = std::time::Instant::now();
             let Some(root) = core.index.root_for_generation(generation)? else {
-                return Ok(ReconcileScan::empty());
+                return Ok(ReconcileScan::default());
             };
             let walk_started = std::time::Instant::now();
             let files = reflect_graph_io::note_files(&root);

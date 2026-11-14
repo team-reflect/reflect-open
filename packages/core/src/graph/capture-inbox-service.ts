@@ -1,11 +1,5 @@
-import { z } from 'zod'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import { fileMetaSchema, type FileMeta } from './schemas.ts'
-
-/**
- * Commands that return `()` from Rust serialize as `null` over IPC.
- */
-const voidSchema = z.null()
+import type { FileMeta } from './schemas.ts'
 
 /**
  * The capture inbox (`.reflect/inbox/`): envelopes spooled by the browser
@@ -73,35 +67,35 @@ class CaptureInboxServiceImpl implements CaptureInboxService {
   }
 
   async registerHost(): Promise<void> {
-    await this.#deps.ipc.call('capture_host_register', {}, voidSchema)
+    await this.#deps.ipc.call('capture_host_register', {})
   }
 
   async list(generation: number): Promise<FileMeta[]> {
-    return await this.#deps.ipc.call('capture_inbox_list', { generation }, z.array(fileMetaSchema))
+    return await this.#deps.ipc.call('capture_inbox_list', { generation })
   }
 
   async read(name: string, generation: number): Promise<string> {
-    return await this.#deps.ipc.call('capture_inbox_read', { name, generation }, z.string())
+    return await this.#deps.ipc.call('capture_inbox_read', { name, generation })
   }
 
   async spool(name: string, json: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('capture_inbox_spool', { name, json, generation }, voidSchema)
+    await this.#deps.ipc.call('capture_inbox_spool', { name, json, generation })
   }
 
   async remove(name: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('capture_inbox_remove', { name, generation }, voidSchema)
+    await this.#deps.ipc.call('capture_inbox_remove', { name, generation })
   }
 
   async reject(name: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('capture_inbox_reject', { name, generation }, voidSchema)
+    await this.#deps.ipc.call('capture_inbox_reject', { name, generation })
   }
 
   async relaySharedInbox(generation: number): Promise<number> {
-    return await this.#deps.ipc.call('capture_shared_inbox_relay', { generation }, z.number())
+    return await this.#deps.ipc.call('capture_shared_inbox_relay', { generation })
   }
 
   async writeQuickNoteDefaults(parent: string): Promise<void> {
-    await this.#deps.ipc.call('capture_quick_note_defaults_write', { parent }, voidSchema)
+    await this.#deps.ipc.call('capture_quick_note_defaults_write', { parent })
   }
 
   async promoteScreenshot(
@@ -110,11 +104,12 @@ class CaptureInboxServiceImpl implements CaptureInboxService {
     maxDim: number,
     generation: number,
   ): Promise<void> {
-    await this.#deps.ipc.call(
-      'capture_screenshot_promote',
-      { spoolName, assetPath, maxDim, generation },
-      voidSchema,
-    )
+    await this.#deps.ipc.call('capture_screenshot_promote', {
+      spoolName,
+      assetPath,
+      maxDim,
+      generation,
+    })
   }
 }
 

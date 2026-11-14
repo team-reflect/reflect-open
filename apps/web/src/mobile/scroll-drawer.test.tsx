@@ -8,7 +8,13 @@ import { swipeDrawerClosed } from '@/test-utils/drawer.ts'
 import { lastChromeState, nativeChromeOptions } from '@/test-utils/native-chrome.tsx'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { scrollElement } from '@/test-utils/scroll.ts'
-import { Drawer, DrawerBody, DrawerContent, DrawerTitle } from './scroll-drawer.tsx'
+import {
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerTitle,
+  DRAWER_OVERSHOOT_PX,
+} from './scroll-drawer.tsx'
 
 /**
  * The native-scroll drawer: the scroller's position is the sheet position, a
@@ -80,6 +86,46 @@ describe('ScrollDrawer', () => {
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('closes once the sheet is off screen, short of the closed snap point', async () => {
+    const onOpenChange = vi.fn()
+    await renderInApp(<Harness onOpenChange={onOpenChange} />)
+    const scroller = await openScroller()
+    // Holds the scroll where a release leaves it, before the snap ends.
+    scroller.style.scrollSnapType = 'none'
+    await scrollElement({ element: scroller, top: 20, touch: true })
+
+    await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    { shown: 0.6, open: true },
+    { shown: 0.4, open: false },
+  ])(
+    'scrolls a sheet stopped with $shown of it shown on to the nearer snap point',
+    async ({ shown, open }) => {
+      const onOpenChange = vi.fn()
+      // A short sheet, where the overshoot is a large part of the travel.
+      await renderInApp(<Harness onOpenChange={onOpenChange} rows={1} />)
+      const scroller = await openScroller()
+      const top = openTop(scroller)
+      // Stands in for a touch that stops the snap: WebKit then snaps no more.
+      scroller.style.scrollSnapType = 'none'
+      await scrollElement({
+        element: scroller,
+        top: Math.round(DRAWER_OVERSHOOT_PX + (top - DRAWER_OVERSHOOT_PX) * shown),
+        touch: true,
+      })
+
+      if (open) {
+        await vi.waitFor(() => expect(scroller.scrollTop).toBe(top))
+        expect(onOpenChange).not.toHaveBeenCalled()
+      } else {
+        await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+      }
+    },
+  )
 
   it('scrolls back open when the owner keeps it open', async () => {
     await renderInApp(<Harness keepOpen />)

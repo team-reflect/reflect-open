@@ -1,4 +1,4 @@
-import type { EventName } from '@reflect/types'
+import type { AssetReadBinaryArgs, Commands, EventName } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ZodType } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -11,10 +11,33 @@ import type { Unlisten } from '../unlisten.ts'
 export const INDEX_WRITTEN_EVENT = 'index:written' satisfies EventName
 
 /**
+ * A command from the generated command table: the Rust core, the desktop
+ * shell or the Swift shell answers it.
+ */
+export type CommandName = keyof Commands
+
+/**
+ * The arguments of command `C`, as Rust deserializes them. Read-only, so
+ * callers can pass read-only arrays.
+ */
+export type CommandArgs<C extends CommandName> = DeepReadonly<Commands[C]['args']>
+
+type DeepReadonly<T> = T extends (infer Item)[]
+  ? readonly DeepReadonly<Item>[]
+  : T extends object
+    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T
+
+/**
+ * The result of command `C`, as Rust serializes it.
+ */
+type CommandResult<C extends CommandName> = Commands[C]['result']
+
+/**
  * The raw transport a host implements: the desktop app adapts Tauri's
  * `invoke`/`listen`, plain-browser dev installs an in-memory bridge, and
- * tests use a fake. {@link createIpcBridgeService} wraps it with validation
- * and error coercion.
+ * tests use a fake. {@link createIpcBridgeService} wraps it with the
+ * command table's types and error coercion.
  */
 export interface IpcBridge {
   /**
@@ -63,33 +86,42 @@ export interface PluginSubscription {
 }
 
 /**
- * The typed IPC boundary: the single place where an untyped native response
- * becomes a validated domain value. Every failure is an {@link AppError}: a
- * rejected command is coerced via {@link toAppError}; a response that doesn't
- * match its schema becomes a `parse` error.
+ * The typed IPC boundary. Arguments and results have the command table's
+ * types. Every failure is an {@link AppError}: a rejected command is coerced
+ * via {@link toAppError}, and a response that does not match an optional
+ * schema becomes a `parse` error.
  */
 export interface IpcBridgeService {
   /**
-   * Invoke a `#[tauri::command]` (snake_case name) and validate the response.
-   * The schema input is `unknown`, not `TOutput`: schemas that normalize
-   * (`.catch`, `.default`) have a wider input type than output.
+   * Invoke a command from the generated command table. The arguments and the
+   * result have the types Rust declares, so the result needs no schema.
    */
-  call<TOutput>(
-    command: string,
-    args: Record<string, unknown>,
+  call<C extends CommandName>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>>
+  /**
+   * Invoke a command from the command table and check its result with a zod
+   * schema: for data from disk or the network, or checks stricter than the
+   * Rust type.
+   */
+  call<C extends CommandName, TOutput>(
+    command: C,
+    args: CommandArgs<C>,
     schema: ZodType<TOutput, unknown>,
   ): Promise<TOutput>
   /**
-   * {@link call}'s binary sibling: the payload is a raw byte body with
+   * Invoke `asset_read_binary`, whose reply is raw bytes. Rejects with a
+   * `parse` {@link AppError} when the reply is not an `ArrayBuffer`.
+   */
+  callBytes(command: 'asset_read_binary', args: AssetReadBinaryArgs): Promise<ArrayBuffer>
+  /**
+   * Invoke `asset_upload_append`, whose payload is a raw byte body with
    * per-call metadata in `headers`. Rejects with an `io` {@link AppError}
    * when the transport has no binary path.
    */
-  callBinary<TOutput>(
-    command: string,
+  callBinary(
+    command: 'asset_upload_append',
     body: Uint8Array,
     headers: Record<string, string>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput>
+  ): Promise<void>
   /**
    * Subscribe to a native event stream, resolving with an unlisten function.
    */
@@ -141,37 +173,46 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
     this.hasBinaryTransport = deps.transport.invokeBinary !== undefined
   }
 
-  async call<TOutput>(
-    command: string,
-    args: Record<string, unknown>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
-    let raw: unknown
+  async call(
+    command: CommandName,
+    args: Readonly<Record<string, unknown>>,
+    schema?: ZodType,
+  ): Promise<unknown> {
+    const raw = await this.#invoke(command, args)
+    // Rust generates the result type from the value it serializes.
+    return schema === undefined ? raw : parseResponse(command, raw, schema)
+  }
+
+  async callBytes(command: 'asset_read_binary', args: AssetReadBinaryArgs): Promise<ArrayBuffer> {
+    const raw = await this.#invoke(command, args)
+    if (!(raw instanceof ArrayBuffer)) {
+      throw new AppError('parse', `"${command}" answered no bytes`)
+    }
+    return raw
+  }
+
+  async #invoke(command: string, args: Readonly<Record<string, unknown>>): Promise<unknown> {
     try {
-      raw = await this.#deps.transport.invoke(command, args)
+      return await this.#deps.transport.invoke(command, args)
     } catch (error) {
       throw toAppError(error)
     }
-    return parseResponse(command, raw, schema)
   }
 
-  async callBinary<TOutput>(
-    command: string,
+  async callBinary(
+    command: 'asset_upload_append',
     body: Uint8Array,
     headers: Record<string, string>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
+  ): Promise<void> {
     const { transport } = this.#deps
     if (transport.invokeBinary === undefined) {
       throw new AppError('io', `the installed IPC bridge has no binary transport for "${command}"`)
     }
-    let raw: unknown
     try {
-      raw = await transport.invokeBinary(command, body, headers)
+      await transport.invokeBinary(command, body, headers)
     } catch (error) {
       throw toAppError(error)
     }
-    return parseResponse(command, raw, schema)
   }
 
   listen(event: string, handler: (payload: unknown) => void): Promise<Unlisten> {
@@ -243,11 +284,7 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
   }
 }
 
-function parseResponse<TOutput>(
-  command: string,
-  raw: unknown,
-  schema: ZodType<TOutput, unknown>,
-): TOutput {
+function parseResponse<TOutput>(command: string, raw: unknown, schema: ZodType<TOutput>): TOutput {
   const result = schema.safeParse(raw)
   if (!result.success) {
     throw new AppError(

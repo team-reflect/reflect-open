@@ -10,45 +10,18 @@ use std::path::Path;
 use git2::build::CheckoutBuilder;
 use git2::{Index, IndexEntry, MergeOptions, Repository};
 use reflect_graph_paths::to_slash_lossy;
-use serde::Serialize;
 
 use reflect_graph_io::conflict::copy::{free_conflict_copy_path, utc_stamp};
 use reflect_graph_io::conflict::ladder::{self, ConflictInput};
 use reflect_graph_io::conflict::merge3;
 use reflect_graph_io::conflict::{ConflictSide, Resolution};
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, ChangeKind, ChangedFile, MergeKind};
+use serde::Serialize;
 
 use super::repo::{
     branch_tip_ahead_of_detached_head, clear_foreign_state, current_branch, open_existing,
     reattach_head, signature, stage0_entry,
 };
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum MergeKind {
-    UpToDate,
-    FastForward,
-    Merged,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ChangeKind {
-    Upsert,
-    Remove,
-}
-
-/// One working-tree file a merge/fast-forward rewrote, in the same shape as
-/// the watcher's `FileChange` so the caller can reindex directly.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChangedFile {
-    /// Graph-relative path, forward-slashed.
-    pub path: String,
-    pub kind: ChangeKind,
-    /// Last-modified time of the written file (epoch ms; upserts only).
-    pub modified_ms: Option<u64>,
-}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

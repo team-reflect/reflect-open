@@ -17,8 +17,14 @@ import { linkOpacityToScroll } from '@/lib/scroll-linked-opacity.ts'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 import { cn } from '@/lib/utils.ts'
 import { useChromeModal } from '@/mobile/chrome/chrome-renderer.ts'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './scroll-drawer.css'
+
+/**
+ * How far (px) past the screen edge the closed snap point leaves the sheet.
+ * The slow end of the release deceleration then runs off screen, and the
+ * drawer closes as soon as the sheet leaves the screen.
+ */
+export const DRAWER_OVERSHOOT_PX = 50
 
 interface DrawerContextValue {
   open: boolean
@@ -121,7 +127,6 @@ function DrawerSheet({
   children?: ReactNode | undefined
 }): ReactElement {
   const { open, onOpenChange } = useDrawer()
-  const reducedMotion = usePrefersReducedMotion()
   const scrollerRef = useRef<HTMLDivElement>(null)
   const slideRef = useRef<HTMLDivElement>(null)
   const tintRef = useRef<HTMLDivElement>(null)
@@ -134,7 +139,6 @@ function DrawerSheet({
     setCloseRequests((count) => count + 1)
     onOpenChange(false)
   })
-  const prefersReducedMotion = useEffectEvent(() => reducedMotion)
   const close = useCallback(() => onOpenChange(false), [onOpenChange])
   const isOpen = useEffectEvent(() => open)
 
@@ -159,7 +163,6 @@ function DrawerSheet({
       handle,
       popup: () => popupRef.current,
       requestClose,
-      prefersReducedMotion,
     })
     controllerRef.current = controller
     return () => {
@@ -179,6 +182,7 @@ function DrawerSheet({
           tabIndex={-1}
           aria-hidden
           className="scroll-drawer-spacer"
+          style={{ height: `calc(100% + ${DRAWER_OVERSHOOT_PX}px)` }}
           onClick={close}
         />
         <div ref={slideRef} className="scroll-drawer-slide">
@@ -255,7 +259,6 @@ interface ScrollDrawerOptions {
    * Asks the owner to close. The owner may keep the drawer open.
    */
   requestClose: () => void
-  prefersReducedMotion: () => boolean
 }
 
 interface ScrollDrawerController {
@@ -278,24 +281,26 @@ function attachScrollDrawer({
   handle,
   popup,
   requestClose,
-  prefersReducedMotion,
 }: ScrollDrawerOptions): ScrollDrawerController {
   const listeners = new AbortController()
   const { signal } = listeners
   // Layout offsets ignore `translate`, so the entry transition never moves this.
   const openTop = (): number => slide.offsetTop + slide.offsetHeight - scroller.clientHeight
   const scrollOpen = (): void => {
-    scroller.scrollTo({ top: openTop(), behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
+    scroller.scrollTo({ top: openTop(), behavior: 'smooth' })
   }
 
-  // The spacer is one scrollport high, so the slide is off screen exactly here.
-  const isClosed = (): boolean => scroller.scrollTop <= 1
+  // The spacer is one scrollport plus the overshoot high, so the slide is off
+  // screen from here down to the closed snap point.
+  const isClosed = (): boolean => scroller.scrollTop <= DRAWER_OVERSHOOT_PX + 1
 
   scroller.scrollTop = openTop()
 
-  // Acts once the sheet rests at the closed snap point, after the finger lifts.
+  // Acts once the sheet is off screen or rests, after the finger lifts.
   // Only a gesture since the sheet last rested open may close it: a resize or
-  // a re-snap that moves the sheet there on its own scrolls it back open.
+  // a re-snap that moves the sheet there on its own scrolls it back open. A
+  // sheet that stops between the snap points (a touch that stops the snap
+  // does not snap again in WebKit) scrolls on to the nearer one.
   let gesturesAtOpen = 0
   const watch = watchScrollSettle({
     element: scroller,
@@ -304,7 +309,17 @@ function attachScrollDrawer({
     dragHandle: handle,
     onSettle: () => {
       if (!isClosed()) {
-        gesturesAtOpen = watch.gestures()
+        // `openTop` adds up rounded offsets; the scroll range bounds the real one.
+        const top = Math.min(openTop(), scroller.scrollHeight - scroller.clientHeight)
+        if (scroller.scrollTop >= top - 1) {
+          gesturesAtOpen = watch.gestures()
+          return
+        }
+        scroller.scrollTo({
+          // The midpoint of the part of the travel where the sheet shows.
+          top: scroller.scrollTop < (DRAWER_OVERSHOOT_PX + top) / 2 ? 0 : top,
+          behavior: 'smooth',
+        })
         return
       }
       if (watch.gestures() === gesturesAtOpen) {
@@ -325,7 +340,15 @@ function attachScrollDrawer({
   resize.observe(slide)
   resize.observe(scroller)
 
-  linkOpacityToScroll({ target: tint, scroller, axis: 'y', from: 0, to: 1, signal })
+  linkOpacityToScroll({
+    target: tint,
+    scroller,
+    axis: 'y',
+    start: DRAWER_OVERSHOOT_PX,
+    from: 0,
+    to: 1,
+    signal,
+  })
 
   return {
     keepOpen: () => {

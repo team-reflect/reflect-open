@@ -1,3 +1,4 @@
+import TypesShared
 import WebHostKit
 import XCTest
 
@@ -14,8 +15,8 @@ final class ReflectCoreTests: XCTestCase {
     }
     addTeardownBlock { try? FileManager.default.removeItem(at: root) }
     return try ReflectCore(
-      config: CoreConfig(
-        documentDir: documents.path, dataDir: data.path, userAgent: "Reflect/test"),
+      config: CoreStartConfig(
+        appDataDir: data.path, documentDir: documents.path, userAgent: "Reflect/test"),
       openURL: { _ in false })
   }
 

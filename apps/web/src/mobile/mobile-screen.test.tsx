@@ -33,6 +33,7 @@ import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
 import { MobileShell } from './mobile-shell.tsx'
+import { BACK_PAGER_OVERSHOOT_PX } from './use-back-pager.ts'
 import { noop, returnFalse, sleep } from '@ocavue/utils'
 
 const waitFor = vi.waitFor
@@ -978,6 +979,13 @@ describe('MobileStack transitions & back pager', () => {
     return element
   }
 
+  /**
+   * The pager's offset when it rests on the current page.
+   */
+  function restLeft(element: HTMLElement): number {
+    return element.scrollWidth - element.clientWidth
+  }
+
   const today = (): string => formatMonthLabel(getYearMonth(getIsoToday()))
 
   it('pushes a note as a sliding card over its origin, which stays mounted but inert', async () => {
@@ -1146,7 +1154,7 @@ describe('MobileStack transitions & back pager', () => {
 
     const scroller = pager(view)
     expect(stackLayers(view)).toHaveLength(2)
-    expect(scroller.scrollLeft).toBe(scroller.clientWidth)
+    expect(scroller.scrollLeft).toBe(restLeft(scroller))
     expect(visibleLayer(view).getBoundingClientRect().left).toBe(
       scroller.getBoundingClientRect().left,
     )
@@ -1202,7 +1210,7 @@ describe('MobileStack transitions & back pager', () => {
 
     const scroller = pager(view)
     await scrollElement({ element: scroller, left: 0 })
-    await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
+    await waitFor(() => expect(scroller.scrollLeft).toBe(restLeft(scroller)))
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     expect(stackLayers(view)).toHaveLength(2)
   })
@@ -1215,7 +1223,7 @@ describe('MobileStack transitions & back pager', () => {
     const scroller = pager(view)
     await touch(scroller, 'start')
     await scrollElement({ element: scroller, left: 0 })
-    await scrollElement({ element: scroller, left: scroller.clientWidth })
+    await scrollElement({ element: scroller, left: restLeft(scroller) })
     await touch(scroller, 'end')
     await sleep(200)
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
@@ -1247,6 +1255,47 @@ describe('MobileStack transitions & back pager', () => {
     })
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
   })
+
+  it('pops once the card is off screen, short of the snap point', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    // Holds the scroll where a release leaves it, before the snap ends.
+    scroller.style.scrollSnapType = 'none'
+    await scrollElement({ element: scroller, left: BACK_PAGER_OVERSHOOT_PX / 2, touch: true })
+    await waitFor(() => expect(shownMonth(view)).toBe(today()))
+    scroller.style.removeProperty('scroll-snap-type')
+  })
+
+  it.each([
+    { stop: 0.75, lands: 'note' },
+    { stop: 0.25, lands: 'today' },
+  ])(
+    'scrolls a pager stopped at $stop of its range on to the $lands page',
+    async ({ stop, lands }) => {
+      core.noteFile.set('notes/meeting-notes.md', 'agenda')
+      const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+      await pushProbeNote(view)
+
+      const scroller = pager(view)
+      // Stands in for a touch that stops the snap: WebKit then snaps no more.
+      scroller.style.scrollSnapType = 'none'
+      await scrollElement({
+        element: scroller,
+        left: Math.round(restLeft(scroller) * stop),
+        touch: true,
+      })
+      if (lands === 'note') {
+        await waitFor(() => expect(scroller.scrollLeft).toBe(restLeft(scroller)))
+        expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+      } else {
+        await waitFor(() => expect(shownMonth(view)).toBe(today()))
+      }
+      scroller.style.removeProperty('scroll-snap-type')
+    },
+  )
 
   it('passes a tap on the edge strip to the back button under it', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
@@ -1330,8 +1379,8 @@ describe('MobileStack transitions & back pager', () => {
       lowest = Math.min(lowest, scroller.scrollLeft)
     })
     await mouseDragFromStrip(view, 60)
-    await waitFor(() => expect(scroller.scrollLeft).toBe(scroller.clientWidth))
-    expect(lowest).toBeLessThan(scroller.clientWidth - 30)
+    await waitFor(() => expect(scroller.scrollLeft).toBe(restLeft(scroller)))
+    expect(lowest).toBeLessThan(restLeft(scroller) - 30)
     await sleep(200)
     expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     expect(stackLayers(view)).toHaveLength(2)
@@ -1355,7 +1404,7 @@ describe('MobileStack transitions & back pager', () => {
     )
     expect(stackLayers(view)).toHaveLength(2)
     const scroller = pager(view)
-    expect(scroller.scrollLeft).toBe(scroller.clientWidth)
+    expect(scroller.scrollLeft).toBe(restLeft(scroller))
   })
 
   /**
@@ -1393,7 +1442,7 @@ describe('MobileStack transitions & back pager', () => {
 
       await touchDrag(toggle, 300)
       await sleep(300)
-      expect(pager(view).scrollLeft).toBe(pager(view).clientWidth)
+      expect(pager(view).scrollLeft).toBe(restLeft(pager(view)))
       expect(toggle.getAttribute('aria-checked')).toBe(checked)
 
       await touchDrag(view.getByRole('button', { name: 'Add AI provider' }).element(), 300)
@@ -1482,7 +1531,7 @@ describe('MobileStack transitions & back pager', () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'note', path: 'notes/meeting-notes.md' })
     await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
-    expect(pager(view).scrollLeft).toBe(pager(view).clientWidth)
+    expect(pager(view).scrollLeft).toBe(restLeft(pager(view)))
 
     await scrollElement({ element: pager(view), left: 0, touch: true })
     await waitFor(() => expect(shownMonth(view)).toBe(today()))

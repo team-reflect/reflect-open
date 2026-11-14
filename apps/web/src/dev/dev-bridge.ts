@@ -1,12 +1,13 @@
 import {
   IAP_PRODUCT_IDS,
-  indexedNoteSchema,
   AppError,
   pickFreeAssetPath,
+  type CommandArgs,
+  type CommandName,
   type IpcBridge,
 } from '@reflect/core'
+import type { AssetReadBinaryArgs } from '@reflect/types'
 import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
-import { z } from 'zod'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
 import type { DevIndexDb } from '@/dev/dev-index-db.ts'
@@ -26,63 +27,13 @@ export interface DevBridgeBackend {
   readonly assets: DevAssetStore
 }
 
-const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
-const pathArgsSchema = z.object({ path: z.string() })
-const writeArgsSchema = z.object({
-  path: z.string(),
-  contents: z.string(),
-  checkContents: z.boolean().optional(),
-  expectedContents: z.string().nullable().optional(),
-})
-const generationArgsSchema = z.object({ generation: z.number().int().nonnegative() })
-const createArgsSchema = writeArgsSchema.extend(generationArgsSchema.shape)
-const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
-const moveRequestArgsSchema = z.object({
-  request: z.object({ from: z.string(), to: z.string() }),
-})
-const metaArgsSchema = z.object({ key: z.string(), value: z.string() })
-const touchArgsSchema = z.object({
-  entries: z.array(z.object({ path: z.string(), mtime: z.number() })),
-})
-const applyArgsSchema = z.object({ note: indexedNoteSchema })
-const applyBatchArgsSchema = z.object({ notes: z.array(indexedNoteSchema) })
-const settingsArgsSchema = z.object({ settings: z.record(z.string(), z.unknown()) })
-const secretNameArgsSchema = z.object({ name: z.string() })
-const secretSetArgsSchema = z.object({ name: z.string(), value: z.string() })
-const chatSaveArgsSchema = z.object({
-  conversation: z.object({
-    id: z.string(),
-    title: z.string(),
-    createdMs: z.number(),
-    updatedMs: z.number(),
-  }),
-  message: z.object({
-    id: z.string(),
-    conversationId: z.string(),
-    userText: z.string(),
-    attachments: z.string(),
-    parts: z.string(),
-    responseMessages: z.string(),
-    createdMs: z.number(),
-  }),
-})
-const uploadIdArgsSchema = z.object({ id: z.string() })
-const uploadCommitArgsSchema = uploadIdArgsSchema.extend({
-  ...generationArgsSchema.shape,
-  desiredName: z.string(),
-})
-const uploadCommitPathArgsSchema = uploadIdArgsSchema.extend({
-  ...generationArgsSchema.shape,
-  path: z.string(),
-})
-const chatDeleteArgsSchema = z.object({ id: z.string() })
-const iapPayloadSchema = z.object({ productType: z.literal('subs') })
-const iapProductArgsSchema = z.object({
-  payload: iapPayloadSchema.extend({ productId: z.string() }),
-})
-const iapProductsArgsSchema = z.object({
-  payload: iapPayloadSchema.extend({ productIds: z.array(z.string()) }),
-})
+/**
+ * The arguments of `command`, typed from the command table. The callers are
+ * the typed `ipc.call` sites, so the bridge reads them without a check.
+ */
+function argsOf<C extends CommandName>(_command: C, args: Record<string, unknown>): CommandArgs<C> {
+  return args as CommandArgs<C>
+}
 
 // Fixed preview prices, independent of App Store Connect and browser locale.
 const iapProducts = [
@@ -143,17 +94,17 @@ class DevBridgeImpl implements IpcBridge {
       case 'plugin:app-store|request_review':
         return null
       case 'plugin:iap|get_products': {
-        const { payload } = iapProductsArgsSchema.parse(args)
+        const { payload } = argsOf('plugin:iap|get_products', args)
         return {
           products: iapProducts.filter((product) => payload.productIds.includes(product.productId)),
         }
       }
       case 'plugin:iap|get_product_status': {
-        const { payload } = iapProductArgsSchema.parse(args)
-        return { productId: payload.productId, isOwned: payload.productId === this.#ownedProductId }
+        const { payload } = argsOf('plugin:iap|get_product_status', args)
+        return { isOwned: payload.productId === this.#ownedProductId }
       }
       case 'plugin:iap|purchase': {
-        const { payload } = iapProductArgsSchema.parse(args)
+        const { payload } = argsOf('plugin:iap|purchase', args)
         if (!iapProducts.some((product) => product.productId === payload.productId)) {
           throw new AppError('notFound', `unknown preview product: ${payload.productId}`)
         }
@@ -203,7 +154,7 @@ class DevBridgeImpl implements IpcBridge {
         return null
 
       case 'note_read': {
-        const { path } = pathArgsSchema.parse(args)
+        const { path } = argsOf('note_read', args)
         const contents = files.read(path)
         if (contents === null) {
           throw new AppError('notFound', `no such note: ${path}`)
@@ -212,7 +163,7 @@ class DevBridgeImpl implements IpcBridge {
       }
       case 'note_read_local': {
         // The in-memory store has no iCloud, so a note is never evicted.
-        const { path } = pathArgsSchema.parse(args)
+        const { path } = argsOf('note_read_local', args)
         const contents = files.read(path)
         if (contents === null) {
           throw new AppError('notFound', `no such note: ${path}`)
@@ -220,7 +171,7 @@ class DevBridgeImpl implements IpcBridge {
         return { kind: 'content', content: contents }
       }
       case 'note_write': {
-        const { path, contents, checkContents, expectedContents } = writeArgsSchema.parse(args)
+        const { path, contents, checkContents, expectedContents } = argsOf('note_write', args)
         if (checkContents === true) {
           const current = files.read(path)
           if (current !== (expectedContents ?? null) && current !== contents) {
@@ -230,24 +181,24 @@ class DevBridgeImpl implements IpcBridge {
         return { modifiedMs: files.write(path, contents), merged: null }
       }
       case 'note_create': {
-        const { path, contents, generation } = createArgsSchema.parse(args)
+        const { path, contents, generation } = argsOf('note_create', args)
         this.#checkGeneration(generation)
         return files.create(path, contents)
       }
       case 'note_exists':
-        return files.exists(pathArgsSchema.parse(args).path)
+        return files.exists(argsOf('note_exists', args).path)
       case 'note_delete': {
-        files.remove(pathArgsSchema.parse(args).path)
+        files.remove(argsOf('note_delete', args).path)
         return null
       }
       case 'list_files':
         return files.list()
       case 'dir_list':
-        return files.listDir(z.object({ dir: z.string() }).parse(args).dir)
+        return files.listDir(argsOf('dir_list', args).dir)
       case 'note_move_indexed': {
         const {
           request: { from, to },
-        } = moveRequestArgsSchema.parse(args)
+        } = argsOf('note_move_indexed', args)
         if (!files.exists(from)) {
           throw new AppError('notFound', `cannot move note: ${from} does not exist`)
         }
@@ -263,35 +214,33 @@ class DevBridgeImpl implements IpcBridge {
       }
 
       case 'asset_write': {
-        const { path, contentsBase64, generation } = generationArgsSchema
-          .extend({ path: z.string(), contentsBase64: z.string() })
-          .parse(args)
+        const { path, contentsBase64, generation } = argsOf('asset_write', args)
         this.#checkGeneration(generation)
         assets.write(path, base64ToBytes(contentsBase64))
         return null
       }
       case 'asset_read':
-        return bytesToBase64(this.#readAsset(pathArgsSchema.parse(args).path))
+        return bytesToBase64(this.#readAsset(argsOf('asset_read', args).path))
       case 'asset_read_binary':
-        return this.#readAsset(pathArgsSchema.parse(args).path).slice().buffer
+        return this.#readAsset((args as AssetReadBinaryArgs).path).slice().buffer
       case 'list_attachments':
         return assets.list()
       case 'asset_upload_begin': {
-        this.#checkGeneration(generationArgsSchema.parse(args).generation)
+        this.#checkGeneration(argsOf('asset_upload_begin', args).generation)
         this.#uploadCount += 1
         const id = `upload-${this.#uploadCount}`
         this.#uploads.set(id, [])
         return id
       }
       case 'asset_upload_commit': {
-        const { id, desiredName, generation } = uploadCommitArgsSchema.parse(args)
+        const { id, desiredName, generation } = argsOf('asset_upload_commit', args)
         this.#checkGeneration(generation)
         const path = pickFreeAssetPath(desiredName, (candidate) => assets.exists(candidate))
         assets.write(path, this.#finishUpload(id))
         return path
       }
       case 'asset_upload_commit_path': {
-        const { id, path, generation } = uploadCommitPathArgsSchema.parse(args)
+        const { id, path, generation } = argsOf('asset_upload_commit_path', args)
         this.#checkGeneration(generation)
         const bytes = this.#finishUpload(id)
         if (assets.exists(path)) {
@@ -301,7 +250,7 @@ class DevBridgeImpl implements IpcBridge {
         return null
       }
       case 'asset_upload_abort': {
-        this.#uploads.delete(uploadIdArgsSchema.parse(args).id)
+        this.#uploads.delete(argsOf('asset_upload_abort', args).id)
         return null
       }
       case 'asset_open':
@@ -310,32 +259,32 @@ class DevBridgeImpl implements IpcBridge {
         return null
 
       case 'db_query': {
-        const { sql, params } = dbQueryArgsSchema.parse(args)
+        const { sql, params } = argsOf('db_query', args)
         return index.query(sql, params)
       }
       case 'index_open':
         return 1
       case 'index_apply': {
-        index.applyNote(applyArgsSchema.parse(args).note)
+        index.applyNote(argsOf('index_apply', args).note)
         return null
       }
       case 'index_apply_batch': {
-        for (const note of applyBatchArgsSchema.parse(args).notes) {
+        for (const note of argsOf('index_apply_batch', args).notes) {
           index.applyNote(note)
         }
         return null
       }
       case 'index_remove': {
-        index.removeNote(pathArgsSchema.parse(args).path)
+        index.removeNote(argsOf('index_remove', args).path)
         return null
       }
       case 'index_move': {
-        const { from, to } = moveArgsSchema.parse(args)
+        const { from, to } = argsOf('index_move', args)
         index.moveNote(from, to)
         return null
       }
       case 'index_touch': {
-        for (const entry of touchArgsSchema.parse(args).entries) {
+        for (const entry of argsOf('index_touch', args).entries) {
           index.touchNote(entry.path, entry.mtime)
         }
         return null
@@ -347,7 +296,7 @@ class DevBridgeImpl implements IpcBridge {
         return null
       }
       case 'index_meta_set': {
-        const { key, value } = metaArgsSchema.parse(args)
+        const { key, value } = argsOf('index_meta_set', args)
         index.setMeta(key, value)
         return null
       }
@@ -355,18 +304,18 @@ class DevBridgeImpl implements IpcBridge {
       case 'settings_load':
         return this.#settingsDocument
       case 'settings_save': {
-        this.#settingsDocument = settingsArgsSchema.parse(args).settings
+        this.#settingsDocument = argsOf('settings_save', args).settings
         return null
       }
       case 'secret_get':
-        return this.#secrets.get(secretNameArgsSchema.parse(args).name) ?? null
+        return this.#secrets.get(argsOf('secret_get', args).name) ?? null
       case 'secret_set': {
-        const { name, value } = secretSetArgsSchema.parse(args)
+        const { name, value } = argsOf('secret_set', args)
         this.#secrets.set(name, value)
         return null
       }
       case 'secret_delete': {
-        this.#secrets.delete(secretNameArgsSchema.parse(args).name)
+        this.#secrets.delete(argsOf('secret_delete', args).name)
         return null
       }
 
@@ -389,12 +338,12 @@ class DevBridgeImpl implements IpcBridge {
         return []
 
       case 'chat_message_save': {
-        const { conversation, message } = chatSaveArgsSchema.parse(args)
+        const { conversation, message } = argsOf('chat_message_save', args)
         index.saveChatMessage(conversation, message)
         return null
       }
       case 'chat_conversation_delete': {
-        index.deleteChatConversation(chatDeleteArgsSchema.parse(args).id)
+        index.deleteChatConversation(argsOf('chat_conversation_delete', args).id)
         return null
       }
 

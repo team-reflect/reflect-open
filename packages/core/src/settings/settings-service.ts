@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import { errorMessage } from '../errors.ts'
 import type { ProgressPort } from '../ports/progress-port.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -46,8 +45,6 @@ export interface SettingsService extends Store<Settings> {
    */
   readonly status: Store<SettingsStatus>
 }
-
-const voidSchema = z.null()
 
 export interface SettingsServiceDeps {
   readonly ipc: IpcBridgeService
@@ -168,7 +165,7 @@ class SettingsServiceImpl implements SettingsService {
     }
     this.#saving = this.#saving.then(async () => {
       try {
-        await ipc.call('settings_save', { settings }, voidSchema)
+        await ipc.call('settings_save', { settings })
         this.#saved = settings
       } catch (error) {
         progress.fail('Saving settings', errorMessage(error))

@@ -15,67 +15,14 @@
 use std::sync::Arc;
 
 use reflect_core::Core;
-use serde::Serialize;
+use reflect_types::{CalendarAuthorizationStatus, CalendarEvent, CalendarInfo};
 use tauri::State;
 
 use crate::error::AppResult;
 
-/// A calendar known to macOS, across every account the user has added in
-/// System Settings → Internet Accounts.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CalendarInfo {
-    /// EventKit's stable calendar identifier — what user settings store.
-    pub id: String,
-    pub title: String,
-    /// The owning account's display name ("iCloud", "Google", "On My Mac").
-    pub source: String,
-    /// Display color as `#rrggbb`, when one could be resolved.
-    pub color: Option<String>,
-}
-
-/// One attendee of a calendar event.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CalendarAttendee {
-    /// Display name, falling back to the address in the participant URL.
-    pub name: String,
-    /// The invite email, when the participant URL is a `mailto:` — what the
-    /// contacts integration resolves person notes by.
-    pub email: Option<String>,
-    pub is_current_user: bool,
-    /// Whether this attendee is a person (as opposed to a room or resource).
-    pub is_person: bool,
-    /// "accepted" | "declined" | "tentative" | "pending" | "unknown".
-    pub status: String,
-}
-
-/// A single event occurrence within a queried date range.
-///
-/// Occurrences of a recurring event share an `id`; consumers needing a unique
-/// key should combine `id` with `starts_at`.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CalendarEvent {
-    pub id: String,
-    pub calendar_id: String,
-    pub title: String,
-    /// Start/end as Unix epoch milliseconds.
-    pub starts_at: f64,
-    pub ends_at: f64,
-    pub all_day: bool,
-    pub recurring: bool,
-    /// "busy" | "free" | "tentative" | "unavailable" | "notSupported".
-    pub availability: String,
-    pub canceled: bool,
-    pub attendees: Vec<CalendarAttendee>,
-}
-
-/// Command: the current EventKit authorization state for events, one of
-/// "notDetermined" | "restricted" | "denied" | "fullAccess" | "writeOnly".
-/// Only "fullAccess" lets Reflect read events.
+/// Command: the current EventKit authorization state for events.
 #[tauri::command]
-pub fn calendar_authorization_status() -> AppResult<String> {
+pub fn calendar_authorization_status() -> AppResult<CalendarAuthorizationStatus> {
     platform::authorization_status()
 }
 
@@ -136,20 +83,22 @@ mod platform {
     };
     use tauri::Emitter;
 
-    use super::{CalendarAttendee, CalendarEvent, CalendarInfo};
     use crate::error::{AppError, AppResult};
+    use reflect_types::{
+        CalendarAttendee, CalendarAttendeeStatus, CalendarAuthorizationStatus,
+        CalendarAvailability, CalendarEvent, CalendarInfo,
+    };
 
-    pub fn authorization_status() -> AppResult<String> {
+    pub fn authorization_status() -> AppResult<CalendarAuthorizationStatus> {
         let status = unsafe { EKEventStore::authorizationStatusForEntityType(EKEntityType::Event) };
-        let name = match status {
-            EKAuthorizationStatus::NotDetermined => "notDetermined",
-            EKAuthorizationStatus::Restricted => "restricted",
-            EKAuthorizationStatus::Denied => "denied",
-            EKAuthorizationStatus::FullAccess => "fullAccess",
-            EKAuthorizationStatus::WriteOnly => "writeOnly",
-            _ => "denied",
-        };
-        Ok(name.to_string())
+        Ok(match status {
+            EKAuthorizationStatus::NotDetermined => CalendarAuthorizationStatus::NotDetermined,
+            EKAuthorizationStatus::Restricted => CalendarAuthorizationStatus::Restricted,
+            EKAuthorizationStatus::Denied => CalendarAuthorizationStatus::Denied,
+            EKAuthorizationStatus::FullAccess => CalendarAuthorizationStatus::FullAccess,
+            EKAuthorizationStatus::WriteOnly => CalendarAuthorizationStatus::WriteOnly,
+            _ => CalendarAuthorizationStatus::Denied,
+        })
     }
 
     pub fn request_access() -> AppResult<bool> {
@@ -297,11 +246,11 @@ mod platform {
             })
             .unwrap_or_default();
         let availability = match unsafe { event.availability() } {
-            EKEventAvailability::Busy => "busy",
-            EKEventAvailability::Free => "free",
-            EKEventAvailability::Tentative => "tentative",
-            EKEventAvailability::Unavailable => "unavailable",
-            _ => "notSupported",
+            EKEventAvailability::Busy => CalendarAvailability::Busy,
+            EKEventAvailability::Free => CalendarAvailability::Free,
+            EKEventAvailability::Tentative => CalendarAvailability::Tentative,
+            EKEventAvailability::Unavailable => CalendarAvailability::Unavailable,
+            _ => CalendarAvailability::NotSupported,
         };
         CalendarEvent {
             id: identifier,
@@ -311,7 +260,7 @@ mod platform {
             ends_at: unsafe { event.endDate() }.timeIntervalSince1970() * 1000.0,
             all_day: unsafe { event.isAllDay() },
             recurring: unsafe { event.hasRecurrenceRules() },
-            availability: availability.to_string(),
+            availability,
             canceled: unsafe { event.status() } == EKEventStatus::Canceled,
             attendees,
         }
@@ -332,26 +281,26 @@ mod platform {
             .or(address)
             .unwrap_or_default();
         let status = match unsafe { attendee.participantStatus() } {
-            EKParticipantStatus::Accepted => "accepted",
-            EKParticipantStatus::Declined => "declined",
-            EKParticipantStatus::Tentative => "tentative",
-            EKParticipantStatus::Pending => "pending",
-            _ => "unknown",
+            EKParticipantStatus::Accepted => CalendarAttendeeStatus::Accepted,
+            EKParticipantStatus::Declined => CalendarAttendeeStatus::Declined,
+            EKParticipantStatus::Tentative => CalendarAttendeeStatus::Tentative,
+            EKParticipantStatus::Pending => CalendarAttendeeStatus::Pending,
+            _ => CalendarAttendeeStatus::Unknown,
         };
         CalendarAttendee {
             name,
             email,
             is_current_user: unsafe { attendee.isCurrentUser() },
             is_person: unsafe { attendee.participantType() } == EKParticipantType::Person,
-            status: status.to_string(),
+            status,
         }
     }
 }
 
 #[cfg(not(target_os = "macos"))]
 mod platform {
-    use super::{CalendarEvent, CalendarInfo};
     use crate::error::{AppError, AppResult};
+    use reflect_types::{CalendarAuthorizationStatus, CalendarEvent, CalendarInfo};
 
     fn unsupported<T>() -> AppResult<T> {
         Err(AppError::Unknown {
@@ -359,7 +308,7 @@ mod platform {
         })
     }
 
-    pub fn authorization_status() -> AppResult<String> {
+    pub fn authorization_status() -> AppResult<CalendarAuthorizationStatus> {
         unsupported()
     }
 

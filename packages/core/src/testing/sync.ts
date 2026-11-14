@@ -113,6 +113,7 @@ class TestGitRepositoryServiceImpl implements TestGitRepositoryService {
     remoteHead: (): RemoteTip => ({ remoteOid: null, trackingOid: null, defaultBranch: null }),
     push: (): PushOutcome => ({ pushed: true, nonFastForward: false, rejectionMessage: null }),
     pull: (): PullOutcome => ({
+      kind: 'merged',
       committed: false,
       ahead: 0,
       skippedLargeFiles: [],

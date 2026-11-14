@@ -32,53 +32,12 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use reflect_graph_paths::{to_slash, to_slash_lossy};
-use serde::Serialize;
 
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, GraphImportSummary};
 
 use super::import_assets::{self, DownloadOutcome};
 use super::io::{atomic_write_bytes, file_occupied};
 use super::resolve::resolve;
-
-/// Summary returned to the settings UI after an import completes.
-#[derive(Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportSummary {
-    /// Zip files newly written to the open graph.
-    pub imported_files: usize,
-    /// Zip files already present with identical bytes, left untouched.
-    pub skipped_files: usize,
-    /// Remote attachments now stored locally under `assets/` (whether newly
-    /// written or already present from an earlier import).
-    pub downloaded_assets: usize,
-    /// Remote attachments that are permanently gone (4xx); their notes keep
-    /// the remote link.
-    pub failed_asset_downloads: usize,
-    /// Zip files written under a `-2`-style suffixed name because their own
-    /// name is held by a differing existing file — a genuine same-name file,
-    /// or one the filesystem merely aliases to the same path
-    /// (case-insensitive APFS folds `Füße.md`/`füsse.md`/`füße.md` together;
-    /// the V1 export keeps them distinct notes). Renamed assets have the
-    /// imported notes' `assets/…` links rewritten to the suffixed name.
-    pub renamed_files: usize,
-    /// Existing daily notes that gained the imported entry's body: the day
-    /// already had a note with different content, so the import appends
-    /// rather than duplicating the day under a suffixed name.
-    pub merged_files: usize,
-    /// Graph-relative paths written to the open graph (new files and merged
-    /// daily notes).
-    pub changed_paths: Vec<String>,
-}
-
-/// Progress of the running import, emitted to the frontend as
-/// `import:progress` events (`stage` is `"downloading"` or `"writing"`).
-#[derive(Clone, Copy, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportProgress {
-    pub stage: &'static str,
-    pub done: usize,
-    pub total: usize,
-}
 
 /// Cooperative cancellation for the single running import, managed as Tauri
 /// state. `begin` claims the one import slot and rearms the flag;
@@ -264,7 +223,7 @@ pub fn finalize_import(
     prepared: PreparedImport,
     mut outcomes: HashMap<String, DownloadOutcome>,
     mut on_progress: impl FnMut(usize, usize),
-) -> AppResult<ImportSummary> {
+) -> AppResult<GraphImportSummary> {
     let PreparedImport {
         mut entries,
         urls,
@@ -404,7 +363,7 @@ pub fn finalize_import(
         on_progress(processed, total);
     }
 
-    Ok(ImportSummary {
+    Ok(GraphImportSummary {
         imported_files,
         skipped_files,
         downloaded_assets,
@@ -838,7 +797,7 @@ mod tests {
     fn import_entries_into_graph(
         root: &Path,
         entries: Vec<ImportEntry>,
-    ) -> AppResult<ImportSummary> {
+    ) -> AppResult<GraphImportSummary> {
         let entries = dedupe_entries(entries)?;
         ensure_has_notes(&entries)?;
         let prepared = PreparedImport {
@@ -853,7 +812,7 @@ mod tests {
         finalize_import(root, prepared, HashMap::new(), |_, _| {})
     }
 
-    fn import_zip_into_graph(root: &Path, zip_path: &Path) -> AppResult<ImportSummary> {
+    fn import_zip_into_graph(root: &Path, zip_path: &Path) -> AppResult<GraphImportSummary> {
         let prepared = prepare_zip_import(root, zip_path)?;
         finalize_import(root, prepared, HashMap::new(), |_, _| {})
     }
@@ -982,7 +941,7 @@ mod tests {
 
         assert_eq!(
             summary,
-            ImportSummary {
+            GraphImportSummary {
                 imported_files: 3,
                 skipped_files: 0,
                 downloaded_assets: 0,
@@ -1418,7 +1377,7 @@ mod tests {
 
         assert_eq!(
             summary,
-            ImportSummary {
+            GraphImportSummary {
                 imported_files: 0,
                 skipped_files: 1,
                 downloaded_assets: 0,
@@ -1442,7 +1401,7 @@ mod tests {
 
         assert_eq!(
             summary,
-            ImportSummary {
+            GraphImportSummary {
                 imported_files: 1,
                 skipped_files: 0,
                 downloaded_assets: 0,
@@ -1509,7 +1468,7 @@ mod tests {
         root: &Path,
         zip_path: &Path,
         prefix: &str,
-    ) -> AppResult<ImportSummary> {
+    ) -> AppResult<GraphImportSummary> {
         let prepared = prepare_zip_import_from(root, zip_path, &[prefix])?;
         let downloads =
             block_on(prepared.download_assets("Reflect/test", no_cancel(), no_progress()))?;

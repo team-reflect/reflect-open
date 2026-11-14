@@ -70,7 +70,8 @@ private func run(
   _ command: String, _ args: String = "{}", on client: FakeStoreClient
 ) async throws -> StoreReply {
   let commands = StoreCommands(client: client, emit: { _, _ in })
-  let handler = try #require(commands.commands[command])
+  let name = try #require(ShellCommandName(rawValue: command))
+  let handler = try #require(commands.commands[name])
   return await handler(Data(args.utf8))
 }
 
@@ -149,14 +150,20 @@ func purchaseAnswersNullOnlyForAVerifiedPurchase(
   let client = FakeStoreClient()
   client.outcome = nil
   let reply = try await run(
-    "plugin:iap|purchase", #"{"payload":{"productId":"missing"}}"#, on: client)
+    "plugin:iap|purchase", #"{"payload":{"productId":"missing","productType":"subs"}}"#, on: client)
   #expect(reply == .error(.notFound(.init(message: "Product not found"))))
 }
 
 @MainActor
 @Test(arguments: [
-  ("plugin:iap|get_products", #"{"payload":{"productIds":["monthly"]}}"#, "Failed to fetch"),
-  ("plugin:iap|purchase", #"{"payload":{"productId":"monthly"}}"#, "Purchase failed"),
+  (
+    "plugin:iap|get_products", #"{"payload":{"productIds":["monthly"],"productType":"subs"}}"#,
+    "Failed to fetch"
+  ),
+  (
+    "plugin:iap|purchase", #"{"payload":{"productId":"monthly","productType":"subs"}}"#,
+    "Purchase failed"
+  ),
   ("plugin:app-store|sync", "{}", "AppStore.sync failed"),
 ])
 func aStoreFailureAnswersAnIOError(command: String, args: String, message: String) async throws {

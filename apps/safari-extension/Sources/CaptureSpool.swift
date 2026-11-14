@@ -1,4 +1,5 @@
 import Foundation
+import TypesShared
 
 /// Spools one wire message from the web extension into the App Group inbox
 /// the desktop app relays into the graph (`relay_shared_spools` in
@@ -7,18 +8,9 @@ import Foundation
 /// parses every wire message with zod before sending it, and the drain parses
 /// every spool file again and quarantines what fails. The checks kept here
 /// guard the disk: the id names the spool files, and the sizes stay inside
-/// what the relay will copy.
+/// what the relay will copy. The envelope stays a dictionary because the
+/// extension also relays X post envelopes through it.
 enum CaptureSpool {
-  /// The relay's caps (`SHARED_ENVELOPE_MAX_BYTES` and
-  /// `SHARED_SCREENSHOT_MAX_BYTES` in `capture.rs`). A file over them is
-  /// quarantined unread, so it must never be spooled.
-  static let envelopeMaxBytes = 8 * 1024 * 1024
-  static let screenshotMaxBytes = 16 * 1024 * 1024
-
-  /// Where spool files go inside the container; the relay reads the same
-  /// directory name (`SHARED_INBOX_DIR`).
-  static let inboxDir = "inbox"
-
   /// The ack for one wire message: `{ok: true, status: "queued"}`, or a
   /// typed failure the extension maps to a hold or a drop.
   static func spool(_ message: Any?) -> [String: Any] {
@@ -28,14 +20,24 @@ enum CaptureSpool {
   /// `spool(_:)` with the inbox resolved by `inbox`, so the spool step can
   /// run outside the app extension's container.
   static func spool(_ message: Any?, into inbox: () throws -> URL) -> [String: Any] {
+    let ack: CaptureAck
     do {
       try write(message, into: inbox)
-      return ["ok": true, "status": "queued"]
+      ack = CaptureAck(ok: true, status: "queued", code: nil, message: nil)
     } catch let failure as SpoolFailure {
-      return ["ok": false, "code": failure.code, "message": failure.message]
+      ack = CaptureAck(ok: false, status: nil, code: failure.code, message: failure.message)
     } catch {
-      return ["ok": false, "code": "io", "message": error.localizedDescription]
+      ack = CaptureAck(ok: false, status: nil, code: .io, message: error.localizedDescription)
     }
+    // Safari takes the reply as Foundation objects.
+    guard let data = try? JSONEncoder().encode(ack),
+      let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+      return [
+        "ok": false, "code": CaptureErrorCode.io.rawValue, "message": "the reply did not encode",
+      ]
+    }
+    return reply
   }
 
   /// Mirrors `ValidatedCapture::parse` and `spool_capture` in the native
@@ -61,7 +63,7 @@ enum CaptureSpool {
       else {
         throw SpoolFailure.invalidPayload("screenshot is not base64")
       }
-      guard bytes.count <= screenshotMaxBytes else {
+      guard bytes.count <= CaptureConstants.sharedScreenshotMaxBytes else {
         throw SpoolFailure.invalidPayload("screenshot is too large to save")
       }
       screenshot = bytes
@@ -74,7 +76,7 @@ enum CaptureSpool {
     }
     let json = try JSONSerialization.data(
       withJSONObject: envelope, options: [.withoutEscapingSlashes])
-    guard json.count <= envelopeMaxBytes else {
+    guard json.count <= CaptureConstants.sharedEnvelopeMaxBytes else {
       throw SpoolFailure.invalidPayload("capture is too large to save")
     }
     let inbox = try inboxUrl()
@@ -98,27 +100,27 @@ enum CaptureSpool {
 
   private static func inboxUrl() throws -> URL {
     guard
-      let group = Bundle.main.object(forInfoDictionaryKey: "ReflectAppGroup") as? String,
+      let group = Bundle.main.object(forInfoDictionaryKey: CaptureConstants.appGroupKey) as? String,
       let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)
     else {
       // An entitlements or build-settings mismatch, not a user-fixable state.
       throw SpoolFailure.io("The Reflect capture inbox is unavailable")
     }
-    return container.appendingPathComponent(inboxDir, isDirectory: true)
+    return container.appendingPathComponent(CaptureConstants.sharedInboxDir, isDirectory: true)
   }
 }
 
-/// The failure half of `captureAckSchema`.
+/// The failure half of `CaptureAck`.
 private enum SpoolFailure: Error {
   /// The extension drops the capture: retrying cannot help.
   case invalidPayload(String)
   /// The extension keeps the capture queued and retries.
   case io(String)
 
-  var code: String {
+  var code: CaptureErrorCode {
     switch self {
-    case .invalidPayload: "invalid-payload"
-    case .io: "io"
+    case .invalidPayload: .invalidPayload
+    case .io: .io
     }
   }
 
