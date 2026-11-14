@@ -193,6 +193,16 @@ describe('CommandPalette', () => {
     expect(view.getByText('Commands').query()).toBeNull() // recall feed only (decided)
   })
 
+  it('ends a typed query with an Ask row that leads to Settings with no AI provider', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([])
+    const { view, navigate } = await renderPalette('pricing plans')
+    await expect.element(view.getByText('No results')).toBeInTheDocument()
+    await view.getByText('Ask “pricing plans”').click()
+    expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
+    expect(view.getByTestId('palette-overlay').query()).toBeNull()
+  })
+
   it('a typed query shows ranked notes with highlighted snippets and Enter opens the top hit', async () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([
@@ -408,7 +418,7 @@ describe('CommandPalette', () => {
     searchWithFilters.mockResolvedValue([])
     const toggleTheme = vi.fn()
     const { view } = await renderPalette('toggle theme', { toggleTheme })
-    await expect.element(view.getByText('Toggle theme')).toBeInTheDocument()
+    await expect.element(view.getByText('Toggle theme', { exact: true })).toBeInTheDocument()
 
     await userEvent.keyboard('{Enter}')
     await vi.waitFor(() => expect(toggleTheme).toHaveBeenCalled())

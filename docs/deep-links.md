@@ -11,7 +11,7 @@ remote control. The parser is `packages/core/src/navigation/deep-link-parse.ts`.
 reflect://today                     the daily stream, on today
 reflect://daily/2026-07-01          a specific day (ISO YYYY-MM-DD)
 reflect://note/<target>             a note
-reflect://search?q=meeting          the search screen, query prefilled
+reflect://search?q=meeting          a search: ⌘K prefilled (desktop), All prefilled (mobile); no history entry
 reflect://tasks                     the tasks view
 ```
 

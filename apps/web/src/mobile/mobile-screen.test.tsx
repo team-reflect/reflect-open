@@ -732,6 +732,19 @@ describe('MobileShell', () => {
     })
   }
 
+  it('with no AI provider, the Ask row leads to Settings', async () => {
+    const view = await mount({ kind: 'allNotes', tag: null })
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await userEvent.fill(box, 'pricing')
+    await expect.element(view.getByText('Add an AI provider in Settings to ask')).toBeVisible()
+
+    await userEvent.click(view.getByRole('button', { name: /^Ask “pricing”/ }))
+
+    await waitFor(() => {
+      expect(visibleLayer(view).querySelector('h1')?.textContent).toBe('Settings')
+    })
+  })
+
   it('asks the search text from All: Chat opens over All, Back returns to the results', async () => {
     const user = userEvent
     const { view, chatEngine } = await mountAllWithChatProvider('You kept one plan.')
