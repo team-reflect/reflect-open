@@ -86,8 +86,8 @@ class TestNavigationServiceImpl implements TestNavigationService {
     this.#inner.forgetNotes(isGone)
   }
 
-  reset(initialRoute?: Route): void {
-    this.#inner.reset(initialRoute)
+  reset(initialRoute?: Route, initialSection?: Section): void {
+    this.#inner.reset(initialRoute, initialSection)
   }
 
   navigations(): readonly TestNavigateCall[] {
