@@ -145,12 +145,7 @@ class AssetStoreServiceImpl implements AssetStoreService {
     if (!ipc.hasBinaryTransport) {
       return base64ToBytes(await this.readBase64(path, generation))
     }
-    const buffer = await ipc.callRaw(
-      'asset_read_binary',
-      { path, generation },
-      z.instanceof(ArrayBuffer),
-    )
-    return new Uint8Array(buffer)
+    return new Uint8Array(await ipc.callBytes('asset_read_binary', { path, generation }))
   }
 
   async open(path: string, generation: number): Promise<void> {

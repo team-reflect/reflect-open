@@ -119,6 +119,11 @@ export interface IpcBridgeService {
     schema: ZodType<TOutput, unknown>,
   ): Promise<TOutput>
   /**
+   * Invoke a command whose reply is raw bytes (`asset_read_binary`). Rejects
+   * with a `parse` {@link AppError} when the reply is not an `ArrayBuffer`.
+   */
+  callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer>
+  /**
    * {@link call}'s binary sibling: the payload is a raw byte body with
    * per-call metadata in `headers`. Rejects with an `io` {@link AppError}
    * when the transport has no binary path.
@@ -196,6 +201,14 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
     schema: ZodType<TOutput, unknown>,
   ): Promise<TOutput> {
     return parseResponse(command, await this.#invoke(command, args), schema)
+  }
+
+  async callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer> {
+    const raw = await this.#invoke(command, args)
+    if (!(raw instanceof ArrayBuffer)) {
+      throw new AppError('parse', `"${command}" answered no bytes`)
+    }
+    return raw
   }
 
   async #invoke(command: string, args: Readonly<Record<string, unknown>>): Promise<unknown> {

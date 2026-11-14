@@ -173,6 +173,10 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
     return this.#inner.callRaw(command, args, schema)
   }
 
+  callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer> {
+    return this.#inner.callBytes(command, args)
+  }
+
   callBinary<TOutput>(
     command: string,
     body: Uint8Array,
