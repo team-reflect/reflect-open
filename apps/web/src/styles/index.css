@@ -56,7 +56,7 @@ Cascade layer order, low to high priority.
 }
 @utility left-window-controls-offset-* {
   left: calc(
-    env(safe-area-inset-left, 0px) + var(--spacing) * --value(integer) +
+    var(--twsa-safe-area-inset-left) + var(--spacing) * --value(integer) +
       var(--window-controls-width, 0px)
   );
 }

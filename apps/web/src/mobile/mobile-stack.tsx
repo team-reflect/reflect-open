@@ -422,13 +422,13 @@ export function MobileStack(props: MobileStackProps): ReactElement {
                       aria-hidden
                       className="mobile-pager-scrim pointer-events-none absolute inset-y-0 right-full w-full bg-black/25"
                     />
-                    {/* Reaches past the left safe area, so the strip stays
-                        touchable beside an overlapping iPad sidebar. */}
+                    {/* `pl-safe` widens the strip past the left safe area,
+                        so it stays touchable beside an overlapping iPad sidebar. */}
                     <div
                       ref={edgeRef}
                       aria-hidden
                       data-pager-edge
-                      className="absolute inset-y-0 left-0 z-10 w-[calc(var(--twsa-safe-area-inset-left)+--spacing(5))] touch-pan-x select-none"
+                      className="absolute inset-y-0 left-0 z-10 box-content w-5 pl-safe touch-pan-x select-none"
                       onClick={forwardStripTap}
                     />
                   </>
