@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 import WebKit
 
@@ -244,16 +245,16 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     guard let id = command.propertyList as? String else { return }
     switch id {
     case "settings":
-      send(.sidebar(.settings))
+      send(.sidebar(.init(command: .settings)))
     case "search":
-      send(.sidebar(.search))
+      send(.sidebar(.init(command: .search)))
     case SidebarRow.chat:
-      send(.sidebar(.chat))
+      send(.sidebar(.init(command: .chat)))
     case "back", "forward":
       guard let entryId, let history,
         id == "back" ? history.back : history.forward
       else { return }
-      send(.history(entryId: entryId, forward: id == "forward"))
+      send(.history(.init(entryId: entryId, direction: id == "forward" ? .forward : .back)))
     case "sidebar":
       userToggledSidebar = true
       sidebar.isHidden.toggle()
@@ -392,7 +393,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   private func sendPlus(_ command: PlusCommand) {
     guard let entryId else { return }
-    send(.plus(entryId: entryId, command: command))
+    send(.plus(.init(entryId: entryId, command: command)))
   }
 
   /// Selects the tab the page shows, or, while the sidebar shows, the
@@ -441,11 +442,11 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     guard let next = ChromeTab(rawValue: tab.identifier) else {
       // The page opens the row's screen; its state selects the row.
       if let intent = SidebarRow.intent(for: tab) {
-        send(.sidebar(intent))
+        send(.sidebar(.init(command: intent)))
       }
       return false
     }
-    send(.tab(next))
+    send(.tab(.init(tab: next)))
     if tab !== selectedTab {
       tabFollow.tap(next)
       taps += 1

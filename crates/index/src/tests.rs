@@ -3,18 +3,19 @@
 //! compose at runtime.
 
 use reflect_index_schema::LATEST_SCHEMA_VERSION;
+use reflect_types::{
+    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexedAlias, IndexedClaim, IndexedEmail,
+    IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress, NoteKind,
+};
 use rusqlite::Connection;
 use serde_json::Value;
 
-use super::chat_write::{ChatConversation, ChatMessageRow, delete_conversation, save_message};
+use super::chat_write::{delete_conversation, save_message};
 use super::connections::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
-use super::embed_write::{EmbeddedChunk, apply_chunks, remove_chunks};
+use super::embed_write::{apply_chunks, remove_chunks};
 use super::query::run_query;
 use super::scan::scan_reconcile;
-use super::write::{
-    IndexedAlias, IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask,
-    MovedNoteAddress, apply_note, claim_tier, clear_index, move_note, touch_note,
-};
+use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
 use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
 
 fn migrated() -> Connection {
@@ -52,7 +53,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         title: title.to_string(),
         title_key: title.to_lowercase(),
         path_key: path.to_lowercase(),
-        kind: "note".to_string(),
+        kind: NoteKind::Note,
         daily_date: None,
         is_private: false,
         is_pinned: false,
@@ -77,7 +78,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
 
 fn wiki(target: &str) -> IndexedLink {
     IndexedLink {
-        kind: "wiki".to_string(),
+        kind: LinkKind::Wiki,
         target_raw: target.to_string(),
         target_key: target.to_lowercase(),
         target_path_key: None,
@@ -88,9 +89,9 @@ fn wiki(target: &str) -> IndexedLink {
 }
 
 /// A link that names an exact file (`[[Projects/Plan]]` or `[x](./plan.md)`).
-fn path_link(kind: &str, target_raw: &str, target_path_key: &str) -> IndexedLink {
+fn path_link(kind: LinkKind, target_raw: &str, target_path_key: &str) -> IndexedLink {
     IndexedLink {
-        kind: kind.to_string(),
+        kind,
         target_raw: target_raw.to_string(),
         target_key: target_raw.to_lowercase(),
         target_path_key: Some(target_path_key.to_string()),
@@ -116,7 +117,7 @@ fn aliased_note(path: &str, title: &str, alias: &str) -> IndexedNote {
 
 fn daily_note(path: &str, date: &str) -> IndexedNote {
     let mut indexed = note(path, date, vec![]);
-    indexed.kind = "daily".to_string();
+    indexed.kind = NoteKind::Daily;
     indexed.daily_date = Some(date.to_string());
     let mut claims = Vec::new();
     push_claim(&mut claims, date, claim_tier::DAILY_DATE);
@@ -500,7 +501,7 @@ fn alias_collisions_choose_the_first_path_for_backlinks() {
 fn templates_are_invisible_to_backlink_resolution() {
     let conn = migrated();
     let mut template = note("templates/journal.md", "Journal", vec![wiki("Target")]);
-    template.kind = "template".to_string();
+    template.kind = NoteKind::Template;
     template.claims = vec![];
     apply_note(&conn, &template).unwrap();
     apply_note(&conn, &note("notes/target.md", "Target", vec![])).unwrap();
@@ -662,12 +663,12 @@ fn reapplying_a_note_replaces_its_rows() {
 fn has_content_lands_on_the_notes_row_and_is_queryable() {
     let conn = migrated();
     let mut blank = note("daily/2026-06-02.md", "2026-06-02", vec![]);
-    blank.kind = "daily".to_string();
+    blank.kind = NoteKind::Daily;
     blank.daily_date = Some("2026-06-02".to_string());
     blank.has_content = false;
     apply_note(&conn, &blank).unwrap();
     let mut written = note("daily/2026-06-01.md", "2026-06-01", vec![]);
-    written.kind = "daily".to_string();
+    written.kind = NoteKind::Daily;
     written.daily_date = Some("2026-06-01".to_string());
     apply_note(&conn, &written).unwrap();
 
@@ -922,7 +923,7 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
     // INCLUDED (the Tasks view is a local-only surface, like local search).
     let conn = migrated();
     let mut public = note("daily/2026-06-10.md", "A", vec![]);
-    public.kind = "daily".to_string();
+    public.kind = NoteKind::Daily;
     public.daily_date = Some("2026-06-10".to_string());
     public.tasks = vec![task(2, "open a", false)];
     apply_note(&conn, &public).unwrap();
@@ -1877,7 +1878,11 @@ fn a_path_link_backlinks_to_exactly_that_file() {
         &note(
             "Journal.md",
             "Journal",
-            vec![path_link("wiki", "Projects/Plan", "projects/plan.md")],
+            vec![path_link(
+                LinkKind::Wiki,
+                "Projects/Plan",
+                "projects/plan.md",
+            )],
         ),
     )
     .unwrap();
@@ -1900,7 +1905,7 @@ fn a_markdown_link_backlinks_through_its_path_key() {
         &note(
             "Projects/Journal.md",
             "Journal",
-            vec![path_link("md", "./Plan.md", "projects/plan.md")],
+            vec![path_link(LinkKind::Md, "./Plan.md", "projects/plan.md")],
         ),
     )
     .unwrap();
@@ -1923,7 +1928,7 @@ fn a_path_link_to_a_missing_file_produces_no_backlink() {
         &note(
             "Journal.md",
             "Journal",
-            vec![path_link("wiki", "Gone/Plan", "gone/plan.md")],
+            vec![path_link(LinkKind::Wiki, "Gone/Plan", "gone/plan.md")],
         ),
     )
     .unwrap();

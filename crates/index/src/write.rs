@@ -5,80 +5,8 @@
 //! transactions and generation gating while these stay directly unit-testable.
 
 use rusqlite::{Connection, params};
-use serde::Deserialize;
 
-use reflect_types::{AppError, AppResult};
-
-/// A note's extracted projection, built in TS (Plan 03) and applied as one
-/// row-set. Mirrors the `indexedNoteSchema` zod contract in
-/// `packages/core/src/indexing/indexed-note.ts` field-for-field (serde
-/// `rename_all = "camelCase"` matches the camelCase payload); a change on either
-/// side must be mirrored on the other.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct IndexedNote {
-    pub(super) path: String,
-    pub(super) id: Option<String>,
-    pub(super) title: String,
-    pub(super) title_key: String,
-    /// ASCII-folded graph path: what a path-qualified link joins against.
-    pub(super) path_key: String,
-    /// 'daily' | 'note' | 'template' — templates are excluded from note surfaces.
-    pub(super) kind: String,
-    pub(super) daily_date: Option<String>,
-    pub(super) is_private: bool,
-    pub(super) is_pinned: bool,
-    pub(super) pinned_order: Option<f64>,
-    pub(super) has_content: bool,
-    /// The published GitHub Gist's html url, when the note has one.
-    pub(super) gist_url: Option<String>,
-    /// The body changed since it was last published to the gist.
-    pub(super) gist_stale: bool,
-    pub(super) file_hash: String,
-    pub(super) mtime: i64,
-    pub(super) text: String,
-    /// Description text of referenced assets (Plan 20), folded into the FTS
-    /// `body` only — never `preview` or anything AI-reachable.
-    #[serde(default)]
-    pub(super) asset_text: String,
-    pub(super) preview: String,
-    pub(super) links: Vec<IndexedLink>,
-    pub(super) tags: Vec<IndexedTag>,
-    pub(super) aliases: Vec<IndexedAlias>,
-    /// Every folded spelling this note answers to (see `note_claims`).
-    pub(super) claims: Vec<IndexedClaim>,
-    /// Emails the note owns via `- Email:` contact-field bullets.
-    pub(super) emails: Vec<IndexedEmail>,
-    pub(super) assets: Vec<String>,
-    pub(super) tasks: Vec<IndexedTask>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct IndexedLink {
-    pub(super) kind: String,
-    pub(super) target_raw: String,
-    pub(super) target_key: String,
-    /// Folded vault path when the link names a file; None when it names a note.
-    pub(super) target_path_key: Option<String>,
-    pub(super) alias: Option<String>,
-    pub(super) pos_from: i64,
-    pub(super) pos_to: i64,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct IndexedTag {
-    pub(super) tag: String,
-    pub(super) tag_key: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct IndexedAlias {
-    pub(super) alias: String,
-    pub(super) alias_key: String,
-}
+use reflect_types::{AppError, AppResult, IndexedNote, MovedNoteAddress};
 
 /// Precedence of the spellings a note answers to (`note_claims.tier`): the
 /// lowest tier claiming a key wins it. Mirrors `CLAIM_TIER` in
@@ -96,39 +24,6 @@ pub(super) mod claim_tier {
     pub const ALIAS: i64 = 3;
     /// Filename stem — the weakest address.
     pub const BASENAME: i64 = 4;
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct IndexedClaim {
-    /// Folded spelling this note answers to.
-    pub(super) key: String,
-    /// One of [`claim_tier`].
-    pub(super) tier: i64,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct IndexedEmail {
-    pub(super) email: String,
-    pub(super) email_key: String,
-}
-
-/// One round task (Plan 18). `ast_path` is the task's address in the note
-/// body's block AST (a JSON array of child indexes) and, with `note_path`, the
-/// row's primary key.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct IndexedTask {
-    pub(super) ast_path: String,
-    /// The task's first paragraph as Markdown, marker excluded.
-    pub(super) markdown: String,
-    /// Ancestor list items' first paragraphs as Markdown, outermost first.
-    #[serde(default)]
-    pub(super) breadcrumbs: Vec<String>,
-    pub(super) checked: bool,
-    /// Explicit due date (first `[[YYYY-MM-DD]]` in the item), or None.
-    pub(super) due_date: Option<String>,
 }
 
 /// Replace all rows for `note.path` with its current projection. Caller wraps
@@ -152,7 +47,7 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         note.title,
         note.title_key,
         note.path_key,
-        note.kind,
+        note.kind.as_str(),
         note.daily_date,
         i64::from(note.is_private),
         i64::from(note.is_pinned),
@@ -172,7 +67,7 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         for link in &note.links {
             stmt.execute(params![
                 note.path,
-                link.kind,
+                link.kind.as_str(),
                 link.target_raw,
                 link.target_key,
                 link.target_path_key,
@@ -248,17 +143,6 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     conn.prepare_cached("INSERT INTO search_fts(path, title, body) VALUES(?1, ?2, ?3)")?
         .execute(params![note.path, note.title, search_body])?;
     Ok(())
-}
-
-/// Path-derived addressing for a moved row: the folded destination path plus
-/// the claims that derive from it. Folded in TypeScript — Rust never folds.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MovedNoteAddress {
-    pub(super) path_key: String,
-    pub(super) basename_key: String,
-    /// Set only for a calendar-valid `daily/YYYY-MM-DD.md` destination.
-    pub(super) daily_date: Option<String>,
 }
 
 /// Move every row keyed by `from` to `to` — the projection half of a file

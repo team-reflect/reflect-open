@@ -3,7 +3,6 @@ import {
   errorMessage,
   INDEX_WRITTEN_EVENT,
   listenNow,
-  windowBootstrapSchema,
   type IpcBridgeService,
   type LoggerService,
   type Unlisten,
@@ -159,14 +158,14 @@ class WindowServiceImpl implements WindowService {
       return
     }
     try {
-      await ipc.call('close_note_windows', {}, z.null())
+      await ipc.call('close_note_windows', {})
     } catch (cause) {
       logger.error('closing note windows failed:', errorMessage(cause))
     }
   }
 
   bootstrap(): Promise<WindowBootstrap> {
-    return this.#deps.ipc.call('window_bootstrap', {}, windowBootstrapSchema)
+    return this.#deps.ipc.call('window_bootstrap', {})
   }
 
   subscribeNavigate(listener: (url: string) => void): Unlisten {
@@ -208,7 +207,7 @@ class WindowServiceImpl implements WindowService {
   }
 
   async toggleDevtools(): Promise<void> {
-    await this.#deps.ipc.call('toggle_devtools', {}, z.null())
+    await this.#deps.ipc.call('toggle_devtools', {})
   }
 
   #track(register: () => MaybePromise<Unlisten>, what: string): Unlisten {
@@ -224,7 +223,7 @@ class WindowServiceImpl implements WindowService {
   async #open(deepLink: string): Promise<boolean> {
     const { ipc, logger } = this.#deps
     try {
-      await ipc.call('open_note_window', { deepLink }, z.null())
+      await ipc.call('open_note_window', { deepLink })
       return true
     } catch (cause) {
       logger.error('open in new window failed:', errorMessage(cause))

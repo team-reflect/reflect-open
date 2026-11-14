@@ -29,7 +29,6 @@ percent-encoding = { workspace = true }
 # `time` backs the bounded wait in `windows::close_note_windows` (tauri
 # already runs on tokio; this only makes the sleep primitive addressable).
 tokio = { workspace = true, features = ["time", "sync", "fs", "io-util"] }
-serde = { workspace = true }
 serde_json = { workspace = true }
 reflect-types = { workspace = true, features = ["git2", "rusqlite"] }
 reflect-index = { workspace = true }

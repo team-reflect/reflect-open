@@ -23,10 +23,6 @@ mod session;
 mod tests;
 mod write;
 
-pub use chat_write::{ChatConversation, ChatMessageRow};
 #[cfg(any(feature = "native", test))]
 pub use connections::FileIndexConnections;
-pub use embed_write::EmbeddedChunk;
-pub use scan::{ReconcileScan, ScanCandidate, ScanOrphan};
-pub use session::{Applied, IndexConnections, IndexSession, IndexTouch, NoteMoveRequest};
-pub use write::{IndexedNote, MovedNoteAddress};
+pub use session::{Applied, IndexConnections, IndexSession};

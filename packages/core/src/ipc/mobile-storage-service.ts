@@ -1,26 +1,8 @@
-import { z } from 'zod'
-import { graphInfoSchema, type GraphInfo } from '../graph/schemas.ts'
+import type { MobileStorageInfo } from '@reflect/types'
+import type { GraphInfo } from '../graph/schemas.ts'
 import type { IpcBridgeService } from './ipc-service.ts'
 
-const mobileStorageInfoSchema = z.object({
-  localRoot: z.string(),
-  /**
-   * The container's `Documents/` dir when iCloud is usable; new graphs are created inside it.
-   */
-  icloudDocumentsRoot: z.string().nullable(),
-  /**
-   * Every graph already in the container (name-sorted); onboarding and the switcher list them.
-   */
-  icloudGraphRoots: z.array(z.string()),
-})
-
-/**
- * Where the mobile graph can live (Plan 21): the app-sandbox `Documents/`
- * directory (always present, never synced) and the app's iCloud Drive
- * container when iCloud is usable, plus every graph the container already
- * holds (a user can keep several).
- */
-export type MobileStorageInfo = z.infer<typeof mobileStorageInfoSchema>
+export type { MobileStorageInfo } from '@reflect/types'
 
 /**
  * Which of the {@link MobileStorageInfo} roots the graph lives in.
@@ -59,15 +41,15 @@ class MobileStorageServiceImpl implements MobileStorageService {
   }
 
   resolve(): Promise<MobileStorageInfo> {
-    return this.#deps.ipc.call('mobile_storage', {}, mobileStorageInfoSchema)
+    return this.#deps.ipc.call('mobile_storage', {})
   }
 
   resolveLocal(): Promise<string> {
-    return this.#deps.ipc.call('mobile_storage_local', {}, z.string())
+    return this.#deps.ipc.call('mobile_storage_local', {})
   }
 
   createGraph(path: string): Promise<GraphInfo> {
-    return this.#deps.ipc.call('graph_create', { path }, graphInfoSchema)
+    return this.#deps.ipc.call('graph_create', { path })
   }
 }
 

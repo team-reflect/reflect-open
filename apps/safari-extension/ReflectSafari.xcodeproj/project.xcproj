@@ -10,6 +10,12 @@
       "Base",
     ],
   },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "../../apple",
+    },
+  ],
   "files": [
     { "kind": "folder", "path": "Sources", "target-membership": [ "SafariExtension" ] },
     {
@@ -29,6 +35,14 @@
       "build-phases": [
         "compile-sources",
         "resources",
+        "frameworks",
+      ],
+      "package-product-members": [
+        {
+          "package": "apple",
+          "product-name": "TypesShared",
+          "build-phase": { "build-phase": "frameworks" },
+        },
       ],
       "build-settings": {
         "CODE_SIGNING_ALLOWED": "NO",

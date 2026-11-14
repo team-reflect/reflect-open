@@ -12,58 +12,10 @@ use std::path::Path;
 use git2::{
     Cred, CredentialType, Direction, FetchOptions, PushOptions, RemoteCallbacks, Repository,
 };
-use serde::{Deserialize, Serialize};
 
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, GitCredential, PushOutcome, RemoteDelta, RemoteTip};
 
 use super::repo::{current_branch, open_existing};
-
-/// An HTTPS sign-in supplied per call. Which username and secret a host
-/// wants is `@reflect/core`'s business (GitHub: `x-access-token` plus the
-/// managed token); this layer only presents it, once, as basic auth, and
-/// only to `origin`, the scheme, host and port it was stored for.
-///
-/// No `Debug`: a derived one would print `secret`.
-#[derive(Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitCredential {
-    pub origin: String,
-    pub username: String,
-    pub secret: String,
-}
-
-/// Where the local branch stands relative to its last-fetched remote
-/// counterpart (no network — call after `fetch`).
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteDelta {
-    pub ahead: usize,
-    pub behind: usize,
-}
-
-/// Where the remote says the current branch is, next to the last-fetched
-/// tracking ref. `remote_oid` is `None` when the remote has no such branch;
-/// `default_branch` is the branch the remote's HEAD points at, `None` when
-/// the remote is empty.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteTip {
-    pub remote_oid: Option<String>,
-    pub tracking_oid: Option<String>,
-    pub default_branch: Option<String>,
-}
-
-/// Result of a push attempt. `pushed: false` with `non_fast_forward: true` is
-/// the normal two-device case (pull, merge, retry); a `rejection_message`
-/// carries anything else the remote said (e.g. GitHub push protection).
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PushOutcome {
-    pub pushed: bool,
-    /// Auth and network failures are `AppError`s, never this.
-    pub non_fast_forward: bool,
-    pub rejection_message: Option<String>,
-}
 
 /// Pick a credential for one callback invocation.
 ///
@@ -401,7 +353,9 @@ fn classify_rejection(message: String, sideband: &str) -> PushOutcome {
 mod credential_tests {
     use git2::{Cred, CredentialType, ErrorCode};
 
-    use super::{GitCredential, Tried, guard_origin, http_origin, resolve_credential};
+    use reflect_types::GitCredential;
+
+    use super::{Tried, guard_origin, http_origin, resolve_credential};
 
     fn github() -> GitCredential {
         GitCredential {

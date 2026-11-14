@@ -12,6 +12,8 @@ export {
   createIpcBridgeService,
   INDEX_WRITTEN_EVENT,
   listenNow,
+  type CommandArgs,
+  type CommandName,
   type IpcBridge,
   type IpcBridgeService,
 } from './ipc/ipc-service.ts'
@@ -109,7 +111,6 @@ export { type ChatModelSelection } from './settings/schema.ts'
 export { type CloudGraphContext } from './privacy/privacy-service.ts'
 export { type CloudSafe } from './privacy/cloud-safe.ts'
 export {
-  calendarEventSchema,
   type CalendarAuthorizationStatus,
   type CalendarInfo,
   type CalendarEvent,
@@ -231,7 +232,6 @@ export {
   type GraphImportProgress,
   type GraphImportSummary,
   type WindowBootstrap,
-  windowBootstrapSchema,
 } from './graph/schemas.ts'
 export { type EmbedMediaService } from './embeds/embed-media-service.ts'
 
@@ -443,7 +443,6 @@ export {
   buildIndexedNote,
   CLAIM_TIER,
   encodeTaskBreadcrumbs,
-  indexedNoteSchema,
   aliasHint,
   type TemplateEntry,
   parseHighlights,

@@ -58,48 +58,39 @@ public final class StoreCommands {
   }
 
   /// The commands by name.
-  public var commands: [String: StoreCommand] {
+  public var commands: [ShellCommandName: StoreCommand] {
     [
-      "plugin:iap|get_products": { [client] args in await Self.getProducts(client, args) },
-      "plugin:iap|purchase": { [client] args in await Self.purchase(client, args) },
-      "plugin:iap|get_product_status": { [client] args in
+      .iapGetProducts: { [client] args in
+        await Self.getProducts(client, args)
+      },
+      .iapPurchase: { [client] args in await Self.purchase(client, args) },
+      .iapGetProductStatus: { [client] args in
         await Self.getProductStatus(client, args)
       },
-      "plugin:app-store|get_environment": { [client] _ in await Self.getEnvironment(client) },
-      "plugin:app-store|sync": { [client] _ in await Self.sync(client) },
+      .appStoreGetEnvironment: { [client] _ in
+        await Self.getEnvironment(client)
+      },
+      .appStoreSync: { [client] _ in await Self.sync(client) },
     ]
   }
 
-  /// The arguments of the `plugin:iap` commands; each command reads its own field.
-  private struct IAPArgs: Decodable {
-    struct Payload: Decodable {
-      var productIds: [String]?
-      var productId: String?
-    }
-    var payload: Payload
-  }
-
-  private static func payload(_ args: Data) -> IAPArgs.Payload? {
-    (try? JSONDecoder().decode(IAPArgs.self, from: args))?.payload
+  /// The product of `purchase` and `get_product_status`.
+  private static func productId(_ args: Data) -> String? {
+    (try? JSONDecoder().decode(IapProductArgs.self, from: args))?.payload.productId
   }
 
   /// `get_products {payload: {productIds}}` answers `{products: [{productId, formattedPrice}]}`.
   private static func getProducts(_ client: any StoreClient, _ args: Data) async -> StoreReply {
-    struct Response: Encodable {
-      struct Item: Encodable {
-        var productId: String
-        var formattedPrice: String
-      }
-      var products: [Item]
-    }
-    guard let ids = payload(args)?.productIds else {
+    guard
+      let ids = (try? JSONDecoder().decode(IapProductsArgs.self, from: args))?.payload.productIds
+    else {
       return .error(.parse(.init(message: "iap get_products takes {payload: {productIds}}")))
     }
     do {
       let products = try await client.products(for: ids)
       return .value(
-        Response(
-          products: products.map { .init(productId: $0.id, formattedPrice: $0.displayPrice) }))
+        IapProducts(
+          products: products.map { IapProduct(productId: $0.id, formattedPrice: $0.displayPrice) }))
     } catch {
       return .error(.io(.init(message: "Failed to fetch products: \(error.localizedDescription)")))
     }
@@ -108,7 +99,7 @@ public final class StoreCommands {
   /// `purchase {payload: {productId}}` runs the purchase sheet. It answers
   /// `null` for a verified purchase and an error for any other outcome.
   private static func purchase(_ client: any StoreClient, _ args: Data) async -> StoreReply {
-    guard let id = payload(args)?.productId else {
+    guard let id = productId(args) else {
       return .error(.parse(.init(message: "iap purchase takes {payload: {productId}}")))
     }
     do {
@@ -136,26 +127,20 @@ public final class StoreCommands {
   private static func getProductStatus(_ client: any StoreClient, _ args: Data) async
     -> StoreReply
   {
-    struct Response: Encodable {
-      var isOwned: Bool
-    }
-    guard let id = payload(args)?.productId else {
+    guard let id = productId(args) else {
       return .error(.parse(.init(message: "iap get_product_status takes {payload: {productId}}")))
     }
-    return .value(Response(isOwned: await client.isEntitled(to: id)))
+    return .value(IapProductStatus(isOwned: await client.isEntitled(to: id)))
   }
 
   /// `get_environment` answers `{environment}`: `Production` for an App Store
   /// install, `Sandbox` for TestFlight and development installs, `Xcode` for
   /// a StoreKit configuration run.
   private static func getEnvironment(_ client: any StoreClient) async -> StoreReply {
-    struct Response: Encodable {
-      var environment: String
-    }
     guard let environment = await client.environment() else {
       return .error(.io(.init(message: "the app transaction is unavailable")))
     }
-    return .value(Response(environment: environment))
+    return .value(AppStoreEnvironmentReply(environment: environment))
   }
 
   /// `sync` fetches transactions and subscription status from the App Store

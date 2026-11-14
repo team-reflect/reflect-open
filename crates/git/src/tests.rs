@@ -6,11 +6,12 @@ use std::thread;
 use std::time::Duration;
 
 use git2::{Repository, RepositoryInitOptions};
+use reflect_types::{CommitOutcome, MergeKind};
 use tempfile::tempdir;
 
 use super::commit::commit_all;
 use super::fault::{self, Fault, FaultPoint};
-use super::merge::{MergeKind, merge_remote};
+use super::merge::merge_remote;
 use super::remote::{fetch, push, remote_head};
 use super::test_support::{
     Fixture, copy_note, fixture, head_blob, head_message, head_tree_paths, read, remote_blob,
@@ -1590,7 +1591,7 @@ fn age_file(path: &Path, minutes: u64) {
         .unwrap();
 }
 
-fn commit_with_lock_retry(root: &Path) -> reflect_types::AppResult<super::commit::CommitOutcome> {
+fn commit_with_lock_retry(root: &Path) -> reflect_types::AppResult<CommitOutcome> {
     super::locks::retry_after_stale_lock(root, || commit_all(root, "sync", MAX_FILE_BYTES))
 }
 

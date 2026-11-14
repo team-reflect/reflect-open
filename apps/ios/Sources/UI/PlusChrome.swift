@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 
 /// The `+` of the screen, over the page: one action, or Daily's capture menu,
@@ -17,7 +18,7 @@ final class PlusChrome {
   private let noteItem: UIButton
   private let taskItem: UIButton
   private let audioItem: UIButton
-  private var spec: PlusSpec?
+  private var spec: PlusState?
   private var hidden = true
   private var shown = false
   private var menuOpen = false
@@ -71,7 +72,7 @@ final class PlusChrome {
   }
 
   private var items: [UIButton] {
-    if case .capture(let audio) = spec, audio != nil {
+    if case .capture(let capture) = spec, capture.audio != nil {
       return [noteItem, taskItem, audioItem]
     }
     return [noteItem, taskItem]
@@ -79,7 +80,7 @@ final class PlusChrome {
 
   /// Shows `spec`, or no `+` for `nil`. The capture menu stays open while
   /// only its audio phase changes.
-  func update(_ spec: PlusSpec?) {
+  func update(_ spec: PlusState?) {
     switch (self.spec, spec) {
     case (.capture, .capture):
       break
@@ -88,11 +89,11 @@ final class PlusChrome {
     }
     self.spec = spec
     switch spec {
-    case .action(let label):
-      button.accessibilityLabel = label
-    case .capture(let audio):
+    case .action(let action):
+      button.accessibilityLabel = action.label
+    case .capture(let capture):
       button.accessibilityLabel = menuOpen ? "Hide capture actions" : "Show capture actions"
-      updateAudioItem(audio)
+      updateAudioItem(capture.audio)
       if menuOpen {
         for item in items {
           item.isHidden = false

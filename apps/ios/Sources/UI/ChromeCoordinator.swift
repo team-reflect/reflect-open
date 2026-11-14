@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 import os
 
@@ -145,7 +146,7 @@ final class ChromeCoordinator {
   }
 
   /// Pins the light or dark style that the page pins, so the system bars match it.
-  private func applyTheme(_ theme: ChromeState.Theme) {
+  private func applyTheme(_ theme: ChromeTheme) {
     let style: UIUserInterfaceStyle =
       switch theme {
       case .system: .unspecified

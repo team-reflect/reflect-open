@@ -81,6 +81,7 @@ const NON_FAST_FORWARD: PushOutcome = {
   rejectionMessage: 'fetch first',
 }
 const PULLED: PullOutcome = {
+  kind: 'merged',
   committed: true,
   ahead: 1,
   skippedLargeFiles: [],
@@ -546,6 +547,7 @@ describe('createSyncEngineFactory', () => {
   it('hands merge-changed files to the reindex callback', async () => {
     const git = fakeGit()
     git.onPull(() => ({
+      kind: 'merged',
       committed: true,
       ahead: 1,
       skippedLargeFiles: [],
@@ -1306,6 +1308,7 @@ describe('review paths', () => {
   it('reports the review paths of a merge', async () => {
     const git = fakeGit()
     git.onPull(() => ({
+      kind: 'merged',
       committed: false,
       ahead: 0,
       skippedLargeFiles: [],

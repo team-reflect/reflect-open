@@ -11,7 +11,7 @@ app and the Swift iOS shell.
 ```text
 React component / hook        useCoreServices()
   └─ service method           packages/core/src/<domain>/<name>-service.ts
-       └─ ipc.call            packages/core/src/ipc/ipc-service.ts  (zod validation)
+       └─ ipc.call            packages/core/src/ipc/ipc-service.ts  (typed by the command table)
             └─ transport.invoke   the `IpcBridge` given to `createCoreServices`
                  ├─ Tauri IPC apps/web/src/services/tauri-ipc.ts
                  └─ Swift IPC apps/web/src/services/swift-ipc.ts
@@ -30,16 +30,23 @@ Put the method in the `crates/core` module that owns the capability (`fs/`,
 `db.rs`, `git.rs`, `capture.rs`, `embed.rs`, …) or a new one. State that
 commands share (the graph session, the index session, the background
 assertions) is a field of `Core`. Commands are snake_case, return
-`AppResult<T>` unless they cannot fail, and serialize camelCase:
+`AppResult<T>` unless they cannot fail, and serialize camelCase. A type that
+crosses the boundary lives in `crates/types`, so the generator can print it
+for TypeScript and Swift:
 
 ```rust
-// crates/core/src/fs/mod.rs
-#[derive(serde::Serialize)]
+// crates/types/src/graph.rs
+#[derive(Serialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct NoteStat {
     pub size_bytes: u64,
     pub modified_ms: u64,
 }
+```
+
+```rust
+// crates/core/src/fs/mod.rs
 
 impl Core {
     /// Command: file metadata for one note (graph-relative path).
@@ -51,20 +58,38 @@ impl Core {
 }
 ```
 
-Then add its row. Both shells get the command from it:
+Then add its row to the command table. Both shells dispatch from it, and the
+generator prints the args and result types from it:
 
 ```rust
-// crates/core/src/lib.rs, in `dispatch_table!`: one row per command.
-// The argument names are the camelCase keys of the JSON arguments.
-"note_stat" => note_stat(path: String),
+// crates/types/src/commands.rs, in the `core` block: one row per command.
+note_stat(path: String) -> NoteStat,
 ```
 
-A row for an `async` method ends in `.await`. A row for a method that returns
-its value without `AppResult` ends in `infallible`. Every command runs on a
-blocking-pool thread, never on the main thread. A command that exists only on
-the desktop (windows, menus) is a `#[tauri::command]` in the Tauri crate,
-registered in `generate_handler!` in `apps/tauri/src/lib.rs`, and
-gets no row.
+The argument names become the camelCase keys of the JSON arguments. A row for
+an `async` method has `.await` before the arrow. A row for a method that
+returns its value without `AppResult` has `infallible` before the arrow. The
+result type must match the method: a mismatch fails to compile. Every command
+runs on a blocking-pool thread, never on the main thread.
+
+A command that exists only on the desktop (windows, menus) is a
+`#[tauri::command]` in the Tauri crate. Its row goes in the `desktop` block as
+`module::name(args) -> Result`, and lists only the arguments the frontend
+sends. The Tauri handler is built from that block. Only the names are
+checked: the compiler does not compare the row with the function signature.
+
+A command that the Swift shell answers (`plugin:<name>|<command>`,
+`host.<command>`) goes in the `shell` block as
+`"name" => identifier(ArgsType) -> Result`. The arguments are one named type
+from `crates/types/src/shell.rs` (`NoArgs` for none), so Swift can decode
+them. Swift registers the handler under the camelCase
+case of `ShellCommandName` (`recording_start` becomes `.recordingStart`).
+
+Then regenerate the TypeScript and Swift types and commit the output:
+
+```bash
+pnpm gen:types
+```
 
 - **Errors are the shared contract.** Return `AppError` (from `reflect-types`,
   `crates/types/src/error.rs`). It serializes as `{ kind, message }`, and the
@@ -104,9 +129,9 @@ Components never call `invoke`. `note_stat` is graph file IO, so it belongs to
 `read` and `write`:
 
 ```ts
-const noteStatSchema = z.object({ sizeBytes: z.number(), modifiedMs: z.number() })
+import type { NoteStat } from '@reflect/types'
 
-export type NoteStat = z.infer<typeof noteStatSchema>
+export type { NoteStat }
 
 export interface NoteFileService {
   // ...
@@ -119,18 +144,21 @@ export interface NoteFileService {
 class NoteFileServiceImpl implements NoteFileService {
   // ...
   async stat(path: string): Promise<NoteStat> {
-    return await this.#deps.ipc.call('note_stat', { path }, noteStatSchema)
+    return await this.#deps.ipc.call('note_stat', { path })
   }
 }
 ```
 
-- `IpcBridgeService.call` is the one place an IPC response becomes typed: a
-  schema mismatch throws a `parse` `AppError` naming the command, and any
-  rejection becomes an `AppError`. Your method adds no error handling.
-- A command returning `()` serializes as `null`: validate with `z.null()`
-  (`voidSchema` in `settings/settings-service.ts`).
-- Schemas live next to the service, or in the domain's `schemas.ts` when
-  shared.
+- `IpcBridgeService.call` takes its args and result types from the command
+  table, and turns any rejection into an `AppError`. Your method adds no error
+  handling. An `Option` argument is required as `T | null`.
+- Pass a zod schema as the third argument only when the result needs a
+  stricter check than its Rust type, for example data read from disk or the
+  network (`settings_load`, `x_syndication_fetch`). A mismatch throws a `parse`
+  `AppError` naming the command.
+- `ipc.callBytes(command, args)` calls a command whose reply is raw bytes
+  (`asset_read_binary`), and `ipc.callBinary` sends a raw byte body
+  (`asset_upload_append`).
 - A mutating method takes `generation: number` and passes it on
   (`write(path, contents, generation)`).
 - Export new types the apps import from `packages/core/src/index.ts`.
@@ -140,7 +168,8 @@ class NoteFileServiceImpl implements NoteFileService {
 
 Plain-browser dev (`pnpm dev` without the shell) answers commands from
 `apps/web/src/dev/dev-bridge.ts` and throws on unknown ones. Add a `case`
-there if the feature must work in that mode.
+there if the feature must work in that mode, and read its args with
+`argsOf(command, args)`.
 
 If no service owns the capability, add one: see [services.md](services.md).
 React reaches the method through the service:
@@ -170,17 +199,18 @@ expect(ipc.calls()).toEqual([{ command: 'note_stat', args: { path: 'notes/a.md' 
 ```
 
 `packages/core/src/ipc/ipc-service.test.ts` covers the error paths. A one-line
-`ipc.call()` method needs little: cover the schema if it normalizes, and the
-behavior in the module that consumes it. See [testing.md](testing.md).
+`ipc.call()` method needs little: cover the behavior in the module that
+consumes it. See [testing.md](testing.md).
 
 ## Checklist
 
 - [ ] Rust: `Core` method in the owning `crates/core` module, `AppResult<T>`,
       camelCase serde, `resolve()`d paths, generation-pinned if mutating or a
       background read
-- [ ] Rust: a row in `dispatch_table!` (`crates/core/src/lib.rs`)
+- [ ] Rust: boundary types in `crates/types`, a row in the command table
+      (`crates/types/src/commands.rs`), then `pnpm gen:types`
 - [ ] Rust: `#[cfg(test)]` tests on the pure helper; `cargo test -p reflect-core`
-- [ ] TS: zod schema + method through `ipc.call()` on the owning service;
+- [ ] TS: method through `ipc.call()` on the owning service;
       `generation` parameter if mutating
 - [ ] TS: test double updated; new types exported from `packages/core/src/index.ts`
 - [ ] TS: behavior covered over `createTestIpcBridgeService()` where it matters

@@ -1,5 +1,6 @@
 import AuthenticationServices
 import ChromeKit
+import TypesShared
 import UIKit
 import WebHostKit
 import os
@@ -44,7 +45,7 @@ final class AppHost {
     let recording = RecordingCapability(emit: emit)
     self.recording = recording
 
-    var shellCommands: [String: ShellCommand] = [:]
+    var shellCommands: [ShellCommandName: ShellCommand] = [:]
     for commands in [
       HostCommands.all { url in await UIApplication.shared.open(url) },
       HapticsCapability.commands, webAuth.commands, store.commands, recording.commands,
@@ -149,18 +150,18 @@ final class AppHost {
   }
 }
 
-extension CoreConfig {
+extension CoreStartConfig {
   /// The config of this app: the Documents directory, `Application Support/<bundle id>`
   /// (created when missing) and `Reflect/<version>`, the same values as the Tauri shell.
   static func current(
     _ directories: AppDirectories, fileManager: FileManager = .default, bundle: Bundle = .main
-  ) throws -> CoreConfig {
+  ) throws -> CoreStartConfig {
     let data = directories.applicationSupport
       .appendingPathComponent(bundle.bundleIdentifier ?? "app.reflect.ios")
     try fileManager.createDirectory(at: data, withIntermediateDirectories: true)
     let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-    return CoreConfig(
-      documentDir: directories.documents.path, dataDir: data.path,
+    return CoreStartConfig(
+      appDataDir: data.path, documentDir: directories.documents.path,
       userAgent: "Reflect/\(version ?? "0.0.0")")
   }
 }

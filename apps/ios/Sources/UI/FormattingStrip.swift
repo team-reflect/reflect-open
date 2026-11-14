@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 
 /// The formatting toolbar above the keyboard: the format buttons scroll

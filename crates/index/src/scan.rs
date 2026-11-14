@@ -11,78 +11,14 @@
 use std::collections::{HashMap, HashSet};
 
 use rusqlite::Connection;
-use serde::Serialize;
 
-use reflect_types::AppResult;
-use reflect_types::FileMeta;
+use reflect_types::{AppResult, FileMeta, ReconcileScan, ScanCandidate, ScanOrphan};
 
 /// Mirrors `MTIME_TRUST_AGE_MS` in `packages/core/src/indexing/hash.ts`: an
 /// mtime match may only skip the read once the file has settled — local write
 /// echoes stamp rows at write time, so two same-millisecond saves could
 /// otherwise read as "unchanged".
 const MTIME_TRUST_AGE_MS: u64 = 5_000;
-
-/// One file the TS reconcile must read: its listed mtime doesn't match the
-/// stored row (or is too fresh to trust), or it has no row at all. Stored
-/// facts ride along so the reconcile needs no follow-up query — a `None`
-/// hash marks an arrival (move-healing candidate).
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScanCandidate {
-    pub path: String,
-    /// The file's listed on-disk mtime (epoch ms).
-    pub modified_ms: u64,
-    /// The stored row's mtime, or `None` when the path has no row.
-    pub stored_mtime: Option<i64>,
-    /// The stored row's content hash, or `None` when the path has no row.
-    pub stored_hash: Option<String>,
-}
-
-/// A stored row whose file vanished from disk. Facts ride along because
-/// id-based move healing pairs orphans with arrivals and, on a heal, the
-/// moved row's hash decides whether the new path needs a re-index at all.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScanOrphan {
-    pub path: String,
-    pub stored_mtime: i64,
-    pub stored_hash: String,
-}
-
-/// The reconcile delta: what changed on disk relative to the index.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReconcileScan {
-    /// Markdown files listed (eviction placeholders included).
-    pub total: u64,
-    pub candidates: Vec<ScanCandidate>,
-    pub orphans: Vec<ScanOrphan>,
-    /// Evicted files whose **content the index lacks**: no stored row (never
-    /// indexed on this device), or a listed mtime differing from the stored
-    /// row (a remote edit that synced while the file was evicted). The
-    /// reconcile cannot read these — placeholders are never candidates — so
-    /// it surfaces them for a *targeted* download request
-    /// (`icloud_request_downloads`); the materialized file then arrives as an
-    /// ordinary watcher upsert. Evicted files whose row is current are
-    /// deliberately absent: re-downloading content we already indexed would
-    /// fight the OS's eviction choice (Optimize Mac Storage). For legacy
-    /// `.icloud` stubs the listed mtime is the stub's own, so an
-    /// evicted-after-indexing note re-requests on each reconcile — matching
-    /// mobile's existing download-all-pending-notes behavior on open/resume.
-    pub stale_placeholders: Vec<String>,
-}
-
-impl ReconcileScan {
-    /// The "nothing to do" scan a superseded generation reports.
-    pub fn empty() -> Self {
-        ReconcileScan {
-            total: 0,
-            candidates: Vec::new(),
-            orphans: Vec::new(),
-            stale_placeholders: Vec::new(),
-        }
-    }
-}
 
 /// Compare `files` (the note listing) against the stored `notes` rows.
 ///

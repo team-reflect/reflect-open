@@ -5,34 +5,11 @@ use std::path::Path;
 
 use git2::{Index, IndexAddOption, IndexEntry};
 use reflect_graph_paths::to_slash_lossy;
-use serde::Serialize;
 
-use reflect_types::AppResult;
+use reflect_types::{AppResult, CommitOutcome, SkippedFile};
 
 use super::commit_message::message_for_commit;
 use super::repo::{clear_foreign_state, open_existing, reattach_head, signature, stage0_entry};
-
-/// A file whose changes were withheld because it is at or above the size
-/// guardrail. An unchanged oversized file is not reported.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkippedFile {
-    /// Graph-relative path (forward-slashed) of the withheld file.
-    pub path: String,
-    pub size: u64,
-}
-
-/// Result of a commit attempt. `committed: false` means the tree was clean.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CommitOutcome {
-    pub committed: bool,
-    pub sha: Option<String>,
-    /// Commits the local branch is ahead of the last-fetched remote (no
-    /// network).
-    pub ahead: usize,
-    pub skipped_large_files: Vec<SkippedFile>,
-}
 
 /// Stage every change under the graph and commit. Returns `committed: false`
 /// when the staged tree already matches HEAD.

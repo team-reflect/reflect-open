@@ -9,23 +9,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
-use reflect_types::{AppError, AppResult};
+use reflect_types::{AppError, AppResult, RecentGraph};
 
 use crate::Core;
 
 const MAX_RECENTS: usize = 12;
-
-/// A previously-opened graph, newest first in the stored list.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RecentGraph {
-    pub root: String,
-    pub name: String,
-    pub opened_ms: u64,
-}
 
 fn store_path() -> AppResult<PathBuf> {
     let base = dirs::config_dir().ok_or_else(|| AppError::io("no OS config dir"))?;

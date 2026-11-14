@@ -21,6 +21,7 @@ use std::path::Path;
 
 use envelope::ValidatedCapture;
 use protocol::{read_message, write_message};
+use reflect_types::{CaptureAck, CaptureErrorCode};
 use spool::{inbox_dir, spool_capture};
 
 /// Why a capture could not be spooled, as acked to the extension.
@@ -37,12 +38,12 @@ pub enum HostError {
 }
 
 impl HostError {
-    fn code(&self) -> &'static str {
+    fn code(&self) -> CaptureErrorCode {
         match self {
-            HostError::NoGraph => "no-graph",
-            HostError::UnsupportedVersion => "unsupported-version",
-            HostError::InvalidPayload(_) => "invalid-payload",
-            HostError::Io(_) => "io",
+            HostError::NoGraph => CaptureErrorCode::NoGraph,
+            HostError::UnsupportedVersion => CaptureErrorCode::UnsupportedVersion,
+            HostError::InvalidPayload(_) => CaptureErrorCode::InvalidPayload,
+            HostError::Io(_) => CaptureErrorCode::Io,
         }
     }
 
@@ -61,15 +62,11 @@ impl HostError {
 /// `queued` is the only success the host can honestly claim — it never
 /// observes the desktop app draining the inbox.
 fn ack_json(outcome: &Result<(), HostError>) -> Vec<u8> {
-    let value = match outcome {
-        Ok(()) => serde_json::json!({ "ok": true, "status": "queued" }),
-        Err(error) => serde_json::json!({
-            "ok": false,
-            "code": error.code(),
-            "message": error.message(),
-        }),
+    let ack = match outcome {
+        Ok(()) => CaptureAck::queued(),
+        Err(error) => CaptureAck::failed(error.code(), error.message()),
     };
-    value.to_string().into_bytes()
+    serde_json::to_vec(&ack).expect("an ack serializes")
 }
 
 /// Handle one wire message: validate, locate the inbox, spool.

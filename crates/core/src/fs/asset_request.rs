@@ -28,7 +28,7 @@ const STATUS_RANGE_NOT_SATISFIABLE: u16 = 416;
 const MIME_SNIFF_LEN: u64 = 64 * 1024;
 
 /// The file to serve for an asset request.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssetFile {
     /// The absolute path to read.
     pub path: PathBuf,
@@ -42,7 +42,7 @@ pub struct AssetFile {
 }
 
 /// The HTTP status to refuse an asset request with.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssetRefusal {
     pub status: u16,
     /// The length of the file, for the `Content-Range` of a 416.

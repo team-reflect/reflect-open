@@ -18,12 +18,11 @@ function serviceOver(transport: IpcBridge) {
 }
 
 describe('call', () => {
-  it('returns the schema-validated response', async () => {
+  it('returns the raw response without a schema', async () => {
     const invoke = vi.fn().mockResolvedValue({ root: '/g', generation: 1 })
     const { ipc } = serviceOver({ invoke, listen: () => Promise.resolve(noop) })
 
-    const schema = z.object({ root: z.string(), generation: z.number() })
-    await expect(ipc.call('graph_open', { path: '/g' }, schema)).resolves.toEqual({
+    await expect(ipc.call('graph_open', { path: '/g' })).resolves.toEqual({
       root: '/g',
       generation: 1,
     })
@@ -42,7 +41,7 @@ describe('call', () => {
     })
 
     const error = await ipc
-      .call('note_read', { path: 'x' }, z.string())
+      .call('note_read', { path: 'x', generation: null })
       .catch((caught: unknown) => caught)
     expect(isAppError(error)).toBe(true)
     expect(error).toEqual(new AppError('notFound', 'missing'))
@@ -55,7 +54,7 @@ describe('call', () => {
     })
 
     const error = await ipc
-      .call('note_read', { path: 'x' }, z.string())
+      .call('note_read', { path: 'x', generation: null })
       .catch((caught: unknown) => caught)
     expect(error).toEqual(new AppError('unknown', 'socket closed'))
   })
@@ -66,7 +65,10 @@ describe('call', () => {
       listen: () => Promise.resolve(noop),
     })
 
-    const error = await ipc.call('graph_open', {}, z.string()).catch((caught: unknown) => caught)
+    const schema = z.object({ root: z.string() })
+    const error = await ipc
+      .call('graph_open', { path: '/g' }, schema)
+      .catch((caught: unknown) => caught)
     expect(isAppError(error)).toBe(true)
     if (isAppError(error)) {
       expect(error.kind).toBe('parse')
@@ -76,8 +78,8 @@ describe('call', () => {
 })
 
 describe('callBinary', () => {
-  it('sends the raw body and headers and validates the response', async () => {
-    const invokeBinary = vi.fn().mockResolvedValue({ written: 3 })
+  it('sends the raw body and headers', async () => {
+    const invokeBinary = vi.fn().mockResolvedValue(null)
     const { ipc } = serviceOver({
       invoke: () => Promise.resolve(null),
       listen: () => Promise.resolve(noop),
@@ -85,10 +87,8 @@ describe('callBinary', () => {
     })
 
     const body = new Uint8Array([1, 2, 3])
-    await expect(
-      ipc.callBinary('asset_write', body, { path: 'a.png' }, z.object({ written: z.number() })),
-    ).resolves.toEqual({ written: 3 })
-    expect(invokeBinary).toHaveBeenCalledWith('asset_write', body, { path: 'a.png' })
+    await ipc.callBinary('asset_upload_append', body, { 'x-upload-id': 'u1' })
+    expect(invokeBinary).toHaveBeenCalledWith('asset_upload_append', body, { 'x-upload-id': 'u1' })
     expect(ipc.hasBinaryTransport).toBe(true)
   })
 
@@ -99,9 +99,9 @@ describe('callBinary', () => {
     })
 
     expect(ipc.hasBinaryTransport).toBe(false)
-    await expect(
-      ipc.callBinary('asset_write', new Uint8Array(), {}, z.unknown()),
-    ).rejects.toMatchObject({ kind: 'io' })
+    await expect(ipc.callBinary('asset_upload_append', new Uint8Array(), {})).rejects.toMatchObject(
+      { kind: 'io' },
+    )
   })
 })
 

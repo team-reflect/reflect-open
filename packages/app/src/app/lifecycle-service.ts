@@ -9,7 +9,6 @@ import {
   type TimerHandle,
   type Unlisten,
 } from '@reflect/core'
-import { z } from 'zod'
 
 /**
  * The shell's notice that it deferred an app exit so the frontend can flush.
@@ -20,8 +19,6 @@ export const QUIT_REQUESTED_EVENT = 'app:quit-requested'
  * The shortest gap between two resume callbacks of one subscription.
  */
 export const RESUME_THROTTLE_MS = 1_500
-
-const backgroundTaskTokenSchema = z.string()
 
 /**
  * The page events an {@link AppLifecycleService} observes.
@@ -166,15 +163,15 @@ class LifecycleServiceImpl implements AppLifecycleService {
   }
 
   async confirmQuit(): Promise<void> {
-    await this.#deps.ipc.call('quit_confirm', {}, z.null())
+    await this.#deps.ipc.call('quit_confirm', {})
   }
 
   beginBackgroundTask(): Promise<BackgroundTaskToken | null> {
-    return this.#deps.ipc.call('background_task_begin', {}, backgroundTaskTokenSchema.nullable())
+    return this.#deps.ipc.call('background_task_begin', {})
   }
 
   async endBackgroundTask(token: BackgroundTaskToken): Promise<void> {
-    await this.#deps.ipc.call('background_task_end', { token }, z.null())
+    await this.#deps.ipc.call('background_task_end', { token })
   }
 
   #subscribeVisibility(visible: boolean, listener: () => void): Unlisten {

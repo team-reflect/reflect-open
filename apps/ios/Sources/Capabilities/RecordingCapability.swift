@@ -43,17 +43,10 @@ final class RecordingCapability {
     engine.queueAction("recordAudio")
   }
 
-  var commands: [String: ShellCommand] {
+  var commands: [ShellCommandName: ShellCommand] {
     [
-      "plugin:recording|start_recording": { [engine] request in
-        struct Args: Decodable {
-          struct Request: Decodable {
-            var segmentMs: Double
-            var reminderMs: Double
-          }
-          var request: Request
-        }
-        guard let args = request.decodeArgs(Args.self)?.request else {
+      .recordingStart: { [engine] request in
+        guard let args = request.decodeArgs(RecordingStartArgs.self)?.request else {
           return .error(
             .parse(.init(message: "start_recording takes {request: {segmentMs, reminderMs}}")))
         }
@@ -61,10 +54,10 @@ final class RecordingCapability {
           engine.start(segmentMs: args.segmentMs, reminderMs: args.reminderMs, completion: $0)
         }
       },
-      "plugin:recording|stop_recording": { [engine] _ in
+      .recordingStop: { [engine] _ in
         await Self.reply { engine.stop(completion: $0) }
       },
-      "plugin:recording|cancel_recording": { [engine] _ in
+      .recordingCancel: { [engine] _ in
         let result = await withCheckedContinuation { continuation in
           engine.cancel { result in continuation.resume(returning: result) }
         }
@@ -73,23 +66,17 @@ final class RecordingCapability {
         }
         return .null
       },
-      "plugin:recording|recording_status": { [engine] _ in .value(engine.status()) },
-      "plugin:recording|list_staged": { [engine] _ in
+      .recordingStatus: { [engine] _ in .value(engine.status()) },
+      .recordingListStaged: { [engine] _ in
         do {
-          return .value(ListStagedResponse(files: try engine.listStaged()))
+          return .value(StagedRecordingList(files: try engine.listStaged()))
         } catch {
           return .error(
             .io(.init(message: "listing staged recordings failed: \(error.localizedDescription)")))
         }
       },
-      "plugin:recording|delete_staged": { [engine] request in
-        struct Args: Decodable {
-          struct Request: Decodable {
-            var path: String
-          }
-          var request: Request
-        }
-        guard let path = request.decodeArgs(Args.self)?.request.path else {
+      .recordingDeleteStaged: { [engine] request in
+        guard let path = request.decodeArgs(RecordingDeleteStagedArgs.self)?.request.path else {
           return .error(.parse(.init(message: "delete_staged takes {request: {path}}")))
         }
         do {
@@ -100,11 +87,11 @@ final class RecordingCapability {
             .io(.init(message: "deleting staged recording failed: \(error.localizedDescription)")))
         }
       },
-      "plugin:recording|actions_ready": { [engine] _ in
+      .recordingActionsReady: { [engine] _ in
         engine.actionsReady()
         return .null
       },
-      "plugin:recording|action_performed": { [engine] _ in
+      .recordingActionPerformed: { [engine] _ in
         engine.actionPerformed()
         return .null
       },

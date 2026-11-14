@@ -23,7 +23,7 @@ final class IPCRouteTests: XCTestCase {
 
   private func route(
     reply: CoreReply = .json(Data("1".utf8)),
-    shellCommands: [String: ShellCommand] = [:],
+    shellCommands: [ShellCommandName: ShellCommand] = [:],
     devOrigin: String? = nil,
     gate: Gate? = nil
   ) -> IPCRoute {
@@ -73,8 +73,8 @@ final class IPCRouteTests: XCTestCase {
 
   func testCommandIsPercentDecoded() async {
     var seen: [String] = []
-    let commands: [String: ShellCommand] = [
-      "plugin:iap|purchase": { _ in
+    let commands: [ShellCommandName: ShellCommand] = [
+      .iapPurchase: { _ in
         seen.append("purchase")
         return .json(Data("null".utf8))
       }
@@ -145,7 +145,7 @@ final class IPCRouteTests: XCTestCase {
   func testUntrustedCallersRunNothing() async {
     var shellRuns = 0
     let route = route(shellCommands: [
-      "host.log": { _ in
+      .hostLog: { _ in
         shellRuns += 1
         return .json(Data("null".utf8))
       }
