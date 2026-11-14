@@ -166,7 +166,7 @@ mod platform {
 
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 mod platform {
-    use reflect_types::{AppError, AppResult};
+    use reflect_types::{AppError, AppResult, ContactMatch, ContactsAuthorization};
 
     fn unavailable<T>() -> AppResult<T> {
         Err(AppError::Unknown {
