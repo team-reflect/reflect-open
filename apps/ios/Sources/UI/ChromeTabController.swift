@@ -169,15 +169,20 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         view.addSubview(standalone.bar)
       }
       view.bringSubviewToFront(standalone.bar)
-      let capsule = standalone.layout(in: view, leading: safe.left + Self.capsuleEdgeGap)
+      var capsule = standalone.layout(in: view, maxWidth: .infinity)
+      // The `+` mirrors the capsule: as tall, on its center line, as far from the edge.
+      let gap = bounds.maxY - capsule.maxY
+      let plusMinX = bounds.maxX - safe.right - gap - capsule.height
+      // The capsule shrinks when its natural width leaves no room for the `+`.
+      let room = plusMinX - Self.capsulePlusGap - capsule.minX
+      if capsule.width > room {
+        capsule = standalone.layout(in: view, maxWidth: room)
+      }
       if !standalone.bar.isHidden {
         inset = max(0, bounds.maxY - standalone.bar.frame.minY - safe.bottom)
       }
-      // The `+` mirrors the capsule: as tall, on its center line, as far from the edge.
       plus.layout(
-        in: view,
-        center: CGPoint(
-          x: bounds.maxX - safe.right - Self.capsuleEdgeGap - capsule.height / 2, y: capsule.midY),
+        in: view, center: CGPoint(x: plusMinX + capsule.height / 2, y: capsule.midY),
         size: capsule.height)
     case .rail:
       // The `+` sits above the rail's capsule, as wide as it.
@@ -201,8 +206,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     }
   }
 
-  /// The gap between the bottom capsule and the side of the safe area.
-  private static let capsuleEdgeGap: CGFloat = 20
+  /// The smallest gap between the bottom capsule and the `+`.
+  private static let capsulePlusGap: CGFloat = 12
 
   /// The system rail's glass capsule, which reaches 2pt past its tabs.
   private func railCapsule() -> CGRect? {
