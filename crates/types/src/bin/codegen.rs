@@ -149,14 +149,7 @@ fn shell_commands() -> String {
         "\n/// The name of every command the Swift shell answers.\npublic enum ShellCommandName: String, CaseIterable, Sendable {\n",
     );
     for (ident, name) in commands::SHELL_COMMANDS {
-        let mut case = String::new();
-        for (i, word) in ident.split('_').enumerate() {
-            let mut chars = word.chars();
-            match chars.next() {
-                Some(first) if i > 0 => case.extend(first.to_uppercase().chain(chars)),
-                _ => case.push_str(word),
-            }
-        }
+        let case = camel_case(ident.split('_'));
         writeln!(out, "    case {case} = {name:?}").unwrap();
     }
     out.push_str("}\n");
@@ -242,20 +235,27 @@ fn rename_cases(swift: &str) -> String {
             .strip_prefix("case ")
             .and_then(|rest| rest.split_once(" = \""))
             .map(|(name, _)| name)
-            .filter(|name| !name.chars().all(char::is_alphanumeric));
+            // A backticked name is an escaped Swift keyword, which is valid.
+            .filter(|name| !name.starts_with('`') && !name.chars().all(char::is_alphanumeric));
         let Some(name) = name else {
             out.push_str(line);
             continue;
         };
-        let mut ident = String::new();
-        for (i, word) in name.split(|c: char| !c.is_alphanumeric()).enumerate() {
-            let mut chars = word.chars();
-            match chars.next() {
-                Some(first) if i > 0 => ident.extend(first.to_uppercase().chain(chars)),
-                _ => ident.push_str(word),
-            }
-        }
+        let ident = camel_case(name.split(|c: char| !c.is_alphanumeric()));
         out.push_str(&line.replacen(name, &ident, 1));
+    }
+    out
+}
+
+/// Joins words in camelCase: the first word as it is, the others capitalized.
+fn camel_case<'a>(words: impl Iterator<Item = &'a str>) -> String {
+    let mut out = String::new();
+    for (i, word) in words.enumerate() {
+        let mut chars = word.chars();
+        match chars.next() {
+            Some(first) if i > 0 => out.extend(first.to_uppercase().chain(chars)),
+            _ => out.push_str(word),
+        }
     }
     out
 }

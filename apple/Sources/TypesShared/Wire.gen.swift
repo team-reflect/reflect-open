@@ -659,7 +659,7 @@ public struct CapturePointer: Codable, Sendable, Equatable {
 
 /// Who produced a link capture.
 public enum CaptureSource: String, Codable, Sendable, Equatable, CaseIterable {
-    case Extension = "extension"
+    case `extension` = "extension"
     case iosShare = "ios-share"
 }
 

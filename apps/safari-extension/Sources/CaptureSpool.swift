@@ -33,7 +33,9 @@ enum CaptureSpool {
     guard let data = try? JSONEncoder().encode(ack),
       let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else {
-      return ["ok": false, "code": CaptureErrorCode.io.rawValue]
+      return [
+        "ok": false, "code": CaptureErrorCode.io.rawValue, "message": "the reply did not encode",
+      ]
     }
     return reply
   }
