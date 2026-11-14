@@ -4577,7 +4577,6 @@ dependencies = [
  "base64 0.23.1",
  "dirs 7.0.0",
  "reflect-types",
- "serde",
  "serde_json",
  "tempfile",
 ]
@@ -4649,7 +4648,6 @@ dependencies = [
  "reflect-core",
  "reflect-graph-io",
  "reflect-types",
- "serde",
  "serde_json",
  "tempfile",
 ]
@@ -4708,7 +4706,6 @@ dependencies = [
  "reflect-index-schema",
  "reflect-types",
  "rusqlite",
- "serde",
  "serde_json",
  "tempfile",
  "tracing",
@@ -4740,7 +4737,6 @@ dependencies = [
  "reflect-index",
  "reflect-types",
  "regex",
- "serde",
  "serde_json",
  "tauri",
  "tauri-build",
