@@ -2,6 +2,7 @@ import type { Store, Unlisten } from '@reflect/core'
 import type { DayScrollPosition } from '../daily/day-window.ts'
 import {
   normalizeRoute,
+  ROUTE_META,
   rootSectionForRoute,
   routesEqual,
   type Route,
@@ -176,21 +177,6 @@ export interface NavigationServiceDeps {
   readonly initialRoute?: Route | undefined
 }
 
-/**
- * The scroll-surface key for routes whose view outlives any single history
- * entry, or `null` for ordinary per-entry restoration. Today and dated daily
- * routes share one stream, hence one key.
- */
-function scrollSurfaceForRoute(route: Route): string | null {
-  switch (route.kind) {
-    case 'today':
-    case 'daily':
-      return 'daily'
-    default:
-      return null
-  }
-}
-
 interface HistoryEntry {
   /**
    * Stable identity for scroll bookkeeping (indices shift on truncation).
@@ -297,13 +283,15 @@ class NavigationServiceImpl implements NavigationService {
   #arrive(route: Route, options: NavigateOptions | undefined, restoreSurface: boolean): void {
     this.#revision += 1
     const target = normalizeRoute(route)
-    const surface = scrollSurfaceForRoute(target)
+    const surface = ROUTE_META[target.kind].scrollSurface
     const currentEntry = this.#stack[this.#index]!
     // A surface restore only means something when coming from OFF the surface;
     // the Daily tab clicked while already on the stream is an explicit
     // re-anchor request, exactly like ⌘D.
     const returning =
-      restoreSurface && surface !== null && scrollSurfaceForRoute(currentEntry.route) !== surface
+      restoreSurface &&
+      surface !== null &&
+      ROUTE_META[currentEntry.route.kind].scrollSurface !== surface
     const restored = returning ? this.#scrollBySurface.get(surface) : undefined
     if (surface !== null && restored === undefined) {
       // An explicit arrival re-anchors the surface, making its saved position
@@ -392,7 +380,7 @@ class NavigationServiceImpl implements NavigationService {
 
   saveScrollState(position: ScrollPosition, at: NavigationPosition = this.#state): void {
     this.#scrollById.set(at.entryId, position)
-    const surface = scrollSurfaceForRoute(at.route)
+    const surface = ROUTE_META[at.route.kind].scrollSurface
     if (surface !== null) {
       this.#scrollBySurface.set(surface, position)
     }
@@ -400,7 +388,7 @@ class NavigationServiceImpl implements NavigationService {
 
   clearScrollState(at: NavigationPosition = this.#state): void {
     this.#scrollById.delete(at.entryId)
-    const surface = scrollSurfaceForRoute(at.route)
+    const surface = ROUTE_META[at.route.kind].scrollSurface
     if (surface !== null) {
       this.#scrollBySurface.delete(surface)
     }

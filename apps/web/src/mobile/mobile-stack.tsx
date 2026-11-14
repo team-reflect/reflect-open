@@ -10,7 +10,14 @@ import {
 } from 'react'
 import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
-import { routesEqual, type AllNotesFilters, type Route, type Section } from '@reflect/app'
+import {
+  ROUTE_META,
+  routeMeta,
+  routesEqual,
+  type AllNotesFilters,
+  type Route,
+  type Section,
+} from '@reflect/app'
 import { ChromeLayerContext, useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { BACK_PAGER_OVERSHOOT_PX, useBackPager } from '@/mobile/use-back-pager.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
@@ -33,29 +40,14 @@ interface StackLayer {
 }
 
 /**
- * Whether a route renders as a card pushed over a tab root. Note screens,
- * Chat (pushed over All) and the settings screens (Settings and its pages)
- * stack; everything else (daily, All, search-as-All, Tasks, and
- * Chat in its own section) is a root.
+ * Whether a route renders as a card pushed over a tab root: every route that
+ * is not the root of its entry's section. Notes and the settings screens
+ * have no section, and Chat is a card over All where Chat is no section.
  *
  * @param section The section of the route's history entry.
  */
 function isStacked(route: Route, section: Section): boolean {
-  return (
-    route.kind === 'note' ||
-    (route.kind === 'chat' && section !== 'chat') ||
-    route.kind === 'settings'
-  )
-}
-
-/**
- * The screen under a card with no history below it, where its Back button
- * lands too: Settings under its pages, today under everything else.
- */
-function coldBelowRoute(route: Route): Route {
-  return route.kind === 'settings' && route.page !== 'main'
-    ? { kind: 'settings', page: 'main' }
-    : { kind: 'today' }
+  return ROUTE_META[route.kind].section !== section
 }
 
 /**
@@ -261,7 +253,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const edgeRef = useRef<HTMLDivElement>(null)
 
   const [transition, setTransition] = useState<StackTransition>({ kind: 'none' })
-  const below: Route = backRoute ?? coldBelowRoute(route)
+  const below: Route = backRoute ?? routeMeta(route).parent(route)
   const [arrival, setArrival] = useState({ route, entryId, below, section })
   // Set when a completed back-swipe commits its pop: the screen is already
   // offscreen, so the arrival it causes must not animate a second time.

@@ -7,8 +7,16 @@
  * note route carries `path` — the reserved frontmatter `id` can join it later
  * without breaking the shape.
  */
+import { returnNull } from '@ocavue/utils'
 import { isIsoDate } from '@reflect/utils'
-import { dailyPath, dateFromDailyPath, isDaily } from '@reflect/core'
+import {
+  DEEP_LINK_SCHEME,
+  dailyDeepLink,
+  dailyPath,
+  dateFromDailyPath,
+  isDaily,
+  noteDeepLink,
+} from '@reflect/core'
 import { z } from 'zod'
 
 /**
@@ -41,25 +49,95 @@ export const sectionSchema = z.enum(['daily', 'all', 'tasks', 'chat'])
  */
 export type Section = z.infer<typeof sectionSchema>
 
+type RouteOf<K extends Route['kind']> = Extract<Route, { kind: K }>
+
+/**
+ * What the navigation layers need to know about one route kind.
+ */
+export interface RouteMeta<R extends Route> {
+  /**
+   * The section whose root screen the route shows, or `null` for a screen
+   * that opens over the current section (a note, the settings screens).
+   */
+  readonly section: Section | null
+  /**
+   * The scroll surface that every entry of this kind shares, or `null` for
+   * per-entry scroll. Today and dated daily routes share one stream.
+   */
+  readonly scrollSurface: string | null
+  /**
+   * The screen under the route when no history is below it, where its Back
+   * lands too.
+   */
+  readonly parent: (route: R) => Route
+  /**
+   * The deep link that addresses the route, or `null` for an in-app surface
+   * that the deep-link grammar does not name.
+   */
+  readonly deepLink: (route: R) => string | null
+}
+
+const today = (): Route => ({ kind: 'today' })
+
+/**
+ * The metadata of every route kind, in one place.
+ */
+export const ROUTE_META: { readonly [K in Route['kind']]: RouteMeta<RouteOf<K>> } = {
+  today: {
+    section: 'daily',
+    scrollSurface: 'daily',
+    parent: today,
+    deepLink: () => `${DEEP_LINK_SCHEME}://today`,
+  },
+  daily: {
+    section: 'daily',
+    scrollSurface: 'daily',
+    parent: today,
+    deepLink: (route) => dailyDeepLink(route.date),
+  },
+  note: {
+    section: null,
+    scrollSurface: null,
+    parent: today,
+    deepLink: (route) => noteDeepLink(route.path),
+  },
+  allNotes: { section: 'all', scrollSurface: null, parent: today, deepLink: returnNull },
+  search: {
+    section: 'all',
+    scrollSurface: null,
+    parent: today,
+    deepLink: (route) => `${DEEP_LINK_SCHEME}://search?q=${encodeURIComponent(route.query)}`,
+  },
+  tasks: {
+    section: 'tasks',
+    scrollSurface: null,
+    parent: today,
+    deepLink: () => `${DEEP_LINK_SCHEME}://tasks`,
+  },
+  chat: { section: 'chat', scrollSurface: null, parent: today, deepLink: returnNull },
+  settings: {
+    section: null,
+    scrollSurface: null,
+    parent: (route) => {
+      return route.page === 'main' ? { kind: 'today' } : { kind: 'settings', page: 'main' }
+    },
+    deepLink: returnNull,
+  },
+}
+
+/**
+ * The metadata of `route`'s kind, typed for `route`.
+ */
+export function routeMeta<R extends Route>(route: R): RouteMeta<R> {
+  return ROUTE_META[route.kind] as unknown as RouteMeta<R>
+}
+
 /**
  * The section whose root screen `route` shows, or `null` for a route that
  * opens over the current section (a note, the settings screens).
  */
 export function rootSectionForRoute(route: Route): Section | null {
-  switch (route.kind) {
-    case 'today':
-    case 'daily':
-      return 'daily'
-    case 'allNotes':
-    case 'search':
-      return 'all'
-    case 'tasks':
-      return 'tasks'
-    case 'chat':
-      return 'chat'
-    default:
-      return null
-  }
+  return ROUTE_META[route.kind].section
 }
 
 /**
@@ -69,27 +147,14 @@ export type NoteRoute = Extract<Route, { kind: 'daily' | 'note' }>
 
 /**
  * Structural route equality (used to avoid pushing no-op history entries).
+ * Every route is a flat object of primitives.
  */
 export function routesEqual(a: Route, b: Route): boolean {
-  if (a.kind !== b.kind) {
-    return false
-  }
-  switch (a.kind) {
-    case 'today':
-    case 'tasks':
-    case 'chat':
-      return true
-    case 'settings':
-      return a.page === (b as Extract<Route, { kind: 'settings' }>).page
-    case 'daily':
-      return a.date === (b as Extract<Route, { kind: 'daily' }>).date
-    case 'note':
-      return a.path === (b as Extract<Route, { kind: 'note' }>).path
-    case 'allNotes':
-      return a.tag === (b as Extract<Route, { kind: 'allNotes' }>).tag
-    case 'search':
-      return a.query === (b as Extract<Route, { kind: 'search' }>).query
-  }
+  const aFields = Object.entries(a)
+  return (
+    aFields.length === Object.keys(b).length &&
+    aFields.every(([key, value]) => (b as Record<string, unknown>)[key] === value)
+  )
 }
 
 /**
