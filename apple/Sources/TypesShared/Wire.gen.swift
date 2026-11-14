@@ -2,6 +2,54 @@
 // swift-format-ignore-file
 import Foundation
 
+/// Where the installed skill file stands relative to what this app would
+/// write today.
+public enum AgentSkillInstallState: String, Codable, Sendable, Equatable {
+    case missing = "missing"
+    case current = "current"
+    case stale = "stale"
+    case conflict = "conflict"
+}
+
+/// Answer for the settings card: where the skill goes, what it's called, and
+/// whether the file on disk is ours.
+public struct AgentSkillStatus: Codable, Sendable, Equatable {
+    public let skillName: String
+    public let skillPath: String
+    public let cliPath: String
+    public let installState: AgentSkillInstallState
+
+    private enum CodingKeys: String, CodingKey {
+        case skillName = "skillName"
+        case skillPath = "skillPath"
+        case cliPath = "cliPath"
+        case installState = "installState"
+    }
+
+    public init(skillName: String, skillPath: String, cliPath: String, installState: AgentSkillInstallState) {
+        self.skillName = skillName
+        self.skillPath = skillPath
+        self.cliPath = cliPath
+        self.installState = installState
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.skillName = try container.decode(String.self, forKey: .skillName)
+        self.skillPath = try container.decode(String.self, forKey: .skillPath)
+        self.cliPath = try container.decode(String.self, forKey: .cliPath)
+        self.installState = try container.decode(AgentSkillInstallState.self, forKey: .installState)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(skillName, forKey: .skillName)
+        try container.encode(skillPath, forKey: .skillPath)
+        try container.encode(cliPath, forKey: .cliPath)
+        try container.encode(installState, forKey: .installState)
+    }
+}
+
 public enum AppError: Sendable, Equatable {
     case io(AppErrorIoData)
     case notFound(AppErrorNotfoundData)
@@ -157,6 +205,397 @@ public enum ChangeKind: String, Codable, Sendable, Equatable {
     case remove = "remove"
 }
 
+/// One working-tree file a merge/fast-forward rewrote, in the same shape as
+/// the watcher's `FileChange` so the caller can reindex directly.
+public struct ChangedFile: Codable, Sendable, Equatable {
+    public let path: String
+    public let kind: ChangeKind
+    public let modifiedMs: UInt64?
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case kind = "kind"
+        case modifiedMs = "modifiedMs"
+    }
+
+    public init(path: String, kind: ChangeKind, modifiedMs: UInt64?) {
+        self.path = path
+        self.kind = kind
+        self.modifiedMs = modifiedMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.kind = try container.decode(ChangeKind.self, forKey: .kind)
+        self.modifiedMs = try container.decodeIfPresent(UInt64.self, forKey: .modifiedMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(modifiedMs, forKey: .modifiedMs)
+    }
+}
+
+/// A conversation's metadata, sent with every message save so the row can be
+/// created lazily on the first message. Mirrors the zod contract in
+/// `packages/core/src/ai/chat/store.ts` field-for-field.
+public struct ChatConversation: Codable, Sendable, Equatable {
+    public let id: String
+    public let title: String
+    public let createdMs: Int64
+    public let updatedMs: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case title = "title"
+        case createdMs = "createdMs"
+        case updatedMs = "updatedMs"
+    }
+
+    public init(id: String, title: String, createdMs: Int64, updatedMs: Int64) {
+        self.id = id
+        self.title = title
+        self.createdMs = createdMs
+        self.updatedMs = updatedMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.createdMs = try container.decode(Int64.self, forKey: .createdMs)
+        self.updatedMs = try container.decode(Int64.self, forKey: .updatedMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(createdMs, forKey: .createdMs)
+        try container.encode(updatedMs, forKey: .updatedMs)
+    }
+}
+
+/// One persisted exchange: the user message and everything the assistant did
+/// in response. The JSON columns are opaque strings here — the TS store owns
+/// their shapes and validates them on read.
+public struct ChatMessageRow: Codable, Sendable, Equatable {
+    public let id: String
+    public let conversationId: String
+    public let userText: String
+    public let attachments: String
+    public let parts: String
+    public let responseMessages: String
+    public let createdMs: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case conversationId = "conversationId"
+        case userText = "userText"
+        case attachments = "attachments"
+        case parts = "parts"
+        case responseMessages = "responseMessages"
+        case createdMs = "createdMs"
+    }
+
+    public init(id: String, conversationId: String, userText: String, attachments: String, parts: String, responseMessages: String, createdMs: Int64) {
+        self.id = id
+        self.conversationId = conversationId
+        self.userText = userText
+        self.attachments = attachments
+        self.parts = parts
+        self.responseMessages = responseMessages
+        self.createdMs = createdMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.conversationId = try container.decode(String.self, forKey: .conversationId)
+        self.userText = try container.decode(String.self, forKey: .userText)
+        self.attachments = try container.decode(String.self, forKey: .attachments)
+        self.parts = try container.decode(String.self, forKey: .parts)
+        self.responseMessages = try container.decode(String.self, forKey: .responseMessages)
+        self.createdMs = try container.decode(Int64.self, forKey: .createdMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(conversationId, forKey: .conversationId)
+        try container.encode(userText, forKey: .userText)
+        try container.encode(attachments, forKey: .attachments)
+        try container.encode(parts, forKey: .parts)
+        try container.encode(responseMessages, forKey: .responseMessages)
+        try container.encode(createdMs, forKey: .createdMs)
+    }
+}
+
+/// Result of a commit attempt. `committed: false` means the tree was clean.
+public struct CommitOutcome: Codable, Sendable, Equatable {
+    public let committed: Bool
+    public let sha: String?
+    public let ahead: UInt
+    public let skippedLargeFiles: [SkippedFile]
+
+    private enum CodingKeys: String, CodingKey {
+        case committed = "committed"
+        case sha = "sha"
+        case ahead = "ahead"
+        case skippedLargeFiles = "skippedLargeFiles"
+    }
+
+    public init(committed: Bool, sha: String?, ahead: UInt, skippedLargeFiles: [SkippedFile]) {
+        self.committed = committed
+        self.sha = sha
+        self.ahead = ahead
+        self.skippedLargeFiles = skippedLargeFiles
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.committed = try container.decode(Bool.self, forKey: .committed)
+        self.sha = try container.decodeIfPresent(String.self, forKey: .sha)
+        self.ahead = try container.decode(UInt.self, forKey: .ahead)
+        self.skippedLargeFiles = try container.decode([SkippedFile].self, forKey: .skippedLargeFiles)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(committed, forKey: .committed)
+        try container.encode(sha, forKey: .sha)
+        try container.encode(ahead, forKey: .ahead)
+        try container.encode(skippedLargeFiles, forKey: .skippedLargeFiles)
+    }
+}
+
+/// One matched contact, flattened to the fields Reflect can write into a
+/// note as markdown. Photos are deliberately absent (out of v1 scope).
+public struct ContactMatch: Codable, Sendable, Equatable {
+    public let fullName: String
+    public let givenName: String
+    public let familyName: String
+    public let emails: [String]
+    public let phones: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case fullName = "fullName"
+        case givenName = "givenName"
+        case familyName = "familyName"
+        case emails = "emails"
+        case phones = "phones"
+    }
+
+    public init(fullName: String, givenName: String, familyName: String, emails: [String], phones: [String]) {
+        self.fullName = fullName
+        self.givenName = givenName
+        self.familyName = familyName
+        self.emails = emails
+        self.phones = phones
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.fullName = try container.decode(String.self, forKey: .fullName)
+        self.givenName = try container.decode(String.self, forKey: .givenName)
+        self.familyName = try container.decode(String.self, forKey: .familyName)
+        self.emails = try container.decode([String].self, forKey: .emails)
+        self.phones = try container.decode([String].self, forKey: .phones)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(fullName, forKey: .fullName)
+        try container.encode(givenName, forKey: .givenName)
+        try container.encode(familyName, forKey: .familyName)
+        try container.encode(emails, forKey: .emails)
+        try container.encode(phones, forKey: .phones)
+    }
+}
+
+/// The Contacts permission state, as the settings UI consumes it.
+public enum ContactsAuthorization: String, Codable, Sendable, Equatable {
+    case notDetermined = "notDetermined"
+    case restricted = "restricted"
+    case denied = "denied"
+    case authorized = "authorized"
+    case limited = "limited"
+    case unavailable = "unavailable"
+}
+
+/// Byte counts for an active model download. Absent until the download
+/// starts (cache probing, or a cached model that skips downloading); after
+/// the last byte it stays at 100% through the model-load phase.
+public struct EmbedProgress: Codable, Sendable, Equatable {
+    public let downloaded: UInt64
+    public let total: UInt64
+
+    private enum CodingKeys: String, CodingKey {
+        case downloaded = "downloaded"
+        case total = "total"
+    }
+
+    public init(downloaded: UInt64, total: UInt64) {
+        self.downloaded = downloaded
+        self.total = total
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.downloaded = try container.decode(UInt64.self, forKey: .downloaded)
+        self.total = try container.decode(UInt64.self, forKey: .total)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(downloaded, forKey: .downloaded)
+        try container.encode(total, forKey: .total)
+    }
+}
+
+public enum EmbedStatus: Sendable, Equatable {
+    case uninitialized
+    case loading(EmbedStatusLoadingData)
+    case ready(EmbedStatusReadyData)
+    case failed(EmbedStatusFailedData)
+    case unsupported
+}
+public struct EmbedStatusLoadingData: Codable, Sendable, Equatable {
+    public let progress: EmbedProgress?
+
+    public init(progress: EmbedProgress?) {
+        self.progress = progress
+    }
+}
+
+public struct EmbedStatusReadyData: Codable, Sendable, Equatable {
+    public let model: String
+
+    public init(model: String) {
+        self.model = model
+    }
+}
+
+public struct EmbedStatusFailedData: Codable, Sendable, Equatable {
+    public let message: String
+
+    public init(message: String) {
+        self.message = message
+    }
+}
+
+// MARK: - EmbedStatus Codable Implementation
+extension EmbedStatus: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("status"))
+        switch tag {
+        case "uninitialized":
+            self = .uninitialized
+        case "loading":
+            let progressValue = try container.decodeIfPresent(EmbedProgress.self, forKey: CodingKeys("progress"))
+            self = .loading(EmbedStatusLoadingData(progress: progressValue))
+        case "ready":
+            let modelValue = try container.decode(String.self, forKey: CodingKeys("model"))
+            self = .ready(EmbedStatusReadyData(model: modelValue))
+        case "failed":
+            let messageValue = try container.decode(String.self, forKey: CodingKeys("message"))
+            self = .failed(EmbedStatusFailedData(message: messageValue))
+        case "unsupported":
+            self = .unsupported
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .uninitialized:
+            try container.encode("uninitialized", forKey: CodingKeys("status"))
+        case .loading(let data):
+            try container.encode("loading", forKey: CodingKeys("status"))
+            try container.encodeIfPresent(data.progress, forKey: CodingKeys("progress"))
+        case .ready(let data):
+            try container.encode("ready", forKey: CodingKeys("status"))
+            try container.encode(data.model, forKey: CodingKeys("model"))
+        case .failed(let data):
+            try container.encode("failed", forKey: CodingKeys("status"))
+            try container.encode(data.message, forKey: CodingKeys("message"))
+        case .unsupported:
+            try container.encode("unsupported", forKey: CodingKeys("status"))
+        }
+    }
+}
+
+
+/// One chunk of a note, built in TS (`@reflect/core` chunker). `vector` is
+/// present only for new/changed chunks — `None` means "this chunk's hash
+/// already has a row; keep its vector, refresh its metadata" (positions and
+/// headings shift when text moves above an unchanged chunk).
+public struct EmbeddedChunk: Codable, Sendable, Equatable {
+    public let heading: String?
+    public let posFrom: Int64
+    public let posTo: Int64
+    public let text: String
+    public let contentHash: String
+    public let modelId: String
+    public let vector: [Float]?
+
+    private enum CodingKeys: String, CodingKey {
+        case heading = "heading"
+        case posFrom = "posFrom"
+        case posTo = "posTo"
+        case text = "text"
+        case contentHash = "contentHash"
+        case modelId = "modelId"
+        case vector = "vector"
+    }
+
+    public init(heading: String?, posFrom: Int64, posTo: Int64, text: String, contentHash: String, modelId: String, vector: [Float]?) {
+        self.heading = heading
+        self.posFrom = posFrom
+        self.posTo = posTo
+        self.text = text
+        self.contentHash = contentHash
+        self.modelId = modelId
+        self.vector = vector
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.heading = try container.decodeIfPresent(String.self, forKey: .heading)
+        self.posFrom = try container.decode(Int64.self, forKey: .posFrom)
+        self.posTo = try container.decode(Int64.self, forKey: .posTo)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.contentHash = try container.decode(String.self, forKey: .contentHash)
+        self.modelId = try container.decode(String.self, forKey: .modelId)
+        self.vector = try container.decodeIfPresent([Float].self, forKey: .vector)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(heading, forKey: .heading)
+        try container.encode(posFrom, forKey: .posFrom)
+        try container.encode(posTo, forKey: .posTo)
+        try container.encode(text, forKey: .text)
+        try container.encode(contentHash, forKey: .contentHash)
+        try container.encode(modelId, forKey: .modelId)
+        try container.encode(vector, forKey: .vector)
+    }
+}
+
 /// One changed graph file.
 public struct FileChange: Codable, Sendable, Equatable {
     public let path: String
@@ -229,6 +668,1336 @@ public struct FileMeta: Codable, Sendable, Equatable {
         if let placeholder = placeholder {
             try container.encode(placeholder, forKey: .placeholder)
         }
+    }
+}
+
+/// An HTTPS sign-in supplied per call. Which username and secret a host
+/// wants is `@reflect/core`'s business (GitHub: `x-access-token` plus the
+/// managed token); this layer only presents it, once, as basic auth, and
+/// only to `origin`, the scheme, host and port it was stored for.
+/// 
+/// No `Debug`: a derived one would print `secret`.
+public struct GitCredential: Codable, Sendable, Equatable {
+    public let origin: String
+    public let username: String
+    public let secret: String
+
+    private enum CodingKeys: String, CodingKey {
+        case origin = "origin"
+        case username = "username"
+        case secret = "secret"
+    }
+
+    public init(origin: String, username: String, secret: String) {
+        self.origin = origin
+        self.username = username
+        self.secret = secret
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.origin = try container.decode(String.self, forKey: .origin)
+        self.username = try container.decode(String.self, forKey: .username)
+        self.secret = try container.decode(String.self, forKey: .secret)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(origin, forKey: .origin)
+        try container.encode(username, forKey: .username)
+        try container.encode(secret, forKey: .secret)
+    }
+}
+
+/// Snapshot of the graph's backup repository for the UI and the sync engine.
+/// Deliberately cheap — refs and config only, no working-tree scan.
+public struct GitStatus: Codable, Sendable, Equatable {
+    public let initialized: Bool
+    public let branch: String?
+    public let remoteUrl: String?
+    public let ahead: UInt
+    public let behind: UInt
+
+    private enum CodingKeys: String, CodingKey {
+        case initialized = "initialized"
+        case branch = "branch"
+        case remoteUrl = "remoteUrl"
+        case ahead = "ahead"
+        case behind = "behind"
+    }
+
+    public init(initialized: Bool, branch: String?, remoteUrl: String?, ahead: UInt, behind: UInt) {
+        self.initialized = initialized
+        self.branch = branch
+        self.remoteUrl = remoteUrl
+        self.ahead = ahead
+        self.behind = behind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.initialized = try container.decode(Bool.self, forKey: .initialized)
+        self.branch = try container.decodeIfPresent(String.self, forKey: .branch)
+        self.remoteUrl = try container.decodeIfPresent(String.self, forKey: .remoteUrl)
+        self.ahead = try container.decode(UInt.self, forKey: .ahead)
+        self.behind = try container.decode(UInt.self, forKey: .behind)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(initialized, forKey: .initialized)
+        try container.encode(branch, forKey: .branch)
+        try container.encode(remoteUrl, forKey: .remoteUrl)
+        try container.encode(ahead, forKey: .ahead)
+        try container.encode(behind, forKey: .behind)
+    }
+}
+
+/// Progress of the running import, emitted to the frontend as
+/// `import:progress` events.
+public struct GraphImportProgress: Codable, Sendable, Equatable {
+    public let stage: GraphImportStage
+    public let done: UInt
+    public let total: UInt
+
+    private enum CodingKeys: String, CodingKey {
+        case stage = "stage"
+        case done = "done"
+        case total = "total"
+    }
+
+    public init(stage: GraphImportStage, done: UInt, total: UInt) {
+        self.stage = stage
+        self.done = done
+        self.total = total
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.stage = try container.decode(GraphImportStage.self, forKey: .stage)
+        self.done = try container.decode(UInt.self, forKey: .done)
+        self.total = try container.decode(UInt.self, forKey: .total)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(stage, forKey: .stage)
+        try container.encode(done, forKey: .done)
+        try container.encode(total, forKey: .total)
+    }
+}
+
+/// Which phase of the import a progress tick belongs to.
+public enum GraphImportStage: String, Codable, Sendable, Equatable {
+    case downloading = "downloading"
+    case writing = "writing"
+}
+
+/// Summary returned to the settings UI after an import completes.
+public struct GraphImportSummary: Codable, Sendable, Equatable {
+    public let importedFiles: UInt
+    public let skippedFiles: UInt
+    public let downloadedAssets: UInt
+    public let failedAssetDownloads: UInt
+    public let renamedFiles: UInt
+    public let mergedFiles: UInt
+    public let changedPaths: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case importedFiles = "importedFiles"
+        case skippedFiles = "skippedFiles"
+        case downloadedAssets = "downloadedAssets"
+        case failedAssetDownloads = "failedAssetDownloads"
+        case renamedFiles = "renamedFiles"
+        case mergedFiles = "mergedFiles"
+        case changedPaths = "changedPaths"
+    }
+
+    public init(importedFiles: UInt, skippedFiles: UInt, downloadedAssets: UInt, failedAssetDownloads: UInt, renamedFiles: UInt, mergedFiles: UInt, changedPaths: [String]) {
+        self.importedFiles = importedFiles
+        self.skippedFiles = skippedFiles
+        self.downloadedAssets = downloadedAssets
+        self.failedAssetDownloads = failedAssetDownloads
+        self.renamedFiles = renamedFiles
+        self.mergedFiles = mergedFiles
+        self.changedPaths = changedPaths
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.importedFiles = try container.decode(UInt.self, forKey: .importedFiles)
+        self.skippedFiles = try container.decode(UInt.self, forKey: .skippedFiles)
+        self.downloadedAssets = try container.decode(UInt.self, forKey: .downloadedAssets)
+        self.failedAssetDownloads = try container.decode(UInt.self, forKey: .failedAssetDownloads)
+        self.renamedFiles = try container.decode(UInt.self, forKey: .renamedFiles)
+        self.mergedFiles = try container.decode(UInt.self, forKey: .mergedFiles)
+        self.changedPaths = try container.decode([String].self, forKey: .changedPaths)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(importedFiles, forKey: .importedFiles)
+        try container.encode(skippedFiles, forKey: .skippedFiles)
+        try container.encode(downloadedAssets, forKey: .downloadedAssets)
+        try container.encode(failedAssetDownloads, forKey: .failedAssetDownloads)
+        try container.encode(renamedFiles, forKey: .renamedFiles)
+        try container.encode(mergedFiles, forKey: .mergedFiles)
+        try container.encode(changedPaths, forKey: .changedPaths)
+    }
+}
+
+/// Identity of an open graph, returned to the frontend.
+public struct GraphInfo: Codable, Sendable, Equatable {
+    public let root: String
+    public let name: String
+    public let generation: UInt64
+
+    private enum CodingKeys: String, CodingKey {
+        case root = "root"
+        case name = "name"
+        case generation = "generation"
+    }
+
+    public init(root: String, name: String, generation: UInt64) {
+        self.root = root
+        self.name = name
+        self.generation = generation
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.root = try container.decode(String.self, forKey: .root)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.generation = try container.decode(UInt64.self, forKey: .generation)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(root, forKey: .root)
+        try container.encode(name, forKey: .name)
+        try container.encode(generation, forKey: .generation)
+    }
+}
+
+/// iCloud availability as desktop onboarding and settings consume it.
+public struct IcloudStatus: Codable, Sendable, Equatable {
+    public let available: Bool
+    public let documentsRoot: String?
+    public let existingGraphRoots: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case available = "available"
+        case documentsRoot = "documentsRoot"
+        case existingGraphRoots = "existingGraphRoots"
+    }
+
+    public init(available: Bool, documentsRoot: String?, existingGraphRoots: [String]) {
+        self.available = available
+        self.documentsRoot = documentsRoot
+        self.existingGraphRoots = existingGraphRoots
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.available = try container.decode(Bool.self, forKey: .available)
+        self.documentsRoot = try container.decodeIfPresent(String.self, forKey: .documentsRoot)
+        self.existingGraphRoots = try container.decode([String].self, forKey: .existingGraphRoots)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(available, forKey: .available)
+        try container.encode(documentsRoot, forKey: .documentsRoot)
+        try container.encode(existingGraphRoots, forKey: .existingGraphRoots)
+    }
+}
+
+/// What one sweep did.
+public struct IcloudSweepOutcome: Codable, Sendable, Equatable {
+    public let changed: [FileChange]
+    public let copies: [String]
+    public let autoResolved: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case changed = "changed"
+        case copies = "copies"
+        case autoResolved = "autoResolved"
+    }
+
+    public init(changed: [FileChange], copies: [String], autoResolved: UInt32) {
+        self.changed = changed
+        self.copies = copies
+        self.autoResolved = autoResolved
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.changed = try container.decode([FileChange].self, forKey: .changed)
+        self.copies = try container.decode([String].self, forKey: .copies)
+        self.autoResolved = try container.decode(UInt32.self, forKey: .autoResolved)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(changed, forKey: .changed)
+        try container.encode(copies, forKey: .copies)
+        try container.encode(autoResolved, forKey: .autoResolved)
+    }
+}
+
+/// One `touch` entry: re-stamp `path`'s stored mtime to `mtime` (epoch ms, as
+/// listed by the file walk).
+public struct IndexTouch: Codable, Sendable, Equatable {
+    public let path: String
+    public let mtime: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case mtime = "mtime"
+    }
+
+    public init(path: String, mtime: Int64) {
+        self.path = path
+        self.mtime = mtime
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(mtime, forKey: .mtime)
+    }
+}
+
+public struct IndexedAlias: Codable, Sendable, Equatable {
+    public let alias: String
+    public let aliasKey: String
+
+    private enum CodingKeys: String, CodingKey {
+        case alias = "alias"
+        case aliasKey = "aliasKey"
+    }
+
+    public init(alias: String, aliasKey: String) {
+        self.alias = alias
+        self.aliasKey = aliasKey
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.alias = try container.decode(String.self, forKey: .alias)
+        self.aliasKey = try container.decode(String.self, forKey: .aliasKey)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(alias, forKey: .alias)
+        try container.encode(aliasKey, forKey: .aliasKey)
+    }
+}
+
+public struct IndexedClaim: Codable, Sendable, Equatable {
+    public let key: String
+    public let tier: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case key = "key"
+        case tier = "tier"
+    }
+
+    public init(key: String, tier: Int64) {
+        self.key = key
+        self.tier = tier
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.key = try container.decode(String.self, forKey: .key)
+        self.tier = try container.decode(Int64.self, forKey: .tier)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(key, forKey: .key)
+        try container.encode(tier, forKey: .tier)
+    }
+}
+
+public struct IndexedEmail: Codable, Sendable, Equatable {
+    public let email: String
+    public let emailKey: String
+
+    private enum CodingKeys: String, CodingKey {
+        case email = "email"
+        case emailKey = "emailKey"
+    }
+
+    public init(email: String, emailKey: String) {
+        self.email = email
+        self.emailKey = emailKey
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.email = try container.decode(String.self, forKey: .email)
+        self.emailKey = try container.decode(String.self, forKey: .emailKey)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(email, forKey: .email)
+        try container.encode(emailKey, forKey: .emailKey)
+    }
+}
+
+public struct IndexedLink: Codable, Sendable, Equatable {
+    public let kind: String
+    public let targetRaw: String
+    public let targetKey: String
+    public let targetPathKey: String?
+    public let alias: String?
+    public let posFrom: Int64
+    public let posTo: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case kind = "kind"
+        case targetRaw = "targetRaw"
+        case targetKey = "targetKey"
+        case targetPathKey = "targetPathKey"
+        case alias = "alias"
+        case posFrom = "posFrom"
+        case posTo = "posTo"
+    }
+
+    public init(kind: String, targetRaw: String, targetKey: String, targetPathKey: String?, alias: String?, posFrom: Int64, posTo: Int64) {
+        self.kind = kind
+        self.targetRaw = targetRaw
+        self.targetKey = targetKey
+        self.targetPathKey = targetPathKey
+        self.alias = alias
+        self.posFrom = posFrom
+        self.posTo = posTo
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.targetRaw = try container.decode(String.self, forKey: .targetRaw)
+        self.targetKey = try container.decode(String.self, forKey: .targetKey)
+        self.targetPathKey = try container.decodeIfPresent(String.self, forKey: .targetPathKey)
+        self.alias = try container.decodeIfPresent(String.self, forKey: .alias)
+        self.posFrom = try container.decode(Int64.self, forKey: .posFrom)
+        self.posTo = try container.decode(Int64.self, forKey: .posTo)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(targetRaw, forKey: .targetRaw)
+        try container.encode(targetKey, forKey: .targetKey)
+        try container.encode(targetPathKey, forKey: .targetPathKey)
+        try container.encode(alias, forKey: .alias)
+        try container.encode(posFrom, forKey: .posFrom)
+        try container.encode(posTo, forKey: .posTo)
+    }
+}
+
+/// A note's extracted projection, built in TS (Plan 03) and applied as one
+/// row-set. Mirrors the `indexedNoteSchema` zod contract in
+/// `packages/core/src/indexing/indexed-note.ts` field-for-field (serde
+/// `rename_all = "camelCase"` matches the camelCase payload); a change on either
+/// side must be mirrored on the other.
+public struct IndexedNote: Codable, Sendable, Equatable {
+    public let path: String
+    public let id: String?
+    public let title: String
+    public let titleKey: String
+    public let pathKey: String
+    public let kind: String
+    public let dailyDate: String?
+    public let isPrivate: Bool
+    public let isPinned: Bool
+    public let pinnedOrder: Double?
+    public let hasContent: Bool
+    public let gistUrl: String?
+    public let gistStale: Bool
+    public let fileHash: String
+    public let mtime: Int64
+    public let text: String
+    public let assetText: String?
+    public let preview: String
+    public let links: [IndexedLink]
+    public let tags: [IndexedTag]
+    public let aliases: [IndexedAlias]
+    public let claims: [IndexedClaim]
+    public let emails: [IndexedEmail]
+    public let assets: [String]
+    public let tasks: [IndexedTask]
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case id = "id"
+        case title = "title"
+        case titleKey = "titleKey"
+        case pathKey = "pathKey"
+        case kind = "kind"
+        case dailyDate = "dailyDate"
+        case isPrivate = "isPrivate"
+        case isPinned = "isPinned"
+        case pinnedOrder = "pinnedOrder"
+        case hasContent = "hasContent"
+        case gistUrl = "gistUrl"
+        case gistStale = "gistStale"
+        case fileHash = "fileHash"
+        case mtime = "mtime"
+        case text = "text"
+        case assetText = "assetText"
+        case preview = "preview"
+        case links = "links"
+        case tags = "tags"
+        case aliases = "aliases"
+        case claims = "claims"
+        case emails = "emails"
+        case assets = "assets"
+        case tasks = "tasks"
+    }
+
+    public init(path: String, id: String?, title: String, titleKey: String, pathKey: String, kind: String, dailyDate: String?, isPrivate: Bool, isPinned: Bool, pinnedOrder: Double?, hasContent: Bool, gistUrl: String?, gistStale: Bool, fileHash: String, mtime: Int64, text: String, assetText: String?, preview: String, links: [IndexedLink], tags: [IndexedTag], aliases: [IndexedAlias], claims: [IndexedClaim], emails: [IndexedEmail], assets: [String], tasks: [IndexedTask]) {
+        self.path = path
+        self.id = id
+        self.title = title
+        self.titleKey = titleKey
+        self.pathKey = pathKey
+        self.kind = kind
+        self.dailyDate = dailyDate
+        self.isPrivate = isPrivate
+        self.isPinned = isPinned
+        self.pinnedOrder = pinnedOrder
+        self.hasContent = hasContent
+        self.gistUrl = gistUrl
+        self.gistStale = gistStale
+        self.fileHash = fileHash
+        self.mtime = mtime
+        self.text = text
+        self.assetText = assetText
+        self.preview = preview
+        self.links = links
+        self.tags = tags
+        self.aliases = aliases
+        self.claims = claims
+        self.emails = emails
+        self.assets = assets
+        self.tasks = tasks
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.id = try container.decodeIfPresent(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.titleKey = try container.decode(String.self, forKey: .titleKey)
+        self.pathKey = try container.decode(String.self, forKey: .pathKey)
+        self.kind = try container.decode(String.self, forKey: .kind)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+        self.isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
+        self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
+        self.pinnedOrder = try container.decodeIfPresent(Double.self, forKey: .pinnedOrder)
+        self.hasContent = try container.decode(Bool.self, forKey: .hasContent)
+        self.gistUrl = try container.decodeIfPresent(String.self, forKey: .gistUrl)
+        self.gistStale = try container.decode(Bool.self, forKey: .gistStale)
+        self.fileHash = try container.decode(String.self, forKey: .fileHash)
+        self.mtime = try container.decode(Int64.self, forKey: .mtime)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.assetText = try container.decodeIfPresent(String.self, forKey: .assetText)
+        self.preview = try container.decode(String.self, forKey: .preview)
+        self.links = try container.decode([IndexedLink].self, forKey: .links)
+        self.tags = try container.decode([IndexedTag].self, forKey: .tags)
+        self.aliases = try container.decode([IndexedAlias].self, forKey: .aliases)
+        self.claims = try container.decode([IndexedClaim].self, forKey: .claims)
+        self.emails = try container.decode([IndexedEmail].self, forKey: .emails)
+        self.assets = try container.decode([String].self, forKey: .assets)
+        self.tasks = try container.decode([IndexedTask].self, forKey: .tasks)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(titleKey, forKey: .titleKey)
+        try container.encode(pathKey, forKey: .pathKey)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(dailyDate, forKey: .dailyDate)
+        try container.encode(isPrivate, forKey: .isPrivate)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encode(pinnedOrder, forKey: .pinnedOrder)
+        try container.encode(hasContent, forKey: .hasContent)
+        try container.encode(gistUrl, forKey: .gistUrl)
+        try container.encode(gistStale, forKey: .gistStale)
+        try container.encode(fileHash, forKey: .fileHash)
+        try container.encode(mtime, forKey: .mtime)
+        try container.encode(text, forKey: .text)
+        if let assetText = assetText {
+            try container.encode(assetText, forKey: .assetText)
+        }
+        try container.encode(preview, forKey: .preview)
+        try container.encode(links, forKey: .links)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(aliases, forKey: .aliases)
+        try container.encode(claims, forKey: .claims)
+        try container.encode(emails, forKey: .emails)
+        try container.encode(assets, forKey: .assets)
+        try container.encode(tasks, forKey: .tasks)
+    }
+}
+
+public struct IndexedTag: Codable, Sendable, Equatable {
+    public let tag: String
+    public let tagKey: String
+
+    private enum CodingKeys: String, CodingKey {
+        case tag = "tag"
+        case tagKey = "tagKey"
+    }
+
+    public init(tag: String, tagKey: String) {
+        self.tag = tag
+        self.tagKey = tagKey
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.tag = try container.decode(String.self, forKey: .tag)
+        self.tagKey = try container.decode(String.self, forKey: .tagKey)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(tag, forKey: .tag)
+        try container.encode(tagKey, forKey: .tagKey)
+    }
+}
+
+/// One round task (Plan 18). `ast_path` is the task's address in the note
+/// body's block AST (a JSON array of child indexes) and, with `note_path`, the
+/// row's primary key.
+public struct IndexedTask: Codable, Sendable, Equatable {
+    public let astPath: String
+    public let markdown: String
+    public let breadcrumbs: [String]?
+    public let checked: Bool
+    public let dueDate: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case astPath = "astPath"
+        case markdown = "markdown"
+        case breadcrumbs = "breadcrumbs"
+        case checked = "checked"
+        case dueDate = "dueDate"
+    }
+
+    public init(astPath: String, markdown: String, breadcrumbs: [String]?, checked: Bool, dueDate: String?) {
+        self.astPath = astPath
+        self.markdown = markdown
+        self.breadcrumbs = breadcrumbs
+        self.checked = checked
+        self.dueDate = dueDate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.astPath = try container.decode(String.self, forKey: .astPath)
+        self.markdown = try container.decode(String.self, forKey: .markdown)
+        self.breadcrumbs = try container.decodeIfPresent([String].self, forKey: .breadcrumbs)
+        self.checked = try container.decode(Bool.self, forKey: .checked)
+        self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(astPath, forKey: .astPath)
+        try container.encode(markdown, forKey: .markdown)
+        if let breadcrumbs = breadcrumbs {
+            try container.encode(breadcrumbs, forKey: .breadcrumbs)
+        }
+        try container.encode(checked, forKey: .checked)
+        try container.encode(dueDate, forKey: .dueDate)
+    }
+}
+
+public struct LinkPreviewHtml: Codable, Sendable, Equatable {
+    public let html: String
+    public let finalUrl: String
+
+    private enum CodingKeys: String, CodingKey {
+        case html = "html"
+        case finalUrl = "finalUrl"
+    }
+
+    public init(html: String, finalUrl: String) {
+        self.html = html
+        self.finalUrl = finalUrl
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.html = try container.decode(String.self, forKey: .html)
+        self.finalUrl = try container.decode(String.self, forKey: .finalUrl)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(html, forKey: .html)
+        try container.encode(finalUrl, forKey: .finalUrl)
+    }
+}
+
+/// How a local note read (the desktop `note_read_local` command) found the
+/// note on disk.
+public enum LocalNoteRead: Sendable, Equatable {
+    case content(LocalNoteReadContentData)
+    case evicted
+}
+public struct LocalNoteReadContentData: Codable, Sendable, Equatable {
+    public let content: String
+
+    public init(content: String) {
+        self.content = content
+    }
+}
+
+// MARK: - LocalNoteRead Codable Implementation
+extension LocalNoteRead: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("kind"))
+        switch tag {
+        case "content":
+            let contentValue = try container.decode(String.self, forKey: CodingKeys("content"))
+            self = .content(LocalNoteReadContentData(content: contentValue))
+        case "evicted":
+            self = .evicted
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .content(let data):
+            try container.encode("content", forKey: CodingKeys("kind"))
+            try container.encode(data.content, forKey: CodingKeys("content"))
+        case .evicted:
+            try container.encode("evicted", forKey: CodingKeys("kind"))
+        }
+    }
+}
+
+
+public enum MergeKind: String, Codable, Sendable, Equatable {
+    case upToDate = "upToDate"
+    case fastForward = "fastForward"
+    case merged = "merged"
+}
+
+/// The storage locations available to the mobile graph, as the onboarding
+/// screen and `GraphProvider` consume them.
+public struct MobileStorageInfo: Codable, Sendable, Equatable {
+    public let localRoot: String
+    public let icloudDocumentsRoot: String?
+    public let icloudGraphRoots: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case localRoot = "localRoot"
+        case icloudDocumentsRoot = "icloudDocumentsRoot"
+        case icloudGraphRoots = "icloudGraphRoots"
+    }
+
+    public init(localRoot: String, icloudDocumentsRoot: String?, icloudGraphRoots: [String]) {
+        self.localRoot = localRoot
+        self.icloudDocumentsRoot = icloudDocumentsRoot
+        self.icloudGraphRoots = icloudGraphRoots
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.localRoot = try container.decode(String.self, forKey: .localRoot)
+        self.icloudDocumentsRoot = try container.decodeIfPresent(String.self, forKey: .icloudDocumentsRoot)
+        self.icloudGraphRoots = try container.decode([String].self, forKey: .icloudGraphRoots)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(localRoot, forKey: .localRoot)
+        try container.encode(icloudDocumentsRoot, forKey: .icloudDocumentsRoot)
+        try container.encode(icloudGraphRoots, forKey: .icloudGraphRoots)
+    }
+}
+
+/// Path-derived addressing for a moved row: the folded destination path plus
+/// the claims that derive from it. Folded in TypeScript — Rust never folds.
+public struct MovedNoteAddress: Codable, Sendable, Equatable {
+    public let pathKey: String
+    public let basenameKey: String
+    public let dailyDate: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case pathKey = "pathKey"
+        case basenameKey = "basenameKey"
+        case dailyDate = "dailyDate"
+    }
+
+    public init(pathKey: String, basenameKey: String, dailyDate: String?) {
+        self.pathKey = pathKey
+        self.basenameKey = basenameKey
+        self.dailyDate = dailyDate
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.pathKey = try container.decode(String.self, forKey: .pathKey)
+        self.basenameKey = try container.decode(String.self, forKey: .basenameKey)
+        self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(pathKey, forKey: .pathKey)
+        try container.encode(basenameKey, forKey: .basenameKey)
+        try container.encode(dailyDate, forKey: .dailyDate)
+    }
+}
+
+/// Result of claiming a note path without overwriting an existing file.
+public enum NoteCreateOutcome: Sendable, Equatable {
+    case created(NoteCreateOutcomeCreatedData)
+    case collision
+}
+public struct NoteCreateOutcomeCreatedData: Codable, Sendable, Equatable {
+    public let modifiedMs: UInt64?
+
+    public init(modifiedMs: UInt64?) {
+        self.modifiedMs = modifiedMs
+    }
+}
+
+// MARK: - NoteCreateOutcome Codable Implementation
+extension NoteCreateOutcome: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("kind"))
+        switch tag {
+        case "created":
+            let modifiedMsValue = try container.decodeIfPresent(UInt64.self, forKey: CodingKeys("modifiedMs"))
+            self = .created(NoteCreateOutcomeCreatedData(modifiedMs: modifiedMsValue))
+        case "collision":
+            self = .collision
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .created(let data):
+            try container.encode("created", forKey: CodingKeys("kind"))
+            try container.encode(data.modifiedMs, forKey: CodingKeys("modifiedMs"))
+        case .collision:
+            try container.encode("collision", forKey: CodingKeys("kind"))
+        }
+    }
+}
+
+
+/// One user-initiated move, with the folded addressing for both directions:
+/// the destination's for the forward row move, the source's for the
+/// compensating reverse move when the disk refuses.
+public struct NoteMoveRequest: Codable, Sendable, Equatable {
+    public let from: String
+    public let to: String
+    public let toAddress: MovedNoteAddress
+    public let fromAddress: MovedNoteAddress
+
+    private enum CodingKeys: String, CodingKey {
+        case from = "from"
+        case to = "to"
+        case toAddress = "toAddress"
+        case fromAddress = "fromAddress"
+    }
+
+    public init(from: String, to: String, toAddress: MovedNoteAddress, fromAddress: MovedNoteAddress) {
+        self.from = from
+        self.to = to
+        self.toAddress = toAddress
+        self.fromAddress = fromAddress
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.from = try container.decode(String.self, forKey: .from)
+        self.to = try container.decode(String.self, forKey: .to)
+        self.toAddress = try container.decode(MovedNoteAddress.self, forKey: .toAddress)
+        self.fromAddress = try container.decode(MovedNoteAddress.self, forKey: .fromAddress)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(from, forKey: .from)
+        try container.encode(to, forKey: .to)
+        try container.encode(toAddress, forKey: .toAddress)
+        try container.encode(fromAddress, forKey: .fromAddress)
+    }
+}
+
+/// What a note write left on disk.
+public struct NoteWriteOutcome: Codable, Sendable, Equatable {
+    public let modifiedMs: UInt64?
+    public let merged: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case modifiedMs = "modifiedMs"
+        case merged = "merged"
+    }
+
+    public init(modifiedMs: UInt64?, merged: String?) {
+        self.modifiedMs = modifiedMs
+        self.merged = merged
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.modifiedMs = try container.decodeIfPresent(UInt64.self, forKey: .modifiedMs)
+        self.merged = try container.decodeIfPresent(String.self, forKey: .merged)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(modifiedMs, forKey: .modifiedMs)
+        try container.encode(merged, forKey: .merged)
+    }
+}
+
+/// What one pull did: the commit of local changes, then the merge of the
+/// fetched remote branch.
+public struct PullOutcome: Codable, Sendable, Equatable {
+    public let committed: Bool
+    public let ahead: UInt
+    public let skippedLargeFiles: [SkippedFile]
+    public let kind: MergeKind
+    public let reviewPaths: [String]
+    public let changedFiles: [ChangedFile]
+
+    private enum CodingKeys: String, CodingKey {
+        case committed = "committed"
+        case ahead = "ahead"
+        case skippedLargeFiles = "skippedLargeFiles"
+        case kind = "kind"
+        case reviewPaths = "reviewPaths"
+        case changedFiles = "changedFiles"
+    }
+
+    public init(committed: Bool, ahead: UInt, skippedLargeFiles: [SkippedFile], kind: MergeKind, reviewPaths: [String], changedFiles: [ChangedFile]) {
+        self.committed = committed
+        self.ahead = ahead
+        self.skippedLargeFiles = skippedLargeFiles
+        self.kind = kind
+        self.reviewPaths = reviewPaths
+        self.changedFiles = changedFiles
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.committed = try container.decode(Bool.self, forKey: .committed)
+        self.ahead = try container.decode(UInt.self, forKey: .ahead)
+        self.skippedLargeFiles = try container.decode([SkippedFile].self, forKey: .skippedLargeFiles)
+        self.kind = try container.decode(MergeKind.self, forKey: .kind)
+        self.reviewPaths = try container.decode([String].self, forKey: .reviewPaths)
+        self.changedFiles = try container.decode([ChangedFile].self, forKey: .changedFiles)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(committed, forKey: .committed)
+        try container.encode(ahead, forKey: .ahead)
+        try container.encode(skippedLargeFiles, forKey: .skippedLargeFiles)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(reviewPaths, forKey: .reviewPaths)
+        try container.encode(changedFiles, forKey: .changedFiles)
+    }
+}
+
+/// Result of a push attempt. `pushed: false` with `non_fast_forward: true` is
+/// the normal two-device case (pull, merge, retry); a `rejection_message`
+/// carries anything else the remote said (e.g. GitHub push protection).
+public struct PushOutcome: Codable, Sendable, Equatable {
+    public let pushed: Bool
+    public let nonFastForward: Bool
+    public let rejectionMessage: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case pushed = "pushed"
+        case nonFastForward = "nonFastForward"
+        case rejectionMessage = "rejectionMessage"
+    }
+
+    public init(pushed: Bool, nonFastForward: Bool, rejectionMessage: String?) {
+        self.pushed = pushed
+        self.nonFastForward = nonFastForward
+        self.rejectionMessage = rejectionMessage
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.pushed = try container.decode(Bool.self, forKey: .pushed)
+        self.nonFastForward = try container.decode(Bool.self, forKey: .nonFastForward)
+        self.rejectionMessage = try container.decodeIfPresent(String.self, forKey: .rejectionMessage)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(pushed, forKey: .pushed)
+        try container.encode(nonFastForward, forKey: .nonFastForward)
+        try container.encode(rejectionMessage, forKey: .rejectionMessage)
+    }
+}
+
+/// A previously-opened graph, newest first in the stored list.
+public struct RecentGraph: Codable, Sendable, Equatable {
+    public let root: String
+    public let name: String
+    public let openedMs: UInt64
+
+    private enum CodingKeys: String, CodingKey {
+        case root = "root"
+        case name = "name"
+        case openedMs = "openedMs"
+    }
+
+    public init(root: String, name: String, openedMs: UInt64) {
+        self.root = root
+        self.name = name
+        self.openedMs = openedMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.root = try container.decode(String.self, forKey: .root)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.openedMs = try container.decode(UInt64.self, forKey: .openedMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(root, forKey: .root)
+        try container.encode(name, forKey: .name)
+        try container.encode(openedMs, forKey: .openedMs)
+    }
+}
+
+/// The reconcile delta: what changed on disk relative to the index.
+public struct ReconcileScan: Codable, Sendable, Equatable {
+    public let total: UInt64
+    public let candidates: [ScanCandidate]
+    public let orphans: [ScanOrphan]
+    public let stalePlaceholders: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case total = "total"
+        case candidates = "candidates"
+        case orphans = "orphans"
+        case stalePlaceholders = "stalePlaceholders"
+    }
+
+    public init(total: UInt64, candidates: [ScanCandidate], orphans: [ScanOrphan], stalePlaceholders: [String]) {
+        self.total = total
+        self.candidates = candidates
+        self.orphans = orphans
+        self.stalePlaceholders = stalePlaceholders
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.total = try container.decode(UInt64.self, forKey: .total)
+        self.candidates = try container.decode([ScanCandidate].self, forKey: .candidates)
+        self.orphans = try container.decode([ScanOrphan].self, forKey: .orphans)
+        self.stalePlaceholders = try container.decode([String].self, forKey: .stalePlaceholders)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(total, forKey: .total)
+        try container.encode(candidates, forKey: .candidates)
+        try container.encode(orphans, forKey: .orphans)
+        try container.encode(stalePlaceholders, forKey: .stalePlaceholders)
+    }
+}
+
+/// Where the local branch stands relative to its last-fetched remote
+/// counterpart (no network — call after `fetch`).
+public struct RemoteDelta: Codable, Sendable, Equatable {
+    public let ahead: UInt
+    public let behind: UInt
+
+    private enum CodingKeys: String, CodingKey {
+        case ahead = "ahead"
+        case behind = "behind"
+    }
+
+    public init(ahead: UInt, behind: UInt) {
+        self.ahead = ahead
+        self.behind = behind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.ahead = try container.decode(UInt.self, forKey: .ahead)
+        self.behind = try container.decode(UInt.self, forKey: .behind)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(ahead, forKey: .ahead)
+        try container.encode(behind, forKey: .behind)
+    }
+}
+
+/// Where the remote says the current branch is, next to the last-fetched
+/// tracking ref. `remote_oid` is `None` when the remote has no such branch;
+/// `default_branch` is the branch the remote's HEAD points at, `None` when
+/// the remote is empty.
+public struct RemoteTip: Codable, Sendable, Equatable {
+    public let remoteOid: String?
+    public let trackingOid: String?
+    public let defaultBranch: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case remoteOid = "remoteOid"
+        case trackingOid = "trackingOid"
+        case defaultBranch = "defaultBranch"
+    }
+
+    public init(remoteOid: String?, trackingOid: String?, defaultBranch: String?) {
+        self.remoteOid = remoteOid
+        self.trackingOid = trackingOid
+        self.defaultBranch = defaultBranch
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.remoteOid = try container.decodeIfPresent(String.self, forKey: .remoteOid)
+        self.trackingOid = try container.decodeIfPresent(String.self, forKey: .trackingOid)
+        self.defaultBranch = try container.decodeIfPresent(String.self, forKey: .defaultBranch)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(remoteOid, forKey: .remoteOid)
+        try container.encode(trackingOid, forKey: .trackingOid)
+        try container.encode(defaultBranch, forKey: .defaultBranch)
+    }
+}
+
+/// One file the TS reconcile must read: its listed mtime doesn't match the
+/// stored row (or is too fresh to trust), or it has no row at all. Stored
+/// facts ride along so the reconcile needs no follow-up query — a `None`
+/// hash marks an arrival (move-healing candidate).
+public struct ScanCandidate: Codable, Sendable, Equatable {
+    public let path: String
+    public let modifiedMs: UInt64
+    public let storedMtime: Int64?
+    public let storedHash: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case modifiedMs = "modifiedMs"
+        case storedMtime = "storedMtime"
+        case storedHash = "storedHash"
+    }
+
+    public init(path: String, modifiedMs: UInt64, storedMtime: Int64?, storedHash: String?) {
+        self.path = path
+        self.modifiedMs = modifiedMs
+        self.storedMtime = storedMtime
+        self.storedHash = storedHash
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.modifiedMs = try container.decode(UInt64.self, forKey: .modifiedMs)
+        self.storedMtime = try container.decodeIfPresent(Int64.self, forKey: .storedMtime)
+        self.storedHash = try container.decodeIfPresent(String.self, forKey: .storedHash)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(modifiedMs, forKey: .modifiedMs)
+        try container.encode(storedMtime, forKey: .storedMtime)
+        try container.encode(storedHash, forKey: .storedHash)
+    }
+}
+
+/// A stored row whose file vanished from disk. Facts ride along because
+/// id-based move healing pairs orphans with arrivals and, on a heal, the
+/// moved row's hash decides whether the new path needs a re-index at all.
+public struct ScanOrphan: Codable, Sendable, Equatable {
+    public let path: String
+    public let storedMtime: Int64
+    public let storedHash: String
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case storedMtime = "storedMtime"
+        case storedHash = "storedHash"
+    }
+
+    public init(path: String, storedMtime: Int64, storedHash: String) {
+        self.path = path
+        self.storedMtime = storedMtime
+        self.storedHash = storedHash
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.storedMtime = try container.decode(Int64.self, forKey: .storedMtime)
+        self.storedHash = try container.decode(String.self, forKey: .storedHash)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(storedMtime, forKey: .storedMtime)
+        try container.encode(storedHash, forKey: .storedHash)
+    }
+}
+
+/// A file whose changes were withheld because it is at or above the size
+/// guardrail. An unchanged oversized file is not reported.
+public struct SkippedFile: Codable, Sendable, Equatable {
+    public let path: String
+    public let size: UInt64
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case size = "size"
+    }
+
+    public init(path: String, size: UInt64) {
+        self.path = path
+        self.size = size
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.size = try container.decode(UInt64.self, forKey: .size)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(size, forKey: .size)
+    }
+}
+
+/// How much of the graph a sweep checks for unresolved versions.
+public enum SweepScope: String, Codable, Sendable, Equatable {
+    case full = "full"
+    case candidates = "candidates"
+    case ingested = "ingested"
+}
+
+/// Counts from the vault catalog. `skipped` is what the walk refused or
+/// failed to list (unreadable directories, symlinks, default-pruned trees) —
+/// the number that keeps "why isn't my file showing up" diagnosable.
+public struct VaultScanStats: Codable, Sendable, Equatable {
+    public let notes: UInt32
+    public let attachments: UInt32
+    public let skipped: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case notes = "notes"
+        case attachments = "attachments"
+        case skipped = "skipped"
+    }
+
+    public init(notes: UInt32, attachments: UInt32, skipped: UInt32) {
+        self.notes = notes
+        self.attachments = attachments
+        self.skipped = skipped
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.notes = try container.decode(UInt32.self, forKey: .notes)
+        self.attachments = try container.decode(UInt32.self, forKey: .attachments)
+        self.skipped = try container.decode(UInt32.self, forKey: .skipped)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(notes, forKey: .notes)
+        try container.encode(attachments, forKey: .attachments)
+        try container.encode(skipped, forKey: .skipped)
+    }
+}
+
+/// What a secondary window needs to boot: the open graph's identity (both
+/// session generations, unbumped) and the deep link it was created to show.
+public struct WindowBootstrap: Codable, Sendable, Equatable {
+    public let graph: GraphInfo
+    public let indexGeneration: UInt64?
+    public let initialDeepLink: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case graph = "graph"
+        case indexGeneration = "indexGeneration"
+        case initialDeepLink = "initialDeepLink"
+    }
+
+    public init(graph: GraphInfo, indexGeneration: UInt64?, initialDeepLink: String?) {
+        self.graph = graph
+        self.indexGeneration = indexGeneration
+        self.initialDeepLink = initialDeepLink
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.graph = try container.decode(GraphInfo.self, forKey: .graph)
+        self.indexGeneration = try container.decodeIfPresent(UInt64.self, forKey: .indexGeneration)
+        self.initialDeepLink = try container.decodeIfPresent(String.self, forKey: .initialDeepLink)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(graph, forKey: .graph)
+        try container.encode(indexGeneration, forKey: .indexGeneration)
+        try container.encode(initialDeepLink, forKey: .initialDeepLink)
     }
 }
 

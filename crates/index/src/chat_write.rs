@@ -7,36 +7,8 @@
 //! command layer ([`super`]) owns transactions and generation gating.
 
 use rusqlite::{Connection, params};
-use serde::Deserialize;
 
-use reflect_types::AppResult;
-
-/// A conversation's metadata, sent with every message save so the row can be
-/// created lazily on the first message. Mirrors the zod contract in
-/// `packages/core/src/ai/chat/store.ts` field-for-field.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatConversation {
-    pub(super) id: String,
-    pub(super) title: String,
-    pub(super) created_ms: i64,
-    pub(super) updated_ms: i64,
-}
-
-/// One persisted exchange: the user message and everything the assistant did
-/// in response. The JSON columns are opaque strings here — the TS store owns
-/// their shapes and validates them on read.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatMessageRow {
-    pub(super) id: String,
-    pub(super) conversation_id: String,
-    pub(super) user_text: String,
-    pub(super) attachments: String,
-    pub(super) parts: String,
-    pub(super) response_messages: String,
-    pub(super) created_ms: i64,
-}
+use reflect_types::{AppResult, ChatConversation, ChatMessageRow};
 
 /// Upsert the conversation row and the message row. The conversation keeps its
 /// original `title`/`created_ms` (set once, on insert) and bumps `updated_ms`;

@@ -10,49 +10,9 @@
 //! status command answers [`ContactsAuthorization::Unavailable`] so the
 //! frontend can hide the integration; the other commands fail loudly.
 
-use serde::Serialize;
-
-use reflect_types::AppResult;
+use reflect_types::{AppResult, ContactMatch, ContactsAuthorization};
 
 use crate::Core;
-
-/// The Contacts permission state, as the settings UI consumes it.
-///
-/// Every variant is part of the wire contract even when the compile target
-/// can't construct it (`Unavailable` only exists off-Apple, `Limited` only
-/// on-device) — hence the `dead_code` allowance.
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ContactsAuthorization {
-    /// The user has not been asked yet — enabling the toggle should prompt.
-    NotDetermined,
-    /// Access is blocked by policy (parental controls, MDM); the user cannot
-    /// grant it from the app.
-    Restricted,
-    /// The user said no — point them at System Settings.
-    Denied,
-    /// Full access granted.
-    Authorized,
-    /// Partial access (iOS 18+); reads work against the shared subset.
-    Limited,
-    /// No Contacts framework on this platform.
-    Unavailable,
-}
-
-/// One matched contact, flattened to the fields Reflect can write into a
-/// note as markdown. Photos are deliberately absent (out of v1 scope).
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ContactMatch {
-    /// Locale-aware display name from `CNContactFormatter` (given/family
-    /// ordering differs by locale, so it is not composed by hand).
-    pub full_name: String,
-    pub given_name: String,
-    pub family_name: String,
-    pub emails: Vec<String>,
-    pub phones: Vec<String>,
-}
 
 impl Core {
     /// Command: the current Contacts permission state. Never prompts.
@@ -100,8 +60,7 @@ mod platform {
     };
     use objc2_foundation::{NSArray, NSError, NSPredicate, NSString};
 
-    use super::{ContactMatch, ContactsAuthorization};
-    use reflect_types::{AppError, AppResult};
+    use reflect_types::{AppError, AppResult, ContactMatch, ContactsAuthorization};
 
     pub fn authorization_status() -> ContactsAuthorization {
         let status =
@@ -207,7 +166,6 @@ mod platform {
 
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 mod platform {
-    use super::{ContactMatch, ContactsAuthorization};
     use reflect_types::{AppError, AppResult};
 
     fn unavailable<T>() -> AppResult<T> {

@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use reflect_core::Core;
-use serde::Serialize;
+use reflect_types::{AgentSkillInstallState, AgentSkillStatus};
 use tauri::State;
 
 use crate::capture::atomic_write_to;
@@ -35,34 +35,6 @@ const CLI_BINARY: &str = if cfg!(windows) {
 } else {
     "reflect"
 };
-
-/// Where the installed skill file stands relative to what this app would
-/// write today.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum SkillInstallState {
-    /// No file at the target path.
-    Missing,
-    /// Byte-identical to what we would write.
-    Current,
-    /// Ours (marker present) but rendered from older inputs — a template
-    /// change, an app move, or a graph rename/move. Safe to rewrite.
-    Stale,
-    /// A file we don't manage: no marker, or marker with edited content.
-    /// Never overwritten, never deleted.
-    Conflict,
-}
-
-/// Answer for the settings card: where the skill goes, what it's called, and
-/// whether the file on disk is ours.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillStatus {
-    pub skill_name: String,
-    pub skill_path: String,
-    pub cli_path: String,
-    pub install_state: SkillInstallState,
-}
 
 /// Everything derived from the open graph that the three commands share.
 struct SkillContext {
@@ -146,33 +118,33 @@ fn without_marker_line(content: &str) -> Option<String> {
 
 /// The marker is self-validating: it records the sha256 of the content it was
 /// inserted into, so an edit anywhere in the file breaks the match and the
-/// file classifies as [`SkillInstallState::Conflict`] — even when the app's
+/// file classifies as [`AgentSkillInstallState::Conflict`] — even when the app's
 /// current inputs have also changed. Only a clean old install may be `Stale`.
 fn classify(
     installed: Option<&str>,
     rendered_hash: &str,
     managed_content: &str,
-) -> SkillInstallState {
+) -> AgentSkillInstallState {
     let Some(installed) = installed else {
-        return SkillInstallState::Missing;
+        return AgentSkillInstallState::Missing;
     };
     if installed == managed_content {
-        return SkillInstallState::Current;
+        return AgentSkillInstallState::Current;
     }
     let (Some(hash), Some(body)) = (managed_hash(installed), without_marker_line(installed)) else {
-        return SkillInstallState::Conflict;
+        return AgentSkillInstallState::Conflict;
     };
     if content_hash(&body) != hash {
         // Edited since we wrote it — the recorded hash no longer matches the
         // file's own body. Never overwrite, regardless of staleness.
-        return SkillInstallState::Conflict;
+        return AgentSkillInstallState::Conflict;
     }
     if hash != rendered_hash {
-        return SkillInstallState::Stale;
+        return AgentSkillInstallState::Stale;
     }
     // Self-consistent and current by hash, yet not byte-identical (e.g. a
     // moved marker line): treat any deviation we can't explain as not ours.
-    SkillInstallState::Conflict
+    AgentSkillInstallState::Conflict
 }
 
 /// The staged CLI sidecar, next to the running executable in both dev
@@ -217,13 +189,13 @@ fn context_for_graph(root: &Path) -> AppResult<SkillContext> {
     Ok(context_for(root, &skills_root, cli_path()?))
 }
 
-fn status_of(context: &SkillContext) -> AppResult<SkillStatus> {
+fn status_of(context: &SkillContext) -> AppResult<AgentSkillStatus> {
     let installed = match fs::read_to_string(&context.target) {
         Ok(content) => Some(content),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
         Err(err) => return Err(err.into()),
     };
-    Ok(SkillStatus {
+    Ok(AgentSkillStatus {
         skill_name: context.skill_name.clone(),
         skill_path: context.target.to_string_lossy().into_owned(),
         cli_path: context.cli_path.to_string_lossy().into_owned(),
@@ -238,7 +210,7 @@ fn status_of(context: &SkillContext) -> AppResult<SkillStatus> {
 /// Command: the skill's name, target path, and install state for the open
 /// graph. Read-only.
 #[tauri::command]
-pub fn skill_status(core: State<Arc<Core>>) -> AppResult<SkillStatus> {
+pub fn skill_status(core: State<Arc<Core>>) -> AppResult<AgentSkillStatus> {
     let root = current_root(&core.graph)?;
     status_of(&context_for_graph(&root)?)
 }
@@ -247,23 +219,23 @@ pub fn skill_status(core: State<Arc<Core>>) -> AppResult<SkillStatus> {
 /// an install racing a graph switch can't write the wrong graph's skill.
 /// Refuses to touch a file we don't manage.
 #[tauri::command]
-pub fn skill_install(generation: u64, core: State<Arc<Core>>) -> AppResult<SkillStatus> {
+pub fn skill_install(generation: u64, core: State<Arc<Core>>) -> AppResult<AgentSkillStatus> {
     let root = root_for_generation(&core.graph, generation)?;
     let context = context_for_graph(&root)?;
     let status = status_of(&context)?;
     match status.install_state {
-        SkillInstallState::Conflict => Err(AppError::io(format!(
+        AgentSkillInstallState::Conflict => Err(AppError::io(format!(
             "{} exists but was not written by Reflect — move it aside first",
             context.target.display()
         ))),
-        SkillInstallState::Current => Ok(status),
-        SkillInstallState::Missing => {
+        AgentSkillInstallState::Current => Ok(status),
+        AgentSkillInstallState::Missing => {
             // No-clobber create: a file appearing between the classify above
             // and this write fails loudly instead of being replaced.
             atomic_create_new(&context.target, &context.managed_content)?;
             status_of(&context)
         }
-        SkillInstallState::Stale => {
+        AgentSkillInstallState::Stale => {
             atomic_write_to(&context.target, &context.managed_content)?;
             status_of(&context)
         }
@@ -289,17 +261,17 @@ fn atomic_create_new(path: &Path, contents: &str) -> AppResult<()> {
 /// Command: remove the graph's skill file (and its directory when that leaves
 /// it empty). Only removes files carrying our managed marker.
 #[tauri::command]
-pub fn skill_uninstall(generation: u64, core: State<Arc<Core>>) -> AppResult<SkillStatus> {
+pub fn skill_uninstall(generation: u64, core: State<Arc<Core>>) -> AppResult<AgentSkillStatus> {
     let root = root_for_generation(&core.graph, generation)?;
     let context = context_for_graph(&root)?;
     let status = status_of(&context)?;
     match status.install_state {
-        SkillInstallState::Missing => Ok(status),
-        SkillInstallState::Conflict => Err(AppError::io(format!(
+        AgentSkillInstallState::Missing => Ok(status),
+        AgentSkillInstallState::Conflict => Err(AppError::io(format!(
             "{} was not written by Reflect — not removing it",
             context.target.display()
         ))),
-        SkillInstallState::Current | SkillInstallState::Stale => {
+        AgentSkillInstallState::Current | AgentSkillInstallState::Stale => {
             fs::remove_file(&context.target)?;
             // Only removes an empty directory — anything else the user put
             // beside the skill file survives.
@@ -377,35 +349,38 @@ mod tests {
         let hash = &context.rendered_hash;
         let managed = &context.managed_content;
 
-        assert_eq!(classify(None, hash, managed), SkillInstallState::Missing);
+        assert_eq!(
+            classify(None, hash, managed),
+            AgentSkillInstallState::Missing
+        );
         assert_eq!(
             classify(Some(managed), hash, managed),
-            SkillInstallState::Current
+            AgentSkillInstallState::Current
         );
         // No marker → not ours.
         assert_eq!(
             classify(Some("# hand-written skill"), hash, managed),
-            SkillInstallState::Conflict
+            AgentSkillInstallState::Conflict
         );
         // Right marker, edited body → not ours either.
         let edited = format!("{managed}\nuser addition\n");
         assert_eq!(
             classify(Some(&edited), hash, managed),
-            SkillInstallState::Conflict
+            AgentSkillInstallState::Conflict
         );
         // Rendered from other inputs (graph moved, template changed) → stale,
         // but only while the old install is untouched.
         let moved = test_context(Path::new("/skills"), Path::new("/elsewhere/Personal"));
         assert_eq!(
             classify(Some(&moved.managed_content), hash, managed),
-            SkillInstallState::Stale
+            AgentSkillInstallState::Stale
         );
         // A user-edited old install must stay a conflict — staleness never
         // downgrades edit protection (the marker validates its own body).
         let stale_edited = format!("{}\nuser addition\n", moved.managed_content);
         assert_eq!(
             classify(Some(&stale_edited), hash, managed),
-            SkillInstallState::Conflict
+            AgentSkillInstallState::Conflict
         );
     }
 
@@ -425,13 +400,13 @@ mod tests {
 
         assert_eq!(
             status_of(&context).expect("status").install_state,
-            SkillInstallState::Missing
+            AgentSkillInstallState::Missing
         );
 
         atomic_write_to(&context.target, &context.managed_content).expect("write");
         assert_eq!(
             status_of(&context).expect("status").install_state,
-            SkillInstallState::Current
+            AgentSkillInstallState::Current
         );
 
         // A graph rename changes the slug-independent inputs → stale, and a
@@ -449,7 +424,7 @@ mod tests {
         std::fs::write(&context.target, &edited).expect("edit");
         assert_eq!(
             status_of(&context).expect("status").install_state,
-            SkillInstallState::Conflict
+            AgentSkillInstallState::Conflict
         );
     }
 }

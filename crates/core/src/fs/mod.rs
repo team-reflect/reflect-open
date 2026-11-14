@@ -25,7 +25,10 @@ use reflect_graph_io::io::{
 use reflect_graph_io::own_writes;
 use reflect_graph_io::*;
 use reflect_graph_paths::{eviction_placeholder, is_dataless};
-use reflect_types::{AppError, AppResult, FileMeta};
+use reflect_types::{
+    AppError, AppResult, FileMeta, GraphImportProgress, GraphImportStage, GraphImportSummary,
+    GraphInfo, LocalNoteRead, NoteCreateOutcome, NoteWriteOutcome, VaultScanStats,
+};
 
 use crate::{Core, Host};
 
@@ -53,7 +56,7 @@ impl Core {
         &self,
         path: String,
         generation: u64,
-    ) -> AppResult<import::ImportSummary> {
+    ) -> AppResult<GraphImportSummary> {
         let root = root_for_generation(&self.graph, generation)?;
         let cancel = &self.import_cancel;
         // Holds the one import slot until this command returns on any path — a
@@ -62,7 +65,12 @@ impl Core {
         let _running = cancel.begin()?;
         let prepared = import::prepare_zip_import(&root, Path::new(&path))?;
         if prepared.remote_asset_count() > 0 {
-            emit_import_progress(self.host(), "downloading", 0, prepared.remote_asset_count());
+            emit_import_progress(
+                self.host(),
+                GraphImportStage::Downloading,
+                0,
+                prepared.remote_asset_count(),
+            );
         }
         let download_host = Arc::clone(&self.host);
         let user_agent = self.config().user_agent.clone();
@@ -71,7 +79,12 @@ impl Core {
                 &user_agent,
                 cancel.flag(),
                 Arc::new(move |done, total| {
-                    emit_import_progress(download_host.as_ref(), "downloading", done, total);
+                    emit_import_progress(
+                        download_host.as_ref(),
+                        GraphImportStage::Downloading,
+                        done,
+                        total,
+                    );
                 }),
             )
             .await?;
@@ -90,7 +103,7 @@ impl Core {
                 let step = (total / 100).max(1);
                 if done == total || done >= last_emitted + step {
                     last_emitted = done;
-                    emit_import_progress(self.host(), "writing", done, total);
+                    emit_import_progress(self.host(), GraphImportStage::Writing, done, total);
                 }
             })
         })?;
@@ -518,8 +531,8 @@ impl Core {
     }
 }
 
-fn emit_import_progress(host: &dyn Host, stage: &'static str, done: usize, total: usize) {
-    if let Ok(payload) = serde_json::to_value(import::ImportProgress { stage, done, total }) {
+fn emit_import_progress(host: &dyn Host, stage: GraphImportStage, done: usize, total: usize) {
+    if let Ok(payload) = serde_json::to_value(GraphImportProgress { stage, done, total }) {
         host.emit("import:progress", payload);
     }
 }

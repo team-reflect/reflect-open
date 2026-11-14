@@ -3,18 +3,19 @@
 //! compose at runtime.
 
 use reflect_index_schema::LATEST_SCHEMA_VERSION;
+use reflect_types::{
+    ChatConversation, ChatMessageRow, EmbeddedChunk, IndexedAlias, IndexedClaim, IndexedEmail,
+    IndexedLink, IndexedNote, IndexedTag, IndexedTask, MovedNoteAddress,
+};
 use rusqlite::Connection;
 use serde_json::Value;
 
-use super::chat_write::{ChatConversation, ChatMessageRow, delete_conversation, save_message};
+use super::chat_write::{delete_conversation, save_message};
 use super::connections::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
-use super::embed_write::{EmbeddedChunk, apply_chunks, remove_chunks};
+use super::embed_write::{apply_chunks, remove_chunks};
 use super::query::run_query;
 use super::scan::scan_reconcile;
-use super::write::{
-    IndexedAlias, IndexedClaim, IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask,
-    MovedNoteAddress, apply_note, claim_tier, clear_index, move_note, touch_note,
-};
+use super::write::{apply_note, claim_tier, clear_index, move_note, touch_note};
 use super::{Applied, FileIndexConnections, IndexConnections, IndexSession};
 
 fn migrated() -> Connection {

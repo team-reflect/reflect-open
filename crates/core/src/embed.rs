@@ -11,8 +11,7 @@ use fastembed::{EmbeddingModel, TextEmbedding, TextInitOptions};
 use hf_hub::Cache;
 use hf_hub::api::Progress;
 use hf_hub::api::sync::ApiBuilder;
-use reflect_types::{AppError, AppResult};
-use serde::Serialize;
+use reflect_types::{AppError, AppResult, EmbedProgress, EmbedStatus};
 
 use crate::{Core, Host};
 
@@ -41,46 +40,12 @@ const INTRA_OP_THREADS: usize = 2;
 /// stays in the process. One text keeps the peak near the model's own size.
 const EMBED_BATCH_SIZE: usize = 1;
 
-/// Byte counts for an active model download. Absent until the download
-/// starts (cache probing, or a cached model that skips downloading); after
-/// the last byte it stays at 100% through the model-load phase.
-#[derive(Clone, Copy, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ByteProgress {
-    pub downloaded: u64,
-    pub total: u64,
-}
-
-#[derive(Clone, Serialize)]
-#[serde(
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase",
-    tag = "status"
-)]
-pub enum EmbedStatus {
-    /// No model loaded yet; `embed_ensure` will download/load it.
-    Uninitialized,
-    /// Download/load in progress (first run downloads ~90MB). The runtime
-    /// keeps the latest byte counts, so polls and `embed:status` events
-    /// report the same progress.
-    Loading {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        progress: Option<ByteProgress>,
-    },
-    /// `embed_texts` is ready; `model` is recorded per vector (rebuild key).
-    Ready { model: String },
-    /// Load failed; semantic search is unavailable (lexical still works).
-    Failed { message: String },
-    /// This CPU cannot run ONNX Runtime (see `cpu_supported`).
-    Unsupported,
-}
-
 #[derive(Default)]
 enum Runtime {
     #[default]
     Uninitialized,
     Loading {
-        progress: Option<ByteProgress>,
+        progress: Option<EmbedProgress>,
     },
     // fastembed's `embed` takes `&mut self`, so the model sits behind its own
     // Mutex — embed calls serialize, which batching makes irrelevant.
@@ -137,7 +102,7 @@ fn emit_status(host: &dyn Host, status: &EmbedStatus) {
 /// (e.g. a UI surface mounted mid-download) reports the same bytes as the
 /// `embed:status` events. Only an in-flight load is updated — by the time a
 /// stale progress callback could land, the state owns a terminal status.
-fn store_progress(state: &Mutex<Runtime>, progress: ByteProgress) {
+fn store_progress(state: &Mutex<Runtime>, progress: EmbedProgress) {
     let Ok(mut runtime) = state.lock() else {
         return;
     };
@@ -164,7 +129,7 @@ struct DownloadState {
 impl DownloadState {
     fn emit(&mut self) {
         self.emitted = self.downloaded;
-        let progress = ByteProgress {
+        let progress = EmbedProgress {
             downloaded: self.downloaded,
             total: self.total,
         };

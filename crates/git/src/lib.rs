@@ -28,30 +28,13 @@ mod tests;
 
 use std::path::Path;
 
-use serde::Serialize;
-
-use reflect_types::AppResult;
-
-pub use self::commit::{CommitOutcome, SkippedFile};
-pub use self::merge::{ChangeKind, ChangedFile, MergeKind};
-pub use self::remote::{GitCredential, PushOutcome, RemoteDelta, RemoteTip};
+use reflect_types::{
+    AppResult, CommitOutcome, GitCredential, GitStatus, PullOutcome, PushOutcome, RemoteDelta,
+    RemoteTip,
+};
 
 /// GitHub rejects files over 100 MB, failing the whole push; stop just under.
 pub const MAX_FILE_BYTES: u64 = 95 * 1024 * 1024;
-
-/// Snapshot of the graph's backup repository for the UI and the sync engine.
-/// Deliberately cheap — refs and config only, no working-tree scan.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitStatus {
-    /// Whether the graph has a repository at all (backup set up).
-    pub initialized: bool,
-    pub branch: Option<String>,
-    pub remote_url: Option<String>,
-    /// Commits ahead/behind the last-fetched remote branch (no network).
-    pub ahead: usize,
-    pub behind: usize,
-}
 
 pub fn status(root: &Path) -> AppResult<GitStatus> {
     if !root.join(".git").exists() {
@@ -113,24 +96,6 @@ pub fn setup(
     }
     drop(repo);
     status(root)
-}
-
-/// What one pull did: the commit of local changes, then the merge of the
-/// fetched remote branch.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PullOutcome {
-    /// Whether local changes were committed before the merge.
-    pub committed: bool,
-    /// Commits the local branch is ahead of the last-fetched remote after the
-    /// merge (no network).
-    pub ahead: usize,
-    pub skipped_large_files: Vec<SkippedFile>,
-    pub kind: MergeKind,
-    /// Graph-relative paths of the conflict copies the merge wrote.
-    pub review_paths: Vec<String>,
-    /// Every file the merge changed on disk.
-    pub changed_files: Vec<ChangedFile>,
 }
 
 /// Commit local changes and merge the fetched remote branch under one graph

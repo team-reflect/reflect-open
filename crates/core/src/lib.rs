@@ -44,7 +44,10 @@ use std::sync::Arc;
 
 use reflect_graph_io::GraphState;
 use reflect_index::IndexSession;
-use reflect_types::{AppError, AppResult};
+use reflect_types::{
+    AppError, AppResult, ChatConversation, ChatMessageRow, EmbeddedChunk, GitCredential,
+    IndexTouch, IndexedNote, MovedNoteAddress, NoteMoveRequest, SettingsDoc, SweepScope,
+};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -269,7 +272,7 @@ macro_rules! dispatch_table {
 
 dispatch_table! {
     "settings_load" => settings_load(),
-    "settings_save" => settings_save(settings: settings::SettingsDoc),
+    "settings_save" => settings_save(settings: SettingsDoc),
     "recent_graphs" => recent_graphs(),
     "forget_recent" => forget_recent(root: String),
     "secret_set" => secret_set(name: String, value: String).await,
@@ -284,7 +287,7 @@ dispatch_table! {
     "icloud_request_downloads" => icloud_request_downloads(paths: Vec<String>).await,
     "icloud_status" => icloud_status().await,
     "icloud_adopt_graph" => icloud_adopt_graph(generation: u64).await,
-    "icloud_conflicts_scan" => icloud_conflicts_scan(generation: u64, skip_paths: Vec<String>, ingested_paths: Vec<String>, record_baseline: bool, scope: icloud::sweep::SweepScope).await,
+    "icloud_conflicts_scan" => icloud_conflicts_scan(generation: u64, skip_paths: Vec<String>, ingested_paths: Vec<String>, record_baseline: bool, scope: SweepScope).await,
     "icloud_watch_start" => icloud_watch_start(root: String).await,
     "icloud_watch_stop" => icloud_watch_stop(),
     "contacts_authorization_status" => contacts_authorization_status().await,
@@ -311,29 +314,29 @@ dispatch_table! {
     "watch_start" => watch_start(),
     "watch_stop" => watch_stop(),
     "index_open" => index_open(),
-    "index_apply" => index_apply(note: reflect_index::IndexedNote, generation: u64),
-    "index_apply_batch" => index_apply_batch(notes: Vec<reflect_index::IndexedNote>, generation: u64),
+    "index_apply" => index_apply(note: IndexedNote, generation: u64),
+    "index_apply_batch" => index_apply_batch(notes: Vec<IndexedNote>, generation: u64),
     "index_remove" => index_remove(path: String, generation: u64),
     "index_clear" => index_clear(generation: u64),
-    "index_move" => index_move(from: String, to: String, generation: u64, to_address: reflect_index::MovedNoteAddress),
+    "index_move" => index_move(from: String, to: String, generation: u64, to_address: MovedNoteAddress),
     "index_reconcile_scan" => index_reconcile_scan(generation: u64).await,
-    "index_touch" => index_touch(entries: Vec<reflect_index::IndexTouch>, generation: u64),
-    "note_move_indexed" => note_move_indexed(request: reflect_index::NoteMoveRequest, generation: u64),
+    "index_touch" => index_touch(entries: Vec<IndexTouch>, generation: u64),
+    "note_move_indexed" => note_move_indexed(request: NoteMoveRequest, generation: u64),
     "index_meta_set" => index_meta_set(key: String, value: String, generation: u64),
     "db_query" => db_query(sql: String, params: Vec<serde_json::Value>).await,
-    "chat_message_save" => chat_message_save(conversation: reflect_index::ChatConversation, message: reflect_index::ChatMessageRow, generation: u64),
+    "chat_message_save" => chat_message_save(conversation: ChatConversation, message: ChatMessageRow, generation: u64),
     "chat_conversation_delete" => chat_conversation_delete(id: String, generation: u64),
-    "embed_apply" => embed_apply(path: String, chunks: Vec<reflect_index::EmbeddedChunk>, generation: u64),
+    "embed_apply" => embed_apply(path: String, chunks: Vec<EmbeddedChunk>, generation: u64),
     "embed_remove" => embed_remove(path: String, generation: u64),
     "git_status" => git_status(generation: u64).await,
     "git_setup" => git_setup(remote_url: Option<String>, branch: Option<String>, generation: u64).await,
     "git_disconnect" => git_disconnect(generation: u64).await,
-    "git_clone" => git_clone(url: String, path: String, credential: Option<reflect_git::GitCredential>).await,
+    "git_clone" => git_clone(url: String, path: String, credential: Option<GitCredential>).await,
     "git_commit_all" => git_commit_all(message: String, generation: u64).await,
-    "git_fetch" => git_fetch(credential: Option<reflect_git::GitCredential>, generation: u64).await,
-    "git_remote_head" => git_remote_head(url: Option<String>, credential: Option<reflect_git::GitCredential>, generation: u64).await,
+    "git_fetch" => git_fetch(credential: Option<GitCredential>, generation: u64).await,
+    "git_remote_head" => git_remote_head(url: Option<String>, credential: Option<GitCredential>, generation: u64).await,
     "git_pull" => git_pull(message: String, generation: u64).await,
-    "git_push" => git_push(credential: Option<reflect_git::GitCredential>, generation: u64).await,
+    "git_push" => git_push(credential: Option<GitCredential>, generation: u64).await,
     "graph_create" => graph_create(path: String),
     "graph_import_reflect_v1_zip" => graph_import_reflect_v1_zip(path: String, generation: u64).await,
     "graph_import_cancel" => graph_import_cancel() infallible,
