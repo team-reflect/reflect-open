@@ -67,6 +67,8 @@ const RouterActionsContext = createContext<RouterActions | null>(null)
 interface RouterProviderProps {
   /** The launch route; defaults to today (the daily note is the spine). */
   initialRoute?: Route | undefined
+  /** The launch route's section; defaults to the one its route implies. */
+  initialSection?: Section | undefined
   children: ReactNode
 }
 
@@ -77,11 +79,12 @@ interface RouterProviderProps {
  */
 export function RouterProvider({
   initialRoute = { kind: 'today' },
+  initialSection,
   children,
 }: RouterProviderProps): ReactElement {
   const { navigation: appNavigation } = useAppServices()
   const [navigation] = useState(() => {
-    appNavigation.reset(initialRoute)
+    appNavigation.reset(initialRoute, initialSection)
     return appNavigation
   })
 

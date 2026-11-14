@@ -34,9 +34,14 @@ export const routeSchema = z.discriminatedUnion('kind', [
 export type Route = z.infer<typeof routeSchema>
 
 /**
+ * Parses a section that was stored as JSON.
+ */
+export const sectionSchema = z.enum(['daily', 'all', 'tasks', 'chat'])
+
+/**
  * A top-level area of the app. Every history entry belongs to one section.
  */
-export type Section = 'daily' | 'all' | 'tasks' | 'chat'
+export type Section = z.infer<typeof sectionSchema>
 
 /**
  * The section whose root screen `route` shows, or `null` for a route that

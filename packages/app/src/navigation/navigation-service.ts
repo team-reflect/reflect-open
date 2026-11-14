@@ -157,12 +157,14 @@ export interface NavigationService extends Store<NavigationState> {
    */
   forgetNotes(isGone: (path: string) => boolean): void
   /**
-   * Start a fresh history on `initialRoute` (today by default), dropping every
+   * Start a fresh history on `initialRoute` (today by default) in
+   * `initialSection` (by default the section whose root it shows, else
+   * Daily), dropping every
    * entry and scroll position: switching graphs must not carry the old graph's
    * history. The view tree that mounts for the new history calls this while it
    * renders, so subscribers are not notified; read `get()` afterwards.
    */
-  reset(initialRoute?: Route): void
+  reset(initialRoute?: Route, initialSection?: Section): void
 }
 
 export interface NavigationServiceDeps {
@@ -407,9 +409,9 @@ class NavigationServiceImpl implements NavigationService {
     }
   }
 
-  reset(initialRoute?: Route): void {
+  reset(initialRoute?: Route, initialSection?: Section): void {
     this.#revision += 1
-    this.#state = this.#start(initialRoute ?? { kind: 'today' })
+    this.#state = this.#start(initialRoute ?? { kind: 'today' }, initialSection)
   }
 
   #snapshot(): NavigationState {
@@ -426,10 +428,11 @@ class NavigationServiceImpl implements NavigationService {
     }
   }
 
-  #start(initialRoute: Route): NavigationState {
+  #start(initialRoute: Route, initialSection?: Section): NavigationState {
     this.#nextId = 0
     const route = normalizeRoute(initialRoute)
-    this.#stack = [{ id: this.#nextId++, route, section: rootSectionForRoute(route) ?? 'daily' }]
+    const section = initialSection ?? rootSectionForRoute(route) ?? 'daily'
+    this.#stack = [{ id: this.#nextId++, route, section }]
     this.#index = 0
     this.#arrivalSeq = 0
     this.#arrivalFocusEditor = false

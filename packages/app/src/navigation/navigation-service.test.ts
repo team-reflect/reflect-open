@@ -478,6 +478,12 @@ describe('NavigationService', () => {
       expect(navigation.savedScroll()).toBeNull()
     })
 
+    it('starts in the given section', () => {
+      const navigation = createNavigationService()
+      navigation.reset({ kind: 'note', path: 'notes/a.md' }, 'tasks')
+      expect(navigation.get().section).toBe('tasks')
+    })
+
     it('defaults to today and normalizes a malformed daily route', () => {
       const navigation = createNavigationService({ initialRoute: { kind: 'tasks' } })
       navigation.reset()

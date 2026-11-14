@@ -56,9 +56,9 @@ function MobileRouter({
   graphRoot: string
   children: ReactNode
 }): ReactElement {
-  const initialRoute = useRestoredRoute(graphRoot)
+  const restored = useRestoredRoute(graphRoot)
   return (
-    <RouterProvider initialRoute={initialRoute}>
+    <RouterProvider initialRoute={restored?.route} initialSection={restored?.section}>
       <MobileDeepLinks>{children}</MobileDeepLinks>
     </RouterProvider>
   )

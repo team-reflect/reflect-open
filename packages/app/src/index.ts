@@ -157,6 +157,7 @@ export {
   normalizeRoute,
   notePathForRoute,
   rootSectionForRoute,
+  sectionSchema,
   routeForPath,
   routeSchema,
   routesEqual,

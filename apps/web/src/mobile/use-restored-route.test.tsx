@@ -3,7 +3,7 @@ import {
   createTestPlatformService,
   createTestStorageService,
 } from '@reflect/core/testing'
-import type { Route } from '@reflect/app'
+import type { Route, Section } from '@reflect/app'
 import { describe, expect, it } from 'vitest'
 import { renderHookInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
@@ -24,14 +24,19 @@ async function renderRestoredRoute(stored: unknown, isSwiftMobile = true) {
   return { view, storage }
 }
 
-function storedRoute(graphRoot: string, route: Route | { kind: 'nowhere' }): unknown {
-  return { graphRoot, route }
+function storedRoute(
+  graphRoot: string,
+  route: Route | { kind: 'nowhere' },
+  section: Section = 'tasks',
+): unknown {
+  return { graphRoot, route, section }
 }
 
 describe('useRestoredRoute', () => {
   it('returns the route stored for the graph and removes it', async () => {
-    const { view, storage } = await renderRestoredRoute(storedRoute('/graph', { kind: 'tasks' }))
-    expect(view.result.current).toEqual({ kind: 'tasks' })
+    const note: Route = { kind: 'note', path: 'a.md' }
+    const { view, storage } = await renderRestoredRoute(storedRoute('/graph', note))
+    expect(view.result.current).toEqual({ graphRoot: '/graph', route: note, section: 'tasks' })
     expect(storage.session.get(STORAGE_KEY)).toBeNull()
   })
 
