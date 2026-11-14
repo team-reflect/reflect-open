@@ -49,7 +49,7 @@ function QuickOpenPanel(): ReactElement {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 px-4 pt-[12vh]"
+      className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 px-safe-offset-4 pt-[12vh]"
       onPointerDown={close}
     >
       <div

@@ -56,7 +56,7 @@ export function MobileChat(): ReactElement {
           <MobileChatComposer />
         </>
       ) : (
-        <div className="flex flex-1 items-center justify-center px-6">
+        <div className="flex flex-1 items-center justify-center px-safe-offset-6">
           <div className="flex max-w-sm flex-col items-center text-center">
             <MessageSquare aria-hidden strokeWidth={1.5} className="size-8 text-text-muted" />
             <h2 className="mt-4 text-lg font-semibold text-text">Chat with your notes</h2>

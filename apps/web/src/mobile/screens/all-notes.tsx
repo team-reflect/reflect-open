@@ -193,7 +193,7 @@ export function MobileAllNotes({
       {/* Undefined hits mean "still fetching" only while the query can run —
           with no bridge/graph it never will, and the empty state is honest. */}
       {enabled && hits === undefined ? (
-        <div className="flex flex-1 items-center justify-center" aria-label="Loading notes">
+        <div className="flex flex-1 items-center justify-center px-safe" aria-label="Loading notes">
           <Spinner className="size-5 text-text-muted" />
         </div>
       ) : (hits ?? []).length === 0 ? (
@@ -241,7 +241,7 @@ function TagSuggestions({
 
 function Empty({ icon, message }: { icon: ReactElement; message: string }): ReactElement {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2 text-text-muted">
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 px-safe text-text-muted">
       {icon}
       <p className="text-sm">{message}</p>
     </div>

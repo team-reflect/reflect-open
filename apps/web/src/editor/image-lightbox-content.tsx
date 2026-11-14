@@ -73,7 +73,7 @@ export function ImageLightboxContent({
         aria-label="Close image preview"
         className={cn(
           'absolute inset-0 flex cursor-zoom-out items-center justify-center overflow-hidden bg-transparent',
-          mobileSurface ? 'touch-none p-0' : 'p-6',
+          mobileSurface ? 'touch-none px-safe' : 'p-6',
         )}
         {...handlers}
       >
