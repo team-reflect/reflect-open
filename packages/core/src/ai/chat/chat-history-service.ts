@@ -20,11 +20,6 @@ import type { AssistantPart, ChatTurn } from './transcript.ts'
  */
 
 /**
- * Chat write commands return `()` from Rust, which serializes to `null`.
- */
-const voidSchema = z.null()
-
-/**
  * One conversation's metadata row.
  */
 export interface ChatConversation {
@@ -217,27 +212,23 @@ class ChatHistoryServiceImpl implements ChatHistoryService {
   }
 
   async saveTurn(input: SaveChatTurnInput): Promise<void> {
-    await this.#deps.ipc.call(
-      'chat_message_save',
-      {
-        conversation: input.conversation,
-        message: {
-          id: input.turn.id,
-          conversationId: input.conversation.id,
-          userText: input.turn.userText,
-          attachments: JSON.stringify(input.turn.attachments),
-          parts: JSON.stringify(input.turn.parts),
-          responseMessages: JSON.stringify(input.turn.responseMessages),
-          createdMs: input.createdMs,
-        },
-        generation: input.generation,
+    await this.#deps.ipc.call('chat_message_save', {
+      conversation: input.conversation,
+      message: {
+        id: input.turn.id,
+        conversationId: input.conversation.id,
+        userText: input.turn.userText,
+        attachments: JSON.stringify(input.turn.attachments),
+        parts: JSON.stringify(input.turn.parts),
+        responseMessages: JSON.stringify(input.turn.responseMessages),
+        createdMs: input.createdMs,
       },
-      voidSchema,
-    )
+      generation: input.generation,
+    })
   }
 
   async deleteConversation(id: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('chat_conversation_delete', { id, generation }, voidSchema)
+    await this.#deps.ipc.call('chat_conversation_delete', { id, generation })
   }
 
   async listRecent(limit = 50): Promise<ChatConversation[]> {

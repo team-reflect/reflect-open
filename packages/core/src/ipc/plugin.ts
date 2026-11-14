@@ -31,7 +31,7 @@ export type PluginEvent<Payload> = (
  * Build the typed caller for one plugin command. Args are typed but not
  * validated: the binding modules construct them, so a malformed args record
  * is a compile error, not a runtime case. The response still crosses the
- * IPC boundary untyped and funnels through {@link IpcBridgeService.call}:
+ * IPC boundary untyped and funnels through {@link IpcBridgeService.callRaw}:
  * validated against `resultSchema`, failures coerced to an `AppError` like
  * every other command.
  */
@@ -41,7 +41,7 @@ export function definePluginCommand<Args extends Record<string, unknown>, Result
   resultSchema: ZodType<Result, unknown>,
 ): PluginCommand<Args, Result> {
   return async (ipc, args) => {
-    return await ipc.call(`plugin:${plugin}|${command}`, args, resultSchema)
+    return await ipc.callRaw(`plugin:${plugin}|${command}`, args, resultSchema)
   }
 }
 

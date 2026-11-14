@@ -1,16 +1,9 @@
 import type { MaybePromise } from '@reflect/utils'
-import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 import { WritableStore, type Store } from '../store.ts'
 import type { Settings } from '../settings/schema.ts'
-import {
-  contactMatchSchema,
-  contactsAuthorizationSchema,
-  isContactsReadable,
-  type ContactMatch,
-  type ContactsAuthorization,
-} from './commands.ts'
+import { isContactsReadable, type ContactMatch, type ContactsAuthorization } from './commands.ts'
 import { pickContactLinkSuggestions } from './match.ts'
 
 /**
@@ -123,11 +116,7 @@ class ContactsServiceImpl implements ContactsService {
     const { ipc, logger } = this.#deps
     let authorization: ContactsAuthorization
     try {
-      authorization = await ipc.call(
-        'contacts_authorization_status',
-        {},
-        contactsAuthorizationSchema,
-      )
+      authorization = await ipc.call('contacts_authorization_status', {})
     } catch (cause) {
       logger.warn('failed to read the contacts permission', cause)
       return
@@ -137,7 +126,7 @@ class ContactsServiceImpl implements ContactsService {
 
   async requestAccess(): Promise<boolean> {
     try {
-      return await this.#deps.ipc.call('contacts_request_access', {}, z.boolean())
+      return await this.#deps.ipc.call('contacts_request_access', {})
     } finally {
       await this.refresh()
     }
@@ -152,11 +141,11 @@ class ContactsServiceImpl implements ContactsService {
   }
 
   lookupByEmail(email: string): Promise<ContactMatch[]> {
-    return this.#deps.ipc.call('contacts_lookup_by_email', { email }, z.array(contactMatchSchema))
+    return this.#deps.ipc.call('contacts_lookup_by_email', { email })
   }
 
   lookupByName(name: string): Promise<ContactMatch[]> {
-    return this.#deps.ipc.call('contacts_lookup_by_name', { name }, z.array(contactMatchSchema))
+    return this.#deps.ipc.call('contacts_lookup_by_name', { name })
   }
 }
 

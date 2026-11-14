@@ -1,4 +1,4 @@
-import type { EventName } from '@reflect/types'
+import type { Commands, EventName } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ZodType } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -9,6 +9,29 @@ import type { Unlisten } from '../unlisten.ts'
  * The shell's broadcast after an index write command commits.
  */
 export const INDEX_WRITTEN_EVENT = 'index:written' satisfies EventName
+
+/**
+ * A command from the generated command table: the Rust core or the desktop
+ * shell answers it.
+ */
+export type CommandName = keyof Commands
+
+/**
+ * The arguments of command `C`, as Rust deserializes them. Read-only, so
+ * callers can pass read-only arrays.
+ */
+export type CommandArgs<C extends CommandName> = DeepReadonly<Commands[C]['args']>
+
+type DeepReadonly<T> = T extends (infer Item)[]
+  ? readonly DeepReadonly<Item>[]
+  : T extends object
+    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T
+
+/**
+ * The result of command `C`, as Rust serializes it.
+ */
+export type CommandResult<C extends CommandName> = Commands[C]['result']
 
 /**
  * The raw transport a host implements: the desktop app adapts Tauri's
@@ -70,11 +93,27 @@ export interface PluginSubscription {
  */
 export interface IpcBridgeService {
   /**
-   * Invoke a `#[tauri::command]` (snake_case name) and validate the response.
-   * The schema input is `unknown`, not `TOutput`: schemas that normalize
-   * (`.catch`, `.default`) have a wider input type than output.
+   * Invoke a command from the generated command table. The arguments and the
+   * result have the types Rust declares, so the result needs no schema.
    */
-  call<TOutput>(
+  call<C extends CommandName>(command: C, args: CommandArgs<C>): Promise<CommandResult<C>>
+  /**
+   * Invoke a command from the command table and check its result with a zod
+   * schema: for data from disk or the network, or checks stricter than the
+   * Rust type.
+   */
+  call<C extends CommandName, TOutput>(
+    command: C,
+    args: CommandArgs<C>,
+    schema: ZodType<TOutput, unknown>,
+  ): Promise<TOutput>
+  /**
+   * Invoke a command outside the command table (Swift shell commands,
+   * plugins, calendar) and validate the whole response. The schema input is
+   * `unknown`, not `TOutput`: schemas that normalize (`.catch`, `.default`)
+   * have a wider input type than output.
+   */
+  callRaw<TOutput>(
     command: string,
     args: Record<string, unknown>,
     schema: ZodType<TOutput, unknown>,
@@ -141,18 +180,30 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
     this.hasBinaryTransport = deps.transport.invokeBinary !== undefined
   }
 
-  async call<TOutput>(
+  async call(
+    command: CommandName,
+    args: Readonly<Record<string, unknown>>,
+    schema?: ZodType,
+  ): Promise<unknown> {
+    const raw = await this.#invoke(command, args)
+    // Rust generates the result type from the value it serializes.
+    return schema === undefined ? raw : parseResponse(command, raw, schema)
+  }
+
+  async callRaw<TOutput>(
     command: string,
     args: Record<string, unknown>,
     schema: ZodType<TOutput, unknown>,
   ): Promise<TOutput> {
-    let raw: unknown
+    return parseResponse(command, await this.#invoke(command, args), schema)
+  }
+
+  async #invoke(command: string, args: Readonly<Record<string, unknown>>): Promise<unknown> {
     try {
-      raw = await this.#deps.transport.invoke(command, args)
+      return await this.#deps.transport.invoke(command, args)
     } catch (error) {
       throw toAppError(error)
     }
-    return parseResponse(command, raw, schema)
   }
 
   async callBinary<TOutput>(
@@ -243,11 +294,7 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
   }
 }
 
-function parseResponse<TOutput>(
-  command: string,
-  raw: unknown,
-  schema: ZodType<TOutput, unknown>,
-): TOutput {
+function parseResponse<TOutput>(command: string, raw: unknown, schema: ZodType<TOutput>): TOutput {
   const result = schema.safeParse(raw)
   if (!result.success) {
     throw new AppError(

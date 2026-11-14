@@ -152,6 +152,7 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
 
   readonly transport: IpcBridge
   readonly hasBinaryTransport: boolean
+  readonly call: IpcBridgeService['call']
 
   constructor(options: TestIpcBridgeServiceOptions | undefined) {
     this.#transport = new TestIpcTransport(options)
@@ -161,14 +162,15 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
       logger: options?.logger ?? createTestLoggerService(),
     })
     this.hasBinaryTransport = this.#inner.hasBinaryTransport
+    this.call = this.#inner.call.bind(this.#inner)
   }
 
-  call<TOutput>(
+  callRaw<TOutput>(
     command: string,
     args: Record<string, unknown>,
     schema: ZodType<TOutput, unknown>,
   ): Promise<TOutput> {
-    return this.#inner.call(command, args, schema)
+    return this.#inner.callRaw(command, args, schema)
   }
 
   callBinary<TOutput>(

@@ -8,11 +8,6 @@ import type { DatabaseService } from './database-service.ts'
 
 import type { IndexedNote } from './indexed-note.ts'
 
-/**
- * Index commands return `()` from Rust, which serializes to `null` over IPC.
- */
-const voidSchema = z.null()
-
 const scanCandidateSchema = z.object({
   path: z.string(),
   modifiedMs: z.number(),
@@ -318,61 +313,58 @@ class IndexStoreServiceImpl implements IndexStoreService {
   }
 
   open(): Promise<number> {
-    return this.#deps.ipc.call('index_open', {}, z.number())
+    return this.#deps.ipc.call('index_open', {})
   }
 
   async apply(note: IndexedNote, generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_apply', { note, generation }, voidSchema)
+    await this.#deps.ipc.call('index_apply', { note, generation })
   }
 
   async applyBatch(notes: IndexedNote[], generation: number): Promise<void> {
     if (notes.length === 0) {
       return
     }
-    await this.#deps.ipc.call('index_apply_batch', { notes, generation }, voidSchema)
+    await this.#deps.ipc.call('index_apply_batch', { notes, generation })
   }
 
   async remove(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_remove', { path, generation }, voidSchema)
+    await this.#deps.ipc.call('index_remove', { path, generation })
   }
 
   async move(from: string, to: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call(
-      'index_move',
-      { from, to, generation, toAddress: movedNoteAddress(to) },
-      voidSchema,
-    )
+    await this.#deps.ipc.call('index_move', {
+      from,
+      to,
+      generation,
+      toAddress: movedNoteAddress(to),
+    })
   }
 
   async moveIndexed(from: string, to: string, fileGeneration: number): Promise<void> {
-    await this.#deps.ipc.call(
-      'note_move_indexed',
-      {
-        request: {
-          from,
-          to,
-          toAddress: movedNoteAddress(to),
-          fromAddress: movedNoteAddress(from),
-        },
-        generation: fileGeneration,
+    await this.#deps.ipc.call('note_move_indexed', {
+      request: {
+        from,
+        to,
+        toAddress: movedNoteAddress(to),
+        fromAddress: movedNoteAddress(from),
       },
-      voidSchema,
-    )
+      generation: fileGeneration,
+    })
   }
 
   reconcileScan(generation: number): Promise<ReconcileScan> {
-    return this.#deps.ipc.call('index_reconcile_scan', { generation }, reconcileScanSchema)
+    return this.#deps.ipc.call('index_reconcile_scan', { generation })
   }
 
   async touch(entries: readonly IndexedNoteTouch[], generation: number): Promise<void> {
     if (entries.length === 0) {
       return
     }
-    await this.#deps.ipc.call('index_touch', { entries, generation }, voidSchema)
+    await this.#deps.ipc.call('index_touch', { entries, generation })
   }
 
   async clear(generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_clear', { generation }, voidSchema)
+    await this.#deps.ipc.call('index_clear', { generation })
   }
 
   async getMeta(key: string): Promise<string | null> {
@@ -385,7 +377,7 @@ class IndexStoreServiceImpl implements IndexStoreService {
   }
 
   async setMeta(key: string, value: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('index_meta_set', { key, value, generation }, voidSchema)
+    await this.#deps.ipc.call('index_meta_set', { key, value, generation })
   }
 
   createApplyBatch(

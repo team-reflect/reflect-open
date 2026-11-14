@@ -9,7 +9,7 @@ import { z } from 'zod'
 export function createSwiftOpenerTransport(ipc: IpcBridgeService): OpenerTransport {
   return {
     openUrl: async (url) => {
-      await ipc.call('host.open_url', { url }, z.null())
+      await ipc.callRaw('host.open_url', { url }, z.null())
     },
     revealItemInDir: (path) => {
       throw new Error(`cannot reveal ${path}: iOS has no file manager`)

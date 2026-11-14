@@ -12,6 +12,9 @@ export {
   createIpcBridgeService,
   INDEX_WRITTEN_EVENT,
   listenNow,
+  type CommandArgs,
+  type CommandName,
+  type CommandResult,
   type IpcBridge,
   type IpcBridgeService,
 } from './ipc/ipc-service.ts'
@@ -231,7 +234,6 @@ export {
   type GraphImportProgress,
   type GraphImportSummary,
   type WindowBootstrap,
-  windowBootstrapSchema,
 } from './graph/schemas.ts'
 export { type EmbedMediaService } from './embeds/embed-media-service.ts'
 

@@ -43,12 +43,15 @@ fn typescript(types: &Types) -> String {
     // 64-bit value the app sends. The remapper turns 64-bit integers into
     // 32-bit ones, which TypeScript renders as `number`. Swift keeps `UInt64`.
     // Floats render as `number | null` (serde writes NaN as `null`); the app
-    // never sends NaN, so they become `number`.
+    // never sends NaN, so they become `number`. Free-form JSON becomes
+    // `unknown`: the frontend validates what it reads and sends plain objects.
     let number = DataType::Reference(specta_typescript::define("number"));
+    let json = <serde_json::Value as specta::Type>::definition(&mut Types::default());
     let remapper = specta_util::Remapper::new()
         .dangerous_bigints_as_number()
         .rule(Primitive::f32.into(), number.clone())
-        .rule(Primitive::f64.into(), number);
+        .rule(Primitive::f64.into(), number)
+        .rule(json, DataType::Reference(specta_typescript::define("unknown")));
     let out = specta_typescript::Typescript::default()
         .header(format!("// {HEADER}"))
         .export(&remapper.remap_types(types.clone()), specta_serde::Format)

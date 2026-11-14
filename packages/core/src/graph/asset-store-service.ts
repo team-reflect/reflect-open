@@ -106,7 +106,7 @@ class AssetStoreServiceImpl implements AssetStoreService {
   async uploadBlob(desiredName: string, contents: Blob, generation: number): Promise<string> {
     const { ipc } = this.#deps
     const path = await this.#streamUpload(contents, generation, async (id) => {
-      return await ipc.call('asset_upload_commit', { id, desiredName, generation }, z.string())
+      return await ipc.call('asset_upload_commit', { id, desiredName, generation })
     })
     this.#reportWrite(path)
     return path
@@ -120,28 +120,24 @@ class AssetStoreServiceImpl implements AssetStoreService {
       return
     }
     await this.#streamUpload(contents, generation, async (id) => {
-      return await ipc.call('asset_upload_commit_path', { id, path, generation }, voidSchema)
+      return await ipc.call('asset_upload_commit_path', { id, path, generation })
     })
     this.#reportWrite(path)
   }
 
   async importFile(sourcePath: string, desiredName: string, generation: number): Promise<string> {
-    const path = await this.#deps.ipc.call(
-      'asset_import',
-      { sourcePath, desiredName, generation },
-      z.string(),
-    )
+    const path = await this.#deps.ipc.call('asset_import', { sourcePath, desiredName, generation })
     this.#reportWrite(path)
     return path
   }
 
   async writeBase64(path: string, contentsBase64: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('asset_write', { path, contentsBase64, generation }, voidSchema)
+    await this.#deps.ipc.call('asset_write', { path, contentsBase64, generation })
     this.#reportWrite(path)
   }
 
   async readBase64(path: string, generation: number): Promise<string> {
-    return await this.#deps.ipc.call('asset_read', { path, generation }, z.string())
+    return await this.#deps.ipc.call('asset_read', { path, generation })
   }
 
   async readBytes(path: string, generation: number): Promise<Uint8Array<ArrayBuffer>> {
@@ -149,7 +145,7 @@ class AssetStoreServiceImpl implements AssetStoreService {
     if (!ipc.hasBinaryTransport) {
       return base64ToBytes(await this.readBase64(path, generation))
     }
-    const buffer = await ipc.call(
+    const buffer = await ipc.callRaw(
       'asset_read_binary',
       { path, generation },
       z.instanceof(ArrayBuffer),
@@ -158,28 +154,28 @@ class AssetStoreServiceImpl implements AssetStoreService {
   }
 
   async open(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('asset_open', { path, generation }, voidSchema)
+    await this.#deps.ipc.call('asset_open', { path, generation })
   }
 
   async reveal(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('asset_reveal', { path, generation }, voidSchema)
+    await this.#deps.ipc.call('asset_reveal', { path, generation })
   }
 
   async deleteAudioMemo(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('audio_memo_delete', { path, generation }, voidSchema)
+    await this.#deps.ipc.call('audio_memo_delete', { path, generation })
   }
 
   async importAudioMemo(sourcePath: string, path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('audio_memo_import', { sourcePath, path, generation }, voidSchema)
+    await this.#deps.ipc.call('audio_memo_import', { sourcePath, path, generation })
     this.#reportWrite(path)
   }
 
   async readTranscriptCache(name: string, generation: number): Promise<string> {
-    return await this.#deps.ipc.call('transcript_cache_read', { name, generation }, z.string())
+    return await this.#deps.ipc.call('transcript_cache_read', { name, generation })
   }
 
   async writeTranscriptCache(name: string, contents: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('transcript_cache_write', { name, contents, generation }, voidSchema)
+    await this.#deps.ipc.call('transcript_cache_write', { name, contents, generation })
   }
 
   #reportWrite(path: string): void {
@@ -196,7 +192,7 @@ class AssetStoreServiceImpl implements AssetStoreService {
     commit: (id: string) => Promise<Result>,
   ): Promise<Result> {
     const { ipc } = this.#deps
-    const id = await ipc.call('asset_upload_begin', { generation }, z.string())
+    const id = await ipc.call('asset_upload_begin', { generation })
     try {
       for (const chunk of blobChunks(contents, CHUNK_BYTES)) {
         await ipc.callBinary(
@@ -210,7 +206,7 @@ class AssetStoreServiceImpl implements AssetStoreService {
     } catch (error) {
       // Best-effort cleanup of the staged temp file; the original error is the
       // one worth surfacing.
-      await ipc.call('asset_upload_abort', { id }, voidSchema).catch(noop)
+      await ipc.call('asset_upload_abort', { id }).catch(noop)
       throw error
     }
   }

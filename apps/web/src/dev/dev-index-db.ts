@@ -10,7 +10,7 @@ import {
   foldGraphPath,
   noteBasenameKey,
   AppError,
-  type IndexedNote,
+  type CommandArgs,
 } from '@reflect/core'
 import { isIsoDate } from '@reflect/utils'
 
@@ -24,7 +24,7 @@ export interface DevIndexDb {
   /** Execute a read query (the `db_query` contract): rows as column-keyed objects. */
   query: (sql: string, params: readonly unknown[]) => Record<string, SqlValue>[]
   /** Replace all rows for `note.path` with its projection (`index_apply`). */
-  applyNote: (note: IndexedNote) => void
+  applyNote: (note: CommandArgs<'index_apply'>['note']) => void
   /** Drop every row belonging to `path` (`index_remove`). */
   removeNote: (path: string) => void
   /** Re-key every row from `from` to `to` (`index_move`); throws when `to` is occupied. */
@@ -210,7 +210,7 @@ export function openDevIndexDb(sqlite3: Sqlite3Static): DevIndexDb {
             note.path,
             task.astPath,
             task.markdown,
-            encodeTaskBreadcrumbs(task.breadcrumbs),
+            encodeTaskBreadcrumbs(task.breadcrumbs ?? []),
             task.checked,
             task.dueDate,
           ],

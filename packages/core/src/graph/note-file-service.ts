@@ -1,45 +1,9 @@
-import { z } from 'zod'
+import type { FileMeta, LocalNoteRead, NoteCreateOutcome, VaultScanStats } from '@reflect/types'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
-import {
-  fileMetaSchema,
-  noteCreateOutcomeSchema,
-  type FileMeta,
-  type NoteCreateOutcome,
-} from './schemas.ts'
 
-/**
-
- * Commands that return `()` from Rust serialize as `null` over IPC.
-
- */
-const voidSchema = z.null()
-
-const localNoteReadSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('content'), content: z.string() }),
-  z.object({ kind: z.literal('evicted') }),
-])
-
-/**
-
- * How a {@link NoteFileService.readLocal} request found the note on disk.
-
- */
-export type LocalNoteRead = z.infer<typeof localNoteReadSchema>
-
-const vaultScanStatsSchema = z.object({
-  notes: z.number(),
-  attachments: z.number(),
-  skipped: z.number(),
-})
-
-export type VaultScanStats = z.infer<typeof vaultScanStatsSchema>
-
-const noteWriteOutcomeSchema = z.object({
-  modifiedMs: z.number().nullable(),
-  merged: z.string().nullable(),
-})
+export type { LocalNoteRead, VaultScanStats } from '@reflect/types'
 
 /**
  * The outcome of {@link NoteFileService.write}.
@@ -122,11 +86,11 @@ class NoteFileServiceImpl implements NoteFileService {
   }
 
   async read(path: string, generation: number): Promise<string> {
-    return await this.#deps.ipc.call('note_read', { path, generation }, z.string())
+    return await this.#deps.ipc.call('note_read', { path, generation })
   }
 
   async readLocal(path: string, generation: number): Promise<LocalNoteRead> {
-    return await this.#deps.ipc.call('note_read_local', { path, generation }, localNoteReadSchema)
+    return await this.#deps.ipc.call('note_read_local', { path, generation })
   }
 
   async write(
@@ -136,16 +100,13 @@ class NoteFileServiceImpl implements NoteFileService {
     expectedContents?: string | null,
   ): Promise<NoteWriteResult> {
     const { ipc, clock, fileChanges } = this.#deps
-    const outcome = await ipc.call(
-      'note_write',
-      {
-        path,
-        contents,
-        generation,
-        ...(expectedContents === undefined ? {} : { checkContents: true, expectedContents }),
-      },
-      noteWriteOutcomeSchema,
-    )
+    const outcome = await ipc.call('note_write', {
+      path,
+      contents,
+      generation,
+      checkContents: expectedContents === undefined ? null : true,
+      expectedContents: expectedContents ?? null,
+    })
     const modifiedMs = outcome.modifiedMs ?? clock.now()
     fileChanges.reportOwnWrite([{ path, kind: 'upsert', modifiedMs }])
     return { merged: outcome.merged }
@@ -153,11 +114,7 @@ class NoteFileServiceImpl implements NoteFileService {
 
   async create(path: string, contents: string, generation: number): Promise<NoteCreateOutcome> {
     const { ipc, clock, fileChanges } = this.#deps
-    const outcome = await ipc.call(
-      'note_create',
-      { path, contents, generation },
-      noteCreateOutcomeSchema,
-    )
+    const outcome = await ipc.call('note_create', { path, contents, generation })
     if (outcome.kind === 'created') {
       fileChanges.reportOwnWrite([
         { path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? clock.now() },
@@ -167,28 +124,28 @@ class NoteFileServiceImpl implements NoteFileService {
   }
 
   async exists(path: string): Promise<boolean> {
-    return await this.#deps.ipc.call('note_exists', { path }, z.boolean())
+    return await this.#deps.ipc.call('note_exists', { path })
   }
 
   async delete(path: string, generation: number): Promise<void> {
-    await this.#deps.ipc.call('note_delete', { path, generation }, voidSchema)
+    await this.#deps.ipc.call('note_delete', { path, generation })
     this.#deps.fileChanges.reportOwnWrite([{ path, kind: 'remove' }])
   }
 
   async listNotes(generation: number): Promise<FileMeta[]> {
-    return await this.#deps.ipc.call('list_files', { generation }, z.array(fileMetaSchema))
+    return await this.#deps.ipc.call('list_files', { generation })
   }
 
   async listAttachments(generation: number): Promise<FileMeta[]> {
-    return await this.#deps.ipc.call('list_attachments', { generation }, z.array(fileMetaSchema))
+    return await this.#deps.ipc.call('list_attachments', { generation })
   }
 
   async listDir(dir: string, generation: number): Promise<FileMeta[]> {
-    return await this.#deps.ipc.call('dir_list', { dir, generation }, z.array(fileMetaSchema))
+    return await this.#deps.ipc.call('dir_list', { dir, generation })
   }
 
   async vaultScanStats(generation: number): Promise<VaultScanStats> {
-    return await this.#deps.ipc.call('vault_scan_stats', { generation }, vaultScanStatsSchema)
+    return await this.#deps.ipc.call('vault_scan_stats', { generation })
   }
 }
 

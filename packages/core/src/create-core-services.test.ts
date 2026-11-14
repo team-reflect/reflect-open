@@ -49,7 +49,7 @@ describe('createCoreServices', () => {
     expect(services.logger).toBe(adapters.logger)
     expect(services.clock).toBe(adapters.clock)
     expect(services.platform).toBe(adapters.platform)
-    await expect(services.ipc.call('app_version', {}, z.string())).resolves.toBe('1.2.3')
+    await expect(services.ipc.callRaw('app_version', {}, z.string())).resolves.toBe('1.2.3')
     expect(services.platform.appVersion).toBe('0.0.0-test')
     await expect(services.path.homeDir()).resolves.toBe('/home/test')
   })

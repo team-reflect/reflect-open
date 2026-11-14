@@ -99,11 +99,11 @@ export type ChatMessageRow = {
 export type Commands = {
 	settings_load: {
 		args: Record<string, never>,
-		result: { [key in string]: Value },
+		result: { [key in string]: unknown },
 	},
 	settings_save: {
 		args: {
-			settings: { [key in string]: Value },
+			settings: { [key in string]: unknown },
 		},
 		result: null,
 	},
@@ -407,9 +407,9 @@ export type Commands = {
 	db_query: {
 		args: {
 			sql: string,
-			params: Value[],
+			params: unknown[],
 		},
-		result: { [key in string]: Value }[],
+		result: { [key in string]: unknown }[],
 	},
 	chat_message_save: {
 		args: {
@@ -702,7 +702,7 @@ export type Commands = {
 	x_archive_write: {
 		args: {
 			generation: number,
-			value: Value,
+			value: unknown,
 		},
 		result: null,
 	},
@@ -711,7 +711,7 @@ export type Commands = {
 			generation: number,
 			postId: string,
 		},
-		result: Value | null,
+		result: unknown | null,
 	},
 	x_archive_owners: {
 		args: {
@@ -724,7 +724,7 @@ export type Commands = {
 		args: {
 			postId: string,
 		},
-		result: Value | null,
+		result: unknown | null,
 	},
 	skill_status: {
 		args: Record<string, never>,
@@ -1369,7 +1369,7 @@ export type SweepScope =
  */
 "ingested";
 
-export type Value = null | boolean | number | string | Value[] | { [key in string]: Value };
+export type Value = null | boolean | number | string | unknown[] | { [key in string]: unknown };
 
 /**
  *  Counts from the vault catalog. `skipped` is what the walk refused or

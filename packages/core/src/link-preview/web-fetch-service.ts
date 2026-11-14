@@ -72,15 +72,15 @@ class WebFetchServiceImpl implements WebFetchService {
   }
 
   async fetchMeta(url: CloudSafe<string>): Promise<string> {
-    return await this.#deps.ipc.call('capture_meta_fetch', { url }, z.string())
+    return await this.#deps.ipc.call('capture_meta_fetch', { url })
   }
 
   async fetchOembed(url: CloudSafe<string>): Promise<string> {
-    return await this.#deps.ipc.call('capture_oembed_fetch', { url }, z.string())
+    return await this.#deps.ipc.call('capture_oembed_fetch', { url })
   }
 
   async fetchLinkPreviewImage(url: CloudSafe<string>): Promise<string | null> {
-    return await this.#deps.ipc.call('capture_link_preview', { url }, z.string().nullable())
+    return await this.#deps.ipc.call('capture_link_preview', { url })
   }
 
   async fetchLinkPreviewHtml(url: CloudSafe<string>): Promise<LinkPreviewHtml> {

@@ -138,7 +138,7 @@ class CalendarServiceImpl implements CalendarService {
   }
 
   authorizationStatus(): Promise<CalendarAuthorizationStatus> {
-    return this.#deps.ipc.call(
+    return this.#deps.ipc.callRaw(
       'calendar_authorization_status',
       {},
       calendarAuthorizationStatusSchema,
@@ -146,15 +146,15 @@ class CalendarServiceImpl implements CalendarService {
   }
 
   requestAccess(): Promise<boolean> {
-    return this.#deps.ipc.call('calendar_request_access', {}, z.boolean())
+    return this.#deps.ipc.callRaw('calendar_request_access', {}, z.boolean())
   }
 
   listCalendars(): Promise<CalendarInfo[]> {
-    return this.#deps.ipc.call('calendar_list_calendars', {}, z.array(calendarInfoSchema))
+    return this.#deps.ipc.callRaw('calendar_list_calendars', {}, z.array(calendarInfoSchema))
   }
 
   listEvents(range: CalendarRange, calendarIds: readonly string[]): Promise<CalendarEvent[]> {
-    return this.#deps.ipc.call(
+    return this.#deps.ipc.callRaw(
       'calendar_list_events',
       { start: range.start, end: range.end, calendarIds: [...calendarIds] },
       z.array(calendarEventSchema),

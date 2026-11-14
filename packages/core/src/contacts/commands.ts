@@ -1,4 +1,7 @@
+import type { ContactsAuthorization } from '@reflect/types'
 import { z } from 'zod'
+
+export type { ContactMatch, ContactsAuthorization } from '@reflect/types'
 
 /**
  * The `contacts` capability's shapes and the permission policy.
@@ -18,8 +21,6 @@ export const contactsAuthorizationSchema = z.enum([
   'unavailable',
 ])
 
-export type ContactsAuthorization = z.infer<typeof contactsAuthorizationSchema>
-
 /**
  * One matched contact, flattened to the fields Reflect can write into a note.
  * Field-level `.catch` keeps a single odd contact from failing a whole lookup.
@@ -32,8 +33,6 @@ export const contactMatchSchema = z.object({
   emails: z.array(z.string()).catch([]),
   phones: z.array(z.string()).catch([]),
 })
-
-export type ContactMatch = z.infer<typeof contactMatchSchema>
 
 /**
  * Can lookups be issued right now? `limited` (iOS 18+) still reads the shared subset.

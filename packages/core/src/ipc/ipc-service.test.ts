@@ -18,12 +18,11 @@ function serviceOver(transport: IpcBridge) {
 }
 
 describe('call', () => {
-  it('returns the schema-validated response', async () => {
+  it('returns the raw response without a schema', async () => {
     const invoke = vi.fn().mockResolvedValue({ root: '/g', generation: 1 })
     const { ipc } = serviceOver({ invoke, listen: () => Promise.resolve(noop) })
 
-    const schema = z.object({ root: z.string(), generation: z.number() })
-    await expect(ipc.call('graph_open', { path: '/g' }, schema)).resolves.toEqual({
+    await expect(ipc.call('graph_open', { path: '/g' })).resolves.toEqual({
       root: '/g',
       generation: 1,
     })
@@ -42,7 +41,7 @@ describe('call', () => {
     })
 
     const error = await ipc
-      .call('note_read', { path: 'x' }, z.string())
+      .call('note_read', { path: 'x', generation: null })
       .catch((caught: unknown) => caught)
     expect(isAppError(error)).toBe(true)
     expect(error).toEqual(new AppError('notFound', 'missing'))
@@ -55,7 +54,7 @@ describe('call', () => {
     })
 
     const error = await ipc
-      .call('note_read', { path: 'x' }, z.string())
+      .call('note_read', { path: 'x', generation: null })
       .catch((caught: unknown) => caught)
     expect(error).toEqual(new AppError('unknown', 'socket closed'))
   })
@@ -66,7 +65,10 @@ describe('call', () => {
       listen: () => Promise.resolve(noop),
     })
 
-    const error = await ipc.call('graph_open', {}, z.string()).catch((caught: unknown) => caught)
+    const schema = z.object({ root: z.string() })
+    const error = await ipc
+      .call('graph_open', { path: '/g' }, schema)
+      .catch((caught: unknown) => caught)
     expect(isAppError(error)).toBe(true)
     if (isAppError(error)) {
       expect(error.kind).toBe('parse')

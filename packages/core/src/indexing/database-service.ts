@@ -1,6 +1,5 @@
 import { createDb, type Database, type QueryRunner } from '@reflect/db'
 import type { Kysely } from 'kysely'
-import { z } from 'zod'
 import { toAppError } from '../errors.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
 
@@ -26,12 +25,6 @@ export interface DatabaseService {
   readonly runQuery: QueryRunner
 }
 
-/**
- * Rows are the index's own projection, so they skip per-row validation; the
- * dialect still fails fast on a response that is not a row array.
- */
-const rowsSchema = z.unknown()
-
 class DatabaseServiceImpl implements DatabaseService {
   readonly db: Kysely<Database>
   readonly runQuery: QueryRunner
@@ -40,7 +33,7 @@ class DatabaseServiceImpl implements DatabaseService {
     const { ipc } = deps
     this.runQuery = async (sql, params) => {
       try {
-        return await ipc.call('db_query', { sql, params: [...params] }, rowsSchema)
+        return await ipc.call('db_query', { sql, params: [...params] })
       } catch (error) {
         throw toAppError(error)
       }

@@ -11,7 +11,9 @@ pub struct GraphInfo {
     pub root: String,
     /// Display name (the root folder name).
     pub name: String,
-    /// Open-session generation; mutating file commands must echo it back.
+    /// Open-session generation, bumped on every graph open. Mutating file
+    /// commands echo it back and are rejected when stale, so a write enqueued
+    /// for one graph can never land in another graph's same-named file.
     pub generation: u64,
 }
 

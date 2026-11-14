@@ -223,7 +223,7 @@ class NativeMenuServiceImpl implements NativeMenuService {
     // Best-effort: the menu works without the item, so a failed call must
     // not make the whole install look failed.
     try {
-      await ipc.call('menu_install_paste_and_match_style', {}, z.null())
+      await ipc.call('menu_install_paste_and_match_style', {})
     } catch (error) {
       logger.warn('failed to add the Paste and Match Style menu item:', error)
     }
