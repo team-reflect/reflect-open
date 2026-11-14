@@ -20,18 +20,6 @@ const TOLERANCE_PX = 1
  */
 const REVEALED_PX = BACK_PAGER_OVERSHOOT_PX + TOLERANCE_PX
 
-/**
- * Rightward finger travel (px) after which a lifted finger counts as the
- * release of a swipe, even before the pager reports a scroll.
- */
-const RELEASE_TRAVEL_PX = 10
-
-/**
- * Time (ms) after a release at which a pager that still rests on its page ends
- * the release: the drag did not move it, so no settle follows.
- */
-const RELEASE_CHECK_MS = 250
-
 export interface BackPagerOptions {
   /**
    * The horizontal scroller. Its pages are the stack layers, the current one last.
@@ -137,13 +125,17 @@ export function useBackPager({
     let popped = false
     // A user swipe has moved the page and has not settled yet.
     let swiping = false
-    let releaseCheck: ReturnType<typeof setTimeout> | undefined
 
     // Only a gesture since the pager last rested on its page may pop it: a
     // scroll that code or the engine started is pinned back.
     let gesturesAtRest = 0
     const watch = watchScrollSettle({
       element: scroller,
+      onRelease: () => {
+        if (!popped) {
+          setReleasing(scroller, true)
+        }
+      },
       onSettle: () => {
         if (popped) {
           return
@@ -199,59 +191,6 @@ export function useBackPager({
     }
     scroller.addEventListener('scroll', startSwipe, { passive: true, signal: controller.signal })
 
-    const release = (): void => {
-      setReleasing(scroller, true)
-      clearTimeout(releaseCheck)
-      releaseCheck = setTimeout(() => {
-        if (!watch.isTouching() && scroller.scrollLeft >= restLeft(scroller) - TOLERANCE_PX) {
-          setReleasing(scroller, false)
-        }
-      }, RELEASE_CHECK_MS)
-    }
-    // The finger's rightward travel since it landed. The first `scroll` of a
-    // fast swipe can reach the page after the finger lifts.
-    let landedX = 0
-    let lastX = 0
-    scroller.addEventListener(
-      'touchstart',
-      (event) => {
-        if (event.touches.length === 1) {
-          landedX = lastX = event.touches[0]?.clientX ?? 0
-        }
-      },
-      { passive: true, signal },
-    )
-    scroller.addEventListener(
-      'touchmove',
-      (event) => {
-        lastX = event.touches[0]?.clientX ?? lastX
-      },
-      { passive: true, signal },
-    )
-    scroller.addEventListener(
-      'touchend',
-      (event) => {
-        if (
-          event.touches.length === 0 &&
-          !popped &&
-          (swiping || lastX - landedX > RELEASE_TRAVEL_PX)
-        ) {
-          release()
-        }
-      },
-      { passive: true, signal },
-    )
-    // A swipe whose first `scroll` comes after the lift.
-    scroller.addEventListener(
-      'scroll',
-      () => {
-        if (swiping && !popped && !watch.isTouching()) {
-          release()
-        }
-      },
-      { passive: true, signal },
-    )
-
     const scrim = scrimRef.current
     if (scrim) {
       linkOpacityToScroll({
@@ -277,7 +216,6 @@ export function useBackPager({
     return () => {
       controller.abort()
       resize.disconnect()
-      clearTimeout(releaseCheck)
       setReleasing(scroller, false)
       if (swiping && !popped) {
         reportSwipe('cancel')
