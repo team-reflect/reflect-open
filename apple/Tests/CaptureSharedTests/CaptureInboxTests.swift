@@ -2,6 +2,7 @@ import Foundation
 import Testing
 
 @testable import CaptureShared
+import TypesShared
 
 private func makeInbox() -> URL {
   FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -134,11 +135,11 @@ func isHttpUrl(candidate: String, expected: Bool) {
   defer { try? FileManager.default.removeItem(at: inbox) }
   #expect(
     try CaptureInbox.spoolText(
-      " \n ", source: "ios-share", parent: nil, id: testId, now: testNow, into: inbox) == false)
+      " \n ", source: .iosShare, parent: nil, id: testId, now: testNow, into: inbox) == false)
   #expect(!FileManager.default.fileExists(atPath: inbox.path))
   // The public entry point returns false before it looks up the App Group
   // container, which the test process does not have.
-  #expect(try CaptureInbox.spoolText(" \n ", source: "ios-share", parent: nil) == false)
+  #expect(try CaptureInbox.spoolText(" \n ", source: .iosShare, parent: nil) == false)
 }
 
 @Test func spoolTextEnvelopeShape() throws {
@@ -146,7 +147,7 @@ func isHttpUrl(candidate: String, expected: Bool) {
   defer { try? FileManager.default.removeItem(at: inbox) }
   #expect(
     try CaptureInbox.spoolText(
-      "first\nsecond", source: "ios-intent", parent: "  Daily \n log ", id: testId, now: testNow,
+      "first\nsecond", source: .iosIntent, parent: "  Daily \n log ", id: testId, now: testNow,
       into: inbox))
 
   let json = try readOnlyEnvelope(in: inbox)
@@ -181,7 +182,7 @@ func isHttpUrl(candidate: String, expected: Bool) {
   defer { try? FileManager.default.removeItem(at: text) }
   #expect(
     try CaptureInbox.spoolText(
-      "call the bank", source: "ios-share", parent: nil, id: testId, now: testNow, into: text))
+      "call the bank", source: .iosShare, parent: nil, id: testId, now: testNow, into: text))
   let expectedText = try JSONSerialization.jsonObject(
     with: Data(
       ("{\"capturedAt\":\"2026-07-05T07:12:30.123Z\",\"id\":\"7c9e6679-7425-40de-944b-e07fc1f90ae7\","

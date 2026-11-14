@@ -199,6 +199,110 @@ extension AppError: Codable {
 }
 
 
+/// The answer to a `reflect-asset` request.
+public enum AssetResolveReply: Sendable, Equatable {
+    case file(AssetResolveReplyFileData)
+    case refused(AssetResolveReplyRefusedData)
+}
+public struct AssetResolveReplyFileData: Codable, Sendable, Equatable {
+    public let path: String
+    public let mime: String
+    public let total: UInt64
+    public let range: ByteRange?
+
+    public init(path: String, mime: String, total: UInt64, range: ByteRange?) {
+        self.path = path
+        self.mime = mime
+        self.total = total
+        self.range = range
+    }
+}
+
+public struct AssetResolveReplyRefusedData: Codable, Sendable, Equatable {
+    public let status: UInt16
+    public let total: UInt64?
+
+    public init(status: UInt16, total: UInt64?) {
+        self.status = status
+        self.total = total
+    }
+}
+
+// MARK: - AssetResolveReply Codable Implementation
+extension AssetResolveReply: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("kind"))
+        switch tag {
+        case "file":
+            let pathValue = try container.decode(String.self, forKey: CodingKeys("path"))
+            let mimeValue = try container.decode(String.self, forKey: CodingKeys("mime"))
+            let totalValue = try container.decode(UInt64.self, forKey: CodingKeys("total"))
+            let rangeValue = try container.decodeIfPresent(ByteRange.self, forKey: CodingKeys("range"))
+            self = .file(AssetResolveReplyFileData(path: pathValue, mime: mimeValue, total: totalValue, range: rangeValue))
+        case "refused":
+            let statusValue = try container.decode(UInt16.self, forKey: CodingKeys("status"))
+            let totalValue = try container.decodeIfPresent(UInt64.self, forKey: CodingKeys("total"))
+            self = .refused(AssetResolveReplyRefusedData(status: statusValue, total: totalValue))
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .file(let data):
+            try container.encode("file", forKey: CodingKeys("kind"))
+            try container.encode(data.path, forKey: CodingKeys("path"))
+            try container.encode(data.mime, forKey: CodingKeys("mime"))
+            try container.encode(data.total, forKey: CodingKeys("total"))
+            try container.encode(data.range, forKey: CodingKeys("range"))
+        case .refused(let data):
+            try container.encode("refused", forKey: CodingKeys("kind"))
+            try container.encode(data.status, forKey: CodingKeys("status"))
+            try container.encode(data.total, forKey: CodingKeys("total"))
+        }
+    }
+}
+
+
+/// The first and last byte of a single-range `Range` header.
+public struct ByteRange: Codable, Sendable, Equatable {
+    public let start: UInt64
+    public let end: UInt64
+
+    private enum CodingKeys: String, CodingKey {
+        case start = "start"
+        case end = "end"
+    }
+
+    public init(start: UInt64, end: UInt64) {
+        self.start = start
+        self.end = end
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.start = try container.decode(UInt64.self, forKey: .start)
+        self.end = try container.decode(UInt64.self, forKey: .end)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(start, forKey: .start)
+        try container.encode(end, forKey: .end)
+    }
+}
+
 /// One attendee of a calendar event.
 public struct CalendarAttendee: Codable, Sendable, Equatable {
     public let name: String
@@ -377,6 +481,135 @@ public struct CalendarInfo: Codable, Sendable, Equatable {
         try container.encode(title, forKey: .title)
         try container.encode(source, forKey: .source)
         try container.encode(color, forKey: .color)
+    }
+}
+
+/// The native host's answer to one wire message: `{ ok: true, status:
+/// "queued" }`, or `{ ok: false, code, message }`.
+public struct CaptureAck: Codable, Sendable, Equatable {
+    public let ok: Bool
+    public let status: String?
+    public let code: CaptureErrorCode?
+    public let message: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case ok = "ok"
+        case status = "status"
+        case code = "code"
+        case message = "message"
+    }
+
+    public init(ok: Bool, status: String?, code: CaptureErrorCode?, message: String?) {
+        self.ok = ok
+        self.status = status
+        self.code = code
+        self.message = message
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.ok = try container.decode(Bool.self, forKey: .ok)
+        self.status = try container.decodeIfPresent(String.self, forKey: .status)
+        self.code = try container.decodeIfPresent(CaptureErrorCode.self, forKey: .code)
+        self.message = try container.decodeIfPresent(String.self, forKey: .message)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(ok, forKey: .ok)
+        if let status = status {
+            try container.encode(status, forKey: .status)
+        }
+        if let code = code {
+            try container.encode(code, forKey: .code)
+        }
+        if let message = message {
+            try container.encode(message, forKey: .message)
+        }
+    }
+}
+
+/// Why a capture was not spooled.
+public enum CaptureErrorCode: String, Codable, Sendable, Equatable {
+    case noGraph = "no-graph"
+    case invalidPayload = "invalid-payload"
+    case io = "io"
+    case unsupportedVersion = "unsupported-version"
+}
+
+/// The file the desktop app writes so the native host can find the open
+/// graph.
+public struct CapturePointer: Codable, Sendable, Equatable {
+    public let version: UInt32
+    public let graphRoot: String
+    public let bookmarkVersion: UInt32?
+    public let xLikeVersion: UInt32?
+
+    private enum CodingKeys: String, CodingKey {
+        case version = "version"
+        case graphRoot = "graphRoot"
+        case bookmarkVersion = "bookmarkVersion"
+        case xLikeVersion = "xLikeVersion"
+    }
+
+    public init(version: UInt32, graphRoot: String, bookmarkVersion: UInt32?, xLikeVersion: UInt32?) {
+        self.version = version
+        self.graphRoot = graphRoot
+        self.bookmarkVersion = bookmarkVersion
+        self.xLikeVersion = xLikeVersion
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.version = try container.decode(UInt32.self, forKey: .version)
+        self.graphRoot = try container.decode(String.self, forKey: .graphRoot)
+        self.bookmarkVersion = try container.decodeIfPresent(UInt32.self, forKey: .bookmarkVersion)
+        self.xLikeVersion = try container.decodeIfPresent(UInt32.self, forKey: .xLikeVersion)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(graphRoot, forKey: .graphRoot)
+        try container.encode(bookmarkVersion, forKey: .bookmarkVersion)
+        try container.encode(xLikeVersion, forKey: .xLikeVersion)
+    }
+}
+
+/// Who produced a link capture.
+public enum CaptureSource: String, Codable, Sendable, Equatable {
+    case Extension = "extension"
+    case iosShare = "ios-share"
+}
+
+/// The browser extension's message to the native host: an envelope and an
+/// optional screenshot.
+public struct CaptureWireMessage: Codable, Sendable, Equatable {
+    public let envelope: LinkCaptureEnvelope
+    public let screenshotBase64: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case envelope = "envelope"
+        case screenshotBase64 = "screenshotBase64"
+    }
+
+    public init(envelope: LinkCaptureEnvelope, screenshotBase64: String?) {
+        self.envelope = envelope
+        self.screenshotBase64 = screenshotBase64
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.envelope = try container.decode(LinkCaptureEnvelope.self, forKey: .envelope)
+        self.screenshotBase64 = try container.decodeIfPresent(String.self, forKey: .screenshotBase64)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(envelope, forKey: .envelope)
+        if let screenshotBase64 = screenshotBase64 {
+            try container.encode(screenshotBase64, forKey: .screenshotBase64)
+        }
     }
 }
 
@@ -605,6 +838,39 @@ public enum ContactsAuthorization: String, Codable, Sendable, Equatable {
     case authorized = "authorized"
     case limited = "limited"
     case unavailable = "unavailable"
+}
+
+/// The directories and user agent the iOS shell starts the core with.
+public struct CoreStartConfig: Codable, Sendable, Equatable {
+    public let appDataDir: String?
+    public let documentDir: String?
+    public let userAgent: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case appDataDir = "appDataDir"
+        case documentDir = "documentDir"
+        case userAgent = "userAgent"
+    }
+
+    public init(appDataDir: String?, documentDir: String?, userAgent: String?) {
+        self.appDataDir = appDataDir
+        self.documentDir = documentDir
+        self.userAgent = userAgent
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.appDataDir = try container.decodeIfPresent(String.self, forKey: .appDataDir)
+        self.documentDir = try container.decodeIfPresent(String.self, forKey: .documentDir)
+        self.userAgent = try container.decodeIfPresent(String.self, forKey: .userAgent)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(appDataDir, forKey: .appDataDir)
+        try container.encode(documentDir, forKey: .documentDir)
+        try container.encode(userAgent, forKey: .userAgent)
+    }
 }
 
 /// Byte counts for an active model download. Absent until the download
@@ -1516,6 +1782,89 @@ public struct IndexedTask: Codable, Sendable, Equatable {
     }
 }
 
+/// A captured web page.
+public struct LinkCaptureEnvelope: Codable, Sendable, Equatable {
+    public let version: UInt32
+    public let id: String
+    public let url: String
+    public let title: String
+    public let selection: String?
+    public let contentText: String?
+    public let metaDescription: String?
+    public let note: String?
+    public let screenshotRef: String?
+    public let capturedAt: String
+    public let source: CaptureSource
+
+    private enum CodingKeys: String, CodingKey {
+        case version = "version"
+        case id = "id"
+        case url = "url"
+        case title = "title"
+        case selection = "selection"
+        case contentText = "contentText"
+        case metaDescription = "metaDescription"
+        case note = "note"
+        case screenshotRef = "screenshotRef"
+        case capturedAt = "capturedAt"
+        case source = "source"
+    }
+
+    public init(version: UInt32, id: String, url: String, title: String, selection: String?, contentText: String?, metaDescription: String?, note: String?, screenshotRef: String?, capturedAt: String, source: CaptureSource) {
+        self.version = version
+        self.id = id
+        self.url = url
+        self.title = title
+        self.selection = selection
+        self.contentText = contentText
+        self.metaDescription = metaDescription
+        self.note = note
+        self.screenshotRef = screenshotRef
+        self.capturedAt = capturedAt
+        self.source = source
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.version = try container.decode(UInt32.self, forKey: .version)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.url = try container.decode(String.self, forKey: .url)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.selection = try container.decodeIfPresent(String.self, forKey: .selection)
+        self.contentText = try container.decodeIfPresent(String.self, forKey: .contentText)
+        self.metaDescription = try container.decodeIfPresent(String.self, forKey: .metaDescription)
+        self.note = try container.decodeIfPresent(String.self, forKey: .note)
+        self.screenshotRef = try container.decodeIfPresent(String.self, forKey: .screenshotRef)
+        self.capturedAt = try container.decode(String.self, forKey: .capturedAt)
+        self.source = try container.decode(CaptureSource.self, forKey: .source)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(id, forKey: .id)
+        try container.encode(url, forKey: .url)
+        try container.encode(title, forKey: .title)
+        if let selection = selection {
+            try container.encode(selection, forKey: .selection)
+        }
+        if let contentText = contentText {
+            try container.encode(contentText, forKey: .contentText)
+        }
+        if let metaDescription = metaDescription {
+            try container.encode(metaDescription, forKey: .metaDescription)
+        }
+        if let note = note {
+            try container.encode(note, forKey: .note)
+        }
+        if let screenshotRef = screenshotRef {
+            try container.encode(screenshotRef, forKey: .screenshotRef)
+        }
+        try container.encode(capturedAt, forKey: .capturedAt)
+        try container.encode(source, forKey: .source)
+    }
+}
+
 /// The syntax of a link: `[[wiki]]` or `[md](path)`.
 public enum LinkKind: String, Codable, Sendable, Equatable {
     case wiki = "wiki"
@@ -1883,6 +2232,35 @@ public struct PushOutcome: Codable, Sendable, Equatable {
     }
 }
 
+/// The quick note defaults the app mirrors into the App Group container
+/// for the iOS App Intent.
+public struct QuickNoteDefaultsFile: Codable, Sendable, Equatable {
+    public let version: UInt32
+    public let parent: String
+
+    private enum CodingKeys: String, CodingKey {
+        case version = "version"
+        case parent = "parent"
+    }
+
+    public init(version: UInt32, parent: String) {
+        self.version = version
+        self.parent = parent
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.version = try container.decode(UInt32.self, forKey: .version)
+        self.parent = try container.decode(String.self, forKey: .parent)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(parent, forKey: .parent)
+    }
+}
+
 /// A previously-opened graph, newest first in the stored list.
 public struct RecentGraph: Codable, Sendable, Equatable {
     public let root: String
@@ -2131,6 +2509,76 @@ public enum SweepScope: String, Codable, Sendable, Equatable {
     case ingested = "ingested"
 }
 
+/// Captured text: one folded line the drain writes into the capture day's
+/// daily note.
+public struct TextCaptureEnvelope: Codable, Sendable, Equatable {
+    public let version: UInt32
+    public let id: String
+    public let kind: TextCaptureKind
+    public let text: String
+    public let parent: String?
+    public let capturedAt: String
+    public let source: TextCaptureSource
+
+    private enum CodingKeys: String, CodingKey {
+        case version = "version"
+        case id = "id"
+        case kind = "kind"
+        case text = "text"
+        case parent = "parent"
+        case capturedAt = "capturedAt"
+        case source = "source"
+    }
+
+    public init(version: UInt32, id: String, kind: TextCaptureKind, text: String, parent: String?, capturedAt: String, source: TextCaptureSource) {
+        self.version = version
+        self.id = id
+        self.kind = kind
+        self.text = text
+        self.parent = parent
+        self.capturedAt = capturedAt
+        self.source = source
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.version = try container.decode(UInt32.self, forKey: .version)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.kind = try container.decode(TextCaptureKind.self, forKey: .kind)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.parent = try container.decodeIfPresent(String.self, forKey: .parent)
+        self.capturedAt = try container.decode(String.self, forKey: .capturedAt)
+        self.source = try container.decode(TextCaptureSource.self, forKey: .source)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        try container.encode(id, forKey: .id)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(text, forKey: .text)
+        if let parent = parent {
+            try container.encode(parent, forKey: .parent)
+        }
+        try container.encode(capturedAt, forKey: .capturedAt)
+        try container.encode(source, forKey: .source)
+    }
+}
+
+/// Where a text capture lands in the daily note.
+public enum TextCaptureKind: String, Codable, Sendable, Equatable {
+    case append = "append"
+    case checkbox = "checkbox"
+    case task = "task"
+}
+
+/// Who produced a text capture.
+public enum TextCaptureSource: String, Codable, Sendable, Equatable {
+    case deepLink = "deep-link"
+    case iosShare = "ios-share"
+    case iosIntent = "ios-intent"
+}
+
 
 /// Counts from the vault catalog. `skipped` is what the walk refused or
 /// failed to list (unreadable directories, symlinks, default-pruned trees) —
@@ -2201,3 +2649,19 @@ public struct WindowBootstrap: Codable, Sendable, Equatable {
     }
 }
 
+
+/// The capture inbox names and limits.
+public enum CaptureConstants {
+    /// The Info.plist key that names the flavor's App Group.
+    public static let appGroupKey = "ReflectAppGroup"
+    /// The spool directory inside the App Group container.
+    public static let sharedInboxDir = "inbox"
+    /// The largest envelope the relay copies out of the App Group container.
+    public static let sharedEnvelopeMaxBytes = 8388608
+    /// The largest screenshot the relay copies out of the App Group container.
+    public static let sharedScreenshotMaxBytes = 16777216
+    /// The largest envelope the iOS producers spool.
+    public static let inboxSpoolMaxBytes = 65536
+    /// The quick note defaults file inside the App Group container.
+    public static let quickNoteDefaultsFile = "quick-note.json"
+}

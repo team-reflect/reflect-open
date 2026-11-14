@@ -49,6 +49,25 @@ export type AppError =
 /**  Anything not covered above. */
 { kind: "unknown"; message: string };
 
+/**  The answer to a `reflect-asset` request. */
+export type AssetResolveReply = 
+/**
+ *  Serve the file at the absolute `path`. `range` selects bytes; `None`
+ *  serves the whole file.
+ */
+{ kind: "file"; path: string; mime: string; total: number; range: ByteRange | null } | 
+/**
+ *  Refuse the request with an HTTP status. `total` is the length of the
+ *  file, for the `Content-Range` of a 416.
+ */
+{ kind: "refused"; status: number; total: number | null };
+
+/**  The first and last byte of a single-range `Range` header. */
+export type ByteRange = {
+	start: number,
+	end: number,
+};
+
 /**  One attendee of a calendar event. */
 export type CalendarAttendee = {
 	/**  Display name, falling back to the address in the participant URL. */
@@ -108,6 +127,52 @@ export type CalendarInfo = {
 	source: string,
 	/**  Display color as `#rrggbb`, when one could be resolved. */
 	color: string | null,
+};
+
+/**
+ *  The native host's answer to one wire message: `{ ok: true, status:
+ *  "queued" }`, or `{ ok: false, code, message }`.
+ */
+export type CaptureAck = {
+	ok: boolean,
+	/**  Always `"queued"` when `ok`: the host never sees the drain. */
+	status?: string | null | undefined,
+	code?: CaptureErrorCode | null | undefined,
+	message?: string | null | undefined,
+};
+
+/**  Why a capture was not spooled. */
+export type CaptureErrorCode = 
+/**  The app has never opened a graph on this machine. */
+"no-graph" | "invalid-payload" | "io" | 
+/**  The app that owns the graph cannot read this envelope version yet. */
+"unsupported-version";
+
+/**
+ *  The file the desktop app writes so the native host can find the open
+ *  graph.
+ */
+export type CapturePointer = {
+	/**  Always 1. */
+	version: number,
+	graphRoot: string,
+	/**  The X bookmark envelope version the app reads. */
+	bookmarkVersion: number | null,
+	/**  The X like envelope version the app reads; none when it reads none. */
+	xLikeVersion: number | null,
+};
+
+/**  Who produced a link capture. */
+export type CaptureSource = "extension" | "ios-share";
+
+/**
+ *  The browser extension's message to the native host: an envelope and an
+ *  optional screenshot.
+ */
+export type CaptureWireMessage = {
+	envelope: LinkCaptureEnvelope,
+	/**  Standard base64 JPEG bytes. */
+	screenshotBase64?: string | null | undefined,
 };
 
 /**  What happened to a graph file. Serializes as `"upsert"` or `"remove"`. */
@@ -897,6 +962,13 @@ export type ContactsAuthorization =
 /**  No Contacts framework on this platform. */
 "unavailable";
 
+/**  The directories and user agent the iOS shell starts the core with. */
+export type CoreStartConfig = {
+	appDataDir: string | null,
+	documentDir: string | null,
+	userAgent: string | null,
+};
+
 /**
  *  Byte counts for an active model download. Absent until the download
  *  starts (cache probing, or a cached model that skips downloading); after
@@ -1237,6 +1309,29 @@ export type IndexedTask = {
 	dueDate: string | null,
 };
 
+/**  A captured web page. */
+export type LinkCaptureEnvelope = {
+	/**  Always 1. */
+	version: number,
+	/**  A UUID; it names the spool files. */
+	id: string,
+	url: string,
+	title: string,
+	selection?: string | null | undefined,
+	contentText?: string | null | undefined,
+	/**  In-page meta description; only the iOS share extension sets it. */
+	metaDescription?: string | null | undefined,
+	note?: string | null | undefined,
+	/**
+	 *  The screenshot file beside the envelope. The spooler sets it; the
+	 *  extension never sends it.
+	 */
+	screenshotRef?: string | null | undefined,
+	/**  ISO-8601 with an offset. */
+	capturedAt: string,
+	source: CaptureSource,
+};
+
 /**  The syntax of a link: `[[wiki]]` or `[md](path)`. */
 export type LinkKind = "wiki" | "md";
 
@@ -1365,6 +1460,17 @@ export type PushOutcome = {
 	rejectionMessage: string | null,
 };
 
+/**
+ *  The quick note defaults the app mirrors into the App Group container
+ *  for the iOS App Intent.
+ */
+export type QuickNoteDefaultsFile = {
+	/**  Always 1. */
+	version: number,
+	/**  The bullet new entries nest under. */
+	parent: string,
+};
+
 /**  A previously-opened graph, newest first in the stored list. */
 export type RecentGraph = {
 	root: string,
@@ -1475,6 +1581,30 @@ export type SweepScope =
  *  working file is the `Full` sweep's job.
  */
 "ingested";
+
+/**
+ *  Captured text: one folded line the drain writes into the capture day's
+ *  daily note.
+ */
+export type TextCaptureEnvelope = {
+	/**  Always 1. */
+	version: number,
+	/**  A UUID; it names the spool file. */
+	id: string,
+	kind: TextCaptureKind,
+	text: string,
+	/**  The top-level bullet the entry nests under; none appends at the end. */
+	parent?: string | null | undefined,
+	/**  ISO-8601 with an offset. */
+	capturedAt: string,
+	source: TextCaptureSource,
+};
+
+/**  Where a text capture lands in the daily note. */
+export type TextCaptureKind = "append" | "checkbox" | "task";
+
+/**  Who produced a text capture. */
+export type TextCaptureSource = "deep-link" | "ios-share" | "ios-intent";
 
 export type Value = null | boolean | number | string | unknown[] | { [key in string]: unknown };
 

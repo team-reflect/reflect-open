@@ -8,7 +8,7 @@ extension ReflectCore {
     case info
   }
 
-  /// Writes one line to the core's log: stderr and `<dataDir>/logs/reflect.log`.
+  /// Writes one line to the core's log: stderr and `<appDataDir>/logs/reflect.log`.
   /// A line before the first core starts is dropped.
   static func log(_ level: LogLevel, _ message: String) {
     switch level {

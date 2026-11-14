@@ -6,12 +6,14 @@
 //! `@reflect/types` and the `TypesShared` Swift module from them.
 
 mod calendar;
+mod capture;
 mod change;
 pub mod commands;
 mod contacts;
 mod embed;
 mod error;
 pub mod events;
+mod ffi;
 mod file_meta;
 mod git;
 mod graph;
@@ -26,10 +28,17 @@ pub use calendar::{
     CalendarAttendee, CalendarAttendeeStatus, CalendarAuthorizationStatus, CalendarAvailability,
     CalendarEvent, CalendarInfo,
 };
+pub use capture::{
+    APP_GROUP_KEY, CAPTURE_POINTER_PATH, CaptureAck, CaptureErrorCode, CapturePointer,
+    CaptureSource, CaptureWireMessage, GRAPH_INBOX_DIR, INBOX_SPOOL_MAX_BYTES, LinkCaptureEnvelope,
+    QUICK_NOTE_DEFAULTS_FILE, QuickNoteDefaultsFile, SHARED_ENVELOPE_MAX_BYTES, SHARED_INBOX_DIR,
+    SHARED_SCREENSHOT_MAX_BYTES, TextCaptureEnvelope, TextCaptureKind, TextCaptureSource,
+};
 pub use change::{ChangeKind, FileChange};
 pub use contacts::{ContactMatch, ContactsAuthorization};
 pub use embed::{EmbedProgress, EmbedStatus};
 pub use error::{AppError, AppResult};
+pub use ffi::{AssetResolveReply, ByteRange, CoreStartConfig};
 pub use file_meta::FileMeta;
 pub use git::{
     ChangedFile, CommitOutcome, GitCredential, GitStatus, MergeKind, PullOutcome, PushOutcome,

@@ -38,7 +38,7 @@ struct Module {
 
 let modules: [Module] = [
   Module(name: "AppStoreKit", layer: .engine, deps: ["TypesShared"], hasTests: true),
-  Module(name: "CaptureShared", layer: .shared, hasTests: true),
+  Module(name: "CaptureShared", layer: .shared, deps: ["TypesShared"], hasTests: true),
   Module(name: "ChromeKit", layer: .engine, hasTests: true, hasTestFixtures: true),
   Module(name: "KeyboardKit", layer: .engine),
   Module(name: "RecordingShared", layer: .shared),
@@ -47,6 +47,9 @@ let modules: [Module] = [
   Module(name: "WebAuthKit", layer: .engine),
   Module(name: "WebHostKit", layer: .engine, deps: ["TypesShared"], hasTests: true),
 ]
+
+/// The wire types generated from `crates/types`. Every module may use them.
+let wireTypes = "TypesShared"
 
 let layerOf = Dictionary(uniqueKeysWithValues: modules.map { ($0.name, $0.layer) })
 for module in modules {
@@ -58,7 +61,7 @@ for module in modules {
       fatalError("\(module.name) depends on unknown module \(dep)")
     }
     precondition(
-      module.layer.allowed.contains(depLayer),
+      dep == wireTypes || module.layer.allowed.contains(depLayer),
       "\(module.name) (\(module.layer)) may not depend on \(dep) (\(depLayer))")
   }
 }

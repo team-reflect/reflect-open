@@ -1,5 +1,6 @@
 import CaptureShared
 import Foundation
+import TypesShared
 
 #if canImport(AppIntents)
 import AppIntents
@@ -39,7 +40,7 @@ struct QuickNoteIntent: AppIntent {
     let parent = QuickNoteDefaults.parent()
     // `spoolText` folds whitespace to one line and returns false when
     // nothing printable remains — reprompt instead of claiming "Saved".
-    guard try CaptureInbox.spoolText(text, source: "ios-intent", parent: parent) else {
+    guard try CaptureInbox.spoolText(text, source: .iosIntent, parent: parent) else {
       throw $text.needsValueError("What do you want to note down?")
     }
     return .result(dialog: Self.savedDialog(parent: parent))

@@ -9,34 +9,24 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use reflect_types::{CAPTURE_POINTER_PATH, CapturePointer, GRAPH_INBOX_DIR};
 
 use crate::HostError;
 use crate::envelope::ValidatedCapture;
-
-/// The pointer-file shape the desktop app writes. Versioned so a future
-/// layout change reads as a typed error here, never as a silent mis-spool.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct Pointer {
-    version: u32,
-    pub graph_root: String,
-    pub x_like_version: Option<u32>,
-}
 
 /// Default pointer-file location, shared with the desktop app's conventions
 /// (`settings.rs`/`recents.rs` live in the same directory).
 pub fn default_pointer_path() -> Option<PathBuf> {
     Some(
-        dirs::config_dir()?
-            .join("reflect-open")
-            .join("capture-pointer.json"),
+        CAPTURE_POINTER_PATH
+            .iter()
+            .fold(dirs::config_dir()?, |path, part| path.join(part)),
     )
 }
 
 /// Resolve the capture inbox from the pointer file, creating the inbox
 /// directory if missing. A missing pointer is the `no-graph` state.
-pub(crate) fn read_pointer(pointer_path: &Path) -> Result<Pointer, HostError> {
+pub(crate) fn read_pointer(pointer_path: &Path) -> Result<CapturePointer, HostError> {
     let raw = match std::fs::read(pointer_path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -44,7 +34,7 @@ pub(crate) fn read_pointer(pointer_path: &Path) -> Result<Pointer, HostError> {
         }
         Err(error) => return Err(HostError::Io(format!("pointer file unreadable: {error}"))),
     };
-    let pointer: Pointer = serde_json::from_slice(&raw)
+    let pointer: CapturePointer = serde_json::from_slice(&raw)
         .map_err(|error| HostError::Io(format!("pointer file malformed: {error}")))?;
     if pointer.version != 1 {
         return Err(HostError::Io(format!(
@@ -65,10 +55,8 @@ pub fn inbox_dir(pointer_path: &Path) -> Result<PathBuf, HostError> {
 }
 
 /// The pointed graph's inbox, created if missing.
-pub(crate) fn inbox_dir_of(pointer: &Pointer) -> Result<PathBuf, HostError> {
-    let inbox = PathBuf::from(&pointer.graph_root)
-        .join(".reflect")
-        .join("inbox");
+pub(crate) fn inbox_dir_of(pointer: &CapturePointer) -> Result<PathBuf, HostError> {
+    let inbox = PathBuf::from(&pointer.graph_root).join(GRAPH_INBOX_DIR);
     std::fs::create_dir_all(&inbox)
         .map_err(|error| HostError::Io(format!("cannot create inbox: {error}")))?;
     Ok(inbox)
