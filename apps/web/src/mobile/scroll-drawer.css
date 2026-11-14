@@ -71,7 +71,10 @@
   pointer-events: none;
 }
 
-/* A swipe already moved the sheet off screen and cleared the tint: unmount at once. */
+/* A swipe already moved the sheet off screen and cleared the tint: unmount at
+   once. `--duration-sheet` (styles/index.css) times the popup's own transition,
+   which Base UI waits for before it unmounts the popup:
+   https://github.com/mui/base-ui/blob/v1.9.0/packages/react/src/internals/useAnimationsFinished.ts#L101-L104 */
 .scroll-drawer-popup[data-closed-by='swipe'] {
   --duration-sheet: 0ms;
 }
