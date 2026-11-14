@@ -1,11 +1,6 @@
 import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import {
-  calendarEventSchema,
-  type CalendarEvent,
-  type MeetingService,
-  type Settings,
-} from '@reflect/core'
+import type { CalendarEvent, MeetingService, Settings } from '@reflect/core'
 import {
   createTestCoreServices,
   createTestCalendarService,
@@ -29,8 +24,8 @@ let addMeetingToDaily: MockInstance<MeetingService['addMeetingToDaily']>
 
 const DATE = '2026-07-01'
 
-function eventAt(hour: number, overrides: Record<string, unknown> = {}): CalendarEvent {
-  return calendarEventSchema.parse({
+function eventAt(hour: number, overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+  return {
     id: `evt-${hour}`,
     calendarId: 'cal-work',
     title: `Meeting at ${hour}`,
@@ -42,7 +37,7 @@ function eventAt(hour: number, overrides: Record<string, unknown> = {}): Calenda
     canceled: false,
     attendees: [],
     ...overrides,
-  })
+  }
 }
 
 let stored: Partial<Settings>
@@ -91,7 +86,9 @@ describe('DailyEventsSection', () => {
       eventAt(10, { title: 'OOO banner', allDay: true }),
       eventAt(11, {
         title: 'Declined sync',
-        attendees: [{ name: 'Me', isCurrentUser: true, isPerson: true, status: 'declined' }],
+        attendees: [
+          { name: 'Me', email: null, isCurrentUser: true, isPerson: true, status: 'declined' },
+        ],
       }),
     ])
     await renderSection()
@@ -115,9 +112,21 @@ describe('DailyEventsSection', () => {
         title: 'Standup',
         recurring: true,
         attendees: [
-          { name: 'Ada Lovelace', isCurrentUser: false, isPerson: true, status: 'accepted' },
-          { name: 'Me', isCurrentUser: true, isPerson: true, status: 'accepted' },
-          { name: 'Room 4', isCurrentUser: false, isPerson: false, status: 'accepted' },
+          {
+            name: 'Ada Lovelace',
+            email: null,
+            isCurrentUser: false,
+            isPerson: true,
+            status: 'accepted',
+          },
+          { name: 'Me', email: null, isCurrentUser: true, isPerson: true, status: 'accepted' },
+          {
+            name: 'Room 4',
+            email: null,
+            isCurrentUser: false,
+            isPerson: false,
+            status: 'accepted',
+          },
         ],
       }),
     ])
@@ -248,7 +257,13 @@ describe('DailyEventsSection', () => {
       eventAt(9, {
         title: 'Standup',
         attendees: [
-          { name: 'Ada Lovelace', isCurrentUser: false, isPerson: true, status: 'accepted' },
+          {
+            name: 'Ada Lovelace',
+            email: null,
+            isCurrentUser: false,
+            isPerson: true,
+            status: 'accepted',
+          },
         ],
       }),
     ])

@@ -146,8 +146,7 @@ mod capability_tests {
 }
 
 /// Builds the desktop command handler from the `desktop` rows of the command
-/// table in `reflect_types::commands`, plus the calendar commands, which the
-/// table leaves out.
+/// table in `reflect_types::commands`.
 macro_rules! desktop_handler {
     (
         core { $( $core:tt )* }
@@ -155,10 +154,6 @@ macro_rules! desktop_handler {
     ) => {
         tauri::generate_handler![
             $( $module::$method, )*
-            calendar::calendar_authorization_status,
-            calendar::calendar_request_access,
-            calendar::calendar_list_calendars,
-            calendar::calendar_list_events,
         ]
     };
 }

@@ -47,7 +47,7 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         note.title,
         note.title_key,
         note.path_key,
-        note.kind,
+        note.kind.as_str(),
         note.daily_date,
         i64::from(note.is_private),
         i64::from(note.is_pinned),
@@ -67,7 +67,7 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         for link in &note.links {
             stmt.execute(params![
                 note.path,
-                link.kind,
+                link.kind.as_str(),
                 link.target_raw,
                 link.target_key,
                 link.target_path_key,

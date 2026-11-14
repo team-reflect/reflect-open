@@ -199,6 +199,187 @@ extension AppError: Codable {
 }
 
 
+/// One attendee of a calendar event.
+public struct CalendarAttendee: Codable, Sendable, Equatable {
+    public let name: String
+    public let email: String?
+    public let isCurrentUser: Bool
+    public let isPerson: Bool
+    public let status: CalendarAttendeeStatus
+
+    private enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case email = "email"
+        case isCurrentUser = "isCurrentUser"
+        case isPerson = "isPerson"
+        case status = "status"
+    }
+
+    public init(name: String, email: String?, isCurrentUser: Bool, isPerson: Bool, status: CalendarAttendeeStatus) {
+        self.name = name
+        self.email = email
+        self.isCurrentUser = isCurrentUser
+        self.isPerson = isPerson
+        self.status = status
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.email = try container.decodeIfPresent(String.self, forKey: .email)
+        self.isCurrentUser = try container.decode(Bool.self, forKey: .isCurrentUser)
+        self.isPerson = try container.decode(Bool.self, forKey: .isPerson)
+        self.status = try container.decode(CalendarAttendeeStatus.self, forKey: .status)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(email, forKey: .email)
+        try container.encode(isCurrentUser, forKey: .isCurrentUser)
+        try container.encode(isPerson, forKey: .isPerson)
+        try container.encode(status, forKey: .status)
+    }
+}
+
+/// An attendee's response to an invite.
+public enum CalendarAttendeeStatus: String, Codable, Sendable, Equatable {
+    case accepted = "accepted"
+    case declined = "declined"
+    case tentative = "tentative"
+    case pending = "pending"
+    case unknown = "unknown"
+}
+
+/// The EventKit authorization state for events. Only `FullAccess` lets
+/// Reflect read events.
+public enum CalendarAuthorizationStatus: String, Codable, Sendable, Equatable {
+    case notDetermined = "notDetermined"
+    case restricted = "restricted"
+    case denied = "denied"
+    case fullAccess = "fullAccess"
+    case writeOnly = "writeOnly"
+}
+
+/// How an event blocks the user's time.
+public enum CalendarAvailability: String, Codable, Sendable, Equatable {
+    case busy = "busy"
+    case free = "free"
+    case tentative = "tentative"
+    case unavailable = "unavailable"
+    case notSupported = "notSupported"
+}
+
+/// A single event occurrence within a queried date range.
+/// 
+/// Occurrences of a recurring event share an `id`; consumers needing a unique
+/// key should combine `id` with `starts_at`.
+public struct CalendarEvent: Codable, Sendable, Equatable {
+    public let id: String
+    public let calendarId: String
+    public let title: String
+    public let startsAt: Double
+    public let endsAt: Double
+    public let allDay: Bool
+    public let recurring: Bool
+    public let availability: CalendarAvailability
+    public let canceled: Bool
+    public let attendees: [CalendarAttendee]
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case calendarId = "calendarId"
+        case title = "title"
+        case startsAt = "startsAt"
+        case endsAt = "endsAt"
+        case allDay = "allDay"
+        case recurring = "recurring"
+        case availability = "availability"
+        case canceled = "canceled"
+        case attendees = "attendees"
+    }
+
+    public init(id: String, calendarId: String, title: String, startsAt: Double, endsAt: Double, allDay: Bool, recurring: Bool, availability: CalendarAvailability, canceled: Bool, attendees: [CalendarAttendee]) {
+        self.id = id
+        self.calendarId = calendarId
+        self.title = title
+        self.startsAt = startsAt
+        self.endsAt = endsAt
+        self.allDay = allDay
+        self.recurring = recurring
+        self.availability = availability
+        self.canceled = canceled
+        self.attendees = attendees
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.calendarId = try container.decode(String.self, forKey: .calendarId)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.startsAt = try container.decode(Double.self, forKey: .startsAt)
+        self.endsAt = try container.decode(Double.self, forKey: .endsAt)
+        self.allDay = try container.decode(Bool.self, forKey: .allDay)
+        self.recurring = try container.decode(Bool.self, forKey: .recurring)
+        self.availability = try container.decode(CalendarAvailability.self, forKey: .availability)
+        self.canceled = try container.decode(Bool.self, forKey: .canceled)
+        self.attendees = try container.decode([CalendarAttendee].self, forKey: .attendees)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(calendarId, forKey: .calendarId)
+        try container.encode(title, forKey: .title)
+        try container.encode(startsAt, forKey: .startsAt)
+        try container.encode(endsAt, forKey: .endsAt)
+        try container.encode(allDay, forKey: .allDay)
+        try container.encode(recurring, forKey: .recurring)
+        try container.encode(availability, forKey: .availability)
+        try container.encode(canceled, forKey: .canceled)
+        try container.encode(attendees, forKey: .attendees)
+    }
+}
+
+/// A calendar known to macOS, across every account the user has added in
+/// System Settings → Internet Accounts.
+public struct CalendarInfo: Codable, Sendable, Equatable {
+    public let id: String
+    public let title: String
+    public let source: String
+    public let color: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case title = "title"
+        case source = "source"
+        case color = "color"
+    }
+
+    public init(id: String, title: String, source: String, color: String?) {
+        self.id = id
+        self.title = title
+        self.source = source
+        self.color = color
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.source = try container.decode(String.self, forKey: .source)
+        self.color = try container.decodeIfPresent(String.self, forKey: .color)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(source, forKey: .source)
+        try container.encode(color, forKey: .color)
+    }
+}
+
 /// What happened to a graph file. Serializes as `"upsert"` or `"remove"`.
 public enum ChangeKind: String, Codable, Sendable, Equatable {
     case upsert = "upsert"
@@ -1065,7 +1246,7 @@ public struct IndexedEmail: Codable, Sendable, Equatable {
 }
 
 public struct IndexedLink: Codable, Sendable, Equatable {
-    public let kind: String
+    public let kind: LinkKind
     public let targetRaw: String
     public let targetKey: String
     public let targetPathKey: String?
@@ -1083,7 +1264,7 @@ public struct IndexedLink: Codable, Sendable, Equatable {
         case posTo = "posTo"
     }
 
-    public init(kind: String, targetRaw: String, targetKey: String, targetPathKey: String?, alias: String?, posFrom: Int64, posTo: Int64) {
+    public init(kind: LinkKind, targetRaw: String, targetKey: String, targetPathKey: String?, alias: String?, posFrom: Int64, posTo: Int64) {
         self.kind = kind
         self.targetRaw = targetRaw
         self.targetKey = targetKey
@@ -1095,7 +1276,7 @@ public struct IndexedLink: Codable, Sendable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.kind = try container.decode(String.self, forKey: .kind)
+        self.kind = try container.decode(LinkKind.self, forKey: .kind)
         self.targetRaw = try container.decode(String.self, forKey: .targetRaw)
         self.targetKey = try container.decode(String.self, forKey: .targetKey)
         self.targetPathKey = try container.decodeIfPresent(String.self, forKey: .targetPathKey)
@@ -1127,7 +1308,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
     public let title: String
     public let titleKey: String
     public let pathKey: String
-    public let kind: String
+    public let kind: NoteKind
     public let dailyDate: String?
     public let isPrivate: Bool
     public let isPinned: Bool
@@ -1138,7 +1319,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
     public let fileHash: String
     public let mtime: Int64
     public let text: String
-    public let assetText: String?
+    public let assetText: String
     public let preview: String
     public let links: [IndexedLink]
     public let tags: [IndexedTag]
@@ -1176,7 +1357,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
         case tasks = "tasks"
     }
 
-    public init(path: String, id: String?, title: String, titleKey: String, pathKey: String, kind: String, dailyDate: String?, isPrivate: Bool, isPinned: Bool, pinnedOrder: Double?, hasContent: Bool, gistUrl: String?, gistStale: Bool, fileHash: String, mtime: Int64, text: String, assetText: String?, preview: String, links: [IndexedLink], tags: [IndexedTag], aliases: [IndexedAlias], claims: [IndexedClaim], emails: [IndexedEmail], assets: [String], tasks: [IndexedTask]) {
+    public init(path: String, id: String?, title: String, titleKey: String, pathKey: String, kind: NoteKind, dailyDate: String?, isPrivate: Bool, isPinned: Bool, pinnedOrder: Double?, hasContent: Bool, gistUrl: String?, gistStale: Bool, fileHash: String, mtime: Int64, text: String, assetText: String, preview: String, links: [IndexedLink], tags: [IndexedTag], aliases: [IndexedAlias], claims: [IndexedClaim], emails: [IndexedEmail], assets: [String], tasks: [IndexedTask]) {
         self.path = path
         self.id = id
         self.title = title
@@ -1211,7 +1392,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
         self.title = try container.decode(String.self, forKey: .title)
         self.titleKey = try container.decode(String.self, forKey: .titleKey)
         self.pathKey = try container.decode(String.self, forKey: .pathKey)
-        self.kind = try container.decode(String.self, forKey: .kind)
+        self.kind = try container.decode(NoteKind.self, forKey: .kind)
         self.dailyDate = try container.decodeIfPresent(String.self, forKey: .dailyDate)
         self.isPrivate = try container.decode(Bool.self, forKey: .isPrivate)
         self.isPinned = try container.decode(Bool.self, forKey: .isPinned)
@@ -1222,7 +1403,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
         self.fileHash = try container.decode(String.self, forKey: .fileHash)
         self.mtime = try container.decode(Int64.self, forKey: .mtime)
         self.text = try container.decode(String.self, forKey: .text)
-        self.assetText = try container.decodeIfPresent(String.self, forKey: .assetText)
+        self.assetText = try container.decode(String.self, forKey: .assetText)
         self.preview = try container.decode(String.self, forKey: .preview)
         self.links = try container.decode([IndexedLink].self, forKey: .links)
         self.tags = try container.decode([IndexedTag].self, forKey: .tags)
@@ -1251,9 +1432,7 @@ public struct IndexedNote: Codable, Sendable, Equatable {
         try container.encode(fileHash, forKey: .fileHash)
         try container.encode(mtime, forKey: .mtime)
         try container.encode(text, forKey: .text)
-        if let assetText = assetText {
-            try container.encode(assetText, forKey: .assetText)
-        }
+        try container.encode(assetText, forKey: .assetText)
         try container.encode(preview, forKey: .preview)
         try container.encode(links, forKey: .links)
         try container.encode(tags, forKey: .tags)
@@ -1298,7 +1477,7 @@ public struct IndexedTag: Codable, Sendable, Equatable {
 public struct IndexedTask: Codable, Sendable, Equatable {
     public let astPath: String
     public let markdown: String
-    public let breadcrumbs: [String]?
+    public let breadcrumbs: [String]
     public let checked: Bool
     public let dueDate: String?
 
@@ -1310,7 +1489,7 @@ public struct IndexedTask: Codable, Sendable, Equatable {
         case dueDate = "dueDate"
     }
 
-    public init(astPath: String, markdown: String, breadcrumbs: [String]?, checked: Bool, dueDate: String?) {
+    public init(astPath: String, markdown: String, breadcrumbs: [String], checked: Bool, dueDate: String?) {
         self.astPath = astPath
         self.markdown = markdown
         self.breadcrumbs = breadcrumbs
@@ -1322,7 +1501,7 @@ public struct IndexedTask: Codable, Sendable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.astPath = try container.decode(String.self, forKey: .astPath)
         self.markdown = try container.decode(String.self, forKey: .markdown)
-        self.breadcrumbs = try container.decodeIfPresent([String].self, forKey: .breadcrumbs)
+        self.breadcrumbs = try container.decode([String].self, forKey: .breadcrumbs)
         self.checked = try container.decode(Bool.self, forKey: .checked)
         self.dueDate = try container.decodeIfPresent(String.self, forKey: .dueDate)
     }
@@ -1331,12 +1510,16 @@ public struct IndexedTask: Codable, Sendable, Equatable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(astPath, forKey: .astPath)
         try container.encode(markdown, forKey: .markdown)
-        if let breadcrumbs = breadcrumbs {
-            try container.encode(breadcrumbs, forKey: .breadcrumbs)
-        }
+        try container.encode(breadcrumbs, forKey: .breadcrumbs)
         try container.encode(checked, forKey: .checked)
         try container.encode(dueDate, forKey: .dueDate)
     }
+}
+
+/// The syntax of a link: `[[wiki]]` or `[md](path)`.
+public enum LinkKind: String, Codable, Sendable, Equatable {
+    case wiki = "wiki"
+    case md = "md"
 }
 
 public struct LinkPreviewHtml: Codable, Sendable, Equatable {
@@ -1540,6 +1723,13 @@ extension NoteCreateOutcome: Codable {
     }
 }
 
+
+/// What a note file is, from its path.
+public enum NoteKind: String, Codable, Sendable, Equatable {
+    case daily = "daily"
+    case note = "note"
+    case template = "template"
+}
 
 /// One user-initiated move, with the folded addressing for both directions:
 /// the destination's for the forward row move, the source's for the

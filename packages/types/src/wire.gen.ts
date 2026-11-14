@@ -49,6 +49,67 @@ export type AppError =
 /**  Anything not covered above. */
 { kind: "unknown"; message: string };
 
+/**  One attendee of a calendar event. */
+export type CalendarAttendee = {
+	/**  Display name, falling back to the address in the participant URL. */
+	name: string,
+	/**
+	 *  The invite email, when the participant URL is a `mailto:`: what the
+	 *  contacts integration resolves person notes by.
+	 */
+	email: string | null,
+	isCurrentUser: boolean,
+	/**  Whether this attendee is a person (as opposed to a room or resource). */
+	isPerson: boolean,
+	status: CalendarAttendeeStatus,
+};
+
+/**  An attendee's response to an invite. */
+export type CalendarAttendeeStatus = "accepted" | "declined" | "tentative" | "pending" | "unknown";
+
+/**
+ *  The EventKit authorization state for events. Only `FullAccess` lets
+ *  Reflect read events.
+ */
+export type CalendarAuthorizationStatus = "notDetermined" | "restricted" | "denied" | "fullAccess" | "writeOnly";
+
+/**  How an event blocks the user's time. */
+export type CalendarAvailability = "busy" | "free" | "tentative" | "unavailable" | "notSupported";
+
+/**
+ *  A single event occurrence within a queried date range.
+ * 
+ *  Occurrences of a recurring event share an `id`; consumers needing a unique
+ *  key should combine `id` with `starts_at`.
+ */
+export type CalendarEvent = {
+	id: string,
+	calendarId: string,
+	title: string,
+	/**  Start/end as Unix epoch milliseconds. */
+	startsAt: number,
+	endsAt: number,
+	allDay: boolean,
+	recurring: boolean,
+	availability: CalendarAvailability,
+	canceled: boolean,
+	attendees: CalendarAttendee[],
+};
+
+/**
+ *  A calendar known to macOS, across every account the user has added in
+ *  System Settings → Internet Accounts.
+ */
+export type CalendarInfo = {
+	/**  EventKit's stable calendar identifier: what user settings store. */
+	id: string,
+	title: string,
+	/**  The owning account's display name ("iCloud", "Google", "On My Mac"). */
+	source: string,
+	/**  Display color as `#rrggbb`, when one could be resolved. */
+	color: string | null,
+};
+
 /**  What happened to a graph file. Serializes as `"upsert"` or `"remove"`. */
 export type ChangeKind = 
 /**  Created or modified. */
@@ -768,6 +829,26 @@ export type Commands = {
 		args: Record<string, never>,
 		result: null,
 	},
+	calendar_authorization_status: {
+		args: Record<string, never>,
+		result: CalendarAuthorizationStatus,
+	},
+	calendar_request_access: {
+		args: Record<string, never>,
+		result: boolean,
+	},
+	calendar_list_calendars: {
+		args: Record<string, never>,
+		result: CalendarInfo[],
+	},
+	calendar_list_events: {
+		args: {
+			start: number,
+			end: number,
+			calendarIds: string[],
+		},
+		result: CalendarEvent[],
+	},
 };
 
 /**  Result of a commit attempt. `committed: false` means the tree was clean. */
@@ -1000,7 +1081,11 @@ export type GraphInfo = {
 	root: string,
 	/**  Display name (the root folder name). */
 	name: string,
-	/**  Open-session generation; mutating file commands must echo it back. */
+	/**
+	 *  Open-session generation, bumped on every graph open. Mutating file
+	 *  commands echo it back and are rejected when stale, so a write enqueued
+	 *  for one graph can never land in another graph's same-named file.
+	 */
 	generation: number,
 };
 
@@ -1050,18 +1135,25 @@ export type IndexedAlias = {
 export type IndexedClaim = {
 	/**  Folded spelling this note answers to. */
 	key: string,
-	/**  One of the `claim_tier` constants in `reflect-index`. */
+	/**  One of the `claim_tier` constants in `reflect-index` (`CLAIM_TIER` in TS). */
 	tier: number,
 };
 
 export type IndexedEmail = {
+	/**  Display casing (as written in the field bullet). */
 	email: string,
+	/**  Case-folded match key: what resolution compares against. */
 	emailKey: string,
 };
 
 export type IndexedLink = {
-	kind: string,
+	kind: LinkKind,
 	targetRaw: string,
+	/**
+	 *  Name key the link answers to: for wiki links, the folded name key
+	 *  (empty when the target has no name reading: a rooted path, `#self`, or
+	 *  a refused URI); for md links, the lowercased href.
+	 */
 	targetKey: string,
 	/**  Folded vault path when the link names a file; None when it names a note. */
 	targetPathKey: string | null,
@@ -1084,12 +1176,14 @@ export type IndexedNote = {
 	titleKey: string,
 	/**  ASCII-folded graph path: what a path-qualified link joins against. */
 	pathKey: string,
-	/**  'daily' | 'note' | 'template' — templates are excluded from note surfaces. */
-	kind: string,
+	/**  Derived from the path; templates are excluded from note surfaces. */
+	kind: NoteKind,
 	dailyDate: string | null,
 	isPrivate: boolean,
 	isPinned: boolean,
+	/**  Explicit pin order (`pinned: <n>`); None for bare `pinned: true`. */
 	pinnedOrder: number | null,
+	/**  The note is not blank: it has display text, or a body the FTS can match. */
 	hasContent: boolean,
 	/**  The published GitHub Gist's html url, when the note has one. */
 	gistUrl: string | null,
@@ -1102,7 +1196,8 @@ export type IndexedNote = {
 	 *  Description text of referenced assets (Plan 20), folded into the FTS
 	 *  `body` only — never `preview` or anything AI-reachable.
 	 */
-	assetText?: string | undefined,
+	assetText: string,
+	/**  The All Notes row snippet, derived once here rather than per query. */
 	preview: string,
 	links: IndexedLink[],
 	tags: IndexedTag[],
@@ -1112,11 +1207,14 @@ export type IndexedNote = {
 	/**  Emails the note owns via `- Email:` contact-field bullets. */
 	emails: IndexedEmail[],
 	assets: string[],
+	/**  Task rows for the Tasks projection (Plan 18). */
 	tasks: IndexedTask[],
 };
 
 export type IndexedTag = {
+	/**  Display casing (first-seen in the document). */
 	tag: string,
+	/**  Case-folded match key: what queries compare against. */
 	tagKey: string,
 };
 
@@ -1129,12 +1227,18 @@ export type IndexedTask = {
 	astPath: string,
 	/**  The task's first paragraph as Markdown, marker excluded. */
 	markdown: string,
-	/**  Ancestor list items' first paragraphs as Markdown, outermost first. */
-	breadcrumbs?: string[] | undefined,
+	/**
+	 *  The headings above the task, then its ancestor list items' first
+	 *  paragraphs, as Markdown, outermost first.
+	 */
+	breadcrumbs: string[],
 	checked: boolean,
 	/**  Explicit due date (first `[[YYYY-MM-DD]]` in the item), or None. */
 	dueDate: string | null,
 };
+
+/**  The syntax of a link: `[[wiki]]` or `[md](path)`. */
+export type LinkKind = "wiki" | "md";
 
 export type LinkPreviewHtml = {
 	html: string,
@@ -1202,6 +1306,9 @@ export type NoteCreateOutcome =
 { kind: "created"; modifiedMs: number | null } | 
 /**  A file or iCloud eviction placeholder already owns the path. */
 { kind: "collision" };
+
+/**  What a note file is, from its path. */
+export type NoteKind = "daily" | "note" | "template";
 
 /**
  *  One user-initiated move, with the folded addressing for both directions:

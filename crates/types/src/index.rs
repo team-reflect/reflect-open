@@ -70,12 +70,14 @@ pub struct IndexedNote {
     pub title_key: String,
     /// ASCII-folded graph path: what a path-qualified link joins against.
     pub path_key: String,
-    /// 'daily' | 'note' | 'template' — templates are excluded from note surfaces.
-    pub kind: String,
+    /// Derived from the path; templates are excluded from note surfaces.
+    pub kind: NoteKind,
     pub daily_date: Option<String>,
     pub is_private: bool,
     pub is_pinned: bool,
+    /// Explicit pin order (`pinned: <n>`); None for bare `pinned: true`.
     pub pinned_order: Option<f64>,
+    /// The note is not blank: it has display text, or a body the FTS can match.
     pub has_content: bool,
     /// The published GitHub Gist's html url, when the note has one.
     pub gist_url: Option<String>,
@@ -86,8 +88,8 @@ pub struct IndexedNote {
     pub text: String,
     /// Description text of referenced assets (Plan 20), folded into the FTS
     /// `body` only — never `preview` or anything AI-reachable.
-    #[serde(default)]
     pub asset_text: String,
+    /// The All Notes row snippet, derived once here rather than per query.
     pub preview: String,
     pub links: Vec<IndexedLink>,
     pub tags: Vec<IndexedTag>,
@@ -97,15 +99,59 @@ pub struct IndexedNote {
     /// Emails the note owns via `- Email:` contact-field bullets.
     pub emails: Vec<IndexedEmail>,
     pub assets: Vec<String>,
+    /// Task rows for the Tasks projection (Plan 18).
     pub tasks: Vec<IndexedTask>,
+}
+
+/// What a note file is, from its path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub enum NoteKind {
+    Daily,
+    Note,
+    Template,
+}
+
+impl NoteKind {
+    /// The `notes.kind` column value.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Daily => "daily",
+            Self::Note => "note",
+            Self::Template => "template",
+        }
+    }
+}
+
+/// The syntax of a link: `[[wiki]]` or `[md](path)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub enum LinkKind {
+    Wiki,
+    Md,
+}
+
+impl LinkKind {
+    /// The `links.kind` column value.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Wiki => "wiki",
+            Self::Md => "md",
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct IndexedLink {
-    pub kind: String,
+    pub kind: LinkKind,
     pub target_raw: String,
+    /// Name key the link answers to: for wiki links, the folded name key
+    /// (empty when the target has no name reading: a rooted path, `#self`, or
+    /// a refused URI); for md links, the lowercased href.
     pub target_key: String,
     /// Folded vault path when the link names a file; None when it names a note.
     pub target_path_key: Option<String>,
@@ -118,7 +164,9 @@ pub struct IndexedLink {
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct IndexedTag {
+    /// Display casing (first-seen in the document).
     pub tag: String,
+    /// Case-folded match key: what queries compare against.
     pub tag_key: String,
 }
 
@@ -136,7 +184,7 @@ pub struct IndexedAlias {
 pub struct IndexedClaim {
     /// Folded spelling this note answers to.
     pub key: String,
-    /// One of the `claim_tier` constants in `reflect-index`.
+    /// One of the `claim_tier` constants in `reflect-index` (`CLAIM_TIER` in TS).
     pub tier: i64,
 }
 
@@ -144,7 +192,9 @@ pub struct IndexedClaim {
 #[cfg_attr(feature = "codegen", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct IndexedEmail {
+    /// Display casing (as written in the field bullet).
     pub email: String,
+    /// Case-folded match key: what resolution compares against.
     pub email_key: String,
 }
 
@@ -158,8 +208,8 @@ pub struct IndexedTask {
     pub ast_path: String,
     /// The task's first paragraph as Markdown, marker excluded.
     pub markdown: String,
-    /// Ancestor list items' first paragraphs as Markdown, outermost first.
-    #[serde(default)]
+    /// The headings above the task, then its ancestor list items' first
+    /// paragraphs, as Markdown, outermost first.
     pub breadcrumbs: Vec<String>,
     pub checked: bool,
     /// Explicit due date (first `[[YYYY-MM-DD]]` in the item), or None.

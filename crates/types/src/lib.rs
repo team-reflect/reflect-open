@@ -5,6 +5,7 @@
 //! wire contract: `pnpm gen:types` (the `codegen` feature) generates
 //! `@reflect/types` and the `TypesShared` Swift module from them.
 
+mod calendar;
 mod change;
 pub mod commands;
 mod contacts;
@@ -21,6 +22,10 @@ mod link_preview;
 mod settings;
 mod skill;
 
+pub use calendar::{
+    CalendarAttendee, CalendarAttendeeStatus, CalendarAuthorizationStatus, CalendarAvailability,
+    CalendarEvent, CalendarInfo,
+};
 pub use change::{ChangeKind, FileChange};
 pub use contacts::{ContactMatch, ContactsAuthorization};
 pub use embed::{EmbedProgress, EmbedStatus};
@@ -38,8 +43,8 @@ pub use icloud::{IcloudStatus, IcloudSweepOutcome, MobileStorageInfo, SweepScope
 pub use import::{GraphImportProgress, GraphImportStage, GraphImportSummary};
 pub use index::{
     ChatConversation, ChatMessageRow, EmbeddedChunk, IndexTouch, IndexedAlias, IndexedClaim,
-    IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, MovedNoteAddress,
-    NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
+    IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, LinkKind, MovedNoteAddress,
+    NoteKind, NoteMoveRequest, ReconcileScan, ScanCandidate, ScanOrphan,
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;

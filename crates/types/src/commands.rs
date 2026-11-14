@@ -124,6 +124,10 @@ macro_rules! commands {
                 windows::window_bootstrap() -> WindowBootstrap,
                 windows::close_note_windows() -> (),
                 devtools::toggle_devtools() -> (),
+                calendar::calendar_authorization_status() -> CalendarAuthorizationStatus,
+                calendar::calendar_request_access() -> bool,
+                calendar::calendar_list_calendars() -> Vec<CalendarInfo>,
+                calendar::calendar_list_events(start: f64, end: f64, calendar_ids: Vec<String>) -> Vec<CalendarEvent>,
             }
         }
     };

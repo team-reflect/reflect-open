@@ -112,7 +112,6 @@ export { type ChatModelSelection } from './settings/schema.ts'
 export { type CloudGraphContext } from './privacy/privacy-service.ts'
 export { type CloudSafe } from './privacy/cloud-safe.ts'
 export {
-  calendarEventSchema,
   type CalendarAuthorizationStatus,
   type CalendarInfo,
   type CalendarEvent,
@@ -445,7 +444,6 @@ export {
   buildIndexedNote,
   CLAIM_TIER,
   encodeTaskBreadcrumbs,
-  indexedNoteSchema,
   aliasHint,
   type TemplateEntry,
   parseHighlights,
