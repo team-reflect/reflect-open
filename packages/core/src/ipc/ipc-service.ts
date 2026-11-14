@@ -36,8 +36,8 @@ export type CommandResult<C extends CommandName> = Commands[C]['result']
 /**
  * The raw transport a host implements: the desktop app adapts Tauri's
  * `invoke`/`listen`, plain-browser dev installs an in-memory bridge, and
- * tests use a fake. {@link createIpcBridgeService} wraps it with validation
- * and error coercion.
+ * tests use a fake. {@link createIpcBridgeService} wraps it with the
+ * command table's types and error coercion.
  */
 export interface IpcBridge {
   /**
@@ -86,10 +86,10 @@ export interface PluginSubscription {
 }
 
 /**
- * The typed IPC boundary: the single place where an untyped native response
- * becomes a validated domain value. Every failure is an {@link AppError}: a
- * rejected command is coerced via {@link toAppError}; a response that doesn't
- * match its schema becomes a `parse` error.
+ * The typed IPC boundary. Arguments and results have the command table's
+ * types. Every failure is an {@link AppError}: a rejected command is coerced
+ * via {@link toAppError}, and a response that does not match an optional
+ * schema becomes a `parse` error.
  */
 export interface IpcBridgeService {
   /**
@@ -113,16 +113,15 @@ export interface IpcBridgeService {
    */
   callBytes(command: 'asset_read_binary', args: AssetReadBinaryArgs): Promise<ArrayBuffer>
   /**
-   * {@link call}'s binary sibling: the payload is a raw byte body with
+   * Invoke `asset_upload_append`, whose payload is a raw byte body with
    * per-call metadata in `headers`. Rejects with an `io` {@link AppError}
    * when the transport has no binary path.
    */
-  callBinary<TOutput>(
-    command: string,
+  callBinary(
+    command: 'asset_upload_append',
     body: Uint8Array,
     headers: Record<string, string>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput>
+  ): Promise<void>
   /**
    * Subscribe to a native event stream, resolving with an unlisten function.
    */
@@ -200,23 +199,20 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
     }
   }
 
-  async callBinary<TOutput>(
-    command: string,
+  async callBinary(
+    command: 'asset_upload_append',
     body: Uint8Array,
     headers: Record<string, string>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
+  ): Promise<void> {
     const { transport } = this.#deps
     if (transport.invokeBinary === undefined) {
       throw new AppError('io', `the installed IPC bridge has no binary transport for "${command}"`)
     }
-    let raw: unknown
     try {
-      raw = await transport.invokeBinary(command, body, headers)
+      await transport.invokeBinary(command, body, headers)
     } catch (error) {
       throw toAppError(error)
     }
-    return parseResponse(command, raw, schema)
   }
 
   listen(event: string, handler: (payload: unknown) => void): Promise<Unlisten> {

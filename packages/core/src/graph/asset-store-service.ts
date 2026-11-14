@@ -1,5 +1,4 @@
 import type { MaybePromise } from '@reflect/utils'
-import { z } from 'zod'
 import type { ClockService } from '../ports/clock-service.ts'
 import type { FileChangeService } from '../indexing/file-change-service.ts'
 import type { IpcBridgeService } from '../ipc/ipc-service.ts'
@@ -11,7 +10,6 @@ import { noop } from '@ocavue/utils'
  * Commands that return `()` from Rust serialize as `null` over IPC.
 
  */
-const voidSchema = z.null()
 
 /**
  * Upload chunk size. Big enough that a large file doesn't drown in IPC
@@ -190,12 +188,9 @@ class AssetStoreServiceImpl implements AssetStoreService {
     const id = await ipc.call('asset_upload_begin', { generation })
     try {
       for (const chunk of blobChunks(contents, CHUNK_BYTES)) {
-        await ipc.callBinary(
-          'asset_upload_append',
-          new Uint8Array(await chunk.arrayBuffer()),
-          { [UPLOAD_ID_HEADER]: id },
-          voidSchema,
-        )
+        await ipc.callBinary('asset_upload_append', new Uint8Array(await chunk.arrayBuffer()), {
+          [UPLOAD_ID_HEADER]: id,
+        })
       }
       return await commit(id)
     } catch (error) {

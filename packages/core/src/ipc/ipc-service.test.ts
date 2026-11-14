@@ -78,8 +78,8 @@ describe('call', () => {
 })
 
 describe('callBinary', () => {
-  it('sends the raw body and headers and validates the response', async () => {
-    const invokeBinary = vi.fn().mockResolvedValue({ written: 3 })
+  it('sends the raw body and headers', async () => {
+    const invokeBinary = vi.fn().mockResolvedValue(null)
     const { ipc } = serviceOver({
       invoke: () => Promise.resolve(null),
       listen: () => Promise.resolve(noop),
@@ -87,10 +87,8 @@ describe('callBinary', () => {
     })
 
     const body = new Uint8Array([1, 2, 3])
-    await expect(
-      ipc.callBinary('asset_write', body, { path: 'a.png' }, z.object({ written: z.number() })),
-    ).resolves.toEqual({ written: 3 })
-    expect(invokeBinary).toHaveBeenCalledWith('asset_write', body, { path: 'a.png' })
+    await ipc.callBinary('asset_upload_append', body, { 'x-upload-id': 'u1' })
+    expect(invokeBinary).toHaveBeenCalledWith('asset_upload_append', body, { 'x-upload-id': 'u1' })
     expect(ipc.hasBinaryTransport).toBe(true)
   })
 
@@ -101,9 +99,9 @@ describe('callBinary', () => {
     })
 
     expect(ipc.hasBinaryTransport).toBe(false)
-    await expect(
-      ipc.callBinary('asset_write', new Uint8Array(), {}, z.unknown()),
-    ).rejects.toMatchObject({ kind: 'io' })
+    await expect(ipc.callBinary('asset_upload_append', new Uint8Array(), {})).rejects.toMatchObject(
+      { kind: 'io' },
+    )
   })
 })
 

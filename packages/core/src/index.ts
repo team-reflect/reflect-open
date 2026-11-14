@@ -14,7 +14,6 @@ export {
   listenNow,
   type CommandArgs,
   type CommandName,
-  type CommandResult,
   type IpcBridge,
   type IpcBridgeService,
 } from './ipc/ipc-service.ts'

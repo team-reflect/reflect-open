@@ -6,6 +6,7 @@ import {
   type CommandName,
   type IpcBridge,
 } from '@reflect/core'
+import type { AssetReadBinaryArgs } from '@reflect/types'
 import { base64ToBytes, bytesToBase64 } from '@reflect/utils'
 import type { DevAssetStore } from '@/dev/dev-asset-store.ts'
 import type { DevFileStore } from '@/dev/dev-file-store.ts'
@@ -100,7 +101,7 @@ class DevBridgeImpl implements IpcBridge {
       }
       case 'plugin:iap|get_product_status': {
         const { payload } = argsOf('plugin:iap|get_product_status', args)
-        return { productId: payload.productId, isOwned: payload.productId === this.#ownedProductId }
+        return { isOwned: payload.productId === this.#ownedProductId }
       }
       case 'plugin:iap|purchase': {
         const { payload } = argsOf('plugin:iap|purchase', args)
@@ -221,7 +222,7 @@ class DevBridgeImpl implements IpcBridge {
       case 'asset_read':
         return bytesToBase64(this.#readAsset(argsOf('asset_read', args).path))
       case 'asset_read_binary':
-        return this.#readAsset(argsOf('asset_read', args).path).slice().buffer
+        return this.#readAsset((args as AssetReadBinaryArgs).path).slice().buffer
       case 'list_attachments':
         return assets.list()
       case 'asset_upload_begin': {

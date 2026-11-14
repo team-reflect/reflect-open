@@ -170,13 +170,12 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
     return this.#inner.callBytes(command, args)
   }
 
-  callBinary<TOutput>(
-    command: string,
+  callBinary(
+    command: 'asset_upload_append',
     body: Uint8Array,
     headers: Record<string, string>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
-    return this.#inner.callBinary(command, body, headers, schema)
+  ): Promise<void> {
+    return this.#inner.callBinary(command, body, headers)
   }
 
   listen(event: string, handler: (payload: unknown) => void): Promise<Unlisten> {

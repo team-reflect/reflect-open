@@ -7,8 +7,8 @@ import { definePluginEvent } from './plugin.ts'
 
 /**
  * The `plugin:iap` commands, the StoreKit In-App Purchase bridge
- * (`apple/Sources/AppStoreKit/StoreCommands.swift`). The wire format comes
- * from `tauri-plugin-iap` v0.9.1, which the permalinks below show.
+ * (`apple/Sources/AppStoreKit/StoreCommands.swift`). The command table
+ * (`crates/types/src/shell.rs`) holds the wire types.
  */
 
 /**
@@ -23,10 +23,8 @@ export type { IapProduct } from '@reflect/types'
 
 /**
  * Fires on purchases, renewals, and offer-code redemptions finished outside
- * the purchase sheet (`Transaction.updates`:
- * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift#L350).
- * The payload is the full Purchase object, but subscribers only treat the
- * event as a refetch signal, so it stays unparsed.
+ * the purchase sheet (`Transaction.updates`). Subscribers treat the event
+ * as a refetch signal, so the payload stays unparsed.
  */
 const purchaseUpdatedEvent = definePluginEvent('iap', 'purchaseUpdated', z.unknown())
 
@@ -35,28 +33,17 @@ const purchaseUpdatedEvent = definePluginEvent('iap', 'purchaseUpdated', z.unkno
  */
 export interface IapService {
   /**
-   * The store's localized offers for `productIds` (get_products:
-   * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts#L214
-   * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift#L63).
+   * The store's localized offers for `productIds`.
    */
   getProducts(productIds: string[]): Promise<IapProduct[]>
   /**
-   * Run the StoreKit purchase sheet for one product (purchase:
-   * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts#L258
-   * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift#L137).
-   * The Purchase response
-   * (https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/src/models.rs#L98)
-   * is ignored; refetch entitlements after this resolves. Do not wait for
-   * `purchaseUpdated` instead: the plugin never emits it for an in-app
-   * purchase.
+   * Run the StoreKit purchase sheet for one product. Refetch entitlements
+   * after this resolves. Do not wait for `purchaseUpdated` instead: the shell
+   * never emits it for an in-app purchase.
    */
   purchase(productId: string): Promise<void>
   /**
-   * Whether the device currently owns `productId` (get_product_status:
-   * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts#L393
-   * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift#L280).
-   * Only `productId` and `isOwned` are always present (ProductStatus:
-   * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/src/models.rs#L200).
+   * Whether the device currently owns `productId`.
    */
   isOwned(productId: string): Promise<boolean>
   /**

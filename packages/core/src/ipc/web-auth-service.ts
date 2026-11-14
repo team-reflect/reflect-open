@@ -2,7 +2,7 @@ import type { WebAuthOptions } from '@reflect/types'
 import type { IpcBridgeService } from './ipc-service.ts'
 
 /**
- * Typed bindings for the `plugin:web-auth` commands, the system web sign-in
+ * The service over the `plugin:web-auth` commands, the system web sign-in
  * session (`apps/ios/Sources/Capabilities/WebAuthCapability.swift`).
  */
 

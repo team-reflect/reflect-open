@@ -27,20 +27,13 @@ enum HostCommands {
     guard let args = request.decodeArgs(HostLogArgs.self) else {
       return .error(.parse(.init(message: "host.log takes {level, message}")))
     }
-    let level: ReflectCore.LogLevel
     switch args.level {
-    case .error:
-      webLogger.error("\(args.message, privacy: .public)")
-      level = .error
-    case .warn:
-      webLogger.warning("\(args.message, privacy: .public)")
-      level = .warn
-    case .info:
-      webLogger.info("\(args.message, privacy: .public)")
-      level = .info
+    case .error: webLogger.error("\(args.message, privacy: .public)")
+    case .warn: webLogger.warning("\(args.message, privacy: .public)")
+    case .info: webLogger.info("\(args.message, privacy: .public)")
     }
     logQueue.async {
-      ReflectCore.log(level, args.message)
+      ReflectCore.log(args.level, args.message)
     }
     return .null
   }

@@ -244,5 +244,5 @@ pub struct HostOpenUrlArgs {
 }
 
 /// The arguments of a command that takes none.
-#[derive(Default, Serialize, Deserialize, specta::Type)]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct NoArgs {}

@@ -2,7 +2,7 @@ import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from './ipc-service.ts'
 
 /**
- * Typed bindings for the `plugin:mobile-haptics` commands, the app's
+ * The service over the `plugin:mobile-haptics` commands, the app's
  * single haptic (`apps/ios/Sources/Capabilities/HapticsCapability.swift`).
  */
 

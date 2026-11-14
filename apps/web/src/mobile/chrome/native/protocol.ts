@@ -29,7 +29,7 @@ export type NativeChromeState = Extract<ChromeMessage, { type: 'state' }>
 /**
  * The commands of the formatting toolbar that the shell draws.
  */
-export const FORMATTING_COMMANDS = [
+const FORMATTING_COMMANDS = [
   'slash',
   'list',
   'todo',

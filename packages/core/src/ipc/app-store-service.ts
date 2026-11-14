@@ -2,7 +2,7 @@ import type { MaybePromise } from '@reflect/utils'
 import type { IpcBridgeService } from './ipc-service.ts'
 
 /**
- * Typed bindings for the `plugin:app-store` commands, the install-channel
+ * The service over the `plugin:app-store` commands, the install-channel
  * probe (`apps/ios/Sources/Capabilities/StoreCapability.swift`).
  */
 
