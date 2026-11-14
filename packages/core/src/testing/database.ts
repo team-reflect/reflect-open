@@ -170,15 +170,15 @@ function insertProjection(database: DatabaseSync, indexed: IndexedNote): void {
       indexed.path,
       task.astPath,
       task.markdown,
-      JSON.stringify(task.breadcrumbs),
+      JSON.stringify(task.breadcrumbs ?? []),
       Number(task.checked),
       task.dueDate,
     )
   }
 
   // The FTS body carries the note text plus its assets' description text.
-  const searchBody =
-    indexed.assetText === '' ? indexed.text : `${indexed.text}\n${indexed.assetText}`
+  const assetText = indexed.assetText ?? ''
+  const searchBody = assetText === '' ? indexed.text : `${indexed.text}\n${assetText}`
   database
     .prepare('INSERT INTO search_fts(path, title, body) VALUES (?, ?, ?)')
     .run(indexed.path, indexed.title, searchBody)

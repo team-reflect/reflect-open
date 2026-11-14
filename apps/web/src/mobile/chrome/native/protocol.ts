@@ -27,22 +27,25 @@ export type {
 export type NativeChromeState = Extract<ChromeMessage, { type: 'state' }>
 
 /**
- * The commands of the formatting toolbar that the shell draws.
+ * Every value of `T`, keyed by itself. A new value in `chrome.rs` fails to
+ * compile until the schema below lists it.
  */
-const FORMATTING_COMMANDS = [
-  'slash',
-  'list',
-  'todo',
-  'link',
-  'tag',
-  'dedent',
-  'indent',
-  'up',
-  'down',
-  'dismiss',
-] as const satisfies readonly FormattingCommand[]
+type AllOf<T extends string> = { [K in T]: K }
 
-const tabSchema = z.enum(['daily', 'all', 'tasks']) satisfies z.ZodType<ChromeTab>
+const formattingCommandSchema = z.enum({
+  slash: 'slash',
+  list: 'list',
+  todo: 'todo',
+  link: 'link',
+  tag: 'tag',
+  dedent: 'dedent',
+  indent: 'indent',
+  up: 'up',
+  down: 'down',
+  dismiss: 'dismiss',
+} satisfies AllOf<FormattingCommand>)
+
+const tabSchema = z.enum({ daily: 'daily', all: 'all', tasks: 'tasks' } satisfies AllOf<ChromeTab>)
 
 const fileSchema = z.object({ name: z.string(), type: z.string(), data: z.string() })
 
@@ -56,7 +59,7 @@ const intentSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('tab'), tab: tabSchema }),
   z.object({ type: z.literal('action'), entryId: z.number(), id: z.string() }),
-  z.object({ type: z.literal('command'), id: z.enum(FORMATTING_COMMANDS) }),
+  z.object({ type: z.literal('command'), id: formattingCommandSchema }),
   z.object({ type: z.literal('files'), files: z.array(fileSchema) }),
   z.object({ type: z.literal('layout'), cornersInHeaderRow: z.boolean() }),
   z.object({

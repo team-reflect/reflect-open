@@ -200,7 +200,8 @@ export function openDevIndexDb(sqlite3: Sqlite3Static): DevIndexDb {
           ],
         )
       }
-      const searchBody = note.assetText === '' ? note.text : `${note.text}\n${note.assetText}`
+      const assetText = note.assetText ?? ''
+      const searchBody = assetText === '' ? note.text : `${note.text}\n${assetText}`
       run(db, 'INSERT INTO search_fts(path, title, body) VALUES(?, ?, ?)', [
         note.path,
         note.title,
