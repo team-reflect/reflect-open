@@ -36,7 +36,7 @@ describe('useRestoredRoute', () => {
   it('returns the route stored for the graph and removes it', async () => {
     const note: Route = { kind: 'note', path: 'a.md' }
     const { view, storage } = await renderRestoredRoute(storedRoute('/graph', note))
-    expect(view.result.current).toEqual({ graphRoot: '/graph', route: note, section: 'tasks' })
+    expect(view.result.current).toEqual({ route: note, section: 'tasks' })
     expect(storage.session.get(STORAGE_KEY)).toBeNull()
   })
 

@@ -9,10 +9,10 @@ const STORAGE_KEY = 'reflect.mobile.route'
 const storedRouteSchema = z.object({
   graphRoot: z.string(),
   route: routeSchema,
-  section: sectionSchema.optional(),
+  section: sectionSchema,
 })
 
-type StoredRoute = z.infer<typeof storedRouteSchema>
+type StoredRoute = Omit<z.infer<typeof storedRouteSchema>, 'graphRoot'>
 
 /**
  * In the Swift shell, keeps the current route and section of the graph in
@@ -36,7 +36,9 @@ export function useRestoredRoute(graphRoot: string): StoredRoute | undefined {
     const stored = storedRouteSchema.safeParse(
       safeParseJson(storage.session.get(STORAGE_KEY) ?? ''),
     )
-    return stored.success && stored.data.graphRoot === graphRoot ? stored.data : undefined
+    return stored.success && stored.data.graphRoot === graphRoot
+      ? { route: stored.data.route, section: stored.data.section }
+      : undefined
   })
 
   useEffect(() => {

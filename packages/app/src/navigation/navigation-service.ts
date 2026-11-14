@@ -159,9 +159,8 @@ export interface NavigationService extends Store<NavigationState> {
   /**
    * Start a fresh history on `initialRoute` (today by default) in
    * `initialSection` (by default the section whose root it shows, else
-   * Daily), dropping every
-   * entry and scroll position: switching graphs must not carry the old graph's
-   * history. The view tree that mounts for the new history calls this while it
+   * Daily), dropping every entry and scroll position: switching graphs must
+   * not carry the old graph's history. The view tree that mounts for the new history calls this while it
    * renders, so subscribers are not notified; read `get()` afterwards.
    */
   reset(initialRoute?: Route, initialSection?: Section): void
@@ -305,9 +304,8 @@ class NavigationServiceImpl implements NavigationService {
       // repopulates it.
       this.#scrollBySurface.delete(surface)
     }
-    const sameEntry =
-      routesEqual(currentEntry.route, target) &&
-      (options?.section ?? currentEntry.section) === currentEntry.section
+    const section = options?.section ?? rootSectionForRoute(target) ?? currentEntry.section
+    const sameEntry = routesEqual(currentEntry.route, target) && section === currentEntry.section
     if (sameEntry) {
       if (restored !== undefined) {
         this.#scrollById.set(currentEntry.id, restored)
@@ -326,7 +324,6 @@ class NavigationServiceImpl implements NavigationService {
       if (restored !== undefined) {
         this.#scrollById.set(id, restored) // seed the fresh entry with the surface position
       }
-      const section = options?.section ?? rootSectionForRoute(target) ?? currentEntry.section
       this.#stack = [...this.#stack.slice(0, this.#index + 1), { id, route: target, section }]
       this.#index = this.#stack.length - 1
     }
