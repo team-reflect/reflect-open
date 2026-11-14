@@ -156,11 +156,13 @@ export {
   focusedNotePathForRoute,
   normalizeRoute,
   notePathForRoute,
+  rootSectionForRoute,
   routeForPath,
   routeSchema,
   routesEqual,
   type NoteRoute,
   type Route,
+  type Section,
 } from './navigation/route.ts'
 export {
   createWindowService,

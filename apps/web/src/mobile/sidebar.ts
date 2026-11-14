@@ -126,7 +126,7 @@ export function useSidebar(tab: MobileTab): {
   const run = (command: SidebarCommand): void => {
     switch (command.kind) {
       case 'chat':
-        navigate({ kind: 'chat' })
+        navigate({ kind: 'chat' }, { section: 'all' })
         return
       case 'search':
         // All lands with its search field focused.

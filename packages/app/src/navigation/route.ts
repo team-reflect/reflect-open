@@ -34,6 +34,32 @@ export const routeSchema = z.discriminatedUnion('kind', [
 export type Route = z.infer<typeof routeSchema>
 
 /**
+ * A top-level area of the app. Every history entry belongs to one section.
+ */
+export type Section = 'daily' | 'all' | 'tasks' | 'chat'
+
+/**
+ * The section whose root screen `route` shows, or `null` for a route that
+ * opens over the current section (a note, the settings screens).
+ */
+export function rootSectionForRoute(route: Route): Section | null {
+  switch (route.kind) {
+    case 'today':
+    case 'daily':
+      return 'daily'
+    case 'allNotes':
+    case 'search':
+      return 'all'
+    case 'tasks':
+      return 'tasks'
+    case 'chat':
+      return 'chat'
+    default:
+      return null
+  }
+}
+
+/**
  * A route that addresses one concrete note, including a dated daily note.
  */
 export type NoteRoute = Extract<Route, { kind: 'daily' | 'note' }>

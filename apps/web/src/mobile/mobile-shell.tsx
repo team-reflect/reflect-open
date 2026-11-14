@@ -2,57 +2,35 @@ import { Suspense, useEffect, useRef, useState, type ReactElement } from 'react'
 import { LoadingScreen } from '@/components/loading-screen.tsx'
 import { useDoubleTap } from '@/hooks/use-double-tap.ts'
 import { MobileStack } from '@/mobile/mobile-stack.tsx'
-import { tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
+import { mobileTabForSection, type MobileTab } from '@/mobile/mobile-tab-bar.tsx'
 import { SafeAreaBoundary } from '@/mobile/safe-area-boundary.tsx'
-import { useAllTabScreen } from '@/mobile/use-all-tab-screen.ts'
-import {
-  EMPTY_ALL_NOTES_FILTERS,
-  type AllNotesFilters,
-  routesEqual,
-  type Route,
-} from '@reflect/app'
+import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from '@reflect/app'
 import { useKeyboardVisible } from '@/mobile/use-keyboard.ts'
 import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useMobileForm } from '@/mobile/mobile-form.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 
-type DailyRoute = Extract<Route, { kind: 'today' }> | Extract<Route, { kind: 'daily' }>
-
-function dailyRouteFrom(route: Route): DailyRoute | null {
-  return route.kind === 'today' || route.kind === 'daily' ? route : null
-}
-
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): screens above, the
- * Daily / All bar below. The active tab derives from the route — a note
- * keeps whichever tab it was opened from, so reading a search result
- * doesn't flip the bar. The All tab's search text and filter badges live
- * here, not in the screen, so opening a note and coming back loses neither.
- * All also remembers the card it was left on (an open Chat or note): tapping
- * All from another tab returns to it, and tapping All again, or
- * double-tapping it, goes back to the list.
+ * Daily / All / Tasks bar below. The active tab is the section of the
+ * history entry on screen, so a note keeps the tab it was opened from. The
+ * All tab's search text and filter badges live here, not in the screen, so
+ * opening a note and coming back loses neither. A tab tap from another tab
+ * returns to where that tab was left (Daily to its last day, All and Tasks
+ * to their last screen); a tap within the tab goes to its root.
  */
 export function MobileShell(): ReactElement {
-  const { route, entryId, backRoute } = useRouterState()
-  const { navigate } = useRouterActions()
+  const { route, entryId, section } = useRouterState()
+  const { navigate, selectSection } = useRouterActions()
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
-  const [lastTab, setLastTab] = useState<MobileTab>('daily')
-  const [lastDailyRoute, setLastDailyRoute] = useState<DailyRoute>({ kind: 'today' })
-  // A card (a note, Chat) keeps the tab of the screen it was opened from:
-  // the tab root its Back reveals, which also covers All returning to its
-  // card with the list put beneath it in the same render. Deeper cards (a
-  // note opened from a note) fall back to the last tab, remembered across
-  // renders. Tracking that in state (adjusted during render) avoids
-  // reading/writing a ref in render.
-  const tab: MobileTab =
-    tabRootFor(route) ?? (backRoute === null ? null : tabRootFor(backRoute)) ?? lastTab
+  const tab = mobileTabForSection(section)
   // A tab double-tap is a capture gesture (Daily focuses today's editor; the
   // list tabs focus their search inputs); a pending tap expires if the shown
   // tab changes between taps (a deep link elsewhere), so that second tap is a
   // return, not a double-tap. Watching the shown tab, not its root, lets the
-  // All tap that returns to its open card still pair with a quick second tap.
+  // tap that returns to a tab's card still pair with a quick second tap.
   const isDoubleTap = useDoubleTap<MobileTab>(tab)
   const keyboardVisible = useKeyboardVisible()
   const chromeRenderer = useChromeRenderer()
@@ -70,39 +48,24 @@ export function MobileShell(): ReactElement {
     }
   }, [route, entryId])
 
-  const currentDailyRoute = dailyRouteFrom(route)
-  if (tab !== lastTab) {
-    setLastTab(tab)
-  }
-  if (currentDailyRoute !== null && !routesEqual(currentDailyRoute, lastDailyRoute)) {
-    setLastDailyRoute(currentDailyRoute)
-  }
-  const allScreen = useAllTabScreen(route, tab)
-
   const handleTabSelect = (next: MobileTab): void => {
     const doubleTap = isDoubleTap(next)
-    // From another tab, All returns to the card it was left on.
-    const restoredAllScreen = next === 'all' && tab !== 'all' ? allScreen : null
 
     if (next === 'all') {
-      const allList: Route = { kind: 'allNotes', tag: null }
-      if (restoredAllScreen !== null && !doubleTap) {
-        // The list goes underneath, so the card's Back lands on All (and the
-        // bar lights All), not the tab just left.
-        navigate(allList)
-        navigate(restoredAllScreen)
-        return
-      }
-      // Tapped on All (its list or a card over it), the tab pops back to the
+      // Within All (its list or a card over it), the tab pops back to the
       // list. The double-tap is a search gesture: it lands there with the
       // search input focused (the Daily tab's capture double-tap,
       // All-flavored).
-      navigate(allList, doubleTap ? { focusEditor: true } : undefined)
+      if (tab === 'all' || doubleTap) {
+        navigate({ kind: 'allNotes', tag: null }, doubleTap ? { focusEditor: true } : undefined)
+      } else {
+        selectSection('all')
+      }
       return
     }
 
     if (next === 'tasks') {
-      navigate({ kind: 'tasks' }, doubleTap ? { focusEditor: true } : undefined)
+      selectSection('tasks', doubleTap ? { focusEditor: true } : undefined)
       return
     }
 
@@ -111,10 +74,10 @@ export function MobileShell(): ReactElement {
       return
     }
 
-    if (currentDailyRoute !== null) {
+    if (route.kind === 'today' || route.kind === 'daily') {
       return
     }
-    navigate(lastDailyRoute, { restoreSurfaceScroll: true })
+    selectSection('daily')
   }
 
   return (

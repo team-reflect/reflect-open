@@ -902,6 +902,31 @@ describe('MobileShell', () => {
     await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
   })
 
+  it('tapping Tasks from another tab returns to the note it was left on, over the list', async () => {
+    const user = userEvent
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'tasks' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    await expect.element(view.getByRole('heading', { name: 'Edit note' })).toBeVisible()
+
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
+    await waitFor(() => expect(shownMonth(view)).not.toBeNull())
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await waitFor(() => {
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('agenda')
+    })
+    expect(view.getByRole('button', { name: 'Tasks' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+    // The task list sits underneath, so Back lands there.
+    await user.click(page.elementLocator(visibleLayer(view)).getByRole('button', { name: 'Back' }))
+    const box = view.getByRole('searchbox', { name: 'Search tasks' })
+    await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
+  })
+
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')

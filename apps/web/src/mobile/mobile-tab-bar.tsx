@@ -3,24 +3,16 @@ import { CircleCheck, Files, SquarePen } from 'lucide-react'
 import { cn } from '@/lib/utils.ts'
 import { hapticImpactLight } from '@/mobile/haptics.ts'
 import { useMobileServices } from '@/mobile/mobile-services.ts'
-import type { Route } from '@reflect/app'
+import type { Section } from '@reflect/app'
 
 export type MobileTab = 'daily' | 'all' | 'tasks'
 
-/** The tab whose root screen a route shows, or `null` for stacked screens. */
-export function tabRootFor(route: Route): MobileTab | null {
-  switch (route.kind) {
-    case 'today':
-    case 'daily':
-      return 'daily'
-    case 'allNotes':
-    case 'search':
-      return 'all'
-    case 'tasks':
-      return 'tasks'
-    default:
-      return null
-  }
+/**
+ * The tab that lights for a history entry of `section`. Chat sits in the All
+ * tab, where asking is next to searching.
+ */
+export function mobileTabForSection(section: Section): MobileTab {
+  return section === 'chat' ? 'all' : section
 }
 
 const TABS = [

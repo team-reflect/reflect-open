@@ -1,6 +1,12 @@
 import type { Store, Unlisten } from '@reflect/core'
 import type { DayScrollPosition } from '../daily/day-window.ts'
-import { normalizeRoute, routesEqual, type Route } from './route.ts'
+import {
+  normalizeRoute,
+  rootSectionForRoute,
+  routesEqual,
+  type Route,
+  type Section,
+} from './route.ts'
 
 /**
  * The app's navigation history (Plan 06): a stack over typed {@link Route}s —
@@ -44,6 +50,11 @@ export interface NavigateOptions {
    * autofocuses every arrival and ignores it.
    */
   focusEditor?: boolean
+  /**
+   * The section of a new history entry. Defaults to the section whose root
+   * screen the route shows, else the current entry's section.
+   */
+  section?: Section | undefined
 }
 
 /**
@@ -82,6 +93,10 @@ export interface NavigationState {
    * a pushed note so the back-swipe gesture reveals a live screen.
    */
   readonly backRoute: Route | null
+  /**
+   * The section of the current history entry, fixed when the entry was pushed.
+   */
+  readonly section: Section
 }
 
 /**
@@ -96,6 +111,13 @@ export type NavigationPosition = Pick<NavigationState, 'entryId' | 'route'>
  */
 export interface NavigationService extends Store<NavigationState> {
   navigate(route: Route, options?: NavigateOptions): void
+  /**
+   * Go to `section`. From another section this lands where that section was
+   * left: the daily surface on its last day, or another section on its last
+   * screen, pushed over its root so Back reveals the root. Within the section
+   * it goes to the section's root, and on the root it re-anchors.
+   */
+  selectSection(section: Section, options?: NavigateOptions): void
   back(): void
   forward(): void
   /**
@@ -129,6 +151,11 @@ export interface NavigationService extends Store<NavigationState> {
    * back-nav can never land on a path that no longer exists.
    */
   noteMoved(from: string, to: string): void
+  /**
+   * Forget the screens remembered for {@link selectSection} that show a note
+   * `isGone` reports, so a section never returns to a deleted note.
+   */
+  forgetNotes(isGone: (path: string) => boolean): void
   /**
    * Start a fresh history on `initialRoute` (today by default), dropping every
    * entry and scroll position: switching graphs must not carry the old graph's
@@ -166,6 +193,27 @@ interface HistoryEntry {
    */
   id: number
   route: Route
+  section: Section
+}
+
+/**
+ * The root screen of `section` before it has shown one.
+ */
+function defaultSectionRoot(section: Section): Route {
+  switch (section) {
+    case 'daily':
+      return { kind: 'today' }
+    case 'all':
+      return { kind: 'allNotes', tag: null }
+    case 'tasks':
+      return { kind: 'tasks' }
+    case 'chat':
+      return { kind: 'chat' }
+  }
+}
+
+function movedRoute(route: Route, from: string, to: string): Route {
+  return route.kind === 'note' && route.path === from ? { kind: 'note', path: to } : route
 }
 
 class NavigationServiceImpl implements NavigationService {
@@ -183,6 +231,14 @@ class NavigationServiceImpl implements NavigationService {
    * Last position per long-lived surface, independent of history entries.
    */
   readonly #scrollBySurface = new Map<string, ScrollPosition>()
+  /**
+   * The screen each section showed last.
+   */
+  readonly #lastBySection = new Map<Section, Route>()
+  /**
+   * The root screen each section showed last.
+   */
+  readonly #rootBySection = new Map<Section, Route>()
   // Not a `WritableStore`: `reset` replaces the state without notifying,
   // because it runs while a view tree renders.
   readonly #listeners = new Set<() => void>()
@@ -204,6 +260,31 @@ class NavigationServiceImpl implements NavigationService {
   }
 
   navigate(route: Route, options?: NavigateOptions): void {
+    this.#arrive(route, options)
+    this.#publish()
+  }
+
+  selectSection(section: Section, options?: NavigateOptions): void {
+    const current = this.#stack[this.#index]!
+    const root = this.#rootBySection.get(section) ?? defaultSectionRoot(section)
+    if (current.section === section) {
+      const onRoot = rootSectionForRoute(current.route) === section
+      this.navigate(onRoot ? current.route : root, { ...options, section })
+      return
+    }
+    if (section === 'daily') {
+      this.navigate(root, { restoreSurfaceScroll: true, ...options, section })
+      return
+    }
+    const last = this.#lastBySection.get(section) ?? root
+    if (!routesEqual(last, root)) {
+      this.#arrive(root, { section })
+    }
+    this.#arrive(last, { ...options, section })
+    this.#publish()
+  }
+
+  #arrive(route: Route, options?: NavigateOptions): void {
     this.#revision += 1
     const target = normalizeRoute(route)
     const surface = scrollSurfaceForRoute(target)
@@ -241,12 +322,12 @@ class NavigationServiceImpl implements NavigationService {
       if (restored !== undefined) {
         this.#scrollById.set(id, restored) // seed the fresh entry with the surface position
       }
-      this.#stack = [...this.#stack.slice(0, this.#index + 1), { id, route: target }]
+      const section = options?.section ?? rootSectionForRoute(target) ?? currentEntry.section
+      this.#stack = [...this.#stack.slice(0, this.#index + 1), { id, route: target, section }]
       this.#index = this.#stack.length - 1
     }
     this.#arrivalSeq += 1
     this.#arrivalFocusEditor = options?.focusEditor === true
-    this.#publish()
   }
 
   back(): void {
@@ -298,17 +379,29 @@ class NavigationServiceImpl implements NavigationService {
     if (current.kind === 'note' && current.path === from) {
       this.#revision += 1
     }
+    for (const [section, route] of this.#lastBySection) {
+      this.#lastBySection.set(section, movedRoute(route, from, to))
+    }
     let changed = false
     const moved = this.#stack.map((entry) => {
-      if (entry.route.kind === 'note' && entry.route.path === from) {
+      const route = movedRoute(entry.route, from, to)
+      if (route !== entry.route) {
         changed = true
-        return { ...entry, route: { kind: 'note' as const, path: to } }
+        return { ...entry, route }
       }
       return entry
     })
     if (changed) {
       this.#stack = moved
       this.#publish()
+    }
+  }
+
+  forgetNotes(isGone: (path: string) => boolean): void {
+    for (const [section, route] of this.#lastBySection) {
+      if (route.kind === 'note' && isGone(route.path)) {
+        this.#lastBySection.delete(section)
+      }
     }
   }
 
@@ -327,21 +420,38 @@ class NavigationServiceImpl implements NavigationService {
       canBack: this.#index > 0,
       canForward: this.#index < this.#stack.length - 1,
       backRoute: this.#index > 0 ? this.#stack[this.#index - 1]!.route : null,
+      section: entry.section,
     }
   }
 
   #start(initialRoute: Route): NavigationState {
     this.#nextId = 0
-    this.#stack = [{ id: this.#nextId++, route: normalizeRoute(initialRoute) }]
+    const route = normalizeRoute(initialRoute)
+    this.#stack = [{ id: this.#nextId++, route, section: rootSectionForRoute(route) ?? 'daily' }]
     this.#index = 0
     this.#arrivalSeq = 0
     this.#arrivalFocusEditor = false
     this.#scrollById.clear()
     this.#scrollBySurface.clear()
+    this.#lastBySection.clear()
+    this.#rootBySection.clear()
+    this.#remember()
     return this.#snapshot()
   }
 
+  /**
+   * Record the current entry as the screen its section showed last.
+   */
+  #remember(): void {
+    const { route, section } = this.#stack[this.#index]!
+    this.#lastBySection.set(section, route)
+    if (rootSectionForRoute(route) === section) {
+      this.#rootBySection.set(section, route)
+    }
+  }
+
   #publish(): void {
+    this.#remember()
     this.#state = this.#snapshot()
     for (const listener of this.#listeners) {
       listener()

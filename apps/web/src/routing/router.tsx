@@ -15,6 +15,7 @@ import type {
   NavigationState,
   Route,
   ScrollPosition,
+  Section,
 } from '@reflect/app'
 import { useAppServices, useCoreServices } from '@/services/services-provider.tsx'
 
@@ -54,6 +55,7 @@ interface RouterHandlers {
  */
 interface RouterActions {
   navigate: RouterNavigate
+  selectSection: (section: Section, options?: NavigateOptions) => void
   back: () => void
   forward: () => void
 }
@@ -111,6 +113,15 @@ function RouterActionsProvider({ navigation, children }: NavigationProviderProps
     [navigation],
   )
 
+  const selectSection = useCallback(
+    (section: Section, options?: NavigateOptions): void => {
+      startTransition(() => {
+        navigation.selectSection(section, options)
+      })
+    },
+    [navigation],
+  )
+
   const back = useCallback((): void => {
     startTransition(() => {
       navigation.back()
@@ -124,8 +135,8 @@ function RouterActionsProvider({ navigation, children }: NavigationProviderProps
   }, [navigation])
 
   const routerActions = useMemo<RouterActions>(
-    () => ({ navigate, back, forward }),
-    [navigate, back, forward],
+    () => ({ navigate, selectSection, back, forward }),
+    [navigate, selectSection, back, forward],
   )
 
   return <RouterActionsContext value={routerActions}>{children}</RouterActionsContext>
@@ -135,7 +146,7 @@ function RouterActionsProvider({ navigation, children }: NavigationProviderProps
  * Provides the service's state as rendered by React.
  */
 function RouterStateProvider({ navigation, children }: NavigationProviderProps): ReactElement {
-  const { noteMove } = useCoreServices()
+  const { noteMove, noteRows } = useCoreServices()
   // React state rather than `useSyncExternalStore`: a store read through that
   // hook always updates synchronously, which would drop the transition and
   // flash the loading fallback of every lazily loaded screen.
@@ -154,6 +165,14 @@ function RouterStateProvider({ navigation, children }: NavigationProviderProps):
   useEffect(() => {
     return noteMove.onMoved((from, to) => navigation.noteMoved(from, to))
   }, [navigation, noteMove])
+
+  // A section never returns to a note trashed in the app.
+  useEffect(() => {
+    return noteRows.subscribe(() => {
+      const overlays = noteRows.get()
+      navigation.forgetNotes((path) => overlays.get(path)?.trashed === true)
+    })
+  }, [navigation, noteRows])
 
   return <RouterStateContext value={state}>{children}</RouterStateContext>
 }
