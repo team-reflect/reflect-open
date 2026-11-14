@@ -231,7 +231,9 @@ interface MobileStackProps {
  * in index.css). A strip along the card's left edge takes the horizontal
  * drag over any of them, by finger or by mouse, and hands taps to what lies
  * under it. A horizontal scroller inside a stacked screen needs
- * `data-scroll-x`.
+ * `data-scroll-x`. Only the current card takes hits: the pager and the
+ * layers under it are `pointer-events: none`, so a touch on the revealed
+ * screen while the card snaps leaves the snap running.
  *
  * A stacked screen must not hold a `position: fixed` element: it stays put
  * while the card moves. Put floating UI in a portal or the top layer.
@@ -363,7 +365,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
       <div
         ref={pagerRef}
         className={cn(
-          'mobile-pager relative flex h-full snap-x snap-mandatory scrollbar-none overflow-y-hidden overscroll-none',
+          'mobile-pager pointer-events-none relative flex h-full snap-x snap-mandatory scrollbar-none overflow-y-hidden overscroll-none',
           swipeEnabled ? 'overflow-x-auto' : 'overflow-x-hidden',
         )}
       >
@@ -375,6 +377,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
               key={layer.key}
               className={cn(
                 'mobile-stack-layer sticky left-0 h-full w-full shrink-0 bg-surface-canvas',
+                !hidden && 'pointer-events-auto',
                 className,
               )}
               style={style}
