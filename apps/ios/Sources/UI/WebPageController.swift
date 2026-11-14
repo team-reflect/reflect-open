@@ -152,7 +152,8 @@ final class WebPageController: UIViewController {
   /// Shows the corner buttons of `state`. Buttons send `action` intents,
   /// menus come from `menus`, and the back button sends `back`. With
   /// `animated`, a group that changes cross-fades when the buttons were on
-  /// screen and the back button stays as it was.
+  /// screen, and one icon button that becomes another icon button replaces
+  /// its symbol.
   func showBar(
     _ state: ChromeState, animated: Bool, menus: MenuPresenter,
     send: @escaping (ChromeIntent) -> Void
@@ -160,7 +161,7 @@ final class WebPageController: UIViewController {
     let wasShown = shownEntryId != nil && !cornerButtons.isHidden
     cornerButtons.isHidden = Self.hidesBar(state)
     let back = BackButtons(state)
-    let fades = animated && wasShown && back == shownBack
+    let fades = animated && wasShown
     let entryId = state.entryId
     let newEntry = entryId != shownEntryId
     shownEntryId = entryId
@@ -172,28 +173,25 @@ final class WebPageController: UIViewController {
       {
         setMenus(of: Array(shown), to: state.leading, entryId: entryId, menus: menus)
       } else {
-        var buttons: [UIButton] = []
+        var items: [CornerItem] = []
         switch back {
         case .none:
           break
         case .back:
-          buttons.append(
-            Self.makeArrow(forward: false) { send(.back(.init(entryId: entryId))) })
+          items.append(.arrow(forward: false) { send(.back(.init(entryId: entryId))) })
         case .history(let history):
-          let backButton = Self.makeArrow(forward: false) {
+          var backItem = CornerItem.arrow(forward: false) {
             send(.history(.init(entryId: entryId, direction: .back)))
           }
-          backButton.isEnabled = history.back
-          let forwardButton = Self.makeArrow(forward: true) {
+          backItem.isEnabled = history.back
+          var forwardItem = CornerItem.arrow(forward: true) {
             send(.history(.init(entryId: entryId, direction: .forward)))
           }
-          forwardButton.isEnabled = history.forward
-          buttons += [backButton, forwardButton]
+          forwardItem.isEnabled = history.forward
+          items += [backItem, forwardItem]
         }
-        buttons += state.leading.map {
-          cornerButton($0, entryId: entryId, menus: menus, send: send)
-        }
-        setButtons(buttons, in: leadingGroup, fades: fades && state.leading != shownLeading)
+        items += state.leading.map { cornerItem($0, entryId: entryId, menus: menus, send: send) }
+        setItems(items, in: leadingGroup, animated: fades)
       }
       shownLeading = state.leading
       shownBack = back
@@ -206,36 +204,37 @@ final class WebPageController: UIViewController {
       {
         setMenus(of: shown, to: state.trailing, entryId: entryId, menus: menus)
       } else {
-        let buttons = state.trailing.map {
-          cornerButton($0, entryId: entryId, menus: menus, send: send)
+        let items = state.trailing.map {
+          cornerItem($0, entryId: entryId, menus: menus, send: send)
         }
-        setButtons(buttons, in: trailingGroup, fades: fades && state.trailing != shownTrailing)
+        setItems(items, in: trailingGroup, animated: fades)
       }
       shownTrailing = state.trailing
     }
   }
 
-  /// A back or forward arrow that runs `action`.
-  private static func makeArrow(forward: Bool, action: @escaping () -> Void) -> UIButton {
-    let name = forward ? "Forward" : "Back"
-    let button = makeButton(
-      image: UIImage(systemName: forward ? "chevron.forward" : "chevron.backward"), title: nil,
-      label: Bundle(for: UIButton.self).localizedString(forKey: name, value: name, table: nil))
-    button.addAction(UIAction { _ in action() }, for: .primaryActionTriggered)
-    return button
-  }
-
-  /// Puts `buttons` in `group`, with a cross-fade when `fades`.
-  private func setButtons(_ buttons: [UIButton], in group: UIStackView, fades: Bool) {
+  /// Puts buttons for `items` in `group`. With `animated`, one icon button
+  /// that becomes another icon button keeps its glass and replaces its
+  /// symbol, as a system bar button does. Other changes cross-fade.
+  private func setItems(_ items: [CornerItem], in group: UIStackView, animated: Bool) {
+    if animated, #available(iOS 26, *), items.count == 1, items[0].image != nil,
+      group.arrangedSubviews.count == 1, let button = group.arrangedSubviews[0] as? UIButton,
+      button.configuration?.image != nil
+    {
+      Self.apply(items[0], to: button)
+      return
+    }
     let swap = {
       for view in group.arrangedSubviews {
         view.removeFromSuperview()
       }
-      for button in buttons {
+      for item in items {
+        let button = Self.makeButton(image: item.image)
+        Self.apply(item, to: button)
         group.addArrangedSubview(button)
       }
     }
-    guard fades else {
+    guard animated else {
       swap()
       return
     }
@@ -275,8 +274,8 @@ final class WebPageController: UIViewController {
   /// document stays on screen.
   func clearBar() {
     cornerButtons.isHidden = true
-    setButtons([], in: leadingGroup, fades: false)
-    setButtons([], in: trailingGroup, fades: false)
+    setItems([], in: leadingGroup, animated: false)
+    setItems([], in: trailingGroup, animated: false)
     shownLeading = nil
     shownTrailing = nil
     shownBack = .none
@@ -303,41 +302,67 @@ final class WebPageController: UIViewController {
   /// is open, as the system bars do behind a sheet.
   func setBarDimmed(_ dimmed: Bool) {
     cornerButtons.isUserInteractionEnabled = !dimmed
-    cornerButtons.tintAdjustmentMode = dimmed ? .dimmed : .automatic
+    // Only on a change: a set calls `tintColorDidChange` on every button,
+    // which updates its configuration and cuts a symbol transition short.
+    let mode: UIView.TintAdjustmentMode = dimmed ? .dimmed : .automatic
+    if cornerButtons.tintAdjustmentMode != mode {
+      cornerButtons.tintAdjustmentMode = mode
+    }
   }
 
-  private func cornerButton(
+  private func cornerItem(
     _ button: BarButton, entryId: Int, menus: MenuPresenter,
     send: @escaping (ChromeIntent) -> Void
-  ) -> UIButton {
-    let control = Self.makeButton(
-      image: button.icon.flatMap { UIImage(systemName: $0) }, title: button.title,
-      label: button.title)
-    if let items = button.menu {
-      control.menu = menus.barMenu(items, entryId: entryId) { [weak control] in control }
-      control.showsMenuAsPrimaryAction = true
-    } else {
-      control.addAction(
-        UIAction { _ in send(.action(.init(entryId: entryId, id: button.id))) },
-        for: .primaryActionTriggered)
+  ) -> CornerItem {
+    let menu = button.menu.map { items in
+      { (control: UIButton) in
+        menus.barMenu(items, entryId: entryId) { [weak control] in control }
+      }
     }
-    return control
+    return CornerItem(
+      image: button.icon.flatMap { UIImage(systemName: $0) }, title: button.title,
+      label: button.title, action: { send(.action(.init(entryId: entryId, id: button.id))) },
+      menu: menu)
   }
 
-  /// A round glass button with `image`, or a capsule with `title` when it
-  /// has no image.
-  private static func makeButton(image: UIImage?, title: String?, label: String) -> UIButton {
+  /// The identifier of the tap action of a corner button, so a new action
+  /// replaces the old one.
+  private static let tapAction = UIAction.Identifier("corner-button-tap")
+
+  /// Shows `item` in `button`: its symbol or title, its label, and its tap
+  /// action or menu.
+  private static func apply(_ item: CornerItem, to button: UIButton) {
+    button.accessibilityLabel = item.label
+    button.isEnabled = item.isEnabled
+    button.removeAction(identifiedBy: tapAction, for: .primaryActionTriggered)
+    if let menu = item.menu {
+      button.menu = menu(button)
+      button.showsMenuAsPrimaryAction = true
+    } else {
+      button.menu = nil
+      button.showsMenuAsPrimaryAction = false
+      let action = item.action
+      button.addAction(
+        UIAction(identifier: tapAction) { _ in action() }, for: .primaryActionTriggered)
+    }
+    var configuration = button.configuration
+    configuration?.image = item.image
+    configuration?.title = item.image == nil ? item.title : nil
+    button.configuration = configuration
+  }
+
+  /// A round glass button for an icon, or a capsule for a title when
+  /// `image` is `nil`.
+  private static func makeButton(image: UIImage?) -> UIButton {
     var configuration: UIButton.Configuration
     if #available(iOS 26, *) {
       configuration = .glass()
+      configuration.symbolContentTransition = UISymbolContentTransition(.replace.downUp)
     } else {
       configuration = .gray()
       configuration.cornerStyle = .capsule
     }
-    configuration.image = image
-    configuration.title = image == nil ? title : nil
     let button = UIButton(configuration: configuration)
-    button.accessibilityLabel = label
     button.translatesAutoresizingMaskIntoConstraints = false
     let width =
       image == nil
@@ -347,6 +372,28 @@ final class WebPageController: UIViewController {
       button.heightAnchor.constraint(equalToConstant: buttonSize), width,
     ])
     return button
+  }
+}
+
+/// What one corner button shows and does.
+private struct CornerItem {
+  let image: UIImage?
+  let title: String?
+  let label: String
+  var isEnabled = true
+  /// Runs on a tap when the button has no menu.
+  let action: () -> Void
+  /// Makes the menu of the button, anchored to the button it gets.
+  let menu: ((UIButton) -> UIMenu)?
+
+  /// A back or forward arrow that runs `action`.
+  @MainActor
+  static func arrow(forward: Bool, action: @escaping () -> Void) -> CornerItem {
+    let name = forward ? "Forward" : "Back"
+    return CornerItem(
+      image: UIImage(systemName: forward ? "chevron.forward" : "chevron.backward"), title: nil,
+      label: Bundle(for: UIButton.self).localizedString(forKey: name, value: name, table: nil),
+      action: action, menu: nil)
   }
 }
 
