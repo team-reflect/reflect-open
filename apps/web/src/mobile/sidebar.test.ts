@@ -18,7 +18,7 @@ describe('selectSidebarRow', () => {
     )
   })
 
-  it('selects Chat, or else the tab under the screen', () => {
+  it("selects Chat, or else the row of the entry's section", () => {
     expect(selectSidebarRow({ kind: 'chat' }, 'all', pinned, TODAY)).toBe('chat')
     expect(selectSidebarRow({ kind: 'note', path: 'other.md' }, 'tasks', pinned, TODAY)).toBe(
       'tasks',

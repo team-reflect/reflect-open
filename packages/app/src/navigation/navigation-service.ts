@@ -155,6 +155,11 @@ export interface NavigationService extends Store<NavigationState> {
    * renders, so subscribers are not notified; read `get()` afterwards.
    */
   reset(initialRoute?: Route, initialSection?: Section): void
+  /**
+   * Set the section a Chat route joins when a navigation names none: Chat by
+   * default, All where Chat is a card over All.
+   */
+  setChatSection(section: Section): void
 }
 
 export interface NavigationServiceDeps {
@@ -210,6 +215,7 @@ function movedRoute(route: Route, from: string, to: string): Route {
 
 class NavigationServiceImpl implements NavigationService {
   #stack: HistoryEntry[] = []
+  #chatSection: Section = 'chat'
   #index = 0
   #arrivalSeq = 0
   #arrivalFocusEditor = false
@@ -299,7 +305,7 @@ class NavigationServiceImpl implements NavigationService {
       // repopulates it.
       this.#scrollBySurface.delete(surface)
     }
-    const section = options?.section ?? rootSectionForRoute(target) ?? currentEntry.section
+    const section = options?.section ?? this.#sectionFor(target) ?? currentEntry.section
     const sameEntry = routesEqual(currentEntry.route, target) && section === currentEntry.section
     if (sameEntry) {
       if (restored !== undefined) {
@@ -406,6 +412,18 @@ class NavigationServiceImpl implements NavigationService {
     this.#state = this.#start(initialRoute ?? { kind: 'today' }, initialSection)
   }
 
+  setChatSection(section: Section): void {
+    this.#chatSection = section
+  }
+
+  /**
+   * The section a new entry for `route` joins, or `null` for a route that
+   * opens over the current section.
+   */
+  #sectionFor(route: Route): Section | null {
+    return route.kind === 'chat' ? this.#chatSection : rootSectionForRoute(route)
+  }
+
   #snapshot(): NavigationState {
     const entry = this.#stack[this.#index]!
     return {
@@ -423,7 +441,7 @@ class NavigationServiceImpl implements NavigationService {
   #start(initialRoute: Route, initialSection?: Section): NavigationState {
     this.#nextId = 0
     const route = normalizeRoute(initialRoute)
-    const section = initialSection ?? rootSectionForRoute(route) ?? 'daily'
+    const section = initialSection ?? this.#sectionFor(route) ?? 'daily'
     this.#stack = [{ id: this.#nextId++, route, section }]
     this.#index = 0
     this.#arrivalSeq = 0
