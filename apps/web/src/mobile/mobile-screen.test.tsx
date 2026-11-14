@@ -33,6 +33,7 @@ import { renderInApp, type RenderInAppOptions } from '@/test-utils/render-in-app
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
 import { MobileAudioMemoProvider } from './audio-memo-provider.tsx'
 import { AllSearchProvider } from '@/mobile/all-search.tsx'
+import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { MobileShell } from './mobile-shell.tsx'
 import { BACK_PAGER_OVERSHOOT_PX } from './use-back-pager.ts'
 import { noop, returnFalse, sleep } from '@ocavue/utils'
@@ -731,6 +732,38 @@ describe('MobileShell', () => {
       expect(visibleLayer(view).querySelector('h1')?.textContent).toBe('Chat')
     })
   }
+
+  it('Quick Open shows the results over the screen and ⌘Return lands on All', async () => {
+    const view = await mount({ kind: 'today' })
+    await act(() => quickOpenVisible.set(true))
+    const input = view.getByRole('searchbox', { name: 'Quick Open' })
+    await userEvent.fill(input, 'meeting')
+    await expect.element(view.getByRole('button', { name: 'See all in All ⌘↩' })).toBeVisible()
+
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    expect(view.getByRole('dialog', { name: 'Quick Open' }).query()).toBeNull()
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect((box.element() as HTMLInputElement).value).toBe('meeting')
+    })
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+  })
+
+  it('Quick Open closes on Escape and leaves the screen as it was', async () => {
+    const view = await mount({ kind: 'tasks' })
+    await act(() => quickOpenVisible.set(true))
+    await expect.element(view.getByRole('searchbox', { name: 'Quick Open' })).toHaveFocus()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(view.getByRole('dialog', { name: 'Quick Open' }).query()).toBeNull()
+    expect(view.getByRole('button', { name: 'Tasks' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
+  })
 
   it('with no AI provider, the Ask row leads to Settings', async () => {
     const view = await mount({ kind: 'allNotes', tag: null })

@@ -12,6 +12,7 @@ import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { useSyncChatSection } from '@/mobile/sidebar.ts'
 import { useAllSearch } from '@/mobile/all-search.tsx'
+import { MobileQuickOpen } from '@/mobile/quick-open.tsx'
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): screens above, the
@@ -91,6 +92,7 @@ export function MobileShell(): ReactElement {
             />
           </Suspense>
         </div>
+        <MobileQuickOpen />
         <chromeRenderer.ShellBars
           form={form}
           tab={tab}

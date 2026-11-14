@@ -9,6 +9,7 @@ import { useStore } from '@/lib/use-store.ts'
 import { graphColorCss } from '@/lib/graph-colors.ts'
 import { useToday } from '@/lib/use-today.ts'
 import type { ChromeMenuItem } from '@/mobile/chrome/screen-chrome.ts'
+import { quickOpenVisible } from '@/mobile/quick-open.tsx'
 import { shareNote } from '@/mobile/share.ts'
 import { useGraphInfo } from '@/providers/graph-provider.tsx'
 import { useRouterActions, useRouterState } from '@/routing/router.tsx'
@@ -150,8 +151,7 @@ export function useSidebar(): {
         }
         return
       case 'search':
-        // All lands with its search field focused.
-        navigate({ kind: 'allNotes', tag: null }, { focusEditor: true })
+        quickOpenVisible.set(true)
         return
       case 'settings':
         navigate({ kind: 'settings', page: 'main' })
