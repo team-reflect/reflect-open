@@ -46,14 +46,27 @@ fn typescript(types: &Types) -> String {
 /// Serde omits a `None` field, but TypeScript code often builds the object
 /// with `field: undefined`. With `exactOptionalPropertyTypes`, an optional
 /// property must say `| undefined` to accept that.
+// TODO: remove once specta-typescript can emit `| undefined` for optional
+// properties; this needs an upstream pull request.
 fn add_undefined(ts: &str) -> String {
-    let mut out = String::new();
-    for line in ts.lines() {
-        match line.strip_suffix(',') {
-            Some(field) if field.trim_start().split_once("?: ").is_some() => {
-                writeln!(out, "{field} | undefined,").unwrap();
-            }
-            _ => writeln!(out, "{line}").unwrap(),
+    let mut out = String::with_capacity(ts.len());
+    for line in ts.split_inclusive('\n') {
+        // A doc comment can quote `?: ` too.
+        if line.trim_start().starts_with(['/', '*']) {
+            out.push_str(line);
+            continue;
+        }
+        let mut parts = line.split("?: ");
+        out.push_str(parts.next().unwrap_or_default());
+        for part in parts {
+            // The property type runs to the end of the property.
+            let end = [",", ";", " }", "\n"]
+                .iter()
+                .filter_map(|stop| part.find(stop))
+                .min()
+                .unwrap_or(part.len());
+            let (ty, rest) = part.split_at(end);
+            write!(out, "?: {ty} | undefined{rest}").unwrap();
         }
     }
     out
