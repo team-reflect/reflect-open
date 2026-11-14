@@ -11,7 +11,8 @@ import {
 /**
  * The app's navigation history (Plan 06): a stack over typed {@link Route}s —
  * no URL, no dependency. `navigate` pushes (truncating any forward entries,
- * like a browser), `back`/`forward` move the cursor.
+ * like a browser) or, with `replace`, swaps the current entry and keeps the
+ * forward entries; `back`/`forward` move the cursor.
  *
  * Each history entry can carry a **scroll position** (Plan 06b): views report
  * theirs via `saveScrollState` (never notifies subscribers — safe from scroll
@@ -319,20 +320,21 @@ class NavigationServiceImpl implements NavigationService {
       const replace = options?.replace ?? false
       // A neighbor that already shows the target takes the replaced entry's
       // place, so Back and Forward never step onto the same screen twice.
-      const neighbor = replace
-        ? [this.#index - 1, this.#index + 1].find((index) => {
+      const neighbors = replace
+        ? [this.#index - 1, this.#index + 1].filter((index) => {
             const entry = this.#stack[index]
             return (
               entry !== undefined && routesEqual(entry.route, target) && entry.section === section
             )
           })
-        : undefined
-      if (replace) {
-        this.#scrollById.delete(currentEntry.id)
-      }
-      if (neighbor !== undefined) {
-        this.#stack = this.#stack.toSpliced(this.#index, 1)
-        this.#index = Math.min(neighbor, this.#index)
+        : []
+      if (neighbors.length > 0) {
+        // Drop the entry, and the forward neighbor too when both match.
+        for (const dropped of this.#stack.slice(this.#index, this.#index + neighbors.length)) {
+          this.#scrollById.delete(dropped.id)
+        }
+        this.#stack = this.#stack.toSpliced(this.#index, neighbors.length)
+        this.#index = Math.min(neighbors[0]!, this.#index)
         // Still an explicit arrival: the screen re-anchors to its target.
         this.#scrollById.delete(this.#stack[this.#index]!.id)
       } else {
@@ -342,6 +344,7 @@ class NavigationServiceImpl implements NavigationService {
         }
         const entry = { id, route: target, section }
         if (replace) {
+          this.#scrollById.delete(currentEntry.id)
           this.#stack = this.#stack.with(this.#index, entry)
         } else {
           for (const dropped of this.#stack.slice(this.#index + 1)) {

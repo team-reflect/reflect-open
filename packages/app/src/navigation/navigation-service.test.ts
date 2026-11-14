@@ -73,6 +73,17 @@ describe('NavigationService', () => {
     expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-09' })
     expect(navigation.get().canForward).toBe(false)
     expect(navigation.get().canBack).toBe(false)
+
+    // Both neighbors show the target: the entry and the forward copy go.
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-08' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' })
+    navigation.back()
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' }, { replace: true })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-07' })
+    expect(navigation.get().canForward).toBe(false)
+    navigation.back()
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-09' })
   })
 
   it('re-navigating to the current route is a no-op (no stack growth)', () => {
