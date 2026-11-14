@@ -20,6 +20,13 @@ import { useChromeModal } from '@/mobile/chrome/chrome-renderer.ts'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './scroll-drawer.css'
 
+/**
+ * How far (px) past the screen edge the closed snap point leaves the sheet.
+ * The slow end of the release deceleration then runs off screen, and the
+ * drawer closes as soon as the sheet leaves the screen.
+ */
+const DRAWER_OVERSHOOT_PX = 50
+
 interface DrawerContextValue {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -179,6 +186,7 @@ function DrawerSheet({
           tabIndex={-1}
           aria-hidden
           className="scroll-drawer-spacer"
+          style={{ height: `calc(100% + ${DRAWER_OVERSHOOT_PX}px)` }}
           onClick={close}
         />
         <div ref={slideRef} className="scroll-drawer-slide">
@@ -288,14 +296,17 @@ function attachScrollDrawer({
     scroller.scrollTo({ top: openTop(), behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
   }
 
-  // The spacer is one scrollport high, so the slide is off screen exactly here.
-  const isClosed = (): boolean => scroller.scrollTop <= 1
+  // The spacer is one scrollport plus the overshoot high, so the slide is off
+  // screen from here down to the closed snap point.
+  const isClosed = (): boolean => scroller.scrollTop <= DRAWER_OVERSHOOT_PX + 1
 
   scroller.scrollTop = openTop()
 
-  // Acts once the sheet rests at the closed snap point, after the finger lifts.
+  // Acts once the sheet is off screen or rests, after the finger lifts.
   // Only a gesture since the sheet last rested open may close it: a resize or
-  // a re-snap that moves the sheet there on its own scrolls it back open.
+  // a re-snap that moves the sheet there on its own scrolls it back open. A
+  // sheet that stops between the snap points (a touch that stops the snap
+  // does not snap again in WebKit) scrolls on to the nearer one.
   let gesturesAtOpen = 0
   const watch = watchScrollSettle({
     element: scroller,
@@ -304,7 +315,15 @@ function attachScrollDrawer({
     dragHandle: handle,
     onSettle: () => {
       if (!isClosed()) {
-        gesturesAtOpen = watch.gestures()
+        const top = openTop()
+        if (scroller.scrollTop >= top - 1) {
+          gesturesAtOpen = watch.gestures()
+          return
+        }
+        scroller.scrollTo({
+          top: scroller.scrollTop < top / 2 ? 0 : top,
+          behavior: prefersReducedMotion() ? 'instant' : 'smooth',
+        })
         return
       }
       if (watch.gestures() === gesturesAtOpen) {

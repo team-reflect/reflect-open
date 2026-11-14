@@ -81,6 +81,44 @@ describe('ScrollDrawer', () => {
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('closes once the sheet is off screen, short of the closed snap point', async () => {
+    const onOpenChange = vi.fn()
+    await renderInApp(<Harness onOpenChange={onOpenChange} />)
+    const scroller = await openScroller()
+    // Holds the scroll where a release leaves it, before the snap ends.
+    scroller.style.scrollSnapType = 'none'
+    await scrollElement({ element: scroller, top: 20, touch: true })
+
+    await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    { stop: 0.75, open: true },
+    { stop: 0.25, open: false },
+  ])(
+    'scrolls a sheet stopped at $stop of its range on to the nearer snap point',
+    async ({ stop, open }) => {
+      const onOpenChange = vi.fn()
+      await renderInApp(<Harness onOpenChange={onOpenChange} rows={8} />)
+      const scroller = await openScroller()
+      // Stands in for a touch that stops the snap: WebKit then snaps no more.
+      scroller.style.scrollSnapType = 'none'
+      await scrollElement({
+        element: scroller,
+        top: Math.round(openTop(scroller) * stop),
+        touch: true,
+      })
+
+      if (open) {
+        await vi.waitFor(() => expect(scroller.scrollTop).toBe(openTop(scroller)))
+        expect(onOpenChange).not.toHaveBeenCalled()
+      } else {
+        await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+      }
+    },
+  )
+
   it('scrolls back open when the owner keeps it open', async () => {
     await renderInApp(<Harness keepOpen />)
     const scroller = await openScroller()

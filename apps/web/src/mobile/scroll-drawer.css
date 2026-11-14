@@ -1,6 +1,7 @@
 /*
  * Native-scroll bottom sheet. The scroller's scrollTop is the sheet position:
- * 0 shows only the spacer (closed), the end shows the whole slide (open).
+ * 0 shows only the spacer (closed, the sheet past the screen edge), the end
+ * shows the whole slide (open). The spacer's height is set inline.
  * Entry and exit move the panel with `translate` while the popup carries Base
  * UI's `data-starting-style` / `data-ending-style`.
  */
@@ -25,7 +26,6 @@
   flex: none;
   display: block;
   width: 100%;
-  height: 100%;
   scroll-snap-align: start;
 }
 
@@ -71,10 +71,8 @@
   pointer-events: none;
 }
 
-/* A swipe already moved the sheet off screen: unmount at once. */
-.scroll-drawer-popup[data-closed-by='swipe'],
-.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-panel,
-.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-backdrop {
+/* A swipe already moved the sheet off screen: only the rest of the tint fades. */
+.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-panel {
   transition-duration: 0s;
 }
 
