@@ -9,7 +9,7 @@ import { keybindingFor } from '@/lib/commands/app-commands.ts'
 import { useToday } from '@/lib/use-today.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { cn } from '@/lib/utils.ts'
-import { notePathForRoute, rootSectionForRoute, type Section } from '@reflect/app'
+import { notePathForRoute, rootSectionForRoute } from '@reflect/app'
 import { useRouterState } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
 import { GraphFooter } from './graph-footer.tsx'
@@ -47,10 +47,10 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   // A section row lights for the section of the screen on view. An open
   // pinned note lights its own row and a fresh untitled note lights New
   // note instead; the settings screens light none.
-  const sectionActive = (row: Section): boolean => {
-    const onSectionScreen = rootSectionForRoute(route) !== null || route.kind === 'note'
-    return section === row && onSectionScreen && !newNoteActive && !hasActivePinnedNote
-  }
+  const sectionRowsLit =
+    (rootSectionForRoute(route) !== null || route.kind === 'note') &&
+    !newNoteActive &&
+    !hasActivePinnedNote
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
@@ -82,7 +82,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             icon={<PencilIcon className="shrink-0" />}
             label="Daily notes"
             binding={keybindingFor('nav.today') ?? undefined}
-            active={sectionActive('daily')}
+            active={sectionRowsLit && section === 'daily'}
             onClick={() => {
               if (onDailySurface) {
                 void context.app.commands.run('nav.today', context)
@@ -110,7 +110,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
             binding={keybindingFor('nav.allNotes') ?? undefined}
-            active={sectionActive('all')}
+            active={sectionRowsLit && section === 'all'}
             onClick={() => void context.app.commands.run('nav.allNotes', context)}
           />
           <SidebarItem
@@ -121,7 +121,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             }
             label="Tasks"
             binding={keybindingFor('nav.tasks') ?? undefined}
-            active={sectionActive('tasks')}
+            active={sectionRowsLit && section === 'tasks'}
             onClick={() => void context.app.commands.run('nav.tasks', context)}
           />
           <SidebarItem
@@ -132,7 +132,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             }
             label="Chat"
             binding={keybindingFor('chat.open') ?? undefined}
-            active={sectionActive('chat')}
+            active={sectionRowsLit && section === 'chat'}
             onClick={() => void context.app.commands.run('chat.open', context)}
           />
         </nav>
