@@ -173,7 +173,15 @@ export function useBackPager({
 
     const scrim = scrimRef.current
     if (scrim) {
-      linkOpacityToScroll({ target: scrim, scroller, axis: 'x', from: 0, to: 1, signal })
+      linkOpacityToScroll({
+        target: scrim,
+        scroller,
+        axis: 'x',
+        start: BACK_PAGER_OVERSHOOT_PX,
+        from: 0,
+        to: 1,
+        signal,
+      })
     }
 
     // A finger on the pager owns its position, even when the keyboard or the

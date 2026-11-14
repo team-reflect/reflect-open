@@ -340,7 +340,15 @@ function attachScrollDrawer({
   resize.observe(slide)
   resize.observe(scroller)
 
-  linkOpacityToScroll({ target: tint, scroller, axis: 'y', from: 0, to: 1, signal })
+  linkOpacityToScroll({
+    target: tint,
+    scroller,
+    axis: 'y',
+    start: DRAWER_OVERSHOOT_PX,
+    from: 0,
+    to: 1,
+    signal,
+  })
 
   return {
     keepOpen: () => {

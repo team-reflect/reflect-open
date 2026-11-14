@@ -71,8 +71,10 @@
   pointer-events: none;
 }
 
-/* A swipe already moved the sheet off screen: only the rest of the tint fades. */
-.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-panel {
+/* A swipe already moved the sheet off screen and cleared the tint: unmount at once. */
+.scroll-drawer-popup[data-closed-by='swipe'],
+.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-panel,
+.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-backdrop {
   transition-duration: 0s;
 }
 
