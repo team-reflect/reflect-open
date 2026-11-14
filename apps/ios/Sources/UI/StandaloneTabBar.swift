@@ -27,8 +27,11 @@ final class StandaloneTabBar: NSObject, UITabBarDelegate {
     onSelect(ChromeTab.allCases[item.tag])
   }
 
-  /// Places the bar at the bottom of `view` with its first item at
-  /// `leading`. Returns the frame of its items in `view`.
+  /// How far the system's glass capsule reaches past the items on every side.
+  static let capsuleInset: CGFloat = 4
+
+  /// Places the bar at the bottom of `view` with its capsule at `leading`.
+  /// Returns the frame of the capsule in `view`.
   func layout(in view: UIView, leading: CGFloat) -> CGRect {
     let bounds = view.bounds
     let height = bar.sizeThatFits(bounds.size).height
@@ -38,7 +41,8 @@ final class StandaloneTabBar: NSObject, UITabBarDelegate {
       $0.union($1)
     }
     guard !items.isNull else { return bar.frame }
-    bar.frame.origin.x += leading - items.minX
-    return items.offsetBy(dx: leading - items.minX, dy: 0)
+    let capsule = items.insetBy(dx: -Self.capsuleInset, dy: -Self.capsuleInset)
+    bar.frame.origin.x += leading - capsule.minX
+    return capsule.offsetBy(dx: leading - capsule.minX, dy: 0)
   }
 }

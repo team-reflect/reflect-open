@@ -28,8 +28,9 @@ describe('initialRouteForDeepLink', () => {
     expect(initialRouteForDeepLink('reflect://note/01hzx4abc')).toBeNull()
   })
 
-  it('declines capture links, garbage, and absence', () => {
+  it('declines capture and search links, garbage, and absence', () => {
     expect(initialRouteForDeepLink('reflect://append?text=hi')).toBeNull()
+    expect(initialRouteForDeepLink('reflect://search?q=x')).toBeNull()
     expect(initialRouteForDeepLink('not a url')).toBeNull()
     expect(initialRouteForDeepLink(null)).toBeNull()
   })
@@ -37,14 +38,12 @@ describe('initialRouteForDeepLink', () => {
 
 describe('routeForDeepLinkTarget', () => {
   it('routes places and notes, and nothing else', () => {
-    expect(routeForDeepLinkTarget({ kind: 'search', query: 'q' })).toEqual({
-      kind: 'search',
-      query: 'q',
-    })
+    expect(routeForDeepLinkTarget({ kind: 'tasks' })).toEqual({ kind: 'tasks' })
     expect(routeForDeepLinkTarget({ kind: 'note', path: 'daily/2026-07-01.md' })).toEqual({
       kind: 'daily',
       date: '2026-07-01',
     })
+    expect(routeForDeepLinkTarget({ kind: 'search', query: 'q' })).toBeNull()
     expect(routeForDeepLinkTarget({ kind: 'capture' })).toBeNull()
     expect(routeForDeepLinkTarget({ kind: 'none' })).toBeNull()
   })

@@ -93,8 +93,12 @@ describe('renderInApp', () => {
   })
 
   it('starts on the given route and records navigation in the navigation service', async () => {
-    const { appServices } = await renderInApp(<Probe />, { route: { kind: 'settings' } })
-    await expect.element(page.getByTestId('route')).toHaveTextContent('{"kind":"settings"}')
+    const { appServices } = await renderInApp(<Probe />, {
+      route: { kind: 'settings', page: 'main' },
+    })
+    await expect
+      .element(page.getByTestId('route'))
+      .toHaveTextContent('{"kind":"settings","page":"main"}')
 
     await page.getByRole('button', { name: 'tasks' }).click()
 

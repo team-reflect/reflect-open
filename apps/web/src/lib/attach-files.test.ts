@@ -51,6 +51,7 @@ function contextFor(notePath: string | null): CommandContext {
     openTemplatePicker: vi.fn(),
     openTemplateCreate: vi.fn(),
     enableSemanticSearch: vi.fn(),
+    selectSection: vi.fn(),
     clearScrollState: vi.fn(),
   }
 }

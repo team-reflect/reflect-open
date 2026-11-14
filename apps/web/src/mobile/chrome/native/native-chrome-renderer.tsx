@@ -192,7 +192,7 @@ function NativeShellBars({ tab, keyboardVisible, onSelectTab }: ShellBarsProps):
   const theme = useThemeSetting()
   const { nativeChrome } = useAppServices()
   const toasts = useToastController()
-  const sidebar = useSidebar(tab)
+  const sidebar = useSidebar()
   const nextSidebarState: NativeSidebarState = {
     ...sidebar.state,
     graphMenu: toWireMenu(sidebar.state.graphMenu),

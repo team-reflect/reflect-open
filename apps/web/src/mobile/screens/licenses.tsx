@@ -11,7 +11,7 @@ export function MobileLicenses(): ReactElement {
     <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
         align="center"
-        back={() => (canBack ? back() : navigate({ kind: 'settings' }))}
+        back={() => (canBack ? back() : navigate({ kind: 'settings', page: 'main' }))}
         title="Licenses"
       />
       <LicenseList className="flex-1 px-safe-offset-4 pt-3 pb-chrome-safe-offset-3" />

@@ -80,7 +80,7 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
       <Button
         onClick={() => {
           memo.onDrawerOpenChange(false)
-          navigate({ kind: 'settings' })
+          navigate({ kind: 'settings', page: 'main' })
         }}
       >
         Open Settings

@@ -122,11 +122,7 @@ describe('buildShellChromeState', () => {
   })
 
   it('shows no corner buttons on All and Tasks', () => {
-    for (const route of [
-      { kind: 'allNotes', tag: null },
-      { kind: 'search', query: 'x' },
-      { kind: 'tasks' },
-    ] satisfies Route[]) {
+    for (const route of [{ kind: 'allNotes', tag: null }, { kind: 'tasks' }] satisfies Route[]) {
       expect(buildShellChromeState({ ...BASE, route, tab: 'all' })).toMatchObject({
         canBack: false,
         leading: [],

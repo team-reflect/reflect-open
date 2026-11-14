@@ -226,7 +226,7 @@ describe('app shortcuts', () => {
 
   it('pin and privacy no-op on note-less routes and without a graph', async () => {
     const { result } = await shortcutsHook()
-    await act(() => result.current.routerActions.navigate({ kind: 'settings' }))
+    await act(() => result.current.routerActions.navigate({ kind: 'settings', page: 'main' }))
     await act(() => press('o'))
     await act(() => result.current.context.togglePrivate())
     await act(() => core.graphSession.setGraph(null))
@@ -410,7 +410,7 @@ describe('app shortcuts', () => {
     const { result } = await shortcutsHook()
 
     await act(() => press('j'))
-    expect(result.current.routerState.route).toEqual({ kind: 'chat' })
+    expect(result.current.routerState.route).toEqual({ kind: 'chat', conversationId: null })
 
     await act(() => press('n', { shiftKey: true }))
     expect(newChat).toHaveBeenCalledTimes(1)

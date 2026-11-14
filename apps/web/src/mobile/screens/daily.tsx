@@ -22,7 +22,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   const { entryId, arrivalSeq, arrivalFocusEditor } = useRouterState()
   const { navigate } = useRouterActions()
   // One live `today` for the whole surface: the strip marks today's cell and
-  // the `select` below decide "is this today?" from the *same* value, so they
+  // `goTo` below decide "is this today?" from the *same* value, so they
   // can't disagree across the midnight rollover (which would otherwise route a
   // tap on the highlighted today cell to a frozen `daily` date). Selecting
   // today routes to the live `today` route, keeping the spine rolling over.
@@ -36,9 +36,12 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // its rolling month title) follows it while the carousel still moves,
   // instead of waiting for the settle-time route change.
   const { targetDate, followSwipeTarget } = useSwipeTarget(navigationKey)
-  const select = useCallback(
-    (day: string): void => {
-      navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day })
+  // A strip tap is a jump and pushes a history entry. A swipe steps one day
+  // and swaps the entry, so Back leaves the stream instead of walking every
+  // day passed.
+  const goTo = useCallback(
+    (day: string, replace: boolean): void => {
+      navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day }, { replace })
     },
     [navigate, today],
   )
@@ -61,7 +64,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         date={targetDate ?? date}
         today={today}
         resetSeq={resetSeq}
-        onSelect={select}
+        onSelect={(day) => goTo(day, false)}
         plus={capture.plus}
       />
       <DayCarousel
@@ -71,7 +74,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         navigationKey={navigationKey}
         focusDate={focusDate}
         onFocusConsumed={consumeFocus}
-        onSelect={select}
+        onSelect={(day) => goTo(day, true)}
         onTarget={followSwipeTarget}
       />
       {capture.sheet}

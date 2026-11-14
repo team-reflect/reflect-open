@@ -63,14 +63,14 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'All notes',
     keywords: ['notes', 'list', 'browse', 'library'],
     keybinding: 'Mod-Shift-a',
-    run: (context) => context.navigate({ kind: 'allNotes', tag: null }),
+    run: (context) => context.selectSection('all'),
   },
   {
     id: 'nav.tasks',
     title: 'Tasks',
     keywords: ['todo', 'todos', 'checklist', 'checkbox', 'open'],
     keybinding: 'Mod-t',
-    run: (context) => context.navigate({ kind: 'tasks' }),
+    run: (context) => context.selectSection('tasks'),
   },
   {
     id: 'note.new',
@@ -121,7 +121,7 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'Chat',
     keywords: ['ai', 'assistant', 'copilot', 'ask'],
     keybinding: 'Mod-j',
-    run: (context) => context.navigate({ kind: 'chat' }),
+    run: (context) => context.navigate({ kind: 'chat', conversationId: null }),
   },
   {
     id: 'chat.new',
@@ -292,7 +292,7 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'Open settings',
     keywords: ['preferences', 'config', 'options'],
     keybinding: 'Mod-,',
-    run: (context) => context.navigate({ kind: 'settings' }),
+    run: (context) => context.navigate({ kind: 'settings', page: 'main' }),
   },
   {
     id: 'whatsNew.show',
