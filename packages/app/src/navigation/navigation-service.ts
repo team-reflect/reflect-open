@@ -48,8 +48,7 @@ export interface NavigateOptions {
   section?: Section | undefined
   /**
    * Swap the current history entry for the target instead of pushing a new
-   * one. Forward entries stay. Daily day stepping (swipe, arrow keys) uses
-   * it, so Back leaves the stream instead of walking every day passed.
+   * one. Forward entries stay.
    */
   replace?: boolean
 }
@@ -316,25 +315,42 @@ class NavigationServiceImpl implements NavigationService {
         // restoring the old scroll position.
         this.#scrollById.delete(currentEntry.id)
       }
-    } else if (options?.replace === true) {
-      this.#scrollById.delete(currentEntry.id)
-      const id = this.#nextId++
-      if (restored !== undefined) {
-        this.#scrollById.set(id, restored)
-      }
-      const section = options.section ?? rootSectionForRoute(target) ?? currentEntry.section
-      this.#stack = this.#stack.with(this.#index, { id, route: target, section })
     } else {
-      const dropped = this.#stack.slice(this.#index + 1)
-      for (const entry of dropped) {
-        this.#scrollById.delete(entry.id) // truncated branch — free its positions
+      const replace = options?.replace ?? false
+      // A neighbor that already shows the target takes the replaced entry's
+      // place, so Back and Forward never step onto the same screen twice.
+      const neighbor = replace
+        ? [this.#index - 1, this.#index + 1].find((index) => {
+            const entry = this.#stack[index]
+            return (
+              entry !== undefined && routesEqual(entry.route, target) && entry.section === section
+            )
+          })
+        : undefined
+      if (replace) {
+        this.#scrollById.delete(currentEntry.id)
       }
-      const id = this.#nextId++
-      if (restored !== undefined) {
-        this.#scrollById.set(id, restored) // seed the fresh entry with the surface position
+      if (neighbor !== undefined) {
+        this.#stack = this.#stack.toSpliced(this.#index, 1)
+        this.#index = Math.min(neighbor, this.#index)
+        // Still an explicit arrival: the screen re-anchors to its target.
+        this.#scrollById.delete(this.#stack[this.#index]!.id)
+      } else {
+        const id = this.#nextId++
+        if (restored !== undefined) {
+          this.#scrollById.set(id, restored) // seed the fresh entry with the surface position
+        }
+        const entry = { id, route: target, section }
+        if (replace) {
+          this.#stack = this.#stack.with(this.#index, entry)
+        } else {
+          for (const dropped of this.#stack.slice(this.#index + 1)) {
+            this.#scrollById.delete(dropped.id) // truncated branch — free its positions
+          }
+          this.#stack = [...this.#stack.slice(0, this.#index + 1), entry]
+          this.#index = this.#stack.length - 1
+        }
       }
-      this.#stack = [...this.#stack.slice(0, this.#index + 1), { id, route: target, section }]
-      this.#index = this.#stack.length - 1
     }
     this.#arrivalSeq += 1
     this.#arrivalFocusEditor = options?.focusEditor === true
