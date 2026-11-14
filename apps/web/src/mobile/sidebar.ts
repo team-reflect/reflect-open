@@ -31,10 +31,13 @@ export function chatSection(): Section {
 }
 
 /**
- * Whether Chat is a section of its own (see {@link chatSection}).
+ * Whether a Chat screen on screen is the root of the Chat section, with
+ * nothing below it: the entry is in the Chat section and the layout has one.
  */
-export function useChatIsSection(): boolean {
-  return useStore(sidebarVisible) !== null
+export function useChatIsRoot(): boolean {
+  const { section } = useRouterState()
+  const hasChatSection = useStore(sidebarVisible) !== null
+  return section === 'chat' && hasChatSection
 }
 
 /**
@@ -121,7 +124,7 @@ export function useSidebar(tab: MobileTab): {
   run: (command: SidebarCommand) => void
 } {
   const { route, section } = useRouterState()
-  const { navigate, selectSection } = useRouterActions()
+  const { navigate } = useRouterActions()
   const { noteActions, logger } = useCoreServices()
   const { share } = useAppServices()
   const today = useToday()
@@ -148,11 +151,7 @@ export function useSidebar(tab: MobileTab): {
   const run = (command: SidebarCommand): void => {
     switch (command.kind) {
       case 'chat':
-        if (chatSection() === 'chat') {
-          selectSection('chat')
-        } else {
-          navigate({ kind: 'chat' }, { section: 'all' })
-        }
+        navigate({ kind: 'chat' }, { section: chatSection() })
         return
       case 'search':
         // All lands with its search field focused.
