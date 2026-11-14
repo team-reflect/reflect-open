@@ -90,6 +90,10 @@ class TestNavigationServiceImpl implements TestNavigationService {
     this.#inner.reset(initialRoute, initialSection)
   }
 
+  setChatSection(section: Section): void {
+    this.#inner.setChatSection(section)
+  }
+
   navigations(): readonly TestNavigateCall[] {
     return [...this.#calls]
   }

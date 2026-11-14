@@ -8,12 +8,12 @@ import {
   createTestSecretStoreService,
   type TestChatEngineService,
 } from '@reflect/core/testing'
-import type { Route } from '@reflect/app'
+import type { Route, Section } from '@reflect/app'
+import { createTestNavigationService } from '@reflect/app/testing'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
-import { sidebarVisible } from '@/mobile/sidebar.ts'
 import { MobileChat } from './chat.tsx'
 
 /**
@@ -92,7 +92,12 @@ function Harness(): ReactElement {
   )
 }
 
-async function renderHarness(route: Route = { kind: 'today' }) {
+/**
+ * @param chatSection The section Chat joins: All on iPhone, Chat on iPad.
+ */
+async function renderHarness(route: Route = { kind: 'today' }, chatSection: Section = 'all') {
+  const navigation = createTestNavigationService()
+  navigation.setChatSection(chatSection)
   const core = createTestCoreServices({
     database: createWasmTestDatabaseService(),
     secretStore: createTestSecretStoreService({ [aiKeySecretName(MODEL.id)]: 'sk-test' }),
@@ -101,6 +106,7 @@ async function renderHarness(route: Route = { kind: 'today' }) {
   // The index is not open, so the history drawer reads nothing.
   return await renderInApp(<Harness />, {
     core,
+    appServices: { navigation },
     graph: { ...GRAPH, indexGeneration: null },
     route,
     settings: { aiProviders: settingsState.models, defaultAiProviderId: settingsState.defaultId },
@@ -127,14 +133,9 @@ describe('MobileChat', () => {
   })
 
   it('is the root of its own section on iPad, with no Back', async () => {
-    sidebarVisible.set(false)
-    try {
-      await renderHarness({ kind: 'chat' })
-      await expect.element(page.getByRole('heading', { name: 'Chat' }).first()).toBeVisible()
-      expect(page.getByRole('button', { name: 'Back' }).query()).toBeNull()
-    } finally {
-      sidebarVisible.set(null)
-    }
+    await renderHarness({ kind: 'chat' }, 'chat')
+    await expect.element(page.getByRole('heading', { name: 'Chat' }).first()).toBeVisible()
+    expect(page.getByRole('button', { name: 'Back' }).query()).toBeNull()
   })
 
   it('sends the draft from the composer and renders the streamed turn', async () => {

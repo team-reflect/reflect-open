@@ -10,6 +10,7 @@ import { useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useMobileForm } from '@/mobile/mobile-form.ts'
 import { useWakeToToday } from '@/mobile/use-wake-to-today.ts'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
+import { useSyncChatSection } from '@/mobile/sidebar.ts'
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): screens above, the
@@ -37,6 +38,7 @@ export function MobileShell(): ReactElement {
   const form = useMobileForm()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
+  useSyncChatSection()
 
   // A `search` history entry seeds the live query — once per entry, so the
   // user can keep typing without the effect snapping the text back.

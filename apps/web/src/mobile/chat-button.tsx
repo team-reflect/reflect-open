@@ -3,7 +3,6 @@ import { MessageSquare } from 'lucide-react'
 import { MobileTopBarIconButton } from '@/mobile/top-bar.tsx'
 import { useHasChatTurns } from '@/providers/chat-provider.tsx'
 import { useRouterActions } from '@/routing/router.tsx'
-import { chatSection } from '@/mobile/sidebar.ts'
 
 /**
  * The All tab's way into Chat when there is nothing typed to ask: it resumes
@@ -20,7 +19,7 @@ export function MobileChatButton(): ReactElement {
       edge="trailing"
       aria-label="Chat"
       className="relative"
-      onClick={() => navigate({ kind: 'chat' }, { section: chatSection(), focusEditor: !hasTurns })}
+      onClick={() => navigate({ kind: 'chat' }, { focusEditor: !hasTurns })}
     >
       <MessageSquare aria-hidden />
       {hasTurns ? (

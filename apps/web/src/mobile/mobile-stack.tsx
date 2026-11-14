@@ -9,10 +9,9 @@ import {
 } from 'react'
 import { cn } from '@/lib/utils.ts'
 import { MobileScreen } from '@/mobile/mobile-screen.tsx'
-import { routesEqual, type AllNotesFilters, type Route } from '@reflect/app'
+import { routesEqual, type AllNotesFilters, type Route, type Section } from '@reflect/app'
 import { ChromeLayerContext, useChromeRenderer } from '@/mobile/chrome/chrome-renderer.ts'
 import { useBackPager } from '@/mobile/use-back-pager.ts'
-import { useChatIsRoot } from '@/mobile/sidebar.ts'
 import { RouterFreeze, useRouterState, useRouterActions } from '@/routing/router.tsx'
 import './mobile-stack.css'
 
@@ -34,16 +33,16 @@ interface StackLayer {
 
 /**
  * Whether a route renders as a card pushed over a tab root. Note screens,
- * Chat (pushed over All, unless `chatRoot`) and the settings screens
- * (Settings, its Graphs sub-screen) stack; everything else (daily, All,
- * search-as-All, Tasks) is a root.
+ * Chat (pushed over All) and the settings screens (Settings, its Graphs
+ * sub-screen) stack; everything else (daily, All, search-as-All, Tasks, and
+ * Chat in its own section) is a root.
  *
- * @param chatRoot Chat is its own section's root: the wide iPad layout.
+ * @param section The section of the route's history entry.
  */
-function isStacked(route: Route, chatRoot: boolean): boolean {
+function isStacked(route: Route, section: Section): boolean {
   return (
     route.kind === 'note' ||
-    (route.kind === 'chat' && !chatRoot) ||
+    (route.kind === 'chat' && section !== 'chat') ||
     route.kind === 'settings' ||
     route.kind === 'graphs' ||
     route.kind === 'licenses'
@@ -90,12 +89,12 @@ function layerKey(route: Route): string {
  * @param below The screen the arriving route sits on (what its Back reveals).
  */
 function transitionFor(
-  from: { route: Route; entryId: number; below: Route; chatRoot: boolean },
-  to: { route: Route; entryId: number; chatRoot: boolean },
+  from: { route: Route; entryId: number; below: Route; section: Section },
+  to: { route: Route; entryId: number; section: Section },
   below: Route,
 ): StackTransition {
-  const fromStacked = isStacked(from.route, from.chatRoot)
-  const toStacked = isStacked(to.route, to.chatRoot)
+  const fromStacked = isStacked(from.route, from.section)
+  const toStacked = isStacked(to.route, to.section)
   const pop: StackTransition = {
     kind: 'pop',
     exiting: { key: layerKey(from.route), route: from.route },
@@ -123,9 +122,9 @@ function presentLayer(
   role: LayerRole,
   layerRoute: Route,
   transition: StackTransition,
-  chatRoot: boolean,
+  section: Section,
 ): LayerPresentation {
-  const shadow = isStacked(layerRoute, chatRoot) ? CARD_SHADOW : undefined
+  const shadow = isStacked(layerRoute, section) ? CARD_SHADOW : undefined
   if (role === 'below') {
     return { style: { zIndex: 0 } }
   }
@@ -245,10 +244,7 @@ interface MobileStackProps {
  * remount it on a canceled swipe.
  */
 export function MobileStack(props: MobileStackProps): ReactElement {
-  const { route, entryId, backRoute, canBack } = useRouterState()
-  // The screen below a card shares its section, so one flag holds for every
-  // layer on screen.
-  const chatRoot = useChatIsRoot()
+  const { route, entryId, backRoute, canBack, section } = useRouterState()
   const { back, navigate } = useRouterActions()
   const chromeRenderer = useChromeRenderer()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -258,7 +254,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
 
   const [transition, setTransition] = useState<StackTransition>({ kind: 'none' })
   const below: Route = backRoute ?? { kind: 'today' }
-  const [arrival, setArrival] = useState({ route, entryId, below, chatRoot })
+  const [arrival, setArrival] = useState({ route, entryId, below, section })
   // Set when a completed back-swipe commits its pop: the screen is already
   // offscreen, so the arrival it causes must not animate a second time.
   const [poppedByGesture, setPoppedByGesture] = useState(false)
@@ -266,17 +262,17 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   // Transition detection happens during render (the mobile-shell `lastTab`
   // pattern) so the new screen's very first frame starts offscreen.
   if (entryId !== arrival.entryId) {
-    setArrival({ route, entryId, below, chatRoot })
+    setArrival({ route, entryId, below, section })
     setPoppedByGesture(false)
     setTransition(
       poppedByGesture
         ? { kind: 'none' }
-        : transitionFor(arrival, { route, entryId, chatRoot }, below),
+        : transitionFor(arrival, { route, entryId, section }, below),
     )
   } else if (route !== arrival.route) {
     // Same entry, new route object: a note move rewrote the history in
     // place. Track it so a later pop's exiting card shows the live path.
-    setArrival({ route, entryId, below, chatRoot })
+    setArrival({ route, entryId, below, section })
   }
 
   const popByGesture = useCallback((): void => {
@@ -336,7 +332,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below
   // it, so it sits over today, where its back button lands too.
-  const belowRoute: Route | null = isStacked(route, chatRoot)
+  const belowRoute: Route | null = isStacked(route, section)
     ? (backRoute ?? { kind: 'today' })
     : null
   const belowKey = belowRoute === null ? null : layerKey(belowRoute)
@@ -355,7 +351,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   }
 
   const swipeEnabled =
-    isStacked(route, chatRoot) &&
+    isStacked(route, section) &&
     transition.kind === 'none' &&
     layers.some((layer) => layer.role === 'below')
 
@@ -381,7 +377,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
         )}
       >
         {layers.map((layer) => {
-          const { className, style } = presentLayer(layer.role, layer.route, transition, chatRoot)
+          const { className, style } = presentLayer(layer.role, layer.route, transition, section)
           const hidden = layer.role !== 'current'
           return (
             <div
@@ -396,7 +392,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
               inert={hidden}
             >
               <div
-                className={cn('h-full', isStacked(layer.route, chatRoot) && 'mobile-pager-content')}
+                className={cn('h-full', isStacked(layer.route, section) && 'mobile-pager-content')}
               >
                 {/* Background layers must not observe navigation: a push bumps
                     arrivalSeq, which the daily surface under the note would read
