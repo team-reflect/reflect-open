@@ -1,5 +1,5 @@
 import type { MaybePromise } from '@reflect/utils'
-import type { AppServices, Command, Route, NavigateOptions } from '@reflect/app'
+import type { AppServices, Command, Route, NavigateOptions, Section } from '@reflect/app'
 import type { CoreServices } from '@reflect/core'
 
 /**
@@ -16,6 +16,10 @@ export interface CommandContext {
   services: CoreServices
   app: AppServices
   navigate: (route: Route, options?: NavigateOptions) => void
+  /**
+   * Go to a section: where it was left from elsewhere, its root from within.
+   */
+  selectSection: (section: Section, options?: NavigateOptions) => void
   /** The current route, read at run time. */
   route: () => Route
   /**

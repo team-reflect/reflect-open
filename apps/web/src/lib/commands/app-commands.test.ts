@@ -71,6 +71,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     // Mirror the real context: note-scoped commands resolve their target from
     // the route (the focused-day branch is exercised in app-shortcuts).
     notePath: () => notePathForRoute(route(), TODAY),
+    selectSection: vi.fn(),
     back: vi.fn(),
     forward: vi.fn(),
     clearScrollState: vi.fn(),
