@@ -8,7 +8,8 @@ import { definePluginEvent } from './plugin.ts'
 /**
  * The `plugin:iap` commands, the StoreKit In-App Purchase bridge
  * (`apple/Sources/AppStoreKit/StoreCommands.swift`). The command table
- * (`crates/types/src/shell.rs`) holds the wire types.
+ * (`crates/types/src/commands.rs`) lists the commands, and
+ * `crates/types/src/shell.rs` holds their wire types.
  */
 
 /**

@@ -31,7 +31,7 @@ type DeepReadonly<T> = T extends (infer Item)[]
 /**
  * The result of command `C`, as Rust serializes it.
  */
-export type CommandResult<C extends CommandName> = Commands[C]['result']
+type CommandResult<C extends CommandName> = Commands[C]['result']
 
 /**
  * The raw transport a host implements: the desktop app adapts Tauri's

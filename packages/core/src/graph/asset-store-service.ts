@@ -6,12 +6,6 @@ import { base64ToBytes, blobChunks, bytesToBase64 } from '@reflect/utils'
 import { noop } from '@ocavue/utils'
 
 /**
-
- * Commands that return `()` from Rust serialize as `null` over IPC.
-
- */
-
-/**
  * Upload chunk size. Big enough that a large file doesn't drown in IPC
  * round-trips, small enough that webview memory holds one chunk, never the
  * whole file.
@@ -19,9 +13,7 @@ import { noop } from '@ocavue/utils'
 const CHUNK_BYTES = 4 * 1024 * 1024
 
 /**
-
  * The header carrying the upload id on raw-body append calls.
-
  */
 const UPLOAD_ID_HEADER = 'x-upload-id'
 
