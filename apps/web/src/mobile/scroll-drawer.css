@@ -72,10 +72,8 @@
 }
 
 /* A swipe already moved the sheet off screen and cleared the tint: unmount at once. */
-.scroll-drawer-popup[data-closed-by='swipe'],
-.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-panel,
-.scroll-drawer-popup[data-closed-by='swipe'] .scroll-drawer-backdrop {
-  transition-duration: 0s;
+.scroll-drawer-popup[data-closed-by='swipe'] {
+  --duration-sheet: 0ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
