@@ -87,14 +87,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     delegate = self
     sidebar.delegate = self
     sidebar.bottomBarView = footer
-    tabs = makeSidebarTabs { [self] in
-      ChromeTab.allCases.map {
-        let tab = makeTab(identifier: $0.rawValue, title: $0.title, image: $0.image)
-        // A fixed tab leaves the sidebar without an Edit button.
-        tab.preferredPlacement = .fixed
-        return tab
-      }
+    let main = ChromeTab.allCases.map {
+      let tab = makeTab(identifier: $0.rawValue, title: $0.title, image: $0.image)
+      // A fixed tab leaves the sidebar without an Edit button.
+      tab.preferredPlacement = .fixed
+      return tab
     }
+    // A phone has no sidebar. The iPhone Duo's rail shows every tab, hidden
+    // or not, so a phone gets the three tabs alone.
+    tabs = UIDevice.current.userInterfaceIdiom == .pad ? makeSidebarTabs { main } : main
     view.tintColor = Self.accent
     stage.view.tintColor = Self.accent
     // The page scrolls inside its own elements, so the edge effect of the web
