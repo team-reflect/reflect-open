@@ -72,6 +72,10 @@ public final class RecordingEngine: NSObject {
   private static let reminderRequestId = "app.reflect.recording.reminder"
   /// `UNTimeIntervalNotificationTrigger` refuses anything under a minute.
   private static let minimumReminderSeconds: TimeInterval = 60
+  /// Runs the `UNUserNotificationCenter` calls in the order the main queue
+  /// sends them. A call can wait minutes for the notification daemon of a
+  /// device that just booted.
+  private static let reminderQueue = DispatchQueue(label: "app.reflect.recording.reminder")
 
   private var recorder: AVAudioRecorder?
   private var meterTimer: Timer?
@@ -612,34 +616,38 @@ public final class RecordingEngine: NSObject {
   /// webview is gone.
   private func scheduleReminder(intervalMs: Double) {
     let interval = max(intervalMs / 1000, Self.minimumReminderSeconds)
-    let center = UNUserNotificationCenter.current()
     // Asked on the first recording rather than at launch, and never blocking:
     // a denial is not an error, it just leaves the Live Activity as the only
     // running indicator.
-    center.requestAuthorization(options: [.alert]) { granted, error in
-      if let error {
-        self.log?("recording reminder authorization failed: \(error)")
-        return
-      }
-      guard granted else { return }
-      DispatchQueue.main.async {
-        // The session may have ended while the permission prompt was up.
-        guard self.recorder != nil else { return }
-        let content = UNMutableNotificationContent()
-        content.title = "Reflect is still recording"
-        content.body = "Open Reflect to stop the recording."
-        // Silent on purpose: the microphone is live, and an alert tone would
-        // land in the recording itself. The elapsed time lives on the Live
-        // Activity, since a repeating request cannot carry a changing body.
-        content.sound = nil
-        let request = UNNotificationRequest(
-          identifier: Self.reminderRequestId,
-          content: content,
-          trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
-        )
-        center.add(request) { error in
-          if let error {
-            self.log?("scheduling the recording reminder failed: \(error)")
+    Self.reminderQueue.async {
+      let center = UNUserNotificationCenter.current()
+      center.requestAuthorization(options: [.alert]) { granted, error in
+        if let error {
+          self.log?("recording reminder authorization failed: \(error)")
+          return
+        }
+        guard granted else { return }
+        DispatchQueue.main.async {
+          // The session may have ended while the permission prompt was up.
+          guard self.recorder != nil else { return }
+          let content = UNMutableNotificationContent()
+          content.title = "Reflect is still recording"
+          content.body = "Open Reflect to stop the recording."
+          // Silent on purpose: the microphone is live, and an alert tone would
+          // land in the recording itself. The elapsed time lives on the Live
+          // Activity, since a repeating request cannot carry a changing body.
+          content.sound = nil
+          let request = UNNotificationRequest(
+            identifier: Self.reminderRequestId,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
+          )
+          Self.reminderQueue.async {
+            center.add(request) { error in
+              if let error {
+                self.log?("scheduling the recording reminder failed: \(error)")
+              }
+            }
           }
         }
       }
@@ -648,9 +656,11 @@ public final class RecordingEngine: NSObject {
 
   /// Clear the reminder and any banner it already delivered.
   private func clearReminder() {
-    let center = UNUserNotificationCenter.current()
-    center.removePendingNotificationRequests(withIdentifiers: [Self.reminderRequestId])
-    center.removeDeliveredNotifications(withIdentifiers: [Self.reminderRequestId])
+    Self.reminderQueue.async {
+      let center = UNUserNotificationCenter.current()
+      center.removePendingNotificationRequests(withIdentifiers: [Self.reminderRequestId])
+      center.removeDeliveredNotifications(withIdentifiers: [Self.reminderRequestId])
+    }
   }
 
   // MARK: - Live Activity
