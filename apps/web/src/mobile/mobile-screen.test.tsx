@@ -1368,6 +1368,72 @@ describe('MobileStack transitions & back pager', () => {
     },
   )
 
+  it('takes no hits from the release of a swipe until the pager settles', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    expect(getComputedStyle(scroller).pointerEvents).toBe('auto')
+    // Holds the scroll where the finger leaves it.
+    scroller.style.scrollSnapType = 'none'
+    await touch(scroller, 'start')
+    await act(async () => {
+      scroller.scrollTo({ left: restLeft(scroller) - 30, behavior: 'instant' })
+      await new Promise((resolve) => scroller.addEventListener('scroll', resolve, { once: true }))
+    })
+    expect(getComputedStyle(scroller).pointerEvents).toBe('auto')
+
+    await touch(scroller, 'end')
+    expect(getComputedStyle(scroller).pointerEvents).toBe('none')
+    expect(getComputedStyle(visibleLayer(view)).pointerEvents).toBe('none')
+
+    scroller.style.removeProperty('scroll-snap-type')
+    await act(() => {
+      scroller.dispatchEvent(new Event('scrollend'))
+    })
+    await waitFor(() => expect(getComputedStyle(scroller).pointerEvents).toBe('auto'))
+    expect(scroller.scrollLeft).toBe(restLeft(scroller))
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+  })
+
+  it('keeps taking hits after a tap on the pager', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    await touch(scroller, 'start')
+    await touch(scroller, 'end')
+    expect(getComputedStyle(scroller).pointerEvents).toBe('auto')
+  })
+
+  it('takes hits again after a rightward drag that did not move the pager', async () => {
+    core.noteFile.set('notes/meeting-notes.md', 'agenda')
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    await pushProbeNote(view)
+
+    const scroller = pager(view)
+    const dispatch = (type: string, touches: { clientX: number }[]): void => {
+      const event = new TouchEvent(type, { bubbles: true })
+      // WebKit has no `Touch` constructor, so plain objects stand in for the lists.
+      Object.defineProperty(event, 'touches', { value: touches })
+      Object.defineProperty(event, 'changedTouches', {
+        value: [{ identifier: 0, target: scroller }],
+      })
+      scroller.dispatchEvent(event)
+    }
+    await act(() => {
+      dispatch('touchstart', [{ clientX: 40 }])
+      dispatch('touchmove', [{ clientX: 120 }])
+      dispatch('touchend', [])
+    })
+    // The finger travelled right, so the release starts before any scroll.
+    expect(getComputedStyle(scroller).pointerEvents).toBe('none')
+    await waitFor(() => expect(getComputedStyle(scroller).pointerEvents).toBe('auto'))
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
+  })
+
   it('passes a tap on the edge strip to the back button under it', async () => {
     core.noteFile.set('notes/meeting-notes.md', 'agenda')
     const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
