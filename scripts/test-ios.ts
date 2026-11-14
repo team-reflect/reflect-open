@@ -155,14 +155,19 @@ async function main(): Promise<void> {
       throw error
     }
   } finally {
-    // `shutdown` fails when the simulator never booted, which is fine.
-    await step('Shut down the simulator', async () => {
-      await exec('xcrun', ['simctl', 'shutdown', simulator], { nodeOptions: { stdio: 'inherit' } })
-    })
+    // A CI runner is discarded after the job, with its simulators.
+    if (!IN_GITHUB_ACTIONS) {
+      // `shutdown` fails when the simulator never booted, which is fine.
+      await step('Shut down the simulator', async () => {
+        await exec('xcrun', ['simctl', 'shutdown', simulator], {
+          nodeOptions: { stdio: 'inherit' },
+        })
+      })
 
-    await step('Delete the simulator', async () => {
-      await run('xcrun', ['simctl', 'delete', simulator])
-    })
+      await step('Delete the simulator', async () => {
+        await run('xcrun', ['simctl', 'delete', simulator])
+      })
+    }
 
     console.log(`[test-ios] results: ${OUTPUT_DIR}`)
   }
