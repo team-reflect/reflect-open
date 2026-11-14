@@ -1,7 +1,6 @@
 import { useEffect, useEffectEvent, useLayoutEffect, type RefObject } from 'react'
 import { linkOpacityToScroll } from '@/lib/scroll-linked-opacity.ts'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 
 /**
  * How far (px) past the screen edge the pop snap point leaves the current
@@ -95,8 +94,6 @@ export function useBackPager({
   onSwipe,
 }: BackPagerOptions): void {
   const pop = useEffectEvent(onPop)
-  const reducedMotion = usePrefersReducedMotion()
-  const prefersReducedMotion = useEffectEvent(() => reducedMotion)
   const reportSwipe = useEffectEvent((phase: 'start' | 'cancel') => onSwipe?.(phase))
 
   // Before paint, so a changed page list never shows the lower page for a frame.
@@ -139,7 +136,7 @@ export function useBackPager({
         if (scroller.scrollLeft > REVEALED_PX) {
           scroller.scrollTo({
             left: scroller.scrollLeft < rest / 2 ? 0 : rest,
-            behavior: prefersReducedMotion() ? 'instant' : 'smooth',
+            behavior: 'smooth',
           })
           return
         }

@@ -322,7 +322,7 @@ function attachScrollDrawer({
         }
         scroller.scrollTo({
           top: scroller.scrollTop < top / 2 ? 0 : top,
-          behavior: prefersReducedMotion() ? 'instant' : 'smooth',
+          behavior: 'smooth',
         })
         return
       }
