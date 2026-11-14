@@ -7,6 +7,7 @@ import { ChromeTopBar } from '@/mobile/chrome/chrome-top-bar.tsx'
 import { ChatHistoryDrawer } from '@/mobile/chat-history-drawer.tsx'
 import { useChatActions, useChatProviders, useHasChatTurns } from '@/providers/chat-provider.tsx'
 import { useRouterState, useRouterActions } from '@/routing/router.tsx'
+import { useChatIsSection } from '@/mobile/sidebar.ts'
 
 /**
  * The Chat screen (Plan 23): desktop's dedicated chat view as a card pushed
@@ -23,7 +24,10 @@ export function MobileChat(): ReactElement {
   const providers = useChatProviders()
   const hasTurns = useHasChatTurns()
   const { newChat } = useChatActions()
-  const { canBack } = useRouterState()
+  const { canBack, section } = useRouterState()
+  // The root of the Chat section has nothing below it to go back to.
+  const chatIsSection = useChatIsSection()
+  const isRoot = section === 'chat' && chatIsSection
   const { navigate, back } = useRouterActions()
   const [historyOpen, setHistoryOpen] = useState(false)
   const hasProvider = providers.length > 0
@@ -32,7 +36,7 @@ export function MobileChat(): ReactElement {
   return (
     <div className="flex h-full w-full flex-col pt-safe">
       <ChromeTopBar
-        back={goBack}
+        back={isRoot ? undefined : goBack}
         trailing={
           hasProvider
             ? [
