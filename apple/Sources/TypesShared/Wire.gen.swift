@@ -596,6 +596,15 @@ public struct EmbeddedChunk: Codable, Sendable, Equatable {
     }
 }
 
+/// An event the native side broadcasts. The serde name is the wire name, and
+/// `pnpm gen:types` exports it to TypeScript and Swift.
+public enum EventName: String, Codable, Sendable, Equatable {
+    case indexChanged = "index:changed"
+    case indexReconcile = "index:reconcile"
+    case indexWritten = "index:written"
+    case noteMoved = "note:moved"
+}
+
 /// One changed graph file.
 public struct FileChange: Codable, Sendable, Equatable {
     public let path: String
@@ -1931,6 +1940,7 @@ public enum SweepScope: String, Codable, Sendable, Equatable {
     case candidates = "candidates"
     case ingested = "ingested"
 }
+
 
 /// Counts from the vault catalog. `skipped` is what the walk refused or
 /// failed to list (unreadable directories, symlinks, default-pruned trees) —

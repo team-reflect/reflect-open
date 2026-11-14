@@ -6,6 +6,7 @@
 //! `@reflect/types` and the `TypesShared` Swift module from them.
 
 mod change;
+pub mod commands;
 mod contacts;
 mod embed;
 mod error;

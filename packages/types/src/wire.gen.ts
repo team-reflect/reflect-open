@@ -95,6 +95,681 @@ export type ChatMessageRow = {
 	createdMs: number,
 };
 
+/**  Every command name with its arguments and result. */
+export type Commands = {
+	settings_load: {
+		args: Record<string, never>,
+		result: { [key in string]: Value },
+	},
+	settings_save: {
+		args: {
+			settings: { [key in string]: Value },
+		},
+		result: null,
+	},
+	recent_graphs: {
+		args: Record<string, never>,
+		result: RecentGraph[],
+	},
+	forget_recent: {
+		args: {
+			root: string,
+		},
+		result: null,
+	},
+	secret_set: {
+		args: {
+			name: string,
+			value: string,
+		},
+		result: null,
+	},
+	secret_get: {
+		args: {
+			name: string,
+		},
+		result: string | null,
+	},
+	secret_delete: {
+		args: {
+			name: string,
+		},
+		result: null,
+	},
+	background_task_begin: {
+		args: Record<string, never>,
+		result: string | null,
+	},
+	background_task_end: {
+		args: {
+			token: string,
+		},
+		result: null,
+	},
+	mobile_storage: {
+		args: Record<string, never>,
+		result: MobileStorageInfo,
+	},
+	mobile_storage_local: {
+		args: Record<string, never>,
+		result: string,
+	},
+	icloud_download_pending: {
+		args: {
+			root: string,
+			notesOnly: boolean,
+		},
+		result: number,
+	},
+	icloud_pending_count: {
+		args: {
+			root: string,
+			notesOnly: boolean,
+		},
+		result: number,
+	},
+	icloud_request_downloads: {
+		args: {
+			paths: string[],
+		},
+		result: number,
+	},
+	icloud_status: {
+		args: Record<string, never>,
+		result: IcloudStatus,
+	},
+	icloud_adopt_graph: {
+		args: {
+			generation: number,
+		},
+		result: string,
+	},
+	icloud_conflicts_scan: {
+		args: {
+			generation: number,
+			skipPaths: string[],
+			ingestedPaths: string[],
+			recordBaseline: boolean,
+			scope: SweepScope,
+		},
+		result: IcloudSweepOutcome,
+	},
+	icloud_watch_start: {
+		args: {
+			root: string,
+		},
+		result: null,
+	},
+	icloud_watch_stop: {
+		args: Record<string, never>,
+		result: null,
+	},
+	contacts_authorization_status: {
+		args: Record<string, never>,
+		result: ContactsAuthorization,
+	},
+	contacts_request_access: {
+		args: Record<string, never>,
+		result: boolean,
+	},
+	contacts_lookup_by_email: {
+		args: {
+			email: string,
+		},
+		result: ContactMatch[],
+	},
+	contacts_lookup_by_name: {
+		args: {
+			name: string,
+		},
+		result: ContactMatch[],
+	},
+	capture_host_register: {
+		args: Record<string, never>,
+		result: null,
+	},
+	capture_inbox_list: {
+		args: {
+			generation: number,
+		},
+		result: FileMeta[],
+	},
+	capture_inbox_spool: {
+		args: {
+			name: string,
+			json: string,
+			generation: number,
+		},
+		result: null,
+	},
+	capture_inbox_read: {
+		args: {
+			name: string,
+			generation: number,
+		},
+		result: string,
+	},
+	capture_inbox_remove: {
+		args: {
+			name: string,
+			generation: number,
+		},
+		result: null,
+	},
+	capture_inbox_reject: {
+		args: {
+			name: string,
+			generation: number,
+		},
+		result: null,
+	},
+	capture_shared_inbox_relay: {
+		args: {
+			generation: number,
+		},
+		result: number,
+	},
+	capture_quick_note_defaults_write: {
+		args: {
+			parent: string,
+		},
+		result: null,
+	},
+	capture_screenshot_promote: {
+		args: {
+			spoolName: string,
+			assetPath: string,
+			maxDim: number,
+			generation: number,
+		},
+		result: null,
+	},
+	capture_link_preview: {
+		args: {
+			url: string,
+		},
+		result: string | null,
+	},
+	capture_meta_fetch: {
+		args: {
+			url: string,
+		},
+		result: string,
+	},
+	capture_oembed_fetch: {
+		args: {
+			url: string,
+		},
+		result: string,
+	},
+	link_preview_fetch_html: {
+		args: {
+			url: string,
+		},
+		result: LinkPreviewHtml,
+	},
+	link_preview_fetch_icon: {
+		args: {
+			url: string,
+		},
+		result: string,
+	},
+	embed_status: {
+		args: Record<string, never>,
+		result: EmbedStatus,
+	},
+	embed_ensure: {
+		args: Record<string, never>,
+		result: EmbedStatus,
+	},
+	embed_texts: {
+		args: {
+			texts: string[],
+		},
+		result: number[][],
+	},
+	watch_start: {
+		args: Record<string, never>,
+		result: null,
+	},
+	watch_stop: {
+		args: Record<string, never>,
+		result: null,
+	},
+	index_open: {
+		args: Record<string, never>,
+		result: number,
+	},
+	index_apply: {
+		args: {
+			note: IndexedNote,
+			generation: number,
+		},
+		result: null,
+	},
+	index_apply_batch: {
+		args: {
+			notes: IndexedNote[],
+			generation: number,
+		},
+		result: null,
+	},
+	index_remove: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	index_clear: {
+		args: {
+			generation: number,
+		},
+		result: null,
+	},
+	index_move: {
+		args: {
+			from: string,
+			to: string,
+			generation: number,
+			toAddress: MovedNoteAddress,
+		},
+		result: null,
+	},
+	index_reconcile_scan: {
+		args: {
+			generation: number,
+		},
+		result: ReconcileScan,
+	},
+	index_touch: {
+		args: {
+			entries: IndexTouch[],
+			generation: number,
+		},
+		result: null,
+	},
+	note_move_indexed: {
+		args: {
+			request: NoteMoveRequest,
+			generation: number,
+		},
+		result: null,
+	},
+	index_meta_set: {
+		args: {
+			key: string,
+			value: string,
+			generation: number,
+		},
+		result: null,
+	},
+	db_query: {
+		args: {
+			sql: string,
+			params: Value[],
+		},
+		result: { [key in string]: Value }[],
+	},
+	chat_message_save: {
+		args: {
+			conversation: ChatConversation,
+			message: ChatMessageRow,
+			generation: number,
+		},
+		result: null,
+	},
+	chat_conversation_delete: {
+		args: {
+			id: string,
+			generation: number,
+		},
+		result: null,
+	},
+	embed_apply: {
+		args: {
+			path: string,
+			chunks: EmbeddedChunk[],
+			generation: number,
+		},
+		result: null,
+	},
+	embed_remove: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	git_status: {
+		args: {
+			generation: number,
+		},
+		result: GitStatus,
+	},
+	git_setup: {
+		args: {
+			remoteUrl: string | null,
+			branch: string | null,
+			generation: number,
+		},
+		result: GitStatus,
+	},
+	git_disconnect: {
+		args: {
+			generation: number,
+		},
+		result: GitStatus,
+	},
+	git_clone: {
+		args: {
+			url: string,
+			path: string,
+			credential: GitCredential | null,
+		},
+		result: null,
+	},
+	git_commit_all: {
+		args: {
+			message: string,
+			generation: number,
+		},
+		result: CommitOutcome,
+	},
+	git_fetch: {
+		args: {
+			credential: GitCredential | null,
+			generation: number,
+		},
+		result: RemoteDelta,
+	},
+	git_remote_head: {
+		args: {
+			url: string | null,
+			credential: GitCredential | null,
+			generation: number,
+		},
+		result: RemoteTip,
+	},
+	git_pull: {
+		args: {
+			message: string,
+			generation: number,
+		},
+		result: PullOutcome,
+	},
+	git_push: {
+		args: {
+			credential: GitCredential | null,
+			generation: number,
+		},
+		result: PushOutcome,
+	},
+	graph_create: {
+		args: {
+			path: string,
+		},
+		result: GraphInfo,
+	},
+	graph_import_reflect_v1_zip: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: GraphImportSummary,
+	},
+	graph_import_cancel: {
+		args: Record<string, never>,
+		result: null,
+	},
+	graph_open: {
+		args: {
+			path: string,
+		},
+		result: GraphInfo,
+	},
+	graph_delete: {
+		args: {
+			generation: number,
+		},
+		result: null,
+	},
+	note_read: {
+		args: {
+			path: string,
+			generation: number | null,
+		},
+		result: string,
+	},
+	note_read_local: {
+		args: {
+			path: string,
+			generation: number | null,
+		},
+		result: LocalNoteRead,
+	},
+	note_write: {
+		args: {
+			path: string,
+			contents: string,
+			generation: number,
+			checkContents: boolean | null,
+			expectedContents: string | null,
+		},
+		result: NoteWriteOutcome,
+	},
+	note_create: {
+		args: {
+			path: string,
+			contents: string,
+			generation: number,
+		},
+		result: NoteCreateOutcome,
+	},
+	note_exists: {
+		args: {
+			path: string,
+		},
+		result: boolean,
+	},
+	note_delete: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	asset_write: {
+		args: {
+			path: string,
+			contentsBase64: string,
+			generation: number,
+		},
+		result: null,
+	},
+	asset_read: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: string,
+	},
+	asset_open: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	asset_reveal: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	audio_memo_delete: {
+		args: {
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	transcript_cache_read: {
+		args: {
+			name: string,
+			generation: number,
+		},
+		result: string,
+	},
+	transcript_cache_write: {
+		args: {
+			name: string,
+			contents: string,
+			generation: number,
+		},
+		result: null,
+	},
+	dir_list: {
+		args: {
+			dir: string,
+			generation: number,
+		},
+		result: FileMeta[],
+	},
+	list_files: {
+		args: {
+			generation: number | null,
+		},
+		result: FileMeta[],
+	},
+	list_attachments: {
+		args: {
+			generation: number | null,
+		},
+		result: FileMeta[],
+	},
+	vault_scan_stats: {
+		args: {
+			generation: number | null,
+		},
+		result: VaultScanStats,
+	},
+	asset_upload_begin: {
+		args: {
+			generation: number,
+		},
+		result: string,
+	},
+	asset_upload_commit: {
+		args: {
+			id: string,
+			desiredName: string,
+			generation: number,
+		},
+		result: string,
+	},
+	asset_upload_commit_path: {
+		args: {
+			id: string,
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	asset_upload_abort: {
+		args: {
+			id: string,
+		},
+		result: null,
+	},
+	asset_import: {
+		args: {
+			sourcePath: string,
+			desiredName: string,
+			generation: number,
+		},
+		result: string,
+	},
+	audio_memo_import: {
+		args: {
+			sourcePath: string,
+			path: string,
+			generation: number,
+		},
+		result: null,
+	},
+	x_archive_write: {
+		args: {
+			generation: number,
+			value: Value,
+		},
+		result: null,
+	},
+	x_archive_resolve: {
+		args: {
+			generation: number,
+			postId: string,
+		},
+		result: Value | null,
+	},
+	x_archive_owners: {
+		args: {
+			assetPath: string,
+			generation: number | null,
+		},
+		result: string[],
+	},
+	x_syndication_fetch: {
+		args: {
+			postId: string,
+		},
+		result: Value | null,
+	},
+	skill_status: {
+		args: Record<string, never>,
+		result: AgentSkillStatus,
+	},
+	skill_install: {
+		args: {
+			generation: number,
+		},
+		result: AgentSkillStatus,
+	},
+	skill_uninstall: {
+		args: {
+			generation: number,
+		},
+		result: AgentSkillStatus,
+	},
+	menu_install_paste_and_match_style: {
+		args: Record<string, never>,
+		result: null,
+	},
+	quit_confirm: {
+		args: Record<string, never>,
+		result: null,
+	},
+	open_note_window: {
+		args: {
+			deepLink: string,
+		},
+		result: null,
+	},
+	window_bootstrap: {
+		args: Record<string, never>,
+		result: WindowBootstrap,
+	},
+	close_note_windows: {
+		args: Record<string, never>,
+		result: null,
+	},
+	toggle_devtools: {
+		args: Record<string, never>,
+		result: null,
+	},
+};
+
 /**  Result of a commit attempt. `committed: false` means the tree was clean. */
 export type CommitOutcome = {
 	committed: boolean,
@@ -693,6 +1368,8 @@ export type SweepScope =
  *  working file is the `Full` sweep's job.
  */
 "ingested";
+
+export type Value = null | boolean | number | string | Value[] | { [key in string]: Value };
 
 /**
  *  Counts from the vault catalog. `skipped` is what the walk refused or

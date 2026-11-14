@@ -145,6 +145,24 @@ mod capability_tests {
     }
 }
 
+/// Builds the desktop command handler from the `desktop` rows of the command
+/// table in `reflect_types::commands`, plus the calendar commands, which the
+/// table leaves out.
+macro_rules! desktop_handler {
+    (
+        core { $( $core:tt )* }
+        desktop { $( $module:ident :: $method:ident ( $( $arg:ident : $ty:ty ),* ) -> $ret:ty ),* $(,)? }
+    ) => {
+        tauri::generate_handler![
+            $( $module::$method, )*
+            calendar::calendar_authorization_status,
+            calendar::calendar_request_access,
+            calendar::calendar_list_calendars,
+            calendar::calendar_list_events,
+        ]
+    };
+}
+
 pub fn run() {
     let builder = tauri::Builder::default();
 
@@ -266,21 +284,8 @@ pub fn run() {
         .manage(quit::QuitState::default())
         .manage(windows::WindowInit::default())
         .invoke_handler({
-            let desktop_commands: fn(tauri::ipc::Invoke) -> bool = tauri::generate_handler![
-                skill::skill_status,
-                skill::skill_install,
-                skill::skill_uninstall,
-                menu::menu_install_paste_and_match_style,
-                calendar::calendar_authorization_status,
-                calendar::calendar_request_access,
-                calendar::calendar_list_calendars,
-                calendar::calendar_list_events,
-                quit::quit_confirm,
-                windows::open_note_window,
-                windows::window_bootstrap,
-                windows::close_note_windows,
-                devtools::toggle_devtools,
-            ];
+            let desktop_commands: fn(tauri::ipc::Invoke) -> bool =
+                reflect_types::commands!(desktop_handler);
             move |invoke| {
                 if Core::has_command(invoke.message.command()) {
                     core_commands::handle(invoke);
