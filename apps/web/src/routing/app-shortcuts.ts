@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider.tsx'
+import { sortGraphsByName } from '@/lib/commands/app-commands.ts'
 import type { CommandContext } from '@/lib/commands/types.ts'
 import { useAudioMemo } from '@/providers/audio-memo-provider.tsx'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider.tsx'
@@ -93,7 +94,8 @@ export function useAppShortcuts(): CommandContext {
   // Read at run time, not captured: a command can fire long after the render
   // that created the context (palette open across an index rebuild, etc.).
   const graphRootRef = useRef<string | null>(graph?.root ?? null)
-  const recentsRef = useRef(recents)
+  const graphsByName = useMemo(() => sortGraphsByName(recents), [recents])
+  const graphsByNameRef = useRef(graphsByName)
   const openRecentRef = useRef(openRecent)
   const routeRef = useRef(route)
   const focusedDailyDateRef = useRef(focusedDailyDate)
@@ -102,7 +104,7 @@ export function useAppShortcuts(): CommandContext {
     shortcutsOpenRef.current = shortcutsOpen
     templatesOpenRef.current = templatePickerOpen || templateCreateOpen
     graphRootRef.current = graph?.root ?? null
-    recentsRef.current = recents
+    graphsByNameRef.current = graphsByName
     openRecentRef.current = openRecent
     routeRef.current = route
     focusedDailyDateRef.current = focusedDailyDate
@@ -162,7 +164,7 @@ export function useAppShortcuts(): CommandContext {
       findNextInNote,
       findPreviousInNote,
       switchGraph: (index) => {
-        const recent = recentsRef.current[index]
+        const recent = graphsByNameRef.current[index]
         if (recent === undefined || recent.root === graphRootRef.current) {
           return
         }
