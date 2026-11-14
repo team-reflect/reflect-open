@@ -47,11 +47,10 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   // A section row lights for the section of the screen on view. An open
   // pinned note lights its own row and a fresh untitled note lights New
   // note instead; the settings screens light none.
-  const sectionActive = (row: Section): boolean =>
-    section === row &&
-    (rootSectionForRoute(route) !== null || route.kind === 'note') &&
-    !newNoteActive &&
-    !hasActivePinnedNote
+  const sectionActive = (row: Section): boolean => {
+    const onSectionScreen = rootSectionForRoute(route) !== null || route.kind === 'note'
+    return section === row && onSectionScreen && !newNoteActive && !hasActivePinnedNote
+  }
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
