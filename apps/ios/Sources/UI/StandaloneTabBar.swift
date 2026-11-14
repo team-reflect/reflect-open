@@ -30,12 +30,17 @@ final class StandaloneTabBar: NSObject, UITabBarDelegate {
   /// How far the system's glass capsule reaches past the items on every side.
   static let capsuleInset: CGFloat = 4
 
-  /// Places the bar at the bottom of `view` with its capsule at `leading`.
-  /// Returns the frame of the capsule in `view`.
-  func layout(in view: UIView, leading: CGFloat) -> CGRect {
+  /// How far the bar reaches past its capsule on each side. A bar narrower
+  /// than the capsule's natural width plus these margins squeezes the capsule.
+  private static let barMargin: CGFloat = 10
+
+  /// Places the bar at the bottom of `view` with its capsule at `leading`, at
+  /// most `maxWidth` wide. Returns the frame of the capsule in `view`.
+  func layout(in view: UIView, leading: CGFloat, maxWidth: CGFloat) -> CGRect {
     let bounds = view.bounds
     let height = bar.sizeThatFits(bounds.size).height
-    bar.frame = CGRect(x: 0, y: bounds.maxY - height, width: bounds.width, height: height)
+    let width = min(bounds.width, maxWidth + 2 * Self.barMargin)
+    bar.frame = CGRect(x: 0, y: bounds.maxY - height, width: width, height: height)
     bar.layoutIfNeeded()
     let items = (bar.items ?? []).compactMap { $0.frame(in: view) }.reduce(CGRect.null) {
       $0.union($1)

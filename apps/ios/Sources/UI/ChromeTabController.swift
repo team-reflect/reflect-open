@@ -169,7 +169,15 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
         view.addSubview(standalone.bar)
       }
       view.bringSubviewToFront(standalone.bar)
-      let capsule = standalone.layout(in: view, leading: safe.left + Self.capsuleEdgeGap)
+      // The capsule shrinks when its natural width leaves no room for the `+`.
+      let leading = safe.left + Self.capsuleEdgeGap
+      var capsule = standalone.layout(in: view, leading: leading, maxWidth: .infinity)
+      let room =
+        bounds.width - safe.left - safe.right - 2 * Self.capsuleEdgeGap - capsule.height
+        - Self.capsulePlusGap
+      if capsule.width > room {
+        capsule = standalone.layout(in: view, leading: leading, maxWidth: room)
+      }
       if !standalone.bar.isHidden {
         inset = max(0, bounds.maxY - standalone.bar.frame.minY - safe.bottom)
       }
@@ -203,6 +211,9 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
 
   /// The gap between the bottom capsule and the side of the safe area.
   private static let capsuleEdgeGap: CGFloat = 20
+
+  /// The smallest gap between the bottom capsule and the `+`.
+  private static let capsulePlusGap: CGFloat = 12
 
   /// The system rail's glass capsule, which reaches 2pt past its tabs.
   private func railCapsule() -> CGRect? {
