@@ -17,7 +17,6 @@ import { linkOpacityToScroll } from '@/lib/scroll-linked-opacity.ts'
 import { watchScrollSettle } from '@/lib/scroll-settle.ts'
 import { cn } from '@/lib/utils.ts'
 import { useChromeModal } from '@/mobile/chrome/chrome-renderer.ts'
-import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion.ts'
 import './scroll-drawer.css'
 
 /**
@@ -128,7 +127,6 @@ function DrawerSheet({
   children?: ReactNode | undefined
 }): ReactElement {
   const { open, onOpenChange } = useDrawer()
-  const reducedMotion = usePrefersReducedMotion()
   const scrollerRef = useRef<HTMLDivElement>(null)
   const slideRef = useRef<HTMLDivElement>(null)
   const tintRef = useRef<HTMLDivElement>(null)
@@ -141,7 +139,6 @@ function DrawerSheet({
     setCloseRequests((count) => count + 1)
     onOpenChange(false)
   })
-  const prefersReducedMotion = useEffectEvent(() => reducedMotion)
   const close = useCallback(() => onOpenChange(false), [onOpenChange])
   const isOpen = useEffectEvent(() => open)
 
@@ -166,7 +163,6 @@ function DrawerSheet({
       handle,
       popup: () => popupRef.current,
       requestClose,
-      prefersReducedMotion,
     })
     controllerRef.current = controller
     return () => {
@@ -263,7 +259,6 @@ interface ScrollDrawerOptions {
    * Asks the owner to close. The owner may keep the drawer open.
    */
   requestClose: () => void
-  prefersReducedMotion: () => boolean
 }
 
 interface ScrollDrawerController {
@@ -286,14 +281,13 @@ function attachScrollDrawer({
   handle,
   popup,
   requestClose,
-  prefersReducedMotion,
 }: ScrollDrawerOptions): ScrollDrawerController {
   const listeners = new AbortController()
   const { signal } = listeners
   // Layout offsets ignore `translate`, so the entry transition never moves this.
   const openTop = (): number => slide.offsetTop + slide.offsetHeight - scroller.clientHeight
   const scrollOpen = (): void => {
-    scroller.scrollTo({ top: openTop(), behavior: prefersReducedMotion() ? 'instant' : 'smooth' })
+    scroller.scrollTo({ top: openTop(), behavior: 'smooth' })
   }
 
   // The spacer is one scrollport plus the overshoot high, so the slide is off
