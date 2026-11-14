@@ -212,19 +212,10 @@ describe('Sidebar', () => {
     })
   })
 
-  it('New note runs its command and shows active while the placeholder note is open', async () => {
-    // The route a ⌘N/new-note click lands on: a fresh ULID placeholder path.
-    const { view, navigate } = await renderSidebar(undefined, {
-      kind: 'note',
-      path: untitledNotePath(),
-    })
-    const newNote = view.getByRole('button', { name: /new note/i })
+  it('the compose button runs the new-note command', async () => {
+    const { view, navigate } = await renderSidebar()
 
-    // Active like every other row whose route is current — until the birth
-    // rename moves the note onto a title slug.
-    await expect.element(newNote).toHaveAttribute('aria-current', 'page')
-
-    await newNote.click()
+    await view.getByRole('button', { name: 'New note' }).click()
     await vi.waitFor(() => {
       expect(navigate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -235,13 +226,6 @@ describe('Sidebar', () => {
     })
   })
 
-  it('New note is inactive on slug-named note routes', async () => {
-    const { view } = await renderSidebar(undefined, { kind: 'note', path: 'notes/meeting.md' })
-    await expect
-      .element(view.getByRole('button', { name: /new note/i }))
-      .not.toHaveAttribute('aria-current')
-  })
-
   it('All notes stays active while editing a note opened from it', async () => {
     const { view, navigation } = await renderSidebar(undefined, { kind: 'allNotes', tag: null })
     navigation.navigate({ kind: 'note', path: 'notes/meeting.md' })
@@ -250,16 +234,12 @@ describe('Sidebar', () => {
       .toHaveAttribute('aria-current', 'page')
   })
 
-  it('only "New note" — not "All notes" — lights for the untitled placeholder', async () => {
-    // A brand-new note is still an untitled placeholder, so the two rows must
-    // never light at once.
-    const { view } = await renderSidebar(undefined, { kind: 'note', path: untitledNotePath() })
+  it('a fresh untitled note lights the section it was created from', async () => {
+    const { view, navigation } = await renderSidebar(undefined, { kind: 'today' })
+    navigation.navigate({ kind: 'note', path: untitledNotePath() })
     await expect
-      .element(view.getByRole('button', { name: /new note/i }))
+      .element(view.getByRole('button', { name: /daily notes/i }))
       .toHaveAttribute('aria-current', 'page')
-    await expect
-      .element(view.getByRole('button', { name: /all notes/i }))
-      .not.toHaveAttribute('aria-current')
   })
 
   it('the search affordance opens the palette', async () => {

@@ -1,7 +1,10 @@
 import type { ReactElement } from 'react'
-import { isUntitledNotePath, type GraphInfo } from '@reflect/core'
+import type { GraphInfo } from '@reflect/core'
 import { ListChecks, MessageSquare, SquarePen } from 'lucide-react'
 import { AudioMemoButton } from '@/components/audio-memo/audio-memo-button.tsx'
+import { ShortcutKeys } from '@/components/shortcut-keys.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { ListIcon } from '@/components/icons/list-icon.tsx'
 import { PencilIcon } from '@/components/icons/pencil-icon.tsx'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
@@ -26,7 +29,7 @@ interface SidebarProps {
 
 /**
  * The workspace sidebar, in the original app's shape: history arrows top
- * right, search, primary navigation with hover-revealed shortcut keycaps, the
+ * right, search with the compose and audio memo buttons, primary navigation with hover-revealed shortcut keycaps, the
  * Pinned shelf, and the graph switcher footer. Nav rows run registered
  * commands so a binding and its behavior stay one definition, and light for
  * the section of the screen on view. Daily notes is the exception: off the
@@ -43,14 +46,11 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const currentNotePath = notePathForRoute(route, today)
   const hasActivePinnedNote =
     currentNotePath !== null && pinned.some((note) => note.path === currentNotePath)
-  const newNoteActive = route.kind === 'note' && isUntitledNotePath(route.path)
   // A section row lights for the section of the screen on view. An open
-  // pinned note lights its own row and a fresh untitled note lights New
-  // note instead; the settings screens light none.
+  // pinned note lights its own row instead; the settings screens light none.
   const sectionRowsLit =
-    (rootSectionForRoute(route) !== null || route.kind === 'note') &&
-    !newNoteActive &&
-    !hasActivePinnedNote
+    (rootSectionForRoute(route) !== null || route.kind === 'note') && !hasActivePinnedNote
+  const newNoteBinding = keybindingFor('note.new')
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
@@ -74,6 +74,24 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
           <div className="min-w-0 flex-1">
             <SidebarSearch onOpen={() => context.openPalette()} />
           </div>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="New note"
+                  onClick={() => void context.app.commands.run('note.new', context)}
+                  className="text-text-muted hover:text-text-secondary dark:hover:text-text"
+                >
+                  <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
+                </Button>
+              }
+            />
+            <TooltipContent side="bottom">
+              New note {newNoteBinding && <ShortcutKeys binding={newNoteBinding} />}
+            </TooltipContent>
+          </Tooltip>
           <AudioMemoButton />
         </div>
 
@@ -90,21 +108,6 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
                 context.selectSection('daily')
               }
             }}
-          />
-          <SidebarItem
-            icon={
-              <span className={lucideBox}>
-                <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
-              </span>
-            }
-            label="New note"
-            binding={keybindingFor('note.new') ?? undefined}
-            // Active while the open note is still on its ULID placeholder
-            // name — the state this row creates. The birth rename onto a
-            // title slug is also what hands the note off to ordinary
-            // navigation, releasing the highlight.
-            active={newNoteActive}
-            onClick={() => void context.app.commands.run('note.new', context)}
           />
           <SidebarItem
             icon={<ListIcon className="shrink-0" />}
