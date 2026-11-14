@@ -46,6 +46,12 @@ export interface NavigateOptions {
    * screen the route shows, else the current entry's section.
    */
   section?: Section | undefined
+  /**
+   * Swap the current history entry for the target instead of pushing a new
+   * one. Forward entries stay. Daily day stepping (swipe, arrow keys) uses
+   * it, so Back leaves the stream instead of walking every day passed.
+   */
+  replace?: boolean
 }
 
 /**
@@ -310,6 +316,14 @@ class NavigationServiceImpl implements NavigationService {
         // restoring the old scroll position.
         this.#scrollById.delete(currentEntry.id)
       }
+    } else if (options?.replace === true) {
+      this.#scrollById.delete(currentEntry.id)
+      const id = this.#nextId++
+      if (restored !== undefined) {
+        this.#scrollById.set(id, restored)
+      }
+      const section = options.section ?? rootSectionForRoute(target) ?? currentEntry.section
+      this.#stack = this.#stack.with(this.#index, { id, route: target, section })
     } else {
       const dropped = this.#stack.slice(this.#index + 1)
       for (const entry of dropped) {

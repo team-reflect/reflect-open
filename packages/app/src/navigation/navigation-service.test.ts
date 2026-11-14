@@ -35,6 +35,28 @@ describe('NavigationService', () => {
     expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-08' })
   })
 
+  it('replace swaps the current entry and keeps forward entries', () => {
+    const navigation = createNavigationService()
+    navigation.navigate({ kind: 'tasks' })
+    navigation.navigate({ kind: 'daily', date: '2026-06-08' })
+    navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+    navigation.back()
+    const before = navigation.get().entryId
+    navigation.saveScrollState(40)
+
+    navigation.navigate({ kind: 'daily', date: '2026-06-07' }, { replace: true })
+    expect(navigation.get().route).toEqual({ kind: 'daily', date: '2026-06-07' })
+    expect(navigation.get().entryId).not.toBe(before)
+    expect(navigation.savedScroll()).toBeNull()
+    expect(navigation.get().canForward).toBe(true)
+
+    navigation.back()
+    expect(navigation.get().route).toEqual({ kind: 'tasks' })
+    navigation.forward()
+    navigation.forward()
+    expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+  })
+
   it('re-navigating to the current route is a no-op (no stack growth)', () => {
     const navigation = createNavigationService()
     navigation.navigate({ kind: 'daily', date: '2026-06-08' })

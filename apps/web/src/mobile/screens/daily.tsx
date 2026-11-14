@@ -42,6 +42,15 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
     },
     [navigate, today],
   )
+  // A swipe steps one day: it swaps the history entry, so Back leaves the
+  // stream instead of walking every day passed. A strip tap is a jump and
+  // pushes like any other navigation.
+  const step = useCallback(
+    (day: string): void => {
+      navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day }, { replace: true })
+    },
+    [navigate, today],
+  )
 
   // An explicit re-arrival at the day already shown — the Daily tab tapped
   // while on today (V1's double-tap-to-today lands here) — re-anchors the
@@ -71,7 +80,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         navigationKey={navigationKey}
         focusDate={focusDate}
         onFocusConsumed={consumeFocus}
-        onSelect={select}
+        onSelect={step}
         onTarget={followSwipeTarget}
       />
       {capture.sheet}
