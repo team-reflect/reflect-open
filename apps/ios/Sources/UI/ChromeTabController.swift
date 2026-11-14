@@ -21,6 +21,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Called when the corner buttons move between the page's header row
   /// (`true`) and the row of the floating tab bar (`false`).
   var onCornersInHeaderRow: (Bool) -> Void = { _ in }
+  /// The last value sent to `onCornersInHeaderRow`.
+  private var cornersInHeaderRow = true
   /// Called when the iPad sidebar shows (`true`) or hides (`false`), and
   /// with `nil` when the window has no sidebar.
   var onSidebarVisible: (Bool?) -> Void = { _ in }
@@ -322,12 +324,20 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     // bar. The corner buttons share its row, as the bar buttons of a
     // navigation controller in the selected tab do.
     let windowTop = view.window?.safeAreaInsets.top ?? want.top
+    let inBarRow = want.top > windowTop + 1
+    // Beside a tiled sidebar they line up with its toggle, which UIKit puts
+    // right under the status bar too, and still share the page's header row.
+    let besideSidebar =
+      mode == .tabSidebar && !sidebar.isHidden && sidebar.preferredLayout == .tile
     let rowCenter: CGFloat? =
-      want.top > windowTop + 1
+      inBarRow || besideSidebar
       ? windowTop + WebPageController.buttonSize / 2 - frame.minY : nil
     if page.topRowCenter != rowCenter {
       page.topRowCenter = rowCenter
-      onCornersInHeaderRow(rowCenter == nil)
+    }
+    if cornersInHeaderRow != !inBarRow {
+      cornersInHeaderRow = !inBarRow
+      onCornersInHeaderRow(!inBarRow)
     }
     let extra = UIEdgeInsets(
       top: max(0, want.top - natural.top), left: max(0, want.left - natural.left),
