@@ -166,18 +166,25 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
       </div>
     ),
   })
-  return { view, navigate, openPalette, context, core }
+  return { view, navigate, openPalette, context, core, navigation: appLayer.navigation }
 }
 
 describe('Sidebar', () => {
-  it('nav rows navigate, with Daily notes always re-anchoring to today', async () => {
-    const { view, navigate } = await renderSidebar(undefined, { kind: 'settings' })
+  it('section rows return to where their section was left', async () => {
+    const { view, navigate, navigation } = await renderSidebar(undefined, { kind: 'settings' })
 
-    // The Daily row shares the ⌘D capture command: even an off-surface
-    // return discards the stream's saved position and re-anchors on today.
+    // Off the stream, Daily notes returns to the last viewed day without
+    // taking focus.
     await view.getByRole('button', { name: /daily notes/i }).click()
+    await vi.waitFor(() => expect(navigation.get().route).toEqual({ kind: 'today' }))
+    expect(navigate).not.toHaveBeenCalled()
+
+    await view.getByRole('button', { name: /tasks/i }).click()
+    await vi.waitFor(() => expect(navigation.get().route).toEqual({ kind: 'tasks' }))
+
+    await view.getByRole('button', { name: /all notes/i }).click()
     await vi.waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true })
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: null })
     })
 
     await view.getByRole('button', { name: /settings/i }).click()
@@ -185,6 +192,15 @@ describe('Sidebar', () => {
 
     await view.getByRole('button', { name: /chat/i }).click()
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'chat' }))
+  })
+
+  it('Daily notes on the stream re-anchors to today with focus', async () => {
+    const { view, navigate } = await renderSidebar(undefined, { kind: 'daily', date: '2026-01-02' })
+
+    await view.getByRole('button', { name: /daily notes/i }).click()
+    await vi.waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true })
+    })
   })
 
   it('New note runs its command and shows active while the placeholder note is open', async () => {
