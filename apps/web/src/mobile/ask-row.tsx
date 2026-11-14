@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { ChevronRight, Sparkles } from 'lucide-react'
 import { useChatActions, useChatProviders } from '@/providers/chat-provider.tsx'
 import { useRouterActions } from '@/routing/router.tsx'
+import { chatSection } from '@/mobile/sidebar.ts'
 
 interface MobileAskRowProps {
   /** The All tab's search text, asked as typed. */
@@ -31,7 +32,7 @@ export function MobileAskRow({ query }: MobileAskRowProps): ReactElement | null 
       type="button"
       onClick={() => {
         void ask(question)
-        navigate({ kind: 'chat' }, { section: 'all' })
+        navigate({ kind: 'chat' }, { section: chatSection() })
       }}
       className="flex w-full shrink-0 items-center gap-3 border-b border-border bg-surface-sunken px-safe-offset-4 py-3 text-left"
     >

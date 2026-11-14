@@ -24,5 +24,6 @@ describe('selectSidebarRow', () => {
       'tasks',
     )
     expect(selectSidebarRow({ kind: 'settings' }, 'daily', pinned, TODAY)).toBe('daily')
+    expect(selectSidebarRow({ kind: 'note', path: 'other.md' }, 'chat', pinned, TODAY)).toBe('chat')
   })
 })

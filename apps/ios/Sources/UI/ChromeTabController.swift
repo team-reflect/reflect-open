@@ -396,10 +396,14 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   }
 
   /// Selects the tab the page shows, or, while the sidebar shows, the
-  /// sidebar row of its state.
+  /// sidebar row of its state. Chat is in the top tab bar too, so its row
+  /// is selected whenever the tab bar is on top.
   func follow(_ chromeTab: ChromeTab) {
     standalone.select(chromeTab)
-    let row = sidebarVisible ? sidebarState?.selection ?? chromeTab.rawValue : chromeTab.rawValue
+    let selection = sidebarState?.selection
+    let row =
+      sidebarVisible || (mode == .tabSidebar && selection == SidebarRow.chat)
+      ? selection ?? chromeTab.rawValue : chromeTab.rawValue
     if let tab = tab(for: row) ?? tab(for: chromeTab.rawValue), selectedTab !== tab {
       following = true
       selectedTab = tab

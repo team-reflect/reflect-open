@@ -13,6 +13,7 @@ import { useRouterState, useRouterActions } from '@/routing/router.tsx'
 import { fireEvent } from '@/test-utils/fire-event.ts'
 import { renderInApp } from '@/test-utils/render-in-app.tsx'
 import { createWasmTestDatabaseService } from '@/test-utils/test-database.ts'
+import { sidebarVisible } from '@/mobile/sidebar.ts'
 import { MobileChat } from './chat.tsx'
 
 /**
@@ -123,6 +124,17 @@ describe('MobileChat', () => {
     await page.getByRole('button', { name: 'Back' }).click()
 
     expect(probedRouteRef.current).toEqual({ kind: 'today' })
+  })
+
+  it('is the root of its own section on iPad, with no Back', async () => {
+    sidebarVisible.set(false)
+    try {
+      await renderHarness({ kind: 'chat' })
+      await expect.element(page.getByRole('heading', { name: 'Chat' }).first()).toBeVisible()
+      expect(page.getByRole('button', { name: 'Back' }).query()).toBeNull()
+    } finally {
+      sidebarVisible.set(null)
+    }
   })
 
   it('sends the draft from the composer and renders the streamed turn', async () => {

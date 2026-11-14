@@ -1,10 +1,11 @@
 import { useCallback } from 'react'
 import { noop } from '@ocavue/utils'
-import { notePathForRoute, routeForPath, type Route } from '@reflect/app'
+import { notePathForRoute, routeForPath, type Route, type Section } from '@reflect/app'
 import { WritableStore } from '@reflect/core'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes.ts'
 import { useNoteLabel } from '@/hooks/use-note-label.ts'
 import { useGraphColors } from '@/hooks/use-graph-colors.ts'
+import { useStore } from '@/lib/use-store.ts'
 import { graphColorCss } from '@/lib/graph-colors.ts'
 import { useToday } from '@/lib/use-today.ts'
 import type { ChromeMenuItem } from '@/mobile/chrome/screen-chrome.ts'
@@ -19,6 +20,22 @@ import { useAppServices, useCoreServices } from '@/services/services-provider.ts
  * compact iPad window, the web). The Swift shell reports it.
  */
 export const sidebarVisible = new WritableStore<boolean | null>(null)
+
+/**
+ * The section a Chat navigation lands in: its own on iPad with a sidebar
+ * (shown or hidden), where Chat is a top-level tab; All elsewhere, where
+ * Chat is a card over All.
+ */
+export function chatSection(): Section {
+  return sidebarVisible.get() === null ? 'all' : 'chat'
+}
+
+/**
+ * Whether Chat is a section of its own (see {@link chatSection}).
+ */
+export function useChatIsSection(): boolean {
+  return useStore(sidebarVisible) !== null
+}
 
 /**
  * A tap in the iPad sidebar.
@@ -43,11 +60,11 @@ export interface SidebarState {
 
 /**
  * The sidebar row of `route`: the pinned note on screen, Chat, or else the
- * tab under the screen.
+ * row under the screen (a tab, or `chat` for the Chat section).
  */
 export function selectSidebarRow(
   route: Route,
-  tab: MobileTab,
+  tab: MobileTab | 'chat',
   pinnedPaths: ReadonlySet<string>,
   today: string,
 ): string {
@@ -103,8 +120,8 @@ export function useSidebar(tab: MobileTab): {
   state: SidebarState
   run: (command: SidebarCommand) => void
 } {
-  const { route } = useRouterState()
-  const { navigate } = useRouterActions()
+  const { route, section } = useRouterState()
+  const { navigate, selectSection } = useRouterActions()
   const { noteActions, logger } = useCoreServices()
   const { share } = useAppServices()
   const today = useToday()
@@ -116,7 +133,12 @@ export function useSidebar(tab: MobileTab): {
   const color = graph === null ? undefined : graphColorCss(colorFor(graph.root))
 
   const state: SidebarState = {
-    selection: selectSidebarRow(route, tab, new Set(pinned.map((note) => note.path)), today),
+    selection: selectSidebarRow(
+      route,
+      section === 'chat' ? 'chat' : tab,
+      new Set(pinned.map((note) => note.path)),
+      today,
+    ),
     pinned: pinned.map((note) => ({ path: note.path, title: noteLabel(note) })),
     graphName: graphMenu.title,
     graphColor: color?.startsWith('#') === true ? color : null,
@@ -126,7 +148,11 @@ export function useSidebar(tab: MobileTab): {
   const run = (command: SidebarCommand): void => {
     switch (command.kind) {
       case 'chat':
-        navigate({ kind: 'chat' }, { section: 'all' })
+        if (chatSection() === 'chat') {
+          selectSection('chat')
+        } else {
+          navigate({ kind: 'chat' }, { section: 'all' })
+        }
         return
       case 'search':
         // All lands with its search field focused.
