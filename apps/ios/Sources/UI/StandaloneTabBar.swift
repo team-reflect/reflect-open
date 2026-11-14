@@ -34,9 +34,10 @@ final class StandaloneTabBar: NSObject, UITabBarDelegate {
   /// than the capsule's natural width plus these margins squeezes the capsule.
   private static let barMargin: CGFloat = 10
 
-  /// Places the bar at the bottom of `view` with its capsule at `leading` and
-  /// at most `maxWidth` wide. Returns the frame of the capsule in `view`.
-  func layout(in view: UIView, leading: CGFloat, maxWidth: CGFloat) -> CGRect {
+  /// Places the bar at the bottom of `view` with its capsule at most `maxWidth`
+  /// wide, as far from the leading safe area edge as the system puts it from
+  /// the bottom edge. Returns the frame of the capsule in `view`.
+  func layout(in view: UIView, maxWidth: CGFloat) -> CGRect {
     let bounds = view.bounds
     let height = bar.sizeThatFits(bounds.size).height
     let width = min(bounds.width, maxWidth + 2 * Self.barMargin)
@@ -47,6 +48,7 @@ final class StandaloneTabBar: NSObject, UITabBarDelegate {
     }
     guard !items.isNull else { return bar.frame }
     let capsule = items.insetBy(dx: -Self.capsuleInset, dy: -Self.capsuleInset)
+    let leading = view.safeAreaInsets.left + bounds.maxY - capsule.maxY
     bar.frame.origin.x += leading - capsule.minX
     return capsule.offsetBy(dx: leading - capsule.minX, dy: 0)
   }
