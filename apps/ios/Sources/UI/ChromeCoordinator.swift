@@ -59,7 +59,9 @@ final class ChromeCoordinator {
     applyTheme(state.theme)
     tabs.apply(state)
     if !barFrozen {
-      showBar(state, animated: state.tab == shownTab)
+      // During a back swipe the buttons are faded out: they change at once
+      // and fade back in.
+      showBar(state, animated: state.tab == shownTab && swipe == nil)
     }
     shownTab = state.tab
     // The pop of a back swipe brings a new entry: its buttons fade back in.
@@ -107,7 +109,7 @@ final class ChromeCoordinator {
   }
 
   /// A web push or pop slide starts or ends. During the slide the corner
-  /// buttons keep the old page; at the end they cross-fade to the latest
+  /// buttons keep the old page; at the end they animate to the latest
   /// state. A lost end thaws them after one second.
   private func transition(started: Bool) {
     // An end without a slide (a tab switch, the first mount) changes nothing.
@@ -122,10 +124,8 @@ final class ChromeCoordinator {
       }
       return
     }
-    guard let state = host.chrome.state, let page = tabs.page(for: state.tab) else { return }
-    UIView.transition(with: page.cornerButtons, duration: 0.2, options: .transitionCrossDissolve) {
-      self.showBar(state, animated: false)
-    }
+    guard let state = host.chrome.state else { return }
+    showBar(state, animated: true)
   }
 
   /// The window changed size (rotation, iPhone Duo posture, iPad split).
