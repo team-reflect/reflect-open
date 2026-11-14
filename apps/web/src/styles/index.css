@@ -433,11 +433,12 @@ html:root {
   padding-inline: var(--editor-content-gutter, max(2rem, calc((100% - 42rem) / 2)));
 }
 
-/* Mobile note-body gutter. This mirrors `.reflect-content-gutter`'s cascade
-   role with a fixed phone-sized inset: the class must be un-layered so it beats
-   `.reflect-editor { padding: 0; }` on the contenteditable itself. */
+/* Mobile note-body gutter: 1rem past the safe area, which on iPad also covers
+   an overlapping sidebar. This mirrors `.reflect-content-gutter`'s cascade
+   role: the class must be un-layered so it beats `.reflect-editor { padding: 0; }`
+   on the contenteditable itself. */
 .reflect-mobile-content-gutter {
-  @apply px-safe-or-4;
+  @apply px-safe-offset-4;
 }
 
 /* Heading weight and spacing override meowdown's `.ProseMirror h*` theme
