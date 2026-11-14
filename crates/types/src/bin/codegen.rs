@@ -2,7 +2,7 @@
 //! generated from the wire types. Run `pnpm gen:types`.
 
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use reflect_types::commands;
 use reflect_types::events::EventName;
@@ -32,6 +32,7 @@ fn main() {
             .register::<GraphImportProgress>()
             .register::<CoreStartConfig>()
             .register::<AssetResolveReply>()
+            .register::<commands::AssetReadBinaryArgs>()
             .register::<LinkCaptureEnvelope>()
             .register::<TextCaptureEnvelope>()
             .register::<CaptureWireMessage>()
@@ -146,7 +147,7 @@ fn swift(types: &Types) -> String {
 /// as a `Commands` struct for Swift.
 fn shell_commands() -> String {
     let mut out = String::from(
-        "\n/// The name of every command the Swift shell answers.\npublic enum ShellCommandName: String, CaseIterable, Sendable {\n",
+        "\n/// The name of every command the Swift shell answers.\npublic enum ShellCommandName: String, Sendable {\n",
     );
     for (ident, name) in commands::SHELL_COMMANDS {
         let case = camel_case(ident.split('_'));
@@ -272,7 +273,7 @@ fn drop_value(swift: &str) -> String {
     format!("{}{}", &swift[..start], &swift[end..])
 }
 
-fn write(path: &PathBuf, contents: &str) {
+fn write(path: &Path, contents: &str) {
     std::fs::create_dir_all(path.parent().expect("parent")).expect("create dir");
     std::fs::write(path, contents).expect("write");
 }

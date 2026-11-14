@@ -222,6 +222,35 @@ public struct AppStoreEnvironmentReply: Codable, Sendable, Equatable {
     }
 }
 
+/// The arguments of `asset_read_binary`, a command with a binary reply. The
+/// table holds JSON commands only.
+public struct AssetReadBinaryArgs: Codable, Sendable, Equatable {
+    public let path: String
+    public let generation: UInt64
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case generation = "generation"
+    }
+
+    public init(path: String, generation: UInt64) {
+        self.path = path
+        self.generation = generation
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.generation = try container.decode(UInt64.self, forKey: .generation)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(generation, forKey: .generation)
+    }
+}
+
 /// The answer to a `reflect-asset` request.
 public enum AssetResolveReply: Sendable, Equatable {
     case file(AssetResolveReplyFileData)
@@ -4307,7 +4336,7 @@ public enum CaptureConstants {
 }
 
 /// The name of every command the Swift shell answers.
-public enum ShellCommandName: String, CaseIterable, Sendable {
+public enum ShellCommandName: String, Sendable {
     case recordingStart = "plugin:recording|start_recording"
     case recordingStop = "plugin:recording|stop_recording"
     case recordingCancel = "plugin:recording|cancel_recording"

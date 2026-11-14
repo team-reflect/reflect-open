@@ -183,12 +183,8 @@ impl Core {
     ) -> AppResult<Reply> {
         match command {
             "asset_read_binary" => {
-                #[derive(serde::Deserialize)]
-                struct Args {
-                    path: String,
-                    generation: u64,
-                }
-                let Args { path, generation } = parse_args(command, args_json)?;
+                let reflect_types::commands::AssetReadBinaryArgs { path, generation } =
+                    parse_args(command, args_json)?;
                 return self.asset_read_binary(path, generation).map(Reply::Bytes);
             }
             "asset_upload_append" => {

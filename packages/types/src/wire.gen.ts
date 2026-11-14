@@ -55,6 +55,15 @@ export type AppStoreEnvironmentReply = {
 	environment: string,
 };
 
+/**
+ *  The arguments of `asset_read_binary`, a command with a binary reply. The
+ *  table holds JSON commands only.
+ */
+export type AssetReadBinaryArgs = {
+	path: string,
+	generation: number,
+};
+
 /**  The answer to a `reflect-asset` request. */
 export type AssetResolveReply = 
 /**

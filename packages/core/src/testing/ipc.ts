@@ -1,10 +1,10 @@
+import type { AssetReadBinaryArgs } from '@reflect/types'
 import type { LoggerService } from '../ports/logger-service.ts'
 import { createTestLoggerService } from './logger.ts'
 import { AppError } from '../errors.ts'
 import type { ZodType } from 'zod'
 import {
   createIpcBridgeService,
-  type AssetReadBinaryArgs,
   type IpcBridge,
   type IpcBridgeService,
   type PluginSubscription,

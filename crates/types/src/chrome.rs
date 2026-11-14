@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 // Only the TypeScript and Swift code builds it: Rust holds the type to
 // generate theirs.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(
     tag = "type",
     rename_all = "camelCase",
@@ -57,8 +56,7 @@ pub enum ChromeMessage {
 }
 
 /// The phase of a web push or pop slide.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum TransitionPhase {
     Start,
@@ -66,8 +64,7 @@ pub enum TransitionPhase {
 }
 
 /// The phase of a user back swipe.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum BackSwipePhase {
     Start,
@@ -76,8 +73,7 @@ pub enum BackSwipePhase {
 
 /// Whether the page shows its shell, or a full-screen page with no bars
 /// (onboarding, loading, the crash card).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ChromeKind {
     Shell,
@@ -85,8 +81,7 @@ pub enum ChromeKind {
 }
 
 /// The theme preference of the page.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ChromeTheme {
     System,
@@ -95,8 +90,7 @@ pub enum ChromeTheme {
 }
 
 /// A tab of the shell.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum ChromeTab {
     Daily,
@@ -105,16 +99,14 @@ pub enum ChromeTab {
 }
 
 /// Whether the history can move back and forward.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct HistoryState {
     pub back: bool,
     pub forward: bool,
 }
 
 /// What the iPad sidebar shows.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SidebarState {
     /// The row to select: a tab, `chat`, or a pinned note's path after
@@ -130,8 +122,7 @@ pub struct SidebarState {
 }
 
 /// A pinned note in the iPad sidebar.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct PinnedNote {
     pub path: String,
     /// The name the sidebar shows.
@@ -139,8 +130,7 @@ pub struct PinnedNote {
 }
 
 /// The `+` of a screen: Daily's capture menu, or one action.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum PlusState {
     /// The capture menu. `audio` is the audio memo phase, or none where the
@@ -151,8 +141,7 @@ pub enum PlusState {
 }
 
 /// The phase of the audio memo recorder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum AudioPhase {
     Idle,
@@ -164,8 +153,7 @@ pub enum AudioPhase {
 
 /// One row of a menu, or a section of rows, in the order the shell shows
 /// them.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum MenuItem {
     /// One row. specta-swift names its payload `MenuItemActionData`.
@@ -194,8 +182,7 @@ pub enum MenuItem {
 
 /// A confirmation the shell shows before it sends the item's intent: an
 /// action sheet (a popover on iPad) with one destructive button and Cancel.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct MenuConfirm {
     pub title: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -206,8 +193,7 @@ pub struct MenuConfirm {
 
 /// A native button that floats in a top corner of the page. A tap opens
 /// `menu` when it has one, and sends an `action` intent with `id` otherwise.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct BarButton {
     pub id: String,
     /// The label, also the accessibility label of an icon button.
@@ -220,8 +206,7 @@ pub struct BarButton {
 }
 
 /// The formatting toolbar of the focused editor.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolbarState {
     pub can_indent: bool,
@@ -233,8 +218,7 @@ pub struct ToolbarState {
 
 /// What the shell sends the page: a tap on a native control, or a change of
 /// the shell's layout.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(
     tag = "type",
     rename_all = "camelCase",
@@ -283,8 +267,7 @@ pub enum ChromeIntent {
 }
 
 /// The direction of a move in the history.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum HistoryDirection {
     Back,
@@ -292,8 +275,7 @@ pub enum HistoryDirection {
 }
 
 /// A command of the page's formatting toolbar.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum FormattingCommand {
     Slash,
@@ -309,8 +291,7 @@ pub enum FormattingCommand {
 }
 
 /// A file the user picked, for the editor to attach.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct IntentFile {
     pub name: String,
     /// The MIME type.
@@ -321,8 +302,7 @@ pub struct IntentFile {
 }
 
 /// A tap on the `+` (`tap`) or on one item of the capture menu.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum PlusCommand {
     Tap,
@@ -332,8 +312,7 @@ pub enum PlusCommand {
 }
 
 /// A tap in the iPad sidebar.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum SidebarIntent {
     Chat,

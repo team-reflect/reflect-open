@@ -76,13 +76,15 @@ runs on a blocking-pool thread, never on the main thread.
 A command that exists only on the desktop (windows, menus) is a
 `#[tauri::command]` in the Tauri crate. Its row goes in the `desktop` block as
 `module::name(args) -> Result`, and lists only the arguments the frontend
-sends. The Tauri handler is built from that block.
+sends. The Tauri handler is built from that block. Only the names are
+checked: the compiler does not compare the row with the function signature.
 
 A command that the Swift shell answers (`plugin:<name>|<command>`,
 `host.<command>`) goes in the `shell` block as
 `"name" => identifier(ArgsType) -> Result`. The arguments are one named type
 from `crates/types/src/shell.rs` (`NoArgs` for none), so Swift can decode
-them. Swift registers the handler under `ShellCommandName.<identifier>`.
+them. Swift registers the handler under the camelCase
+case of `ShellCommandName` (`recording_start` becomes `.recordingStart`).
 
 Then regenerate the TypeScript and Swift types and commit the output:
 

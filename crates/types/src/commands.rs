@@ -197,14 +197,17 @@ macro_rules! define_commands {
             #[allow(unused_imports)]
             use super::*;
 
-            /// The command's arguments and result.
-            #[cfg(feature = "codegen")]
-            #[derive(specta::Type)]
-            #[specta(inline)]
-            pub struct Signature {
-                pub args: $args,
-                pub result: $ret,
-            }
+            define_commands!(@signature $args, $ret);
+        }
+    };
+    (@signature $args:ty, $ret:ty) => {
+        /// The command's arguments and result.
+        #[cfg(feature = "codegen")]
+        #[derive(specta::Type)]
+        #[specta(inline)]
+        pub struct Signature {
+            pub args: $args,
+            pub result: $ret,
         }
     };
     (@one $method:ident ( $( $arg:ident : $ty:ty ),* ) -> $ret:ty) => {
@@ -224,16 +227,19 @@ macro_rules! define_commands {
             /// The command's result.
             pub type Result = $ret;
 
-            /// The command's arguments and result.
-            #[cfg(feature = "codegen")]
-            #[derive(specta::Type)]
-            #[specta(inline)]
-            pub struct Signature {
-                pub args: Args,
-                pub result: $ret,
-            }
+            define_commands!(@signature Args, $ret);
         }
     };
 }
 
 commands!(define_commands);
+
+/// The arguments of `asset_read_binary`, a command with a binary reply. The
+/// table holds JSON commands only.
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct AssetReadBinaryArgs {
+    pub path: String,
+    pub generation: u64,
+}

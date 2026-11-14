@@ -1,4 +1,4 @@
-import type { Commands, EventName } from '@reflect/types'
+import type { AssetReadBinaryArgs, Commands, EventName } from '@reflect/types'
 import type { MaybePromise } from '@reflect/utils'
 import type { ZodType } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
@@ -83,15 +83,6 @@ export interface IpcBridge {
 export interface PluginSubscription {
   ready: Promise<void>
   unlisten: Unlisten
-}
-
-/**
- * The arguments of `asset_read_binary`. The command table holds JSON commands
- * only, so this binary command is typed here.
- */
-export type AssetReadBinaryArgs = {
-  readonly path: string
-  readonly generation: number
 }
 
 /**

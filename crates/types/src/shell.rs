@@ -4,15 +4,13 @@
 use serde::{Deserialize, Serialize};
 
 /// `plugin:recording|start_recording` arguments.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct RecordingStartArgs {
     pub request: StartRecordingOptions,
 }
 
 /// How a recording session runs.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StartRecordingOptions {
     /// Rotate the recorder after this much audio, natively, so rotation holds
@@ -25,8 +23,7 @@ pub struct StartRecordingOptions {
 }
 
 /// The identity every segment of a session shares.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordingSessionStart {
     /// Epoch milliseconds.
@@ -34,8 +31,7 @@ pub struct RecordingSessionStart {
 }
 
 /// A session's final segment, still in staging.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordingStopResponse {
     /// Absolute path of the staged `.m4a`, already `-end`-marked.
@@ -48,8 +44,7 @@ pub struct RecordingStopResponse {
 }
 
 /// Whether a session runs, and its recorded length so far.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordingStatus {
     pub recording: bool,
@@ -58,8 +53,7 @@ pub struct RecordingStatus {
 }
 
 /// One staged segment file.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StagedRecordingFile {
     /// Absolute path of the staged `.m4a`.
@@ -73,30 +67,26 @@ pub struct StagedRecordingFile {
 }
 
 /// `plugin:recording|list_staged` result.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct StagedRecordingList {
     pub files: Vec<StagedRecordingFile>,
 }
 
 /// `plugin:recording|delete_staged` arguments.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct RecordingDeleteStagedArgs {
     pub request: StagedRecordingPath,
 }
 
 /// One staged segment file, by its absolute path.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct StagedRecordingPath {
     pub path: String,
 }
 
 /// `plugin:recording:recordingLevel`, about 10 times a second while
 /// recording in the foreground.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordingLevelEvent {
     /// Linear input level from 0 to 1.
@@ -108,8 +98,7 @@ pub struct RecordingLevelEvent {
 /// `plugin:recording:recordingSegment`: a finished segment of a session that
 /// still records. The final segment arrives in the stop result or in
 /// `recordingStopped`.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordingSegmentEvent {
     pub path: String,
@@ -118,8 +107,7 @@ pub struct RecordingSegmentEvent {
 }
 
 /// `plugin:recording:recordingStopped`: the shell ended a session.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordingStoppedEvent {
     pub path: String,
@@ -132,23 +120,20 @@ pub struct RecordingStoppedEvent {
 
 /// `plugin:recording:nativeAction`: an OS entry point asked for something
 /// only the web view can present.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct RecordingNativeActionEvent {
     /// Currently only `recordAudio`.
     pub action: String,
 }
 
 /// `plugin:web-auth|start` arguments.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct WebAuthStartArgs {
     pub payload: WebAuthOptions,
 }
 
 /// A system web sign-in.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WebAuthOptions {
     /// The page that starts the sign-in.
@@ -161,8 +146,7 @@ pub struct WebAuthOptions {
 }
 
 /// `plugin:web-auth|start` result.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct WebAuthCallback {
     /// The callback URL; none when the user cancels.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -170,16 +154,14 @@ pub struct WebAuthCallback {
 }
 
 /// `plugin:app-store|get_environment` result.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct AppStoreEnvironmentReply {
     /// `Production`, `Sandbox` or `Xcode`.
     pub environment: String,
 }
 
 /// The kind of store product.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum IapProductType {
     /// An auto-renewable subscription.
@@ -187,15 +169,13 @@ pub enum IapProductType {
 }
 
 /// `plugin:iap|get_products` arguments.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct IapProductsArgs {
     pub payload: IapProductsQuery,
 }
 
 /// The products to look up.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct IapProductsQuery {
     pub product_ids: Vec<String>,
@@ -203,15 +183,13 @@ pub struct IapProductsQuery {
 }
 
 /// `plugin:iap|get_products` result.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct IapProducts {
     pub products: Vec<IapProduct>,
 }
 
 /// One store product.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct IapProduct {
     pub product_id: String,
@@ -221,15 +199,13 @@ pub struct IapProduct {
 }
 
 /// `plugin:iap|purchase` and `plugin:iap|get_product_status` arguments.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct IapProductArgs {
     pub payload: IapProductQuery,
 }
 
 /// One product.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct IapProductQuery {
     pub product_id: String,
@@ -237,8 +213,7 @@ pub struct IapProductQuery {
 }
 
 /// `plugin:iap|get_product_status` result.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct IapProductStatus {
     /// Whether a verified transaction entitles the user to the product now.
@@ -246,8 +221,7 @@ pub struct IapProductStatus {
 }
 
 /// The severity of a `host.log` line.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "lowercase")]
 pub enum HostLogLevel {
     Error,
@@ -256,22 +230,19 @@ pub enum HostLogLevel {
 }
 
 /// `host.log` arguments: one line of the web app.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct HostLogArgs {
     pub level: HostLogLevel,
     pub message: String,
 }
 
 /// `host.open_url` arguments.
-#[derive(Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Serialize, Deserialize, specta::Type)]
 pub struct HostOpenUrlArgs {
     /// An absolute URL.
     pub url: String,
 }
 
 /// The arguments of a command that takes none.
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "codegen", derive(specta::Type))]
+#[derive(Default, Serialize, Deserialize, specta::Type)]
 pub struct NoArgs {}

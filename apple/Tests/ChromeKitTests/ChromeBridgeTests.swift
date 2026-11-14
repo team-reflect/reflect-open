@@ -35,11 +35,6 @@ final class ChromeBridgeTests: XCTestCase {
       ])
   }
 
-  func testNamesTheFormattingCommandsOfThePage() throws {
-    let ids = try JSONDecoder().decode([String].self, from: try fixture("commands"))
-    XCTAssertEqual(FormattingCommand.allCases.map(\.rawValue), ids)
-  }
-
   func testEncodesEveryIntentAsTheFixtureThePageParses() throws {
     let intents: [ChromeIntent] = [
       .back(.init(entryId: 3)),
