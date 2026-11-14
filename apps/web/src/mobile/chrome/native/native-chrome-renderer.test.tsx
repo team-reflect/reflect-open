@@ -76,4 +76,24 @@ describe('NativeChromeRenderer', () => {
       expect(back()).not.toBeNull()
     })
   })
+  it('moves the header row past the window controls', async () => {
+    const host = createTestNativeChromeHost()
+    const view = await renderInApp(<ChromeTopBar title={<h1>Tag</h1>} />, nativeChromeOptions(host))
+    const left = (): number => view.container.querySelector('h1')!.getBoundingClientRect().left
+    await vi.waitFor(() => {
+      expect(host.posted).toContainEqual({ type: 'chromeReady' })
+    })
+    const start = left()
+
+    host.sendIntent({ type: 'windowControls', width: 88 })
+    await vi.waitFor(() => {
+      expect(left()).toBeGreaterThanOrEqual(start + 88)
+    })
+    expect(document.documentElement.style.getPropertyValue('--window-controls-width')).toBe('88px')
+
+    host.sendIntent({ type: 'windowControls', width: 0 })
+    await vi.waitFor(() => {
+      expect(left()).toBe(start)
+    })
+  })
 })

@@ -21,6 +21,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
   /// Called when the corner buttons move between the page's header row
   /// (`true`) and the row of the floating tab bar (`false`).
   var onCornersInHeaderRow: (Bool) -> Void = { _ in }
+  /// Called when the window controls' reach into the page's top row changes.
+  var onWindowControlsWidth: (CGFloat) -> Void = { _ in }
   /// The last value sent to `onCornersInHeaderRow`.
   private var cornersInHeaderRow = true
   /// Called when the iPad sidebar shows (`true`) or hides (`false`), and
@@ -107,6 +109,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
     isTabBarHidden = true
     page.attach(webView)
     plus.send = { [weak self] command in self?.sendPlus(command) }
+    page.onWindowControlsWidth = { [weak self] width in self?.onWindowControlsWidth(width) }
     standalone.bar.isHidden = true
     registerForTraitChanges([UITraitHorizontalSizeClass.self]) {
       (self: Self, _: UITraitCollection) in

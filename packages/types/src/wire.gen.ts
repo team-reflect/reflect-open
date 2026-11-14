@@ -267,6 +267,11 @@ export type ChromeIntent = { type: "back"; entryId: number } |
  *  of the floating tab bar above it.
  */
 { type: "layout"; cornersInHeaderRow: boolean } | 
+/**
+ *  How far the window controls reach into the page's top row from its
+ *  leading edge, in points. Zero outside a window.
+ */
+{ type: "windowControls"; width: number } | 
 /**  A tap on the `+` of the screen of `entry_id`. */
 { type: "plus"; entryId: number; command: PlusCommand } | 
 /**  Whether the iPad sidebar shows, or none without a sidebar. */

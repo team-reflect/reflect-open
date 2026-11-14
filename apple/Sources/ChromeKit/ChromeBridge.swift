@@ -40,6 +40,17 @@ public final class ChromeBridge {
     }
   }
 
+  /// How far the window controls reach into the page's top row, in points.
+  /// The page starts with `0`; the bridge sends a `windowControls` intent
+  /// when the value changes, and when a page gets ready while it is not `0`.
+  public var windowControlsWidth: Double = 0 {
+    didSet {
+      if windowControlsWidth != oldValue {
+        send(.windowControls(.init(width: windowControlsWidth)))
+      }
+    }
+  }
+
   /// Whether the iPad sidebar shows, or `nil` without a sidebar. The page
   /// starts with `nil`; the bridge sends a `sidebarVisible` intent when the
   /// value changes, and when a page gets ready while it is not `nil`.
@@ -73,6 +84,9 @@ public final class ChromeBridge {
       isReady = true
       if !cornersInHeaderRow {
         send(.layout(.init(cornersInHeaderRow: false)))
+      }
+      if windowControlsWidth != 0 {
+        send(.windowControls(.init(width: windowControlsWidth)))
       }
       if let sidebarVisible {
         send(.sidebarVisible(.init(visible: sidebarVisible)))

@@ -29,6 +29,8 @@ final class WebPageController: UIViewController {
   var topRowCenter: CGFloat? {
     didSet { updateRowCenter() }
   }
+  /// Called when the window controls' reach into the top row changes.
+  var onWindowControlsWidth: (CGFloat) -> Void = { _ in }
 
   /// The buttons on screen, so a state with the same buttons keeps them,
   /// and an open menu stays open.
@@ -90,17 +92,22 @@ final class WebPageController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    let constant = Self.margin + windowControlsWidth
+    let width = windowControlsWidth
+    let constant = Self.margin + width
     if leadingEdge.constant != constant {
       leadingEdge.constant = constant
+      onWindowControlsWidth(width)
     }
   }
 
   /// How far a window's controls reach past the leading safe area, in the
-  /// row of the floating tab bar. The page's own safe area starts under that
-  /// row, so it leaves the controls out.
+  /// top row. The safe area leaves the controls out. A window as large as
+  /// the screen has no controls; its corner insets come from the display's
+  /// round corners.
   private var windowControlsWidth: CGFloat {
-    guard #available(iOS 26, *), topRowCenter != nil, let window = view.window else { return 0 }
+    guard #available(iOS 26, *), let window = view.window,
+      window.bounds.size != window.screen.bounds.size
+    else { return 0 }
     let controls = window.edgeInsets(for: .safeArea(cornerAdaptation: .horizontal)).left
     let start = view.convert(CGPoint.zero, to: window).x + view.safeAreaInsets.left
     return max(0, controls - start)
