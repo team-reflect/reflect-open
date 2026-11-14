@@ -26,7 +26,7 @@ enum SidebarRow {
 /// the graph and Settings at the bottom. Chat also shows in the top tab bar.
 /// The page sends what it shows and runs every tap.
 extension ChromeTabController: UITabBarController.Sidebar.Delegate {
-  /// The tabs from `main` with the sidebar-only rows around them.
+  /// The tabs from `main` with Search, Chat, and the pinned notes around them.
   func makeSidebarTabs(main: () -> [UITab]) -> [UITab] {
     let search = UISearchTab { _ in TabPlaceholder() }
     let chat = makeTab(

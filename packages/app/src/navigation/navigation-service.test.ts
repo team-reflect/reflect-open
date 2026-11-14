@@ -313,6 +313,16 @@ describe('NavigationService', () => {
   })
 
   describe('sections', () => {
+    it('puts a Chat navigation in the section set for Chat', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'chat' })
+      expect(navigation.get().section).toBe('chat')
+      navigation.setChatSection('all')
+      navigation.navigate({ kind: 'tasks' })
+      navigation.navigate({ kind: 'chat' })
+      expect(navigation.get().section).toBe('all')
+    })
+
     it('gives a root its own section and a note the current section', () => {
       const navigation = createNavigationService()
       expect(navigation.get().section).toBe('daily')
