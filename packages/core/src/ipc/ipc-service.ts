@@ -11,8 +11,8 @@ import type { Unlisten } from '../unlisten.ts'
 export const INDEX_WRITTEN_EVENT = 'index:written' satisfies EventName
 
 /**
- * A command from the generated command table: the Rust core or the desktop
- * shell answers it.
+ * A command from the generated command table: the Rust core, the desktop
+ * shell or the Swift shell answers it.
  */
 export type CommandName = keyof Commands
 
@@ -108,17 +108,6 @@ export interface IpcBridgeService {
     schema: ZodType<TOutput, unknown>,
   ): Promise<TOutput>
   /**
-   * Invoke a command outside the command table (Swift shell commands,
-   * plugins, calendar) and validate the whole response. The schema input is
-   * `unknown`, not `TOutput`: schemas that normalize (`.catch`, `.default`)
-   * have a wider input type than output.
-   */
-  callRaw<TOutput>(
-    command: string,
-    args: Record<string, unknown>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput>
-  /**
    * Invoke a command whose reply is raw bytes (`asset_read_binary`). Rejects
    * with a `parse` {@link AppError} when the reply is not an `ArrayBuffer`.
    */
@@ -193,14 +182,6 @@ class IpcBridgeServiceImpl implements IpcBridgeService {
     const raw = await this.#invoke(command, args)
     // Rust generates the result type from the value it serializes.
     return schema === undefined ? raw : parseResponse(command, raw, schema)
-  }
-
-  async callRaw<TOutput>(
-    command: string,
-    args: Record<string, unknown>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
-    return parseResponse(command, await this.#invoke(command, args), schema)
   }
 
   async callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer> {

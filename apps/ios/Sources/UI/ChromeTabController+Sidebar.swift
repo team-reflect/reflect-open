@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 
 /// The identifiers of the sidebar's rows beyond the three tabs.
@@ -12,7 +13,9 @@ enum SidebarRow {
   static func intent(for tab: UITab) -> SidebarIntent? {
     if tab is UISearchTab { return .search }
     if tab.identifier == chat { return .chat }
-    if tab.identifier.hasPrefix(pinnedPrefix) { return .openNote(path(of: tab.identifier)) }
+    if tab.identifier.hasPrefix(pinnedPrefix) {
+      return .openNote(.init(path: path(of: tab.identifier)))
+    }
     return nil
   }
 
@@ -40,8 +43,8 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
       guard let self, self.selectedTab?.parent === self.pinnedGroup else { return }
       self.placeStage()
     }
-    footer.onMenu = { [weak self] id in self?.send(.sidebar(.menu(id))) }
-    footer.onSettings = { [weak self] in self?.send(.sidebar(.settings)) }
+    footer.onMenu = { [weak self] id in self?.send(.sidebar(.init(command: .menu(.init(id: id))))) }
+    footer.onSettings = { [weak self] in self?.send(.sidebar(.init(command: .settings))) }
     return [search] + main() + [chat, pinnedGroup]
   }
 
@@ -139,10 +142,10 @@ extension ChromeTabController: UITabBarController.Sidebar.Delegate {
     let open = sidebarState?.selection == tab.identifier
     return UIContextMenuConfiguration(actionProvider: { [weak self] _ in
       let share = UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) {
-        _ in self?.send(.sidebar(.share(path)))
+        _ in self?.send(.sidebar(.init(command: .share(.init(path: path)))))
       }
       let unpin = UIAction(title: "Unpin", image: UIImage(systemName: "pin.slash")) { _ in
-        self?.send(.sidebar(.unpin(path)))
+        self?.send(.sidebar(.init(command: .unpin(.init(path: path)))))
       }
       return UIMenu(children: open ? [share, unpin] : [unpin])
     })

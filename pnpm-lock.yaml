@@ -193,6 +193,9 @@ importers:
       '@reflect/design-system':
         specifier: workspace:*
         version: link:../../design-system
+      '@reflect/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@reflect/utils':
         specifier: workspace:*
         version: link:../../packages/utils

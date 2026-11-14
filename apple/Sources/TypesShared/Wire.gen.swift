@@ -4,7 +4,7 @@ import Foundation
 
 /// Where the installed skill file stands relative to what this app would
 /// write today.
-public enum AgentSkillInstallState: String, Codable, Sendable, Equatable {
+public enum AgentSkillInstallState: String, Codable, Sendable, Equatable, CaseIterable {
     case missing = "missing"
     case current = "current"
     case stale = "stale"
@@ -199,6 +199,29 @@ extension AppError: Codable {
 }
 
 
+/// `plugin:app-store|get_environment` result.
+public struct AppStoreEnvironmentReply: Codable, Sendable, Equatable {
+    public let environment: String
+
+    private enum CodingKeys: String, CodingKey {
+        case environment = "environment"
+    }
+
+    public init(environment: String) {
+        self.environment = environment
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.environment = try container.decode(String.self, forKey: .environment)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(environment, forKey: .environment)
+    }
+}
+
 /// The answer to a `reflect-asset` request.
 public enum AssetResolveReply: Sendable, Equatable {
     case file(AssetResolveReplyFileData)
@@ -275,6 +298,64 @@ extension AssetResolveReply: Codable {
 }
 
 
+/// The phase of the audio memo recorder.
+public enum AudioPhase: String, Codable, Sendable, Equatable, CaseIterable {
+    case idle = "idle"
+    case requesting = "requesting"
+    case recording = "recording"
+    case transcribing = "transcribing"
+    case error = "error"
+}
+
+/// The phase of a user back swipe.
+public enum BackSwipePhase: String, Codable, Sendable, Equatable, CaseIterable {
+    case start = "start"
+    case cancel = "cancel"
+}
+
+/// A native button that floats in a top corner of the page. A tap opens
+/// `menu` when it has one, and sends an `action` intent with `id` otherwise.
+public struct BarButton: Codable, Sendable, Equatable {
+    public let id: String
+    public let title: String
+    public let icon: String?
+    public let menu: [MenuItem]?
+
+    private enum CodingKeys: String, CodingKey {
+        case id = "id"
+        case title = "title"
+        case icon = "icon"
+        case menu = "menu"
+    }
+
+    public init(id: String, title: String, icon: String?, menu: [MenuItem]?) {
+        self.id = id
+        self.title = title
+        self.icon = icon
+        self.menu = menu
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        self.menu = try container.decodeIfPresent([MenuItem].self, forKey: .menu)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        if let icon = icon {
+            try container.encode(icon, forKey: .icon)
+        }
+        if let menu = menu {
+            try container.encode(menu, forKey: .menu)
+        }
+    }
+}
+
 /// The first and last byte of a single-range `Range` header.
 public struct ByteRange: Codable, Sendable, Equatable {
     public let start: UInt64
@@ -347,7 +428,7 @@ public struct CalendarAttendee: Codable, Sendable, Equatable {
 }
 
 /// An attendee's response to an invite.
-public enum CalendarAttendeeStatus: String, Codable, Sendable, Equatable {
+public enum CalendarAttendeeStatus: String, Codable, Sendable, Equatable, CaseIterable {
     case accepted = "accepted"
     case declined = "declined"
     case tentative = "tentative"
@@ -357,7 +438,7 @@ public enum CalendarAttendeeStatus: String, Codable, Sendable, Equatable {
 
 /// The EventKit authorization state for events. Only `FullAccess` lets
 /// Reflect read events.
-public enum CalendarAuthorizationStatus: String, Codable, Sendable, Equatable {
+public enum CalendarAuthorizationStatus: String, Codable, Sendable, Equatable, CaseIterable {
     case notDetermined = "notDetermined"
     case restricted = "restricted"
     case denied = "denied"
@@ -366,7 +447,7 @@ public enum CalendarAuthorizationStatus: String, Codable, Sendable, Equatable {
 }
 
 /// How an event blocks the user's time.
-public enum CalendarAvailability: String, Codable, Sendable, Equatable {
+public enum CalendarAvailability: String, Codable, Sendable, Equatable, CaseIterable {
     case busy = "busy"
     case free = "free"
     case tentative = "tentative"
@@ -530,7 +611,7 @@ public struct CaptureAck: Codable, Sendable, Equatable {
 }
 
 /// Why a capture was not spooled.
-public enum CaptureErrorCode: String, Codable, Sendable, Equatable {
+public enum CaptureErrorCode: String, Codable, Sendable, Equatable, CaseIterable {
     case noGraph = "no-graph"
     case invalidPayload = "invalid-payload"
     case io = "io"
@@ -577,7 +658,7 @@ public struct CapturePointer: Codable, Sendable, Equatable {
 }
 
 /// Who produced a link capture.
-public enum CaptureSource: String, Codable, Sendable, Equatable {
+public enum CaptureSource: String, Codable, Sendable, Equatable, CaseIterable {
     case Extension = "extension"
     case iosShare = "ios-share"
 }
@@ -614,7 +695,7 @@ public struct CaptureWireMessage: Codable, Sendable, Equatable {
 }
 
 /// What happened to a graph file. Serializes as `"upsert"` or `"remove"`.
-public enum ChangeKind: String, Codable, Sendable, Equatable {
+public enum ChangeKind: String, Codable, Sendable, Equatable, CaseIterable {
     case upsert = "upsert"
     case remove = "remove"
 }
@@ -748,6 +829,356 @@ public struct ChatMessageRow: Codable, Sendable, Equatable {
     }
 }
 
+/// What the shell sends the page: a tap on a native control, or a change of
+/// the shell's layout.
+public enum ChromeIntent: Sendable, Equatable {
+    case back(ChromeIntentBackData)
+    case history(ChromeIntentHistoryData)
+    case tab(ChromeIntentTabData)
+    case action(ChromeIntentActionData)
+    case command(ChromeIntentCommandData)
+    case files(ChromeIntentFilesData)
+    case layout(ChromeIntentLayoutData)
+    case plus(ChromeIntentPlusData)
+    case sidebarVisible(ChromeIntentSidebarvisibleData)
+    case sidebar(ChromeIntentSidebarData)
+}
+public struct ChromeIntentBackData: Codable, Sendable, Equatable {
+    public let entryId: Int
+
+    public init(entryId: Int) {
+        self.entryId = entryId
+    }
+}
+
+public struct ChromeIntentHistoryData: Codable, Sendable, Equatable {
+    public let entryId: Int
+    public let direction: HistoryDirection
+
+    public init(entryId: Int, direction: HistoryDirection) {
+        self.entryId = entryId
+        self.direction = direction
+    }
+}
+
+public struct ChromeIntentTabData: Codable, Sendable, Equatable {
+    public let tab: ChromeTab
+
+    public init(tab: ChromeTab) {
+        self.tab = tab
+    }
+}
+
+public struct ChromeIntentActionData: Codable, Sendable, Equatable {
+    public let entryId: Int
+    public let id: String
+
+    public init(entryId: Int, id: String) {
+        self.entryId = entryId
+        self.id = id
+    }
+}
+
+public struct ChromeIntentCommandData: Codable, Sendable, Equatable {
+    public let id: FormattingCommand
+
+    public init(id: FormattingCommand) {
+        self.id = id
+    }
+}
+
+public struct ChromeIntentFilesData: Codable, Sendable, Equatable {
+    public let files: [IntentFile]
+
+    public init(files: [IntentFile]) {
+        self.files = files
+    }
+}
+
+public struct ChromeIntentLayoutData: Codable, Sendable, Equatable {
+    public let cornersInHeaderRow: Bool
+
+    public init(cornersInHeaderRow: Bool) {
+        self.cornersInHeaderRow = cornersInHeaderRow
+    }
+}
+
+public struct ChromeIntentPlusData: Codable, Sendable, Equatable {
+    public let entryId: Int
+    public let command: PlusCommand
+
+    public init(entryId: Int, command: PlusCommand) {
+        self.entryId = entryId
+        self.command = command
+    }
+}
+
+public struct ChromeIntentSidebarvisibleData: Codable, Sendable, Equatable {
+    public let visible: Bool?
+
+    public init(visible: Bool?) {
+        self.visible = visible
+    }
+}
+
+public struct ChromeIntentSidebarData: Codable, Sendable, Equatable {
+    public let command: SidebarIntent
+
+    public init(command: SidebarIntent) {
+        self.command = command
+    }
+}
+
+// MARK: - ChromeIntent Codable Implementation
+extension ChromeIntent: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("type"))
+        switch tag {
+        case "back":
+            let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
+            self = .back(ChromeIntentBackData(entryId: entryIdValue))
+        case "history":
+            let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
+            let directionValue = try container.decode(HistoryDirection.self, forKey: CodingKeys("direction"))
+            self = .history(ChromeIntentHistoryData(entryId: entryIdValue, direction: directionValue))
+        case "tab":
+            let tabValue = try container.decode(ChromeTab.self, forKey: CodingKeys("tab"))
+            self = .tab(ChromeIntentTabData(tab: tabValue))
+        case "action":
+            let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
+            let idValue = try container.decode(String.self, forKey: CodingKeys("id"))
+            self = .action(ChromeIntentActionData(entryId: entryIdValue, id: idValue))
+        case "command":
+            let idValue = try container.decode(FormattingCommand.self, forKey: CodingKeys("id"))
+            self = .command(ChromeIntentCommandData(id: idValue))
+        case "files":
+            let filesValue = try container.decode([IntentFile].self, forKey: CodingKeys("files"))
+            self = .files(ChromeIntentFilesData(files: filesValue))
+        case "layout":
+            let cornersInHeaderRowValue = try container.decode(Bool.self, forKey: CodingKeys("cornersInHeaderRow"))
+            self = .layout(ChromeIntentLayoutData(cornersInHeaderRow: cornersInHeaderRowValue))
+        case "plus":
+            let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
+            let commandValue = try container.decode(PlusCommand.self, forKey: CodingKeys("command"))
+            self = .plus(ChromeIntentPlusData(entryId: entryIdValue, command: commandValue))
+        case "sidebarVisible":
+            let visibleValue = try container.decodeIfPresent(Bool.self, forKey: CodingKeys("visible"))
+            self = .sidebarVisible(ChromeIntentSidebarvisibleData(visible: visibleValue))
+        case "sidebar":
+            let commandValue = try container.decode(SidebarIntent.self, forKey: CodingKeys("command"))
+            self = .sidebar(ChromeIntentSidebarData(command: commandValue))
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .back(let data):
+            try container.encode("back", forKey: CodingKeys("type"))
+            try container.encode(data.entryId, forKey: CodingKeys("entryId"))
+        case .history(let data):
+            try container.encode("history", forKey: CodingKeys("type"))
+            try container.encode(data.entryId, forKey: CodingKeys("entryId"))
+            try container.encode(data.direction, forKey: CodingKeys("direction"))
+        case .tab(let data):
+            try container.encode("tab", forKey: CodingKeys("type"))
+            try container.encode(data.tab, forKey: CodingKeys("tab"))
+        case .action(let data):
+            try container.encode("action", forKey: CodingKeys("type"))
+            try container.encode(data.entryId, forKey: CodingKeys("entryId"))
+            try container.encode(data.id, forKey: CodingKeys("id"))
+        case .command(let data):
+            try container.encode("command", forKey: CodingKeys("type"))
+            try container.encode(data.id, forKey: CodingKeys("id"))
+        case .files(let data):
+            try container.encode("files", forKey: CodingKeys("type"))
+            try container.encode(data.files, forKey: CodingKeys("files"))
+        case .layout(let data):
+            try container.encode("layout", forKey: CodingKeys("type"))
+            try container.encode(data.cornersInHeaderRow, forKey: CodingKeys("cornersInHeaderRow"))
+        case .plus(let data):
+            try container.encode("plus", forKey: CodingKeys("type"))
+            try container.encode(data.entryId, forKey: CodingKeys("entryId"))
+            try container.encode(data.command, forKey: CodingKeys("command"))
+        case .sidebarVisible(let data):
+            try container.encode("sidebarVisible", forKey: CodingKeys("type"))
+            try container.encode(data.visible, forKey: CodingKeys("visible"))
+        case .sidebar(let data):
+            try container.encode("sidebar", forKey: CodingKeys("type"))
+            try container.encode(data.command, forKey: CodingKeys("command"))
+        }
+    }
+}
+
+
+/// Whether the page shows its shell, or a full-screen page with no bars
+/// (onboarding, loading, the crash card).
+public enum ChromeKind: String, Codable, Sendable, Equatable, CaseIterable {
+    case shell = "shell"
+    case none = "none"
+}
+
+/// A message the page posts to the shell.
+public enum ChromeMessage: Sendable, Equatable {
+    case state(ChromeMessageStateData)
+    case transition(ChromeMessageTransitionData)
+    case backSwipe(ChromeMessageBackswipeData)
+    case chromeReady
+}
+public struct ChromeMessageStateData: Codable, Sendable, Equatable {
+    public let generation: Int
+    public let entryId: Int
+    public let chrome: ChromeKind
+    public let routeKind: String?
+    public let tab: ChromeTab
+    public let canBack: Bool
+    public let leading: [BarButton]
+    public let trailing: [BarButton]
+    public let keyboardVisible: Bool
+    public let modal: Bool
+    public let toolbar: ToolbarState?
+    public let plus: PlusState?
+    public let sidebar: SidebarState?
+    public let history: HistoryState?
+    public let theme: ChromeTheme
+
+    public init(generation: Int, entryId: Int, chrome: ChromeKind, routeKind: String?, tab: ChromeTab, canBack: Bool, leading: [BarButton], trailing: [BarButton], keyboardVisible: Bool, modal: Bool, toolbar: ToolbarState?, plus: PlusState?, sidebar: SidebarState?, history: HistoryState?, theme: ChromeTheme) {
+        self.generation = generation
+        self.entryId = entryId
+        self.chrome = chrome
+        self.routeKind = routeKind
+        self.tab = tab
+        self.canBack = canBack
+        self.leading = leading
+        self.trailing = trailing
+        self.keyboardVisible = keyboardVisible
+        self.modal = modal
+        self.toolbar = toolbar
+        self.plus = plus
+        self.sidebar = sidebar
+        self.history = history
+        self.theme = theme
+    }
+}
+
+public struct ChromeMessageTransitionData: Codable, Sendable, Equatable {
+    public let phase: TransitionPhase
+
+    public init(phase: TransitionPhase) {
+        self.phase = phase
+    }
+}
+
+public struct ChromeMessageBackswipeData: Codable, Sendable, Equatable {
+    public let phase: BackSwipePhase
+
+    public init(phase: BackSwipePhase) {
+        self.phase = phase
+    }
+}
+
+// MARK: - ChromeMessage Codable Implementation
+extension ChromeMessage: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("type"))
+        switch tag {
+        case "state":
+            let generationValue = try container.decode(Int.self, forKey: CodingKeys("generation"))
+            let entryIdValue = try container.decode(Int.self, forKey: CodingKeys("entryId"))
+            let chromeValue = try container.decode(ChromeKind.self, forKey: CodingKeys("chrome"))
+            let routeKindValue = try container.decodeIfPresent(String.self, forKey: CodingKeys("routeKind"))
+            let tabValue = try container.decode(ChromeTab.self, forKey: CodingKeys("tab"))
+            let canBackValue = try container.decode(Bool.self, forKey: CodingKeys("canBack"))
+            let leadingValue = try container.decode([BarButton].self, forKey: CodingKeys("leading"))
+            let trailingValue = try container.decode([BarButton].self, forKey: CodingKeys("trailing"))
+            let keyboardVisibleValue = try container.decode(Bool.self, forKey: CodingKeys("keyboardVisible"))
+            let modalValue = try container.decode(Bool.self, forKey: CodingKeys("modal"))
+            let toolbarValue = try container.decodeIfPresent(ToolbarState.self, forKey: CodingKeys("toolbar"))
+            let plusValue = try container.decodeIfPresent(PlusState.self, forKey: CodingKeys("plus"))
+            let sidebarValue = try container.decodeIfPresent(SidebarState.self, forKey: CodingKeys("sidebar"))
+            let historyValue = try container.decodeIfPresent(HistoryState.self, forKey: CodingKeys("history"))
+            let themeValue = try container.decode(ChromeTheme.self, forKey: CodingKeys("theme"))
+            self = .state(ChromeMessageStateData(generation: generationValue, entryId: entryIdValue, chrome: chromeValue, routeKind: routeKindValue, tab: tabValue, canBack: canBackValue, leading: leadingValue, trailing: trailingValue, keyboardVisible: keyboardVisibleValue, modal: modalValue, toolbar: toolbarValue, plus: plusValue, sidebar: sidebarValue, history: historyValue, theme: themeValue))
+        case "transition":
+            let phaseValue = try container.decode(TransitionPhase.self, forKey: CodingKeys("phase"))
+            self = .transition(ChromeMessageTransitionData(phase: phaseValue))
+        case "backSwipe":
+            let phaseValue = try container.decode(BackSwipePhase.self, forKey: CodingKeys("phase"))
+            self = .backSwipe(ChromeMessageBackswipeData(phase: phaseValue))
+        case "chromeReady":
+            self = .chromeReady
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .state(let data):
+            try container.encode("state", forKey: CodingKeys("type"))
+            try container.encode(data.generation, forKey: CodingKeys("generation"))
+            try container.encode(data.entryId, forKey: CodingKeys("entryId"))
+            try container.encode(data.chrome, forKey: CodingKeys("chrome"))
+            try container.encode(data.routeKind, forKey: CodingKeys("routeKind"))
+            try container.encode(data.tab, forKey: CodingKeys("tab"))
+            try container.encode(data.canBack, forKey: CodingKeys("canBack"))
+            try container.encode(data.leading, forKey: CodingKeys("leading"))
+            try container.encode(data.trailing, forKey: CodingKeys("trailing"))
+            try container.encode(data.keyboardVisible, forKey: CodingKeys("keyboardVisible"))
+            try container.encode(data.modal, forKey: CodingKeys("modal"))
+            try container.encode(data.toolbar, forKey: CodingKeys("toolbar"))
+            try container.encode(data.plus, forKey: CodingKeys("plus"))
+            try container.encode(data.sidebar, forKey: CodingKeys("sidebar"))
+            try container.encode(data.history, forKey: CodingKeys("history"))
+            try container.encode(data.theme, forKey: CodingKeys("theme"))
+        case .transition(let data):
+            try container.encode("transition", forKey: CodingKeys("type"))
+            try container.encode(data.phase, forKey: CodingKeys("phase"))
+        case .backSwipe(let data):
+            try container.encode("backSwipe", forKey: CodingKeys("type"))
+            try container.encode(data.phase, forKey: CodingKeys("phase"))
+        case .chromeReady:
+            try container.encode("chromeReady", forKey: CodingKeys("type"))
+        }
+    }
+}
+
+
+/// A tab of the shell.
+public enum ChromeTab: String, Codable, Sendable, Equatable, CaseIterable {
+    case daily = "daily"
+    case all = "all"
+    case tasks = "tasks"
+}
+
+/// The theme preference of the page.
+public enum ChromeTheme: String, Codable, Sendable, Equatable, CaseIterable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+}
+
 /// Result of a commit attempt. `committed: false` means the tree was clean.
 public struct CommitOutcome: Codable, Sendable, Equatable {
     public let committed: Bool
@@ -831,7 +1262,7 @@ public struct ContactMatch: Codable, Sendable, Equatable {
 }
 
 /// The Contacts permission state, as the settings UI consumes it.
-public enum ContactsAuthorization: String, Codable, Sendable, Equatable {
+public enum ContactsAuthorization: String, Codable, Sendable, Equatable, CaseIterable {
     case notDetermined = "notDetermined"
     case restricted = "restricted"
     case denied = "denied"
@@ -1045,7 +1476,7 @@ public struct EmbeddedChunk: Codable, Sendable, Equatable {
 
 /// An event the native side broadcasts. The serde name is the wire name, and
 /// `pnpm gen:types` exports it to TypeScript and Swift.
-public enum EventName: String, Codable, Sendable, Equatable {
+public enum EventName: String, Codable, Sendable, Equatable, CaseIterable {
     case indexChanged = "index:changed"
     case indexReconcile = "index:reconcile"
     case indexWritten = "index:written"
@@ -1125,6 +1556,20 @@ public struct FileMeta: Codable, Sendable, Equatable {
             try container.encode(placeholder, forKey: .placeholder)
         }
     }
+}
+
+/// A command of the page's formatting toolbar.
+public enum FormattingCommand: String, Codable, Sendable, Equatable, CaseIterable {
+    case slash = "slash"
+    case list = "list"
+    case todo = "todo"
+    case link = "link"
+    case tag = "tag"
+    case dedent = "dedent"
+    case indent = "indent"
+    case up = "up"
+    case down = "down"
+    case dismiss = "dismiss"
 }
 
 /// An HTTPS sign-in supplied per call. Which username and secret a host
@@ -1244,7 +1689,7 @@ public struct GraphImportProgress: Codable, Sendable, Equatable {
 }
 
 /// Which phase of the import a progress tick belongs to.
-public enum GraphImportStage: String, Codable, Sendable, Equatable {
+public enum GraphImportStage: String, Codable, Sendable, Equatable, CaseIterable {
     case downloading = "downloading"
     case writing = "writing"
 }
@@ -1332,6 +1777,281 @@ public struct GraphInfo: Codable, Sendable, Equatable {
         try container.encode(root, forKey: .root)
         try container.encode(name, forKey: .name)
         try container.encode(generation, forKey: .generation)
+    }
+}
+
+/// The direction of a move in the history.
+public enum HistoryDirection: String, Codable, Sendable, Equatable, CaseIterable {
+    case back = "back"
+    case forward = "forward"
+}
+
+/// Whether the history can move back and forward.
+public struct HistoryState: Codable, Sendable, Equatable {
+    public let back: Bool
+    public let forward: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case back = "back"
+        case forward = "forward"
+    }
+
+    public init(back: Bool, forward: Bool) {
+        self.back = back
+        self.forward = forward
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.back = try container.decode(Bool.self, forKey: .back)
+        self.forward = try container.decode(Bool.self, forKey: .forward)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(back, forKey: .back)
+        try container.encode(forward, forKey: .forward)
+    }
+}
+
+/// `host.log` arguments: one line of the web app.
+public struct HostLogArgs: Codable, Sendable, Equatable {
+    public let level: HostLogLevel
+    public let message: String
+
+    private enum CodingKeys: String, CodingKey {
+        case level = "level"
+        case message = "message"
+    }
+
+    public init(level: HostLogLevel, message: String) {
+        self.level = level
+        self.message = message
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.level = try container.decode(HostLogLevel.self, forKey: .level)
+        self.message = try container.decode(String.self, forKey: .message)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(level, forKey: .level)
+        try container.encode(message, forKey: .message)
+    }
+}
+
+/// The severity of a `host.log` line.
+public enum HostLogLevel: String, Codable, Sendable, Equatable, CaseIterable {
+    case error = "error"
+    case warn = "warn"
+    case info = "info"
+}
+
+/// `host.open_url` arguments.
+public struct HostOpenUrlArgs: Codable, Sendable, Equatable {
+    public let url: String
+
+    private enum CodingKeys: String, CodingKey {
+        case url = "url"
+    }
+
+    public init(url: String) {
+        self.url = url
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.url = try container.decode(String.self, forKey: .url)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(url, forKey: .url)
+    }
+}
+
+/// One store product.
+public struct IapProduct: Codable, Sendable, Equatable {
+    public let productId: String
+    public let formattedPrice: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case productId = "productId"
+        case formattedPrice = "formattedPrice"
+    }
+
+    public init(productId: String, formattedPrice: String?) {
+        self.productId = productId
+        self.formattedPrice = formattedPrice
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.productId = try container.decode(String.self, forKey: .productId)
+        self.formattedPrice = try container.decodeIfPresent(String.self, forKey: .formattedPrice)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(productId, forKey: .productId)
+        if let formattedPrice = formattedPrice {
+            try container.encode(formattedPrice, forKey: .formattedPrice)
+        }
+    }
+}
+
+/// `plugin:iap|purchase` and `plugin:iap|get_product_status` arguments.
+public struct IapProductArgs: Codable, Sendable, Equatable {
+    public let payload: IapProductQuery
+
+    private enum CodingKeys: String, CodingKey {
+        case payload = "payload"
+    }
+
+    public init(payload: IapProductQuery) {
+        self.payload = payload
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.payload = try container.decode(IapProductQuery.self, forKey: .payload)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(payload, forKey: .payload)
+    }
+}
+
+/// One product.
+public struct IapProductQuery: Codable, Sendable, Equatable {
+    public let productId: String
+    public let productType: IapProductType
+
+    private enum CodingKeys: String, CodingKey {
+        case productId = "productId"
+        case productType = "productType"
+    }
+
+    public init(productId: String, productType: IapProductType) {
+        self.productId = productId
+        self.productType = productType
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.productId = try container.decode(String.self, forKey: .productId)
+        self.productType = try container.decode(IapProductType.self, forKey: .productType)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(productId, forKey: .productId)
+        try container.encode(productType, forKey: .productType)
+    }
+}
+
+/// `plugin:iap|get_product_status` result.
+public struct IapProductStatus: Codable, Sendable, Equatable {
+    public let isOwned: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case isOwned = "isOwned"
+    }
+
+    public init(isOwned: Bool) {
+        self.isOwned = isOwned
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.isOwned = try container.decode(Bool.self, forKey: .isOwned)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(isOwned, forKey: .isOwned)
+    }
+}
+
+/// The kind of store product.
+public enum IapProductType: String, Codable, Sendable, Equatable, CaseIterable {
+    case subs = "subs"
+}
+
+/// `plugin:iap|get_products` result.
+public struct IapProducts: Codable, Sendable, Equatable {
+    public let products: [IapProduct]
+
+    private enum CodingKeys: String, CodingKey {
+        case products = "products"
+    }
+
+    public init(products: [IapProduct]) {
+        self.products = products
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.products = try container.decode([IapProduct].self, forKey: .products)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(products, forKey: .products)
+    }
+}
+
+/// `plugin:iap|get_products` arguments.
+public struct IapProductsArgs: Codable, Sendable, Equatable {
+    public let payload: IapProductsQuery
+
+    private enum CodingKeys: String, CodingKey {
+        case payload = "payload"
+    }
+
+    public init(payload: IapProductsQuery) {
+        self.payload = payload
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.payload = try container.decode(IapProductsQuery.self, forKey: .payload)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(payload, forKey: .payload)
+    }
+}
+
+/// The products to look up.
+public struct IapProductsQuery: Codable, Sendable, Equatable {
+    public let productIds: [String]
+    public let productType: IapProductType
+
+    private enum CodingKeys: String, CodingKey {
+        case productIds = "productIds"
+        case productType = "productType"
+    }
+
+    public init(productIds: [String], productType: IapProductType) {
+        self.productIds = productIds
+        self.productType = productType
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.productIds = try container.decode([String].self, forKey: .productIds)
+        self.productType = try container.decode(IapProductType.self, forKey: .productType)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(productIds, forKey: .productIds)
+        try container.encode(productType, forKey: .productType)
     }
 }
 
@@ -1782,6 +2502,39 @@ public struct IndexedTask: Codable, Sendable, Equatable {
     }
 }
 
+/// A file the user picked, for the editor to attach.
+public struct IntentFile: Codable, Sendable, Equatable {
+    public let name: String
+    public let type: String
+    public let data: String
+
+    private enum CodingKeys: String, CodingKey {
+        case name = "name"
+        case type = "type"
+        case data = "data"
+    }
+
+    public init(name: String, type: String, data: String) {
+        self.name = name
+        self.type = type
+        self.data = data
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.data = try container.decode(String.self, forKey: .data)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+        try container.encode(type, forKey: .type)
+        try container.encode(data, forKey: .data)
+    }
+}
+
 /// A captured web page.
 public struct LinkCaptureEnvelope: Codable, Sendable, Equatable {
     public let version: UInt32
@@ -1866,7 +2619,7 @@ public struct LinkCaptureEnvelope: Codable, Sendable, Equatable {
 }
 
 /// The syntax of a link: `[[wiki]]` or `[md](path)`.
-public enum LinkKind: String, Codable, Sendable, Equatable {
+public enum LinkKind: String, Codable, Sendable, Equatable, CaseIterable {
     case wiki = "wiki"
     case md = "md"
 }
@@ -1949,7 +2702,132 @@ extension LocalNoteRead: Codable {
 }
 
 
-public enum MergeKind: String, Codable, Sendable, Equatable {
+/// A confirmation the shell shows before it sends the item's intent: an
+/// action sheet (a popover on iPad) with one destructive button and Cancel.
+public struct MenuConfirm: Codable, Sendable, Equatable {
+    public let title: String
+    public let message: String?
+    public let action: String
+
+    private enum CodingKeys: String, CodingKey {
+        case title = "title"
+        case message = "message"
+        case action = "action"
+    }
+
+    public init(title: String, message: String?, action: String) {
+        self.title = title
+        self.message = message
+        self.action = action
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.message = try container.decodeIfPresent(String.self, forKey: .message)
+        self.action = try container.decode(String.self, forKey: .action)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(title, forKey: .title)
+        if let message = message {
+            try container.encode(message, forKey: .message)
+        }
+        try container.encode(action, forKey: .action)
+    }
+}
+
+/// One row of a menu, or a section of rows, in the order the shell shows
+/// them.
+public enum MenuItem: Sendable, Equatable {
+    case action(MenuItemActionData)
+    case section(MenuItemSectionData)
+}
+public struct MenuItemActionData: Codable, Sendable, Equatable {
+    public let id: String
+    public let title: String
+    public let icon: String?
+    public let destructive: Bool?
+    public let disabled: Bool?
+    public let checked: Bool?
+    public let confirm: MenuConfirm?
+
+    public init(id: String, title: String, icon: String?, destructive: Bool?, disabled: Bool?, checked: Bool?, confirm: MenuConfirm?) {
+        self.id = id
+        self.title = title
+        self.icon = icon
+        self.destructive = destructive
+        self.disabled = disabled
+        self.checked = checked
+        self.confirm = confirm
+    }
+}
+
+public struct MenuItemSectionData: Codable, Sendable, Equatable {
+    public let title: String?
+    public let items: [MenuItem]
+
+    public init(title: String?, items: [MenuItem]) {
+        self.title = title
+        self.items = items
+    }
+}
+
+// MARK: - MenuItem Codable Implementation
+extension MenuItem: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("type"))
+        switch tag {
+        case "action":
+            let idValue = try container.decode(String.self, forKey: CodingKeys("id"))
+            let titleValue = try container.decode(String.self, forKey: CodingKeys("title"))
+            let iconValue = try container.decodeIfPresent(String.self, forKey: CodingKeys("icon"))
+            let destructiveValue = try container.decodeIfPresent(Bool.self, forKey: CodingKeys("destructive"))
+            let disabledValue = try container.decodeIfPresent(Bool.self, forKey: CodingKeys("disabled"))
+            let checkedValue = try container.decodeIfPresent(Bool.self, forKey: CodingKeys("checked"))
+            let confirmValue = try container.decodeIfPresent(MenuConfirm.self, forKey: CodingKeys("confirm"))
+            self = .action(MenuItemActionData(id: idValue, title: titleValue, icon: iconValue, destructive: destructiveValue, disabled: disabledValue, checked: checkedValue, confirm: confirmValue))
+        case "section":
+            let titleValue = try container.decodeIfPresent(String.self, forKey: CodingKeys("title"))
+            let itemsValue = try container.decode([MenuItem].self, forKey: CodingKeys("items"))
+            self = .section(MenuItemSectionData(title: titleValue, items: itemsValue))
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .action(let data):
+            try container.encode("action", forKey: CodingKeys("type"))
+            try container.encode(data.id, forKey: CodingKeys("id"))
+            try container.encode(data.title, forKey: CodingKeys("title"))
+            try container.encodeIfPresent(data.icon, forKey: CodingKeys("icon"))
+            try container.encodeIfPresent(data.destructive, forKey: CodingKeys("destructive"))
+            try container.encodeIfPresent(data.disabled, forKey: CodingKeys("disabled"))
+            try container.encodeIfPresent(data.checked, forKey: CodingKeys("checked"))
+            try container.encodeIfPresent(data.confirm, forKey: CodingKeys("confirm"))
+        case .section(let data):
+            try container.encode("section", forKey: CodingKeys("type"))
+            try container.encodeIfPresent(data.title, forKey: CodingKeys("title"))
+            try container.encode(data.items, forKey: CodingKeys("items"))
+        }
+    }
+}
+
+
+public enum MergeKind: String, Codable, Sendable, Equatable, CaseIterable {
     case upToDate = "upToDate"
     case fastForward = "fastForward"
     case merged = "merged"
@@ -2023,6 +2901,11 @@ public struct MovedNoteAddress: Codable, Sendable, Equatable {
     }
 }
 
+/// The arguments of a command that takes none.
+public struct NoArgs: Codable, Sendable, Equatable {
+    public init() {}
+}
+
 /// Result of claiming a note path without overwriting an existing file.
 public enum NoteCreateOutcome: Sendable, Equatable {
     case created(NoteCreateOutcomeCreatedData)
@@ -2074,7 +2957,7 @@ extension NoteCreateOutcome: Codable {
 
 
 /// What a note file is, from its path.
-public enum NoteKind: String, Codable, Sendable, Equatable {
+public enum NoteKind: String, Codable, Sendable, Equatable, CaseIterable {
     case daily = "daily"
     case note = "note"
     case template = "template"
@@ -2147,6 +3030,102 @@ public struct NoteWriteOutcome: Codable, Sendable, Equatable {
         try container.encode(merged, forKey: .merged)
     }
 }
+
+/// A pinned note in the iPad sidebar.
+public struct PinnedNote: Codable, Sendable, Equatable {
+    public let path: String
+    public let title: String
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case title = "title"
+    }
+
+    public init(path: String, title: String) {
+        self.path = path
+        self.title = title
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.title = try container.decode(String.self, forKey: .title)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(title, forKey: .title)
+    }
+}
+
+/// A tap on the `+` (`tap`) or on one item of the capture menu.
+public enum PlusCommand: String, Codable, Sendable, Equatable, CaseIterable {
+    case tap = "tap"
+    case note = "note"
+    case task = "task"
+    case audio = "audio"
+}
+
+/// The `+` of a screen: Daily's capture menu, or one action.
+public enum PlusState: Sendable, Equatable {
+    case capture(PlusStateCaptureData)
+    case action(PlusStateActionData)
+}
+public struct PlusStateCaptureData: Codable, Sendable, Equatable {
+    public let audio: AudioPhase?
+
+    public init(audio: AudioPhase?) {
+        self.audio = audio
+    }
+}
+
+public struct PlusStateActionData: Codable, Sendable, Equatable {
+    public let label: String
+
+    public init(label: String) {
+        self.label = label
+    }
+}
+
+// MARK: - PlusState Codable Implementation
+extension PlusState: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("kind"))
+        switch tag {
+        case "capture":
+            let audioValue = try container.decodeIfPresent(AudioPhase.self, forKey: CodingKeys("audio"))
+            self = .capture(PlusStateCaptureData(audio: audioValue))
+        case "action":
+            let labelValue = try container.decode(String.self, forKey: CodingKeys("label"))
+            self = .action(PlusStateActionData(label: labelValue))
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .capture(let data):
+            try container.encode("capture", forKey: CodingKeys("kind"))
+            try container.encode(data.audio, forKey: CodingKeys("audio"))
+        case .action(let data):
+            try container.encode("action", forKey: CodingKeys("kind"))
+            try container.encode(data.label, forKey: CodingKeys("label"))
+        }
+    }
+}
+
 
 /// What one pull did: the commit of local changes, then the merge of the
 /// fetched remote branch.
@@ -2332,6 +3311,272 @@ public struct ReconcileScan: Codable, Sendable, Equatable {
     }
 }
 
+/// `plugin:recording|delete_staged` arguments.
+public struct RecordingDeleteStagedArgs: Codable, Sendable, Equatable {
+    public let request: StagedRecordingPath
+
+    private enum CodingKeys: String, CodingKey {
+        case request = "request"
+    }
+
+    public init(request: StagedRecordingPath) {
+        self.request = request
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.request = try container.decode(StagedRecordingPath.self, forKey: .request)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(request, forKey: .request)
+    }
+}
+
+/// `plugin:recording:recordingLevel`, about 10 times a second while
+/// recording in the foreground.
+public struct RecordingLevelEvent: Codable, Sendable, Equatable {
+    public let level: Float
+    public let elapsedMs: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case level = "level"
+        case elapsedMs = "elapsedMs"
+    }
+
+    public init(level: Float, elapsedMs: Double) {
+        self.level = level
+        self.elapsedMs = elapsedMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.level = try container.decode(Float.self, forKey: .level)
+        self.elapsedMs = try container.decode(Double.self, forKey: .elapsedMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(level, forKey: .level)
+        try container.encode(elapsedMs, forKey: .elapsedMs)
+    }
+}
+
+/// `plugin:recording:nativeAction`: an OS entry point asked for something
+/// only the web view can present.
+public struct RecordingNativeActionEvent: Codable, Sendable, Equatable {
+    public let action: String
+
+    private enum CodingKeys: String, CodingKey {
+        case action = "action"
+    }
+
+    public init(action: String) {
+        self.action = action
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.action = try container.decode(String.self, forKey: .action)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(action, forKey: .action)
+    }
+}
+
+/// `plugin:recording:recordingSegment`: a finished segment of a session that
+/// still records. The final segment arrives in the stop result or in
+/// `recordingStopped`.
+public struct RecordingSegmentEvent: Codable, Sendable, Equatable {
+    public let path: String
+    public let sessionStartedMs: Double
+    public let part: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case sessionStartedMs = "sessionStartedMs"
+        case part = "part"
+    }
+
+    public init(path: String, sessionStartedMs: Double, part: UInt32) {
+        self.path = path
+        self.sessionStartedMs = sessionStartedMs
+        self.part = part
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.sessionStartedMs = try container.decode(Double.self, forKey: .sessionStartedMs)
+        self.part = try container.decode(UInt32.self, forKey: .part)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(sessionStartedMs, forKey: .sessionStartedMs)
+        try container.encode(part, forKey: .part)
+    }
+}
+
+/// The identity every segment of a session shares.
+public struct RecordingSessionStart: Codable, Sendable, Equatable {
+    public let sessionStartedMs: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionStartedMs = "sessionStartedMs"
+    }
+
+    public init(sessionStartedMs: Double) {
+        self.sessionStartedMs = sessionStartedMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.sessionStartedMs = try container.decode(Double.self, forKey: .sessionStartedMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sessionStartedMs, forKey: .sessionStartedMs)
+    }
+}
+
+/// `plugin:recording|start_recording` arguments.
+public struct RecordingStartArgs: Codable, Sendable, Equatable {
+    public let request: StartRecordingOptions
+
+    private enum CodingKeys: String, CodingKey {
+        case request = "request"
+    }
+
+    public init(request: StartRecordingOptions) {
+        self.request = request
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.request = try container.decode(StartRecordingOptions.self, forKey: .request)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(request, forKey: .request)
+    }
+}
+
+/// Whether a session runs, and its recorded length so far.
+public struct RecordingStatus: Codable, Sendable, Equatable {
+    public let recording: Bool
+    public let elapsedMs: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case recording = "recording"
+        case elapsedMs = "elapsedMs"
+    }
+
+    public init(recording: Bool, elapsedMs: Double) {
+        self.recording = recording
+        self.elapsedMs = elapsedMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.recording = try container.decode(Bool.self, forKey: .recording)
+        self.elapsedMs = try container.decode(Double.self, forKey: .elapsedMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(recording, forKey: .recording)
+        try container.encode(elapsedMs, forKey: .elapsedMs)
+    }
+}
+
+/// A session's final segment, still in staging.
+public struct RecordingStopResponse: Codable, Sendable, Equatable {
+    public let path: String
+    public let sessionStartedMs: Double
+    public let part: UInt32
+    public let durationMs: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case sessionStartedMs = "sessionStartedMs"
+        case part = "part"
+        case durationMs = "durationMs"
+    }
+
+    public init(path: String, sessionStartedMs: Double, part: UInt32, durationMs: Double) {
+        self.path = path
+        self.sessionStartedMs = sessionStartedMs
+        self.part = part
+        self.durationMs = durationMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.sessionStartedMs = try container.decode(Double.self, forKey: .sessionStartedMs)
+        self.part = try container.decode(UInt32.self, forKey: .part)
+        self.durationMs = try container.decode(Double.self, forKey: .durationMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(sessionStartedMs, forKey: .sessionStartedMs)
+        try container.encode(part, forKey: .part)
+        try container.encode(durationMs, forKey: .durationMs)
+    }
+}
+
+/// `plugin:recording:recordingStopped`: the shell ended a session.
+public struct RecordingStoppedEvent: Codable, Sendable, Equatable {
+    public let path: String
+    public let sessionStartedMs: Double
+    public let part: UInt32
+    public let durationMs: Double
+    public let reason: String
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case sessionStartedMs = "sessionStartedMs"
+        case part = "part"
+        case durationMs = "durationMs"
+        case reason = "reason"
+    }
+
+    public init(path: String, sessionStartedMs: Double, part: UInt32, durationMs: Double, reason: String) {
+        self.path = path
+        self.sessionStartedMs = sessionStartedMs
+        self.part = part
+        self.durationMs = durationMs
+        self.reason = reason
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.sessionStartedMs = try container.decode(Double.self, forKey: .sessionStartedMs)
+        self.part = try container.decode(UInt32.self, forKey: .part)
+        self.durationMs = try container.decode(Double.self, forKey: .durationMs)
+        self.reason = try container.decode(String.self, forKey: .reason)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(sessionStartedMs, forKey: .sessionStartedMs)
+        try container.encode(part, forKey: .part)
+        try container.encode(durationMs, forKey: .durationMs)
+        try container.encode(reason, forKey: .reason)
+    }
+}
+
 /// Where the local branch stands relative to its last-fetched remote
 /// counterpart (no network — call after `fetch`).
 public struct RemoteDelta: Codable, Sendable, Equatable {
@@ -2473,6 +3718,154 @@ public struct ScanOrphan: Codable, Sendable, Equatable {
     }
 }
 
+/// A tap in the iPad sidebar.
+public enum SidebarIntent: Sendable, Equatable {
+    case chat
+    case search
+    case settings
+    case openNote(SidebarIntentOpennoteData)
+    case unpin(SidebarIntentUnpinData)
+    case share(SidebarIntentShareData)
+    case menu(SidebarIntentMenuData)
+}
+public struct SidebarIntentOpennoteData: Codable, Sendable, Equatable {
+    public let path: String
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
+public struct SidebarIntentUnpinData: Codable, Sendable, Equatable {
+    public let path: String
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
+public struct SidebarIntentShareData: Codable, Sendable, Equatable {
+    public let path: String
+
+    public init(path: String) {
+        self.path = path
+    }
+}
+
+public struct SidebarIntentMenuData: Codable, Sendable, Equatable {
+    public let id: String
+
+    public init(id: String) {
+        self.id = id
+    }
+}
+
+// MARK: - SidebarIntent Codable Implementation
+extension SidebarIntent: Codable {
+    private struct CodingKeys: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+        init(_ stringValue: String) { self.stringValue = stringValue }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let tag = try container.decode(String.self, forKey: CodingKeys("kind"))
+        switch tag {
+        case "chat":
+            self = .chat
+        case "search":
+            self = .search
+        case "settings":
+            self = .settings
+        case "openNote":
+            let pathValue = try container.decode(String.self, forKey: CodingKeys("path"))
+            self = .openNote(SidebarIntentOpennoteData(path: pathValue))
+        case "unpin":
+            let pathValue = try container.decode(String.self, forKey: CodingKeys("path"))
+            self = .unpin(SidebarIntentUnpinData(path: pathValue))
+        case "share":
+            let pathValue = try container.decode(String.self, forKey: CodingKeys("path"))
+            self = .share(SidebarIntentShareData(path: pathValue))
+        case "menu":
+            let idValue = try container.decode(String.self, forKey: CodingKeys("id"))
+            self = .menu(SidebarIntentMenuData(id: idValue))
+        default:
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown variant \(tag)"))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .chat:
+            try container.encode("chat", forKey: CodingKeys("kind"))
+        case .search:
+            try container.encode("search", forKey: CodingKeys("kind"))
+        case .settings:
+            try container.encode("settings", forKey: CodingKeys("kind"))
+        case .openNote(let data):
+            try container.encode("openNote", forKey: CodingKeys("kind"))
+            try container.encode(data.path, forKey: CodingKeys("path"))
+        case .unpin(let data):
+            try container.encode("unpin", forKey: CodingKeys("kind"))
+            try container.encode(data.path, forKey: CodingKeys("path"))
+        case .share(let data):
+            try container.encode("share", forKey: CodingKeys("kind"))
+            try container.encode(data.path, forKey: CodingKeys("path"))
+        case .menu(let data):
+            try container.encode("menu", forKey: CodingKeys("kind"))
+            try container.encode(data.id, forKey: CodingKeys("id"))
+        }
+    }
+}
+
+
+/// What the iPad sidebar shows.
+public struct SidebarState: Codable, Sendable, Equatable {
+    public let selection: String
+    public let pinned: [PinnedNote]
+    public let graphName: String
+    public let graphColor: String?
+    public let graphMenu: [MenuItem]
+
+    private enum CodingKeys: String, CodingKey {
+        case selection = "selection"
+        case pinned = "pinned"
+        case graphName = "graphName"
+        case graphColor = "graphColor"
+        case graphMenu = "graphMenu"
+    }
+
+    public init(selection: String, pinned: [PinnedNote], graphName: String, graphColor: String?, graphMenu: [MenuItem]) {
+        self.selection = selection
+        self.pinned = pinned
+        self.graphName = graphName
+        self.graphColor = graphColor
+        self.graphMenu = graphMenu
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.selection = try container.decode(String.self, forKey: .selection)
+        self.pinned = try container.decode([PinnedNote].self, forKey: .pinned)
+        self.graphName = try container.decode(String.self, forKey: .graphName)
+        self.graphColor = try container.decodeIfPresent(String.self, forKey: .graphColor)
+        self.graphMenu = try container.decode([MenuItem].self, forKey: .graphMenu)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(selection, forKey: .selection)
+        try container.encode(pinned, forKey: .pinned)
+        try container.encode(graphName, forKey: .graphName)
+        try container.encode(graphColor, forKey: .graphColor)
+        try container.encode(graphMenu, forKey: .graphMenu)
+    }
+}
+
 /// A file whose changes were withheld because it is at or above the size
 /// guardrail. An unchanged oversized file is not reported.
 public struct SkippedFile: Codable, Sendable, Equatable {
@@ -2502,8 +3895,125 @@ public struct SkippedFile: Codable, Sendable, Equatable {
     }
 }
 
+/// One staged segment file.
+public struct StagedRecordingFile: Codable, Sendable, Equatable {
+    public let path: String
+    public let sessionStartedMs: Double
+    public let part: UInt32
+    public let end: Bool
+    public let modifiedMs: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+        case sessionStartedMs = "sessionStartedMs"
+        case part = "part"
+        case end = "end"
+        case modifiedMs = "modifiedMs"
+    }
+
+    public init(path: String, sessionStartedMs: Double, part: UInt32, end: Bool, modifiedMs: Double) {
+        self.path = path
+        self.sessionStartedMs = sessionStartedMs
+        self.part = part
+        self.end = end
+        self.modifiedMs = modifiedMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+        self.sessionStartedMs = try container.decode(Double.self, forKey: .sessionStartedMs)
+        self.part = try container.decode(UInt32.self, forKey: .part)
+        self.end = try container.decode(Bool.self, forKey: .end)
+        self.modifiedMs = try container.decode(Double.self, forKey: .modifiedMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+        try container.encode(sessionStartedMs, forKey: .sessionStartedMs)
+        try container.encode(part, forKey: .part)
+        try container.encode(end, forKey: .end)
+        try container.encode(modifiedMs, forKey: .modifiedMs)
+    }
+}
+
+/// `plugin:recording|list_staged` result.
+public struct StagedRecordingList: Codable, Sendable, Equatable {
+    public let files: [StagedRecordingFile]
+
+    private enum CodingKeys: String, CodingKey {
+        case files = "files"
+    }
+
+    public init(files: [StagedRecordingFile]) {
+        self.files = files
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.files = try container.decode([StagedRecordingFile].self, forKey: .files)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(files, forKey: .files)
+    }
+}
+
+/// One staged segment file, by its absolute path.
+public struct StagedRecordingPath: Codable, Sendable, Equatable {
+    public let path: String
+
+    private enum CodingKeys: String, CodingKey {
+        case path = "path"
+    }
+
+    public init(path: String) {
+        self.path = path
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.path = try container.decode(String.self, forKey: .path)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(path, forKey: .path)
+    }
+}
+
+/// How a recording session runs.
+public struct StartRecordingOptions: Codable, Sendable, Equatable {
+    public let segmentMs: Double
+    public let reminderMs: Double
+
+    private enum CodingKeys: String, CodingKey {
+        case segmentMs = "segmentMs"
+        case reminderMs = "reminderMs"
+    }
+
+    public init(segmentMs: Double, reminderMs: Double) {
+        self.segmentMs = segmentMs
+        self.reminderMs = reminderMs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.segmentMs = try container.decode(Double.self, forKey: .segmentMs)
+        self.reminderMs = try container.decode(Double.self, forKey: .reminderMs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(segmentMs, forKey: .segmentMs)
+        try container.encode(reminderMs, forKey: .reminderMs)
+    }
+}
+
 /// How much of the graph a sweep checks for unresolved versions.
-public enum SweepScope: String, Codable, Sendable, Equatable {
+public enum SweepScope: String, Codable, Sendable, Equatable, CaseIterable {
     case full = "full"
     case candidates = "candidates"
     case ingested = "ingested"
@@ -2566,17 +4076,66 @@ public struct TextCaptureEnvelope: Codable, Sendable, Equatable {
 }
 
 /// Where a text capture lands in the daily note.
-public enum TextCaptureKind: String, Codable, Sendable, Equatable {
+public enum TextCaptureKind: String, Codable, Sendable, Equatable, CaseIterable {
     case append = "append"
     case checkbox = "checkbox"
     case task = "task"
 }
 
 /// Who produced a text capture.
-public enum TextCaptureSource: String, Codable, Sendable, Equatable {
+public enum TextCaptureSource: String, Codable, Sendable, Equatable, CaseIterable {
     case deepLink = "deep-link"
     case iosShare = "ios-share"
     case iosIntent = "ios-intent"
+}
+
+/// The formatting toolbar of the focused editor.
+public struct ToolbarState: Codable, Sendable, Equatable {
+    public let canIndent: Bool
+    public let canDedent: Bool
+    public let canMoveUp: Bool
+    public let canMoveDown: Bool
+    public let canAttachFiles: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case canIndent = "canIndent"
+        case canDedent = "canDedent"
+        case canMoveUp = "canMoveUp"
+        case canMoveDown = "canMoveDown"
+        case canAttachFiles = "canAttachFiles"
+    }
+
+    public init(canIndent: Bool, canDedent: Bool, canMoveUp: Bool, canMoveDown: Bool, canAttachFiles: Bool) {
+        self.canIndent = canIndent
+        self.canDedent = canDedent
+        self.canMoveUp = canMoveUp
+        self.canMoveDown = canMoveDown
+        self.canAttachFiles = canAttachFiles
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.canIndent = try container.decode(Bool.self, forKey: .canIndent)
+        self.canDedent = try container.decode(Bool.self, forKey: .canDedent)
+        self.canMoveUp = try container.decode(Bool.self, forKey: .canMoveUp)
+        self.canMoveDown = try container.decode(Bool.self, forKey: .canMoveDown)
+        self.canAttachFiles = try container.decode(Bool.self, forKey: .canAttachFiles)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(canIndent, forKey: .canIndent)
+        try container.encode(canDedent, forKey: .canDedent)
+        try container.encode(canMoveUp, forKey: .canMoveUp)
+        try container.encode(canMoveDown, forKey: .canMoveDown)
+        try container.encode(canAttachFiles, forKey: .canAttachFiles)
+    }
+}
+
+/// The phase of a web push or pop slide.
+public enum TransitionPhase: String, Codable, Sendable, Equatable, CaseIterable {
+    case start = "start"
+    case end = "end"
 }
 
 
@@ -2612,6 +4171,87 @@ public struct VaultScanStats: Codable, Sendable, Equatable {
         try container.encode(notes, forKey: .notes)
         try container.encode(attachments, forKey: .attachments)
         try container.encode(skipped, forKey: .skipped)
+    }
+}
+
+/// `plugin:web-auth|start` result.
+public struct WebAuthCallback: Codable, Sendable, Equatable {
+    public let url: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case url = "url"
+    }
+
+    public init(url: String?) {
+        self.url = url
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.url = try container.decodeIfPresent(String.self, forKey: .url)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let url = url {
+            try container.encode(url, forKey: .url)
+        }
+    }
+}
+
+/// A system web sign-in.
+public struct WebAuthOptions: Codable, Sendable, Equatable {
+    public let url: String
+    public let callbackScheme: String
+    public let ephemeral: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case url = "url"
+        case callbackScheme = "callbackScheme"
+        case ephemeral = "ephemeral"
+    }
+
+    public init(url: String, callbackScheme: String, ephemeral: Bool) {
+        self.url = url
+        self.callbackScheme = callbackScheme
+        self.ephemeral = ephemeral
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.url = try container.decode(String.self, forKey: .url)
+        self.callbackScheme = try container.decode(String.self, forKey: .callbackScheme)
+        self.ephemeral = try container.decode(Bool.self, forKey: .ephemeral)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(url, forKey: .url)
+        try container.encode(callbackScheme, forKey: .callbackScheme)
+        try container.encode(ephemeral, forKey: .ephemeral)
+    }
+}
+
+/// `plugin:web-auth|start` arguments.
+public struct WebAuthStartArgs: Codable, Sendable, Equatable {
+    public let payload: WebAuthOptions
+
+    private enum CodingKeys: String, CodingKey {
+        case payload = "payload"
+    }
+
+    public init(payload: WebAuthOptions) {
+        self.payload = payload
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.payload = try container.decode(WebAuthOptions.self, forKey: .payload)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(payload, forKey: .payload)
     }
 }
 
@@ -2664,4 +4304,27 @@ public enum CaptureConstants {
     public static let inboxSpoolMaxBytes = 65536
     /// The quick note defaults file inside the App Group container.
     public static let quickNoteDefaultsFile = "quick-note.json"
+}
+
+/// The name of every command the Swift shell answers.
+public enum ShellCommandName: String, CaseIterable, Sendable {
+    case recordingStart = "plugin:recording|start_recording"
+    case recordingStop = "plugin:recording|stop_recording"
+    case recordingCancel = "plugin:recording|cancel_recording"
+    case recordingStatus = "plugin:recording|recording_status"
+    case recordingListStaged = "plugin:recording|list_staged"
+    case recordingDeleteStaged = "plugin:recording|delete_staged"
+    case recordingActionsReady = "plugin:recording|actions_ready"
+    case recordingActionPerformed = "plugin:recording|action_performed"
+    case webAuthStart = "plugin:web-auth|start"
+    case hapticsImpactLight = "plugin:mobile-haptics|impact_light"
+    case appStoreGetEnvironment = "plugin:app-store|get_environment"
+    case appStoreSync = "plugin:app-store|sync"
+    case appStorePresentOfferCodeRedeemSheet = "plugin:app-store|present_offer_code_redeem_sheet"
+    case appStoreRequestReview = "plugin:app-store|request_review"
+    case iapGetProducts = "plugin:iap|get_products"
+    case iapPurchase = "plugin:iap|purchase"
+    case iapGetProductStatus = "plugin:iap|get_product_status"
+    case hostLog = "host.log"
+    case hostOpenUrl = "host.open_url"
 }

@@ -9,7 +9,8 @@ public enum QuickNoteDefaults {
   public static func parent() -> String? {
     guard
       let container = CaptureInbox.containerUrl(),
-      let data = try? Data(contentsOf: container.appendingPathComponent(CaptureConstants.quickNoteDefaultsFile)),
+      let data = try? Data(
+        contentsOf: container.appendingPathComponent(CaptureConstants.quickNoteDefaultsFile)),
       let file = try? JSONDecoder().decode(QuickNoteDefaultsFile.self, from: data),
       file.version == 1
     else {

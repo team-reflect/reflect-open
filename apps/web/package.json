@@ -29,6 +29,7 @@
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
+    "@reflect/types": "workspace:*",
     "@reflect/utils": "workspace:*",
     "@sentry/react": "^11.9.0",
     "@shadcn/react": "^0.3.1",

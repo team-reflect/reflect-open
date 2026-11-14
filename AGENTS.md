@@ -180,7 +180,7 @@ The short version:
 
 **Frontend ↔ Rust**
 
-- Define commands as `Core` methods in `crates/core`, or `#[tauri::command]`s in `apps/tauri/src/` for desktop-only ones, each with a row in the command table (`crates/types/src/commands.rs`). Run `pnpm gen:types` after you change a row or a type.
+- Define commands as `Core` methods in `crates/core`, `#[tauri::command]`s in `apps/tauri/src/` for desktop-only ones, or Swift shell handlers for `plugin:` and `host.` commands, each with a row in the command table (`crates/types/src/commands.rs`). Types that cross between TS and Swift without a command (the chrome protocol, plugin events, capture files) also live in `crates/types`. Run `pnpm gen:types` after you change a row or a type.
 - Bind each command as a method of the core service that owns the domain, through `ipc.call(command, args)`. The table types the args and the result. Components never call `invoke`. See [docs/contributing/adding-a-command.md](docs/contributing/adding-a-command.md).
 - Add Tauri plugins in `apps/tauri/Cargo.toml` (Rust) and grant permissions in `apps/tauri/capabilities/`.
 

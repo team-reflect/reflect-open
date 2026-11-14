@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 
 /// Builds the menus of the corner buttons as `UIMenu`s and asks before
@@ -26,7 +27,8 @@ final class MenuPresenter {
       guard let self else { return }
       // The next state rebuilds a button's menu with the new checkmarks.
       self.select(
-        action, intent: .action(entryId: entryId, id: action.id), entryId: entryId, source: source)
+        action, intent: .action(.init(entryId: entryId, id: action.id)), entryId: entryId,
+        source: source)
     }
   }
 

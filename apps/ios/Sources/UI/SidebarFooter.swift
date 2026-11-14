@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 
 /// The bottom of the iPad sidebar: the graph button, which opens the graph

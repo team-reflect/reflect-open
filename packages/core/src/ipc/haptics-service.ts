@@ -1,17 +1,10 @@
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from './ipc-service.ts'
-import { definePluginCommand, ignoredResult } from './plugin.ts'
 
 /**
  * Typed bindings for the `plugin:mobile-haptics` commands, the app's
  * single haptic (`apps/ios/Sources/Capabilities/HapticsCapability.swift`).
  */
-
-const impactLightCommand = definePluginCommand<Record<string, never>, unknown>(
-  'mobile-haptics',
-  'impact_light',
-  ignoredResult,
-)
 
 /**
  * The haptic engine.
@@ -43,7 +36,7 @@ class HapticsServiceImpl implements HapticsService {
       return
     }
     try {
-      await impactLightCommand(this.#deps.ipc, {})
+      await this.#deps.ipc.call('plugin:mobile-haptics|impact_light', {})
     } catch (error) {
       // Several calls can be in flight before the first rejection lands;
       // only one of them warns.

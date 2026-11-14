@@ -1,3 +1,4 @@
+import TypesShared
 import XCTest
 
 @testable import ChromeKit

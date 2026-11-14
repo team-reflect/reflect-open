@@ -151,6 +151,7 @@ macro_rules! desktop_handler {
     (
         core { $( $core:tt )* }
         desktop { $( $module:ident :: $method:ident ( $( $arg:ident : $ty:ty ),* ) -> $ret:ty ),* $(,)? }
+        shell { $( $shell:tt )* }
     ) => {
         tauri::generate_handler![
             $( $module::$method, )*

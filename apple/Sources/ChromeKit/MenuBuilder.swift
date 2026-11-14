@@ -1,4 +1,5 @@
 #if canImport(UIKit)
+public import TypesShared
 public import UIKit
 
 /// Builds `UIMenu`s and confirmations from the page's menu items.
@@ -17,19 +18,19 @@ public enum MenuBuilder {
   ) -> [UIMenuElement] {
     items.map { item in
       switch item {
-      case .section(let title, let items):
+      case .section(let section):
         return UIMenu(
-          title: title ?? "", options: .displayInline,
-          children: elements(items, onSelect: onSelect))
+          title: section.title ?? "", options: .displayInline,
+          children: elements(section.items, onSelect: onSelect))
       case .action(let action):
         var attributes: UIMenuElement.Attributes = []
-        if action.destructive { attributes.insert(.destructive) }
-        if action.disabled { attributes.insert(.disabled) }
+        if action.destructive == true { attributes.insert(.destructive) }
+        if action.disabled == true { attributes.insert(.disabled) }
         return UIAction(
           title: action.title,
           image: action.icon.flatMap { UIImage(systemName: $0) },
           attributes: attributes,
-          state: action.checked ? .on : .off
+          state: action.checked == true ? .on : .off
         ) { _ in
           onSelect(action)
         }

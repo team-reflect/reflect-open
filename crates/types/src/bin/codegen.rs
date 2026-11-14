@@ -8,9 +8,10 @@ use reflect_types::commands;
 use reflect_types::events::EventName;
 use reflect_types::{
     APP_GROUP_KEY, AppError, AssetResolveReply, CaptureAck, CapturePointer, CaptureWireMessage,
-    CoreStartConfig, FileChange, GraphImportProgress, INBOX_SPOOL_MAX_BYTES, LinkCaptureEnvelope,
-    QUICK_NOTE_DEFAULTS_FILE, QuickNoteDefaultsFile, SHARED_ENVELOPE_MAX_BYTES, SHARED_INBOX_DIR,
-    SHARED_SCREENSHOT_MAX_BYTES, TextCaptureEnvelope,
+    ChromeIntent, ChromeMessage, CoreStartConfig, FileChange, GraphImportProgress,
+    INBOX_SPOOL_MAX_BYTES, LinkCaptureEnvelope, QUICK_NOTE_DEFAULTS_FILE, QuickNoteDefaultsFile,
+    RecordingLevelEvent, RecordingNativeActionEvent, RecordingSegmentEvent, RecordingStoppedEvent,
+    SHARED_ENVELOPE_MAX_BYTES, SHARED_INBOX_DIR, SHARED_SCREENSHOT_MAX_BYTES, TextCaptureEnvelope,
 };
 use specta::Types;
 use specta::datatype::{DataType, Primitive};
@@ -21,7 +22,8 @@ fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     // The command table registers every argument and result type; specta adds
     // the types they reference. The rest are event payloads and names, the
-    // JSON that crosses the C interface, and the capture inbox files.
+    // JSON that crosses the C interface, the capture inbox files, and the Swift
+    // shell's plugin events and chrome protocol.
     let types = commands::register(
         Types::default()
             .register::<AppError>()
@@ -35,7 +37,13 @@ fn main() {
             .register::<CaptureWireMessage>()
             .register::<CaptureAck>()
             .register::<CapturePointer>()
-            .register::<QuickNoteDefaultsFile>(),
+            .register::<QuickNoteDefaultsFile>()
+            .register::<RecordingLevelEvent>()
+            .register::<RecordingSegmentEvent>()
+            .register::<RecordingStoppedEvent>()
+            .register::<RecordingNativeActionEvent>()
+            .register::<ChromeMessage>()
+            .register::<ChromeIntent>(),
     );
     // The manifest maps each command to its inline arguments and result, which
     // specta-swift cannot render, so only TypeScript gets it.
@@ -43,7 +51,7 @@ fn main() {
 
     write(
         &root.join("packages/types/src/wire.gen.ts"),
-        &typescript(&ts_types),
+        &name_shell_commands(&typescript(&ts_types)),
     );
     write(
         &root.join("apple/Sources/TypesShared/Wire.gen.swift"),
@@ -74,6 +82,20 @@ fn typescript(types: &Types) -> String {
         .export(&remapper.remap_types(types.clone()), specta_serde::Format)
         .expect("typescript export");
     add_undefined(&out)
+}
+
+/// Renames each Swift shell command in `Commands` from its identifier to its
+/// name (`recording_start` to `"plugin:recording|start_recording"`).
+// TODO: put `#[serde(rename)]` on the fields instead once specta reads it on
+// a type that does not derive serde.
+fn name_shell_commands(ts: &str) -> String {
+    let mut out = ts.to_owned();
+    for (ident, name) in commands::SHELL_COMMANDS {
+        let field = format!("\n\t{ident}: {{\n");
+        assert!(out.contains(&field), "`Commands` has no field {ident}");
+        out = out.replace(&field, &format!("\n\t{name:?}: {{\n"));
+    }
+    out
 }
 
 /// Serde omits a `None` field, but TypeScript code often builds the object
@@ -112,7 +134,33 @@ fn swift(types: &Types) -> String {
         .add_protocol("Equatable")
         .export(types, specta_serde::Format)
         .expect("swift export");
-    drop_value(&rename_cases(&add_public_inits(&out))) + &capture_constants()
+    // A unit enum lists its cases, as the shell's tab bar needs.
+    let out = out.replace(
+        ": String, Codable, Sendable, Equatable {",
+        ": String, Codable, Sendable, Equatable, CaseIterable {",
+    );
+    drop_value(&rename_cases(&add_public_inits(&out))) + &capture_constants() + &shell_commands()
+}
+
+/// The command table's Swift shell commands, which the codegen cannot render
+/// as a `Commands` struct for Swift.
+fn shell_commands() -> String {
+    let mut out = String::from(
+        "\n/// The name of every command the Swift shell answers.\npublic enum ShellCommandName: String, CaseIterable, Sendable {\n",
+    );
+    for (ident, name) in commands::SHELL_COMMANDS {
+        let mut case = String::new();
+        for (i, word) in ident.split('_').enumerate() {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) if i > 0 => case.extend(first.to_uppercase().chain(chars)),
+                _ => case.push_str(word),
+            }
+        }
+        writeln!(out, "    case {case} = {name:?}").unwrap();
+    }
+    out.push_str("}\n");
+    out
 }
 
 /// The capture names and limits the Swift producers share with Rust.

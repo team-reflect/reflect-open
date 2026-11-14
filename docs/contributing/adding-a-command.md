@@ -78,6 +78,12 @@ A command that exists only on the desktop (windows, menus) is a
 `module::name(args) -> Result`, and lists only the arguments the frontend
 sends. The Tauri handler is built from that block.
 
+A command that the Swift shell answers (`plugin:<name>|<command>`,
+`host.<command>`) goes in the `shell` block as
+`"name" => identifier(ArgsType) -> Result`. The arguments are one named type
+from `crates/types/src/shell.rs` (`NoArgs` for none), so Swift can decode
+them. Swift registers the handler under `ShellCommandName.<identifier>`.
+
 Then regenerate the TypeScript and Swift types and commit the output:
 
 ```bash
@@ -149,8 +155,9 @@ class NoteFileServiceImpl implements NoteFileService {
   stricter check than its Rust type, for example data read from disk or the
   network (`settings_load`, `x_syndication_fetch`). A mismatch throws a `parse`
   `AppError` naming the command.
-- `ipc.callRaw(command, args, schema)` calls a command outside the table
-  (plugin commands, calendar) and always takes a schema.
+- `ipc.callBytes(command, args)` calls a command whose reply is raw bytes
+  (`asset_read_binary`), and `ipc.callBinary` sends a raw byte body
+  (`asset_upload_append`).
 - A mutating method takes `generation: number` and passes it on
   (`write(path, contents, generation)`).
 - Export new types the apps import from `packages/core/src/index.ts`.

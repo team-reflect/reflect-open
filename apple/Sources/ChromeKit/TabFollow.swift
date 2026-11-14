@@ -1,3 +1,5 @@
+public import TypesShared
+
 /// Which tab the native tab bar shows. A tap selects its tab at once and
 /// sends it to the page. States posted before the tap still name the old tab,
 /// so they must not move the selection back until the page shows the tapped

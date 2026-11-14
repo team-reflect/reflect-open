@@ -1,4 +1,5 @@
 import Foundation
+import TypesShared
 import XCTest
 
 @testable import ChromeKit
@@ -29,8 +30,8 @@ final class ChromeBridgeTests: XCTestCase {
     XCTAssertEqual(
       messages,
       [
-        .transition(started: true), .transition(started: false), .backSwipe(started: true),
-        .backSwipe(started: false), .chromeReady,
+        .transition(.init(phase: .start)), .transition(.init(phase: .end)),
+        .backSwipe(.init(phase: .start)), .backSwipe(.init(phase: .cancel)), .chromeReady,
       ])
   }
 
@@ -41,24 +42,25 @@ final class ChromeBridgeTests: XCTestCase {
 
   func testEncodesEveryIntentAsTheFixtureThePageParses() throws {
     let intents: [ChromeIntent] = [
-      .back(entryId: 3),
-      .tab(.all),
-      .action(entryId: 3, id: "gear"),
-      .command(.indent),
-      .files([IntentFile(name: "Image.png", type: "image/png", data: Data([1, 2, 3]))]),
-      .layout(cornersInHeaderRow: false),
-      .plus(entryId: 3, command: .note),
-      .sidebarVisible(true),
-      .sidebarVisible(nil),
-      .history(entryId: 3, forward: false),
-      .history(entryId: 3, forward: true),
-      .sidebar(.chat),
-      .sidebar(.search),
-      .sidebar(.settings),
-      .sidebar(.openNote("reflect-v2.md")),
-      .sidebar(.unpin("reflect-v2.md")),
-      .sidebar(.share("reflect-v2.md")),
-      .sidebar(.menu("graphs")),
+      .back(.init(entryId: 3)),
+      .tab(.init(tab: .all)),
+      .action(.init(entryId: 3, id: "gear")),
+      .command(.init(id: .indent)),
+      .files(
+        .init(files: [IntentFile(name: "Image.png", type: "image/png", bytes: Data([1, 2, 3]))])),
+      .layout(.init(cornersInHeaderRow: false)),
+      .plus(.init(entryId: 3, command: .note)),
+      .sidebarVisible(.init(visible: true)),
+      .sidebarVisible(.init(visible: nil)),
+      .history(.init(entryId: 3, direction: .back)),
+      .history(.init(entryId: 3, direction: .forward)),
+      .sidebar(.init(command: .chat)),
+      .sidebar(.init(command: .search)),
+      .sidebar(.init(command: .settings)),
+      .sidebar(.init(command: .openNote(.init(path: "reflect-v2.md")))),
+      .sidebar(.init(command: .unpin(.init(path: "reflect-v2.md")))),
+      .sidebar(.init(command: .share(.init(path: "reflect-v2.md")))),
+      .sidebar(.init(command: .menu(.init(id: "graphs")))),
     ]
     let encoded = try JSONSerialization.jsonObject(with: try JSONEncoder().encode(intents))
     let expected = try JSONSerialization.jsonObject(with: try fixture("intents"))
@@ -78,10 +80,10 @@ final class ChromeBridgeTests: XCTestCase {
     let decoder = JSONDecoder()
     XCTAssertEqual(
       try decoder.decode(ChromeState.self, from: try fixture("daily")).plus,
-      .capture(audio: .idle))
+      .capture(.init(audio: .idle)))
     XCTAssertEqual(
       try decoder.decode(ChromeState.self, from: try fixture("tasks")).plus,
-      .action(label: "New task"))
+      .action(.init(label: "New task")))
     XCTAssertNil(try decoder.decode(ChromeState.self, from: try fixture("none")).plus)
   }
 
@@ -89,12 +91,12 @@ final class ChromeBridgeTests: XCTestCase {
     let state = try JSONDecoder().decode(ChromeState.self, from: try fixture("note"))
     XCTAssertEqual(state.theme, .dark)
     XCTAssertEqual(state.toolbar?.canAttachFiles, true)
-    guard case .section(_, let items) = state.trailing.first?.menu?.last,
-      case .action(let delete) = items.first
+    guard case .section(let section) = state.trailing.first?.menu?.last,
+      case .action(let delete) = section.items.first
     else {
       return XCTFail("no delete section")
     }
-    XCTAssertTrue(delete.destructive)
+    XCTAssertEqual(delete.destructive, true)
     XCTAssertEqual(delete.confirm?.action, "Delete")
   }
 
@@ -121,9 +123,9 @@ final class ChromeBridgeTests: XCTestCase {
     var sent: [String] = []
     bridge.send = { sent.append(String(decoding: $0, as: UTF8.self)) }
 
-    bridge.send(.tab(.all))
+    bridge.send(.tab(.init(tab: .all)))
     bridge.receive(try message(["type": "chromeReady"]))
-    bridge.send(.action(entryId: 4, id: "pin"))
+    bridge.send(.action(.init(entryId: 4, id: "pin")))
 
     XCTAssertEqual(sent.count, 1)
     let intent = try JSONSerialization.jsonObject(with: Data(sent[0].utf8)) as! [String: Any]
@@ -137,7 +139,7 @@ final class ChromeBridgeTests: XCTestCase {
     var sent: [ChromeIntent] = []
     bridge.send = { data in
       let object = try! JSONSerialization.jsonObject(with: data) as! [String: Any]
-      sent.append(.layout(cornersInHeaderRow: object["cornersInHeaderRow"] as! Bool))
+      sent.append(.layout(.init(cornersInHeaderRow: object["cornersInHeaderRow"] as! Bool)))
     }
 
     bridge.cornersInHeaderRow = false
@@ -147,7 +149,9 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.documentDidStart()
     bridge.receive(try message(["type": "chromeReady"]))
 
-    XCTAssertEqual(sent, [.layout(cornersInHeaderRow: false), .layout(cornersInHeaderRow: true)])
+    XCTAssertEqual(
+      sent,
+      [.layout(.init(cornersInHeaderRow: false)), .layout(.init(cornersInHeaderRow: true))])
   }
 
   func testSendsTheSidebarVisibilityWhenItChangesAndToANewPage() throws {
@@ -179,7 +183,7 @@ final class ChromeBridgeTests: XCTestCase {
     bridge.receive(try message(["type": "chromeReady"]))
 
     bridge.documentDidStart()
-    bridge.send(.tab(.daily))
+    bridge.send(.tab(.init(tab: .daily)))
 
     XCTAssertNil(bridge.state)
     XCTAssertEqual(resets, 1)

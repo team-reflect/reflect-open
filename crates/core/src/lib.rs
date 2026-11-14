@@ -248,6 +248,7 @@ macro_rules! dispatch_table {
     (
         core { $( $method:ident ( $( $arg:ident : $ty:ty ),* ) $( . $await:tt )? $( $infallible:ident )? -> $ret:ty ),* $(,)? }
         desktop { $( $desktop:tt )* }
+        shell { $( $shell:tt )* }
     ) => {
         /// The commands with JSON arguments and a JSON reply.
         const JSON_COMMANDS: &[&str] = &[$( stringify!($method) ),*];

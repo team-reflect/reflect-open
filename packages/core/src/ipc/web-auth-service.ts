@@ -1,37 +1,17 @@
-import { z } from 'zod'
+import type { WebAuthOptions } from '@reflect/types'
 import type { IpcBridgeService } from './ipc-service.ts'
-import { definePluginCommand } from './plugin.ts'
 
 /**
  * Typed bindings for the `plugin:web-auth` commands, the system web sign-in
  * session (`apps/ios/Sources/Capabilities/WebAuthCapability.swift`).
  */
 
-export interface WebAuthOptions {
-  /**
-   * The page to open, usually an OAuth authorize URL.
-   */
-  url: string
-  /**
-   * The URL scheme (without `://`) whose navigation ends the session, e.g. `reflect`.
-   */
-  callbackScheme: string
-  /**
-   * When true, the session shares no cookies or website data with the system browser.
-   */
-  ephemeral: boolean
-}
+export type { WebAuthOptions } from '@reflect/types'
 
 /**
  * Opens the system web sign-in and resolves its callback URL, or `null` when cancelled.
  */
 export type StartWebAuth = (options: WebAuthOptions) => Promise<string | null>
-
-// iOS omits `url` on cancel and the desktop stub sends `null`; accept both.
-const startCommand = definePluginCommand<
-  { payload: WebAuthOptions },
-  { url?: string | null | undefined }
->('web-auth', 'start', z.object({ url: z.string().nullish() }))
 
 /**
  * The system web sign-in session.
@@ -61,7 +41,7 @@ class WebAuthServiceImpl implements WebAuthService {
       callbackScheme: options.callbackScheme,
       ephemeral: options.ephemeral,
     }
-    return (await startCommand(this.#deps.ipc, { payload })).url ?? null
+    return (await this.#deps.ipc.call('plugin:web-auth|start', { payload })).url ?? null
   }
 }
 

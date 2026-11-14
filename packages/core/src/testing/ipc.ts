@@ -165,14 +165,6 @@ class TestIpcBridgeServiceImpl implements TestIpcBridgeService {
     this.call = this.#inner.call.bind(this.#inner)
   }
 
-  callRaw<TOutput>(
-    command: string,
-    args: Record<string, unknown>,
-    schema: ZodType<TOutput, unknown>,
-  ): Promise<TOutput> {
-    return this.#inner.callRaw(command, args, schema)
-  }
-
   callBytes(command: string, args: Readonly<Record<string, unknown>>): Promise<ArrayBuffer> {
     return this.#inner.callBytes(command, args)
   }

@@ -1,21 +1,14 @@
+import type { IapProduct } from '@reflect/types'
 import { z } from 'zod'
 import type { LoggerService } from '../ports/logger-service.ts'
 import type { IpcBridgeService } from './ipc-service.ts'
 import type { Unlisten } from '../unlisten.ts'
-import { definePluginCommand, definePluginEvent, ignoredResult } from './plugin.ts'
+import { definePluginEvent } from './plugin.ts'
 
 /**
- * Typed bindings for the `plugin:iap` commands, the StoreKit In-App
- * Purchase bridge (`apps/ios/Sources/Capabilities/StoreCapability.swift`).
- * Each schema mirrors the wire format of `tauri-plugin-iap` v0.9.1, which
- * the permalinks below show.
- * TS shapes (hand-written, no runtime guarantee):
- * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts
- * Plugin iOS replies (hand-built dictionaries; fields vary by code path).
- * `StoreCapability.swift` builds the shipped replies in the same shape:
- * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift
- * Rust request/response models (serde camelCase):
- * https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/src/models.rs
+ * The `plugin:iap` commands, the StoreKit In-App Purchase bridge
+ * (`apple/Sources/AppStoreKit/StoreCommands.swift`). The wire format comes
+ * from `tauri-plugin-iap` v0.9.1, which the permalinks below show.
  */
 
 /**
@@ -26,38 +19,7 @@ export const IAP_PRODUCT_IDS = {
   yearly: 'app.reflect.ios.pro.yearly',
 } as const
 
-// Product:
-// https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/guest-js/index.ts#L39
-// https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/src/models.rs#L43
-// https://github.com/Choochmeque/tauri-plugin-iap/blob/v0.9.1/ios/Sources/IapPlugin.swift#L63
-const iapProductSchema = z.object({
-  productId: z.string(),
-  formattedPrice: z.string().nullish(),
-})
-
-/**
- * One store product as the plugin reports it. `formattedPrice` is the
- * store-localized display price (e.g., "$4.99"); it is nullish on plugin code
- * paths that build the dictionary without loaded store metadata.
- */
-export type IapProduct = z.infer<typeof iapProductSchema>
-
-// Command args mirror the serde request models (`GetProductsRequest`,
-// `PurchaseRequest`, ...) under the command's `payload` parameter.
-const getProductsCommand = definePluginCommand<
-  { payload: { productIds: string[]; productType: 'subs' } },
-  { products: IapProduct[] }
->('iap', 'get_products', z.object({ products: z.array(iapProductSchema) }))
-
-const purchaseCommand = definePluginCommand<
-  { payload: { productId: string; productType: 'subs' } },
-  unknown
->('iap', 'purchase', ignoredResult)
-
-const getProductStatusCommand = definePluginCommand<
-  { payload: { productId: string; productType: 'subs' } },
-  { isOwned: boolean }
->('iap', 'get_product_status', z.object({ isOwned: z.boolean() }))
+export type { IapProduct } from '@reflect/types'
 
 /**
  * Fires on purchases, renewals, and offer-code redemptions finished outside
@@ -117,18 +79,20 @@ class IapServiceImpl implements IapService {
   }
 
   async getProducts(productIds: string[]): Promise<IapProduct[]> {
-    const { products } = await getProductsCommand(this.#deps.ipc, {
+    const { products } = await this.#deps.ipc.call('plugin:iap|get_products', {
       payload: { productIds, productType: 'subs' },
     })
     return products
   }
 
   async purchase(productId: string): Promise<void> {
-    await purchaseCommand(this.#deps.ipc, { payload: { productId, productType: 'subs' } })
+    await this.#deps.ipc.call('plugin:iap|purchase', {
+      payload: { productId, productType: 'subs' },
+    })
   }
 
   async isOwned(productId: string): Promise<boolean> {
-    const { isOwned } = await getProductStatusCommand(this.#deps.ipc, {
+    const { isOwned } = await this.#deps.ipc.call('plugin:iap|get_product_status', {
       payload: { productId, productType: 'subs' },
     })
     return isOwned

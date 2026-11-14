@@ -1,8 +1,8 @@
 import Foundation
 import Testing
+import TypesShared
 
 @testable import CaptureShared
-import TypesShared
 
 private func makeInbox() -> URL {
   FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

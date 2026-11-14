@@ -14,30 +14,26 @@ enum HostCommands {
   /// `openURL` hands a URL to the system and returns whether an app opened it.
   static func all(openURL: @escaping @MainActor (URL) async -> Bool) -> [String: ShellCommand] {
     [
-      "host.log": log,
-      "host.open_url": { request in await open(request, with: openURL) },
+      ShellCommandName.hostLog.rawValue: log,
+      ShellCommandName.hostOpenUrl.rawValue: { request in await open(request, with: openURL) },
     ]
   }
 
   /// `host.log {level, message}`: writes a line of the web app to the system
   /// log and to the core's log file.
   private static func log(_ request: ShellRequest) async -> CoreReply {
-    struct Args: Decodable {
-      var level: String
-      var message: String
-    }
-    guard let args = request.decodeArgs(Args.self) else {
+    guard let args = request.decodeArgs(HostLogArgs.self) else {
       return .error(.parse(.init(message: "host.log takes {level, message}")))
     }
     let level: ReflectCore.LogLevel
     switch args.level {
-    case "error":
+    case .error:
       webLogger.error("\(args.message, privacy: .public)")
       level = .error
-    case "warn":
+    case .warn:
       webLogger.warning("\(args.message, privacy: .public)")
       level = .warn
-    default:
+    case .info:
       webLogger.info("\(args.message, privacy: .public)")
       level = .info
     }
@@ -51,10 +47,7 @@ enum HostCommands {
   private static func open(
     _ request: ShellRequest, with openURL: @MainActor (URL) async -> Bool
   ) async -> CoreReply {
-    struct Args: Decodable {
-      var url: String
-    }
-    guard let args = request.decodeArgs(Args.self),
+    guard let args = request.decodeArgs(HostOpenUrlArgs.self),
       let url = URL(string: args.url), url.scheme != nil
     else {
       return .error(.parse(.init(message: "host.open_url takes {url} with an absolute URL")))

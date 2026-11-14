@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 
 /// The tab bar of the `bar` form: a public `UITabBar` that the shell places

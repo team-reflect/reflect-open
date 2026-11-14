@@ -1,38 +1,10 @@
 import type { MaybePromise } from '@reflect/utils'
-import { z } from 'zod'
 import type { IpcBridgeService } from './ipc-service.ts'
-import { definePluginCommand, ignoredResult } from './plugin.ts'
 
 /**
  * Typed bindings for the `plugin:app-store` commands, the install-channel
  * probe (`apps/ios/Sources/Capabilities/StoreCapability.swift`).
  */
-
-const appStoreEnvironmentSchema = z.object({ environment: z.string() })
-
-const getEnvironmentCommand = definePluginCommand<Record<string, never>, { environment: string }>(
-  'app-store',
-  'get_environment',
-  appStoreEnvironmentSchema,
-)
-
-const syncCommand = definePluginCommand<Record<string, never>, unknown>(
-  'app-store',
-  'sync',
-  ignoredResult,
-)
-
-const presentOfferCodeRedeemSheetCommand = definePluginCommand<Record<string, never>, unknown>(
-  'app-store',
-  'present_offer_code_redeem_sheet',
-  ignoredResult,
-)
-
-const requestReviewCommand = definePluginCommand<Record<string, never>, unknown>(
-  'app-store',
-  'request_review',
-  ignoredResult,
-)
 
 /**
  * The App Store install channel and its restore and redeem flows.
@@ -79,19 +51,19 @@ class AppStoreServiceImpl implements AppStoreService {
   }
 
   async environment(): Promise<string> {
-    return (await getEnvironmentCommand(this.#deps.ipc, {})).environment
+    return (await this.#deps.ipc.call('plugin:app-store|get_environment', {})).environment
   }
 
   async sync(): Promise<void> {
-    await syncCommand(this.#deps.ipc, {})
+    await this.#deps.ipc.call('plugin:app-store|sync', {})
   }
 
   async presentOfferCodeRedeemSheet(): Promise<void> {
-    await presentOfferCodeRedeemSheetCommand(this.#deps.ipc, {})
+    await this.#deps.ipc.call('plugin:app-store|present_offer_code_redeem_sheet', {})
   }
 
   async requestReview(): Promise<void> {
-    await requestReviewCommand(this.#deps.ipc, {})
+    await this.#deps.ipc.call('plugin:app-store|request_review', {})
   }
 }
 

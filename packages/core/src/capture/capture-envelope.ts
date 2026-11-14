@@ -1,4 +1,9 @@
-import type * as wire from '@reflect/types'
+import type {
+  CaptureAck as WireCaptureAck,
+  CaptureWireMessage as WireCaptureWireMessage,
+  LinkCaptureEnvelope,
+  TextCaptureEnvelope as WireTextCaptureEnvelope,
+} from '@reflect/types'
 import { z } from 'zod'
 import { xPostEnvelopeSchema, xPostWireSchema } from './bookmark-envelope.ts'
 import { TEXT_CAPTURE_PARENT_MAX_LENGTH } from './text-capture-limits.ts'
@@ -73,7 +78,7 @@ export const captureEnvelopeSchema = z.object({
   capturedAt: z.iso.datetime({ offset: true }),
   /** Where the capture originated. */
   source: captureSourceSchema,
-}) satisfies z.ZodType<wire.LinkCaptureEnvelope>
+}) satisfies z.ZodType<LinkCaptureEnvelope>
 
 export type CaptureEnvelope = z.infer<typeof captureEnvelopeSchema>
 export type CaptureSource = z.infer<typeof captureSourceSchema>
@@ -88,7 +93,7 @@ export const captureWireMessageSchema = z.object({
   envelope: captureEnvelopeSchema.omit({ screenshotRef: true }),
   /** JPEG screenshot bytes, base64 (no data-URL prefix). */
   screenshotBase64: z.string().min(1).regex(BASE64_RE, 'must be base64').optional(),
-}) satisfies z.ZodType<wire.CaptureWireMessage>
+}) satisfies z.ZodType<WireCaptureWireMessage>
 
 export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>
 
@@ -161,7 +166,7 @@ export const textCaptureEnvelopeSchema = z.object({
   capturedAt: z.iso.datetime({ offset: true }),
   /** Where the capture came from. */
   source: textCaptureSourceSchema,
-}) satisfies z.ZodType<wire.TextCaptureEnvelope>
+}) satisfies z.ZodType<WireTextCaptureEnvelope>
 
 export type TextCaptureEnvelope = z.infer<typeof textCaptureEnvelopeSchema>
 export type TextCaptureKind = z.infer<typeof textCaptureKindSchema>
@@ -200,6 +205,6 @@ export const captureAckSchema = z.discriminatedUnion('ok', [
     code: z.enum(['no-graph', 'invalid-payload', 'io', 'unsupported-version']),
     message: z.string(),
   }),
-]) satisfies z.ZodType<wire.CaptureAck>
+]) satisfies z.ZodType<WireCaptureAck>
 
 export type CaptureAck = z.infer<typeof captureAckSchema>

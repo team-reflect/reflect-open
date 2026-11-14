@@ -1,5 +1,5 @@
-//! The command table: every command the frontend calls through the Rust core
-//! or the desktop shell, with its arguments and result.
+//! The command table: every command the frontend calls through the Rust core,
+//! the desktop shell or the Swift shell, with its arguments and result.
 
 #[allow(unused_imports)]
 use crate::*;
@@ -9,7 +9,8 @@ use crate::*;
 /// A `core` row names a `Core` method; `.await` marks an async method and
 /// `infallible` one that returns its value without `AppResult`. A `desktop`
 /// row names a Tauri command by its module path and lists only the arguments
-/// the frontend sends.
+/// the frontend sends. A `shell` row maps a Swift shell command name to an
+/// identifier, its arguments type and its result.
 #[macro_export]
 macro_rules! commands {
     ($callback:ident) => {
@@ -129,6 +130,27 @@ macro_rules! commands {
                 calendar::calendar_list_calendars() -> Vec<CalendarInfo>,
                 calendar::calendar_list_events(start: f64, end: f64, calendar_ids: Vec<String>) -> Vec<CalendarEvent>,
             }
+            shell {
+                "plugin:recording|start_recording" => recording_start(RecordingStartArgs) -> RecordingSessionStart,
+                "plugin:recording|stop_recording" => recording_stop(NoArgs) -> RecordingStopResponse,
+                "plugin:recording|cancel_recording" => recording_cancel(NoArgs) -> (),
+                "plugin:recording|recording_status" => recording_status(NoArgs) -> RecordingStatus,
+                "plugin:recording|list_staged" => recording_list_staged(NoArgs) -> StagedRecordingList,
+                "plugin:recording|delete_staged" => recording_delete_staged(RecordingDeleteStagedArgs) -> (),
+                "plugin:recording|actions_ready" => recording_actions_ready(NoArgs) -> (),
+                "plugin:recording|action_performed" => recording_action_performed(NoArgs) -> (),
+                "plugin:web-auth|start" => web_auth_start(WebAuthStartArgs) -> WebAuthCallback,
+                "plugin:mobile-haptics|impact_light" => haptics_impact_light(NoArgs) -> (),
+                "plugin:app-store|get_environment" => app_store_get_environment(NoArgs) -> AppStoreEnvironmentReply,
+                "plugin:app-store|sync" => app_store_sync(NoArgs) -> (),
+                "plugin:app-store|present_offer_code_redeem_sheet" => app_store_present_offer_code_redeem_sheet(NoArgs) -> (),
+                "plugin:app-store|request_review" => app_store_request_review(NoArgs) -> (),
+                "plugin:iap|get_products" => iap_get_products(IapProductsArgs) -> IapProducts,
+                "plugin:iap|purchase" => iap_purchase(IapProductArgs) -> (),
+                "plugin:iap|get_product_status" => iap_get_product_status(IapProductArgs) -> IapProductStatus,
+                "host.log" => host_log(HostLogArgs) -> (),
+                "host.open_url" => host_open_url(HostOpenUrlArgs) -> (),
+            }
         }
     };
 }
@@ -139,9 +161,11 @@ macro_rules! define_commands {
     (
         core { $( $method:ident ( $( $arg:ident : $ty:ty ),* ) $( . $await:tt )? $( $infallible:ident )? -> $ret:ty ),* $(,)? }
         desktop { $( $module:ident :: $desktop:ident ( $( $desktop_arg:ident : $desktop_ty:ty ),* ) -> $desktop_ret:ty ),* $(,)? }
+        shell { $( $name:literal => $shell:ident ( $shell_args:ty ) -> $shell_ret:ty ),* $(,)? }
     ) => {
         $( define_commands!(@one $method ( $( $arg : $ty ),* ) -> $ret); )*
         $( define_commands!(@one $desktop ( $( $desktop_arg : $desktop_ty ),* ) -> $desktop_ret); )*
+        $( define_commands!(@shell $shell ( $shell_args ) -> $shell_ret); )*
 
         /// Registers the argument and result types of every command.
         #[cfg(feature = "codegen")]
@@ -149,14 +173,38 @@ macro_rules! define_commands {
             types
                 $( .register::<$method::Signature>() )*
                 $( .register::<$desktop::Signature>() )*
+                $( .register::<$shell::Signature>() )*
         }
 
-        /// Every command name with its arguments and result.
+        /// Every command with its arguments and result. A Swift shell command
+        /// field is named after its identifier; the codegen renames it after
+        /// the command (`SHELL_COMMANDS`).
         #[cfg(feature = "codegen")]
         #[derive(specta::Type)]
         pub struct Commands {
             $( pub $method: $method::Signature, )*
             $( pub $desktop: $desktop::Signature, )*
+            $( pub $shell: $shell::Signature, )*
+        }
+
+        /// The identifier and the name of every Swift shell command.
+        #[cfg(feature = "codegen")]
+        pub const SHELL_COMMANDS: &[(&str, &str)] = &[$( (stringify!($shell), $name) ),*];
+    };
+    (@shell $shell:ident ( $args:ty ) -> $ret:ty) => {
+        #[allow(non_camel_case_types)]
+        pub mod $shell {
+            #[allow(unused_imports)]
+            use super::*;
+
+            /// The command's arguments and result.
+            #[cfg(feature = "codegen")]
+            #[derive(specta::Type)]
+            #[specta(inline)]
+            pub struct Signature {
+                pub args: $args,
+                pub result: $ret,
+            }
         }
     };
     (@one $method:ident ( $( $arg:ident : $ty:ty ),* ) -> $ret:ty) => {

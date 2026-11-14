@@ -49,6 +49,12 @@ export type AppError =
 /**  Anything not covered above. */
 { kind: "unknown"; message: string };
 
+/**  `plugin:app-store|get_environment` result. */
+export type AppStoreEnvironmentReply = {
+	/**  `Production`, `Sandbox` or `Xcode`. */
+	environment: string,
+};
+
 /**  The answer to a `reflect-asset` request. */
 export type AssetResolveReply = 
 /**
@@ -61,6 +67,25 @@ export type AssetResolveReply =
  *  file, for the `Content-Range` of a 416.
  */
 { kind: "refused"; status: number; total: number | null };
+
+/**  The phase of the audio memo recorder. */
+export type AudioPhase = "idle" | "requesting" | "recording" | "transcribing" | "error";
+
+/**  The phase of a user back swipe. */
+export type BackSwipePhase = "start" | "cancel";
+
+/**
+ *  A native button that floats in a top corner of the page. A tap opens
+ *  `menu` when it has one, and sends an `action` intent with `id` otherwise.
+ */
+export type BarButton = {
+	id: string,
+	/**  The label, also the accessibility label of an icon button. */
+	title: string,
+	/**  An SF Symbol name; without it the button shows `title`. */
+	icon?: string | null | undefined,
+	menu?: MenuItem[] | null | undefined,
+};
 
 /**  The first and last byte of a single-range `Range` header. */
 export type ByteRange = {
@@ -221,7 +246,87 @@ export type ChatMessageRow = {
 	createdMs: number,
 };
 
-/**  Every command name with its arguments and result. */
+/**
+ *  What the shell sends the page: a tap on a native control, or a change of
+ *  the shell's layout.
+ */
+export type ChromeIntent = { type: "back"; entryId: number } | 
+/**  A move in the history, from the screen of `entry_id`. */
+{ type: "history"; entryId: number; direction: HistoryDirection } | { type: "tab"; tab: ChromeTab } | { type: "action"; entryId: number; id: string } | { type: "command"; id: FormattingCommand } | { type: "files"; files: IntentFile[] } | 
+/**
+ *  Whether the corner buttons sit in the page's header row, or in the row
+ *  of the floating tab bar above it.
+ */
+{ type: "layout"; cornersInHeaderRow: boolean } | 
+/**  A tap on the `+` of the screen of `entry_id`. */
+{ type: "plus"; entryId: number; command: PlusCommand } | 
+/**  Whether the iPad sidebar shows, or none without a sidebar. */
+{ type: "sidebarVisible"; visible: boolean | null } | 
+/**  A tap in the iPad sidebar. */
+{ type: "sidebar"; command: SidebarIntent };
+
+/**
+ *  Whether the page shows its shell, or a full-screen page with no bars
+ *  (onboarding, loading, the crash card).
+ */
+export type ChromeKind = "shell" | "none";
+
+/**  A message the page posts to the shell. */
+export type ChromeMessage = 
+/**
+ *  The chrome state, after every change. specta-swift names its payload
+ *  `ChromeMessageStateData`.
+ */
+{ type: "state"; 
+/**  Grows with every state of one document. */
+generation: number; 
+/**
+ *  The history entry the state describes; intents echo it. A surface
+ *  outside the router uses -1.
+ */
+entryId: number; chrome: ChromeKind; 
+/**  The kind of the route on screen, for logs. */
+routeKind: string | null; 
+/**  The tab the page shows. */
+tab: ChromeTab; 
+/**  The shell shows a back button before the `leading` buttons. */
+canBack: boolean; 
+/**  The buttons in the top-left corner, after the back button. */
+leading: BarButton[]; 
+/**  The buttons in the top-right corner. */
+trailing: BarButton[]; keyboardVisible: boolean; 
+/**  A web drawer is open: the shell hides its bars. */
+modal: boolean; toolbar: ToolbarState | null; 
+/**  The `+` of the screen, or none for a screen without one. */
+plus: PlusState | null; 
+/**  What the iPad sidebar shows, or none outside the shell. */
+sidebar: SidebarState | null; 
+/**
+ *  Where the history can move, while the window has a sidebar. The shell
+ *  then shows a back and a forward button in place of the back button.
+ */
+history: HistoryState | null; theme: ChromeTheme } | 
+/**  A web push or pop slide starts or ends. */
+{ type: "transition"; phase: TransitionPhase } | 
+/**
+ *  A user back swipe starts to move the page, or settles back without a
+ *  pop.
+ */
+{ type: "backSwipe"; phase: BackSwipePhase } | 
+/**  The page listens for intents. */
+{ type: "chromeReady" };
+
+/**  A tab of the shell. */
+export type ChromeTab = "daily" | "all" | "tasks";
+
+/**  The theme preference of the page. */
+export type ChromeTheme = "system" | "light" | "dark";
+
+/**
+ *  Every command with its arguments and result. A Swift shell command
+ *  field is named after its identifier; the codegen renames it after
+ *  the command (`SHELL_COMMANDS`).
+ */
 export type Commands = {
 	settings_load: {
 		args: Record<string, never>,
@@ -914,6 +1019,82 @@ export type Commands = {
 		},
 		result: CalendarEvent[],
 	},
+	"plugin:recording|start_recording": {
+		args: RecordingStartArgs,
+		result: RecordingSessionStart,
+	},
+	"plugin:recording|stop_recording": {
+		args: NoArgs,
+		result: RecordingStopResponse,
+	},
+	"plugin:recording|cancel_recording": {
+		args: NoArgs,
+		result: null,
+	},
+	"plugin:recording|recording_status": {
+		args: NoArgs,
+		result: RecordingStatus,
+	},
+	"plugin:recording|list_staged": {
+		args: NoArgs,
+		result: StagedRecordingList,
+	},
+	"plugin:recording|delete_staged": {
+		args: RecordingDeleteStagedArgs,
+		result: null,
+	},
+	"plugin:recording|actions_ready": {
+		args: NoArgs,
+		result: null,
+	},
+	"plugin:recording|action_performed": {
+		args: NoArgs,
+		result: null,
+	},
+	"plugin:web-auth|start": {
+		args: WebAuthStartArgs,
+		result: WebAuthCallback,
+	},
+	"plugin:mobile-haptics|impact_light": {
+		args: NoArgs,
+		result: null,
+	},
+	"plugin:app-store|get_environment": {
+		args: NoArgs,
+		result: AppStoreEnvironmentReply,
+	},
+	"plugin:app-store|sync": {
+		args: NoArgs,
+		result: null,
+	},
+	"plugin:app-store|present_offer_code_redeem_sheet": {
+		args: NoArgs,
+		result: null,
+	},
+	"plugin:app-store|request_review": {
+		args: NoArgs,
+		result: null,
+	},
+	"plugin:iap|get_products": {
+		args: IapProductsArgs,
+		result: IapProducts,
+	},
+	"plugin:iap|purchase": {
+		args: IapProductArgs,
+		result: null,
+	},
+	"plugin:iap|get_product_status": {
+		args: IapProductArgs,
+		result: IapProductStatus,
+	},
+	"host.log": {
+		args: HostLogArgs,
+		result: null,
+	},
+	"host.open_url": {
+		args: HostOpenUrlArgs,
+		result: null,
+	},
 };
 
 /**  Result of a commit attempt. `committed: false` means the tree was clean. */
@@ -1064,6 +1245,9 @@ export type FileMeta = {
 	placeholder?: boolean | undefined,
 };
 
+/**  A command of the page's formatting toolbar. */
+export type FormattingCommand = "slash" | "list" | "todo" | "link" | "tag" | "dedent" | "indent" | "up" | "down" | "dismiss";
+
 /**
  *  An HTTPS sign-in supplied per call. Which username and secret a host
  *  wants is `@reflect/core`'s business (GitHub: `x-access-token` plus the
@@ -1159,6 +1343,75 @@ export type GraphInfo = {
 	 *  for one graph can never land in another graph's same-named file.
 	 */
 	generation: number,
+};
+
+/**  The direction of a move in the history. */
+export type HistoryDirection = "back" | "forward";
+
+/**  Whether the history can move back and forward. */
+export type HistoryState = {
+	back: boolean,
+	forward: boolean,
+};
+
+/**  `host.log` arguments: one line of the web app. */
+export type HostLogArgs = {
+	level: HostLogLevel,
+	message: string,
+};
+
+/**  The severity of a `host.log` line. */
+export type HostLogLevel = "error" | "warn" | "info";
+
+/**  `host.open_url` arguments. */
+export type HostOpenUrlArgs = {
+	/**  An absolute URL. */
+	url: string,
+};
+
+/**  One store product. */
+export type IapProduct = {
+	productId: string,
+	/**  The store-localized display price, such as `$4.99`. */
+	formattedPrice?: string | null | undefined,
+};
+
+/**  `plugin:iap|purchase` and `plugin:iap|get_product_status` arguments. */
+export type IapProductArgs = {
+	payload: IapProductQuery,
+};
+
+/**  One product. */
+export type IapProductQuery = {
+	productId: string,
+	productType: IapProductType,
+};
+
+/**  `plugin:iap|get_product_status` result. */
+export type IapProductStatus = {
+	/**  Whether a verified transaction entitles the user to the product now. */
+	isOwned: boolean,
+};
+
+/**  The kind of store product. */
+export type IapProductType = 
+/**  An auto-renewable subscription. */
+"subs";
+
+/**  `plugin:iap|get_products` result. */
+export type IapProducts = {
+	products: IapProduct[],
+};
+
+/**  `plugin:iap|get_products` arguments. */
+export type IapProductsArgs = {
+	payload: IapProductsQuery,
+};
+
+/**  The products to look up. */
+export type IapProductsQuery = {
+	productIds: string[],
+	productType: IapProductType,
 };
 
 /**  iCloud availability as desktop onboarding and settings consume it. */
@@ -1309,6 +1562,15 @@ export type IndexedTask = {
 	dueDate: string | null,
 };
 
+/**  A file the user picked, for the editor to attach. */
+export type IntentFile = {
+	name: string,
+	/**  The MIME type. */
+	type: string,
+	/**  The bytes, base64. */
+	data: string,
+};
+
 /**  A captured web page. */
 export type LinkCaptureEnvelope = {
 	/**  Always 1. */
@@ -1354,6 +1616,29 @@ export type LocalNoteRead =
  */
 { kind: "evicted" };
 
+/**
+ *  A confirmation the shell shows before it sends the item's intent: an
+ *  action sheet (a popover on iPad) with one destructive button and Cancel.
+ */
+export type MenuConfirm = {
+	title: string,
+	message?: string | null | undefined,
+	/**  The label of the destructive button. */
+	action: string,
+};
+
+/**
+ *  One row of a menu, or a section of rows, in the order the shell shows
+ *  them.
+ */
+export type MenuItem = 
+/**  One row. specta-swift names its payload `MenuItemActionData`. */
+{ type: "action"; id: string; title: string; 
+/**  An SF Symbol name. */
+icon?: string | null | undefined; destructive?: boolean | null | undefined; disabled?: boolean | null | undefined; 
+/**  Shows a checkmark. */
+checked?: boolean | null | undefined; confirm?: MenuConfirm | null | undefined } | { type: "section"; title?: string | null | undefined; items: MenuItem[] };
+
 export type MergeKind = "upToDate" | "fastForward" | "merged";
 
 /**
@@ -1395,6 +1680,9 @@ export type MovedNoteAddress = {
 	dailyDate: string | null,
 };
 
+/**  The arguments of a command that takes none. */
+export type NoArgs = Record<string, never>;
+
 /**  Result of claiming a note path without overwriting an existing file. */
 export type NoteCreateOutcome = 
 /**  The path was free and now contains the supplied bytes. */
@@ -1427,6 +1715,26 @@ export type NoteWriteOutcome = {
 	 */
 	merged: string | null,
 };
+
+/**  A pinned note in the iPad sidebar. */
+export type PinnedNote = {
+	path: string,
+	/**  The name the sidebar shows. */
+	title: string,
+};
+
+/**  A tap on the `+` (`tap`) or on one item of the capture menu. */
+export type PlusCommand = "tap" | "note" | "task" | "audio";
+
+/**  The `+` of a screen: Daily's capture menu, or one action. */
+export type PlusState = 
+/**
+ *  The capture menu. `audio` is the audio memo phase, or none where the
+ *  recorder is unavailable: the menu then has no audio item.
+ */
+{ kind: "capture"; audio: AudioPhase | null } | 
+/**  One action. `label` is the accessibility label. */
+{ kind: "action"; label: string };
 
 /**
  *  What one pull did: the commit of local changes, then the merge of the
@@ -1501,6 +1809,81 @@ export type ReconcileScan = {
 	stalePlaceholders: string[],
 };
 
+/**  `plugin:recording|delete_staged` arguments. */
+export type RecordingDeleteStagedArgs = {
+	request: StagedRecordingPath,
+};
+
+/**
+ *  `plugin:recording:recordingLevel`, about 10 times a second while
+ *  recording in the foreground.
+ */
+export type RecordingLevelEvent = {
+	/**  Linear input level from 0 to 1. */
+	level: number,
+	/**  Recorded time so far, pauses excluded. */
+	elapsedMs: number,
+};
+
+/**
+ *  `plugin:recording:nativeAction`: an OS entry point asked for something
+ *  only the web view can present.
+ */
+export type RecordingNativeActionEvent = {
+	/**  Currently only `recordAudio`. */
+	action: string,
+};
+
+/**
+ *  `plugin:recording:recordingSegment`: a finished segment of a session that
+ *  still records. The final segment arrives in the stop result or in
+ *  `recordingStopped`.
+ */
+export type RecordingSegmentEvent = {
+	path: string,
+	sessionStartedMs: number,
+	part: number,
+};
+
+/**  The identity every segment of a session shares. */
+export type RecordingSessionStart = {
+	/**  Epoch milliseconds. */
+	sessionStartedMs: number,
+};
+
+/**  `plugin:recording|start_recording` arguments. */
+export type RecordingStartArgs = {
+	request: StartRecordingOptions,
+};
+
+/**  Whether a session runs, and its recorded length so far. */
+export type RecordingStatus = {
+	recording: boolean,
+	/**  Across every segment of the session. */
+	elapsedMs: number,
+};
+
+/**  A session's final segment, still in staging. */
+export type RecordingStopResponse = {
+	/**  Absolute path of the staged `.m4a`, already `-end`-marked. */
+	path: string,
+	sessionStartedMs: number,
+	/**  1-based position of this final segment. */
+	part: number,
+	/**  The whole session's recorded length. */
+	durationMs: number,
+};
+
+/**  `plugin:recording:recordingStopped`: the shell ended a session. */
+export type RecordingStoppedEvent = {
+	path: string,
+	sessionStartedMs: number,
+	part: number,
+	/**  The whole session's recorded length. */
+	durationMs: number,
+	reason: string,
+};
+
 /**
  *  Where the local branch stands relative to its last-fetched remote
  *  counterpart (no network — call after `fetch`).
@@ -1549,6 +1932,29 @@ export type ScanOrphan = {
 	storedHash: string,
 };
 
+/**  A tap in the iPad sidebar. */
+export type SidebarIntent = { kind: "chat" } | { kind: "search" } | { kind: "settings" } | 
+/**  Opens a pinned note. */
+{ kind: "openNote"; path: string } | { kind: "unpin"; path: string } | { kind: "share"; path: string } | 
+/**  An item of the graph menu. */
+{ kind: "menu"; id: string };
+
+/**  What the iPad sidebar shows. */
+export type SidebarState = {
+	/**
+	 *  The row to select: a tab, `chat`, or a pinned note's path after
+	 *  `pinned:`.
+	 */
+	selection: string,
+	/**  The pinned notes, in shelf order. */
+	pinned: PinnedNote[],
+	graphName: string,
+	/**  The graph's color as `#rrggbb`, or none for the app's tint. */
+	graphColor: string | null,
+	/**  The menu of the graph button. */
+	graphMenu: MenuItem[],
+};
+
 /**
  *  A file whose changes were withheld because it is at or above the size
  *  guardrail. An unchanged oversized file is not reported.
@@ -1557,6 +1963,43 @@ export type SkippedFile = {
 	/**  Graph-relative path (forward-slashed) of the withheld file. */
 	path: string,
 	size: number,
+};
+
+/**  One staged segment file. */
+export type StagedRecordingFile = {
+	/**  Absolute path of the staged `.m4a`. */
+	path: string,
+	sessionStartedMs: number,
+	/**  1-based position within the session. */
+	part: number,
+	/**  True for the final segment of a session. */
+	end: boolean,
+	modifiedMs: number,
+};
+
+/**  `plugin:recording|list_staged` result. */
+export type StagedRecordingList = {
+	files: StagedRecordingFile[],
+};
+
+/**  One staged segment file, by its absolute path. */
+export type StagedRecordingPath = {
+	path: string,
+};
+
+/**  How a recording session runs. */
+export type StartRecordingOptions = {
+	/**
+	 *  Rotate the recorder after this much audio, natively, so rotation holds
+	 *  even if JS never wakes. Each segment is one staged file.
+	 */
+	segmentMs: number,
+	/**
+	 *  Remind the user this often while the session runs. The shell schedules
+	 *  the notification itself, so it survives a sleeping web view and is
+	 *  cleared by whatever ends the session.
+	 */
+	reminderMs: number,
 };
 
 /**  How much of the graph a sweep checks for unresolved versions. */
@@ -1606,6 +2049,18 @@ export type TextCaptureKind = "append" | "checkbox" | "task";
 /**  Who produced a text capture. */
 export type TextCaptureSource = "deep-link" | "ios-share" | "ios-intent";
 
+/**  The formatting toolbar of the focused editor. */
+export type ToolbarState = {
+	canIndent: boolean,
+	canDedent: boolean,
+	canMoveUp: boolean,
+	canMoveDown: boolean,
+	canAttachFiles: boolean,
+};
+
+/**  The phase of a web push or pop slide. */
+export type TransitionPhase = "start" | "end";
+
 export type Value = null | boolean | number | string | unknown[] | { [key in string]: unknown };
 
 /**
@@ -1617,6 +2072,30 @@ export type VaultScanStats = {
 	notes: number,
 	attachments: number,
 	skipped: number,
+};
+
+/**  `plugin:web-auth|start` result. */
+export type WebAuthCallback = {
+	/**  The callback URL; none when the user cancels. */
+	url?: string | null | undefined,
+};
+
+/**  A system web sign-in. */
+export type WebAuthOptions = {
+	/**  The page that starts the sign-in. */
+	url: string,
+	/**  The URL scheme that ends the sign-in. */
+	callbackScheme: string,
+	/**
+	 *  When true, the session shares no cookies or website data with the
+	 *  system browser.
+	 */
+	ephemeral: boolean,
+};
+
+/**  `plugin:web-auth|start` arguments. */
+export type WebAuthStartArgs = {
+	payload: WebAuthOptions,
 };
 
 /**

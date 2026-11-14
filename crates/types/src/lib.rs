@@ -8,6 +8,7 @@
 mod calendar;
 mod capture;
 mod change;
+mod chrome;
 pub mod commands;
 mod contacts;
 mod embed;
@@ -22,6 +23,7 @@ mod import;
 mod index;
 mod link_preview;
 mod settings;
+mod shell;
 mod skill;
 
 pub use calendar::{
@@ -35,6 +37,7 @@ pub use capture::{
     SHARED_SCREENSHOT_MAX_BYTES, TextCaptureEnvelope, TextCaptureKind, TextCaptureSource,
 };
 pub use change::{ChangeKind, FileChange};
+pub use chrome::*;
 pub use contacts::{ContactMatch, ContactsAuthorization};
 pub use embed::{EmbedProgress, EmbedStatus};
 pub use error::{AppError, AppResult};
@@ -57,4 +60,5 @@ pub use index::{
 };
 pub use link_preview::LinkPreviewHtml;
 pub use settings::SettingsDoc;
+pub use shell::*;
 pub use skill::{AgentSkillInstallState, AgentSkillStatus};

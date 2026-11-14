@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import { parseSearchQuery } from './indexing/filter-query.ts'
 import { createTestClockService } from './testing/clock.ts'
 import { createNodeTestDatabaseService, seedNotes } from './testing/database.ts'
@@ -20,7 +19,7 @@ import {
 import { createPosixPathTransport } from './ports/path-service.ts'
 
 function requiredAdapters(): CoreAdapters {
-  const ipc = createTestIpcBridgeService({ commands: { app_version: () => '1.2.3' } })
+  const ipc = createTestIpcBridgeService({ commands: { mobile_storage_local: () => '/local' } })
   return {
     ipc,
     platform: createTestPlatformService(),
@@ -49,7 +48,7 @@ describe('createCoreServices', () => {
     expect(services.logger).toBe(adapters.logger)
     expect(services.clock).toBe(adapters.clock)
     expect(services.platform).toBe(adapters.platform)
-    await expect(services.ipc.callRaw('app_version', {}, z.string())).resolves.toBe('1.2.3')
+    await expect(services.ipc.call('mobile_storage_local', {})).resolves.toBe('/local')
     expect(services.platform.appVersion).toBe('0.0.0-test')
     await expect(services.path.homeDir()).resolves.toBe('/home/test')
   })

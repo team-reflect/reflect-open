@@ -1,4 +1,5 @@
 import ChromeKit
+import TypesShared
 import UIKit
 import WebKit
 
@@ -177,14 +178,14 @@ final class WebPageController: UIViewController {
           break
         case .back:
           buttons.append(
-            Self.makeArrow(forward: false) { send(.back(entryId: entryId)) })
+            Self.makeArrow(forward: false) { send(.back(.init(entryId: entryId))) })
         case .history(let history):
           let backButton = Self.makeArrow(forward: false) {
-            send(.history(entryId: entryId, forward: false))
+            send(.history(.init(entryId: entryId, direction: .back)))
           }
           backButton.isEnabled = history.back
           let forwardButton = Self.makeArrow(forward: true) {
-            send(.history(entryId: entryId, forward: true))
+            send(.history(.init(entryId: entryId, direction: .forward)))
           }
           forwardButton.isEnabled = history.forward
           buttons += [backButton, forwardButton]
@@ -317,7 +318,7 @@ final class WebPageController: UIViewController {
       control.showsMenuAsPrimaryAction = true
     } else {
       control.addAction(
-        UIAction { _ in send(.action(entryId: entryId, id: button.id)) },
+        UIAction { _ in send(.action(.init(entryId: entryId, id: button.id))) },
         for: .primaryActionTriggered)
     }
     return control
