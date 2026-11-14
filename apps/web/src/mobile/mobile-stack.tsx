@@ -34,8 +34,8 @@ interface StackLayer {
 
 /**
  * Whether a route renders as a card pushed over a tab root. Note screens,
- * Chat (pushed over All) and the settings screens (Settings, its Graphs
- * sub-screen) stack; everything else (daily, All, search-as-All, Tasks, and
+ * Chat (pushed over All) and the settings screens (Settings and its pages)
+ * stack; everything else (daily, All, search-as-All, Tasks, and
  * Chat in its own section) is a root.
  *
  * @param section The section of the route's history entry.
@@ -44,10 +44,18 @@ function isStacked(route: Route, section: Section): boolean {
   return (
     route.kind === 'note' ||
     (route.kind === 'chat' && section !== 'chat') ||
-    route.kind === 'settings' ||
-    route.kind === 'graphs' ||
-    route.kind === 'licenses'
+    route.kind === 'settings'
   )
+}
+
+/**
+ * The screen under a card with no history below it, where its Back button
+ * lands too: Settings under its pages, today under everything else.
+ */
+function coldBelowRoute(route: Route): Route {
+  return route.kind === 'settings' && route.page !== 'main'
+    ? { kind: 'settings', page: 'main' }
+    : { kind: 'today' }
 }
 
 /**
@@ -63,11 +71,7 @@ function layerKey(route: Route): string {
     case 'chat':
       return 'chat'
     case 'settings':
-      return 'settings'
-    case 'graphs':
-      return 'graphs'
-    case 'licenses':
-      return 'licenses'
+      return `settings:${route.page}`
     case 'allNotes':
     case 'search':
       return 'all'
@@ -257,7 +261,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const edgeRef = useRef<HTMLDivElement>(null)
 
   const [transition, setTransition] = useState<StackTransition>({ kind: 'none' })
-  const below: Route = backRoute ?? { kind: 'today' }
+  const below: Route = backRoute ?? coldBelowRoute(route)
   const [arrival, setArrival] = useState({ route, entryId, below, section })
   // Set when a completed back-swipe commits its pop: the screen is already
   // offscreen, so the arrival it causes must not animate a second time.
@@ -284,9 +288,9 @@ export function MobileStack(props: MobileStackProps): ReactElement {
     if (canBack) {
       back()
     } else {
-      navigate({ kind: 'today' })
+      navigate(below)
     }
-  }, [canBack, back, navigate])
+  }, [canBack, back, navigate, below])
 
   const reportSwipe = useCallback(
     (phase: 'start' | 'cancel'): void => {
@@ -334,11 +338,8 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   }, [chromeRenderer, transition])
 
   const currentKey = layerKey(route)
-  // What the back gesture reveals. A cold note entry has no history below
-  // it, so it sits over today, where its back button lands too.
-  const belowRoute: Route | null = isStacked(route, section)
-    ? (backRoute ?? { kind: 'today' })
-    : null
+  // What the back gesture reveals.
+  const belowRoute: Route | null = isStacked(route, section) ? below : null
   const belowKey = belowRoute === null ? null : layerKey(belowRoute)
 
   const layers: StackLayer[] = []

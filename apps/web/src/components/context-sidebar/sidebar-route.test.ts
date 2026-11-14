@@ -36,6 +36,6 @@ describe('contextSidebarTarget', () => {
 
   it('shows no context sidebar on search and settings routes', () => {
     expect(contextSidebarTarget({ kind: 'search', query: 'rust' }, TODAY)).toBeNull()
-    expect(contextSidebarTarget({ kind: 'settings' }, TODAY)).toBeNull()
+    expect(contextSidebarTarget({ kind: 'settings', page: 'main' }, TODAY)).toBeNull()
   })
 })

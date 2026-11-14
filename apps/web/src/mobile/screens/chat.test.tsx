@@ -119,7 +119,7 @@ describe('MobileChat', () => {
 
     await page.getByRole('button', { name: 'Add an AI provider' }).click()
 
-    expect(probedRouteRef.current).toEqual({ kind: 'settings' })
+    expect(probedRouteRef.current).toEqual({ kind: 'settings', page: 'main' })
   })
 
   it('Back from a cold entry lands on today, as the back-swipe does', async () => {

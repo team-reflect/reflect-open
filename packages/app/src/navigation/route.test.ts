@@ -39,7 +39,7 @@ describe('routesEqual', () => {
 
   it('treats singleton screens as equal to themselves', () => {
     expect(routesEqual({ kind: 'chat' }, { kind: 'chat' })).toBe(true)
-    expect(routesEqual({ kind: 'chat' }, { kind: 'settings' })).toBe(false)
+    expect(routesEqual({ kind: 'chat' }, { kind: 'settings', page: 'main' })).toBe(false)
   })
 })
 
@@ -56,7 +56,7 @@ describe('notePathForRoute', () => {
 
   it('is null on screens that edit no note', () => {
     expect(notePathForRoute({ kind: 'search', query: 'x' }, TODAY)).toBeNull()
-    expect(notePathForRoute({ kind: 'settings' }, TODAY)).toBeNull()
+    expect(notePathForRoute({ kind: 'settings', page: 'main' }, TODAY)).toBeNull()
     expect(notePathForRoute({ kind: 'allNotes', tag: null }, TODAY)).toBeNull()
     expect(notePathForRoute({ kind: 'chat' }, TODAY)).toBeNull()
   })
@@ -82,7 +82,7 @@ describe('effectiveDailyDate', () => {
   it('is null off the daily views, even with a focused day (focus is irrelevant)', () => {
     expect(effectiveDailyDate({ kind: 'note', path: 'notes/a.md' }, TODAY, '2026-06-01')).toBeNull()
     expect(effectiveDailyDate({ kind: 'search', query: 'x' }, TODAY, '2026-06-01')).toBeNull()
-    expect(effectiveDailyDate({ kind: 'settings' }, TODAY, '2026-06-01')).toBeNull()
+    expect(effectiveDailyDate({ kind: 'settings', page: 'main' }, TODAY, '2026-06-01')).toBeNull()
   })
 })
 
@@ -99,6 +99,8 @@ describe('focusedNotePathForRoute', () => {
     expect(focusedNotePathForRoute({ kind: 'note', path: 'notes/a.md' }, TODAY, '2026-06-01')).toBe(
       'notes/a.md',
     )
-    expect(focusedNotePathForRoute({ kind: 'settings' }, TODAY, '2026-06-01')).toBeNull()
+    expect(
+      focusedNotePathForRoute({ kind: 'settings', page: 'main' }, TODAY, '2026-06-01'),
+    ).toBeNull()
   })
 })

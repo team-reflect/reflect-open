@@ -158,7 +158,7 @@ describe('app commands', () => {
   it('settings.open navigates to the settings screen', async () => {
     const { context, navigated } = fakeContext()
     await command('settings.open').run(context)
-    expect(navigated).toEqual([{ kind: 'settings' }])
+    expect(navigated).toEqual([{ kind: 'settings', page: 'main' }])
   })
 
   it('note Find commands use the shared window-scoped capabilities', async () => {
@@ -185,7 +185,7 @@ describe('app commands', () => {
     expect(context.openTemplatePicker).toHaveBeenCalledTimes(1)
 
     // Settings edits no note — there is nothing to insert into.
-    const { context: noNote } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context: noNote } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('template.insert').run(noNote)
     expect(noNote.openTemplatePicker).not.toHaveBeenCalled()
   })
@@ -256,7 +256,7 @@ describe('app commands', () => {
   })
 
   it('note.openInNewWindow is inert on a screen with no selected note', async () => {
-    const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('note.openInNewWindow').run(context)
     expect(windows.openedNoteWindows()).toEqual([])
   })
@@ -342,7 +342,7 @@ describe('app commands', () => {
 
   it('note.copyDeepLink no-ops on note-less routes', async () => {
     const deepLinkFor = vi.spyOn(core.noteActions, 'deepLinkFor').mockResolvedValue('reflect://x')
-    const { context, appLayer } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context, appLayer } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('note.copyDeepLink').run(context)
     expect(deepLinkFor).not.toHaveBeenCalled()
     expect(appLayer.clipboard.writes()).toEqual([])
@@ -391,7 +391,7 @@ describe('app commands', () => {
     const absolutePathFor = vi
       .spyOn(core.noteActions, 'absolutePathFor')
       .mockResolvedValue('/g/notes/a.md')
-    const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    const { context } = fakeContext({ route: () => ({ kind: 'settings', page: 'main' }) })
     await command('note.copyPath').run(context)
     expect(absolutePathFor).not.toHaveBeenCalled()
   })

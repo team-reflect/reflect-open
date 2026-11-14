@@ -62,7 +62,7 @@ describe('useRestoredRoute', () => {
     const stored = storedRoute('/graph', { kind: 'tasks' })
     const { view, storage } = await renderRestoredRoute(stored, false)
     expect(view.result.current).toBeUndefined()
-    view.appServices.navigation.navigate({ kind: 'settings' })
+    view.appServices.navigation.navigate({ kind: 'settings', page: 'main' })
     expect(storage.session.get(STORAGE_KEY)).toBe(JSON.stringify(stored))
   })
 })

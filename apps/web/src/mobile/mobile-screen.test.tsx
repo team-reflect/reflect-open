@@ -1434,7 +1434,7 @@ describe('MobileStack transitions & back pager', () => {
   it.skipIf(server.browser !== 'chromium')(
     'pops on a finger drag from a settings row, not from its switch',
     async () => {
-      const view = await mount({ kind: 'settings' })
+      const view = await mount({ kind: 'settings', page: 'main' })
       const toggle = await waitFor(() => {
         return view.getByRole('switch', { name: 'Smooth caret animation' }).element()
       })
@@ -1535,5 +1535,15 @@ describe('MobileStack transitions & back pager', () => {
 
     await scrollElement({ element: pager(view), left: 0, touch: true })
     await waitFor(() => expect(shownMonth(view)).toBe(today()))
+  })
+
+  it('swipes a cold settings page back to Settings, where its Back lands', async () => {
+    const view = await mount({ kind: 'settings', page: 'licenses' })
+    await waitFor(() => expect(stackLayers(view)).toHaveLength(2))
+
+    await scrollElement({ element: pager(view), left: 0, touch: true })
+    await waitFor(() => {
+      expect(view.appServices.navigation.get().route).toEqual({ kind: 'settings', page: 'main' })
+    })
   })
 })

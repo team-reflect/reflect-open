@@ -64,7 +64,7 @@ async function renderSection(): Promise<void> {
   openRecent = vi
     .spyOn(core.graphSession, 'openRecent')
     .mockImplementation(() => Promise.resolve(reopens))
-  await renderInApp(<SyncSection />, { core, graph, route: { kind: 'settings' } })
+  await renderInApp(<SyncSection />, { core, graph, route: { kind: 'settings', page: 'main' } })
 }
 
 function legend(section: Locator, text: string): Locator {

@@ -292,7 +292,7 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'Open settings',
     keywords: ['preferences', 'config', 'options'],
     keybinding: 'Mod-,',
-    run: (context) => context.navigate({ kind: 'settings' }),
+    run: (context) => context.navigate({ kind: 'settings', page: 'main' }),
   },
   {
     id: 'whatsNew.show',

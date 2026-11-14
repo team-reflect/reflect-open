@@ -124,7 +124,7 @@ describe('RouteContent', () => {
   })
 
   it('renders the settings screen for the settings route', async () => {
-    const view = await renderRoute({ kind: 'settings' })
+    const view = await renderRoute({ kind: 'settings', page: 'main' })
     await expect.element(page.getByTestId('settings-screen')).toBeInTheDocument()
     await view.unmount()
   })

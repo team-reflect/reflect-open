@@ -28,8 +28,6 @@ export function deepLinkForRoute(route: Route): string | null {
     case 'allNotes':
     case 'chat':
     case 'settings':
-    case 'graphs':
-    case 'licenses':
       return null
   }
 }

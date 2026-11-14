@@ -96,9 +96,9 @@ export function useGraphMenu(): {
   const run = useCallback(
     (id: string): void => {
       if (id === 'graphs') {
-        navigate({ kind: 'graphs' })
+        navigate({ kind: 'settings', page: 'graphs' })
       } else if (id === 'settings') {
-        navigate({ kind: 'settings' })
+        navigate({ kind: 'settings', page: 'main' })
       } else if (id === 'academy') {
         opener.openUrlSync('https://reflect.academy')
       }
@@ -151,7 +151,7 @@ export function useSidebar(): {
         navigate({ kind: 'allNotes', tag: null }, { focusEditor: true })
         return
       case 'settings':
-        navigate({ kind: 'settings' })
+        navigate({ kind: 'settings', page: 'main' })
         return
       case 'openNote':
         navigate(routeForPath(command.path))

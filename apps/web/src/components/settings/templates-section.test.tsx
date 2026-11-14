@@ -36,7 +36,7 @@ async function renderSection(): Promise<ReturnType<typeof createTestCoreServices
       core,
       appServices: { window: createTestWindowService({ openNoteWindow }) },
       graph: { root: '/g', name: 'g' },
-      route: { kind: 'settings' },
+      route: { kind: 'settings', page: 'main' },
       wrapper: (children) => <NoteTemplatesProvider>{children}</NoteTemplatesProvider>,
     },
   )

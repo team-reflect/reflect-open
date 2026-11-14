@@ -195,7 +195,9 @@ describe('Sidebar', () => {
     })
 
     await view.getByRole('button', { name: /settings/i }).click()
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
+    await vi.waitFor(() => {
+      return expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
+    })
 
     await view.getByRole('button', { name: /chat/i }).click()
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'chat' }))
@@ -440,7 +442,9 @@ describe('Sidebar', () => {
     await view.getByRole('button', { name: /Notes/ }).click()
     await page.getByRole('menuitem', { name: 'Preferences' }).click()
 
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
+    await vi.waitFor(() => {
+      return expect(navigate).toHaveBeenCalledWith({ kind: 'settings', page: 'main' })
+    })
   })
 
   it('the graph menu offers the iOS app and browser extension in their stores', async () => {

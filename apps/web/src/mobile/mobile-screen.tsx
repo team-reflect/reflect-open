@@ -96,11 +96,14 @@ export function MobileScreen({
     case 'chat':
       return <MobileChat key="chat" />
     case 'settings':
-      return <MobileSettings key="settings" />
-    case 'graphs':
-      return <MobileGraphs key="graphs" />
-    case 'licenses':
-      return <MobileLicenses key="licenses" />
+      switch (route.page) {
+        case 'main':
+          return <MobileSettings key="settings" />
+        case 'graphs':
+          return <MobileGraphs key="graphs" />
+        case 'licenses':
+          return <MobileLicenses key="licenses" />
+      }
     default:
       return <MobileDaily key="daily" date={today} />
   }

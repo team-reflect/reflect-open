@@ -107,7 +107,7 @@ async function mount(options?: MountOptions) {
     core,
     graph: { root: '/g', name: 'Field Notes', generation: 1 },
     mobile: { kind: options?.storageKind ?? 'icloud' },
-    route: { kind: 'settings' },
+    route: { kind: 'settings', page: 'main' },
     settings: options?.settings,
   })
   return Object.assign(view, { gitSync, gitHostConnector, updateSettings, appStore })
@@ -140,7 +140,7 @@ describe('MobileSettings', () => {
     await user.click(graphRow)
 
     expect(view.appServices.navigation.navigations()).toEqual([
-      { route: { kind: 'graphs' }, options: undefined },
+      { route: { kind: 'settings', page: 'graphs' }, options: undefined },
     ])
   })
 
@@ -150,7 +150,7 @@ describe('MobileSettings', () => {
     await userEvent.click(page.getByRole('button', { name: 'Open Source Licenses' }))
 
     expect(view.appServices.navigation.navigations()).toEqual([
-      { route: { kind: 'licenses' }, options: undefined },
+      { route: { kind: 'settings', page: 'licenses' }, options: undefined },
     ])
   })
 

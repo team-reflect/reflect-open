@@ -22,13 +22,11 @@ export const routeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('search'), query: z.string() }),
   z.object({ kind: z.literal('tasks') }),
   z.object({ kind: z.literal('chat') }),
-  z.object({ kind: z.literal('settings') }),
-  // The graph-switcher screen — a mobile settings sub-screen; desktop renders
-  // it as the settings screen (its switcher lives in the sidebar footer).
-  z.object({ kind: z.literal('graphs') }),
-  // The Open Source Licenses screen: a mobile settings sub-screen. Desktop
-  // shows licenses in a dialog and renders this route as the settings screen.
-  z.object({ kind: z.literal('licenses') }),
+  // `graphs` (the graph switcher) and `licenses` (Open Source Licenses) are
+  // mobile sub-screens of Settings. Desktop renders every page as the
+  // settings screen: its graph switcher lives in the sidebar footer and its
+  // licenses in a dialog.
+  z.object({ kind: z.literal('settings'), page: z.enum(['main', 'graphs', 'licenses']) }),
 ])
 
 export type Route = z.infer<typeof routeSchema>
@@ -80,10 +78,9 @@ export function routesEqual(a: Route, b: Route): boolean {
     case 'today':
     case 'tasks':
     case 'chat':
-    case 'settings':
-    case 'graphs':
-    case 'licenses':
       return true
+    case 'settings':
+      return a.page === (b as Extract<Route, { kind: 'settings' }>).page
     case 'daily':
       return a.date === (b as Extract<Route, { kind: 'daily' }>).date
     case 'note':

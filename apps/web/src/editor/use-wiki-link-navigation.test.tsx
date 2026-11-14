@@ -413,7 +413,7 @@ describe('useWikiLinkNavigation', () => {
 
     lastHandlerRef.current?.({ target: 'Target', openInNewWindow: false })
     await vi.waitFor(() => expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1))
-    navigateRef.current?.({ kind: 'settings' })
+    navigateRef.current?.({ kind: 'settings', page: 'main' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
     pendingResolution.resolve({ kind: 'resolved', path: 'notes/target.md' })
@@ -432,7 +432,7 @@ describe('useWikiLinkNavigation', () => {
     await vi.waitFor(() => {
       expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Brand New', 7)
     })
-    navigateRef.current?.({ kind: 'settings' })
+    navigateRef.current?.({ kind: 'settings', page: 'main' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
     pendingCreation.resolve({ kind: 'created', path: 'notes/created.md' })
