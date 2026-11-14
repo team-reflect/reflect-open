@@ -172,9 +172,8 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       // The capsule shrinks when its natural width leaves no room for the `+`.
       let leading = safe.left + Self.capsuleEdgeGap
       var capsule = standalone.layout(in: view, leading: leading, maxWidth: .infinity)
-      let room =
-        bounds.width - safe.left - safe.right - 2 * Self.capsuleEdgeGap - capsule.height
-        - Self.capsulePlusGap
+      let plusMinX = bounds.maxX - safe.right - Self.capsuleEdgeGap - capsule.height
+      let room = plusMinX - Self.capsulePlusGap - leading
       if capsule.width > room {
         capsule = standalone.layout(in: view, leading: leading, maxWidth: room)
       }
@@ -183,9 +182,7 @@ final class ChromeTabController: UITabBarController, UITabBarControllerDelegate 
       }
       // The `+` mirrors the capsule: as tall, on its center line, as far from the edge.
       plus.layout(
-        in: view,
-        center: CGPoint(
-          x: bounds.maxX - safe.right - Self.capsuleEdgeGap - capsule.height / 2, y: capsule.midY),
+        in: view, center: CGPoint(x: plusMinX + capsule.height / 2, y: capsule.midY),
         size: capsule.height)
     case .rail:
       // The `+` sits above the rail's capsule, as wide as it.

@@ -34,8 +34,8 @@ final class StandaloneTabBar: NSObject, UITabBarDelegate {
   /// than the capsule's natural width plus these margins squeezes the capsule.
   private static let barMargin: CGFloat = 10
 
-  /// Places the bar at the bottom of `view` with its capsule at `leading`, at
-  /// most `maxWidth` wide. Returns the frame of the capsule in `view`.
+  /// Places the bar at the bottom of `view` with its capsule at `leading` and
+  /// at most `maxWidth` wide. Returns the frame of the capsule in `view`.
   func layout(in view: UIView, leading: CGFloat, maxWidth: CGFloat) -> CGRect {
     let bounds = view.bounds
     let height = bar.sizeThatFits(bounds.size).height
