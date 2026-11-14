@@ -398,6 +398,41 @@ describe('NavigationService', () => {
       expect(navigation.savedScroll()).toEqual({ date: '2026-06-08', offset: 40 })
     })
 
+    it('restores the Tasks list scroll when the section is selected again', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'tasks' })
+      navigation.saveScrollState(300)
+      navigation.navigate({ kind: 'today' })
+
+      navigation.selectSection('tasks')
+
+      expect(navigation.get().route).toEqual({ kind: 'tasks' })
+      expect(navigation.savedScroll()).toBe(300)
+
+      // A tap within the section re-anchors, and a later return does too.
+      navigation.selectSection('tasks')
+      expect(navigation.savedScroll()).toBeNull()
+      navigation.navigate({ kind: 'today' })
+      navigation.selectSection('tasks')
+      expect(navigation.savedScroll()).toBeNull()
+    })
+
+    it('restores the All list scroll under the screen the section returns to', () => {
+      const navigation = createNavigationService()
+      navigation.navigate({ kind: 'allNotes', tag: 'work' })
+      navigation.saveScrollState(300)
+      navigation.navigate({ kind: 'note', path: 'notes/a.md' })
+      navigation.navigate({ kind: 'tasks' })
+
+      navigation.selectSection('all')
+      expect(navigation.get().route).toEqual({ kind: 'note', path: 'notes/a.md' })
+      expect(navigation.savedScroll()).toBeNull()
+
+      navigation.back()
+      expect(navigation.get().route).toEqual({ kind: 'allNotes', tag: 'work' })
+      expect(navigation.savedScroll()).toBe(300)
+    })
+
     it('lands on the default root of a section it has not shown', () => {
       const navigation = createNavigationService()
       navigation.selectSection('all')

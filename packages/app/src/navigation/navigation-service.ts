@@ -20,11 +20,11 @@ import {
  * handlers) and read `savedScroll()` after a back/forward restores an entry.
  * Plain views save a pixel offset; the daily stream saves a {@link DayScrollPosition}.
  *
- * Long-lived surfaces (the daily stream, shared by the today/daily routes)
- * additionally keep a **surface position** — the last reported position,
- * independent of any history entry — so a Daily section return can resume the stream
- * where the user left it (`selectSection('daily')`) even though it lands on
- * a fresh entry.
+ * Long-lived surfaces (the daily stream, shared by the today/daily routes,
+ * and the All and Tasks lists) additionally keep a **surface position** — the
+ * last reported position, independent of any history entry — so a section
+ * return can resume the surface where the user left it (`selectSection`)
+ * even though it lands on a fresh entry.
  */
 
 /**
@@ -113,8 +113,9 @@ export interface NavigationService extends Store<NavigationState> {
   /**
    * Go to `section`. Daily lands on its last day with the stream's scroll
    * restored. Another section lands on its last screen, pushed over its last
-   * root so Back reveals the root; from within the section it lands on the
-   * section's default root (All without a tag filter).
+   * root so Back reveals the root, with the All or Tasks list's scroll
+   * restored; from within the section it lands on the section's default root
+   * (All without a tag filter).
    */
   selectSection(section: Section, options?: NavigateOptions): void
   back(): void
@@ -269,10 +270,11 @@ class NavigationServiceImpl implements NavigationService {
       return
     }
     const last = this.#lastBySection.get(section) ?? root
+    // The section's list resumes where it was left.
     if (!routesEqual(last, root)) {
-      this.#arrive(root, { section }, false)
+      this.#arrive(root, { section }, true)
     }
-    this.#arrive(last, { ...options, section }, false)
+    this.#arrive(last, { ...options, section }, true)
     this.#publish()
   }
 

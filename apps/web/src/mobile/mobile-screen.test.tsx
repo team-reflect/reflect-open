@@ -928,6 +928,46 @@ describe('MobileShell', () => {
     await waitFor(() => expect(visibleLayer(view).contains(box.element())).toBe(true))
   })
 
+  it('keeps the Tasks search when switching tabs and back', async () => {
+    const user = userEvent
+    const view = await mount({ kind: 'tasks' })
+    await user.fill(view.getByRole('searchbox', { name: 'Search tasks' }), 'milk')
+
+    await user.click(view.getByRole('button', { name: 'All' }))
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+
+    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toHaveValue('milk')
+  })
+
+  it('restores the All list scroll when switching tabs and back', async () => {
+    const user = userEvent
+    vi.spyOn(core.search, 'searchWithFilters').mockResolvedValue(
+      Array.from({ length: 40 }, (_, index) => ({
+        path: `notes/note-${index}.md`,
+        title: `Note ${index}`,
+        highlightedTitle: `Note ${index}`,
+        dailyDate: null,
+        snippet: null,
+        preview: '',
+        mtime: 0,
+        isPinned: false,
+      })),
+    )
+    const view = await mount({ kind: 'allNotes', tag: null })
+    const list = (): HTMLElement => {
+      return visibleLayer(view).querySelector<HTMLElement>('ul')!.parentElement!
+    }
+    await waitFor(() => expect(list().scrollHeight).toBeGreaterThan(list().clientHeight + 300))
+    await scrollElement({ element: list(), top: 300 })
+
+    await user.click(view.getByRole('button', { name: 'Tasks' }))
+    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toBeVisible()
+    await user.click(view.getByRole('button', { name: 'All' }))
+
+    await waitFor(() => expect(list().scrollTop).toBe(300))
+  })
+
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent
     core.noteFile.set('notes/meeting-notes.md', 'agenda')

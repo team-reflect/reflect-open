@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { page, userEvent, type Locator } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import {
@@ -150,10 +150,18 @@ function RouteProbe(): ReactNode {
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
+/**
+ * Holds the search text the way the shell does.
+ */
+function ShellTasks(): ReactNode {
+  const [query, setQuery] = useState('')
+  return <MobileTasks query={query} onQueryChange={setQuery} />
+}
+
 function renderScreen() {
   return renderInApp(
     <>
-      <MobileTasks />
+      <ShellTasks />
       <RouteProbe />
     </>,
     {

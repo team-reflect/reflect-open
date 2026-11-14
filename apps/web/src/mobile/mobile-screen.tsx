@@ -42,6 +42,11 @@ interface MobileScreenProps {
   /** The All tab's badge filters (owned by the shell — survive navigation). */
   allFilters: AllNotesFilters
   onAllFiltersChange: (filters: AllNotesFilters) => void
+  /**
+   * The Tasks tab's search text (owned by the shell — survives navigation).
+   */
+  tasksQuery: string
+  onTasksQueryChange: (query: string) => void
 }
 
 /**
@@ -58,6 +63,8 @@ export function MobileScreen({
   onAllQueryChange,
   allFilters,
   onAllFiltersChange,
+  tasksQuery,
+  onTasksQueryChange,
 }: MobileScreenProps): ReactElement {
   const today = useToday()
 
@@ -92,7 +99,7 @@ export function MobileScreen({
         />
       )
     case 'tasks':
-      return <MobileTasks key="tasks" />
+      return <MobileTasks key="tasks" query={tasksQuery} onQueryChange={onTasksQueryChange} />
     case 'chat':
       return <MobileChat key="chat" />
     case 'settings':

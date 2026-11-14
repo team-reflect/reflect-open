@@ -19,13 +19,15 @@ import { useSyncChatSection } from '@/mobile/sidebar.ts'
  * All tab's search text and filter badges live here, not in the screen, so
  * opening a note and coming back loses neither. A tab tap from another tab
  * returns to where that tab was left (Daily to its last day, All and Tasks
- * to their last screen); a tap within the tab goes to its root.
+ * to their last screen); a tap within the tab goes to its root. The Tasks
+ * tab's search text lives here too, so switching tabs keeps it.
  */
 export function MobileShell(): ReactElement {
   const { route, entryId, section } = useRouterState()
   const { navigate, selectSection } = useRouterActions()
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
+  const [tasksQuery, setTasksQuery] = useState('')
   const tab = mobileTabForSection(section)
   // A tab double-tap is a capture gesture (Daily focuses today's editor; the
   // list tabs focus their search inputs); a pending tap expires if the shown
@@ -93,6 +95,8 @@ export function MobileShell(): ReactElement {
               onAllQueryChange={setAllQuery}
               allFilters={allFilters}
               onAllFiltersChange={setAllFilters}
+              tasksQuery={tasksQuery}
+              onTasksQueryChange={setTasksQuery}
             />
           </Suspense>
         </div>

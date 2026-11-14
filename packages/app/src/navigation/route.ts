@@ -63,8 +63,10 @@ export interface RouteMeta<R extends Route> {
    */
   readonly section: Section | null
   /**
-   * The scroll surface that every entry of this kind shares, or `null` for
-   * per-entry scroll. Today and dated daily routes share one stream.
+   * The scroll surface that every entry of this kind shares, whose position
+   * a section return restores, or `null` for per-entry scroll only. Today
+   * and dated daily routes share one stream; the All list (any tag) and the
+   * Tasks list have one each.
    */
   readonly scrollSurface: string | null
   /**
@@ -103,7 +105,7 @@ export const ROUTE_META: { readonly [K in Route['kind']]: RouteMeta<RouteOf<K>> 
     parent: today,
     deepLink: (route) => noteDeepLink(route.path),
   },
-  allNotes: { section: 'all', scrollSurface: null, parent: today, deepLink: returnNull },
+  allNotes: { section: 'all', scrollSurface: 'allNotes', parent: today, deepLink: returnNull },
   search: {
     section: 'all',
     scrollSurface: null,
@@ -112,7 +114,7 @@ export const ROUTE_META: { readonly [K in Route['kind']]: RouteMeta<RouteOf<K>> 
   },
   tasks: {
     section: 'tasks',
-    scrollSurface: null,
+    scrollSurface: 'tasks',
     parent: today,
     deepLink: () => `${DEEP_LINK_SCHEME}://tasks`,
   },

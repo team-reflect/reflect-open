@@ -211,6 +211,11 @@ interface MobileStackProps {
   /** The All tab's badge filters (owned by the shell — survive navigation). */
   allFilters: AllNotesFilters
   onAllFiltersChange: (filters: AllNotesFilters) => void
+  /**
+   * The Tasks tab's search text (owned by the shell — survives navigation).
+   */
+  tasksQuery: string
+  onTasksQueryChange: (query: string) => void
 }
 
 /**
