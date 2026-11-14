@@ -54,7 +54,7 @@ fastembed = { version = "7.5.0", default-features = false, features = [
   "hf-hub-native-tls",
   "ort-download-binaries-native-tls",
 ] }
-futures-util = { version = "0.3.33", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
 # Everything is vendored/static: libssh2 and openssl must never link against
 # homebrew dylibs the distributed app won't have (libssh2-sys only consults
 # pkg-config when LIBSSH2_SYS_USE_PKG_CONFIG is set, and vendored-openssl pins
@@ -67,12 +67,12 @@ git2 = { version = "0.21.0", default-features = false, features = [
 ] }
 hf-hub = { version = "0.5.0", default-features = false }
 http-range-header = "0.4.2"
-ignore = "0.4.33"
+ignore = "0.4.34"
 image = { version = "0.25.10", default-features = false }
 infer = "0.22.0"
-jiff = { version = "0.2.38", default-features = false, features = ["std"] }
+jiff = { version = "0.2.43", default-features = false, features = ["std"] }
 keyring-core = "1.0.1"
-log = "0.4.34"
+log = "0.4.35"
 notify-debouncer-full = "0.8.0-rc.3"
 objc2 = "0.6.5"
 objc2-app-kit = { version = "0.3.2", default-features = false }
@@ -83,13 +83,13 @@ objc2-link-presentation = { version = "0.3.2", default-features = false }
 objc2-ui-kit = { version = "0.3.2", default-features = false }
 percent-encoding = "2.3.2"
 proptest = "1.12.0"
-pulldown-cmark = "0.13.4"
+pulldown-cmark = "0.13.6"
 reconcile-text = "0.14.1"
 regex = "1.13.1"
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
-rusqlite_migration = "2.6.0"
+rusqlite_migration = "2.7.0"
 saphyr = "0.2.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
@@ -114,14 +114,14 @@ tauri-plugin-single-instance = "2.5.5"
 tauri-plugin-updater = "2.14.1"
 tauri-plugin-window-state = "2.5.0"
 tempfile = "3.27.0"
-tokio = "1.53.3"
+tokio = "1.54.1"
 tracing = "0.1.44"
-trash = "5.2.9"
+trash = "5.3.0"
 unicode-normalization = "0.1.26"
 urlpattern = "0.6.0"
 walkdir = "2.5.0"
 windows-native-keyring-store = "1.1.0"
-xattr = "1.6.1"
+xattr = "1.7.0"
 zip = { version = "9.0.5", default-features = false }
 
 [profile.release]
